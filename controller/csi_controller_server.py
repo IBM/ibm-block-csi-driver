@@ -116,8 +116,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             print('Controller Server Stopped ...')
 
 
-
-
 parser = OptionParser()
 parser.add_option("-e", "--csi.endpoint", dest="endpoint",
                   help="grpc endpoint")
