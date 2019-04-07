@@ -1,13 +1,14 @@
 #!/bin/python
 import grpc
 import time
-from csi_general import csi_pb2
-from csi_general import csi_pb2_grpc
+from controller.csi_general import csi_pb2
+from controller.csi_general import csi_pb2_grpc
 from concurrent import futures
 from optparse import OptionParser
-from array_action.array_connection_manager import  ArrayConnectionManager,NoConnctionAvailableException,  xiv_type
+from controller.array_action.array_connection_manager import  ArrayConnectionManager,NoConnctionAvailableException,  xiv_type
 import threading
 from csi_logger import get_stdout_logger
+from settings import  user, password, array,vol_name
 
 logger = get_stdout_logger()
 
@@ -23,25 +24,19 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     
     def CreateVolume(self, request, context):
         logger.debug( "create volume")
-        #TODO: uncomment this! this is the test logic
-#         if request.name == '':
-#             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-#             context.set_details('name should not be empty')
-#             return csi_pb2.CreateVolumeResponse()
-        
+        if request.name == '':
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            context.set_details('name should not be empty')
+            return csi_pb2.CreateVolumeResponse()
+         
         try:
-            args = {"array_type" :xiv_type, "user": "olgas", "password" : "olgas123", "endpoint": "gen4d-67d.xiv.ibm.com"}
+            args = {"array_type" :xiv_type, "user": user, "password" : password, "endpoint": array}
             with ArrayConnectionManager(**args) as array_mediator:
-                logger.debug("here1")
                 try:
                     logger.debug( array_mediator)
-                    vol = array_mediator.get_volume("olga_new_vol_1231")
+                    #TODO: add create volume logic
+                    vol = array_mediator.get_volume(vol_name)
                     logger.debug(vol)
-                    #TODO : remove this from here! it should be above
-                    if request.name == '':
-                        context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                        context.set_details('name should not be empty')
-                        return csi_pb2.CreateVolumeResponse()
                 except Exception as ex :
                     logger.debug(ex)
                   
@@ -90,7 +85,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     
         return csi_pb2.ControllerGetCapabilitiesResponse(
            capabilities=[csi_pb2.ControllerServiceCapability(
-               rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_VOLUME"))),
+                            rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_VOLUME"))),
                          csi_pb2.ControllerServiceCapability(
                              rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("PUBLISH_UNPUBLISH_VOLUME")))  ])
  

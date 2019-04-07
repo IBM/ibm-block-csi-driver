@@ -6,7 +6,7 @@ from time import sleep
 from csi_logger import get_stdout_logger
 from errors import NoConnctionAvailableException
 
-connection_lock = Lock()
+connection_lock_dict= {}
 array_connections_dict = {}
 
 xiv_type = "a9k"
@@ -19,14 +19,15 @@ SLEEP_TIME = 10
 
 class ArrayConnectionManager(object):
 
-    def __init__(self, **kwargs):  # array_type, user, password, endpoint):
+    def __init__(self, array_type, user, password, endpoint):  #TODO return the params back. 
         self.array_mediator_class_dict = {xiv_type : XIVArrayMediator, svc_type : SVCArrayMediator}
-        self.array_type = kwargs["array_type"]
-#         self.user = user
-#         self.password = password
-        self.endpoint = kwargs["endpoint"]
-        self.med_class_params = kwargs
+        self.array_type = array_type
+        self.user = user
+        self.password = password
+        self.endpoint = endpoint
+        connection_lock_dict[endpoint] =  Lock()
         self.med_class = None
+        self.connected = False
     
     def __enter__(self):
         logger.debug("in enter")
@@ -52,26 +53,22 @@ class ArrayConnectionManager(object):
         
     def __exit__(self, type, value, traceback):
         logger.debug("closing the connection")
-        self.med_class.close()
-        logger.debug("reducing the connection count")
-        connection_lock.acquire(True)
-        array_connections_dict[self.endpoint] -= 1
-        logger.debug("removing the connection  : {}".format(array_connections_dict))
-        connection_lock.release() 
+        with connection_lock_dict[self.endpoint] : #TODO: when moving to python 3 add tiemout!
+            if self.connected : 
+                self.med_class.close()
+                logger.debug("reducing the connection count")
+                array_connections_dict[self.endpoint] -= 1
+                logger.debug("removing the connection  : {}".format(array_connections_dict))
+                self.connected = False
     
-    def get_array_connection(self):  # , array_type, user, password, endpoint):
+    def get_array_connection(self):  
         logger.debug("get array connection")
         med_class = self.array_mediator_class_dict[self.array_type]
         
-        try:
-            logger.debug('getting conncetion')
-            try:
-                # TODO:  when moving to python 3 there is probably an option to add timeout
-                connection_lock.acquire(True)  # this is blocking forever 
-            except Exception as ex :
-                logger.exception(ex)
+        with connection_lock_dict[self.endpoint] :  #TODO: when moving to python 3 - add timeout to the lock!
 
             logger.debug("got connection lock. array connection dict is: {}".format(array_connections_dict))
+            self.med_class = med_class(self.user, self.password, self.endpoint)
                 
             if self.endpoint in  array_connections_dict:
                 if array_connections_dict[self.endpoint] < med_class.CONNECTION_LIMIT:
@@ -84,12 +81,11 @@ class ArrayConnectionManager(object):
             else:
                 logger.debug("adding new connection to new endpoint : {}".format(self.endpoint))
                 array_connections_dict[self.endpoint] = 1
+            
+            self.connected = True
                 
-            self.med_class = med_class(**self.med_class_params) 
             return self.med_class
+            
         
-        finally:
-            logger.debug("Released adding connection lock")
-            connection_lock.release()
         
         

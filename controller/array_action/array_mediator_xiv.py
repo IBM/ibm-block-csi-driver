@@ -6,6 +6,7 @@ import threading
 from csi_logger import get_stdout_logger
 import time
 from array_action_types import ArrayVolume
+from errors import CredentailsError
 
 connection_lock = Lock()
 array_connections_dict = {}
@@ -19,10 +20,10 @@ class XIVArrayMediator():
     CONNECTION_LIMIT = 3
     MAX_CONNECTION_RETRY=3
 
-    def __init__(self, **kwargs):#user, password, endpoint):
-        self.user = kwargs["user"]
-        self.password = kwargs["password"]
-        self.endpoint = kwargs["endpoint"]
+    def __init__(self, user, password, endpoint):
+        self.user = user
+        self.password = password
+        self.endpoint = endpoint
         self.client = None
         
         logger.debug("in init")
@@ -31,9 +32,6 @@ class XIVArrayMediator():
    
     def _connect(self):
         logger.debug("connecting to endpoint")
-        #TODO: remove the sleep!!!
-        time.sleep(2)
-        logger.debug("after sleep")
         try:
             self.client = XCLIClient.connect_multiendpoint_ssl(
                 self.user,
@@ -43,10 +41,10 @@ class XIVArrayMediator():
         
         except xcli_errors.CredentialsError:
             logger.debug("err1")
-            raise Exception("connection credentials error")
+            raise CredentailsError(self.endpoint)
         except xcli_errors.XCLIError:
             logger.debug("err2")
-            raise Exception("connection error")
+            raise CredentailsError(self.endpoint)
 
      
     def close(self):
