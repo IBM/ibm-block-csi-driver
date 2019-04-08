@@ -3,7 +3,7 @@ import abc
 class ArrayMediator():
     
     @abc.abstractmethod
-    def __init__(self, user, password, endpoint):
+    def __init__(self, user, password, address):
         """ 
         This is the init function for the class.
         it should establish the connection to the storage system.  
@@ -11,7 +11,7 @@ class ArrayMediator():
         Args:
             user : user name for connecting to the endpoint
             password : password for connecting to the endpoint
-            endpoint : storage array fqdn
+            endpoint : storage array fqdn or ip
         
         Returns:  
             empty.
@@ -30,7 +30,7 @@ class ArrayMediator():
         Args:
             vol_name : name of the volume to be created in the stoarge system
             size_in_bytes: size in bytes of the volume
-            capabilities : list of capabilities 
+            capabilities : dict of capabilities {<capbility_name>:<value>}
             pool : pool name to create the volume in.
         
         Returns:  
@@ -71,7 +71,7 @@ class ArrayMediator():
             vol_name : name of the volume to be created in the storage system
         
         Returns:  
-           size_in_bytes
+           Volume
             
         Errors:
             volumeNotFound

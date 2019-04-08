@@ -5,7 +5,7 @@ from threading import Thread, Lock, BoundedSemaphore
 import threading
 from csi_logger import get_stdout_logger
 import time
-from array_action_types import ArrayVolume
+from array_action_types import Volume
 from errors import CredentailsError
 
 connection_lock = Lock()
@@ -40,10 +40,8 @@ class XIVArrayMediator():
             )
         
         except xcli_errors.CredentialsError:
-            logger.debug("err1")
             raise CredentailsError(self.endpoint)
         except xcli_errors.XCLIError:
-            logger.debug("err2")
             raise CredentailsError(self.endpoint)
 
      
@@ -57,6 +55,6 @@ class XIVArrayMediator():
     def get_volume(self, vol_name):
         cli_volume = self.client.cmd.vol_list(vol=vol_name).as_single_element
         logger.debug(cli_volume)
-        array_vol = ArrayVolume(self._convert_volume_size(int(cli_volume.size)))
+        array_vol = Volume(self._convert_volume_size(int(cli_volume.size)))
         logger.debug("array volume :  {}".format(array_vol.size))
         return array_vol
