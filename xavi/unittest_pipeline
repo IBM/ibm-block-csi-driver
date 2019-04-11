@@ -1,4 +1,7 @@
 pipeline {
+    agent {
+        label 'ansible_rhel73'
+    }
     stages {
         stage ('Environment Setup'){
             steps {
