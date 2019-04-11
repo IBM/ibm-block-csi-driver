@@ -21,4 +21,5 @@ pipeline {
                 sh 'nosetests --cover-package=controller --with-coverage'
             }
         }
+	}
 }
