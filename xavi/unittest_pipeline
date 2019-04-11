@@ -10,7 +10,7 @@ pipeline {
                           doGenerateSubmoduleConfigurations: false,
                           extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'csi_git']],
                           submoduleCfg: [],
-                          userRemoteConfigs: [[url: 'ssh://github.com/ibm/ibm-block-csi-driver']]])
+                          userRemoteConfigs: [[url: 'https://github.com/ibm/ibm-block-csi-driver']]])
             }
         }
         stage ('Dummy') {
