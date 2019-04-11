@@ -1,0 +1,24 @@
+pipeline {
+    stages {
+        stage ('Environment Setup'){
+            steps {
+                checkout([$class: 'GitSCM',
+                          branches: [[name: 'origin/develop']],
+                          doGenerateSubmoduleConfigurations: false,
+                          extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'csi_git']],
+                          submoduleCfg: [],
+                          userRemoteConfigs: [[url: 'ssh://cssgitfu@github.com/ibm/ibm-block-csi-driver']]])
+            }
+        }
+        stage ('Dummy') {
+            steps {
+                sh 'echo "olga"
+            }
+        }
+
+        stage ('Run unittests') {
+            steps {
+                sh 'nosetests --cover-package=controller --with-coverage'
+            }
+        }
+}

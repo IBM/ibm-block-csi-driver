@@ -1,3 +1,2 @@
-#ignore this! 
-controller/controller_server/settings.py
-*.pyc 
+*.pyc
+
