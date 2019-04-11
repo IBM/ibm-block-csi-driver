@@ -12,7 +12,7 @@ pipeline {
         }
         stage ('Dummy') {
             steps {
-                sh 'echo "olga"
+                sh 'echo olga'
             }
         }
 
