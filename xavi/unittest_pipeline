@@ -6,7 +6,7 @@ pipeline {
         stage ('Environment Setup'){
             steps {
                 checkout([$class: 'GitSCM',
-                          branches: [[name: 'origin/feature/CSI-11_add_csi_unittest_pipeline']],
+                          branches: [[name: 'feature/CSI-11_add_csi_unittest_pipeline']],
                           doGenerateSubmoduleConfigurations: false,
                           extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'csi_git']],
                           submoduleCfg: [],
