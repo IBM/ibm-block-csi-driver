@@ -48,7 +48,7 @@ class TestControllerServer(unittest.TestCase):
         print "blah"
         get_volume.side_effect = [Exception("msg") ]
         request = Mock()
-        request.name = "some name12"
+        request.name = "some name123"
         context = Mock()
         res = self.servicer.CreateVolume(request, context)
         print res
