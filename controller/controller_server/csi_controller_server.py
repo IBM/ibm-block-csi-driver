@@ -6,7 +6,7 @@ from controller.csi_general import csi_pb2
 from controller.csi_general import csi_pb2_grpc
 from controller.array_action.array_connection_manager import  ArrayConnectionManager, NoConnctionAvailableException, xiv_type
 from controller.common.csi_logger import get_stdout_logger
-from settings import  user, password, array, vol_name
+from test_settings import  user, password, array, vol_name
 
 logger = get_stdout_logger()
 
