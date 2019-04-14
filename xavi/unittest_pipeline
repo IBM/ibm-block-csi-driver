@@ -1,6 +1,6 @@
 pipeline {
     agent {
-        label 'ansible_rhel73'
+        label 'IT_RH6_x64_Build'
     }
     stages {
         stage ('Environment Setup'){
