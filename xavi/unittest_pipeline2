@@ -1,6 +1,6 @@
 pipeline {
     agent {
-        label 'jenkins-rhel-7-64.ps.xiv.ibm.com'
+        label 'ansible_rhel73'
     }
     stages {
         stage ('Environment Setup'){
