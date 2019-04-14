@@ -1,12 +1,12 @@
 import unittest
 import controller.array_action.array_connection_manager as array_connection_manager
-from controller.array_action.array_connection_manager import ArrayConnectionManager, NoConnctionAvailableException
+from controller.array_action.array_connection_manager import ArrayConnectionManager, NoConnctionAvailableException, xiv_type
 from mock import patch, Mock
 
 class TestWithFunctionality(unittest.TestCase):
     def setUp(self):
         self.fqdn = "fqdn"
-        self.array_connection = ArrayConnectionManager("a9k", "user", "password",  self.fqdn) 
+        self.array_connection = ArrayConnectionManager(xiv_type, "user", "password",  self.fqdn) 
     
     @patch("controller.array_action.array_connection_manager.XIVArrayMediator._connect")
     @patch("controller.array_action.array_connection_manager.XIVArrayMediator.close")
@@ -57,7 +57,7 @@ class TestGetconnection(unittest.TestCase):
     def setUp(self):
         print "setUP"
         self.fqdn = "fqdn"
-        self.array_connection = ArrayConnectionManager("a9k", "user", "password",  self.fqdn)
+        self.array_connection = ArrayConnectionManager(xiv_type, "user", "password",  self.fqdn)
         array_connection_manager.array_connections_dict = {}
         
     def tearDown(self):
@@ -70,7 +70,7 @@ class TestGetconnection(unittest.TestCase):
         self.assertEqual(array_connection_manager.array_connections_dict, {self.fqdn : 1})
         
         new_fqdn = "new-fqdn"
-        array_connection2 = ArrayConnectionManager("a9k", "user", "password",  new_fqdn)
+        array_connection2 = ArrayConnectionManager(xiv_type, "user", "password",  new_fqdn)
         array_connection2.get_array_connection()  
         self.assertEqual(array_connection_manager.array_connections_dict, {self.fqdn : 1, new_fqdn:1})   
         

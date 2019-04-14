@@ -35,7 +35,7 @@ class TestControllerServer(unittest.TestCase):
         a_enter.return_value = self.mediator
         self.mediator.get_volume = Mock()
         request = Mock()
-        request.name = "some name"
+        request.name = "some_name"
         context = Mock()
         res = self.servicer.CreateVolume(request, context)
         context.set_code.assert_called_once_with(grpc.StatusCode.OK)
@@ -45,13 +45,11 @@ class TestControllerServer(unittest.TestCase):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_create_volume_exception(self, a_enter, get_volume):
         a_enter.return_value = self.mediator
-        print "blah"
         get_volume.side_effect = [Exception("msg") ]
         request = Mock()
-        request.name = "some name"
+        request.name = "some_name"
         context = Mock()
         res = self.servicer.CreateVolume(request, context)
-        print res
         context.set_code.assert_called_once_with(grpc.StatusCode.INTERNAL)
         self.mediator.get_volume.assert_called_once_with(vol_name)
           

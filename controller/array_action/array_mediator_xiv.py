@@ -9,7 +9,6 @@ import time
 from array_action_types import Volume
 from errors import CredentailsError
 
-connection_lock = Lock()
 array_connections_dict = {}
 logger = get_stdout_logger()
 
