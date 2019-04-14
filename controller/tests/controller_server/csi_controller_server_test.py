@@ -35,7 +35,7 @@ class TestControllerServer(unittest.TestCase):
         a_enter.return_value = self.mediator
         self.mediator.get_volume = Mock()
         request = Mock()
-        request.name = "some name"
+        request.name = "some name1"
         context = Mock()
         res = self.servicer.CreateVolume(request, context)
         context.set_code.assert_called_once_with(grpc.StatusCode.OK)
