@@ -15,7 +15,7 @@ pipeline {
         }
         stage ('Dummy') {
             steps {
-                sh 'echo olgaisawesome'
+                sh 'echo olgaisawesome1'
             }
         }
 
