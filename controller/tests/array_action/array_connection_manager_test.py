@@ -33,7 +33,7 @@ class TestWithFunctionality(unittest.TestCase):
     @patch("controller.array_action.array_connection_manager.sleep")    
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.get_array_connection")
     def test_with_throws_error_if_other_error_occures(self, get_connection, sleep):
-        error_message = "this is a dummy error"
+        error_message = "this is a dummy error "
         get_connection.side_effect = [Exception(error_message)]
         with self.assertRaises(Exception) as ex:
             with self.array_connection as array_mediator:
