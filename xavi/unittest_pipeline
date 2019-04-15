@@ -1,0 +1,22 @@
+pipeline {
+    agent {
+        label 'ansible_rhel73'
+    }
+    stages {
+        stage ('Environment Setup'){
+            steps {
+                checkout([$class: 'GitSCM',
+                          branches: [[name: 'feature/CSI-11_add_csi_unittest_pipeline']],
+                          doGenerateSubmoduleConfigurations: false,
+                          extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'csi_git']],
+                          submoduleCfg: [],
+                          userRemoteConfigs: [[url: 'https://github.com/ibm/ibm-block-csi-driver']]])
+            }
+        }
+        stage ('Run unittests') {
+            steps {
+                sh 'nosetests --cover-package=controller --with-coverage'
+            }
+        }
+	}
+}
