@@ -3,7 +3,6 @@ pipeline {
         label 'ansible_rhel73'
     }
     stages {
-        }
         stage ('Run unittests') {
             steps {
                 sh 'nosetests --cover-package=controller --with-coverage'
