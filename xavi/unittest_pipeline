@@ -13,12 +13,6 @@ pipeline {
                           userRemoteConfigs: [[url: 'https://github.com/ibm/ibm-block-csi-driver']]])
             }
         }
-        stage ('Dummy') {
-            steps {
-                sh 'echo olgaisawesome112321'
-            }
-        }
-
         stage ('Run unittests') {
             steps {
                 sh 'nosetests --cover-package=controller --with-coverage'
