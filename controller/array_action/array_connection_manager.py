@@ -13,9 +13,6 @@ xiv_type = "a9k"
 svc_type = "svc"
 
 logger = get_stdout_logger()
-MAX_TRIES = 3
-SLEEP_TIME = 10
-
 
 class ArrayConnectionManager(object):
 
@@ -31,23 +28,7 @@ class ArrayConnectionManager(object):
     
     def __enter__(self):
         logger.debug("in enter")
-        counter = 0
-        while counter < MAX_TRIES:
-            try:
-                arr_conncetion = self.get_array_connection()
-                break
-            except NoConnctionAvailableException as ex:
-                logger.debug("sleeping : {}".format(counter))
-                sleep(SLEEP_TIME)
-                logger.debug("done sleeping : {} ".format(counter))
-                counter += 1
-                logger.debug("retrying. counter :  {}".format(counter))
-                continue
-        else:
-            # get here if the while loop ran its course and no connection was established
-            logger.debug("failed to get connection raising error. counter :  {}".format(counter))
-            raise NoConnctionAvailableException(self.endpoint) 
-        
+        arr_conncetion = self.get_array_connection()       
         return arr_conncetion
         
     def __exit__(self, type, value, traceback):
@@ -75,7 +56,7 @@ class ArrayConnectionManager(object):
                     array_connections_dict[self.endpoint] += 1
                     
                 else:
-                    logger.debug("failed to get connection. current connections: {}".format(array_connections_dict))
+                    logger.error("failed to get connection. current connections: {}".format(array_connections_dict))
                     raise NoConnctionAvailableException(self.endpoint) 
             else:
                 logger.debug("adding new connection to new endpoint : {}".format(self.endpoint))

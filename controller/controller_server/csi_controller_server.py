@@ -10,9 +10,6 @@ from test_settings import  user, password, array, vol_name
 
 logger = get_stdout_logger()
 
-TIMEOUT = 3
-
-
 class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     """
     gRPC server for Digestor Service
@@ -38,7 +35,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
  
                 context.set_code(grpc.StatusCode.OK)
                 return csi_pb2.CreateVolumeResponse()
-#    
+            
         except Exception as ex :
             logger.exception(ex)
             context.set_code(grpc.StatusCode.INTERNAL)
