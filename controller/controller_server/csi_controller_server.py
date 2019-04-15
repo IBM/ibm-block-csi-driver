@@ -10,6 +10,7 @@ from test_settings import  user, password, array, vol_name
 
 logger = get_stdout_logger()
 
+
 class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     """
     gRPC server for Digestor Service
@@ -75,17 +76,41 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def ControllerGetCapabilities(self, request, context):
         logger.debug("ControllerGetCapabilities")
         types = csi_pb2.ControllerServiceCapability.RPC.Type
-                    
+        
+        context.set_code(grpc.StatusCode.OK)
         return csi_pb2.ControllerGetCapabilitiesResponse(
            capabilities=[csi_pb2.ControllerServiceCapability(
                             rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_VOLUME"))),
                          csi_pb2.ControllerServiceCapability(
                              rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("PUBLISH_UNPUBLISH_VOLUME")))  ])
  
+    def GetPluginInfo(self, request, context):
+        logger.debug("GetPluginInfo")
+        context.set_code(grpc.StatusCode.OK)
+        return csi_pb2.GetPluginInfoResponse(name="ibm-block-csi-driver", vendor_version="1.0.0")
+    
+    def GetPluginCapabilities(self, request, context):
+        logger.debug("GetPluginCapabilities")
+        context.set_code(grpc.StatusCode.OK)
+        types = csi_pb2.PluginCapability.Service.Type
+        return csi_pb2.GetPluginCapabilitiesResponse(
+            capabilities=[csi_pb2.PluginCapability(
+                            service=csi_pb2.PluginCapability.Service(type=types.Value("CONTROLLER_SERVICE")))
+                         ]
+                        
+            )
+
+    def Probe(self, request, context):
+        logger.debug("Probe")
+        # TODO: add future logic
+        context.set_code(grpc.StatusCode.OK)
+        return csi_pb2.ProbeResponse()
+        
     def start_server(self):
         controller_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         
         csi_pb2_grpc.add_ControllerServicer_to_server(self, controller_server)
+        csi_pb2_grpc.add_IdentityServicer_to_server(self, controller_server)
         
         # bind the server to the port defined above
         # controller_server.add_insecure_port('[::]:{}'.format(self.server_port))

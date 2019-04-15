@@ -39,6 +39,7 @@ class TestControllerServer(unittest.TestCase):
         res = self.servicer.CreateVolume(request, context)
         context.set_code.assert_called_once_with(grpc.StatusCode.OK)
         self.mediator.get_volume.assert_called_once_with(vol_name)
+
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.get_volume")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_create_volume_exception(self, a_enter, get_volume):
@@ -50,3 +51,27 @@ class TestControllerServer(unittest.TestCase):
         res = self.servicer.CreateVolume(request, context)
         context.set_code.assert_called_once_with(grpc.StatusCode.INTERNAL)
         self.mediator.get_volume.assert_called_once_with(vol_name)
+
+    def test_controller_get_capabilities(self):
+        request = Mock()
+        context = Mock()
+        res = self.servicer.ControllerGetCapabilities(request, context)
+        context.set_code.assert_called_once_with(grpc.StatusCode.OK)
+        
+    def test_identity_plugin_get_info(self):
+        request = Mock()
+        context = Mock()
+        res = self.servicer.GetPluginInfo(request, context)
+        context.set_code.assert_called_once_with(grpc.StatusCode.OK)
+        
+    def test_identity_get_plugin_capabilities(self):
+        request = Mock()
+        context = Mock()
+        res = self.servicer.GetPluginCapabilities(request, context)
+        context.set_code.assert_called_once_with(grpc.StatusCode.OK)
+
+    def test_identity_probe(self):
+        request = Mock()
+        context = Mock()
+        res = self.servicer.Probe(request, context)
+        context.set_code.assert_called_once_with(grpc.StatusCode.OK)
