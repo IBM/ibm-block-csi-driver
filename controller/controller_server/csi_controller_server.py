@@ -10,9 +10,6 @@ from settings import  user, password, array, vol_name
 
 logger = get_stdout_logger()
 
-TIMEOUT = 3
-
-
 class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     """
     gRPC server for Digestor Service
