@@ -27,7 +27,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         path = os.path.join(my_path, "../../common/config.yaml")
 
         with open(path, 'r') as ymlfile:
-            self.cfg = yaml.load(ymlfile, Loader=yaml.FullLoader)
+            self.cfg = yaml.load(ymlfile)# TODO: add the following when possible : Loader=yaml.FullLoader)
                 
     def CreateVolume(self, request, context):
         logger.debug("create volume")
