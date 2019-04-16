@@ -28,7 +28,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         with open(path, 'r') as ymlfile:
             self.cfg = yaml.load(ymlfile, Loader=yaml.FullLoader)
-    
+                
     def CreateVolume(self, request, context):
         logger.debug("create volume")
         if request.name == '':
@@ -94,12 +94,26 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                              rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("PUBLISH_UNPUBLISH_VOLUME")))  ])
  
     def __get_identity_config(self, attribute_name):
-            
         return self.cfg['identity'][attribute_name]
         
     def GetPluginInfo(self, request, context):
         logger.debug("GetPluginInfo")
-        return csi_pb2.GetPluginInfoResponse(name=self.__get_identity_config("name"), vendor_version=self.__get_identity_config("version"))
+        try:
+            name = self.__get_identity_config("name")
+            version = self.__get_identity_config("version")
+        except Exception as ex:
+            logger.exception(ex)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details('an error occured while trying to get plugin name or version')
+            return csi_pb2.GetPluginInfoResponse()
+         
+        if not name or not version:
+            logger.error("plugin name or version cannot be empty")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details("plugin name or version cannot be empty")
+            return csi_pb2.GetPluginInfoResponse()
+        
+        return csi_pb2.GetPluginInfoResponse(name=name, vendor_version=version)
     
     def GetPluginCapabilities(self, request, context):
         logger.debug("GetPluginCapabilities")
