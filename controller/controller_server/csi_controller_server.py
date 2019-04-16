@@ -1,6 +1,10 @@
 import grpc
 import time
 from optparse import OptionParser
+import yaml
+
+import os.path
+
 from concurrent import futures
 from controller.csi_general import csi_pb2
 from controller.csi_general import csi_pb2_grpc
@@ -18,6 +22,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def __init__(self, endpoint):
         self.endpoint = endpoint
+        
+        my_path = os.path.abspath(os.path.dirname(__file__))
+        path = os.path.join(my_path, "../../common/config.yaml")
+
+        with open(path, 'r') as ymlfile:
+            self.cfg = yaml.load(ymlfile, Loader=yaml.FullLoader)
     
     def CreateVolume(self, request, context):
         logger.debug("create volume")
@@ -77,26 +87,34 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.debug("ControllerGetCapabilities")
         types = csi_pb2.ControllerServiceCapability.RPC.Type
         
-        context.set_code(grpc.StatusCode.OK)
         return csi_pb2.ControllerGetCapabilitiesResponse(
            capabilities=[csi_pb2.ControllerServiceCapability(
                             rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_VOLUME"))),
                          csi_pb2.ControllerServiceCapability(
                              rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("PUBLISH_UNPUBLISH_VOLUME")))  ])
  
+    def __get_identity_config(self, attribute_name):
+            
+        return self.cfg['identity'][attribute_name]
+        
     def GetPluginInfo(self, request, context):
         logger.debug("GetPluginInfo")
-        context.set_code(grpc.StatusCode.OK)
-        return csi_pb2.GetPluginInfoResponse(name="ibm-block-csi-driver", vendor_version="1.0.0")
+        return csi_pb2.GetPluginInfoResponse(name=self.__get_identity_config("name"), vendor_version=self.__get_identity_config("version"))
     
     def GetPluginCapabilities(self, request, context):
         logger.debug("GetPluginCapabilities")
-        context.set_code(grpc.StatusCode.OK)
         types = csi_pb2.PluginCapability.Service.Type
+        capabilities = self.__get_identity_config("capabilities")
+        capability_list = []
+        for cap in capabilities:
+            capability_list.append(
+                csi_pb2.PluginCapability(
+                    service=csi_pb2.PluginCapability.Service(type=types.Value(cap))
+                    )
+                )
+        
         return csi_pb2.GetPluginCapabilitiesResponse(
-            capabilities=[csi_pb2.PluginCapability(
-                            service=csi_pb2.PluginCapability.Service(type=types.Value("CONTROLLER_SERVICE")))
-                         ]
+            capabilities=capability_list
                         
             )
 

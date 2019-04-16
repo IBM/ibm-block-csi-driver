@@ -17,6 +17,7 @@ class TestControllerServer(unittest.TestCase):
         self.mediator = XIVArrayMediator("user", "password", self.fqdn) 
         self.mediator.client = Mock()
         self.servicer = ControllerServicer(self.fqdn) 
+
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     def test_create_volume_with_empty_name(self, a_enter, a_exit):
@@ -55,23 +56,19 @@ class TestControllerServer(unittest.TestCase):
     def test_controller_get_capabilities(self):
         request = Mock()
         context = Mock()
-        res = self.servicer.ControllerGetCapabilities(request, context)
-        context.set_code.assert_called_once_with(grpc.StatusCode.OK)
+        self.servicer.ControllerGetCapabilities(request, context)
         
     def test_identity_plugin_get_info(self):
         request = Mock()
         context = Mock()
-        res = self.servicer.GetPluginInfo(request, context)
-        context.set_code.assert_called_once_with(grpc.StatusCode.OK)
+        self.servicer.GetPluginInfo(request, context)
         
     def test_identity_get_plugin_capabilities(self):
         request = Mock()
         context = Mock()
-        res = self.servicer.GetPluginCapabilities(request, context)
-        context.set_code.assert_called_once_with(grpc.StatusCode.OK)
+        self.servicer.GetPluginCapabilities(request, context)
 
     def test_identity_probe(self):
         request = Mock()
         context = Mock()
-        res = self.servicer.Probe(request, context)
-        context.set_code.assert_called_once_with(grpc.StatusCode.OK)
+        self.servicer.Probe(request, context)
