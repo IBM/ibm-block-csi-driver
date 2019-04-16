@@ -1,0 +1,5 @@
+identity:
+   name: ibm-block-csi-driver
+   version: 1.0.0
+   capabilities: 
+      - CONTROLLER_SERVICE
