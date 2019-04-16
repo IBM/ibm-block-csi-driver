@@ -1,6 +1,10 @@
 import grpc
 import time
 from optparse import OptionParser
+import yaml
+
+import os.path
+
 from concurrent import futures
 from controller.csi_general import csi_pb2
 from controller.csi_general import csi_pb2_grpc
@@ -10,6 +14,7 @@ from test_settings import  user, password, array, vol_name
 
 logger = get_stdout_logger()
 
+
 class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     """
     gRPC server for Digestor Service
@@ -17,7 +22,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def __init__(self, endpoint):
         self.endpoint = endpoint
-    
+        
+        my_path = os.path.abspath(os.path.dirname(__file__))
+        path = os.path.join(my_path, "../../common/config.yaml")
+
+        with open(path, 'r') as ymlfile:
+            self.cfg = yaml.load(ymlfile, Loader=yaml.FullLoader)
+                
     def CreateVolume(self, request, context):
         logger.debug("create volume")
         if request.name == '':
@@ -75,17 +86,63 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def ControllerGetCapabilities(self, request, context):
         logger.debug("ControllerGetCapabilities")
         types = csi_pb2.ControllerServiceCapability.RPC.Type
-                    
+        
         return csi_pb2.ControllerGetCapabilitiesResponse(
            capabilities=[csi_pb2.ControllerServiceCapability(
                             rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_VOLUME"))),
                          csi_pb2.ControllerServiceCapability(
                              rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("PUBLISH_UNPUBLISH_VOLUME")))  ])
  
+    def __get_identity_config(self, attribute_name):
+        return self.cfg['identity'][attribute_name]
+        
+    def GetPluginInfo(self, request, context):
+        logger.debug("GetPluginInfo")
+        try:
+            name = self.__get_identity_config("name")
+            version = self.__get_identity_config("version")
+        except Exception as ex:
+            logger.exception(ex)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details('an error occured while trying to get plugin name or version')
+            return csi_pb2.GetPluginInfoResponse()
+         
+        if not name or not version:
+            logger.error("plugin name or version cannot be empty")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details("plugin name or version cannot be empty")
+            return csi_pb2.GetPluginInfoResponse()
+        
+        return csi_pb2.GetPluginInfoResponse(name=name, vendor_version=version)
+    
+    def GetPluginCapabilities(self, request, context):
+        logger.debug("GetPluginCapabilities")
+        types = csi_pb2.PluginCapability.Service.Type
+        capabilities = self.__get_identity_config("capabilities")
+        capability_list = []
+        for cap in capabilities:
+            capability_list.append(
+                csi_pb2.PluginCapability(
+                    service=csi_pb2.PluginCapability.Service(type=types.Value(cap))
+                    )
+                )
+        
+        return csi_pb2.GetPluginCapabilitiesResponse(
+            capabilities=capability_list
+                        
+            )
+
+    def Probe(self, request, context):
+        logger.debug("Probe")
+        # TODO: add future logic
+        context.set_code(grpc.StatusCode.OK)
+        return csi_pb2.ProbeResponse()
+        
     def start_server(self):
         controller_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
         
         csi_pb2_grpc.add_ControllerServicer_to_server(self, controller_server)
+        csi_pb2_grpc.add_IdentityServicer_to_server(self, controller_server)
         
         # bind the server to the port defined above
         # controller_server.add_insecure_port('[::]:{}'.format(self.server_port))
