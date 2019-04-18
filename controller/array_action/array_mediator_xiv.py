@@ -44,7 +44,7 @@ class XIVArrayMediator(ArrayMediator):
         except xcli_errors.XCLIError:
             raise CredentailsError(self.endpoint)
      
-    def close(self):
+    def disconnect(self):
         if self.client and self.client.is_connected():
             self.client.close()
         

@@ -38,7 +38,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
          
         try:
             with ArrayConnectionManager(xiv_type, user, password, array) as array_mediator:
-                logger.debug(array_mediator)
                 # TODO: add create volume logic
                 vol = array_mediator.get_volume(vol_name)
 
@@ -158,10 +157,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 time.sleep(60 * 60 * 60)
         except KeyboardInterrupt:
             controller_server.stop(0)
-            print('Controller Server Stopped ...')
+            logger.debug('Controller Server Stopped ...')
 
 
-if __name__ == '__main__':
+def main():
     parser = OptionParser()
     parser.add_option("-e", "--csi.endpoint", dest="endpoint",
                       help="grpc endpoint")
@@ -171,3 +170,6 @@ if __name__ == '__main__':
     
     curr_server = ControllerServicer(endpoint)
     curr_server.start_server()
+
+if __name__ == '__main__':
+    main()
