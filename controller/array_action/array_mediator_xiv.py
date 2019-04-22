@@ -55,6 +55,6 @@ class XIVArrayMediator(ArrayMediator):
         logger.debug("Get volume")
         cli_volume = self.client.cmd.vol_list(vol=vol_name).as_single_element
         logger.debug(cli_volume)
-        array_vol = Volume(self._convert_volume_size(int(cli_volume.size)))
+        array_vol = Volume(self._convert_volume_size(int(cli_volume.capacity)))
         logger.debug("array volume :  {}".format(array_vol.size))
         return array_vol
