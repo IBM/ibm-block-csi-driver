@@ -11,7 +11,7 @@ class TestWithFunctionality(unittest.TestCase):
         self.array_connection = ArrayConnectionManager("user", "password", self.fqdn, xiv_type)
     
     @patch("controller.array_action.array_connection_manager.XIVArrayMediator._connect")
-    @patch("controller.array_action.array_connection_manager.XIVArrayMediator.close")
+    @patch("controller.array_action.array_connection_manager.XIVArrayMediator.disconnect")
     def test_with_opens_and_closes_the_connection(self, close, connect):
         with self.array_connection as array_mediator:
             self.assertEqual(self.array_connection.connected, True)

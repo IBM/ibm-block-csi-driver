@@ -44,9 +44,9 @@ class XIVArrayMediator(ArrayMediator):
         except xcli_errors.CredentialsError:
             raise CredentialsError(self.endpoint)
         except xcli_errors.XCLIError:
-            raise CredentialsError(self.endpoint)
+            raise CredentailsError(self.endpoint)
 
-    def close(self):
+    def disconnect(self):
         if self.client and self.client.is_connected():
             self.client.close()
 
@@ -75,6 +75,7 @@ class XIVArrayMediator(ArrayMediator):
             raise VolumeNotFoundError(vol_name)
 
         array_vol = self._generate_volume_response(cli_volume)
+
         logger.debug("array volume :  {}".format(array_vol.size))
         return array_vol
 

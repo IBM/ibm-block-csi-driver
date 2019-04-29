@@ -1,7 +1,8 @@
-import abc 
+import abc
 
-class ArrayMediator():
-    
+
+class ArrayMediator:
+
     @abc.abstractmethod
     def __init__(self, user, password, address):
         """ 
@@ -19,9 +20,9 @@ class ArrayMediator():
         Errors:
             CredentialsError
         
-        """ 
+        """
         raise NotImplementedError
-    
+
     @abc.abstractmethod
     def create_volume(self, vol_name, size_in_bytes, capabilities, pool):
         """ 
@@ -41,11 +42,13 @@ class ArrayMediator():
             PoolDoesNotExist
             PoolDoesNotMatchCapabilities
             CapabilityNotSupported (user is passing capability value that does not exist, or wrong spelling..)
-            IllegalObjectName 
+            IllegalObjectName
+            VolumeNameIsNotSupported 
+            PermissionDenied
 
-        """ 
+        """
         raise NotImplementedError
-    
+
     @abc.abstractmethod
     def delete_volume(self, volume_id):
         """ 
@@ -59,10 +62,11 @@ class ArrayMediator():
             
         Errors:
             volumeNotFound
+            PermissionDenied
 
-        """ 
+        """
         raise NotImplementedError
-  
+
     @abc.abstractmethod
     def get_volume(self, volume_name):
         """ 
@@ -77,8 +81,9 @@ class ArrayMediator():
         Errors:
             volumeNotFound
             IllegalObjectName
+            PermissionDenied
 
-        """ 
+        """
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -94,9 +99,10 @@ class ArrayMediator():
             
         Errors:
             volumeNotFound
+            PermissionDenied
 
-        """ 
-        raise NotImplementedError    
+        """
+        raise NotImplementedError
 
     @abc.abstractmethod
     def map_volume(self, volume_id, host_name):
@@ -114,10 +120,11 @@ class ArrayMediator():
             noAvailableLun
             volumeNotFound
             hostNotFound
+            PermissionDenied
         
-        """ 
-        raise NotImplementedError     
-    
+        """
+        raise NotImplementedError
+
     @abc.abstractmethod
     def unmap_volume(self, volume_id, host_name):
         """ 
@@ -134,10 +141,11 @@ class ArrayMediator():
             volumeNotFound
             volAlreadyUnmapped
             hostNotFound
+            PermissionDenied
         
-        """ 
-        raise NotImplementedError 
-    
+        """
+        raise NotImplementedError
+
     @abc.abstractmethod
     def get_host_by_host_identifiers(self, iscis_iqn, fc_initiators):
         """ 
@@ -154,8 +162,7 @@ class ArrayMediator():
         Errors:
             hostNotFound
             multipleHostsFoundError
+            PermissionDenied
         
-        """ 
-        raise NotImplementedError     
-    
-    
+        """
+        raise NotImplementedError

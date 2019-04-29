@@ -84,6 +84,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return csi_pb2.CreateVolumeResponse()
         except Exception as ex:
             logger.debug("an internal exception occured")
+
             logger.exception(ex)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details('an internal exception occurred : {}'.format(ex))
@@ -232,10 +233,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 time.sleep(60 * 60 * 60)
         except KeyboardInterrupt:
             controller_server.stop(0)
-            print('Controller Server Stopped ...')
+            logger.debug('Controller Server Stopped ...')
 
 
-if __name__ == '__main__':
+def main():
     parser = OptionParser()
     parser.add_option("-e", "--csi.endpoint", dest="endpoint",
                       help="grpc endpoint")
@@ -245,3 +246,7 @@ if __name__ == '__main__':
 
     curr_server = ControllerServicer(endpoint)
     curr_server.start_server()
+
+
+if __name__ == '__main__':
+    main()

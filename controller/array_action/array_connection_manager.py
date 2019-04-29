@@ -54,7 +54,7 @@ class ArrayConnectionManager(object):
         logger.debug("closing the connection")
         with connection_lock_dict[self.endpoint]:  # TODO: when moving to python 3 add tiemout!
             if self.connected:
-                self.med_class.close()
+                self.med_class.disconnect()
                 logger.debug("reducing the connection count")
                 array_connections_dict[self.endpoint] -= 1
                 logger.debug("removing the connection  : {}".format(array_connections_dict))
@@ -65,11 +65,8 @@ class ArrayConnectionManager(object):
         med_class = self.array_mediator_class_dict[self.array_type]
 
         with connection_lock_dict[self.endpoint]:  # TODO: when moving to python 3 - add timeout to the lock!
-
-            logger.debug("got connection lock. array connection dict is: {}".format(array_connections_dict))
-            self.med_class = med_class(self.user, self.password, self.endpoint)
-
             if self.endpoint in array_connections_dict:
+
                 if array_connections_dict[self.endpoint] < med_class.CONNECTION_LIMIT:
                     logger.debug("adding new connection ")
                     array_connections_dict[self.endpoint] += 1
@@ -80,6 +77,13 @@ class ArrayConnectionManager(object):
             else:
                 logger.debug("adding new connection to new endpoint : {}".format(self.endpoint))
                 array_connections_dict[self.endpoint] = 1
+
+            logger.debug("got connection lock. array connection dict is: {}".format(array_connections_dict))
+            try:
+                self.med_class = med_class(self.user, self.password, self.endpoint)
+            except Exception as ex:
+                array_connections_dict[self.endpoint] -= 1
+                raise ex
 
             self.connected = True
 
