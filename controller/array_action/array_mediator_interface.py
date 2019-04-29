@@ -40,7 +40,8 @@ class ArrayMediator():
             VolumeAlreadyExists
             PoolDoesNotExist
             PoolDoesNotMatchCapabilities
-            CapabilityNotSupported (user is passing capability value that does not exist, or wrong spelling..) 
+            CapabilityNotSupported (user is passing capability value that does not exist, or wrong spelling..)
+            IllegalObjectName 
 
         """ 
         raise NotImplementedError
@@ -75,6 +76,7 @@ class ArrayMediator():
             
         Errors:
             volumeNotFound
+            IllegalObjectName
 
         """ 
         raise NotImplementedError

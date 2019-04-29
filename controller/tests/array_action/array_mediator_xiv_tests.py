@@ -35,11 +35,11 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_connect_errors(self, client):
         client.connect_multiendpoint_ssl.return_value = Mock()
         client.connect_multiendpoint_ssl.side_effect = [xcli_errors.CredentialsError("a", "b", "c")]
-        with self.assertRaises(array_errors.CredentailsError):
+        with self.assertRaises(array_errors.CredentialsError):
             self.mediator._connect()
         
         client.connect_multiendpoint_ssl.side_effect = [xcli_errors.XCLIError()]
-        with self.assertRaises(array_errors.CredentailsError) as ex:
+        with self.assertRaises(array_errors.CredentialsError) as ex:
             self.mediator._connect()
             
     @patch("controller.array_action.array_mediator_xiv.XCLIClient")
