@@ -40,7 +40,9 @@ class ArrayMediator():
             VolumeAlreadyExists
             PoolDoesNotExist
             PoolDoesNotMatchCapabilities
-            CapabilityNotSupported (user is passing capability value that does not exist, or wrong spelling..) 
+            CapabilityNotSupported (user is passing capability value that does not exist, or wrong spelling..)
+            VolumeNameIsNotSupported 
+            PermissionDenied
 
         """ 
         raise NotImplementedError
@@ -58,6 +60,7 @@ class ArrayMediator():
             
         Errors:
             volumeNotFound
+            PermissionDenied
 
         """ 
         raise NotImplementedError
@@ -75,6 +78,7 @@ class ArrayMediator():
             
         Errors:
             volumeNotFound
+            PermissionDenied
 
         """ 
         raise NotImplementedError
@@ -92,6 +96,7 @@ class ArrayMediator():
             
         Errors:
             volumeNotFound
+            PermissionDenied
 
         """ 
         raise NotImplementedError    
@@ -112,6 +117,7 @@ class ArrayMediator():
             noAvailableLun
             volumeNotFound
             hostNotFound
+            PermissionDenied
         
         """ 
         raise NotImplementedError     
@@ -132,6 +138,7 @@ class ArrayMediator():
             volumeNotFound
             volAlreadyUnmapped
             hostNotFound
+            PermissionDenied
         
         """ 
         raise NotImplementedError 
@@ -152,6 +159,7 @@ class ArrayMediator():
         Errors:
             hostNotFound
             multipleHostsFoundError
+            PermissionDenied
         
         """ 
         raise NotImplementedError     

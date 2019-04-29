@@ -29,7 +29,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_list.return_value = bunch.Bunch(as_single_element=vol)
         res = self.mediator.get_volume("some name")            
 
-        self.assertTrue(res.size == self.mediator._convert_volume_size(vol.size))
+        self.assertTrue(res.size == vol.size*1024*1024*1024)
         
     @patch("controller.array_action.array_mediator_xiv.XCLIClient")
     def test_connect_errors(self, client):
@@ -45,11 +45,11 @@ class TestArrayMediatorXIV(unittest.TestCase):
     @patch("controller.array_action.array_mediator_xiv.XCLIClient")
     def test_close(self, client):
         self.mediator.client.is_connected = lambda : True
-        self.mediator.close()
+        self.mediator.disconnect()
         self.mediator.client.close.assert_called_once_with()
         
         self.mediator.client.is_connected = lambda : False
-        self.mediator.close()
+        self.mediator.disconnect()
         self.mediator.client.close.assert_called_once_with()
 
         
