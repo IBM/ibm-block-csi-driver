@@ -50,6 +50,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         pool = request.parameters[config.PARAMETERS_CAPACITY].split("=")[1]
         capabilities = request.parameters[config.PARAMETERS_CAPABILITIES]
+        if config.PARAMETERS_PREFIX in request.parameters:
+            volume_prefix = request.parameters[config.PARAMETERS_PREFIX]
+            volume_name = volume_prefix + "_" + volume_name
 
         try:
             # TODO : pass multiple array addresses
