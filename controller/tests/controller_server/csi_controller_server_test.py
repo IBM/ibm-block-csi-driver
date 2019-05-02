@@ -2,7 +2,6 @@ import unittest
 # from unittest import mock as umock
 import grpc
 
-
 from mock import patch, Mock, call
 from controller.tests import utils
 
@@ -67,6 +66,7 @@ class TestControllerServerCreateVolume(unittest.TestCase):
         res = self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.mediator.get_volume.assert_called_once_with(vol_name)
+        self.mediator.create_volume.assert_called_once_with(vol_name, 10, '', 'pool1')
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
@@ -197,6 +197,21 @@ class TestControllerServerCreateVolume(unittest.TestCase):
         self.assertTrue(msg in context.details)
         self.mediator.get_volume.assert_called_once_with(vol_name)
         self.mediator.create_volume.assert_called_once_with(vol_name, self.capacity_bytes, "", self.pool)
+
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_create_volume_cuts_name_if_its_too_long(self, a_exit, a_enter, array_type):
+        a_enter.return_value = self.mediator
+        context = utils.FakeContext()
+
+        self.request.name = "a" * 128
+        self.mediator.create_volume = Mock()
+        self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn")
+        array_type.return_value = "a9k"
+        res = self.servicer.CreateVolume(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.OK)
+        self.mediator.get_volume.assert_called_once_with("a" * self.mediator.MAX_VOL_NAME_LENGTH)
 
     def test_create_volume_with_illegal_object_name_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT, err=IllegalObjectName("vol"))

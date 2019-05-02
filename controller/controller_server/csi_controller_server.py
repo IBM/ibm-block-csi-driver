@@ -56,6 +56,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             with ArrayConnectionManager(user, password, array_addresses[0]) as array_mediator:
                 logger.debug(array_mediator)
 
+                if len(volume_name) > array_mediator.MAX_VOL_NAME_LENGTH:
+                    volume_name = volume_name[:array_mediator.MAX_VOL_NAME_LENGTH]
+                    logger.debug("volume name is too long - cutting it to be of size : {0}. new name : {1}".format(
+                        array_mediator.MAX_VOL_NAME_LENGTH, volume_name))
+
                 try:
                     vol = array_mediator.get_volume(volume_name)
 
@@ -69,7 +74,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 else:
                     logger.debug("volume found : {}".format(vol))
 
-                    if not (vol.size == request.capacity_range.required_bytes):
+                    if not (vol.capacity_bytes == request.capacity_range.required_bytes):
                         context.set_details("Volume was already created with different size.")
                         context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                         return csi_pb2.CreateVolumeResponse()

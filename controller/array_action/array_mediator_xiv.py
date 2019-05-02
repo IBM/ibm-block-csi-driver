@@ -18,6 +18,7 @@ class XIVArrayMediator(ArrayMediator):
     BLOCK_SIZE_IN_BYTES = 512
     CONNECTION_LIMIT = 3
     MAX_CONNECTION_RETRY = 3
+    MAX_VOL_NAME_LENGTH = 63
 
     def __init__(self, user, password, endpoint):
         self.user = user
