@@ -60,7 +60,6 @@ def validate_create_volume_request(request):
 
     logger.debug("validating volume capacity")
     if request.capacity_range:
-        print request.capacity_range.required_bytes
         if request.capacity_range.required_bytes <= 0:
             return False, 'size should be bigger then 0'
     else:
@@ -104,6 +103,7 @@ def get_create_volume_response(new_vol):
 
     except Exception as ex:
         logger.exception(ex)
+        return csi_pb2.CreateVolumeResponse()
 
 
 def get_volume_id_info(volume_id):

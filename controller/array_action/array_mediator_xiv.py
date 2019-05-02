@@ -1,11 +1,7 @@
 from pyxcli.client import XCLIClient
 from pyxcli import errors as xcli_errors
-from concurrent.futures import ThreadPoolExecutor
-from threading import Thread, Lock, BoundedSemaphore
-import threading
 from controller.common.csi_logger import get_stdout_logger
 from array_mediator_interface import ArrayMediator
-import time
 from array_action_types import Volume
 from errors import CredentialsError, VolumeNotFoundError, IllegalObjectName, PoolDoesNotMatchCapabilities, \
     CapabilityNotSupported, \
@@ -44,7 +40,7 @@ class XIVArrayMediator(ArrayMediator):
         except xcli_errors.CredentialsError:
             raise CredentialsError(self.endpoint)
         except xcli_errors.XCLIError:
-            raise CredentailsError(self.endpoint)
+            raise CredentialsError(self.endpoint)
 
     def disconnect(self):
         if self.client and self.client.is_connected():
@@ -75,8 +71,6 @@ class XIVArrayMediator(ArrayMediator):
             raise VolumeNotFoundError(vol_name)
 
         array_vol = self._generate_volume_response(cli_volume)
-
-        logger.debug("array volume :  {}".format(array_vol.size))
         return array_vol
 
     def _validate_capabiliy_supported(self, capabilities):
