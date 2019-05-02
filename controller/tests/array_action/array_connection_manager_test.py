@@ -17,7 +17,7 @@ class TestWithFunctionality(unittest.TestCase):
     def test_with_opens_and_closes_the_connection(self, close, connect):
         with self.array_connection as array_mediator:
             self.assertEqual(self.array_connection.connected, True)
-            self.assertEqual(array_mediator.endpoint, self.fqdn)
+            self.assertEqual(array_mediator.first_endpoint, self.fqdn)
         connect.assert_called_with()
         close.assert_called_with()
 

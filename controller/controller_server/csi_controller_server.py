@@ -53,7 +53,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         try:
             # TODO : pass multiple array addresses
-            with ArrayConnectionManager(user, password, array_addresses[0]) as array_mediator:
+            with ArrayConnectionManager(user, password, array_addresses) as array_mediator:
                 logger.debug(array_mediator)
 
                 if len(volume_name) > array_mediator.MAX_VOL_NAME_LENGTH:
@@ -119,7 +119,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         try:
             # TODO : pass multiple array addresses
-            with ArrayConnectionManager(user, password, array_addresses[0], array_type) as array_mediator:
+            with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
                 logger.debug(array_mediator)
 
                 try:
