@@ -10,14 +10,14 @@ class TestWithFunctionality(unittest.TestCase):
 
     def setUp(self):
         self.fqdn = "fqdn"
-        self.array_connection = ArrayConnectionManager("user", "password", self.fqdn, xiv_type)
+        self.array_connection = ArrayConnectionManager("user", "password", [self.fqdn, self.fqdn] , xiv_type)
 
     @patch("controller.array_action.array_connection_manager.XIVArrayMediator._connect")
     @patch("controller.array_action.array_connection_manager.XIVArrayMediator.disconnect")
     def test_with_opens_and_closes_the_connection(self, close, connect):
         with self.array_connection as array_mediator:
             self.assertEqual(self.array_connection.connected, True)
-            self.assertEqual(array_mediator.first_endpoint, self.fqdn)
+            self.assertEqual(array_mediator.endpoint, [self.fqdn, self.fqdn])
         connect.assert_called_with()
         close.assert_called_with()
 
@@ -38,7 +38,7 @@ class TestGetconnection(unittest.TestCase):
     def setUp(self):
         print "setUP"
         self.fqdn = "fqdn"
-        self.array_connection = ArrayConnectionManager("user", "password", self.fqdn, xiv_type)
+        self.array_connection = ArrayConnectionManager("user", "password", [self.fqdn, self.fqdn], xiv_type)
         array_connection_manager.array_connections_dict = {}
 
     def tearDown(self):
@@ -51,7 +51,7 @@ class TestGetconnection(unittest.TestCase):
         self.assertEqual(array_connection_manager.array_connections_dict, {self.fqdn: 1})
 
         new_fqdn = "new-fqdn"
-        array_connection2 = ArrayConnectionManager("user", "password", new_fqdn, xiv_type)
+        array_connection2 = ArrayConnectionManager("user", "password", [new_fqdn], xiv_type)
         array_connection2.get_array_connection()
         self.assertEqual(array_connection_manager.array_connections_dict, {self.fqdn: 1, new_fqdn: 1})
 
@@ -88,11 +88,11 @@ class TestGetconnection(unittest.TestCase):
         res = self.array_connection.detect_array_type()
         self.assertEqual(res, xiv_type)
 
-        socket_connet.side_effect = [1, 0]
+        socket_connet.side_effect = [1, 1, 0, 0]
 
         res = self.array_connection.detect_array_type()
         self.assertEqual(res, svc_type)
 
-        socket_connet.side_effect = [1, 1]
+        socket_connet.side_effect = [1, 1, 1, 1]
         with self.assertRaises(FailedToFindStorageSystemType):
             res = self.array_connection.detect_array_type()
