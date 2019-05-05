@@ -3,9 +3,14 @@ pipeline {
         label 'ansible_rhel73'
     }
     stages {
-        stage ('Run unittests') {
+        stage ('Run CSI controller unittests (inside container)') {
             steps {
-                sh 'nosetests --cover-package=controller --with-coverage'
+                sh './scripts/run_unittest.sh'
+            }
+        }
+        stage ('Build CSI controller image') {
+            steps {
+                sh './scripts/build_imag.sh'
             }
         }
 	}
