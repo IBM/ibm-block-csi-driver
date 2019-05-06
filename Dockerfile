@@ -1,10 +1,28 @@
+# Copyright IBM Corporation 2019.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 FROM centos:7
-RUN yum --enablerepo=extras -y install epel-release && yum -y install python2-pip 
+RUN yum --enablerepo=extras -y install epel-release && yum -y install python2-pip
 RUN pip install "grpcio==1.20.1" "grpcio-tools==1.20.1" "protobuf==3.7.1" "futures==3.2.0" "pyyaml==5.1" &&\
     # A9000 python client
-    pip install "pyxcli==1.1.7" 
+    pip install "pyxcli==1.1.7"
 
-COPY . /driver
+COPY ./common ./controller /driver/
+RUN groupadd -g 9999 appuser && \
+    useradd -r -u 9999 -g appuser appuser
+RUN chown -R appuser:appuser /driver
+USER appuser
 WORKDIR /driver
 ENV PYTHONPATH=/driver
 ENTRYPOINT ["python", "/driver/controller/controller_server/csi_controller_server.py"]
