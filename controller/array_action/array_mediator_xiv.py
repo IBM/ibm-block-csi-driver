@@ -3,7 +3,7 @@ from pyxcli import errors as xcli_errors
 from controller.common.csi_logger import get_stdout_logger
 from array_mediator_interface import ArrayMediator
 from array_action_types import Volume
-from errors import CredentialsError, VolumeNotFoundError, IllegalObjectName, PoolDoesNotMatchCapabilities, \
+from controller.array_action.errors import CredentialsError, VolumeNotFoundError, IllegalObjectName, PoolDoesNotMatchCapabilities, \
     CapabilityNotSupported, \
     VolumeAlreadyExists, PoolDoesNotExist
 
