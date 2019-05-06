@@ -14,9 +14,10 @@
 
 FROM centos:7
 RUN yum --enablerepo=extras -y install epel-release && yum -y install python2-pip
-RUN pip install "grpcio==1.20.1" "grpcio-tools==1.20.1" "protobuf==3.7.1" "futures==3.2.0" "pyyaml==5.1" &&\
-    # A9000 python client
-    pip install "pyxcli==1.1.7"
+
+COPY controller/requirements.txt /driver/controller/
+RUN pip install -r /driver/controller/requirements.txt
+
 
 COPY ./common /driver/common
 COPY ./controller /driver/controller
