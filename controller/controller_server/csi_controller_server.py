@@ -64,6 +64,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug("volume name is too long - cutting it to be of size : {0}. new name : {1}".format(
                         array_mediator.MAX_VOL_NAME_LENGTH, volume_name))
 
+                size = request.capacity_range.required_bytes
+
+                if size == 0:
+                    size = array_mediator.get_minimal_volume_size_in_bytes()
+                    logger.debug("requested size is 0 so the default size will be used : {0} ".format(
+                        size))
                 try:
                     vol = array_mediator.get_volume(volume_name)
 
@@ -71,7 +77,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
-                    vol = array_mediator.create_volume(volume_name, request.capacity_range.required_bytes, capabilities,
+                    vol = array_mediator.create_volume(volume_name, size, capabilities,
                                                        pool)
 
                 else:

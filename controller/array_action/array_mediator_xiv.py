@@ -3,7 +3,8 @@ from pyxcli import errors as xcli_errors
 from controller.common.csi_logger import get_stdout_logger
 from array_mediator_interface import ArrayMediator
 from array_action_types import Volume
-from controller.array_action.errors import CredentialsError, VolumeNotFoundError, IllegalObjectName, PoolDoesNotMatchCapabilities, \
+from controller.array_action.errors import CredentialsError, VolumeNotFoundError, IllegalObjectName, \
+    PoolDoesNotMatchCapabilities, \
     CapabilityNotSupported, \
     VolumeAlreadyExists, PoolDoesNotExist
 
@@ -129,3 +130,6 @@ class XIVArrayMediator(ArrayMediator):
         except xcli_errors.VolumeBadNameError as ex:
             logger.exception(ex)
             raise VolumeNotFoundError(vol_name)
+
+    def get_minimal_volume_size_in_bytes(self):
+        return 1 * 1024 * 1024 * 1024

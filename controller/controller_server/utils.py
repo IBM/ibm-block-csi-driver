@@ -60,7 +60,7 @@ def validate_create_volume_request(request):
 
     logger.debug("validating volume capacity")
     if request.capacity_range:
-        if request.capacity_range.required_bytes <= 0:
+        if request.capacity_range.required_bytes < 0:
             return False, 'size should be bigger then 0'
     else:
         return False, 'no capacity range set'

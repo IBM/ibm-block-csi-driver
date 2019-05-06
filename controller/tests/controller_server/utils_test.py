@@ -81,11 +81,12 @@ class TestUtils(unittest.TestCase):
 
         request.name = "name"
 
-        request.capacity_range.required_bytes = 0
+        request.capacity_range.required_bytes = -1
 
         res, msg = utils.validate_create_volume_request(request)
         self.assertEqual(res, False)
         self.assertTrue("size" in msg)
+
 
         request.capacity_range.required_bytes = 10
         valiate_capabilities.return_value = (False, "msg")
@@ -130,6 +131,11 @@ class TestUtils(unittest.TestCase):
         self.assertTrue("parameters" in msg)
 
         request.parameters = {"capacity": "pool=pool1", "capabilities": ""}
+
+        res, msg = utils.validate_create_volume_request(request)
+        self.assertEqual(res, True)
+
+        request.capacity_range.required_bytes = 0
 
         res, msg = utils.validate_create_volume_request(request)
         self.assertEqual(res, True)
