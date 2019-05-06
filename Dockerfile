@@ -18,7 +18,8 @@ RUN pip install "grpcio==1.20.1" "grpcio-tools==1.20.1" "protobuf==3.7.1" "futur
     # A9000 python client
     pip install "pyxcli==1.1.7"
 
-COPY ./common ./controller /driver/
+COPY ./common /driver/common
+COPY ./controller /driver/controller
 RUN groupadd -g 9999 appuser && \
     useradd -r -u 9999 -g appuser appuser
 RUN chown -R appuser:appuser /driver
