@@ -1,6 +1,6 @@
 pipeline {
     agent {
-        label 'ansible_rhel73'
+        label 'docker-engine'
     }
     stages {
         stage ('Run CSI controller unittests (inside container)') {
@@ -10,7 +10,7 @@ pipeline {
         }
         stage ('Build CSI controller image') {
             steps {
-                sh './scripts/build_imag.sh'
+                sh './scripts/ci/build_push_images.sh'
             }
         }
 	}
