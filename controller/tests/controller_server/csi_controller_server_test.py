@@ -10,7 +10,7 @@ from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.controller_server.csi_controller_server import ControllerServicer
 from controller.controller_server.test_settings import vol_name
 from controller.array_action.errors import VolumeNotFoundError, FailedToFindStorageSystemType, IllegalObjectName, \
-    VolumeAlreadyExists, PoolDoesNotExist, PoolDoesNotMatchCapabilities, CapabilityNotSupported
+    VolumeAlreadyExists, PoolDoesNotExist, PoolDoesNotMatchCapabilities, StorageClassCapabilityNotSupported
 
 
 class TestControllerServerCreateVolume(unittest.TestCase):
@@ -92,21 +92,21 @@ class TestControllerServerCreateVolume(unittest.TestCase):
 
         self.request.secrets = []
 
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_create_volume_with_wrong_parameters(self, a_enter, a_exit):
+    def test_create_volume_with_wrong_parameters(self, a_enter, a_exit, array_type):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
 
         self.request.parameters = {"capacity": "pool=pool1"}
         res = self.servicer.CreateVolume(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "capabilities is missing in secrets")
-        self.assertTrue("parameters" in context.details)
+        self.assertNotEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
 
         self.request.parameters = {"capabilities": ""}
         res = self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "capacity is missing in secrets")
-        self.assertTrue("parameters" in context.details)
+        self.assertTrue("parameter" in context.details)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
@@ -217,18 +217,18 @@ class TestControllerServerCreateVolume(unittest.TestCase):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT, err=IllegalObjectName("vol"))
 
     def test_create_volume_with_create_volume_with_volume_exsits_exception(self):
-        self.create_volume_returns_error(return_code=grpc.StatusCode.ALREADY_EXISTS, err=VolumeAlreadyExists("vol"))
+        self.create_volume_returns_error(return_code=grpc.StatusCode.ALREADY_EXISTS, err=VolumeAlreadyExists("vol", "endpoint"))
 
     def test_create_volume_with_create_volume_with_pool_does_not_exist_exception(self):
-        self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT, err=PoolDoesNotExist("pool1"))
+        self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT, err=PoolDoesNotExist("pool1","endpoint"))
 
     def test_create_volume_with_create_volume_with_pool_does_not_match_capabilities_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
-                                         err=PoolDoesNotMatchCapabilities("pool1", ""))
+                                         err=PoolDoesNotMatchCapabilities("pool1", "", "endpoint"))
 
     def test_create_volume_with_create_volume_with_capability_not_supported_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
-                                         err=CapabilityNotSupported(["cap"]))
+                                         err=StorageClassCapabilityNotSupported(["cap"]))
 
     def test_create_volume_with_create_volume_with_other_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INTERNAL,

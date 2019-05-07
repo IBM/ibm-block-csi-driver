@@ -1,24 +1,15 @@
-import bunch
+from mock import Mock
 import grpc
 
 
-def get_mock_xiv_volume(size, name, wwn):
-    vol = bunch.Bunch()
-    vol.capacity = size
-    vol.wwn = wwn
-    vol.name = name
-    vol.pool_name = "vol-name"
-    return vol
-
-
 def get_mock_mediator_response_volume(size, name, wwn):
-    vol = bunch.Bunch()
+    vol = Mock()
     vol.capacity_bytes = size
-    vol.volume_id = wwn
+    vol.id = wwn
     vol.volume_name = name
     vol.array_name = "arr1"
     vol.pool_name = "pool1"
-    vol.storage_type = "xiv"
+    vol.array_type = "xiv"
 
     return vol
 

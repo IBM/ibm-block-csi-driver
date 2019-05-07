@@ -12,8 +12,9 @@ from controller.common.csi_logger import get_stdout_logger
 import config
 import utils
 from controller.array_action.errors import VolumeNotFoundError, IllegalObjectName, PoolDoesNotMatchCapabilities, \
-    CapabilityNotSupported, \
+    StorageClassCapabilityNotSupported, \
     VolumeAlreadyExists, PoolDoesNotExist
+from controller.controller_server.errors import ValidationException, VolumeIdError
 
 logger = get_stdout_logger()
 
@@ -35,10 +36,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def CreateVolume(self, request, context):
         logger.debug("create volume")
 
-        res, msg = utils.validate_create_volume_request(request)
-        if not res:
-            logger.error("failed request validation. error : {}".format(msg))
-            context.set_details(msg)
+        try:
+            utils.validate_create_volume_request(request)
+        except ValidationException as ex:
+            logger.error("failed request validation")
+            logger.exception(ex)
+            context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateVolumeResponse()
 
@@ -48,8 +51,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         secrets = request.secrets
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
 
-        pool = request.parameters[config.PARAMETERS_CAPACITY].split("=")[1]
-        capabilities = request.parameters[config.PARAMETERS_CAPABILITIES]
+        pool = request.parameters[config.PARAMETERS_CAPACITY].split(config.PARAMETERS_CAPACITY_DELIMITER)[1]
+        try:
+            capabilities = request.parameters[config.PARAMETERS_CAPABILITIES]
+        except KeyError as ex:
+            logger.debug("no capabilities passed for this volume creation")
+            capabilities = None
 
         try:
             # TODO : pass multiple array addresses
@@ -58,7 +65,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 if len(volume_name) > array_mediator.MAX_VOL_NAME_LENGTH:
                     volume_name = volume_name[:array_mediator.MAX_VOL_NAME_LENGTH]
-                    logger.debug("volume name is too long - cutting it to be of size : {0}. new name : {1}".format(
+                    logger.warning("volume name is too long - cutting it to be of size : {0}. new name : {1}".format(
                         array_mediator.MAX_VOL_NAME_LENGTH, volume_name))
 
                 try:
@@ -67,6 +74,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 except VolumeNotFoundError as ex:
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
+
+                    array_mediator.validate_supported_capabilities(capabilities)
 
                     vol = array_mediator.create_volume(volume_name, request.capacity_range.required_bytes, capabilities,
                                                        pool)
@@ -79,7 +88,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                         return csi_pb2.CreateVolumeResponse()
 
-        except (IllegalObjectName, CapabilityNotSupported, PoolDoesNotExist, PoolDoesNotMatchCapabilities) as ex:
+                logger.debug("generating create volume response")
+                return utils.generate_csi_create_volume_response(vol)
+
+        except (
+                IllegalObjectName, StorageClassCapabilityNotSupported, PoolDoesNotExist,
+                PoolDoesNotMatchCapabilities) as ex:
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateVolumeResponse()
@@ -88,32 +102,31 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.ALREADY_EXISTS)
             return csi_pb2.CreateVolumeResponse()
         except Exception as ex:
-            logger.debug("an internal exception occured")
-
+            logger.error("an internal exception occured")
             logger.exception(ex)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateVolumeResponse()
 
-        logger.debug("generating create volume response")
-        return utils.get_create_volume_response(vol)
-
     def DeleteVolume(self, request, context):
         logger.debug("DeleteVolume")
-        volume_id = request.volume_id
         secrets = request.secrets
 
-        res, msg = utils.validate_secret(secrets)
-        if not res:
-            context.set_details(msg)
+        try:
+            utils.validate_secret(secrets)
+        except ValidationException as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.DeleteVolumeResponse()
 
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
 
-        res, array_type, vol_id = utils.get_volume_id_info(volume_id)
-        if not res:
-            context.set_details("Wrong volume id format")
+        try:
+            res, array_type, vol_id = utils.get_volume_id_info(request.volume_id)
+        except VolumeIdError as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.DeleteVolumeResponse()
 

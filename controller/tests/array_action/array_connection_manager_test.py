@@ -1,16 +1,17 @@
 import unittest
 import controller.array_action.array_connection_manager as array_connection_manager
-from controller.array_action.array_connection_manager import ArrayConnectionManager, NoConnectionAvailableException, \
-    xiv_type, svc_type
+from controller.array_action.array_connection_manager import ArrayConnectionManager, NoConnectionAvailableException
 from mock import patch
 from controller.array_action.errors import FailedToFindStorageSystemType
+from controller.array_action.array_mediator_xiv import XIVArrayMediator
+from controller.array_action.array_mediator_svc import SVCArrayMediator
 
 
 class TestWithFunctionality(unittest.TestCase):
 
     def setUp(self):
         self.fqdn = "fqdn"
-        self.array_connection = ArrayConnectionManager("user", "password", self.fqdn, xiv_type)
+        self.array_connection = ArrayConnectionManager("user", "password", self.fqdn, XIVArrayMediator.ARRAY_TYPE)
 
     @patch("controller.array_action.array_connection_manager.XIVArrayMediator._connect")
     @patch("controller.array_action.array_connection_manager.XIVArrayMediator.disconnect")
@@ -36,9 +37,8 @@ class TestWithFunctionality(unittest.TestCase):
 class TestGetconnection(unittest.TestCase):
 
     def setUp(self):
-        print "setUP"
         self.fqdn = "fqdn"
-        self.array_connection = ArrayConnectionManager("user", "password", self.fqdn, xiv_type)
+        self.array_connection = ArrayConnectionManager("user", "password", self.fqdn, XIVArrayMediator.ARRAY_TYPE)
         array_connection_manager.array_connections_dict = {}
 
     def tearDown(self):
@@ -51,7 +51,7 @@ class TestGetconnection(unittest.TestCase):
         self.assertEqual(array_connection_manager.array_connections_dict, {self.fqdn: 1})
 
         new_fqdn = "new-fqdn"
-        array_connection2 = ArrayConnectionManager("user", "password", new_fqdn, xiv_type)
+        array_connection2 = ArrayConnectionManager("user", "password", new_fqdn, XIVArrayMediator.ARRAY_TYPE)
         array_connection2.get_array_connection()
         self.assertEqual(array_connection_manager.array_connections_dict, {self.fqdn: 1, new_fqdn: 1})
 
@@ -81,17 +81,17 @@ class TestGetconnection(unittest.TestCase):
 
         self.assertTrue(error_msg in ex.exception)
 
-    @patch("controller.array_action.array_connection_manager._socket_connect")
+    @patch("controller.array_action.array_connection_manager._socket_connect_test")
     def test_detect_array_type(self, socket_connet):
         socket_connet.side_effect = [0, 1]
 
         res = self.array_connection.detect_array_type()
-        self.assertEqual(res, xiv_type)
+        self.assertEqual(res, XIVArrayMediator.ARRAY_TYPE)
 
         socket_connet.side_effect = [1, 0]
 
         res = self.array_connection.detect_array_type()
-        self.assertEqual(res, svc_type)
+        self.assertEqual(res, SVCArrayMediator.ARRAY_TYPE)
 
         socket_connet.side_effect = [1, 1]
         with self.assertRaises(FailedToFindStorageSystemType):
