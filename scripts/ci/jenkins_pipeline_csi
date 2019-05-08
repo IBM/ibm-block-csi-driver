@@ -6,7 +6,7 @@ pipeline {
         stage ('Run CSI controller unittests (inside container)') {
             steps {
                 sh 'mkdir -p build/reports && chmod 777 build/reports'
-                sh './scripts/run_unitests.sh build/reports'
+                sh './scripts/run_unitests.sh `pwd`/build/reports'
             }
         }
         stage ('Build CSI controller image') {
