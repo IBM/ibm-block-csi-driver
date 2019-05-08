@@ -5,7 +5,7 @@ pipeline {
     stages {
         stage ('Run CSI controller unittests (inside container)') {
             steps {
-                sh './scripts/run_unittest.sh'
+                sh './scripts/run_unitests.sh'
             }
         }
         stage ('Build CSI controller image') {
