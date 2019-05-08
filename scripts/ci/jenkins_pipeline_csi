@@ -19,7 +19,7 @@ pipeline {
         always {
             sh 'ls -la build/reports/'
             junit 'build/reports/*.xml'
-            cobertura coberturaReportFile: 'build/reports/*.xml'
+            # cobertura coberturaReportFile: 'build/reports/*.xml'   ## TODO need to run cobertura but it has an issue "No such DSL method"
             sh '[ -d build/reports ] && rm -rf build/reports'
         }
     }
