@@ -14,11 +14,11 @@ pipeline {
                 sh './scripts/ci/build_push_images.sh'
             }
         }
-        post {
-            always {
-                junit 'build/reports/*.xml'
-                sh '[ -d build/reports ] && rm -rf build/reports'
-             }
+    }
+    post {
+        always {
+            junit 'build/reports/*.xml'
+            sh '[ -d build/reports ] && rm -rf build/reports'
         }
     }
 }
