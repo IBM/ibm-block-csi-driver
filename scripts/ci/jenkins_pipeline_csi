@@ -3,13 +3,13 @@ pipeline {
         label 'docker-engine'
     }
     stages {
-        stage ('Run CSI controller unittests (inside container)') {
+        stage ('CSI-controller: Unit testing') {
             steps {
                 sh 'mkdir -p build/reports && chmod 777 build/reports'
                 sh './scripts/run_unitests.sh `pwd`/build/reports'
             }
         }
-        stage ('Build CSI controller image') {
+        stage ('CSI-controller: Build and push image') {
             steps {
                 sh './scripts/ci/build_push_images.sh'
             }
