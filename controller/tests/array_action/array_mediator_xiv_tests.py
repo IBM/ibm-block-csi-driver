@@ -25,11 +25,11 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_get_volume_return_correct_value(self):
         error_msg = "ex"
         vol = bunch.Bunch()
-        vol.size = 10
+        vol.capacity = 10
         self.mediator.client.cmd.vol_list.return_value = bunch.Bunch(as_single_element=vol)
         res = self.mediator.get_volume("some name")            
 
-        self.assertTrue(res.size == vol.size*1024*1024*1024)
+        self.assertTrue(res.size == vol.capacity*1024*1024*1024)
         
     @patch("controller.array_action.array_mediator_xiv.XCLIClient")
     def test_connect_errors(self, client):
