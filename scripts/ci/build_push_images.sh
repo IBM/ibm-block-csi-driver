@@ -26,4 +26,4 @@ set +x
 echo ""
 echo "Image ready:"
 echo "   ${ctl_tag_specific}"
-[ "$tag_latest" = "true" ] && echo "   ${ctl_tag_latest}"
+[ "$tag_latest" = "true" ] && echo "   ${ctl_tag_latest}" || :
