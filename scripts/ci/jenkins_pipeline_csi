@@ -5,7 +5,8 @@ pipeline {
     stages {
         stage ('Run CSI controller unittests (inside container)') {
             steps {
-                sh './scripts/run_unitests.sh'
+                sh 'mkdir -p build/reports && chmod 777 build/reports'
+                sh './scripts/run_unitests.sh build/reports'
             }
         }
         stage ('Build CSI controller image') {
@@ -13,5 +14,11 @@ pipeline {
                 sh './scripts/ci/build_push_images.sh'
             }
         }
-	}
+        post {
+            always {
+                junit 'build/reports/*.xml'
+                sh '[ -d build/reports ] && rm -rf build/reports'
+             }
+        }
+    }
 }
