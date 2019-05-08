@@ -17,7 +17,9 @@ pipeline {
     }
     post {
         always {
+            sh 'ls -la build/reports/'
             junit 'build/reports/*.xml'
+            cobertura coberturaReportFile: 'build/reports/*.xml'
             sh '[ -d build/reports ] && rm -rf build/reports'
         }
     }
