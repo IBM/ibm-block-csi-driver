@@ -12,8 +12,7 @@ def get_stdout_logger():
         formatter = logging.Formatter('[%(asctime)s %(thread)d %(levelname)s %(filename)s %(lineno)d %(funcName)s] %(message)s')
         handler.setFormatter(formatter)
         csi_logger.addHandler(handler)
-        
-
+    
         csi_logger.handler_set = True
         
 
