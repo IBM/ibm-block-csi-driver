@@ -3,9 +3,9 @@ from pyxcli import errors as xcli_errors
 from controller.common.csi_logger import get_stdout_logger
 from array_mediator_interface import ArrayMediator
 from array_action_types import Volume
-from controller.array_action.errors import CredentialsError, VolumeNotFoundError, IllegalObjectName, PoolDoesNotMatchCapabilities, \
+from controller.array_action.errors import CredentialsError, VolumeNotFoundError, IllegalObjectName,\
     StorageClassCapabilityNotSupported, \
-    VolumeAlreadyExists, PoolDoesNotExist
+    VolumeAlreadyExists, PoolDoesNotExist, PermissionDeniedError
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -75,16 +75,19 @@ class XIVArrayMediator(ArrayMediator):
         return array_vol
 
     def validate_supported_capabilities(self, capabilities):
+        logger.info("validate_supported_capabilities for capabilities : {0}".format(capabilities))
         # for a9k there should be no capabilities
         if capabilities or len(capabilities) > 0:
             raise StorageClassCapabilityNotSupported(capabilities)
+
+        logger.info("Finished validate_supported_capabilities")
 
     def _convert_size_bytes_to_blocks(self, size_in_bytes):
         """:rtype: float"""
         return float(size_in_bytes) / self.BLOCK_SIZE_IN_BYTES
 
     def create_volume(self, name, size_in_bytes, capabilities, pool):
-        logger.debug("creating volume with name : {}. size : {} . in pool : {} with capabilities : {}".format(
+        logger.info("creating volume with name : {}. size : {} . in pool : {} with capabilities : {}".format(
             name, size_in_bytes, pool, capabilities))
 
         size_in_blocks = int(self._convert_size_bytes_to_blocks(size_in_bytes))
@@ -92,7 +95,7 @@ class XIVArrayMediator(ArrayMediator):
         try:
             cli_volume = self.client.cmd.vol_create(vol=name, size_blocks=size_in_blocks,
                                                     pool=pool).as_single_element
-            logger.debug("cli volume : {}".format(cli_volume))
+            logger.info("finished creating cli volume : {}".format(cli_volume))
             return self._generate_volume_response(cli_volume)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
@@ -103,18 +106,27 @@ class XIVArrayMediator(ArrayMediator):
         except xcli_errors.PoolDoesNotExistError as ex:
             logger.exception(ex)
             raise PoolDoesNotExist(pool, self.endpoint)
+        except xcli_errors.OperationForbiddenForUserCategoryError as ex:
+            logger.exception(ex)
+            raise PermissionDeniedError("create vol : {0}".format(name))
 
     def delete_volume(self, volume_id):
-        logger.debug("Deleting volume with id : {}".format(volume_id))
+        logger.info("Deleting volume with id : {0}".format(volume_id))
         vol_by_wwn = self.client.cmd.vol_list(vol=volume_id).as_single_element
         if not vol_by_wwn:
             raise VolumeNotFoundError(volume_id)
 
         vol_name = vol_by_wwn.name
-        logger.debug("found volume name : {}".format(vol_name))
+        logger.debug("found volume name : {0}".format(vol_name))
 
         try:
             self.client.cmd.vol_delete(vol=vol_name)
         except xcli_errors.VolumeBadNameError as ex:
             logger.exception(ex)
             raise VolumeNotFoundError(vol_name)
+
+        except xcli_errors.OperationForbiddenForUserCategoryError as ex:
+            logger.exception(ex)
+            raise PermissionDeniedError("delete vol : {0}".format(vol_name))
+
+        logger.info("Finished volume deletion. id : {0}".format(volume_id))

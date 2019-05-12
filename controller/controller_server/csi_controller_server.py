@@ -13,7 +13,7 @@ import config
 import utils
 from controller.array_action.errors import VolumeNotFoundError, IllegalObjectName, PoolDoesNotMatchCapabilities, \
     StorageClassCapabilityNotSupported, \
-    VolumeAlreadyExists, PoolDoesNotExist
+    VolumeAlreadyExists, PoolDoesNotExist, PermissionDeniedError
 from controller.controller_server.errors import ValidationException, VolumeIdError
 
 logger = get_stdout_logger()
@@ -34,7 +34,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             self.cfg = yaml.load(yamlfile)  # TODO: add the following when possible : Loader=yaml.FullLoader)
 
     def CreateVolume(self, request, context):
-        logger.debug("create volume")
+        logger.info("create volume")
 
         try:
             utils.validate_create_volume_request(request)
@@ -89,27 +89,32 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return csi_pb2.CreateVolumeResponse()
 
                 logger.debug("generating create volume response")
-                return utils.generate_csi_create_volume_response(vol)
+                res = utils.generate_csi_create_volume_response(vol)
+                logger.info("finished create volume")
+                return res
 
-        except (
-                IllegalObjectName, StorageClassCapabilityNotSupported, PoolDoesNotExist,
+        except (IllegalObjectName, StorageClassCapabilityNotSupported, PoolDoesNotExist,
                 PoolDoesNotMatchCapabilities) as ex:
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateVolumeResponse()
+        except PermissionDeniedError as ex:
+                context.set_code(grpc.StatusCode.PERMISSION_DENIED)
+                context.set_details(ex)
+                return csi_pb2.CreateVolumeResponse()
         except VolumeAlreadyExists as ex:
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.ALREADY_EXISTS)
             return csi_pb2.CreateVolumeResponse()
         except Exception as ex:
-            logger.error("an internal exception occured")
+            logger.error("an internal exception occurred")
             logger.exception(ex)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateVolumeResponse()
 
     def DeleteVolume(self, request, context):
-        logger.debug("DeleteVolume")
+        logger.info("DeleteVolume")
         secrets = request.secrets
 
         try:
@@ -141,6 +146,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 except VolumeNotFoundError as ex:
                     logger.debug("volume was not found during deletion: {0}".format(ex))
 
+                except PermissionDeniedError as ex:
+                    context.set_code(grpc.StatusCode.PERMISSION_DENIED)
+                    context.set_details(ex)
+                    return csi_pb2.DeleteVolumeResponse()
+
         except Exception as ex:
             logger.debug("an internal exception occurred")
             logger.exception(ex)
@@ -149,48 +159,58 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return csi_pb2.DeleteVolumeResponse()
 
         logger.debug("generating delete volume response")
-        return csi_pb2.DeleteVolumeResponse()
+        res = csi_pb2.DeleteVolumeResponse()
+        logger.info("finished DeleteVolume")
+        return res
 
     def ControllerPublishVolume(self, request, context):
-        logger.debug("ControllerPublishVolume")
+        logger.info("ControllerPublishVolume")
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        logger.info("finished ControllerPublishVolume")
         return csi_pb2.ControllerPublishVolumeResponse()
 
     def ControllerUnpublishVolume(self, request, context):
-        logger.debug("ControllerUnpublishVolume")
+        logger.info("ControllerUnpublishVolume")
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        logger.info("finished ControllerUnpublishVolume")
         return csi_pb2.ControllerUnpublishVolumeResponse()
 
     def ValidateVolumeCapabilities(self, request, context):
-        logger.debug("ValidateVolumeCapabilities")
+        logger.info("ValidateVolumeCapabilities")
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        logger.info("finished ValidateVolumeCapabilities")
         return csi_pb2.ValidateVolumeCapabilitiesResponse()
 
     def ListVolumes(self, request, context):
-        logger.debug("ListVolumes")
+        logger.info("ListVolumes")
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        logger.info("finished ListVolumes")
         return csi_pb2.ListVolumesResponse()
 
     def GetCapacity(self, request, context):
-        logger.debug("GetCapacity")
+        logger.info("GetCapacity")
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        logger.info("finished GetCapacity")
         return csi_pb2.GetCapacityResponse()
 
     def ControllerGetCapabilities(self, request, context):
-        logger.debug("ControllerGetCapabilities")
+        logger.info("ControllerGetCapabilities")
         types = csi_pb2.ControllerServiceCapability.RPC.Type
 
-        return csi_pb2.ControllerGetCapabilitiesResponse(
+        res = csi_pb2.ControllerGetCapabilitiesResponse(
             capabilities=[csi_pb2.ControllerServiceCapability(
                 rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_VOLUME"))),
                 csi_pb2.ControllerServiceCapability(
                     rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("PUBLISH_UNPUBLISH_VOLUME")))])
 
+        logger.info("finished ControllerGetCapabilities")
+        return res
+
     def __get_identity_config(self, attribute_name):
         return self.cfg['identity'][attribute_name]
 
     def GetPluginInfo(self, request, context):
-        logger.debug("GetPluginInfo")
+        logger.info("GetPluginInfo")
         try:
             name = self.__get_identity_config("name")
             version = self.__get_identity_config("version")
@@ -206,10 +226,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details("plugin name or version cannot be empty")
             return csi_pb2.GetPluginInfoResponse()
 
+        logger.info("finished GetPluginInfo")
         return csi_pb2.GetPluginInfoResponse(name=name, vendor_version=version)
 
     def GetPluginCapabilities(self, request, context):
-        logger.debug("GetPluginCapabilities")
+        logger.info("GetPluginCapabilities")
         types = csi_pb2.PluginCapability.Service.Type
         capabilities = self.__get_identity_config("capabilities")
         capability_list = []
@@ -220,15 +241,17 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 )
             )
 
+        logger.info("finished GetPluginCapabilities")
         return csi_pb2.GetPluginCapabilitiesResponse(
             capabilities=capability_list
 
         )
 
     def Probe(self, request, context):
-        logger.debug("Probe")
+        logger.info("Probe")
         # TODO: add future logic
         context.set_code(grpc.StatusCode.OK)
+        logger.info("finished Probe")
         return csi_pb2.ProbeResponse()
 
     def start_server(self):

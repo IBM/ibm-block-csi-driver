@@ -61,7 +61,7 @@ class TestControllerServerCreateVolume(unittest.TestCase):
         context = utils.FakeContext()
 
         self.mediator.create_volume = Mock()
-        self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn")
+        self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn", "xiv")
         array_type.return_value = "a9k"
         res = self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -207,7 +207,7 @@ class TestControllerServerCreateVolume(unittest.TestCase):
 
         self.request.name = "a" * 128
         self.mediator.create_volume = Mock()
-        self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn")
+        self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn", "xiv")
         array_type.return_value = "a9k"
         res = self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)

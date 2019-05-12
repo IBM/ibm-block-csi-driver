@@ -2,6 +2,7 @@ from controller.common.csi_logger import get_stdout_logger
 import config
 from controller.csi_general import csi_pb2
 from controller.controller_server.errors import ValidationException, VolumeIdError
+import controller.controller_server.messages as messages
 
 logger = get_stdout_logger()
 
@@ -22,31 +23,31 @@ def validate_secret(secret):
         if not (config.SECRET_USERNAME_PARAMETER in secret and
                 config.SECRET_PASSWORD_PARAMETER in secret and
                 config.SECRET_ARRAY_PARAMETER in secret):
-            raise ValidationException('invalid secret was passed')
+            raise ValidationException(messages.invalid_secret_message)
 
     else:
-        raise ValidationException('secret is missing')
+        raise ValidationException(messages.secret_missing_message)
 
 
 def validate_csi_volume_capabilties(capabilities):
     logger.debug("all volume capabilies: {}".format(capabilities))
     if len(capabilities) == 0:
-        raise ValidationException("capbilities were not set")
+        raise ValidationException(messages.capabilities_not_set_message)
 
     for cap in capabilities:
         if cap.mount:
             if cap.mount.fs_type:
                 if cap.mount.fs_type not in config.SUPPORTED_FS_TYPES:
-                    logger.error("unsupported fs_type : {}".format(cap.mount.fs_type))
-                    raise ValidationException("unsupported fs_type")
+                    logger.error("unsupported fs type : {0}".format(cap.mount.fs_type))
+                    raise ValidationException(messages.unsupported_fs_type_message)
 
         else:
             logger.error("only mount volume capability is supported")
-            raise ValidationException("only mount volume capability is supported")
+            raise ValidationException(messages.only_mount_supported_message)
 
         if cap.access_mode.mode not in config.SUPPORTED_ACCESS_MODE:
             logger.error("unsupported access mode : {}".format(cap.access_mode))
-            raise ValidationException("unsupported access mode")
+            raise ValidationException(messages.unsupported_access_mode_message)
 
 
 def validate_create_volume_request(request):
@@ -54,14 +55,14 @@ def validate_create_volume_request(request):
 
     logger.debug("validating volume name")
     if request.name == '':
-        raise ValidationException('name should not be empty')
+        raise ValidationException(messages.name_should_be_empty_message)
 
     logger.debug("validating volume capacity")
     if request.capacity_range:
         if request.capacity_range.required_bytes <= 0:
-            raise ValidationException('size should be bigger then 0')
+            raise ValidationException(messages.size_bigget_then_0_message)
     else:
-        raise ValidationException('no capacity range set')
+        raise ValidationException(messages.no_capacity_range_message)
 
     logger.debug("validating volume capabilities")
     validate_csi_volume_capabilties(request.volume_capabilities)
@@ -73,12 +74,12 @@ def validate_create_volume_request(request):
     logger.debug("validating storage class parameters")
     if request.parameters:
         if not (config.PARAMETERS_CAPACITY in request.parameters):
-            raise ValidationException('Capacity parameter is missing.')
+            raise ValidationException(messages.capacity_is_missing_message)
 
         if not len(request.parameters[config.PARAMETERS_CAPACITY].split(config.PARAMETERS_CAPACITY_DELIMITER)) == 2:
-            raise ValidationException('wrong capacity parameter passed')
+            raise ValidationException(messages.wrong_cpacity_passed_message)
     else:
-        raise ValidationException('parameters are missing')
+        raise ValidationException(messages.params_are_missing_message)
 
     logger.debug("request validation finished.")
 
