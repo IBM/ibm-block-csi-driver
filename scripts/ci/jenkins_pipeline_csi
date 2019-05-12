@@ -1,0 +1,26 @@
+pipeline {
+    agent {
+        label 'docker-engine'
+    }
+    stages {
+        stage ('CSI-controller: Unit testing') {
+            steps {
+                sh 'mkdir -p build/reports && chmod 777 build/reports'
+                sh './scripts/run_unitests.sh `pwd`/build/reports'
+            }
+        }
+        stage ('CSI-controller: Build and push image') {
+            steps {
+                sh './scripts/ci/build_push_images.sh'
+            }
+        }
+    }
+    post {
+        always {
+            sh 'ls -la build/reports/'
+            junit 'build/reports/*.xml'
+            // cobertura coberturaReportFile: 'build/reports/*.xml'   ## TODO need to run cobertura but it has an issue "No such DSL method"
+            sh '[ -d build/reports ] && rm -rf build/reports'
+        }
+    }
+}
