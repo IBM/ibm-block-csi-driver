@@ -1,0 +1,8 @@
+grpcio==1.20.1
+grpcio-tools==1.20.1
+protobuf==3.7.1
+futures==3.2.0
+pyyaml==5.1
+
+# A9000 python client
+pyxcli==1.1.7
