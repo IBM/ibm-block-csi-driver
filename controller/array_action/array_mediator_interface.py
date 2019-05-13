@@ -1,4 +1,5 @@
 import abc
+from builtins import NotImplementedError
 
 
 class ArrayMediator:
@@ -41,7 +42,6 @@ class ArrayMediator:
             VolumeAlreadyExists
             PoolDoesNotExist
             PoolDoesNotMatchCapabilities
-            CapabilityNotSupported (user is passing capability value that does not exist, or wrong spelling..)
             IllegalObjectName
             VolumeNameIsNotSupported 
             PermissionDenied
@@ -176,6 +176,23 @@ class ArrayMediator:
 
         Returns:
            vol size : the minimal size of the volume
+
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def validate_supported_capabilities(self,capabilities):
+        """
+        This function will check if the capabilities passed to the create volume are valid
+
+        Args:
+           capabilities : as passed from the storage class
+
+        Returns:
+
+
+        Errors:
+            CapabilityNotSupported
 
         """
         raise NotImplementedError

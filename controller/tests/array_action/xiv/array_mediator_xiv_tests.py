@@ -3,7 +3,7 @@ from pyxcli import errors as xcli_errors
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from mock import patch, Mock
 import controller.array_action.errors as array_errors
-from controller.tests import utils
+from controller.tests.array_action.xiv import utils
 
 
 class TestArrayMediatorXIV(unittest.TestCase):
@@ -64,18 +64,6 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.is_connected = lambda: False
         self.mediator.disconnect()
         self.mediator.client.close.assert_called_once_with()
-
-    @patch.object(XIVArrayMediator, "_validate_capabiliy_supported")
-    def test_create_volume_CapabilityNotSupported(self, validate_caps):
-        validate_caps.return_value = False
-        with self.assertRaises(array_errors.CapabilityNotSupported):
-            self.mediator.create_volume("vol", 10, [], "pool1")
-
-    @patch.object(XIVArrayMediator, "_validate_pool_capabilities")
-    def test_create_volume_CapabilityNotSupported(self, validate_pool):
-        validate_pool.return_value = False
-        with self.assertRaises(array_errors.PoolDoesNotMatchCapabilities):
-            self.mediator.create_volume("vol", 10, [], "pool1")
 
     def test_create_volume_return_illegal_name_for_object(self):
         self.mediator.client.cmd.vol_create.side_effect = [xcli_errors.IllegalNameForObjectError("", "vol", "")]

@@ -3,6 +3,7 @@ from mock import patch, Mock
 from controller.csi_general import csi_pb2
 from controller.controller_server.csi_controller_server import ControllerServicer
 import controller.controller_server.utils as utils
+from controller.controller_server.errors import ValidationException
 
 
 class TestUtils(unittest.TestCase):
@@ -16,27 +17,27 @@ class TestUtils(unittest.TestCase):
         password = "pass"
         mgmt = "mg"
         secrets = {"username": username, "password": password, "management_address": mgmt}
-        res, msg = utils.validate_secret(secrets)
-        self.assertEqual(res, True)
 
-        res, msg = utils.validate_secret(None)
-        self.assertEqual(res, False)
+        utils.validate_secret(secrets)
+
+        with self.assertRaises(ValidationException):
+            utils.validate_secret(None)
 
         secrets = {"username": username, "password": password}
-        res, msg = utils.validate_secret(secrets)
-        self.assertEqual(res, False)
+        with self.assertRaises(ValidationException):
+            utils.validate_secret(secrets)
 
         secrets = {"username": username, "management_address": mgmt}
-        res, msg = utils.validate_secret(secrets)
-        self.assertEqual(res, False)
+        with self.assertRaises(ValidationException):
+            utils.validate_secret(secrets)
 
         secrets = {"password": password, "management_address": mgmt}
-        res, msg = utils.validate_secret(secrets)
-        self.assertEqual(res, False)
+        with self.assertRaises(ValidationException):
+            utils.validate_secret(secrets)
 
         secrets = {}
-        res, msg = utils.validate_secret(secrets)
-        self.assertEqual(res, False)
+        with self.assertRaises(ValidationException):
+            utils.validate_secret(secrets)
 
     def test_validate_volume_capabilities(self):
         caps = Mock()
@@ -45,95 +46,87 @@ class TestUtils(unittest.TestCase):
         access_types = csi_pb2.VolumeCapability.AccessMode
         caps.access_mode.mode = access_types.SINGLE_NODE_WRITER
 
-        res, msg = utils.validate_volume_capabilties([caps])
-        self.assertEqual(res, True)
+        utils.validate_csi_volume_capabilties([caps])
 
-        res, msg = utils.validate_volume_capabilties([])
-        self.assertEqual(res, False)
+        with self.assertRaises(ValidationException):
+            utils.validate_csi_volume_capabilties([])
 
         caps.mount.fs_type = "ext41"
-        res, msg = utils.validate_volume_capabilties([caps])
-        self.assertEqual(res, False)
+        with self.assertRaises(ValidationException):
+            utils.validate_csi_volume_capabilties([caps])
 
         caps.mount.fs_type = "ext4"
         caps.access_mode.mode = access_types.SINGLE_NODE_READER_ONLY
-        res, msg = utils.validate_volume_capabilties([caps])
-        self.assertEqual(res, False)
+        with self.assertRaises(ValidationException):
+            utils.validate_csi_volume_capabilties([caps])
 
         caps = Mock()
         caps.mount = None
         caps.access_mode.mode = access_types.SINGLE_NODE_READER_ONLY
-        res, msg = utils.validate_volume_capabilties([caps])
-        self.assertEqual(res, False)
+        with self.assertRaises(ValidationException):
+            utils.validate_csi_volume_capabilties([caps])
 
     @patch('controller.controller_server.utils.validate_secret')
-    @patch('controller.controller_server.utils.validate_volume_capabilties')
+    @patch('controller.controller_server.utils.validate_csi_volume_capabilties')
     def test_validate_create_volume_request(self, valiate_capabilities, validate_secret):
         request = Mock()
-        # request.name = "name"
-
-        # request.parameters = {"capacity": "pool=pool1", "capabilities": ""}
         request.name = ""
 
-        res, msg = utils.validate_create_volume_request(request)
-        self.assertEqual(res, False)
-        self.assertTrue("name" in msg)
+        with self.assertRaises(ValidationException) as ex:
+            utils.validate_create_volume_request(request)
+            self.assertTrue("name" in ex.message)
 
         request.name = "name"
 
         request.capacity_range.required_bytes = -1
 
-        res, msg = utils.validate_create_volume_request(request)
-        self.assertEqual(res, False)
-        self.assertTrue("size" in msg)
+        with self.assertRaises(ValidationException) as ex:
+            utils.validate_create_volume_request(request)
+            self.assertTrue("size" in ex.message)
 
 
         request.capacity_range.required_bytes = 10
-        valiate_capabilities.return_value = (False, "msg")
+        valiate_capabilities.side_effect = ValidationException("msg")
 
-        res, msg = utils.validate_create_volume_request(request)
-        self.assertEqual(res, False)
-        self.assertTrue("msg" in msg)
+        with self.assertRaises(ValidationException) as ex:
+            utils.validate_create_volume_request(request)
+            self.assertTrue("msg" in ex.message)
 
-        valiate_capabilities.return_value = (True, "")
+        valiate_capabilities.side_effect = None
 
-        validate_secret.return_value = (False, "other msg")
+        validate_secret.side_effect = ValidationException(" other msg")
 
-        res, msg = utils.validate_create_volume_request(request)
-        self.assertEqual(res, False)
-        self.assertTrue("other msg" in msg)
+        with self.assertRaises(ValidationException) as ex:
+            utils.validate_create_volume_request(request)
+            self.assertTrue("other msg" in ex.message)
 
-        validate_secret.return_value = (True, "")
-
-        # request.parameters = {"capacity": "pool={0}".format(self.pool), "capabilities": ""}
-        request.parameters = {"capacity": "pool=pool1"}
-
-        res, msg = utils.validate_create_volume_request(request)
-        self.assertEqual(res, False)
-        self.assertTrue("parameters" in msg)
+        validate_secret.side_effect = None
 
         request.parameters = {"capabilities": ""}
 
-        res, msg = utils.validate_create_volume_request(request)
-        self.assertEqual(res, False)
-        self.assertTrue("parameters" in msg)
+        with self.assertRaises(ValidationException) as ex:
+            utils.validate_create_volume_request(request)
+            self.assertTrue("parameters" in ex.message)
 
         request.parameters = {}
 
-        res, msg = utils.validate_create_volume_request(request)
-        self.assertEqual(res, False)
-        self.assertTrue("parameters" in msg)
+        with self.assertRaises(ValidationException) as ex:
+            utils.validate_create_volume_request(request)
+            self.assertTrue("parameters" in ex.message)
 
         request.parameters = None
 
-        res, msg = utils.validate_create_volume_request(request)
-        self.assertEqual(res, False)
-        self.assertTrue("parameters" in msg)
+        with self.assertRaises(ValidationException) as ex:
+            utils.validate_create_volume_request(request)
+            self.assertTrue("parameters" in ex.message)
 
         request.parameters = {"capacity": "pool=pool1", "capabilities": ""}
 
-        res, msg = utils.validate_create_volume_request(request)
-        self.assertEqual(res, True)
+        utils.validate_create_volume_request(request)
+
+        request.parameters = {"capacity": "pool=pool1"}
+        utils.validate_create_volume_request(request)
+
 
         request.capacity_range.required_bytes = 0
 
@@ -145,16 +138,19 @@ class TestUtils(unittest.TestCase):
         new_vol = Mock()
         new_vol.volume_name = "name"
         new_vol.array_name = ["fqdn1", "fqdn2"]
+
         new_vol.pool_name = "pool"
-        new_vol.storage_type = "a9k"
+        new_vol.array_type = "a9k"
         new_vol.capacity_bytes = 10
 
         get_vol_id.return_value = "a9k:name"
+        res = utils.generate_csi_create_volume_response(new_vol)
 
-        res = utils.get_create_volume_response(new_vol)
         self.assertEqual(10, res.volume.capacity_bytes)
 
         get_vol_id.side_effect = [Exception("err")]
 
-        res = utils.get_create_volume_response(new_vol)
-        self.assertNotEqual(10, res.volume.capacity_bytes)
+
+        with self.assertRaises(Exception):
+            utils.generate_csi_create_volume_response(new_vol)
+
