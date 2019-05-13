@@ -138,6 +138,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         try:
             # TODO : pass multiple array addresses
             with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
+
                 logger.debug(array_mediator)
 
                 try:

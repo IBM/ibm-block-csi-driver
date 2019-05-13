@@ -51,8 +51,8 @@ class TestGetconnection(unittest.TestCase):
         self.assertEqual(array_connection_manager.array_connections_dict, {self.fqdn: 1})
 
         new_fqdn = "new-fqdn"
-
         array_connection2 = ArrayConnectionManager("user", "password",[new_fqdn], XIVArrayMediator.ARRAY_TYPE)
+
         array_connection2.get_array_connection()
         self.assertEqual(array_connection_manager.array_connections_dict, {self.fqdn: 1, new_fqdn: 1})
 
@@ -91,9 +91,12 @@ class TestGetconnection(unittest.TestCase):
 
         socket_connet.side_effect = [1, 1, 0, 0]
 
+
         res = self.array_connection.detect_array_type()
         self.assertEqual(res, SVCArrayMediator.ARRAY_TYPE)
 
         socket_connet.side_effect = [1, 1, 1, 1]
         with self.assertRaises(FailedToFindStorageSystemType):
             self.array_connection.detect_array_type()
+
+

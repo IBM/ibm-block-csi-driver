@@ -132,6 +132,7 @@ class TestUtils(unittest.TestCase):
         new_vol = Mock()
         new_vol.volume_name = "name"
         new_vol.array_name = ["fqdn1", "fqdn2"]
+
         new_vol.pool_name = "pool"
         new_vol.array_type = "a9k"
         new_vol.capacity_bytes = 10
@@ -142,6 +143,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(10, res.volume.capacity_bytes)
 
         get_vol_id.side_effect = [Exception("err")]
+
 
         with self.assertRaises(Exception):
             utils.generate_csi_create_volume_response(new_vol)

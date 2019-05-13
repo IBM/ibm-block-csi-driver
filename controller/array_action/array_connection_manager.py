@@ -86,11 +86,13 @@ class ArrayConnectionManager(object):
                 logger.debug("adding new connection to new endpoint : {}".format(self.first_endpoint))
                 array_connections_dict[self.first_endpoint] = 1
 
+
             logger.debug("got connection lock. array connection dict is: {}".format(array_connections_dict))
             try:
                 self.med_class = med_class(self.user, self.password, self.endpoints)
             except Exception as ex:
                 array_connections_dict[self.first_endpoint] -= 1
+
                 raise ex
 
             self.connected = True
