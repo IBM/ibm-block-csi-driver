@@ -44,12 +44,12 @@ class ArrayConnectionManager(object):
         self.user = user
         self.password = password
         self.endpoints = endpoint
-        self.first_endpoint = endpoint[0]
+        self.endpoint_key = ",".join(self.endpoints)
 
         if self.array_type is None:
             self.array_type = self.detect_array_type()
 
-        connection_lock_dict[self.first_endpoint] = Lock()
+        connection_lock_dict[self.endpoint_key] = Lock()
         self.med_class = None
         self.connected = False
 
@@ -60,11 +60,14 @@ class ArrayConnectionManager(object):
 
     def __exit__(self, type, value, traceback):
         logger.debug("closing the connection")
-        with connection_lock_dict[self.first_endpoint]:  # TODO: when moving to python 3 add tiemout!
+        with connection_lock_dict[self.endpoint_key]:  # TODO: when moving to python 3 add tiemout!
             if self.connected:
                 self.med_class.disconnect()
                 logger.debug("reducing the connection count")
-                array_connections_dict[self.first_endpoint] -= 1
+                if array_connections_dict[self.endpoint_key]  == 1 :
+                    del array_connections_dict[self.endpoint_key]
+                else:
+                    array_connections_dict[self.endpoint_key] -= 1
                 logger.debug("removing the connection  : {}".format(array_connections_dict))
                 self.connected = False
 
@@ -72,26 +75,29 @@ class ArrayConnectionManager(object):
         logger.debug("get array connection")
         med_class = self.array_mediator_class_dict[self.array_type]
 
-        with connection_lock_dict[self.first_endpoint]:  # TODO: when moving to python 3 - add timeout to the lock!
-            if self.first_endpoint in array_connections_dict:
+        with connection_lock_dict[self.endpoint_key]:  # TODO: when moving to python 3 - add timeout to the lock!
+            if self.endpoint_key in array_connections_dict:
 
-                if array_connections_dict[self.first_endpoint] < med_class.CONNECTION_LIMIT:
+                if array_connections_dict[self.endpoint_key] < med_class.CONNECTION_LIMIT:
                     logger.debug("adding new connection ")
-                    array_connections_dict[self.first_endpoint] += 1
+                    array_connections_dict[self.endpoint_key] += 1
 
                 else:
                     logger.error("failed to get connection. current connections: {}".format(array_connections_dict))
-                    raise NoConnectionAvailableException(self.first_endpoint)
+                    raise NoConnectionAvailableException(self.endpoint_key)
             else:
-                logger.debug("adding new connection to new endpoint : {}".format(self.first_endpoint))
-                array_connections_dict[self.first_endpoint] = 1
+                logger.debug("adding new connection to new endpoint : {}".format(self.endpoint_key))
+                array_connections_dict[self.endpoint_key] = 1
 
 
             logger.debug("got connection lock. array connection dict is: {}".format(array_connections_dict))
             try:
                 self.med_class = med_class(self.user, self.password, self.endpoints)
             except Exception as ex:
-                array_connections_dict[self.first_endpoint] -= 1
+                if array_connections_dict[self.endpoint_key]  == 1 :
+                    del array_connections_dict[self.endpoint_key]
+                else:
+                    array_connections_dict[self.endpoint_key] -= 1
 
                 raise ex
 
@@ -107,5 +113,5 @@ class ArrayConnectionManager(object):
                     logger.debug("storage array type is : {0}".format(self.array_type))
                     return storage_type
 
-        raise FailedToFindStorageSystemType(self.first_endpoint)
+        raise FailedToFindStorageSystemType(self.endpoints)
 
