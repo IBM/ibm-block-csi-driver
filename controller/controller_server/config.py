@@ -12,4 +12,5 @@ SECRET_ARRAY_PARAMETER = "management_address"
 PARAMETERS_CAPACITY = "capacity"
 PARAMETERS_CAPABILITIES = "capabilities"
 PARAMETERS_PREFIX = "volume_name_prefix"
+PARAMETERS_CAPACITY_DELIMITER = "="
 
