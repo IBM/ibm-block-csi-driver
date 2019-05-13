@@ -58,6 +58,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.debug("no capabilities passed for this volume creation")
             capabilities = None
 
+        if config.PARAMETERS_PREFIX in request.parameters:
+            volume_prefix = request.parameters[config.PARAMETERS_PREFIX]
+            volume_name = volume_prefix + "_" + volume_name
+
         try:
             # TODO : pass multiple array addresses
             with ArrayConnectionManager(user, password, array_addresses) as array_mediator:
