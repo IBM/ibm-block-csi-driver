@@ -87,7 +87,7 @@ class XIVArrayMediator(ArrayMediator):
         return float(size_in_bytes) / self.BLOCK_SIZE_IN_BYTES
 
     def get_minimal_volume_size_in_bytes(self):
-        return 1 * 1024 * 1024 * 1024
+        return 1 * 1024 * 1024 * 1024  # 1 GiB
 
     def create_volume(self, name, size_in_bytes, capabilities, pool):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with capabilities : {}".format(
