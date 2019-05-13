@@ -1,6 +1,4 @@
 import abc
-from builtins import NotImplementedError
-
 
 class ArrayMediator:
 
