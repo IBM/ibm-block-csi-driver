@@ -86,7 +86,7 @@ def validate_create_volume_request(request):
 
 def generate_csi_create_volume_response(new_vol):
     vol_context = {"volume_name": new_vol.volume_name,
-                   "array_name": new_vol.array_name,
+                   "array_name": ",".join(new_vol.array_name),
                    "pool_name": new_vol.pool_name,
                    "storage_type": new_vol.array_type
                    }

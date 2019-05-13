@@ -11,14 +11,14 @@ class TestWithFunctionality(unittest.TestCase):
 
     def setUp(self):
         self.fqdn = "fqdn"
-        self.array_connection = ArrayConnectionManager("user", "password", self.fqdn, XIVArrayMediator.ARRAY_TYPE)
+        self.array_connection = ArrayConnectionManager("user", "password", [self.fqdn, self.fqdn] , XIVArrayMediator.ARRAY_TYPE)
 
     @patch("controller.array_action.array_connection_manager.XIVArrayMediator._connect")
     @patch("controller.array_action.array_connection_manager.XIVArrayMediator.disconnect")
     def test_with_opens_and_closes_the_connection(self, close, connect):
         with self.array_connection as array_mediator:
             self.assertEqual(self.array_connection.connected, True)
-            self.assertEqual(array_mediator.endpoint, self.fqdn)
+            self.assertEqual(array_mediator.endpoint, [self.fqdn, self.fqdn])
         connect.assert_called_with()
         close.assert_called_with()
 
@@ -38,7 +38,9 @@ class TestGetconnection(unittest.TestCase):
 
     def setUp(self):
         self.fqdn = "fqdn"
-        self.array_connection = ArrayConnectionManager("user", "password", self.fqdn, XIVArrayMediator.ARRAY_TYPE)
+        self.connections = [self.fqdn, self.fqdn]
+        self.connection_key = ",".join(self.connections )
+        self.array_connection = ArrayConnectionManager("user", "password", self.connections, XIVArrayMediator.ARRAY_TYPE)
         array_connection_manager.array_connections_dict = {}
 
     def tearDown(self):
@@ -48,26 +50,27 @@ class TestGetconnection(unittest.TestCase):
     def test_connection_adds_the_new_endpoint_for_the_first_time(self, connect):
         self.assertEqual(array_connection_manager.array_connections_dict, {})
         self.array_connection.get_array_connection()
-        self.assertEqual(array_connection_manager.array_connections_dict, {self.fqdn: 1})
+        self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 1})
 
         new_fqdn = "new-fqdn"
-        array_connection2 = ArrayConnectionManager("user", "password", new_fqdn, XIVArrayMediator.ARRAY_TYPE)
+        array_connection2 = ArrayConnectionManager("user", "password",[new_fqdn], XIVArrayMediator.ARRAY_TYPE)
+
         array_connection2.get_array_connection()
-        self.assertEqual(array_connection_manager.array_connections_dict, {self.fqdn: 1, new_fqdn: 1})
+        self.assertEqual(array_connection_manager.array_connections_dict, { self.connection_key: 1, new_fqdn: 1})
 
     @patch("controller.array_action.array_connection_manager.XIVArrayMediator._connect")
     def test_connection_adds_connections_to_connection_dict(self, connect):
         self.assertEqual(array_connection_manager.array_connections_dict, {})
         self.array_connection.get_array_connection()
-        self.assertEqual(array_connection_manager.array_connections_dict, {self.fqdn: 1})
+        self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 1})
 
         self.array_connection.get_array_connection()
-        self.assertEqual(array_connection_manager.array_connections_dict, {self.fqdn: 2})
+        self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 2})
 
     @patch("controller.array_action.array_connection_manager.XIVArrayMediator._connect")
     def test_connection_returns_error_on_too_many_connection(self, connect):
         array_connection_manager.array_connections_dict = {
-            self.fqdn: array_connection_manager.XIVArrayMediator.CONNECTION_LIMIT}
+            self.connection_key: array_connection_manager.XIVArrayMediator.CONNECTION_LIMIT}
         with self.assertRaises(NoConnectionAvailableException):
             self.array_connection.get_array_connection()
 
@@ -88,11 +91,33 @@ class TestGetconnection(unittest.TestCase):
         res = self.array_connection.detect_array_type()
         self.assertEqual(res, XIVArrayMediator.ARRAY_TYPE)
 
-        socket_connet.side_effect = [1, 0]
+        socket_connet.side_effect = [1, 1, 0, 0]
+
 
         res = self.array_connection.detect_array_type()
         self.assertEqual(res, SVCArrayMediator.ARRAY_TYPE)
 
-        socket_connet.side_effect = [1, 1]
+        socket_connet.side_effect = [1, 1, 1, 1]
         with self.assertRaises(FailedToFindStorageSystemType):
-            res = self.array_connection.detect_array_type()
+            self.array_connection.detect_array_type()
+
+    @patch("controller.array_action.array_connection_manager.XIVArrayMediator._connect")
+    def test_exit_reduces_connection_to_zero(self, connect):
+        self.array_connection.get_array_connection()
+        self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 1})
+
+        self.array_connection.__exit__("", "", None)
+        self.assertEqual(array_connection_manager.array_connections_dict, {})
+
+
+    @patch("controller.array_action.array_connection_manager.XIVArrayMediator._connect")
+    def test_exit_reduces_connection(self, connect):
+        self.array_connection.get_array_connection()
+        self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 1})
+
+        self.array_connection.get_array_connection()
+        self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 2})
+
+        self.array_connection.__exit__("", "", None)
+        self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 1})
+

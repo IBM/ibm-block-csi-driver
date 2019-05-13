@@ -127,19 +127,23 @@ class TestUtils(unittest.TestCase):
         utils.validate_create_volume_request(request)
 
 
-    def test_get_create_volume_response(self):
+    @patch("controller.controller_server.utils.get_vol_id")
+    def test_get_create_volume_response(self, get_vol_id):
         new_vol = Mock()
         new_vol.volume_name = "name"
-        new_vol.array_name = "array"
+        new_vol.array_name = ["fqdn1", "fqdn2"]
+
         new_vol.pool_name = "pool"
         new_vol.array_type = "a9k"
         new_vol.capacity_bytes = 10
 
+        get_vol_id.return_value = "a9k:name"
         res = utils.generate_csi_create_volume_response(new_vol)
+
         self.assertEqual(10, res.volume.capacity_bytes)
 
-        new_vol = Mock()
-        new_vol.volume_name.side_effect = [Exception("err")]
+        get_vol_id.side_effect = [Exception("err")]
+
 
         with self.assertRaises(Exception):
             utils.generate_csi_create_volume_response(new_vol)
