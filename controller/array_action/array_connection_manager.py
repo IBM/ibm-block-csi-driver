@@ -2,20 +2,29 @@ from threading import Lock
 import socket
 
 from controller.common.csi_logger import get_stdout_logger
-from errors import NoConnectionAvailableException, FailedToFindStorageSystemType
+from controller.array_action.errors import NoConnectionAvailableException, FailedToFindStorageSystemType
 from array_mediator_xiv import XIVArrayMediator
 from array_mediator_svc import SVCArrayMediator
 
 connection_lock_dict = {}
 array_connections_dict = {}
 
-xiv_type = XIVArrayMediator.ARRAY_TYPE
-svc_type = SVCArrayMediator.ARRAY_TYPE
 
 logger = get_stdout_logger()
 
 
-def _socket_connect(ipaddr, port, timeout=1):
+def _socket_connect_test(ipaddr, port, timeout=1):
+    '''
+    function to test socket connection to ip:port.
+
+    :param ipaddr: ip address
+    :param port: port
+    :param timeout: connection timeout
+
+    :return:  0 - on successful connection
+             -1 for exception + other return codes for connection errors.
+
+    '''
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(timeout)
@@ -30,7 +39,7 @@ def _socket_connect(ipaddr, port, timeout=1):
 class ArrayConnectionManager(object):
 
     def __init__(self, user, password, endpoint, array_type=None):  # TODO return the params back.
-        self.array_mediator_class_dict = {xiv_type: XIVArrayMediator, svc_type: SVCArrayMediator}
+        self.array_mediator_class_dict = {XIVArrayMediator.ARRAY_TYPE: XIVArrayMediator, SVCArrayMediator.ARRAY_TYPE: SVCArrayMediator}
         self.array_type = array_type
         self.user = user
         self.password = password
@@ -38,9 +47,7 @@ class ArrayConnectionManager(object):
         self.first_endpoint = endpoint[0]
 
         if self.array_type is None:
-            logger.debug("detectin array connection type")
             self.array_type = self.detect_array_type()
-            logger.debug("storage array type is : {0}".format(self.array_type))
 
         connection_lock_dict[self.first_endpoint] = Lock()
         self.med_class = None
@@ -91,8 +98,12 @@ class ArrayConnectionManager(object):
             return self.med_class
 
     def detect_array_type(self):
-        for storage_type, port in [(xiv_type, 7778), (svc_type, 22)]:  # ds8k : 8452
+        logger.debug("detecting array connection type")
+        for storage_type, port in [(XIVArrayMediator.ARRAY_TYPE, XIVArrayMediator.PORT), (SVCArrayMediator.ARRAY_TYPE, XIVArrayMediator.PORT)]:  # ds8k : 8452
             for endpoint in self.endpoints:
-                if _socket_connect(endpoint, port) == 0:
+                if _socket_connect_test(endpoint, port) == 0:
+                    logger.debug("storage array type is : {0}".format(self.array_type))
                     return storage_type
+
         raise FailedToFindStorageSystemType(self.first_endpoint)
+
