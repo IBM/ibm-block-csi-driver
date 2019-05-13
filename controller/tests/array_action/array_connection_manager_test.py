@@ -101,4 +101,23 @@ class TestGetconnection(unittest.TestCase):
         with self.assertRaises(FailedToFindStorageSystemType):
             self.array_connection.detect_array_type()
 
+    @patch("controller.array_action.array_connection_manager.XIVArrayMediator._connect")
+    def test_exit_reduces_connection_to_zero(self, connect):
+        self.array_connection.get_array_connection()
+        self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 1})
+
+        self.array_connection.__exit__("", "", None)
+        self.assertEqual(array_connection_manager.array_connections_dict, {})
+
+
+    @patch("controller.array_action.array_connection_manager.XIVArrayMediator._connect")
+    def test_exit_reduces_connection(self, connect):
+        self.array_connection.get_array_connection()
+        self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 1})
+
+        self.array_connection.get_array_connection()
+        self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 2})
+
+        self.array_connection.__exit__("", "", None)
+        self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 1})
 
