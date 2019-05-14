@@ -1,6 +1,5 @@
 import abc
 
-
 class ArrayMediator:
 
     @abc.abstractmethod
@@ -163,6 +162,19 @@ class ArrayMediator:
             multipleHostsFoundError
             PermissionDenied
         
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_minimal_volume_size_in_bytes(self):
+        """
+        This function will return the default volume size for volume
+
+        Args:
+
+        Returns:
+           vol size : the minimal size of the volume
+
         """
         raise NotImplementedError
 

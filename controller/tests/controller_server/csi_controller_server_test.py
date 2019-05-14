@@ -251,6 +251,21 @@ class TestControllerServerCreateVolume(unittest.TestCase):
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.mediator.create_volume.assert_called_once_with("prefix_some_name", 10 , "", "pool1")
 
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_create_volume_with_zero_size(self, a_exit, a_enter, array_type):
+        a_enter.return_value = self.mediator
+        context = utils.FakeContext()
+
+        self.request.capacity_range.required_bytes = 0
+        self.mediator.create_volume = Mock()
+        self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn", "xiv")
+        array_type.return_value = "a9k"
+        res = self.servicer.CreateVolume(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.OK)
+        self.mediator.create_volume.assert_called_once_with(self.request.name, 1*1024*1024*1024, "", "pool1")
+
 
 class TestControllerServerDeleteVolume(unittest.TestCase):
 

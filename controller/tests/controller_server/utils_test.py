@@ -78,7 +78,7 @@ class TestUtils(unittest.TestCase):
 
         request.name = "name"
 
-        request.capacity_range.required_bytes = 0
+        request.capacity_range.required_bytes = -1
 
         with self.assertRaises(ValidationException) as ex:
             utils.validate_create_volume_request(request)
@@ -126,6 +126,8 @@ class TestUtils(unittest.TestCase):
         request.parameters = {"capacity": "pool=pool1"}
         utils.validate_create_volume_request(request)
 
+        request.capacity_range.required_bytes = 0
+        utils.validate_create_volume_request(request)
 
     @patch("controller.controller_server.utils.get_vol_id")
     def test_get_create_volume_response(self, get_vol_id):
@@ -144,7 +146,5 @@ class TestUtils(unittest.TestCase):
 
         get_vol_id.side_effect = [Exception("err")]
 
-
         with self.assertRaises(Exception):
             utils.generate_csi_create_volume_response(new_vol)
-
