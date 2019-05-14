@@ -1,7 +1,7 @@
 from array_mediator_interface import  ArrayMediator
 
 class SVCArrayMediator(ArrayMediator):
-    CONNECTION_LIMIT = 10
-    PORT = 22
-    ARRAY_TYPE = "svc"
+    max_connections = 10
+    port = 22
+    array_type = "svc"
     pass

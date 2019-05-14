@@ -1,5 +1,6 @@
 import abc
 
+
 class ArrayMediator:
 
     @abc.abstractmethod
@@ -13,12 +14,16 @@ class ArrayMediator:
             password : password for connecting to the endpoint
             endpoint : storage array fqdn or ip
         
-        Returns:  
-            empty.
-            
         Errors:
             CredentialsError
         
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def disconnect(self):
+        """
+        This function disconnect the storage system connection that was opened in the init phase.
         """
         raise NotImplementedError
 
@@ -55,9 +60,6 @@ class ArrayMediator:
         Args:
             vol_id : wwn of the volume to delete
         
-        Returns:  
-           empty
-            
         Errors:
             volumeNotFound
             PermissionDenied
@@ -132,9 +134,6 @@ class ArrayMediator:
            volume_id : the volume WWN.
            host_name : the name of the host to map the volume to.
         
-        Returns:  
-           empty
-            
         Errors:
             volumeNotFound
             volAlreadyUnmapped
@@ -161,19 +160,6 @@ class ArrayMediator:
             hostNotFound
             multipleHostsFoundError
             PermissionDenied
-        
-        """
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def get_minimal_volume_size_in_bytes(self):
-        """
-        This function will return the default volume size for volume
-
-        Args:
-
-        Returns:
-           vol size : the minimal size of the volume
 
         """
         raise NotImplementedError
@@ -194,3 +180,36 @@ class ArrayMediator:
 
         """
         raise NotImplementedError
+
+
+
+
+
+    @abc.abstractproperty
+    def array_type(self):
+        """
+        The storage system type.
+        """
+        raise NotImplementedError
+
+    @abc.abstractproperty
+    def port(self):
+        """
+        The storage system managment port number.
+        """
+        raise NotImplementedError
+
+    @abc.abstractproperty
+    def max_vol_name_length(self):
+        """
+        The max number of concurrent connections to the storage system.
+        """
+        raise NotImplementedError
+
+    @abc.abstractproperty
+    def max_connections(self):
+        """
+        The max number of concurrent connections to the storage system.
+        """
+        raise NotImplementedError
+

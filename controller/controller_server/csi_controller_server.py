@@ -67,10 +67,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             with ArrayConnectionManager(user, password, array_addresses) as array_mediator:
                 logger.debug(array_mediator)
 
-                if len(volume_name) > array_mediator.MAX_VOL_NAME_LENGTH:
-                    volume_name = volume_name[:array_mediator.MAX_VOL_NAME_LENGTH]
+                if len(volume_name) > array_mediator.max_vol_name_length:
+                    volume_name = volume_name[:array_mediator.max_vol_name_length]
                     logger.warning("volume name is too long - cutting it to be of size : {0}. new name : {1}".format(
-                        array_mediator.MAX_VOL_NAME_LENGTH, volume_name))
+                        array_mediator.max_vol_name_length, volume_name))
 
                 size = request.capacity_range.required_bytes
 

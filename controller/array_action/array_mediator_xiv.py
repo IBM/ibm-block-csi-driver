@@ -12,14 +12,24 @@ logger = get_stdout_logger()
 
 
 class XIVArrayMediator(ArrayMediator):
-    ARRAY_TYPE = 'XIV'
-    PORT = 7778
     ARRAY_ACTIONS = {}
-
     BLOCK_SIZE_IN_BYTES = 512
-    CONNECTION_LIMIT = 3
-    MAX_CONNECTION_RETRY = 3
-    MAX_VOL_NAME_LENGTH = 63
+
+    @property
+    def array_type(self):
+       return 'XIV'
+
+    @property
+    def port(self):
+       return 7778
+
+    @property
+    def max_vol_name_length(self):
+       return 63
+
+    @property
+    def max_connections(self):
+       return 2
 
     def __init__(self, user, password, endpoint):
         self.user = user
@@ -57,7 +67,7 @@ class XIVArrayMediator(ArrayMediator):
                       cli_volume.name,
                       self.endpoint,
                       cli_volume.pool_name,
-                      self.ARRAY_TYPE)
+                      self.array_type)
 
     def get_volume(self, vol_name):
         logger.debug("Get volume : {}".format(vol_name))
