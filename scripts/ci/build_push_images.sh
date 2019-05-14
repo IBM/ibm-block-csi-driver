@@ -27,3 +27,7 @@ echo ""
 echo "Image ready:"
 echo "   ${ctl_tag_specific}"
 [ "$tag_latest" = "true" ] && echo "   ${ctl_tag_latest}" || :
+
+# if param $1 given the script echo the specific tag
+[ -n "$1" ] && echo ${ctl_tag_specific} > $1 || :
+
