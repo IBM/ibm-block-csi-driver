@@ -23,6 +23,9 @@ class ArrayMediator:
     def disconnect(self):
         """
         This function disconnect the storage system connection that was opened in the init phase.
+
+        Returns:
+            None
         """
         raise NotImplementedError
 
@@ -57,7 +60,10 @@ class ArrayMediator:
         
         Args:
             vol_id : wwn of the volume to delete
-        
+
+        Returns:
+            None
+
         Raises:
             volumeNotFound
             PermissionDenied
