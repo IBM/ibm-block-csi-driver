@@ -75,7 +75,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 size = request.capacity_range.required_bytes
 
                 if size == 0:
-                    size = array_mediator.get_minimal_volume_size_in_bytes()
+                    size = array_mediator.minimal_volume_size_in_bytes
                     logger.debug("requested size is 0 so the default size will be used : {0} ".format(
                         size))
                 try:

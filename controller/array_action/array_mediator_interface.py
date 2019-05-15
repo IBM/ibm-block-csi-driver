@@ -213,3 +213,12 @@ class ArrayMediator:
         """
         raise NotImplementedError
 
+    @abc.abstractproperty
+    def minimal_volume_size_in_bytes(self):
+        """
+        The minimal volume size in bytes (used in case trying to provision volume with zero size).
+        """
+        raise NotImplementedError
+
+
+

@@ -31,6 +31,10 @@ class XIVArrayMediator(ArrayMediator):
     def max_connections(self):
        return 2
 
+    @property
+    def minimal_volume_size_in_bytes(self):
+        return 1 * 1024 * 1024 * 1024  # 1 GiB
+
     def __init__(self, user, password, endpoint):
         self.user = user
         self.password = password
@@ -95,9 +99,6 @@ class XIVArrayMediator(ArrayMediator):
     def _convert_size_bytes_to_blocks(self, size_in_bytes):
         """:rtype: float"""
         return float(size_in_bytes) / self.BLOCK_SIZE_IN_BYTES
-
-    def get_minimal_volume_size_in_bytes(self):
-        return 1 * 1024 * 1024 * 1024  # 1 GiB
 
     def create_volume(self, name, size_in_bytes, capabilities, pool):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with capabilities : {}".format(
