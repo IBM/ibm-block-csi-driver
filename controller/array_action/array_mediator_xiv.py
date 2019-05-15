@@ -12,14 +12,28 @@ logger = get_stdout_logger()
 
 
 class XIVArrayMediator(ArrayMediator):
-    ARRAY_TYPE = 'XIV'
-    PORT = 7778
     ARRAY_ACTIONS = {}
-
     BLOCK_SIZE_IN_BYTES = 512
-    CONNECTION_LIMIT = 3
-    MAX_CONNECTION_RETRY = 3
-    MAX_VOL_NAME_LENGTH = 63
+
+    @property
+    def array_type(self):
+       return 'XIV'
+
+    @property
+    def port(self):
+       return 7778
+
+    @property
+    def max_vol_name_length(self):
+       return 63
+
+    @property
+    def max_connections(self):
+       return 2
+
+    @property
+    def minimal_volume_size_in_bytes(self):
+        return 1 * 1024 * 1024 * 1024  # 1 GiB
 
     def __init__(self, user, password, endpoint):
         self.user = user
@@ -57,7 +71,7 @@ class XIVArrayMediator(ArrayMediator):
                       cli_volume.name,
                       self.endpoint,
                       cli_volume.pool_name,
-                      self.ARRAY_TYPE)
+                      self.array_type)
 
     def get_volume(self, vol_name):
         logger.debug("Get volume : {}".format(vol_name))
@@ -85,9 +99,6 @@ class XIVArrayMediator(ArrayMediator):
     def _convert_size_bytes_to_blocks(self, size_in_bytes):
         """:rtype: float"""
         return float(size_in_bytes) / self.BLOCK_SIZE_IN_BYTES
-
-    def get_minimal_volume_size_in_bytes(self):
-        return 1 * 1024 * 1024 * 1024  # 1 GiB
 
     def create_volume(self, name, size_in_bytes, capabilities, pool):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with capabilities : {}".format(

@@ -11,7 +11,7 @@ class TestWithFunctionality(unittest.TestCase):
 
     def setUp(self):
         self.fqdn = "fqdn"
-        self.array_connection = ArrayConnectionManager("user", "password", [self.fqdn, self.fqdn] , XIVArrayMediator.ARRAY_TYPE)
+        self.array_connection = ArrayConnectionManager("user", "password", [self.fqdn, self.fqdn] , XIVArrayMediator.array_type)
 
     @patch("controller.array_action.array_connection_manager.XIVArrayMediator._connect")
     @patch("controller.array_action.array_connection_manager.XIVArrayMediator.disconnect")
@@ -40,7 +40,7 @@ class TestGetconnection(unittest.TestCase):
         self.fqdn = "fqdn"
         self.connections = [self.fqdn, self.fqdn]
         self.connection_key = ",".join(self.connections )
-        self.array_connection = ArrayConnectionManager("user", "password", self.connections, XIVArrayMediator.ARRAY_TYPE)
+        self.array_connection = ArrayConnectionManager("user", "password", self.connections, XIVArrayMediator.array_type)
         array_connection_manager.array_connections_dict = {}
 
     def tearDown(self):
@@ -53,7 +53,7 @@ class TestGetconnection(unittest.TestCase):
         self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 1})
 
         new_fqdn = "new-fqdn"
-        array_connection2 = ArrayConnectionManager("user", "password",[new_fqdn], XIVArrayMediator.ARRAY_TYPE)
+        array_connection2 = ArrayConnectionManager("user", "password",[new_fqdn], XIVArrayMediator.array_type)
 
         array_connection2.get_array_connection()
         self.assertEqual(array_connection_manager.array_connections_dict, { self.connection_key: 1, new_fqdn: 1})
@@ -70,7 +70,7 @@ class TestGetconnection(unittest.TestCase):
     @patch("controller.array_action.array_connection_manager.XIVArrayMediator._connect")
     def test_connection_returns_error_on_too_many_connection(self, connect):
         array_connection_manager.array_connections_dict = {
-            self.connection_key: array_connection_manager.XIVArrayMediator.CONNECTION_LIMIT}
+            self.connection_key: array_connection_manager.XIVArrayMediator.max_connections}
         with self.assertRaises(NoConnectionAvailableException):
             self.array_connection.get_array_connection()
 
@@ -89,13 +89,13 @@ class TestGetconnection(unittest.TestCase):
         socket_connet.side_effect = [0, 1]
 
         res = self.array_connection.detect_array_type()
-        self.assertEqual(res, XIVArrayMediator.ARRAY_TYPE)
+        self.assertEqual(res, XIVArrayMediator.array_type)
 
         socket_connet.side_effect = [1, 1, 0, 0]
 
 
         res = self.array_connection.detect_array_type()
-        self.assertEqual(res, SVCArrayMediator.ARRAY_TYPE)
+        self.assertEqual(res, SVCArrayMediator.array_type)
 
         socket_connet.side_effect = [1, 1, 1, 1]
         with self.assertRaises(FailedToFindStorageSystemType):
