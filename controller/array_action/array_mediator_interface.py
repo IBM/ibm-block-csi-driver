@@ -13,10 +13,9 @@ class ArrayMediator:
             user : user name for connecting to the endpoint
             password : password for connecting to the endpoint
             endpoint : storage array fqdn or ip
-        
-        Errors:
+
+        Raises:
             CredentialsError
-        
         """
         raise NotImplementedError
 
@@ -41,14 +40,13 @@ class ArrayMediator:
         Returns:  
             volume_id : the volume WWN. 
             
-        Errors:
+        Raises:
             VolumeAlreadyExists
             PoolDoesNotExist
             PoolDoesNotMatchCapabilities
             IllegalObjectName
             VolumeNameIsNotSupported 
             PermissionDenied
-
         """
         raise NotImplementedError
 
@@ -60,10 +58,9 @@ class ArrayMediator:
         Args:
             vol_id : wwn of the volume to delete
         
-        Errors:
+        Raises:
             volumeNotFound
             PermissionDenied
-
         """
         raise NotImplementedError
 
@@ -78,11 +75,10 @@ class ArrayMediator:
         Returns:  
            Volume
             
-        Errors:
+        Raises:
             volumeNotFound
             IllegalObjectName
             PermissionDenied
-
         """
         raise NotImplementedError
 
@@ -97,10 +93,9 @@ class ArrayMediator:
         Returns:  
            mapped_host_luns : a dict like this: {<host name>:<lun id>,...}
             
-        Errors:
+        Raises:
             volumeNotFound
             PermissionDenied
-
         """
         raise NotImplementedError
 
@@ -116,12 +111,11 @@ class ArrayMediator:
         Returns:  
            lun : the lun_id the volume was mapped to.
             
-        Errors:
+        Raises:
             noAvailableLun
             volumeNotFound
             hostNotFound
             PermissionDenied
-        
         """
         raise NotImplementedError
 
@@ -133,13 +127,15 @@ class ArrayMediator:
         Args:
            volume_id : the volume WWN.
            host_name : the name of the host to map the volume to.
-        
-        Errors:
+
+        Returns:
+            None
+
+        Raises:
             volumeNotFound
             volAlreadyUnmapped
             hostNotFound
             PermissionDenied
-        
         """
         raise NotImplementedError
 
@@ -156,11 +152,10 @@ class ArrayMediator:
            connectivity_types : list of connectivity types ([iscis, fc] or just [iscsi],..)
            hostname : the name of the host
             
-        Errors:
+        Raises:
             hostNotFound
             multipleHostsFoundError
             PermissionDenied
-
         """
         raise NotImplementedError
 
@@ -173,11 +168,10 @@ class ArrayMediator:
            capabilities : as passed from the storage class
 
         Returns:
+            None
 
-
-        Errors:
+        Raises:
             CapabilityNotSupported
-
         """
         raise NotImplementedError
 
