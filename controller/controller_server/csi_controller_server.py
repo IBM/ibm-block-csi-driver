@@ -136,7 +136,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
 
         try:
-            res, array_type, vol_id = utils.get_volume_id_info(request.volume_id)
+            array_type, vol_id = utils.get_volume_id_info(request.volume_id)
         except VolumeIdError as ex:
             logger.exception(ex)
             context.set_details(ex.message)
@@ -174,7 +174,33 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def ControllerPublishVolume(self, request, context):
         logger.info("ControllerPublishVolume")
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        try:
+
+            utils.validate_publish_volume_request(request)
+
+            array_type, vol_id = utils.get_vol_id(request.volume_id)
+
+            hostname, iscsi_iqn = utils.get_vol_id(request.node_id)
+
+            #TODO : continue
+
+
+        except ValidationException as ex:
+            logger.error("failed request validation")
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            return csi_pb2.ControllerPublishVolumeResponse()
+
+
+        except Exception as ex:
+            logger.debug("an internal exception occurred")
+            logger.exception(ex)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details('an internal exception occurred : {}'.format(ex))
+            return csi_pb2.ControllerPublishVolumeResponse()
+
+
         logger.info("finished ControllerPublishVolume")
         return csi_pb2.ControllerPublishVolumeResponse()
 

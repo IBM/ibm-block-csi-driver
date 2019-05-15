@@ -15,7 +15,7 @@ def get_array_connection_info_from_secret(secrets):
 
 
 def get_vol_id(new_vol):
-    return "{}:{}".format(new_vol.array_type, new_vol.volume_name)
+    return "{0}{1}{2}".format(new_vol.array_type, config.PARAMETERS_VOLUME_ID_DELIMITER, new_vol.volume_name)
 
 
 def validate_secret(secret):
@@ -51,7 +51,7 @@ def validate_csi_volume_capabilties(capabilities):
 
 
 def validate_create_volume_request(request):
-    logger.debug("validating request")
+    logger.debug("validating create volume request")
 
     logger.debug("validating volume name")
     if request.name == '':
@@ -97,10 +97,40 @@ def generate_csi_create_volume_response(new_vol):
         volume_context=vol_context))
 
 
+def validate_publish_volume_request(request):
+    logger.debug("validating publish volume request")
+
+    logger.debug("validating volume id")
+    if len(request.volume_id.split(config.PARAMETERS_VOLUME_ID_DELIMITER)) != 2:
+        raise ValidationException(messages.volume_id_wrong_format_message)
+
+    logger.debug("validating readonly")
+    if not request.readonly:
+        raise ValidationException(messages.readoly_not_supported_message)
+
+    logger.debug("validating volume capabilities")
+    validate_csi_volume_capabilties(request.volume_capabilities)
+
+    logger.debug("validating secrets")
+    if request.secrets:
+        validate_secret(request.secrets)
+
+    logger.debug("request validation finished.")
+
+
 def get_volume_id_info(volume_id):
-    split_vol = volume_id.split(":")
+    split_vol = volume_id.split(config.PARAMETERS_VOLUME_ID_DELIMITER)
     if len(split_vol) != 2:
-        raise VolumeIdError(volume_id)
+        raise ValidationException(messages.volume_id_wrong_format_message)
 
     array_type, vol_id = split_vol
-    return True, array_type, vol_id
+    return array_type, vol_id
+
+
+def get_node_id_info(node_id):
+    split_node = node_id.split(config.PARAMETERS_NODE_ID_DELIMITER)
+    if len(split_node) != config.SUPPORTED_CONNECTIVITY_TYPES + 1:  # the 1 is for the hostname
+        raise ValidationException(messages.node_id_wrong_format_message)
+
+    hostname, iscsi_iqn = split_node
+    return hostname, iscsi_iqn
