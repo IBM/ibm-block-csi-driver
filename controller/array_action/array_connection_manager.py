@@ -39,7 +39,7 @@ def _socket_connect_test(ipaddr, port, timeout=1):
 class ArrayConnectionManager(object):
 
     def __init__(self, user, password, endpoint, array_type=None):  # TODO return the params back.
-        self.array_mediator_class_dict = {XIVArrayMediator.ARRAY_TYPE: XIVArrayMediator, SVCArrayMediator.ARRAY_TYPE: SVCArrayMediator}
+        self.array_mediator_class_dict = {XIVArrayMediator.array_type: XIVArrayMediator, SVCArrayMediator.array_type: SVCArrayMediator}
         self.array_type = array_type
         self.user = user
         self.password = password
@@ -78,7 +78,7 @@ class ArrayConnectionManager(object):
         with connection_lock_dict[self.endpoint_key]:  # TODO: when moving to python 3 - add timeout to the lock!
             if self.endpoint_key in array_connections_dict:
 
-                if array_connections_dict[self.endpoint_key] < med_class.CONNECTION_LIMIT:
+                if array_connections_dict[self.endpoint_key] < med_class.max_connections:
                     logger.debug("adding new connection ")
                     array_connections_dict[self.endpoint_key] += 1
 
@@ -107,7 +107,7 @@ class ArrayConnectionManager(object):
 
     def detect_array_type(self):
         logger.debug("detecting array connection type")
-        for storage_type, port in [(XIVArrayMediator.ARRAY_TYPE, XIVArrayMediator.PORT), (SVCArrayMediator.ARRAY_TYPE, XIVArrayMediator.PORT)]:  # ds8k : 8452
+        for storage_type, port in [(XIVArrayMediator.array_type, XIVArrayMediator.port), (SVCArrayMediator.array_type, XIVArrayMediator.port)]:  # ds8k : 8452
             for endpoint in self.endpoints:
                 if _socket_connect_test(endpoint, port) == 0:
                     logger.debug("storage array type is : {0}".format(self.array_type))
