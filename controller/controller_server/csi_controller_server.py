@@ -288,7 +288,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
 def main():
     parser = OptionParser()
-    parser.add_option("-e", "--csi.endpoint", dest="endpoint",
+    parser.add_option("-e", "--csi-endpoint", dest="endpoint",
                       help="grpc endpoint")
 
     (options, args) = parser.parse_args()
