@@ -1,4 +1,5 @@
 # CSI Controller Service Account
+
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -14,8 +15,8 @@ metadata:
   name: ibm-block-csi-external-provisioner-role
 rules:
   - apiGroups: [""]
-     resources: ["secrets"]
-     verbs: ["get", "list"]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
   - apiGroups: [""]
     resources: ["persistentvolumes"]
     verbs: ["get", "list", "watch", "create", "delete"]
@@ -73,7 +74,7 @@ rules:
     verbs: ["get", "list", "watch"]
   - apiGroups: ["csi.storage.k8s.io"]
 #    resources: ["csinodeinfos"]  # TODO: This is for k8s 1.13
-     resources: ["csinode"]  # For k8s 1.14+
+    resources: ["csinode"]  # For k8s 1.14+
     verbs: ["get", "list", "watch"]
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments"]
@@ -303,108 +304,108 @@ spec:
 ---
 
 ## CSI Node Service Deamonset
-kind: DaemonSet
-apiVersion: apps/v1beta2
-metadata:
-  name: ibm-block-csi-node
-  namespace: kube-system
-spec:
-  selector:
-    matchLabels:
-      app: ibm-block-csi-node
-  template:
-    metadata:
-      labels:
-        app: ibm-block-csi-node
-    spec:
-      hostNetwork: true
-      priorityClassName: system-node-critical
-      tolerations:
-        - key: CriticalAddonsOnly
-          operator: Exists
-      containers:
-        - name: ibm-block-csi-node
-          securityContext:
-            privileged: true
-          image: ibmcom/ibm-block-csi-controller-driver:1.0.0
-          imagePullPolicy: "IfNotPresent"
-          args:
-            - --endpoint=$(CSI_ENDPOINT)
-            - --logtostderr
-            - --v=5
-          env:
-            - name: CSI_ENDPOINT
-              value: unix:/csi/csi.sock
-          volumeMounts:
-            - name: kubelet-dir
-              mountPath: /var/lib/kubelet
-              mountPropagation: "Bidirectional"
-            - name: plugin-dir
-              mountPath: /csi
-            - name: device-dir
-              mountPath: /dev
-          ports:
-            - name: healthz
-              containerPort: 9808
-              protocol: TCP
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: healthz
-            initialDelaySeconds: 10
-            timeoutSeconds: 3
-            periodSeconds: 10
-            failureThreshold: 5
-
-
-        - name: node-driver-registrar
-          image: quay.io/k8scsi/csi-node-driver-registrar:v1.0.2
-          imagePullPolicy: "IfNotPresent"
-          args:
-            - --csi-address=$(ADDRESS)
-            - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
-            - --v=5
-          lifecycle:
-            preStop:
-              exec:
-                command: ["/bin/sh", "-c", "rm -rf /registration/ibm-block-csi-driver-reg.sock /csi/csi.sock"]
-          env:
-            - name: ADDRESS
-              value: /csi/csi.sock
-            - name: DRIVER_REG_SOCK_PATH
-              value: /var/lib/kubelet/plugins/ibm-block-csi-driver/csi.sock
-          volumeMounts:
-            - name: plugin-dir
-              mountPath: /csi
-            - name: registration-dir
-              mountPath: /registration
-
-
-        - name: liveness-probe
-          image: quay.io/k8scsi/livenessprobe:v1.1.0  # TODO v1.1.0 is for k8s 1.13+, but v1.0.2 was the first k8s 1.13 version.
-          args:
-            - --csi-address=/csi/csi.sock
-            - --connection-timeout=3s   # TODO this line is deprecated from v1.1.0. So if exist its ignore it.
-          volumeMounts:
-            - name: socket-dir
-              mountPath: /csi
-
-
-      volumes:
-        - name: kubelet-dir
-          hostPath:
-            path: /var/lib/kubelet
-            type: Directory
-        - name: plugin-dir
-          hostPath:
-            path: /var/lib/kubelet/plugins/ibm-block-csi-driver/
-            # TODO align driver name block.csi.ibm.com
-            type: DirectoryOrCreate
-        - name: registration-dir
-          hostPath:
-            path: /var/lib/kubelet/plugins_registry/
-            type: Directory
-        - name: device-dir
-          hostPath:
-            path: /dev
-            type: Directory
+#kind: DaemonSet
+#apiVersion: apps/v1beta2
+#metadata:
+#  name: ibm-block-csi-node
+#  namespace: kube-system
+#spec:
+#  selector:
+#    matchLabels:
+#      app: ibm-block-csi-node
+#  template:
+#    metadata:
+#      labels:
+#        app: ibm-block-csi-node
+#    spec:
+#      hostNetwork: true
+#      priorityClassName: system-node-critical
+#      tolerations:
+#        - key: CriticalAddonsOnly
+#          operator: Exists
+#      containers:
+#        - name: ibm-block-csi-node
+#          securityContext:
+#            privileged: true
+#          image:
+#          imagePullPolicy: "IfNotPresent"
+#          args:
+#            - --endpoint=$(CSI_ENDPOINT)
+#            - --logtostderr
+#            - --v=5
+#          env:
+#            - name: CSI_ENDPOINT
+#              value: unix:/csi/csi.sock
+#          volumeMounts:
+#            - name: kubelet-dir
+#              mountPath: /var/lib/kubelet
+#              mountPropagation: "Bidirectional"
+#            - name: plugin-dir
+#              mountPath: /csi
+#            - name: device-dir
+#              mountPath: /dev
+#          ports:
+#            - name: healthz
+#              containerPort: 9808
+#              protocol: TCP
+#          livenessProbe:
+#            httpGet:
+#              path: /healthz
+#              port: healthz
+#            initialDelaySeconds: 10
+#            timeoutSeconds: 3
+#            periodSeconds: 10
+#            failureThreshold: 5
+#
+#
+#        - name: node-driver-registrar
+#          image: quay.io/k8scsi/csi-node-driver-registrar:v1.0.2
+#          imagePullPolicy: "IfNotPresent"
+#          args:
+#            - --csi-address=$(ADDRESS)
+#            - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
+#            - --v=5
+#          lifecycle:
+#            preStop:
+#              exec:
+#                command: ["/bin/sh", "-c", "rm -rf /registration/ibm-block-csi-driver-reg.sock /csi/csi.sock"]
+#          env:
+#            - name: ADDRESS
+#              value: /csi/csi.sock
+#            - name: DRIVER_REG_SOCK_PATH
+#              value: /var/lib/kubelet/plugins/ibm-block-csi-driver/csi.sock
+#          volumeMounts:
+#            - name: plugin-dir
+#              mountPath: /csi
+#            - name: registration-dir
+#              mountPath: /registration
+#
+#
+#        - name: liveness-probe
+#          image: quay.io/k8scsi/livenessprobe:v1.1.0  # TODO v1.1.0 is for k8s 1.13+, but v1.0.2 was the first k8s 1.13 version.
+#          args:
+#            - --csi-address=/csi/csi.sock
+#            - --connection-timeout=3s   # TODO this line is deprecated from v1.1.0. So if exist its ignore it.
+#          volumeMounts:
+#            - name: socket-dir
+#              mountPath: /csi
+#
+#
+#      volumes:
+#        - name: kubelet-dir
+#          hostPath:
+#            path: /var/lib/kubelet
+#            type: Directory
+#        - name: plugin-dir
+#          hostPath:
+#            path: /var/lib/kubelet/plugins/ibm-block-csi-driver/
+#            # TODO align driver name block.csi.ibm.com
+#            type: DirectoryOrCreate
+#        - name: registration-dir
+#          hostPath:
+#            path: /var/lib/kubelet/plugins_registry/
+#            type: Directory
+#        - name: device-dir
+#          hostPath:
+#            path: /dev
+#            type: Directory
