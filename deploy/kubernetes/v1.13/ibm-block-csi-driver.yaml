@@ -273,18 +273,19 @@ spec:
               mountPath: /var/lib/csi/sockets/pluginproxy/
 
 
-        - name: csi-snapshotter
-          image: quay.io/k8scsi/csi-snapshotter:v1.1.0   # TODO v1.1.0 for k8s1.13+(github release different then k8s CSI docs), but there is v1.0.1 for k8s 1.13
-          imagePullPolicy: "IfNotPresent"
-          args:
-            - --csi-address=$(ADDRESS)
-            - --connection-timeout=15s
-          env:
-            - name: ADDRESS
-              value: /var/lib/csi/sockets/pluginproxy/csi.sock
-          volumeMounts:
-            - name: socket-dir
-              mountPath: /var/lib/csi/sockets/pluginproxy/
+## TODO add snapshotter when plugin will support ControllerCreateSnapshot capability.
+#        - name: csi-snapshotter
+#          image: quay.io/k8scsi/csi-snapshotter:v1.1.0   # TODO v1.1.0 for k8s1.13+(github release different then k8s CSI docs), but there is v1.0.1 for k8s 1.13
+#          imagePullPolicy: "IfNotPresent"
+#          args:
+#            - --csi-address=$(ADDRESS)
+#            - --connection-timeout=15s
+#          env:
+#            - name: ADDRESS
+#              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+#          volumeMounts:
+#            - name: socket-dir
+#              mountPath: /var/lib/csi/sockets/pluginproxy/
 
 
         - name: liveness-probe
