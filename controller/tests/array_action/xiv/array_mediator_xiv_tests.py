@@ -97,3 +97,6 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_delete.side_effect = [xcli_errors.VolumeBadNameError("", "vol", "")]
         with self.assertRaises(array_errors.VolumeNotFoundError):
             self.mediator.delete_volume("vol-wwn")
+
+    def test_property(self):
+        self.assertEqual(XIVArrayMediator.port, 7778)

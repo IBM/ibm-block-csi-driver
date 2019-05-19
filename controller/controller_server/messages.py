@@ -1,14 +1,16 @@
-ValidationException_message = "Validation error has occured : {0}"
+ValidationException_message = "Validation error has occurred : {0}"
 
 VolumeIdError_message = "Wrong volume id format : {0}"
+
+more_then_one_mapping_message = "Volume is already mapped to a different host : {0}"
 
 ################## validation error messages
 invalid_secret_message = "invalid secret was passed"
 secret_missing_message = 'secret is missing'
 capabilities_not_set_message = "capbilities were not set"
-unsupported_fs_type_message = "unsupported fs_type "
+unsupported_fs_type_message = "unsupported fs_type : {}"
 only_mount_supported_message = "only mount volume capability is supported"
-unsupported_access_mode_message = "unsupported access mode"
+unsupported_access_mode_message = "unsupported access mode : {}"
 name_should_be_empty_message = 'name should not be empty'
 size_bigget_then_0_message = 'size should be bigger then 0'
 no_capacity_range_message = 'no capacity range set'

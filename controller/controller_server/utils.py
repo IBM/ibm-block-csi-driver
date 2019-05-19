@@ -1,8 +1,10 @@
 from controller.common.csi_logger import get_stdout_logger
-import config
+import controller.controller_server.config as config
 from controller.csi_general import csi_pb2
-from controller.controller_server.errors import ValidationException, VolumeIdError
+from controller.controller_server.errors import ValidationException
 import controller.controller_server.messages as messages
+from controller.array_action.config import ISCSI_CONNECTIVITY_TYPE
+from controller.array_action.errors import HostNotFoundError, VolumeNotFoundError
 
 logger = get_stdout_logger()
 
@@ -15,10 +17,14 @@ def get_array_connection_info_from_secret(secrets):
 
 
 def get_vol_id(new_vol):
-    return "{0}{1}{2}".format(new_vol.array_type, config.PARAMETERS_VOLUME_ID_DELIMITER, new_vol.volume_name)
+    logger.debug('getting vol id for vol : {0}'.format(new_vol))
+    vol_id = "{0}{1}{2}".format(new_vol.array_type, config.PARAMETERS_VOLUME_ID_DELIMITER, new_vol.volume_name)
+    logger.debug("vol id is : {0}".format(vol_id))
+    return vol_id
 
 
 def validate_secret(secret):
+    logger.debug("validating secrets")
     if secret:
         if not (config.SECRET_USERNAME_PARAMETER in secret and
                 config.SECRET_PASSWORD_PARAMETER in secret and
@@ -28,26 +34,36 @@ def validate_secret(secret):
     else:
         raise ValidationException(messages.secret_missing_message)
 
+    logger.debug("secret validation finished")
+
+
+def validate_csi_volume_capability(cap):
+    logger.debug("validating csi volume capability : {0}".format(cap))
+    if cap.mount:
+        if cap.mount.fs_type:
+            if cap.mount.fs_type not in config.SUPPORTED_FS_TYPES:
+                raise ValidationException(messages.unsupported_fs_type_message.format(cap.mount.fs_type))
+
+    else:
+        logger.error("only mount volume capability is supported")
+        raise ValidationException(messages.only_mount_supported_message)
+
+    if cap.access_mode.mode not in config.SUPPORTED_ACCESS_MODE:
+        logger.error("unsupported access mode : {}".format(cap.access_mode))
+        raise ValidationException(messages.unsupported_access_mode_message.format(cap.access_mode))
+
+    logger.debug("csi volume capabilities validation finished.")
+
 
 def validate_csi_volume_capabilties(capabilities):
-    logger.debug("all volume capabilies: {}".format(capabilities))
+    logger.debug("validating csi volume capabilities: {}".format(capabilities))
     if len(capabilities) == 0:
         raise ValidationException(messages.capabilities_not_set_message)
 
     for cap in capabilities:
-        if cap.mount:
-            if cap.mount.fs_type:
-                if cap.mount.fs_type not in config.SUPPORTED_FS_TYPES:
-                    logger.error("unsupported fs type : {0}".format(cap.mount.fs_type))
-                    raise ValidationException(messages.unsupported_fs_type_message)
+        validate_csi_volume_capability(cap)
 
-        else:
-            logger.error("only mount volume capability is supported")
-            raise ValidationException(messages.only_mount_supported_message)
-
-        if cap.access_mode.mode not in config.SUPPORTED_ACCESS_MODE:
-            logger.error("unsupported access mode : {}".format(cap.access_mode))
-            raise ValidationException(messages.unsupported_access_mode_message)
+    logger.debug("finished validating csi volume capabilities.")
 
 
 def validate_create_volume_request(request):
@@ -86,51 +102,115 @@ def validate_create_volume_request(request):
 
 
 def generate_csi_create_volume_response(new_vol):
+    logger.debug("creating volume response for vol : {0}".format(new_vol))
+
     vol_context = {"volume_name": new_vol.volume_name,
                    "array_name": ",".join(new_vol.array_name),
                    "pool_name": new_vol.pool_name,
                    "storage_type": new_vol.array_type
                    }
-    return csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(
+
+    res = csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(
         capacity_bytes=new_vol.capacity_bytes,
         volume_id=get_vol_id(new_vol),
         volume_context=vol_context))
 
+    logger.debug("finished creating volume response : {0}".format(res))
+    return res
 
-def validate_publish_volume_request(request):
-    logger.debug("validating publish volume request")
 
-    logger.debug("validating volume id")
-    if len(request.volume_id.split(config.PARAMETERS_VOLUME_ID_DELIMITER)) != 2:
-        raise ValidationException(messages.volume_id_wrong_format_message)
+def validate_delete_volume_request(request):
+    logger.debug("validating delete volume request")
 
-    logger.debug("validating readonly")
-    if not request.readonly:
-        raise ValidationException(messages.readoly_not_supported_message)
-
-    logger.debug("validating volume capabilities")
-    validate_csi_volume_capabilties(request.volume_capabilities)
+    if request.volume_id == "":
+        raise ValidationException("Volume id cannot be empty")
 
     logger.debug("validating secrets")
     if request.secrets:
         validate_secret(request.secrets)
 
-    logger.debug("request validation finished.")
+    logger.debug("delete volume validation finished")
+
+
+def validate_publish_volume_request(request):
+    logger.debug("validating publish volume request")
+
+    logger.debug("validating readonly")
+    if request.readonly:
+        raise ValidationException(messages.readoly_not_supported_message)
+
+    logger.debug("validating volume capabilities")
+    validate_csi_volume_capability(request.volume_capability)
+
+    logger.debug("validating secrets")
+    if request.secrets:
+        validate_secret(request.secrets)
+    else:
+        raise ValidationException(messages.secret_missing_message)
+
+    logger.debug("publish volume request validation finished.")
 
 
 def get_volume_id_info(volume_id):
+    logger.debug("getting volume info for vol id : {0}".format(volume_id))
     split_vol = volume_id.split(config.PARAMETERS_VOLUME_ID_DELIMITER)
     if len(split_vol) != 2:
-        raise ValidationException(messages.volume_id_wrong_format_message)
+        raise VolumeNotFoundError(volume_id)
 
     array_type, vol_id = split_vol
+    logger.debug("volume id : {0}, array type :{1}".format(volume_id, array_type))
     return array_type, vol_id
 
 
 def get_node_id_info(node_id):
+    logger.debug("getting node info for node id : {0}".format(node_id))
     split_node = node_id.split(config.PARAMETERS_NODE_ID_DELIMITER)
     if len(split_node) != config.SUPPORTED_CONNECTIVITY_TYPES + 1:  # the 1 is for the hostname
-        raise ValidationException(messages.node_id_wrong_format_message)
+        raise HostNotFoundError(node_id)
 
     hostname, iscsi_iqn = split_node
+    logger.debug("hostname : {0}, iscsi_iqn : {1} ".format(hostname, iscsi_iqn))
     return hostname, iscsi_iqn
+
+
+def choose_connectivity_type(connecitvity_types):
+    # TODO: when adding support for FC need to add here the logic for choosing the correct connctivity type
+    logger.debug("choosing connectivity type for connectivity types : {0}", format(connecitvity_types))
+    res = None
+    if len(connecitvity_types) == 1:
+        res = connecitvity_types[0]
+    else:
+        res = ISCSI_CONNECTIVITY_TYPE
+
+    logger.debug("connectivity type is : {0}".format(res))
+
+    return res
+
+
+def generate_csi_publish_volume_response(lun, connectivity_type, config):
+    logger.debug("generating publish volume response for lun :{0}, connectivity : {1}".format(lun, connectivity_type))
+
+    lun_param = config["controller"]["publish_context_lun_parameter"]
+    connectivity_param = config["controller"]["publish_context_connectivity_parameter"]
+
+    res = csi_pb2.ControllerPublishVolumeResponse(publish_context={lun_param: lun,
+                                                                              connectivity_param: connectivity_type})
+
+    logger.debug("publish volume response is :{0}".format(res))
+    return res
+
+
+def validate_unpublish_volume_request(request):
+    logger.debug("validating unpublish volume request")
+
+    logger.debug("validating volume id")
+    if len(request.volume_id.split(config.PARAMETERS_VOLUME_ID_DELIMITER)) != 2:
+        raise ValidationException(messages.volume_id_wrong_format_message)
+
+    logger.debug("validating secrets")
+    if request.secrets:
+        validate_secret(request.secrets)
+    else:
+        raise ValidationException(messages.secret_missing_message)
+
+    logger.debug("unpublish volume request validation finished.")

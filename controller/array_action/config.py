@@ -1,0 +1,1 @@
+ISCSI_CONNECTIVITY_TYPE = "iscsi"
