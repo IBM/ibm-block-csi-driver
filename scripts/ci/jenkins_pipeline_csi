@@ -9,6 +9,11 @@ pipeline {
                 sh './scripts/run_unitests.sh `pwd`/build/reports'
             }
         }
+        stage ('CSI-deployment: k8s yamls validation') {
+            steps {
+                sh './scripts/run_yamlcheck.sh'
+            }
+        }
         stage ('CSI-controller: Build and push image') {
             steps {
                 sh './scripts/ci/build_push_images.sh build/reports/images_url'
