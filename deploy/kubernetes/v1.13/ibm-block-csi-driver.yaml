@@ -1,3 +1,22 @@
+# ==============================================================
+# IBM Block CSI driver - Kubernetes manifest.
+# The manifest contains:
+#    CSI controller (StatefulSet)
+#    CSI node (DaemonSet)
+#  And all the relevant RBAC elements the CSI side car containers:
+#    CSI controller service account
+#        ibm-block-csi-external-provisioner-role
+#        ibm-block-csi-provisioner-binding
+#        ibm-block-csi-external-attacher-role
+#        ibm-block-csi-attacher-binding
+#        ibm-block-csi-cluster-driver-registrar-role
+#        ibm-block-csi-driver-registrar-binding
+#        ibm-block-csi-external-snapshotter-role
+#        ibm-block-csi-snapshotter-binding
+#    CSI node service account
+# ==============================================================
+
+
 # CSI Controller Service Account
 
 apiVersion: v1
@@ -198,7 +217,7 @@ spec:
           imagePullPolicy: "IfNotPresent"
           args :
             - --csi-endpoint=$(CSI_ENDPOINT)
-            - --loglevel=$(CSI_LOGLEVEL)
+#            - --loglevel=$(CSI_LOGLEVEL)
           env:
             - name: CSI_ENDPOINT
               value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
@@ -328,12 +347,11 @@ spec:
 #        - name: ibm-block-csi-node
 #          securityContext:
 #            privileged: true
-#          image:
+#          image: ibmcom/ibm-block-csi-node-driver:1.0.0
 #          imagePullPolicy: "IfNotPresent"
 #          args:
 #            - --endpoint=$(CSI_ENDPOINT)
-#            - --logtostderr
-#            - --v=5
+#            - --loglevel=$(CSI_LOGLEVEL)
 #          env:
 #            - name: CSI_ENDPOINT
 #              value: unix:/csi/csi.sock
