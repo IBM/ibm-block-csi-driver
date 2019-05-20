@@ -314,8 +314,7 @@ class TestControllerServerDeleteVolume(unittest.TestCase):
         context = utils.FakeContext()
         self.request.volume_id = "wrong_id"
         res = self.servicer.DeleteVolume(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "volume id is not set correctly")
-        self.assertTrue("volume id" in context.details)
+        self.assertEqual(context.code, grpc.StatusCode.OK)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
@@ -351,6 +350,93 @@ class TestControllerServerDeleteVolume(unittest.TestCase):
         context = utils.FakeContext()
         res = self.servicer.DeleteVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
+
+
+
+class TestControllerServerPublishVolume(unittest.TestCase):
+
+    # @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
+    # def setUp(self, connect):
+    #     self.fqdn = "fqdn"
+    #     self.mediator = XIVArrayMediator("user", "password", self.fqdn)
+    #     self.mediator.client = Mock()
+    #
+    #     self.mediator.get_volume = Mock()
+    #
+    #     self.servicer = ControllerServicer(self.fqdn)
+    #
+    #     self.request = Mock()
+    #
+    #     self.pool = 'pool1'
+    #     self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
+    #
+    #     self.request.volume_id = "xiv:vol-id"
+    #
+    # @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    # @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    # def test_delete_volume_with_wrong_secrets(self, a_enter, a_exit):
+    #     a_enter.return_value = self.mediator
+    #     context = utils.FakeContext()
+    #
+    #     self.request.secrets = {"password": "pass", "management_address": "mg"}
+    #     res = self.servicer.DeleteVolume(self.request, context)
+    #     self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "username is missing in secrets")
+    #     self.assertTrue("secret" in context.details)
+    #
+    #     self.request.secrets = {"username": "user", "management_address": "mg"}
+    #     res = self.servicer.DeleteVolume(self.request, context)
+    #     self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "password is missing in secrets")
+    #     self.assertTrue("secret" in context.details)
+    #
+    #     self.request.secrets = {"username": "user", "password": "pass"}
+    #     res = self.servicer.DeleteVolume(self.request, context)
+    #     self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "mgmt address is missing in secrets")
+    #     self.assertTrue("secret" in context.details)
+    #
+    # @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    # @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    # def test_delete_volume_invalid_volume_id(self, a_enter, a_exit):
+    #     a_enter.return_value = self.mediator
+    #     context = utils.FakeContext()
+    #     self.request.volume_id = "wrong_id"
+    #     res = self.servicer.DeleteVolume(self.request, context)
+    #     self.assertEqual(context.code, grpc.StatusCode.OK)
+    #
+    # @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    # @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    # def test_delete_volume_with_array_connection_exception(self, a_enter, a_exit):
+    #     a_enter.side_effect = [Exception("a_enter error")]
+    #     context = utils.FakeContext()
+    #     res = self.servicer.DeleteVolume(self.request, context)
+    #     self.assertEqual(context.code, grpc.StatusCode.INTERNAL, "array connection internal error")
+    #     self.assertTrue("a_enter error" in context.details)
+    #
+    # @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.delete_volume")
+    # @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    # def delete_volume_returns_error(self, a_enter, delete_volume, error, return_code):
+    #     a_enter.return_value = self.mediator
+    #     delete_volume.side_effect = [error]
+    #     context = utils.FakeContext()
+    #     res = self.servicer.DeleteVolume(self.request, context)
+    #     self.assertEqual(context.code, return_code)
+    #     if return_code != grpc.StatusCode.OK:
+    #         msg = error.message
+    #         self.assertTrue(msg in context.details, "msg : {0} is not in : {1}".format(msg, context.details))
+    #
+    # def test_delete_volume_with_volume_not_found_error(self, ):
+    #     self.delete_volume_returns_error(error=VolumeNotFoundError("vol"), return_code=grpc.StatusCode.OK)
+    #
+    # def test_delete_volume_with_delete_volume_other_exception(self):
+    #     self.delete_volume_returns_error(error=Exception("error"), return_code=grpc.StatusCode.INTERNAL)
+    #
+    # @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.delete_volume")
+    # @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    # def test_delete_volume_succeeds(self, a_enter, delete_volume):
+    #     a_enter.return_value = self.mediator
+    #     context = utils.FakeContext()
+    #     res = self.servicer.DeleteVolume(self.request, context)
+    #     self.assertEqual(context.code, grpc.StatusCode.OK)
+
 
 
 class TestControllerServerGetCapabilities(unittest.TestCase):

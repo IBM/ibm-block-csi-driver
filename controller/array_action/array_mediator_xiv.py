@@ -159,9 +159,11 @@ class XIVArrayMediator(ArrayMediator):
     def get_host_by_host_identifiers(self, iscsi_iqn):
         logger.debug("Getting host id for initiators . iscsi_iqn : {0}".format(iscsi_iqn))
         host_list = self.client.cmd.host_list().as_list
+        logger.debug("host list : {0}".format(host_list))
         current_host = None
         for host in host_list:
-            if iscsi_iqn in host.iscsi_ports:
+            logger.debug("type ports list : {}".format(type(host.iscsi_ports)))
+            if iscsi_iqn == host.iscsi_ports:
                 logger.debug("found iscsi iqn in list : {0} for host : {1}".format(host.iscsi_ports, host.name))
                 if current_host:
                     raise controller_errors.MultipleHostsFoundError(iscsi_iqn, [current_host, host.name])
@@ -176,6 +178,7 @@ class XIVArrayMediator(ArrayMediator):
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume id : {0}".format(volume_id))
         vol_name = self._get_vol_by_wwn(volume_id)
+        logger.debug("vol name : {0}".format(vol_name))
         mapping_list = self.client.cmd.vol_mapping_list(vol=vol_name).as_list
         res = {}
         for mapping in mapping_list:
@@ -196,7 +199,7 @@ class XIVArrayMediator(ArrayMediator):
         logger.debug("luns in use : {0}".format(luns_in_use))
 
         # try to use random lun number just in case there are many calls at the same time to reduce re-tries
-        all_available_luns = [i for i in range(self.MIN_LUN_NUMBER, self.MAX_LUN_NUMBER) if i not in luns_in_use]
+        all_available_luns = [i for i in range(self.MIN_LUN_NUMBER, self.MAX_LUN_NUMBER + 1) if i not in luns_in_use]
         logger.debug("all_available_luns : {0}".format(all_available_luns))
 
         if len(all_available_luns) == 0:
