@@ -181,39 +181,40 @@ class ArrayMediator:
         """
         raise NotImplementedError
 
-
-
-
-
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def array_type(self):
         """
         The storage system type.
         """
         raise NotImplementedError
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def port(self):
         """
         The storage system managment port number.
         """
         raise NotImplementedError
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def max_vol_name_length(self):
         """
         The max number of concurrent connections to the storage system.
         """
         raise NotImplementedError
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def max_connections(self):
         """
         The max number of concurrent connections to the storage system.
         """
         raise NotImplementedError
 
-    @abc.abstractproperty
+    @property
+    @abc.abstractmethod
     def minimal_volume_size_in_bytes(self):
         """
         The minimal volume size in bytes (used in case trying to provision volume with zero size).

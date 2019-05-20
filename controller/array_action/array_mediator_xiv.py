@@ -6,6 +6,7 @@ from array_action_types import Volume
 from controller.array_action.errors import CredentialsError, VolumeNotFoundError, IllegalObjectName,\
     StorageClassCapabilityNotSupported, \
     VolumeAlreadyExists, PoolDoesNotExist, PermissionDeniedError
+from controller.array_action.utils import classproperty
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -15,23 +16,23 @@ class XIVArrayMediator(ArrayMediator):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
 
-    @property
+    @classproperty
     def array_type(self):
        return 'XIV'
 
-    @property
+    @classproperty
     def port(self):
        return 7778
 
-    @property
+    @classproperty
     def max_vol_name_length(self):
        return 63
 
-    @property
+    @classproperty
     def max_connections(self):
        return 2
 
-    @property
+    @classproperty
     def minimal_volume_size_in_bytes(self):
         return 1 * 1024 * 1024 * 1024  # 1 GiB
 
