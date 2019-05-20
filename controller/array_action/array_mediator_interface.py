@@ -182,7 +182,6 @@ class ArrayMediator:
         """
         raise NotImplementedError
 
-
     @property
     @abc.abstractmethod
     def array_type(self):
