@@ -175,7 +175,7 @@ def get_node_id_info(node_id):
 
 def choose_connectivity_type(connecitvity_types):
     # TODO: when adding support for FC need to add here the logic for choosing the correct connctivity type
-    logger.debug("choosing connectivity type for connectivity types : {0}", format(connecitvity_types))
+    logger.debug("choosing connectivity type for connectivity types : {0}".format(connecitvity_types))
     res = None
     if len(connecitvity_types) == 1:
         res = connecitvity_types[0]
@@ -193,7 +193,7 @@ def generate_csi_publish_volume_response(lun, connectivity_type, config):
     lun_param = config["controller"]["publish_context_lun_parameter"]
     connectivity_param = config["controller"]["publish_context_connectivity_parameter"]
 
-    res = csi_pb2.ControllerPublishVolumeResponse(publish_context={lun_param: lun,
+    res = csi_pb2.ControllerPublishVolumeResponse(publish_context={lun_param: str(lun),
                                                                               connectivity_param: connectivity_type})
 
     logger.debug("publish volume response is :{0}".format(res))

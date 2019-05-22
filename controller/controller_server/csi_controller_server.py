@@ -185,6 +185,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 host_name, connectivity_types = array_mediator.get_host_by_host_identifiers(iscsi_iqn)
 
+                logger.debug("hostname : {}, connectiivity_types  : {}".format(host_name, connectivity_types))
+
                 connectivity_type = utils.choose_connectivity_type(connectivity_types)
 
                 mappings = array_mediator.get_volume_mappings(vol_id)
@@ -210,7 +212,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug("lun : {}".format(lun))
                 except controller_errors.LunAlreadyInUseError as ex:
                     logger.warning("Lun was already in use. re-trying the operation. {0}".format(ex))
-                    for i in range(array_mediator.max_lun_retries):
+                    for i in range(array_mediator.max_lun_retries - 1):
                         try:
                             lun = array_mediator.map_volume(vol_id, host_name)
                             break
