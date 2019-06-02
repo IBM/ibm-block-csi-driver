@@ -9,12 +9,12 @@ pipeline {
                 sh './scripts/run_unitests.sh `pwd`/build/reports'
             }
         }
-        stage ('CSI-i-controller: pep8 TBD') {
+        stage ('CSI-controller: pep8') {
             steps {
                 sh 'true'
             }
         }
-        stage ('CSI-i-controller: pylint TBD') {
+        stage ('CSI-controller: pylint') {
             steps {
                 sh 'true'
           
