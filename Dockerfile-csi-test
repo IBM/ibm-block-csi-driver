@@ -16,7 +16,7 @@ FROM golang:1.11
 #RUN yum --enablerepo=extras -y install epel-release && yum -y install python2-pip
 
 RUN git clone https://github.com/kubernetes-csi/csi-test /csi-test
-RUN make -C /csi-test
+#RUN make -C /csi-test
 
 COPY ./scripts/csi_test /csi-test/ibm-driver
 
