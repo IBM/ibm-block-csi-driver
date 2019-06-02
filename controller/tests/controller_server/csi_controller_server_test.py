@@ -379,7 +379,7 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.request = Mock()
         arr_type = XIVArrayMediator.array_type
         self.request.volume_id = "{}:wwn1".format(arr_type)
-        self.request.node_id = "hostname;iqn1"
+        self.request.node_id = "hostname;iqn.1994-05.com.redhat:686358c930fe"
         self.request.readonly = False
         self.request.readonly = False
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}

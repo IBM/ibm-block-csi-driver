@@ -258,8 +258,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def ControllerUnpublishVolume(self, request, context):
         logger.info("ControllerUnpublishVolume")
         try:
-
-            utils.validate_unpublish_volume_request(request)
+            try:
+                utils.validate_unpublish_volume_request(request)
+            except ValidationException as ex:
+                logger.exception(ex)
+                context.set_details(ex.message)
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                return csi_pb2.ControllerUnpublishVolumeResponse()
 
             array_type, vol_id = utils.get_volume_id_info(request.volume_id)
 
@@ -290,12 +295,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)
-            return csi_pb2.ControllerUnpublishVolumeResponse()
-
-        except ValidationException as ex:
-            logger.exception(ex)
-            context.set_details(ex.message)
-            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.ControllerUnpublishVolumeResponse()
 
         except Exception as ex:

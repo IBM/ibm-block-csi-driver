@@ -166,9 +166,8 @@ class XIVArrayMediator(ArrayMediator):
             logger.debug("type ports list : {}".format(type(host.iscsi_ports)))
             if iscsi_iqn == host.iscsi_ports:
                 logger.debug("found iscsi iqn in list : {0} for host : {1}".format(host.iscsi_ports, host.name))
-                if current_host:
-                    raise controller_errors.MultipleHostsFoundError(iscsi_iqn, [current_host, host.name])
                 current_host = host.name
+                break
 
         if current_host:
             logger.debug("found host : {0}".format(current_host))
@@ -208,7 +207,7 @@ class XIVArrayMediator(ArrayMediator):
 
         index = randint(0, len(all_available_luns) - 1)
         lun = all_available_luns[index]
-        logger.debug("next available lun is : {0}".format(lun))
+        logger.debug("next random available lun is : {0}".format(lun))
         return lun
 
     def map_volume(self, volume_id, host_name):

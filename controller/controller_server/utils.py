@@ -40,12 +40,11 @@ def validate_secret(secret):
 def validate_csi_volume_capability(cap):
     logger.debug("validating csi volume capability : {0}".format(cap))
     if cap.mount:
-        if cap.mount.fs_type:
-            if cap.mount.fs_type not in config.SUPPORTED_FS_TYPES:
+        if cap.mount.fs_type and (cap.mount.fs_type not in config.SUPPORTED_FS_TYPES):
                 raise ValidationException(messages.unsupported_fs_type_message.format(cap.mount.fs_type))
 
     else:
-        logger.error("only mount volume capability is supported")
+        logger.error(messages.only_mount_supported_message)
         raise ValidationException(messages.only_mount_supported_message)
 
     if cap.access_mode.mode not in config.SUPPORTED_ACCESS_MODE:

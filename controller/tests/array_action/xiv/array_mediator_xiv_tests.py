@@ -112,18 +112,6 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_property(self):
         self.assertEqual(XIVArrayMediator.port, 7778)
 
-    def test_get_host_by_identifiers_returns_multiple_hosts(self):
-        iqn = "iqn1"
-
-        host1 = utils.get_mock_xiv_host("host1", iqn)
-        host2 = utils.get_mock_xiv_host("host2", iqn)
-        ret = Mock()
-        ret.as_list = [host1, host2]
-
-        self.mediator.client.cmd.host_list.return_value = ret
-        with self.assertRaises(array_errors.MultipleHostsFoundError):
-            self.mediator.get_host_by_host_identifiers(iqn)
-
     def test_get_host_by_identifiers_returns_host_not_found(self):
         iqn = "iqn"
 
