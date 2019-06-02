@@ -104,7 +104,7 @@ Create a storage class yaml file as follow with the relevant capabilities, pool 
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
-  name: <VALUE_NAME>
+  name: gold   # Storage class name
 provisioner: ibm-block-csi-driver
 parameters:
   #capabilities:                               # Optional.
@@ -132,36 +132,36 @@ Apply the storage class:
 
 ## Usage
 
-Create pvc.yaml file as follow:
+Create pvc-demo.yaml file as follow:
 ```
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: csi-pvc-demo
+  name: pvc-demo
 spec:
   accessModes:
   - ReadWriteOnce
   resources:
     requests:
       storage: 10Gi
-  storageClassName: csi-xtremio-sc
+  storageClassName: gold
 
 ```
 
 Apply the PVC:
 ```
-#> kubectl apply -f pvc.yaml
-persistentvolumeclaim/pvc1 created
+#> kubectl apply -f pvc-demo.yaml
+persistentvolumeclaim/pvc-demo created
 ```
 
 View the PVC and the created PV:
 ```
 #> kubectl get pv,pvc
 NAME                                                        CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM          STORAGECLASS   REASON   AGE
-persistentvolume/pvc-efc3aae8-7c96-11e9-a7c0-005056a41609   1Gi        RWO            Delete           Bound    default/pvc1   gold                    5s
+persistentvolume/pvc-efc3aae8-7c96-11e9-a7c0-005056a41609   10Gi       RWO            Delete           Bound    default/pvc1   gold                    5s
 
 NAME                         STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
-persistentvolumeclaim/pvc1   Bound    pvc-efc3aae8-7c96-11e9-a7c0-005056a41609   1Gi        RWO            gold           3m51s
+persistentvolumeclaim/pvc-demo   Bound    pvc-efc3aae8-7c96-11e9-a7c0-005056a41609  10Gi    RWO            gold           3m51s
 
 
 #> kubectl describe persistentvolume/pvc-efc3aae8-7c96-11e9-a7c0-005056a41609
@@ -171,11 +171,11 @@ Annotations:     pv.kubernetes.io/provisioned-by: ibm-block-csi-driver
 Finalizers:      [kubernetes.io/pv-protection]
 StorageClass:    gold
 Status:          Bound
-Claim:           default/pvc1
+Claim:           default/pvc-demo
 Reclaim Policy:  Delete
 Access Modes:    RWO
 VolumeMode:      Filesystem
-Capacity:        1Gi
+Capacity:        10Gi
 Node Affinity:   <none>
 Message:         
 Source:
@@ -183,19 +183,44 @@ Source:
     Driver:            ibm-block-csi-driver
     VolumeHandle:      A9000:6001738CFC9035EB0000000000D1F111
     ReadOnly:          false
-    VolumeAttributes:      array_name=9.151.156.113
+    VolumeAttributes:      array_name=IP
                            pool_name=gold
                            storage.kubernetes.io/csiProvisionerIdentity=1558522090494-8081-ibm-block-csi-driver
                            storage_type=A9000
-                           volume_name=demo1_pvc-efc3aae8-7c96-11e9-a7c0-005056a41609
+                           volume_name=pvc-efc3aae8-7c96-11e9-a7c0-005056a41609
 Events:                <none>
 
 ```
 
 
+Delete PVC:
+```
+#> kubectl delete pvc-demo
+persistentvolumeclaim/pvc-demo deleted
+```
+
+
+
+
+## Un-installation
+
+#### 1. Delete storage class and secret
+```
+#> kubectl delete -f storage-class.yaml
+#> kubectl delete -f array-secret.yaml
+```
+
+
+#### 2. Delete the driver
+```sh
+#> kubectl delete -f ibm-block-csi-driver.yaml
+```
+
+
+
 ## Licensing
 
-Copyright 2016, 2017 IBM Corp.
+Copyright 2019 IBM Corp.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
