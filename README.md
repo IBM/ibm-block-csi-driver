@@ -11,14 +11,15 @@ The Container Storage Interface (CSI) Driver for IBM block storage systems enabl
 # If require to update the IMAGE URLs, then edit the ibm-block-csi-driver.yaml file.
 
 #> kubectl apply -f ibm-block-csi-driver.yaml
+serviceaccount/ibm-block-csi-controller-sa created
 clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-provisioner-role created
-clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-provisioner-binding created
+clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-external-provisioner-binding created
 clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-attacher-role created
-clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-attacher-binding created
+clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-external-attacher-binding created
 clusterrole.rbac.authorization.k8s.io/ibm-block-csi-cluster-driver-registrar-role created
-clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-driver-registrar-binding created
+clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-cluster-driver-registrar-binding created
 clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-snapshotter-role created
-clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-snapshotter-binding created
+clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-external-snapshotter-binding created
 statefulset.apps/ibm-block-csi-controller created
 csidriver.storage.k8s.io/ibm-block-csi-driver created
 ```
@@ -28,6 +29,10 @@ Verify driver is running (Currently only the csi-controller pod should be in Run
 #> kubectl get -n kube-system pod/ibm-block-csi-controller-0
 NAME                         READY   STATUS    RESTARTS   AGE
 ibm-block-csi-controller-0   5/5     Running   0          10m
+
+# NOTE if pod/ibm-block-csi-controller-0 is not in Running state, then troubleshoot by run:
+#> kubectl describe -n kube-system pod/ibm-block-csi-controller-0
+
 ```
 
 Additional info on the driver:
@@ -51,18 +56,18 @@ Events:               <none>
 
 
 #> kubectl get -n kube-system  csidriver,sa,clusterrole,clusterrolebinding,statefulset,pod | grep ibm
-csidriver.storage.k8s.io/ibm-block-csi-driver   2019-05-22T10:16:03Z
-serviceaccount/ibm-block-csi-controller-sa          1         3m41s
-clusterrole.rbac.authorization.k8s.io/ibm-block-csi-cluster-driver-registrar-role                            3m41s
-clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-attacher-role                                   3m41s
-clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-provisioner-role                                3m41s
-clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-snapshotter-role                                3m41s
-clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-attacher-binding                         3m41s
-clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-driver-registrar-binding                 3m41s
-clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-provisioner-binding                      3m41s
-clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-snapshotter-binding                      3m41s
-statefulset.apps/ibm-block-csi-controller   1/1     3m41s
-pod/ibm-block-csi-controller-0                    5/5     Running   0          3m41s
+csidriver.storage.k8s.io/ibm-block-csi-driver   2019-06-02T09:30:36Z
+serviceaccount/ibm-block-csi-controller-sa          1         2m16s
+clusterrole.rbac.authorization.k8s.io/ibm-block-csi-cluster-driver-registrar-role                            2m16s
+clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-attacher-role                                   2m16s
+clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-provisioner-role                                2m16s
+clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-snapshotter-role                                2m16s
+clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-cluster-driver-registrar-binding         2m16s
+clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-external-attacher-binding                2m16s
+clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-external-provisioner-binding             2m16s
+clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-external-snapshotter-binding             2m16s
+statefulset.apps/ibm-block-csi-controller   1/1     2m16s
+pod/ibm-block-csi-controller-0                    5/5     Running   0          2m16s
 
 
 #> kubectl get -n kube-system -o jsonpath="{..image}" statefulset.apps/ibm-block-csi-controller | tr -s '[[:space:]]' '\n'; echo ""
@@ -72,6 +77,9 @@ quay.io/k8scsi/csi-provisioner:v1.1.1
 quay.io/k8scsi/csi-attacher:v1.1.1
 quay.io/k8scsi/livenessprobe:v1.1.0
 
+
+## Watch the driver logs
+#> kubectl log -f -n kube-system ibm-block-csi-controller-0 ibm-block-csi-controller
 ```
 
 #### 2. Create array secret
@@ -143,7 +151,7 @@ spec:
   - ReadWriteOnce
   resources:
     requests:
-      storage: 10Gi
+      storage: 1Gi
   storageClassName: gold
 
 ```
@@ -158,10 +166,10 @@ View the PVC and the created PV:
 ```
 #> kubectl get pv,pvc
 NAME                                                        CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM          STORAGECLASS   REASON   AGE
-persistentvolume/pvc-efc3aae8-7c96-11e9-a7c0-005056a41609   10Gi       RWO            Delete           Bound    default/pvc1   gold                    5s
+persistentvolume/pvc-efc3aae8-7c96-11e9-a7c0-005056a41609   1Gi       RWO            Delete           Bound    default/pvc1   gold                    5s
 
 NAME                         STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
-persistentvolumeclaim/pvc-demo   Bound    pvc-efc3aae8-7c96-11e9-a7c0-005056a41609  10Gi    RWO            gold           3m51s
+persistentvolumeclaim/pvc-demo   Bound    pvc-efc3aae8-7c96-11e9-a7c0-005056a41609  1Gi    RWO            gold           3m51s
 
 
 #> kubectl describe persistentvolume/pvc-efc3aae8-7c96-11e9-a7c0-005056a41609
@@ -175,7 +183,7 @@ Claim:           default/pvc-demo
 Reclaim Policy:  Delete
 Access Modes:    RWO
 VolumeMode:      Filesystem
-Capacity:        10Gi
+Capacity:        1Gi
 Node Affinity:   <none>
 Message:         
 Source:

@@ -6,11 +6,11 @@
 #  And all the relevant RBAC elements the CSI side car containers:
 #    CSI controller service account
 #        ibm-block-csi-external-provisioner-role
-#        ibm-block-csi-provisioner-binding
+#        ibm-block-csi-external-provisioner-binding
 #        ibm-block-csi-external-attacher-role
-#        ibm-block-csi-attacher-binding
+#        ibm-block-csi-external-attacher-binding
 #        ibm-block-csi-cluster-driver-registrar-role
-#        ibm-block-csi-driver-registrar-binding
+#        ibm-block-csi-cluster-driver-registrar-binding
 #        ibm-block-csi-external-snapshotter-role
 #        ibm-block-csi-snapshotter-binding
 #    CSI node service account
@@ -68,7 +68,7 @@ rules:
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: ibm-block-csi-provisioner-binding
+  name: ibm-block-csi-external-provisioner-binding
 subjects:
   - kind: ServiceAccount
     name: ibm-block-csi-controller-sa
@@ -104,7 +104,7 @@ rules:
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: ibm-block-csi-attacher-binding
+  name: ibm-block-csi-external-attacher-binding
 subjects:
   - kind: ServiceAccount
     name: ibm-block-csi-controller-sa
@@ -134,7 +134,7 @@ rules:
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: ibm-block-csi-driver-registrar-binding
+  name: ibm-block-csi-cluster-driver-registrar-binding
 subjects:
   - kind: ServiceAccount
     name: ibm-block-csi-controller-sa
@@ -184,7 +184,7 @@ rules:
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: ibm-block-csi-snapshotter-binding
+  name: ibm-block-csi-external-snapshotter-binding
 subjects:
   - kind: ServiceAccount
     name: ibm-block-csi-controller-sa
@@ -244,7 +244,6 @@ spec:
             periodSeconds: 2
 
 
-        ## DONE
         - name: cluster-driver-registrar
           ## Note: Requires CRD CSIDriver
           image: quay.io/k8scsi/csi-cluster-driver-registrar:v1.0.1
@@ -261,7 +260,6 @@ spec:
               mountPath: /var/lib/csi/sockets/pluginproxy/
 
 
-        ## DONE
         - name: csi-provisioner
           image: quay.io/k8scsi/csi-provisioner:v1.1.1  #TODO v1.1.1 is for k8s1.14+(with additional RBAC), while v1.0.1 is for k8s1.13+,
           imagePullPolicy: "IfNotPresent"
@@ -277,7 +275,6 @@ spec:
               mountPath: /var/lib/csi/sockets/pluginproxy/
 
 
-        ## DONE
         - name: csi-attacher
           image: quay.io/k8scsi/csi-attacher:v1.1.1    # TODO v1.1.1 is for k8s 1.14+(with additional RBAC), v1.0.1 is for k8s 1.13
           imagePullPolicy: "IfNotPresent"
@@ -339,10 +336,6 @@ spec:
 #        app: ibm-block-csi-node
 #    spec:
 #      hostNetwork: true
-#      priorityClassName: system-node-critical
-#      tolerations:
-#        - key: CriticalAddonsOnly
-#          operator: Exists
 #      containers:
 #        - name: ibm-block-csi-node
 #          securityContext:
