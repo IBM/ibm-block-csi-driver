@@ -31,6 +31,6 @@ RUN chown -R appuser:appuser /tmp/b
 USER appuser
 WORKDIR /usr/local/go/src/github.com/kubernetes-csi/csi-test
 
-ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/run_csi_test.sh", "server:4444", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/olga_secrets", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/olga_params", "CreateVolume"]
+ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/run_csi_test.sh", "server:4444", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_params", "CreateVolume"]
 
 

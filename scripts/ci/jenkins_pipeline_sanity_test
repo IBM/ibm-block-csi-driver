@@ -5,12 +5,12 @@ pipeline {
     stages {
         stage ('CSI-controller: build and start controller server') {
             steps {
-                sh './scripts/ci/build_and_run_controller_server.sh csi-controller &'
+                sh './scripts/ci/build_and_run_controller_server.sh csi-controller > /tmp/server_output &'
             }
         }
         stage ('CSI-controller: build and start csi sanity client') {
             steps {
-                sh './scripts/ci/build_and_run_sanity_test_client.sh csi-sanity-test &'
+                sh './scripts/ci/build_and_run_sanity_test_client.sh csi-sanity-test > /tmp/client_output &'
             }
         }
 	stage ('CSI-controller: add containers to the internal network') {
@@ -19,5 +19,13 @@ pipeline {
             }
         }
 
+    }
+    post {
+        always {
+            sh 'echo "SERVER OUTPUT"'
+            sh 'cat /tmp/server_output'
+            sh 'echo "CLIENT OUTPUT"'
+            sh 'cat /tmp/client_output'
+        }
     }
 }
