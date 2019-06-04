@@ -1,0 +1,23 @@
+pipeline {
+    agent {
+        label 'docker-engine'
+    }
+    stages {
+        stage ('CSI-controller: build and start controller server') {
+            steps {
+                sh './scripts/ci/build_and_run_controller_server.sh csi-controller'
+            }
+        }
+        stage ('CSI-controller: build and start csi sanity client') {
+            steps {
+                sh './scripts/ci/build_and_run_sanity_test_client.sh csi-sanity-test'
+            }
+        }
+	stage ('CSI-controller: add containers to the internal network') {
+            steps {
+                sh './scripts/csi_test/add_containers_to_network.sh csi-controller csi-sanity-test'
+            }
+        }
+
+    }
+}

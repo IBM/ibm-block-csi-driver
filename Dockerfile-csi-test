@@ -15,19 +15,22 @@
 FROM golang:1.11
 #RUN yum --enablerepo=extras -y install epel-release && yum -y install python2-pip
 
-RUN git clone https://github.com/kubernetes-csi/csi-test /csi-test
-RUN make -C /csi-test
+RUN git clone https://github.com/kubernetes-csi/csi-test /usr/local/go/src/github.com/kubernetes-csi/csi-test
+RUN make -C /usr/local/go/src/github.com/kubernetes-csi/csi-test
 
-COPY ./scripts/csi_test /csi-test/ibm-driver
+COPY ./scripts/csi_test /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver
 
-RUN cat test_to_run | paste -sd "|"
+RUN cat /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/test_to_run | paste -sd "|"
+RUN cat /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/run_csi_test.sh
 
 RUN groupadd -g 9999 appuser && \
     useradd -r -u 9999 -g appuser appuser
-RUN chown -R appuser:appuser /csi-test
+RUN chown -R appuser:appuser /usr/local/go/src/github.com/kubernetes-csi/csi-test
+RUN touch /tmp/b
+RUN chown -R appuser:appuser /tmp/b
 USER appuser
-WORKDIR /csi-test
+WORKDIR /usr/local/go/src/github.com/kubernetes-csi/csi-test
 
-ENTRYPOINT ["/csi-test/ibm-driver/run_csi_test.sh", "/tmp/b", "/csi-test/ibm-driver/olga_secrets", "/csi-test/ibm-driver/olga_params", `cat ../../IBM/ibm-block-csi-driver/scripts/csi_test/test_to_run | paste -sd "|"` ]
+ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/run_csi_test.sh", "server:4444", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/olga_secrets", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/olga_params", "CreateVolume"]
 
 
