@@ -15,7 +15,7 @@ def get_array_connection_info_from_secret(secrets):
 
 
 def get_vol_id(new_vol):
-    return "{}:{}".format(new_vol.array_type, new_vol.volume_name)
+    return "{}:{}".format(new_vol.array_type, new_vol.id)
 
 
 def validate_secret(secret):

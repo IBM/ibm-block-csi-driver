@@ -3,10 +3,26 @@ pipeline {
         label 'docker-engine'
     }
     stages {
-        stage ('CSI-controller: Unit testing') {
+        stage ('CSI-controller: Unit testing + coverage') {
             steps {
                 sh 'mkdir -p build/reports && chmod 777 build/reports'
                 sh './scripts/run_unitests.sh `pwd`/build/reports'
+            }
+        }
+        stage ('CSI-controller: pep8') {
+            steps {
+                sh 'true'
+            }
+        }
+        stage ('CSI-controller: pylint') {
+            steps {
+                sh 'true'
+          
+            }
+        }
+        stage ('CSI-deployment: k8s yamls validation') {
+            steps {
+                sh './scripts/run_yamlcheck.sh'
             }
         }
         stage ('CSI-controller: Build and push image') {
