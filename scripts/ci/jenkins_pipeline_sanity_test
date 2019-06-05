@@ -37,6 +37,8 @@ pipeline {
             sh 'cat /tmp/server_output'
             junit '/tmp/out_client'
 
+            sh './scripts/csi_test/cleanup.sh csi-controller csi-sanity-test'
+
         }
     }
 }
