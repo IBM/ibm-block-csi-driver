@@ -9,8 +9,19 @@ pipeline {
             }
         }
         stage ('CSI-controller: build and start csi sanity client') {
-            steps {
-                sh './scripts/ci/build_and_run_sanity_test_client.sh csi-sanity-test > /tmp/client_output &'
+            parallel {
+                stage{
+                    steps {
+                        sh './scripts/ci/build_and_run_sanity_test_client.sh csi-sanity-test'
+
+                    }
+                }
+                stage{
+                    steps {
+                        sh './scripts/csi_test/add_containers_to_network.sh csi-controller csi-sanity-test'
+
+                    }
+                }
             }
         }
 	stage ('CSI-controller: add containers to the internal network') {
