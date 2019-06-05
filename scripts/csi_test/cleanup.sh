@@ -1,5 +1,5 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-docker rm $1
-docker rm $2
-docket network rm testnet
+res=`docker rm $1`
+res=`docker rm $2`
+res=`docket network rm testnet`
