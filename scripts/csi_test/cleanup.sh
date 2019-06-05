@@ -1,5 +1,7 @@
 #!/bin/bash
 
-res=`docker rm $1`
-res=`docker rm $2`
-res=`docket network rm testnet`
+docker kill $1
+docker rm $1
+docker kill $2
+docker rm $2
+docket network rm testnet
