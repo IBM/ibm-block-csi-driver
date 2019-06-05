@@ -24,8 +24,8 @@ pipeline {
         always {
             sh 'echo "SERVER OUTPUT"'
             sh 'cat /tmp/server_output'
-            junit '/tmp/server_output'
-            junit '/tmp/client_output'
+            junit '/tmp/out_client'
+
         }
     }
 }
