@@ -101,7 +101,6 @@ class ArrayMediator:
             
         Raises:
             volumeNotFound
-            PermissionDenied
         """
         raise NotImplementedError
 
@@ -118,10 +117,12 @@ class ArrayMediator:
            lun : the lun_id the volume was mapped to.
             
         Raises:
-            noAvailableLun
+            NoAvailableLun
+            LunAlreadyInUse
             volumeNotFound
             hostNotFound
             PermissionDenied
+            MappingError
         """
         raise NotImplementedError
 
@@ -141,18 +142,18 @@ class ArrayMediator:
             volumeNotFound
             volAlreadyUnmapped
             hostNotFound
+            UnMappingError
             PermissionDenied
         """
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get_host_by_host_identifiers(self, iscis_iqn, fc_initiators):
+    def get_host_by_host_identifiers(self, iscis_iqn):
         """ 
         This function will find the name of the volume by the volume_id and unmap the volume from the host.
                 
         Args:
            iscis_iqn : the iscsi iqn of the wanted host.
-           fc_initiators : fc initiators of the wanted host.
         
         Returns:  
            connectivity_types : list of connectivity types ([iscis, fc] or just [iscsi],..)
@@ -221,5 +222,10 @@ class ArrayMediator:
         """
         raise NotImplementedError
 
-
-
+    @property
+    @abc.abstractmethod
+    def max_lun_retries(self):
+        """
+            The maximum number of times a map operation will retry if lun is already in use
+        """
+        raise NotImplementedError

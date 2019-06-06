@@ -93,7 +93,6 @@ class TestGetconnection(unittest.TestCase):
 
         socket_connet.side_effect = [1, 1, 0, 0]
 
-
         res = self.array_connection.detect_array_type()
         self.assertEqual(res, SVCArrayMediator.array_type)
 
