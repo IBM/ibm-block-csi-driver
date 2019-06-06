@@ -109,7 +109,7 @@ class ArrayConnectionManager(object):
         for storage_type, port in [(XIVArrayMediator.array_type, XIVArrayMediator.port), (SVCArrayMediator.array_type, XIVArrayMediator.port)]:  # ds8k : 8452
             for endpoint in self.endpoints:
                 if _socket_connect_test(endpoint, port) == 0:
-                    logger.debug("storage array type is : {0}".format(self.array_type))
+                    logger.debug("storage array type is : {0}".format(storage_type))
                     return storage_type
 
         raise FailedToFindStorageSystemType(self.endpoints)

@@ -21,7 +21,7 @@ class XIVArrayMediator(ArrayMediator):
 
     @classproperty
     def array_type(self):
-        return 'XIV'
+       return 'A9000'
 
     @classproperty
     def port(self):

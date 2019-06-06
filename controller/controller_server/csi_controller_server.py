@@ -377,10 +377,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         )
 
     def Probe(self, request, context):
-        logger.info("Probe")
-        # TODO: add future logic
         context.set_code(grpc.StatusCode.OK)
-        logger.info("finished Probe")
         return csi_pb2.ProbeResponse()
 
     def start_server(self):
@@ -408,7 +405,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
 def main():
     parser = OptionParser()
-    parser.add_option("-e", "--csi.endpoint", dest="endpoint",
+    parser.add_option("-e", "--csi-endpoint", dest="endpoint",
                       help="grpc endpoint")
 
     (options, args) = parser.parse_args()
