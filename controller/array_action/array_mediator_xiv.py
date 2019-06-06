@@ -16,7 +16,7 @@ logger = get_stdout_logger()
 class XIVArrayMediator(ArrayMediator):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
-    MAX_LUN_NUMBER = 255
+    MAX_LUN_NUMBER = 511
     MIN_LUN_NUMBER = 1
 
     @classproperty
@@ -41,7 +41,7 @@ class XIVArrayMediator(ArrayMediator):
 
     @classproperty
     def max_lun_retries(self):
-        return self.MAX_LUN_NUMBER
+        return 10
 
     def __init__(self, user, password, endpoint):
         self.user = user
@@ -169,11 +169,11 @@ class XIVArrayMediator(ArrayMediator):
                 current_host = host.name
                 break
 
-        if current_host:
-            logger.debug("found host : {0}".format(current_host))
-            return current_host, [ISCSI_CONNECTIVITY_TYPE]
+        if not current_host:
+            raise controller_errors.HostNotFoundError(iscsi_iqn)
 
-        raise controller_errors.HostNotFoundError(iscsi_iqn)
+        logger.debug("found host : {0}".format(current_host))
+        return current_host, [ISCSI_CONNECTIVITY_TYPE]
 
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume id : {0}".format(volume_id))

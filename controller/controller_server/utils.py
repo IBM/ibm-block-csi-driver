@@ -41,7 +41,7 @@ def validate_csi_volume_capability(cap):
     logger.debug("validating csi volume capability : {0}".format(cap))
     if cap.mount:
         if cap.mount.fs_type and (cap.mount.fs_type not in config.SUPPORTED_FS_TYPES):
-                raise ValidationException(messages.unsupported_fs_type_message.format(cap.mount.fs_type))
+            raise ValidationException(messages.unsupported_fs_type_message.format(cap.mount.fs_type))
 
     else:
         logger.error(messages.only_mount_supported_message)
@@ -167,7 +167,7 @@ def get_node_id_info(node_id):
     if len(split_node) != config.SUPPORTED_CONNECTIVITY_TYPES + 1:  # the 1 is for the hostname
         raise HostNotFoundError(node_id)
 
-    hostname, iscsi_iqn = split_node
+    hostname, iscsi_iqn = split_node  # TODO: for FC : fc wwns will need to be added here.
     logger.debug("hostname : {0}, iscsi_iqn : {1} ".format(hostname, iscsi_iqn))
     return hostname, iscsi_iqn
 
@@ -193,7 +193,7 @@ def generate_csi_publish_volume_response(lun, connectivity_type, config):
     connectivity_param = config["controller"]["publish_context_connectivity_parameter"]
 
     res = csi_pb2.ControllerPublishVolumeResponse(publish_context={lun_param: str(lun),
-                                                                              connectivity_param: connectivity_type})
+                                                                   connectivity_param: connectivity_type})
 
     logger.debug("publish volume response is :{0}".format(res))
     return res

@@ -107,3 +107,8 @@ class UnMappingError(BaseArrayActionException):
 
     def __init__(self, vol, host, err):
         self.message = messages.UnMappingError_message.format(vol, host, err)
+
+class BadNodeIdError(BaseArrayActionException):
+
+    def __init__(self, name):
+        self.message = messages.BadNodeIdError_message.format(name)
