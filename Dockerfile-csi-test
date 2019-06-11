@@ -34,5 +34,5 @@ WORKDIR /usr/local/go/src/github.com/kubernetes-csi/csi-test
 #ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/run_csi_test.sh", "server:4444", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_params", "CreateVolume", "/tmp/out_client"]
 
 
-ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/run_csi_test.sh", "/tmp/k8s_dir/f", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/olga_secrets", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/olga_params", "CreateVolume", "/tmp/out_ckuebt"]
+ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/run_csi_test.sh", "/tmp/k8s_dir/f", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_params", "CreateVolume", "/tmp/out_ckuebt"]
 
