@@ -9,6 +9,7 @@ sed -i -e 's/USERNAME/${USERNAME}/g' $2
 sed -i -e 's/PASSWORD/${PASSWORD}/g' $2
 
 echo "####### ${MGMT_ADDRESS} ${USERNAME} ${PASSWORD} "
+cat $2
 
 #sed -i -e 's/MGMT_ADDRESS/9.151.156.113/g' $2
 

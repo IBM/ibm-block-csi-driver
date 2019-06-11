@@ -36,10 +36,15 @@ ARG MGMT_ADDRESS
 ARG USERNAME
 ARG PASSWORD
 
-RUN echo "@@@@@@@ $MGMT_ADDRESS $USERNAME"
-RUN sed -i -e 's/MGMT_ADDRESS/${MGMT_ADDRESS}/g' /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets
-RUN sed -i -e 's/USERNAME/${USERNAME}/g' /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets
-RUN sed -i -e 's/PASSWORD/${PASSWORD}/g' /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets
+ENV MGMT_ADDRESS $MGMT_ADDRESS
+ENV USERNAME $USERNAME
+ENV PASSWORD $PASSWORD
+
+
+RUN echo "@@@@@@ $MGMT_ADDRESS $USERNAME"
+#RUN sed -i -e 's/MGMT_ADDRESS/${MGMT_ADDRESS}/g' /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets
+#RUN sed -i -e 's/USERNAME/${USERNAME}/g' /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets
+#RUN sed -i -e 's/PASSWORD/${PASSWORD}/g' /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets
 
 RUN cat /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets
 
