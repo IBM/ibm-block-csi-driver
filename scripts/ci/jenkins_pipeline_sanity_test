@@ -5,12 +5,23 @@ pipeline {
     stages {
         stage ('CSI-controller: build and start controller server') {
             steps {
-                sh './scripts/ci/build_and_run_controller_server.sh csi-controller'
+                sh './scripts/ci/build_and_run_controller_server.sh csi-controller > /tmp/server_output &'
             }
         }
         stage ('CSI-controller: build and start csi sanity client') {
-            steps {
-                sh './scripts/ci/build_and_run_sanity_test_client.sh csi-sanity-test'
+            parallel {
+                stage ('run csi test'){
+                    steps {
+                        sh './scripts/ci/build_and_run_sanity_test_client.sh csi-sanity-test'
+
+                    }
+                }
+                stage ('add containers to internal network'){
+                    steps {
+                        sh './scripts/csi_test/add_containers_to_network.sh csi-controller csi-sanity-test'
+
+                    }
+                }
             }
         }
 #	stage ('CSI-controller: add containers to the internal network') {
@@ -19,5 +30,13 @@ pipeline {
  #           }
  #       }
 
+    }
+    post {
+        always {
+            sh './scripts/csi_test/cleanup.sh csi-controller csi-sanity-test'
+            sh 'echo "SERVER OUTPUT"'
+            sh 'cat /tmp/server_output'
+            junit '/tmp/out_client'
+        }
     }
 }
