@@ -21,6 +21,8 @@ pipeline {
         always {
             sh 'echo "SERVER OUTPUT"'
             sh 'cat /tmp/server_output'
+	    sh 'echo !@#@!#@!#!@#!@#@!#@!#@!#!@#@!#!@#!@#!@#!@#'
+	    sh 'cat /tmp/out_client'
             junit '/tmp/out_client'
         }
     }
