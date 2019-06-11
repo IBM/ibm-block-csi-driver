@@ -47,7 +47,7 @@ RUN echo "@@@@@@ $MGMT_ADDRESS $USERNAME $PASSWORD"
 #RUN sed -i -e 's/PASSWORD/${PASSWORD}/g' /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets
 
 RUN cat /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets
-
+RUN mkdir /tmp/k8s_dir
 
 ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/run_csi_test.sh", "/tmp/k8s_dir/f", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_params", "CreateVolume", "/tmp/out_ckuebt"]
 
