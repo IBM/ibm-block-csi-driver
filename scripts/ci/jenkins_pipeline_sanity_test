@@ -19,7 +19,6 @@ pipeline {
     }
     post {
         always {
-            sh './scripts/csi_test/cleanup.sh csi-controller csi-sanity-test'
             sh 'echo "SERVER OUTPUT"'
             sh 'cat /tmp/server_output'
             junit '/tmp/out_client'
