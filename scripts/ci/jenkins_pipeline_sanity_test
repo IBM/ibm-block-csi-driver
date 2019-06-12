@@ -5,7 +5,7 @@ pipeline {
     stages {
         stage ('CSI-controller: build and start controller server') {
             steps {
-                sh './scripts/ci/build_and_run_controller_server.sh csi-controller > `pwd`/tmp/server_output &'
+                sh './scripts/ci/build_and_run_controller_server.sh csi-controller > server_output &'
             }
         }
         stage ('CSI-controller: build and start csi sanity client') {
@@ -18,7 +18,7 @@ pipeline {
     }
     post {
         always {
-            archiveArtifacts 'tmp/server_output'
+            archiveArtifacts 'server_output'
 	        sh 'ls build/reports'
             junit 'build/reports/*.xml'
             sh '[ -d build/reports ] && rm -rf build/reports'
