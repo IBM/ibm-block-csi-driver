@@ -26,19 +26,7 @@ RUN chown -R appuser:appuser /usr/local/go/src/github.com/kubernetes-csi/csi-tes
 USER appuser
 WORKDIR /usr/local/go/src/github.com/kubernetes-csi/csi-test
 
-#ARG MGMT_ADDRESS
-#ARG USERNAME
-#ARG PASSWORD
-#ARG TESTS_TO_RUN
-#ARG POOL_NAME
+ENV JUNIT_OUTPUT="/tmp/test_results/out_client.xml"
 
-#ENV MGMT_ADDRESS $MGMT_ADDRESS
-#ENV USERNAME $USERNAME
-#ENV PASSWORD $PASSWORD
-#ENV TESTS_TO_RUN $TESTS_TO_RUN
-#ENV POOL_NAME $POOL_NAME
-
-RUN echo $TESTS_TO_RUN 
-
-ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/entrypoint-csi-sanity.sh", "/tmp/k8s_dir/f", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_params", "/tmp/test_results/out_client.xml"]
+ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/entrypoint-csi-sanity.sh", "/tmp/k8s_dir/f", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_params", "/tmp/test_results/out_client.xml", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_tests_to_run"]
 
