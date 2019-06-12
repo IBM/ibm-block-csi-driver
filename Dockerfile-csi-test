@@ -43,5 +43,5 @@ ENV TESTS_TO_RUN $TESTS_TO_RUN
 
 RUN echo $TESTS_TO_RUN $USERNAME
 
-ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/run_csi_test.sh", "/tmp/k8s_dir/f", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_params", "$TESTS_TO_RUN", "/tmp/test_results/out_client.xml"]
+ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/run_csi_test.sh", "/tmp/k8s_dir/f", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_params", "/tmp/test_results/out_client.xml"]
 

@@ -13,7 +13,7 @@ cat $2
 
 #sed -i -e 's/MGMT_ADDRESS/9.151.156.113/g' $2
 
-/usr/local/go/src/github.com/kubernetes-csi/csi-test/cmd/csi-sanity/csi-sanity  --csi.endpoint $1 --csi.secrets $2 --csi.testvolumeparameters $3  --csi.junitfile $5 --ginkgo.focus $4
+/usr/local/go/src/github.com/kubernetes-csi/csi-test/cmd/csi-sanity/csi-sanity  --csi.endpoint $1 --csi.secrets $2 --csi.testvolumeparameters $3  --csi.junitfile ${TESTS_TO_RUN} --ginkgo.focus $4
 
 
 
