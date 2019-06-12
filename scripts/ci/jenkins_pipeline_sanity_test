@@ -10,11 +10,9 @@ pipeline {
         }
         stage ('CSI-controller: build and start csi sanity client') {
               steps {
-			sh 'mkdir -p build/reports && chmod 777 build/reports'
-                        sh './scripts/ci/build_and_run_sanity_test_client.sh csi-sanity-test `pwd`/build/reports/'
-
-                    }
-                
+			        sh 'mkdir -p build/reports && chmod 777 build/reports'
+                    sh './scripts/ci/build_and_run_sanity_test_client.sh csi-sanity-test `pwd`/build/reports/'
+              }
         }
 
     }
@@ -22,7 +20,7 @@ pipeline {
         always {
             sh 'echo "SERVER OUTPUT"'
             sh 'cat /tmp/server_output'
-	        sh 'echo !@#@!#@!#!@#!@#@!#@!#@!#!@#@!#!@#!@#!@#!@#'
+            archiveArtifacts '/tmp/server_output'
 	        sh 'ls build/reports'
             junit 'build/reports/*.xml'
             sh '[ -d build/reports ] && rm -rf build/reports'
