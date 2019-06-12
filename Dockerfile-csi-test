@@ -20,9 +20,6 @@ RUN make -C /usr/local/go/src/github.com/kubernetes-csi/csi-test
 
 COPY ./scripts/csi_test /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver
 
-RUN cat /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/test_to_run | paste -sd "|"
-RUN cat /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/run_csi_test.sh
-
 RUN groupadd -g 9999 appuser && \
     useradd -r -u 9999 -g appuser appuser
 RUN chown -R appuser:appuser /usr/local/go/src/github.com/kubernetes-csi/csi-test
