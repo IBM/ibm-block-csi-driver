@@ -15,3 +15,19 @@ PoolDoesNotExist_message = "Pool does not exist: {0} , array : {1}"
 FailedToFindStorageSystemType_message = "Could not identify the type for endpoint: {0} "
 
 PermissionDeniedError_message = "Permission was denied to operation : {0}"
+
+MultipleHostsFoundError_message = "Multiple hosts found for iscsi iqn: {0}. hosts are : {1}"
+
+HostNotFoundError_message = "Host for node: {0} was not found"
+
+NoAvailableLunError_message = "No available lun was found for host : {0}"
+
+LunAlreadyInUse_message = "Lun : {0} is already mapped for host : {1}"
+
+MappingError_message = "Mapping error has occured while mapping vol : {0} to host : {1}. error : {2}"
+
+VolumeAlreadyUnmapped_message = "Volume: {0} is already unmapped."
+
+UnMappingError_message = "Unmapping error has occurred for vol : {0} and host : {1}. error : {2}"
+
+BadNodeIdError_message = "Bad node id format for node id : {0}"

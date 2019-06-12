@@ -4,6 +4,7 @@ from controller.csi_general import csi_pb2
 from controller.controller_server.csi_controller_server import ControllerServicer
 import controller.controller_server.utils as utils
 from controller.controller_server.errors import ValidationException
+from controller.array_action.errors import VolumeNotFoundError
 
 
 class TestUtils(unittest.TestCase):
@@ -148,3 +149,99 @@ class TestUtils(unittest.TestCase):
 
         with self.assertRaises(Exception):
             utils.generate_csi_create_volume_response(new_vol)
+
+    @patch('controller.controller_server.utils.validate_secret')
+    @patch('controller.controller_server.utils.validate_csi_volume_capability')
+    def test_validate_publish_volume_request(self, validate_capabilities, validate_secrets):
+        request = Mock()
+        request.readonly = True
+
+        with self.assertRaises(ValidationException) as ex:
+            utils.validate_publish_volume_request(request)
+            self.assertTrue("readonly" in ex.message)
+
+        request.readonly = False
+        validate_capabilities.side_effect = [ValidationException("msg1")]
+
+        with self.assertRaises(ValidationException) as ex:
+            utils.validate_publish_volume_request(request)
+            self.assertTrue("msg1" in ex.message)
+
+        validate_capabilities.side_effect = None
+        request.secrets = []
+
+        with self.assertRaises(ValidationException) as ex:
+            utils.validate_publish_volume_request(request)
+            self.assertTrue("secrets" in ex.message)
+
+        request.secrets = ["secret"]
+        validate_secrets.side_effect = [ValidationException("msg2")]
+
+        with self.assertRaises(ValidationException) as ex:
+            utils.validate_publish_volume_request(request)
+            self.assertTrue("msg2" in ex.message)
+
+        validate_secrets.side_effect = None
+
+        utils.validate_publish_volume_request(request)
+
+    @patch('controller.controller_server.utils.validate_secret')
+    def test_validate_unpublish_volume_request(self, validate_secret):
+        request = Mock()
+        request.volume_id = "somebadvolumename"
+
+        with self.assertRaises(ValidationException) as ex:
+            utils.validate_unpublish_volume_request(request)
+            self.assertTrue("volume" in ex.message)
+
+        request.volume_id = "xiv:volume"
+
+        request.secrets = []
+        with self.assertRaises(ValidationException) as ex:
+            utils.validate_unpublish_volume_request(request)
+            self.assertTrue("secret" in ex.message)
+
+        request.secrets = ["secret"]
+        validate_secret.side_effect = [ValidationException("msg2")]
+        with self.assertRaises(ValidationException) as ex:
+            utils.validate_unpublish_volume_request(request)
+            self.assertTrue("msg2" in ex.message)
+
+        validate_secret.side_effect = None
+
+        utils.validate_unpublish_volume_request(request)
+
+    def test_get_volume_id_info(self):
+        with self.assertRaises(VolumeNotFoundError) as ex:
+            utils.get_volume_id_info("badvolumeformat")
+            self.assertTrue("volume" in ex.message)
+
+        arr_type, vol = utils.get_volume_id_info("xiv:vol")
+        self.assertEqual(arr_type, "xiv")
+        self.assertEqual(vol, "vol")
+
+    def test_get_node_id_info(self):
+        with self.assertRaises(VolumeNotFoundError) as ex:
+            utils.get_volume_id_info("badvolumeformat")
+            self.assertTrue("volume" in ex.message)
+
+        arr_type, vol = utils.get_volume_id_info("xiv:vol")
+        self.assertEqual(arr_type, "xiv")
+        self.assertEqual(vol, "vol")
+
+    def test_choose_connectivity_types(self):
+        res = utils.choose_connectivity_type([])
+        self.assertEqual(res, "iscsi")
+
+        res = utils.choose_connectivity_type(["something"])
+        self.assertEqual(res, "something")
+
+        res = utils.choose_connectivity_type(["something", "something else"])
+        self.assertEqual(res, "iscsi")
+
+    def test_generate_publish_volume_response(self):
+        config = {"controller": {"publish_context_lun_parameter": "lun",
+                                 "publish_context_connectivity_parameter": "connectivity_type"}}
+        res = utils.generate_csi_publish_volume_response(0, "iscsi", config)
+        self.assertEqual(res.publish_context["lun"], '0')
+        self.assertEqual(res.publish_context["connectivity_type"], "iscsi")

@@ -65,3 +65,50 @@ class PermissionDeniedError(BaseArrayActionException):
 
     def __init__(self, operation):
         self.message = messages.PermissionDeniedError_message.format(operation)
+
+
+class MultipleHostsFoundError(BaseArrayActionException):
+
+    def __init__(self, iscsi_iqn, hosts):
+        self.message = messages.MultipleHostsFoundError_message.format(iscsi_iqn, hosts)
+
+
+class HostNotFoundError(BaseArrayActionException):
+
+    def __init__(self, iscsi_iqn):
+        self.message = messages.HostNotFoundError_message.format(iscsi_iqn)
+
+
+class NoAvailableLunError(BaseArrayActionException):
+
+    def __init__(self, host):
+        self.message = messages.NoAvailableLunError_message.format(host)
+
+
+class LunAlreadyInUseError(BaseArrayActionException):
+
+    def __init__(self, lun, host):
+        self.message = messages.LunAlreadyInUse_message.format(lun, host)
+
+
+class MappingError(BaseArrayActionException):
+
+    def __init__(self, vol, host, err):
+        self.message = messages.MappingError_message.format(vol, host, err)
+
+
+class VolumeAlreadyUnmappedError(BaseArrayActionException):
+
+    def __init__(self, vol):
+        self.message = messages.VolumeAlreadyUnmapped_message.format(vol)
+
+
+class UnMappingError(BaseArrayActionException):
+
+    def __init__(self, vol, host, err):
+        self.message = messages.UnMappingError_message.format(vol, host, err)
+
+class BadNodeIdError(BaseArrayActionException):
+
+    def __init__(self, name):
+        self.message = messages.BadNodeIdError_message.format(name)

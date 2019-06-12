@@ -89,7 +89,6 @@ class ArrayConnectionManager(object):
                 logger.debug("adding new connection to new endpoint : {}".format(self.endpoint_key))
                 array_connections_dict[self.endpoint_key] = 1
 
-
             logger.debug("got connection lock. array connection dict is: {}".format(array_connections_dict))
             try:
                 self.med_class = med_class(self.user, self.password, self.endpoints)
@@ -110,7 +109,7 @@ class ArrayConnectionManager(object):
         for storage_type, port in [(XIVArrayMediator.array_type, XIVArrayMediator.port), (SVCArrayMediator.array_type, XIVArrayMediator.port)]:  # ds8k : 8452
             for endpoint in self.endpoints:
                 if _socket_connect_test(endpoint, port) == 0:
-                    logger.debug("storage array type is : {0}".format(self.array_type))
+                    logger.debug("storage array type is : {0}".format(storage_type))
                     return storage_type
 
         raise FailedToFindStorageSystemType(self.endpoints)

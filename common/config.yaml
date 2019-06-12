@@ -3,3 +3,7 @@ identity:
    version: 1.0.0
    capabilities: 
       - CONTROLLER_SERVICE
+
+controller:
+   publish_context_lun_parameter : "PUBLISH_CONTEXT_LUN"
+   publish_context_connectivity_parameter : "PUBLISH_CONTEXT_CONNECTIVITY"
