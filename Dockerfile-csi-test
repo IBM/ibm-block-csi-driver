@@ -39,5 +39,5 @@ ENV MGMT_ADDRESS $MGMT_ADDRESS
 ENV USERNAME $USERNAME
 ENV PASSWORD $PASSWORD
 
-ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/run_csi_test.sh", "/tmp/k8s_dir/f", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_params", `/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/test_to_run | paste -sd "|"`, "/tmp/test_results/out_client.xml"]
+ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/run_csi_test.sh", "/tmp/k8s_dir/f", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_params", "CreateVolume", "/tmp/test_results/out_client.xml"]
 
