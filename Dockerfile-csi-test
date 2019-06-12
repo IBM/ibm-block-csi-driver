@@ -31,7 +31,6 @@ RUN chown -R appuser:appuser /tmp/b
 USER appuser
 WORKDIR /usr/local/go/src/github.com/kubernetes-csi/csi-test
 
-#ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/run_csi_test.sh", "server:4444", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_params", "CreateVolume", "/tmp/out_client"]
 ARG MGMT_ADDRESS
 ARG USERNAME
 ARG PASSWORD
@@ -40,15 +39,5 @@ ENV MGMT_ADDRESS $MGMT_ADDRESS
 ENV USERNAME $USERNAME
 ENV PASSWORD $PASSWORD
 
-
-RUN echo "@@@@@@ $MGMT_ADDRESS $USERNAME $PASSWORD"
-#RUN sed -i -e 's/MGMT_ADDRESS/${MGMT_ADDRESS}/g' /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets
-#RUN sed -i -e 's/USERNAME/${USERNAME}/g' /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets
-#RUN sed -i -e 's/PASSWORD/${PASSWORD}/g' /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets
-
-#RUN cat /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets
-#RUN mkdir /tmp/k8s_dir -m 777
-#RUN chown -R appuser:appuser /tmp/k8s_dir
-
-ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/run_csi_test.sh", "/tmp/k8s_dir/f", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_params", "CreateVolume", "/tmp/test_results/out_client.xml"]
+ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/run_csi_test.sh", "/tmp/k8s_dir/f", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_params", `/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/test_to_run | paste -sd "|"`, "/tmp/test_results/out_client.xml"]
 
