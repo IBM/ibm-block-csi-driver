@@ -5,13 +5,7 @@ pipeline {
     stages {
         stage ('CSI-controller: build and start controller server') {
             steps {
-                script {
-                    out = sh (
-                            script: './scripts/ci/build_and_run_controller_server.sh csi-controller &',
-                            returnStdout: true
-                        ).Trim()
-                    sh 'echo ${out} > server_output'
-                }
+                sh  './scripts/ci/build_and_run_controller_server.sh csi-controller > server_output 2>&1 &'
 
             }
         }
