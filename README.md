@@ -5,13 +5,20 @@ Support Kubernetes v1.13 and Openshift v4.1.
 
 ## Prerequisite
 
-#### Install CSIDriver CRD
-```sh
-#> kubectl create -f https://raw.githubusercontent.com/kubernetes/csi-api/master/pkg/crd/manifests/csidriver.yaml
-```
-Note: More detail about CSIDriver -> https://kubernetes-csi.github.io/docs/csi-driver-object.html#enabling-csidriver-on-kubernetes
+#### Install CSIDriver CRD - optional
+Enabling CSIDriver on Kubernetes (more detail -> https://kubernetes-csi.github.io/docs/csi-driver-object.html#enabling-csidriver-on-kubernetes)
 
- 
+In Kubernetes v1.13, because the feature was alpha, it was disabled by default. To enable the use of CSIDriver on these versions, do the following:
+
+1. Ensure the feature gate is enabled via the following Kubernetes feature flag: --feature-gates=CSIDriverRegistry=true
+   For example on kubeadm installation add the flag inside the /etc/kubernetes/manifests/kube-apiserver.yaml.
+2. Either ensure the CSIDriver CRD is automatically installed via the Kubernetes Storage CRD addon OR manually install the CSIDriver CRD on the Kubernetes cluster with the following command:
+   ```sh
+   #> kubectl create -f https://raw.githubusercontent.com/kubernetes/csi-api/master/pkg/crd/manifests/csidriver.yaml
+   ```
+
+If the feature gate was not enabled then CSIDriver for the ibm-block-csi-driver will not be created automatically.
+
 ## Driver Installation
 
 #### 1. Install the CSI driver
@@ -32,7 +39,6 @@ clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-cluster-driver-regist
 clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-snapshotter-role created
 clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-external-snapshotter-binding created
 statefulset.apps/ibm-block-csi-controller created
-csidriver.storage.k8s.io/ibm-block-csi-driver created
 ```
 
 Verify driver is running (Currently only the csi-controller pod should be in Running state):
@@ -48,6 +54,7 @@ ibm-block-csi-controller-0   5/5     Running   0          10m
 
 Additional info on the driver:
 ```sh
+### if feature-gates=CSIDriverRegistry=true then the driver will have automatic CSIDriver CRD that can be viewed as: 
 #> kubectl describe csidriver ibm-block-csi-driver
 Name:         ibm-block-csi-driver
 Namespace:    
