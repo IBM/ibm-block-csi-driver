@@ -34,10 +34,14 @@ WORKDIR /usr/local/go/src/github.com/kubernetes-csi/csi-test
 ARG MGMT_ADDRESS
 ARG USERNAME
 ARG PASSWORD
+ARG TESTS_TO_RUN
 
 ENV MGMT_ADDRESS $MGMT_ADDRESS
 ENV USERNAME $USERNAME
 ENV PASSWORD $PASSWORD
+ENV TESTS_TO_RUN $TESTS_TO_RUN
 
-ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/run_csi_test.sh", "/tmp/k8s_dir/f", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_params", `cat /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/test_to_run | paste -sd "|"`, "/tmp/test_results/out_client.xml"]
+RUN echo $TESTS_TO_RUN
+
+ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/run_csi_test.sh", "/tmp/k8s_dir/f", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_params", $TESTS_TO_RUN, "/tmp/test_results/out_client.xml"]
 
