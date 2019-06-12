@@ -1,14 +1,25 @@
 # ibm-block-csi-drive
 The Container Storage Interface (CSI) Driver for IBM block storage systems enables container orchestrators such as Kubernetes to manage the life-cycle of persistent storage.
+Support Kubernetes v1.13 and Openshift v4.1.
 
 
-## Installation
+## Prerequisite
+
+#### Install CSIDriver CRD
+```sh
+#> kubectl create -f https://raw.githubusercontent.com/kubernetes/csi-api/master/pkg/crd/manifests/csidriver.yaml
+```
+Note: More detail about CSIDriver -> https://kubernetes-csi.github.io/docs/csi-driver-object.html#enabling-csidriver-on-kubernetes
+
+ 
+## Driver Installation
 
 #### 1. Install the CSI driver
 ```sh
-#> curl https://raw.githubusercontent.com/IBM/ibm-block-csi-driver/feature/k8s-deployment/deploy/kubernetes/v1.14/ibm-block-csi-driver.yaml > ibm-block-csi-driver.yaml 
 
-# If require to update the IMAGE URLs, then edit the ibm-block-csi-driver.yaml file.
+#> curl https://raw.githubusercontent.com/IBM/ibm-block-csi-driver/develop/deploy/kubernetes/v1.13/ibm-block-csi-driver.yaml > ibm-block-csi-driver.yaml 
+
+### If require to update the IMAGE URLs, then edit the ibm-block-csi-driver.yaml file.
 
 #> kubectl apply -f ibm-block-csi-driver.yaml
 serviceaccount/ibm-block-csi-controller-sa created
@@ -30,7 +41,7 @@ Verify driver is running (Currently only the csi-controller pod should be in Run
 NAME                         READY   STATUS    RESTARTS   AGE
 ibm-block-csi-controller-0   5/5     Running   0          10m
 
-# NOTE if pod/ibm-block-csi-controller-0 is not in Running state, then troubleshoot by run:
+### NOTE if pod/ibm-block-csi-controller-0 is not in Running state, then troubleshoot by run:
 #> kubectl describe -n kube-system pod/ibm-block-csi-controller-0
 
 ```
@@ -78,7 +89,7 @@ quay.io/k8scsi/csi-attacher:v1.1.1
 quay.io/k8scsi/livenessprobe:v1.1.0
 
 
-## Watch the driver logs
+### Watch the driver logs
 #> kubectl log -f -n kube-system ibm-block-csi-controller-0 ibm-block-csi-controller
 ```
 
