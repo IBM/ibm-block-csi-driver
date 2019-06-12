@@ -27,6 +27,7 @@ RUN chown -R appuser:appuser /driver
 USER appuser
 WORKDIR /driver
 ENV PYTHONPATH=/driver
+
 ENTRYPOINT ["/driver/controller/scripts/entrypoint.sh"]
 
 
