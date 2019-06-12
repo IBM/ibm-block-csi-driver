@@ -22,9 +22,10 @@ pipeline {
         always {
             sh 'echo "SERVER OUTPUT"'
             sh 'cat /tmp/server_output'
-	    sh 'echo !@#@!#@!#!@#!@#@!#@!#@!#!@#@!#!@#!@#!@#!@#'
-	    sh 'ls build/reports'
+	        sh 'echo !@#@!#@!#!@#!@#@!#@!#@!#!@#@!#!@#!@#!@#!@#'
+	        sh 'ls build/reports'
             junit 'build/reports/*.xml'
+            sh '[ -d build/reports ] && rm -rf build/reports'
 
         }
     }
