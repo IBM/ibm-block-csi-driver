@@ -1,5 +1,6 @@
 #!/bin/bash -xe
 
+# create the /tmp/k8s-dir where the grpc unix socket will be.
 if [ ! -d /tmp/k8s_dir ]; then
  mkdir /tmp/k8s_dir
 fi 
