@@ -27,6 +27,10 @@ USER appuser
 WORKDIR /usr/local/go/src/github.com/kubernetes-csi/csi-test
 
 ENV JUNIT_OUTPUT="/tmp/test_results/out_client.xml"
+ENV SECRET_FILE="/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets"
+ENV PARAM_FILE="/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_params"
+ENV ENDPOINT="/tmp/k8s_dir/f"
+ENV TESTS_TO_RUN_FILE="/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_tests_to_run"
 
-ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/entrypoint-csi-sanity.sh", "/tmp/k8s_dir/f", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_params", "/tmp/test_results/out_client.xml", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_tests_to_run"]
+ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/entrypoint-csi-sanity.sh"]#, "/tmp/k8s_dir/f", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_params", "/tmp/test_results/out_client.xml", "/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_tests_to_run"]
 
