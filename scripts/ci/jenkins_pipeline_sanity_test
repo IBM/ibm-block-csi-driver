@@ -18,6 +18,7 @@ pipeline {
     }
     post {
         always {
+            sh 'cat server_output'
             archiveArtifacts 'server_output'
 	        sh 'ls build/reports'
             junit 'build/reports/*.xml'
