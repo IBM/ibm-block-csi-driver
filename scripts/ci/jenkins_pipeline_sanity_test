@@ -23,7 +23,7 @@ pipeline {
             sh 'cat /tmp/server_output'
 	    sh 'echo !@#@!#@!#!@#!@#@!#@!#@!#!@#@!#!@#!@#!@#!@#'
 	    sh 'cat /tmp/k8s_dir/out_client'
-            junit '/tmp/k8s_dir/out_client'
+            junit '/tmp/k8s_dir/out_client.xml'
 
         }
     }
