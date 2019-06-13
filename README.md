@@ -1,11 +1,23 @@
 # ibm-block-csi-drive
 The Container Storage Interface (CSI) Driver for IBM block storage systems enables container orchestrators such as Kubernetes to manage the life-cycle of persistent storage.
-Support Kubernetes v1.13 and Openshift v4.1.
 
+Support container platforms:
+  - Openshift v4.1
+  - Kubernetes v1.13
+The code is provided as is, without warranty. Any issue will be handled on a best-effort basis.
+Support IBM storage systems:
+  - IBM FlashSystem 9100
+  - IBM Spectrum Virtualize
+  - IBM Storwize
+  - IBM FlashSystem A9000\R
 
-## Prerequisite
+DISCLAIMER: The code is provided as is, without warranty. Any issue will be handled on a best-effort basis.
 
-#### Install CSIDriver CRD - optional
+## Driver Installation
+
+#### Prerequisite
+
+###### Install CSIDriver CRD - optional
 Enabling CSIDriver on Kubernetes (more detail -> https://kubernetes-csi.github.io/docs/csi-driver-object.html#enabling-csidriver-on-kubernetes)
 
 In Kubernetes v1.13, because the feature was alpha, it was disabled by default. To enable the use of CSIDriver on these versions, do the following:
@@ -18,8 +30,6 @@ In Kubernetes v1.13, because the feature was alpha, it was disabled by default. 
    ```
 
 If the feature gate was not enabled then CSIDriver for the ibm-block-csi-driver will not be created automatically.
-
-## Driver Installation
 
 #### 1. Install the CSI driver
 ```sh
@@ -238,11 +248,16 @@ persistentvolumeclaim/pvc-demo deleted
 
 
 #### 2. Delete the driver
+
 ```sh
 #> kubectl delete -f ibm-block-csi-driver.yaml
 ```
 
-
+Kubernetes version 1.13 creates automatically the driver CSIDriver `ibm-block-csi-driver`, but it does not delete it automatically when removing the driver manifest.
+So in order to clean the   driver CSIDriver object, run the following commend:
+```sh
+kubectl delete CSIDriver ibm-block-csi-driver
+```
 
 ## Licensing
 
