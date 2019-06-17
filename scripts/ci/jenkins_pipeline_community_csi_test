@@ -16,6 +16,7 @@ pipeline {
     post {
         always {
             sh './scripts/ci/community_csi_test_cleanup.sh csi-controller'
+            sh './scripts/ci/community_csi_test_cleanup.sh csi-sanity-test'
             sh 'cat server_output'
             archiveArtifacts 'csi_controller_logs'
 	        sh 'ls build/reports'
