@@ -19,7 +19,7 @@ pipeline {
 	        sh 'ls build/reports'
             junit 'build/reports/*.xml'
             sh '[ -d build/reports ] && rm -rf build/reports'
-            sh '[ -d csi_controller_logs ] && rm -f csi_controller_logs'
+            sh '[ -f csi_controller_logs ] && rm -f csi_controller_logs'
 
         }
     }
