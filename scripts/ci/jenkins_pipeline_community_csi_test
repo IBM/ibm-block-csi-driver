@@ -1,0 +1,26 @@
+pipeline {
+    agent {
+        label 'docker-engine'
+    }
+    stages {
+        stage ('CSI-controller: build and start controller server and csi sanity tests') {
+            steps {
+                sh  './scripts/ci/run_controller_server_for_csi_test.sh csi-controller > csi_controller_logs 2>&1 '
+                sh 'sleep 2 '
+                sh 'mkdir -p build/reports && chmod 777 build/reports'
+                sh './scripts/ci/run_csi_test_client.sh csi-sanity-test `pwd`/build/reports/'
+            }
+        }
+    }
+
+    post {
+        always {
+            sh 'cat server_output'
+            archiveArtifacts 'csi_controller_logs'
+	        sh 'ls build/reports'
+            junit 'build/reports/*.xml'
+            sh '[ -d build/reports ] && rm -rf build/reports'
+
+        }
+    }
+}
