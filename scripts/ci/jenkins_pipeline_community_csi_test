@@ -15,6 +15,8 @@ pipeline {
 
     post {
         always {
+            sh 'docker stop csi-controller'
+            sh 'docker stop csi-sanity-test'
             sh 'cat server_output'
             archiveArtifacts 'csi_controller_logs'
 	        sh 'ls build/reports'
