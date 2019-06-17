@@ -36,7 +36,7 @@ If the feature gate was not enabled then CSIDriver for the ibm-block-csi-driver 
 
 #> curl https://raw.githubusercontent.com/IBM/ibm-block-csi-driver/develop/deploy/kubernetes/v1.13/ibm-block-csi-driver.yaml > ibm-block-csi-driver.yaml 
 
-### If it is required to update the IMAGE URLs, then edit the ibm-block-csi-driver.yaml file.
+### Optional: Edit the `ibm-block-csi-driver.yaml` file only if you need to change the driver IMAGE URL. By default its `ibmcom/ibm-block-csi-controller-driver:1.0.0`.
 
 #> kubectl apply -f ibm-block-csi-driver.yaml
 serviceaccount/ibm-block-csi-controller-sa created
