@@ -17,11 +17,11 @@ pipeline {
         always {
             sh './scripts/ci/community_csi_test_cleanup.sh csi-controller'
             sh './scripts/ci/community_csi_test_cleanup.sh csi-sanity-test'
-            archiveArtifacts '${CONTROLLER_LOGS}'
+            archiveArtifacts '${env.CONTROLLER_LOGS}'
 	        sh 'ls build/reports'
             junit 'build/reports/*.xml'
             sh '[ -d build/reports ] && rm -rf build/reports'
-            sh '[ -f `${CONTROLLER_LOGS}` ] && rm -f csi_controller_logs'
+            sh '[ -f `${env.CONTROLLER_LOGS}` ] && rm -f csi_controller_logs'
 
         }
     }
