@@ -7,13 +7,13 @@ pipeline {
         STORAGE_CONF_YAML = "`pwd`/scripts/ci/storage_conf.yaml"
 
     }
-   /* stage('Environment Setup') {
+    stage('Environment Setup') {
         agent {
                 label 'ansible_rhel73'
             }
         env.relative_storage_conf_yaml_path = sh (returnStdout: true, script: 'source "${WORKSPACE}/pipeline/csi/$JOB_BASE_NAME".params; echo -n $CONFIGURE_STORAGE_YAML_PATH')
         env.full_storage_conf_yaml_path = "${WORKSPACE}/${relative_storage_conf_yaml_path}"
-    }*/
+    }
 
    stages {
         stage('Configure Storage') {
@@ -27,9 +27,9 @@ pipeline {
             }*/
            steps {
                 echo "setting up env vars"
-                env.relative_storage_conf_yaml_path = sh (returnStdout: true, script: 'source "${WORKSPACE}/pipeline/csi/$JOB_BASE_NAME".params; echo -n $CONFIGURE_STORAGE_YAML_PATH')
+                //env.relative_storage_conf_yaml_path = sh (returnStdout: true, script: 'source "${WORKSPACE}/pipeline/csi/$JOB_BASE_NAME".params; echo -n $CONFIGURE_STORAGE_YAML_PATH')
                 echo "${env.relative_storage_conf_yaml_path}"
-                env.full_storage_conf_yaml_path = "${WORKSPACE}/${relative_storage_conf_yaml_path}"
+                //env.full_storage_conf_yaml_path = "${WORKSPACE}/${relative_storage_conf_yaml_path}"
                 echo "${env.full_storage_conf_yaml_path}"
 
                 echo "found storage yaml so running ansible to configure storage"
