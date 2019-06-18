@@ -2,7 +2,7 @@ pipeline {
     agent none
     environment {
         CONTROLLER_LOGS = "csi_controller_logs"
-        STORAGE_CONF_YAML = "./scripts/ci/storage_conf.yaml"
+        STORAGE_CONF_YAML = "`pwd`/scripts/ci/storage_conf.yaml"
 
     }
     /*stage('Environment Setup') {
