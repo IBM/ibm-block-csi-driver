@@ -1,7 +1,5 @@
 pipeline {
-    agent {
-        label 'docker-engine'
-    }
+    agent none
     environment {
         CONTROLLER_LOGS = "csi_controller_logs"
         STORAGE_CONF_YAML = "./scripts/ci/storage_conf.yaml"
@@ -13,6 +11,9 @@ pipeline {
 
     stages {
         stage('Configure Storage') {
+            agent {
+                label 'ansible_rhel73''
+            }
             when {
                 expression {
                     return env.relative_storage_conf_yaml_path != ''
@@ -26,6 +27,9 @@ pipeline {
             }
         }
         stage ('CSI-controller: build and start controller server and csi sanity tests') {
+            agent {
+                label 'docker-engine'
+            }
             steps {
                 sh  './scripts/ci/run_community_csi_test.sh'
             }
