@@ -12,7 +12,7 @@ pipeline {
     stages {
         stage('Configure Storage') {
             agent {
-                label 'ansible_rhel73''
+                label 'ansible_rhel73'
             }
             when {
                 expression {
