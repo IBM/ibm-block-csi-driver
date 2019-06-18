@@ -1,0 +1,1 @@
+export CONFIGURE_STORAGE_YAML_PATH="scripts/ci/storage_conf.yaml"

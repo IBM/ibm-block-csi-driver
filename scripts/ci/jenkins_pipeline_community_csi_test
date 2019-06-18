@@ -1,43 +1,53 @@
 pipeline {
-    agent none
+    agent {
+        label 'docker-engine'
+    }
     environment {
         CONTROLLER_LOGS = "csi_controller_logs"
         STORAGE_CONF_YAML = "`pwd`/scripts/ci/storage_conf.yaml"
 
     }
-    /*stage('Environment Setup') {
+   /* stage('Environment Setup') {
+        agent {
+                label 'ansible_rhel73'
+            }
         env.relative_storage_conf_yaml_path = sh (returnStdout: true, script: 'source "${WORKSPACE}/pipeline/csi/$JOB_BASE_NAME".params; echo -n $CONFIGURE_STORAGE_YAML_PATH')
+        env.full_storage_conf_yaml_path = "${WORKSPACE}/${relative_storage_conf_yaml_path}"
     }*/
 
-    stages {
+   stages {
         stage('Configure Storage') {
             agent {
                 label 'ansible_rhel73'
             }
-            when {
+           /* when {
                 expression {
                     return env.relative_storage_conf_yaml_path != ''
                 }
-            }
-            steps {
+            }*/
+           steps {
+                echo "setting up env vars"
+                env.relative_storage_conf_yaml_path = sh (returnStdout: true, script: 'source "${WORKSPACE}/pipeline/csi/$JOB_BASE_NAME".params; echo -n $CONFIGURE_STORAGE_YAML_PATH')
+                echo "${env.relative_storage_conf_yaml_path}"
+                env.full_storage_conf_yaml_path = "${WORKSPACE}/${relative_storage_conf_yaml_path}"
+                echo "${env.full_storage_conf_yaml_path}"
+
                 echo "found storage yaml so running ansible to configure storage"
                 script {
-                    configureStorage(storage_arrays: "${env.STORAGE_ARRAYS}", vars_file: "${env.STORAGE_CONF_YAML}")
+                    configureStorage(storage_arrays: "${env.STORAGE_ARRAYS}", vars_file: "${env.full_storage_conf_yaml_path}")
                 }
-            }
+           }
         }
         stage ('CSI-controller: build and start controller server and csi sanity tests') {
-            agent {
-                label 'docker-engine'
-            }
             steps {
                 sh  './scripts/ci/run_community_csi_test.sh'
             }
         }
     }
 
-    post {
+   post {
         always {
+
             sh './scripts/ci/community_csi_test_cleanup.sh csi-controller'
             sh './scripts/ci/community_csi_test_cleanup.sh csi-sanity-test'
             archiveArtifacts "${env.CONTROLLER_LOGS}"
