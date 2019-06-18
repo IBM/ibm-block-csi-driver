@@ -4,7 +4,25 @@ pipeline {
     }
     environment {
         CONTROLLER_LOGS = "csi_controller_logs"
+        STORAGE_CONF_YAML = "./scripts/ci/storage_conf.yaml"
+
     }
+    /*stage('Environment Setup') {
+        env.relative_storage_conf_yaml_path = sh (returnStdout: true, script: 'source "${WORKSPACE}/pipeline/csi/$JOB_BASE_NAME".params; echo -n $CONFIGURE_STORAGE_YAML_PATH')
+    }*/
+    stage('Configure Storage') {
+            when {
+                expression {
+                    return env.relative_storage_conf_yaml_path != ''
+                }
+            }
+            steps {
+                echo "found storage yaml so running ansible to configure storage"
+                script {
+                    configureStorage(storage_arrays: "${env.STORAGE_ARRAYS}", vars_file: "${env.STORAGE_CONF_YAML}")
+                }
+            }
+        }
     stages {
         stage ('CSI-controller: build and start controller server and csi sanity tests') {
             steps {
