@@ -15,8 +15,12 @@ pipeline {
                 }
              steps {
                 script{
-                    env.relative_storage_conf_yaml_path = sh (returnStdout: true, script: 'source "${WORKSPACE}/pipeline/csi/$JOB_BASE_NAME".params; echo -n $CONFIGURE_STORAGE_YAML_PATH')
-                    env.full_storage_conf_yaml_path = "${WORKSPACE}/${relative_storage_conf_yaml_path}"
+                    env.pwd = `pwd`
+                    echo " env.pwd  ${env.pwd}"
+                    env.relative_storage_conf_yaml_path = sh (returnStdout: true, script: 'source "${env.pwd}/scripts/ci/$JOB_BASE_NAME".params; echo -n $CONFIGURE_STORAGE_YAML_PATH')
+                    echo " env.relative_storage_conf_yaml_path  ${env.relative_storage_conf_yaml_path}"
+                    env.full_storage_conf_yaml_path = "${env.pwd}/${relative_storage_conf_yaml_path}"
+                    echo " env.full_storage_conf_yaml_path  ${env.full_storage_conf_yaml_path}"
                 }
              }
         }
