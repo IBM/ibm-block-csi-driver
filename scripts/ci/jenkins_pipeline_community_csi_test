@@ -13,8 +13,10 @@ pipeline {
             agent {
                     label 'ansible_rhel73'
                 }
-            env.relative_storage_conf_yaml_path = sh (returnStdout: true, script: 'source "${WORKSPACE}/pipeline/csi/$JOB_BASE_NAME".params; echo -n $CONFIGURE_STORAGE_YAML_PATH')
-            env.full_storage_conf_yaml_path = "${WORKSPACE}/${relative_storage_conf_yaml_path}"
+             steps {
+                env.relative_storage_conf_yaml_path = sh (returnStdout: true, script: 'source "${WORKSPACE}/pipeline/csi/$JOB_BASE_NAME".params; echo -n $CONFIGURE_STORAGE_YAML_PATH')
+                env.full_storage_conf_yaml_path = "${WORKSPACE}/${relative_storage_conf_yaml_path}"
+             }
         }
        stage('Configure Storage') {
             agent {
