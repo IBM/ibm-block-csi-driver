@@ -3,3 +3,5 @@
 .coverage
 .project
 .pydevproject
+/.metadata/
+/bin/
