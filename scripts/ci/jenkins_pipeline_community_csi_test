@@ -19,7 +19,7 @@ pipeline {
                     echo " env.pwd  ${env.pwd}"
                     //env.relative_storage_conf_yaml_path = sh (returnStdout: true, script: 'source "$pwd/scripts/ci/$JOB_BASE_NAME".params; echo -n $CONFIGURE_STORAGE_YAML_PATH')
                     //echo " env.relative_storage_conf_yaml_path  ${env.relative_storage_conf_yaml_path}"
-                    env.full_storage_conf_yaml_path = "${env.pwd}/scripts/ci/storage_conf.yaml"
+                    env.full_storage_conf_yaml_path = "${env.pwd}/../scripts/ci/storage_conf.yaml"
                     echo " env.full_storage_conf_yaml_path  ${env.full_storage_conf_yaml_path}"
                 }
              }
