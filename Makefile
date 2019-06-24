@@ -33,6 +33,10 @@ ibm-block-csi-driver:
 test:
 	go test -v -race ./node/...
 
+.PHONY: gofmt
+gofmt:
+	gofmt -w .
+
 #.PHONY: image-release
 #image-release:
 #	docker build -t $(IMAGE):$(VERSION) .

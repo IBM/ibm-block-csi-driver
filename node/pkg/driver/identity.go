@@ -27,7 +27,7 @@ func (d *Driver) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoReques
 	klog.V(6).Infof("GetPluginInfo: called with args %+v", *req)
 	resp := &csi.GetPluginInfoResponse{
 		Name:          DriverName,
-		VendorVersion: DriverVersion,
+		VendorVersion: driverVersion,
 	}
 
 	return resp, nil

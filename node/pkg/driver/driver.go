@@ -29,7 +29,6 @@ import (
 
 const (
 	DriverName    = "ibm-block-csi-driver" // TODO take from ini
-	DriverVersion = "1.0.0"
 )
 
 type Driver struct {
@@ -40,7 +39,7 @@ type Driver struct {
 }
 
 func NewDriver(endpoint string) (*Driver, error) {
-	klog.Infof("Driver: %v Version: %v", DriverName, DriverVersion)
+	klog.Infof("Driver: %v Version: %v", DriverName, driverVersion)
 
 	return &Driver{
 		endpoint: endpoint,
