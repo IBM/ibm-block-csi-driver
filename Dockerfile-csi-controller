@@ -13,10 +13,10 @@
 # limitations under the License.
 
 FROM centos:7
-RUN yum --enablerepo=extras -y install epel-release && yum -y install python2-pip
+RUN yum --enablerepo=extras -y install epel-release && yum -y install python36-pip
 
 COPY controller/requirements.txt /driver/controller/
-RUN pip install -r /driver/controller/requirements.txt
+RUN pip3 install -r /driver/controller/requirements.txt
 
 
 COPY ./common /driver/common

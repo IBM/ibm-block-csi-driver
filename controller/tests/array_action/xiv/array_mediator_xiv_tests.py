@@ -21,7 +21,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(Exception) as ex:
             self.mediator.get_volume("some name")
 
-        self.assertTrue(error_msg in ex.exception)
+        self.assertTrue(error_msg in str(ex.exception))
 
     def test_get_volume_return_correct_value(self):
         vol = utils.get_mock_xiv_volume(10, "vol_name", "wwn")

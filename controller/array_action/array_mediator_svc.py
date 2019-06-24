@@ -1,4 +1,4 @@
-from array_mediator_interface import  ArrayMediator
+from controller.array_action.array_mediator_interface import  ArrayMediator
 
 class SVCArrayMediator(ArrayMediator):
     max_connections = 10  # TODO : need to implement all the interface methods\properties 

@@ -30,7 +30,7 @@ class TestWithFunctionality(unittest.TestCase):
             with self.array_connection as array_mediator:
                 pass
 
-        self.assertTrue(error_message in ex.exception)
+        self.assertTrue(error_message in str(ex.exception))
         self.assertEqual(get_connection.call_count, 1)
 
 
@@ -82,7 +82,7 @@ class TestGetconnection(unittest.TestCase):
         with self.assertRaises(Exception) as ex:
             self.array_connection.get_array_connection()
 
-        self.assertTrue(error_msg in ex.exception)
+        self.assertTrue(error_msg in str(ex.exception))
 
     @patch("controller.array_action.array_connection_manager._socket_connect_test")
     def test_detect_array_type(self, socket_connet):
