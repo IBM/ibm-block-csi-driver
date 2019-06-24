@@ -193,7 +193,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 if len(mappings) >= 1:
                     logger.debug("{0} mappings have been found for volume. the mappings are: {1}".format(len(mappings), mappings))
                     if len(mappings) == 1:
-                        mapping = mappings.keys()[0]
+                        mapping = list(mappings)[0]
                         if  mapping == host_name:
                             logger.debug("idempotent case - volume is already mapped to host.")
                             return utils.generate_csi_publish_volume_response(mappings[mapping], connectivity_type,

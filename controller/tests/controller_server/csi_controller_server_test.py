@@ -338,7 +338,7 @@ class TestControllerServerDeleteVolume(unittest.TestCase):
         res = self.servicer.DeleteVolume(self.request, context)
         self.assertEqual(context.code, return_code)
         if return_code != grpc.StatusCode.OK:
-            msg = error.message
+            msg = str(error)
             self.assertTrue(msg in context.details, "msg : {0} is not in : {1}".format(msg, context.details))
 
     def test_delete_volume_with_volume_not_found_error(self, ):
