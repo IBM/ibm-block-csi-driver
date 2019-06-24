@@ -1,14 +1,42 @@
 # ibm-block-csi-drive
 The Container Storage Interface (CSI) Driver for IBM block storage systems enables container orchestrators such as Kubernetes to manage the life-cycle of persistent storage.
 
+Supported container platforms:
+  - Openshift v4.1
+  - Kubernetes v1.13
 
-## Installation
+Supported IBM storage systems:
+  - IBM FlashSystem 9100
+  - IBM Spectrum Virtualize
+  - IBM Storwize
+  - IBM FlashSystem A9000\R
+
+DISCLAIMER: The code is provided as is, without warranty. Any issue will be handled on a best-effort basis.
+
+## Driver Installation
+
+#### Prerequisite
+
+###### Install CSIDriver CRD - optional
+Enabling CSIDriver on Kubernetes (more details -> https://kubernetes-csi.github.io/docs/csi-driver-object.html#enabling-csidriver-on-kubernetes)
+
+In Kubernetes v1.13, because the feature was alpha, it was disabled by default. To enable the use of CSIDriver on these versions, do the following:
+
+1. Ensure the feature gate is enabled via the following Kubernetes feature flag: --feature-gates=CSIDriverRegistry=true
+   For example on kubeadm installation add the flag inside the /etc/kubernetes/manifests/kube-apiserver.yaml.
+2. Either ensure the CSIDriver CRD is automatically installed via the Kubernetes Storage CRD addon OR manually install the CSIDriver CRD on the Kubernetes cluster with the following command:
+   ```sh
+   #> kubectl create -f https://raw.githubusercontent.com/kubernetes/csi-api/master/pkg/crd/manifests/csidriver.yaml
+   ```
+
+If the feature gate was not enabled then CSIDriver for the ibm-block-csi-driver will not be created automatically.
 
 #### 1. Install the CSI driver
 ```sh
-#> curl https://raw.githubusercontent.com/IBM/ibm-block-csi-driver/feature/k8s-deployment/deploy/kubernetes/v1.14/ibm-block-csi-driver.yaml > ibm-block-csi-driver.yaml 
 
-# If require to update the IMAGE URLs, then edit the ibm-block-csi-driver.yaml file.
+#> curl https://raw.githubusercontent.com/IBM/ibm-block-csi-driver/develop/deploy/kubernetes/v1.13/ibm-block-csi-driver.yaml > ibm-block-csi-driver.yaml 
+
+### Optional: Edit the `ibm-block-csi-driver.yaml` file only if you need to change the driver IMAGE URL. By default its `ibmcom/ibm-block-csi-controller-driver:1.0.0`.
 
 #> kubectl apply -f ibm-block-csi-driver.yaml
 serviceaccount/ibm-block-csi-controller-sa created
@@ -21,22 +49,22 @@ clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-cluster-driver-regist
 clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-snapshotter-role created
 clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-external-snapshotter-binding created
 statefulset.apps/ibm-block-csi-controller created
-csidriver.storage.k8s.io/ibm-block-csi-driver created
 ```
 
-Verify driver is running (Currently only the csi-controller pod should be in Running state):
+Verify driver is running (The csi-controller pod should be in Running state):
 ```sh
 #> kubectl get -n kube-system pod/ibm-block-csi-controller-0
 NAME                         READY   STATUS    RESTARTS   AGE
 ibm-block-csi-controller-0   5/5     Running   0          10m
 
-# NOTE if pod/ibm-block-csi-controller-0 is not in Running state, then troubleshoot by run:
+### NOTE if pod/ibm-block-csi-controller-0 is not in Running state, then troubleshoot by running:
 #> kubectl describe -n kube-system pod/ibm-block-csi-controller-0
 
 ```
 
 Additional info on the driver:
 ```sh
+### if feature-gates=CSIDriverRegistry was set to `true` then CSIDriver object for the driver will be automaticaly created. Can be viewed by running: 
 #> kubectl describe csidriver ibm-block-csi-driver
 Name:         ibm-block-csi-driver
 Namespace:    
@@ -78,7 +106,7 @@ quay.io/k8scsi/csi-attacher:v1.1.1
 quay.io/k8scsi/livenessprobe:v1.1.0
 
 
-## Watch the driver logs
+### Watch the driver logs
 #> kubectl log -f -n kube-system ibm-block-csi-controller-0 ibm-block-csi-controller
 ```
 
@@ -220,11 +248,16 @@ persistentvolumeclaim/pvc-demo deleted
 
 
 #### 2. Delete the driver
+
 ```sh
 #> kubectl delete -f ibm-block-csi-driver.yaml
 ```
 
-
+Kubernetes version 1.13 automatically creates the CSIDriver `ibm-block-csi-driver`, but it does not delete it automatically when removing the driver manifest.
+So in order to clean up CSIDriver object, run the following commend:
+```sh
+kubectl delete CSIDriver ibm-block-csi-driver
+```
 
 ## Licensing
 

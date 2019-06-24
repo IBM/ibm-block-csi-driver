@@ -92,7 +92,7 @@ rules:
     resources: ["nodes"]
     verbs: ["get", "list", "watch"]
   - apiGroups: ["csi.storage.k8s.io"]
-    resources: ["csinode"]  # For k8s 1.14+
+    resources: ["csinodeinfos"] # For k8s 1.14+
     verbs: ["get", "list", "watch"]
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments"]
@@ -120,6 +120,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: ibm-block-csi-cluster-driver-registrar-role
 rules:
+  ## Only needed for k8s 1.13 since it was automatic install the CSIDriver. But for 1.14+ its not available.
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["create", "list", "watch", "delete"]
+
   - apiGroups: ["csi.storage.k8s.io"]
     resources: ["csidrivers"]
     verbs: ["create", "delete"]
@@ -271,7 +276,7 @@ spec:
 
 
         - name: csi-attacher
-          image: quay.io/k8scsi/csi-attacher:v1.1.1    # TODO v1.1.1 is for k8s 1.14+(with additional RBAC), v1.0.1 is for k8s 1.13
+          image: quay.io/k8scsi/csi-attacher:v1.0.1    # TODO v1.1.1 is for k8s 1.14+(with additional RBAC), v1.0.1 is for k8s 1.13
           imagePullPolicy: "IfNotPresent"
           args:
             - --csi-address=$(ADDRESS)
@@ -416,15 +421,4 @@ spec:
 #          hostPath:
 #            path: /dev
 #            type: Directory
-
----
-
-## The below CSIDriver object is required to define (k8s 1.14 its still needed to be added due to redesign -> https://kubernetes-csi.github.io/docs/cluster-driver-registrar.html)
-apiVersion: storage.k8s.io/v1beta1   ## for k8s 1.13 it should be csi.storage.k8s.io/v1alpha1 and requires to set feature gate --feature-gates=CSIDriverRegistry=true
-kind: CSIDriver
-metadata:
-  name: ibm-block-csi-driver
-spec:
-  attachRequired: true
-  podInfoOnMount: false
 

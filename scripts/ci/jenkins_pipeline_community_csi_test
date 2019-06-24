@@ -46,6 +46,7 @@ pipeline {
                 }
            }
         }
+
         stage ('CSI-controller: build and start controller server and csi sanity tests') {
             steps {
                 sh  './scripts/ci/run_community_csi_test.sh'
