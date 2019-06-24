@@ -3,8 +3,8 @@ from random import randint
 from pyxcli.client import XCLIClient
 from pyxcli import errors as xcli_errors
 from controller.common.csi_logger import get_stdout_logger
-from array_mediator_interface import ArrayMediator
-from array_action_types import Volume
+from controller.array_action.array_mediator_interface import ArrayMediator
+from controller.array_action.array_action_types import Volume
 import controller.array_action.errors as controller_errors
 from controller.array_action.config import ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.utils import classproperty

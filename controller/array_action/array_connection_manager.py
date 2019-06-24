@@ -3,8 +3,8 @@ import socket
 
 from controller.common.csi_logger import get_stdout_logger
 from controller.array_action.errors import NoConnectionAvailableException, FailedToFindStorageSystemType
-from array_mediator_xiv import XIVArrayMediator
-from array_mediator_svc import SVCArrayMediator
+from controller.array_action.array_mediator_xiv import XIVArrayMediator
+from controller.array_action.array_mediator_svc import SVCArrayMediator
 
 connection_lock_dict = {}
 array_connections_dict = {}
