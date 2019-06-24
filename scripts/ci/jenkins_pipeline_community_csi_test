@@ -5,7 +5,6 @@ pipeline {
     environment {
         CONTROLLER_LOGS = "csi_controller_logs"
         STORAGE_CONF_YAML = '`pwd`/scripts/ci/storage_conf.yaml'
-
     }
 
     stages {
@@ -13,7 +12,7 @@ pipeline {
             agent {
                     label 'ansible_rhel73'
                 }
-             steps {
+            steps {
                 script{
                     if (env.XAVILIB_BRANCH == null) {
                         env.XAVILIB_BRANCH = 'develop'
@@ -29,7 +28,7 @@ pipeline {
                     env.full_storage_conf_yaml_path = "${env.pwd}/scripts/ci/storage_conf.yaml"
                     echo " env.full_storage_conf_yaml_path  ${env.full_storage_conf_yaml_path}"
                 }
-             }
+            }
         }
        stage('Configure Storage') {
             agent {

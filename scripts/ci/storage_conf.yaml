@@ -7,8 +7,8 @@ arrays:
       hard_capacity: 3000
       soft_capacity: 6000
     users:
-    - name: xavi-csi-sanity-test-user
-      password: adminadmin
+    - name:  <%= ENV['USERNAME'] %>
+      password: <%= ENV['PASSWORD'] %>
       category: storageintegrationadmin
       domain: xavi-csi-sanity-test-domain
     hosts:
