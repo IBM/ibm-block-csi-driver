@@ -193,7 +193,7 @@ class TestControllerServerCreateVolume(unittest.TestCase):
 
         context = utils.FakeContext()
         res = self.servicer.CreateVolume(self.request, context)
-        msg = err.message
+        msg = str(err)
 
         self.assertEqual(context.code, return_code)
         self.assertTrue(msg in context.details)
