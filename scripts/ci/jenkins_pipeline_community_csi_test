@@ -1,0 +1,28 @@
+pipeline {
+    agent {
+        label 'docker-engine'
+    }
+    environment {
+        CONTROLLER_LOGS = "csi_controller_logs"
+    }
+    stages {
+        stage ('CSI-controller: build and start controller server and csi sanity tests') {
+            steps {
+                sh  './scripts/ci/run_community_csi_test.sh'
+            }
+        }
+    }
+
+    post {
+        always {
+            sh './scripts/ci/community_csi_test_cleanup.sh csi-controller'
+            sh './scripts/ci/community_csi_test_cleanup.sh csi-sanity-test'
+            archiveArtifacts "${env.CONTROLLER_LOGS}"
+	        sh 'ls build/reports'
+            junit 'build/reports/*.xml'
+            sh '[ -d build/reports ] && rm -rf build/reports'
+            sh '[ -f `${env.CONTROLLER_LOGS}` ] && rm -f csi_controller_logs'
+
+        }
+    }
+}

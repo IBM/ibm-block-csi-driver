@@ -1,0 +1,5 @@
+#capabilities:
+# SpaceEfficiency= Compression
+capacity:
+ pool=POOL_NAME
+#volume_name_prefix : v_olga
