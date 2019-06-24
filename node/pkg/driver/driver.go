@@ -18,17 +18,16 @@ package driver
 
 import (
 	"context"
-	"net"
-    "io/ioutil"
-	"os"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	util "github.com/ibm/ibm-block-csi-driver/node/util"
+	"io/ioutil"
+	"net"
+	"os"
 
 	"google.golang.org/grpc"
+	"gopkg.in/yaml.v2"
 	"k8s.io/klog"
-    "gopkg.in/yaml.v2"	
 )
-
 
 type Driver struct {
 	// TODO nodeService
@@ -38,17 +37,16 @@ type Driver struct {
 	config   ConfigFile
 }
 
-
 func NewDriver(endpoint string) (*Driver, error) {
 	configFile, err := ReadConfigFile()
 	if err != nil {
 		return nil, err
-	}	
+	}
 	klog.Infof("Driver: %v Version: %v", configFile.Identity.Name, configFile.Identity.Version)
 
 	return &Driver{
 		endpoint: endpoint,
-		config: configFile,
+		config:   configFile,
 		//		controllerService: newControllerService(),
 		//		nodeService:       newNodeService(),
 	}, nil
@@ -90,31 +88,29 @@ func (d *Driver) Stop() {
 	d.srv.Stop()
 }
 
-
-
 type ConfigFile struct {
 	Identity struct {
-		Name string
+		Name    string
 		Version string
 		// TODO missing capabilities
 	}
 	Controller struct {
-		Publish_context_lun_parameter string
+		Publish_context_lun_parameter          string
 		Publish_context_connectivity_parameter string
-	}	
+	}
 }
 
 const (
-	DefualtConfigFile string = "config.yaml"
+	DefualtConfigFile     string = "config.yaml"
 	EnvNameDriverConfFile string = "DRIVER_CONFIG_YML"
 )
 
-func ReadConfigFile() (ConfigFile, error){
+func ReadConfigFile() (ConfigFile, error) {
 	var configFile ConfigFile
 
 	configYamlPath := os.Getenv(EnvNameDriverConfFile)
-	if configYamlPath == ""{
-		configYamlPath = DefualtConfigFile	
+	if configYamlPath == "" {
+		configYamlPath = DefualtConfigFile
 		klog.V(4).Infof("Config file environment variable %s=%s", EnvNameDriverConfFile, configYamlPath)
 	} else {
 		klog.V(4).Infof("Not found config file environment variable %s. Set default value %s.", EnvNameDriverConfFile, configYamlPath)
@@ -131,6 +127,6 @@ func ReadConfigFile() (ConfigFile, error){
 		klog.Errorf("error unmarshaling yaml: %v", err)
 		return ConfigFile{}, err
 	}
-	
-	return configFile ,nil
+
+	return configFile, nil
 }

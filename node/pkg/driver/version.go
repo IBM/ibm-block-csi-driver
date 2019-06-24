@@ -24,8 +24,8 @@ import (
 
 // These are set during build time via -ldflags
 var (
-	gitCommit     string
-	buildDate     string
+	gitCommit string
+	buildDate string
 )
 
 type VersionInfo struct {
@@ -41,7 +41,7 @@ func GetVersion() (VersionInfo, error) {
 	configFile, err := ReadConfigFile()
 	if err != nil {
 		return VersionInfo{}, err
-	}	
+	}
 
 	return VersionInfo{
 		DriverVersion: configFile.Identity.Version,

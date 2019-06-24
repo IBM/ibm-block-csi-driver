@@ -47,4 +47,3 @@ func ParseEndpoint(endpoint string) (string, string, error) {
 
 	return scheme, addr, nil
 }
-
