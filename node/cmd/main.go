@@ -18,11 +18,11 @@ package main
 
 import (
 	"flag"
-	"os"
 	"fmt"
-	
+	"os"
+
+	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 	"k8s.io/klog"
-	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"	
 )
 
 func main() {

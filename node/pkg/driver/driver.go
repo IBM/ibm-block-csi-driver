@@ -22,13 +22,13 @@ import (
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	util "github.com/ibm/ibm-block-csi-driver/node/util"
-	
+
 	"google.golang.org/grpc"
 	"k8s.io/klog"
 )
 
 const (
-	DriverName  = "ibm-block-csi-driver"  // TODO take from ini
+	DriverName    = "ibm-block-csi-driver" // TODO take from ini
 	DriverVersion = "1.0.0"
 )
 
@@ -43,9 +43,9 @@ func NewDriver(endpoint string) (*Driver, error) {
 	klog.Infof("Driver: %v Version: %v", DriverName, DriverVersion)
 
 	return &Driver{
-		endpoint:          endpoint,
-//		controllerService: newControllerService(),
-//		nodeService:       newNodeService(),
+		endpoint: endpoint,
+		//		controllerService: newControllerService(),
+		//		nodeService:       newNodeService(),
 	}, nil
 }
 

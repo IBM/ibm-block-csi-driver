@@ -25,7 +25,6 @@ import (
 	"strings"
 )
 
-
 func ParseEndpoint(endpoint string) (string, string, error) {
 	u, err := url.Parse(endpoint)
 	if err != nil {

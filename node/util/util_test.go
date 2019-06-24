@@ -21,7 +21,6 @@ import (
 	"testing"
 )
 
-
 func TestParseEndpoint(t *testing.T) {
 	testCases := []struct {
 		name      string
