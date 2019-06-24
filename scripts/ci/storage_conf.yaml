@@ -6,16 +6,17 @@ arrays:
       max_volumes: 100
       hard_capacity: 3000
       soft_capacity: 6000
-      managed: True
     users:
     - name: xavi-csi-sanity-test-user
       password: adminadmin
       category: storageintegrationadmin
       domain: xavi-csi-sanity-test-domain
-      connect: True
     hosts:
     - host_index: "0"
       connectivity: iscsi
-      domain: xavi-csi-sanity-test-domain
-      hostname: xavi-csi-sanity-test-host
-      iscsi_name: iqn.1994-05.com.redhat:875831148e69 
+
+hosts:
+  - host_index: "0"
+    type: "linux"
+
+
