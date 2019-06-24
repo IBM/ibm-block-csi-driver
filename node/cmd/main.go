@@ -18,7 +18,9 @@ package main
 
 import (
 	"flag"
-
+	"os"
+	"fmt"
+	
 	"k8s.io/klog"
 	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"	
 )
@@ -26,9 +28,19 @@ import (
 func main() {
 	var (
 		endpoint = flag.String("csi-endpoint", "unix://csi/csi.sock", "CSI Endpoint")
+		version  = flag.Bool("version", false, "Print the version and exit.")
 	)
 	klog.InitFlags(nil)
 	flag.Parse()
+
+	if *version {
+		info, err := driver.GetVersionJSON()
+		if err != nil {
+			klog.Fatalln(err)
+		}
+		fmt.Println(info)
+		os.Exit(0)
+	}
 
 	drv, err := driver.NewDriver(*endpoint)
 	if err != nil {
