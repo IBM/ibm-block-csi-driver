@@ -32,5 +32,5 @@ ENV PARAM_FILE="/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/
 ENV ENDPOINT="/tmp/k8s_dir/f"
 ENV TESTS_TO_RUN_FILE="/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_tests_to_run"
 
-ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/entrypoint-csi-sanity.sh"]
+ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/entrypoint-csi-tests.sh"]
 
