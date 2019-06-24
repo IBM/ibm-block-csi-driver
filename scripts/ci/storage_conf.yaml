@@ -13,9 +13,9 @@ arrays:
       category: storageintegrationadmin
       domain: xavi-csi-sanity-test-domain
       connect: True
-#    hosts:
-#    - host_index: "0"
-#      connectivity: iscsi
-#      domain: xavi-csi-sanity-test-domain
-#      hostname: xavi-csi-sanity-test-host
-#      iscsi_name: iqn.1998-01.com.vmware:newvvol-esx-16f7fcf2
+    hosts:
+    - host_index: "0"
+      connectivity: iscsi
+      domain: xavi-csi-sanity-test-domain
+      hostname: xavi-csi-sanity-test-host
+      iscsi_name: iqn.1994-05.com.redhat:875831148e69 
