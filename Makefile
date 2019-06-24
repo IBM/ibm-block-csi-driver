@@ -15,11 +15,10 @@
 #
 
 PKG=github.com/ibm/ibm-block-csi-driver
-VERSION=1.0.0
 IMAGE=ibmcom/ibm-block-csi-driver
 GIT_COMMIT?=$(shell git rev-parse HEAD)
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
-LDFLAGS?="-X ${PKG}/node/pkg/driver.driverVersion=${VERSION} -X ${PKG}/node/pkg/driver.gitCommit=${GIT_COMMIT} -X ${PKG}/node/pkg/dridddver.buildDate=${BUILD_DATE} -s -w"
+LDFLAGS?="-X ${PKG}/node/pkg/driver.gitCommit=${GIT_COMMIT} -X ${PKG}/node/pkg/dridddver.buildDate=${BUILD_DATE} -s -w"
 
 GO111MODULE=on
 .EXPORT_ALL_VARIABLES:

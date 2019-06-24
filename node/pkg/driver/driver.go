@@ -20,7 +20,7 @@ import (
 	"context"
 	"net"
     "io/ioutil"
-
+	"os"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	util "github.com/ibm/ibm-block-csi-driver/node/util"
 
@@ -29,18 +29,6 @@ import (
     "gopkg.in/yaml.v2"	
 )
 
-type ConfigFile struct {
-	identity struct {
-		name string
-		version string
-		// TODO missing capabilities
-	}
-	controller struct {
-		publish_context_lun_parameter string
-		publish_context_connectivity_parameter string
-	}
-	
-}
 
 type Driver struct {
 	// TODO nodeService
@@ -50,22 +38,13 @@ type Driver struct {
 	config   ConfigFile
 }
 
-const configYamlPath = "../../../common/config.yaml"
 
 func NewDriver(endpoint string) (*Driver, error) {
-	// Read config file
-	var configFile ConfigFile
-	yamlFile, err := ioutil.ReadFile(configYamlPath)
+	configFile, err := ReadConfigFile()
 	if err != nil {
-		klog.Errorf("failed to read file %q: %v", yamlFile, err)
 		return nil, err
-	}
-	err = yaml.Unmarshal(yamlFile, &configFile)
-	if err != nil {
-		klog.Errorf("error unmarshaling yaml: %v", err)
-		return nil, err
-	}
-	klog.Infof("Driver: %v Version: %v", configFile.identity.name, driverVersion)
+	}	
+	klog.Infof("Driver: %v Version: %v", configFile.Identity.Name, configFile.Identity.Version)
 
 	return &Driver{
 		endpoint: endpoint,
@@ -109,4 +88,49 @@ func (d *Driver) Run() error {
 func (d *Driver) Stop() {
 	klog.Infof("Stopping server")
 	d.srv.Stop()
+}
+
+
+
+type ConfigFile struct {
+	Identity struct {
+		Name string
+		Version string
+		// TODO missing capabilities
+	}
+	Controller struct {
+		Publish_context_lun_parameter string
+		Publish_context_connectivity_parameter string
+	}	
+}
+
+const (
+	DefualtConfigFile string = "config.yaml"
+	EnvNameDriverConfFile string = "DRIVER_CONFIG_YML"
+)
+
+func ReadConfigFile() (ConfigFile, error){
+	var configFile ConfigFile
+
+	configYamlPath := os.Getenv(EnvNameDriverConfFile)
+	if configYamlPath == ""{
+		configYamlPath = DefualtConfigFile	
+		klog.V(4).Infof("Config file environment variable %s=%s", EnvNameDriverConfFile, configYamlPath)
+	} else {
+		klog.V(4).Infof("Not found config file environment variable %s. Set default value %s.", EnvNameDriverConfFile, configYamlPath)
+	}
+
+	yamlFile, err := ioutil.ReadFile(configYamlPath)
+	if err != nil {
+		klog.Errorf("failed to read file %q: %v", yamlFile, err)
+		return ConfigFile{}, err
+	}
+
+	err = yaml.Unmarshal(yamlFile, &configFile)
+	if err != nil {
+		klog.Errorf("error unmarshaling yaml: %v", err)
+		return ConfigFile{}, err
+	}
+	
+	return configFile ,nil
 }
