@@ -19,30 +19,57 @@ package driver
 import (
 	"context"
 	"net"
+    "io/ioutil"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	util "github.com/ibm/ibm-block-csi-driver/node/util"
 
 	"google.golang.org/grpc"
 	"k8s.io/klog"
+    "gopkg.in/yaml.v2"	
 )
 
-const (
-	DriverName    = "ibm-block-csi-driver" // TODO take from ini
-)
+type ConfigFile struct {
+	identity struct {
+		name string
+		version string
+		// TODO missing capabilities
+	}
+	controller struct {
+		publish_context_lun_parameter string
+		publish_context_connectivity_parameter string
+	}
+	
+}
 
 type Driver struct {
 	// TODO nodeService
 	// TODO controllerServer maybe?
 	srv      *grpc.Server
 	endpoint string
+	config   ConfigFile
 }
 
+const configYamlPath = "../../../common/config.yaml"
+
 func NewDriver(endpoint string) (*Driver, error) {
-	klog.Infof("Driver: %v Version: %v", DriverName, driverVersion)
+	// Read config file
+	var configFile ConfigFile
+	yamlFile, err := ioutil.ReadFile(configYamlPath)
+	if err != nil {
+		klog.Errorf("failed to read file %q: %v", yamlFile, err)
+		return nil, err
+	}
+	err = yaml.Unmarshal(yamlFile, &configFile)
+	if err != nil {
+		klog.Errorf("error unmarshaling yaml: %v", err)
+		return nil, err
+	}
+	klog.Infof("Driver: %v Version: %v", configFile.identity.name, driverVersion)
 
 	return &Driver{
 		endpoint: endpoint,
+		config: configFile,
 		//		controllerService: newControllerService(),
 		//		nodeService:       newNodeService(),
 	}, nil

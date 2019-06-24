@@ -27,7 +27,7 @@ GO111MODULE=on
 .PHONY: ibm-block-csi-driver
 ibm-block-csi-driver:
 	mkdir -p bin
-	CGO_ENABLED=0 GOOS=linux go build -ldflags  ${LDFLAGS} -o bin/ibm-block-csi-driver ./node/cmd
+	CGO_ENABLED=0 GOOS=linux go build -ldflags  ${LDFLAGS} -o bin/ibm-block-csi-node-driver ./node/cmd
 
 .PHONY: test
 test:
