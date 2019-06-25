@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog"
-	//"k8s.io/kubernetes/pkg/util/mount"
+	//"k8s.io/kubernetes/pkg/util/mount" // TODO since there is error "loading module requirements" I comment it out for now.
 )
 
 const (
@@ -69,7 +69,7 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, err
 	}
 
-	return nil, status.Errorf(codes.Internal, "NodeStageVolume - Not implemented yet")  // TODO
+	return nil, status.Errorf(codes.Unimplemented, "NodeStageVolume - Not implemented yet")  // TODO
 }
 
 func (d *nodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeRequest) error {
@@ -153,7 +153,7 @@ func (d *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return &csi.NodeUnstageVolumeResponse{}, nil
 	*/
 
-	return nil, status.Errorf(codes.Internal, "NodeUnstageVolume - Not implemented yet") // TODO
+	return nil, status.Errorf(codes.Unimplemented, "NodeUnstageVolume - Not implemented yet") // TODO
 }
 
 func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
@@ -223,7 +223,7 @@ func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return &csi.NodeUnpublishVolumeResponse{}, nil
 	*/
 
-	return nil, status.Errorf(codes.Internal, "NodeUnpublishVolume - Not implemented yet")
+	return nil, status.Errorf(codes.Unimplemented, "NodeUnpublishVolume - Not implemented yet")
 }
 
 func (d *nodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
@@ -281,7 +281,7 @@ func (d *nodeService) nodePublishVolumeForFileSystem(req *csi.NodePublishVolumeR
 		return nil
 	*/
 	
-	return status.Errorf(codes.Internal, "nodePublishVolumeForFileSystem - Not implemented yet") // TODO
+	return status.Errorf(codes.Unimplemented, "nodePublishVolumeForFileSystem - Not implemented yet") // TODO
 }
 
 func isValidVolumeCapabilities(volCaps []*csi.VolumeCapability) bool {
