@@ -298,6 +298,7 @@ func isValidVolumeCapabilities(volCaps []*csi.VolumeCapability) bool {
 	for _, c := range volCaps {
 		if !hasSupport(c) {
 			foundAll = false
+			break
 		}
 	}
 	return foundAll
