@@ -33,12 +33,11 @@ pipeline {
 
                     // this should replace the username and passoword env vars in the yaml file.
                     sh '''
-                        rm -f temp.yml
                         ( echo "cat <<EOF > ${new_conf_yaml_name}";
                           cat ${full_storage_conf_yaml_path};
                           echo "EOF";
-                        ) > temp.yml
-                        . temp.yml
+                        ) > ${new_conf_yaml_name}
+                        . ${new_conf_yaml_name}
                         cat ${new_conf_yaml_name}
                     '''
 
