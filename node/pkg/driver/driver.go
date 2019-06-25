@@ -108,9 +108,9 @@ func ReadConfigFile() (ConfigFile, error) {
 	configYamlPath := os.Getenv(EnvNameDriverConfFile)
 	if configYamlPath == "" {
 		configYamlPath = DefualtConfigFile
-		klog.V(4).Infof("Config file environment variable %s=%s", EnvNameDriverConfFile, configYamlPath)
-	} else {
 		klog.V(4).Infof("Not found config file environment variable %s. Set default value %s.", EnvNameDriverConfFile, configYamlPath)
+	} else {
+		klog.V(4).Infof("Config file environment variable %s=%s", EnvNameDriverConfFile, configYamlPath)
 	}
 
 	yamlFile, err := ioutil.ReadFile(configYamlPath)
@@ -122,6 +122,19 @@ func ReadConfigFile() (ConfigFile, error) {
 	err = yaml.Unmarshal(yamlFile, &configFile)
 	if err != nil {
 		klog.Errorf("error unmarshaling yaml: %v", err)
+		return ConfigFile{}, err
+	}
+
+	// Verify mandatory attributes in config file
+	if configFile.Identity.Name == "" {
+		err := &ConfigYmlEmptyAttribute{"Identity.Name"}
+		klog.Errorf("%v", err)
+		return ConfigFile{}, err
+	}
+
+	if configFile.Identity.Version == "" {
+		err := &ConfigYmlEmptyAttribute{"Identity.Version"}
+		klog.Errorf("%v", err)
 		return ConfigFile{}, err
 	}
 
