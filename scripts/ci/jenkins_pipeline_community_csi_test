@@ -25,7 +25,29 @@ pipeline {
 
                     //env.relative_storage_conf_yaml_path = sh (returnStdout: true, script: 'source "$pwd/scripts/ci/$JOB_BASE_NAME".params; echo -n $CONFIGURE_STORAGE_YAML_PATH')
                     //echo " env.relative_storage_conf_yaml_path  ${env.relative_storage_conf_yaml_path}"
+
+                    env.new_conf_yaml_name = "${env.pwd}/scripts/ci/storage_conf_new.yaml"
+                    sh 'echo new conf yaml ${new_conf_yaml_name}'
+
                     env.full_storage_conf_yaml_path = "${env.pwd}/scripts/ci/storage_conf.yaml"
+
+                    // this should replace the username and passoword env vars in the yaml file.
+                    sh '''
+                        rm -f temp.yml
+                        ( echo "cat <<EOF > ${new_conf_yaml_name}";
+                          cat ${full_storage_conf_yaml_path};
+                          echo "EOF";
+                        ) > temp.yml
+                        . temp.yml
+                        cat ${new_conf_yaml_name}
+                    '''
+
+                    echo "new_conf_yaml_name"
+                    sh 'cat ${new_conf_yaml_name}'
+                    echo "full_storage_conf_yaml_path"
+                    sh 'cat ${full_storage_conf_yaml_path}'
+
+
                     echo " env.full_storage_conf_yaml_path  ${env.full_storage_conf_yaml_path}"
                 }
             }
@@ -48,7 +70,7 @@ pipeline {
 
                 echo "found storage yaml so running ansible to configure storage"
                 script {
-                    configureStorage(storage_arrays: "${env.STORAGE_ARRAYS}", vars_file: "${env.full_storage_conf_yaml_path}")
+                    configureStorage(storage_arrays: "${env.STORAGE_ARRAYS}", vars_file: "${env.new_conf_yaml_name}")
                 }
            }
         }
