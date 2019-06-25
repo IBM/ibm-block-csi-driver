@@ -30,8 +30,7 @@ import (
 )
 
 type Driver struct {
-	// TODO nodeService
-	// TODO controllerServer maybe?
+	nodeService
 	srv      *grpc.Server
 	endpoint string
 	config   ConfigFile
@@ -45,10 +44,9 @@ func NewDriver(endpoint string) (*Driver, error) {
 	klog.Infof("Driver: %v Version: %v", configFile.Identity.Name, configFile.Identity.Version)
 
 	return &Driver{
-		endpoint: endpoint,
-		config:   configFile,
-		//		controllerService: newControllerService(),
-		//		nodeService:       newNodeService(),
+		endpoint:    endpoint,
+		config:      configFile,
+		nodeService: newNodeService(),
 	}, nil
 }
 
@@ -76,8 +74,8 @@ func (d *Driver) Run() error {
 	d.srv = grpc.NewServer(opts...)
 
 	csi.RegisterIdentityServer(d.srv, d)
+	csi.RegisterNodeServer(d.srv, d)
 	//csi.RegisterControllerServer(d.srv, d)
-	//csi.RegisterNodeServer(d.srv, d)
 
 	klog.Infof("Listening for connections on address: %#v", listener.Addr())
 	return d.srv.Serve(listener)

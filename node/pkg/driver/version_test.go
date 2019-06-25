@@ -24,10 +24,10 @@ import (
 )
 
 func TestGetVersion(t *testing.T) {
-	version := GetVersion()
+	version, err := GetVersion()
 
 	expected := VersionInfo{
-		DriverVersion: "",
+		DriverVersion: "1.0.0",
 		GitCommit:     "",
 		BuildDate:     "",
 		GoVersion:     runtime.Version(),
@@ -38,6 +38,10 @@ func TestGetVersion(t *testing.T) {
 	if !reflect.DeepEqual(version, expected) {
 		t.Fatalf("structs not equall\ngot:\n%+v\nexpected:\n%+v", version, expected)
 	}
+
+	if err != nil {
+		t.Fatalf("Get version return error")
+	}
 }
 
 func TestGetVersionJSON(t *testing.T) {
@@ -47,7 +51,7 @@ func TestGetVersionJSON(t *testing.T) {
 	}
 
 	expected := fmt.Sprintf(`{
-  "driverVersion": "",
+  "driverVersion": "1.0.0",
   "gitCommit": "",
   "buildDate": "",
   "goVersion": "%s",
