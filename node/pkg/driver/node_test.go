@@ -18,9 +18,9 @@ package driver
 
 import (
 	"context"
-	"testing"
 	"reflect"
-	
+	"testing"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -36,8 +36,8 @@ func TestNodeStageVolume(t *testing.T) {
 		},
 	}
 	testCases := []struct {
-		name string
-		req  *csi.NodeStageVolumeRequest
+		name       string
+		req        *csi.NodeStageVolumeRequest
 		expErrCode codes.Code
 	}{
 		{
@@ -47,7 +47,7 @@ func TestNodeStageVolume(t *testing.T) {
 				StagingTargetPath: "/test/path",
 				VolumeCapability:  stdVolCap,
 			},
-			expErrCode:  codes.InvalidArgument,
+			expErrCode: codes.InvalidArgument,
 		},
 		{
 			name: "fail no StagingTargetPath",
@@ -56,7 +56,7 @@ func TestNodeStageVolume(t *testing.T) {
 				VolumeCapability: stdVolCap,
 				VolumeId:         "vol-test",
 			},
-			expErrCode:  codes.InvalidArgument,
+			expErrCode: codes.InvalidArgument,
 		},
 		{
 			name: "fail no VolumeCapability",
@@ -65,7 +65,7 @@ func TestNodeStageVolume(t *testing.T) {
 				StagingTargetPath: "/test/path",
 				VolumeId:          "vol-test",
 			},
-			expErrCode:  codes.InvalidArgument,
+			expErrCode: codes.InvalidArgument,
 		},
 		{
 			name: "fail invalid VolumeCapability",
@@ -79,19 +79,18 @@ func TestNodeStageVolume(t *testing.T) {
 				},
 				VolumeId: "vol-test",
 			},
-			expErrCode:  codes.InvalidArgument,
+			expErrCode: codes.InvalidArgument,
 		},
 		{
 			name: "fail because not implemented yet - but pass all basic verifications",
 			req: &csi.NodeStageVolumeRequest{
 				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
 				StagingTargetPath: "/test/path",
-				VolumeCapability: stdVolCap,				
+				VolumeCapability:  stdVolCap,
 				VolumeId:          "vol-test",
 			},
-			expErrCode:  codes.Unimplemented,
+			expErrCode: codes.Unimplemented,
 		},
-
 	}
 
 	for _, tc := range testCases {
@@ -116,15 +115,14 @@ func TestNodeStageVolume(t *testing.T) {
 }
 
 func newTestNodeService() nodeService {
-	return nodeService{
-	}
+	return nodeService{}
 }
 
 func TestNodeUnstageVolume(t *testing.T) {
 	testCases := []struct {
-		name            string
-		req             *csi.NodeUnstageVolumeRequest
-		expErrCode      codes.Code
+		name       string
+		req        *csi.NodeUnstageVolumeRequest
+		expErrCode codes.Code
 	}{
 		{
 			name: "fail no VolumeId",
@@ -143,11 +141,11 @@ func TestNodeUnstageVolume(t *testing.T) {
 		{
 			name: "fail because not implemented yet - but pass all basic verifications",
 			req: &csi.NodeUnstageVolumeRequest{
-				VolumeId: "vol-test",
+				VolumeId:          "vol-test",
 				StagingTargetPath: "/test/path",
 			},
-			expErrCode:  codes.Unimplemented,
-		},	
+			expErrCode: codes.Unimplemented,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -170,7 +168,6 @@ func TestNodeUnstageVolume(t *testing.T) {
 	}
 }
 
-
 func TestNodePublishVolume(t *testing.T) {
 	stdVolCap := &csi.VolumeCapability{
 		AccessType: &csi.VolumeCapability_Mount{
@@ -181,8 +178,8 @@ func TestNodePublishVolume(t *testing.T) {
 		},
 	}
 	testCases := []struct {
-		name string
-		req  *csi.NodePublishVolumeRequest
+		name       string
+		req        *csi.NodePublishVolumeRequest
 		expErrCode codes.Code
 	}{
 		{
@@ -193,7 +190,7 @@ func TestNodePublishVolume(t *testing.T) {
 				TargetPath:        "/test/target/path",
 				VolumeCapability:  stdVolCap,
 			},
-			expErrCode:  codes.InvalidArgument,
+			expErrCode: codes.InvalidArgument,
 		},
 		{
 			name: "fail no StagingTargetPath",
@@ -203,7 +200,7 @@ func TestNodePublishVolume(t *testing.T) {
 				VolumeCapability: stdVolCap,
 				VolumeId:         "vol-test",
 			},
-			expErrCode:  codes.InvalidArgument,
+			expErrCode: codes.InvalidArgument,
 		},
 		{
 			name: "fail no TargetPath",
@@ -213,7 +210,7 @@ func TestNodePublishVolume(t *testing.T) {
 				VolumeCapability:  stdVolCap,
 				VolumeId:          "vol-test",
 			},
-			expErrCode:  codes.InvalidArgument,
+			expErrCode: codes.InvalidArgument,
 		},
 		{
 			name: "fail no VolumeCapability",
@@ -223,7 +220,7 @@ func TestNodePublishVolume(t *testing.T) {
 				TargetPath:        "/test/target/path",
 				VolumeId:          "vol-test",
 			},
-			expErrCode:  codes.InvalidArgument,
+			expErrCode: codes.InvalidArgument,
 		},
 		{
 			name: "fail invalid VolumeCapability",
@@ -238,7 +235,7 @@ func TestNodePublishVolume(t *testing.T) {
 					},
 				},
 			},
-			expErrCode:  codes.InvalidArgument,
+			expErrCode: codes.InvalidArgument,
 		},
 		{
 			name: "fail because not implemented yet - but pass all basic verifications",
@@ -249,8 +246,8 @@ func TestNodePublishVolume(t *testing.T) {
 				VolumeCapability:  stdVolCap,
 				VolumeId:          "vol-test",
 			},
-			expErrCode:  codes.Unimplemented,
-		},			
+			expErrCode: codes.Unimplemented,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -273,8 +270,6 @@ func TestNodePublishVolume(t *testing.T) {
 		})
 	}
 }
-
-
 
 func TestNodeUnpublishVolume(t *testing.T) {
 	testCases := []struct {
@@ -300,8 +295,8 @@ func TestNodeUnpublishVolume(t *testing.T) {
 		{
 			name: "fail because not implemented yet - but pass all basic verifications",
 			req: &csi.NodeUnpublishVolumeRequest{
-				VolumeId: "vol-test",
-				TargetPath: "/test/path",			
+				VolumeId:   "vol-test",
+				TargetPath: "/test/path",
 			},
 			expErrCode: codes.Unimplemented,
 		},
@@ -327,7 +322,6 @@ func TestNodeUnpublishVolume(t *testing.T) {
 	}
 }
 
-
 func TestNodeGetVolumeStats(t *testing.T) {
 
 	req := &csi.NodeGetVolumeStatsRequest{}
@@ -348,7 +342,6 @@ func TestNodeGetVolumeStats(t *testing.T) {
 		t.Fatalf("Expected error code %d, got %d message %s", expErrCode, srvErr.Code(), srvErr.Message())
 	}
 }
-
 
 func TestNodeGetCapabilities(t *testing.T) {
 	req := &csi.NodeGetCapabilitiesRequest{}
@@ -399,4 +392,3 @@ func TestNodeGetInfo(t *testing.T) {
 		t.Fatalf("Expected error code %d, got %d message %s", expErrCode, srvErr.Code(), srvErr.Message())
 	}
 }
-

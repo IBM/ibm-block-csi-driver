@@ -24,7 +24,7 @@ import (
 )
 
 func (d *Driver) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
-	klog.V(6).Infof("GetPluginInfo: called with args %+v", *req)
+	klog.V(5).Infof("GetPluginInfo: called with args %+v", *req)
 	resp := &csi.GetPluginInfoResponse{
 		Name:          d.config.Identity.Name,
 		VendorVersion: d.config.Identity.Version,
@@ -35,7 +35,7 @@ func (d *Driver) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoReques
 
 func (d *Driver) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
 	// TODO take it from ini file
-	klog.V(6).Infof("GetPluginCapabilities: called with args %+v", *req)
+	klog.V(5).Infof("GetPluginCapabilities: called with args %+v", *req)
 	resp := &csi.GetPluginCapabilitiesResponse{
 		Capabilities: []*csi.PluginCapability{
 			{
@@ -52,6 +52,6 @@ func (d *Driver) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCa
 }
 
 func (d *Driver) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
-	klog.V(6).Infof("Probe: called with args %+v", *req)
+	klog.V(5).Infof("Probe: called with args %+v", *req)
 	return &csi.ProbeResponse{}, nil
 }
