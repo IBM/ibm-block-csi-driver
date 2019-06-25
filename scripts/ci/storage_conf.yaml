@@ -11,6 +11,7 @@ arrays:
       password: ${PASSWORD}
       category: storageadmin
       domain: xavi-csi-sanity-test-domain
+      connect: true
     pools:
     - domain: xavi-csi-sanity-test-domain
       name: xavi-csi-sanity-pool1
