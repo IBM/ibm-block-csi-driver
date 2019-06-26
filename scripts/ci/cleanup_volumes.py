@@ -5,7 +5,7 @@ from pyxcli.client import XCLIClient
 user = os.environ["USER"]
 password = os.environ["PASSWORD"]
 endpoint = os.environ["STORAGE_ARRAYS"]
-pool = os.environ["STORAGE_POOL"]
+pool = os.environ["POOL_NAME"]
 
 print("os.endpoint : {}, os.user :{}, os.pass : {} ".format(user, password ,endpoint))
 
