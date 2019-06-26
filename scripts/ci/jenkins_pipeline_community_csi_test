@@ -31,7 +31,7 @@ pipeline {
 
                     env.full_storage_conf_yaml_path = "${env.pwd}/scripts/ci/storage_conf.yaml"
 
-                    // this should replace the username and passoword env vars in the yaml file.
+                    // this should replace the username and password env vars in the yaml file.
                     sh '''
                         ( echo "cat <<EOF > ${new_conf_yaml_name}";
                           cat ${full_storage_conf_yaml_path};
@@ -45,6 +45,9 @@ pipeline {
                     sh 'cat ${new_conf_yaml_name}'
                     echo "full_storage_conf_yaml_path"
                     sh 'cat ${full_storage_conf_yaml_path}'
+
+                    env.POOL_NAME = sh(returnStdout: true, script: 'cat ${full_storage_conf_yaml_path}  | grep " pools:" -A 4 | grep name | cut -d ":" -f2').trim()
+                    echo "pool name ${POOL_NAME}"
 
 
                     echo " env.full_storage_conf_yaml_path  ${env.full_storage_conf_yaml_path}"
