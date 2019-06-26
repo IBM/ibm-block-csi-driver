@@ -1,0 +1,23 @@
+import os
+from pyxcli.client import XCLIClient
+
+
+user = os.environ["USER"]
+password = os.environ["PASSWORD"]
+endpoint = os.environ["STORAGE_ARRAY"]
+pool = os.environ["STORAGE_POOL"]
+
+print("os.endpoint : {}, os.user :{}, os.pass : {} ".format(user, password ,endpoint))
+
+
+
+client = XCLIClient.connect_multiendpoint_ssl(
+                user,
+                password,
+                endpoint
+            )
+
+vol_list = client.cmd.vol_list(pool=pool).as_list
+for vol in vol_list:
+    print("deleting volume : {}".format(vol))
+    client.cmd.vol_delete(vol=vol.name)
