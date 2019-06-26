@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3.6
 
 import os
 from pyxcli.client import XCLIClient
