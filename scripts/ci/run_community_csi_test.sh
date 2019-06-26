@@ -1,6 +1,6 @@
 #!/bin/bash -xe
 
-echo "${CONTROLLER_LOGS}"
+echo "controller logs : ${CONTROLLER_LOGS}"
 ./scripts/ci/run_controller_server_for_csi_test.sh csi-controller > ${CONTROLLER_LOGS} 2>&1
 echo `pwd`
 sleep 2
