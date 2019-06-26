@@ -87,7 +87,10 @@ pipeline {
         always {
             sh './scripts/ci/community_csi_test_cleanup.sh csi-controller'
             sh './scripts/ci/community_csi_test_cleanup.sh csi-sanity-test'
-            sh 'python ./scripts/ci/cleanup_volumes.py'
+            sh '''
+                docker build -f Dockerfile-cleanup-volumes -t csi-cleanupvolumes .  && docker run  -e STORAGE_ARRAYS=${STORAGE_ARRAYS} -e USERNAME=${USERNAME} -e PASSWORD=${PASSWORD}  -e POOL_NAME=${POOL_NAME}  --rm  --name csi-cleanupvolumes csi-cleanupvolumes
+                ./scripts/ci/community_csi_test_cleanup.sh csi-cleanupvolumes
+            '''
             archiveArtifacts "${env.CONTROLLER_LOGS}"
 	        sh 'ls build/reports'
             junit 'build/reports/*.xml'
