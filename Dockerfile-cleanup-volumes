@@ -26,6 +26,6 @@ USER appuser
 WORKDIR /scripts
 ENV PYTHONPATH=/scripts
 
-ENTRYPOINT ["/scripts/cleanup_volumes.sh"]
+ENTRYPOINT ["/scripts/cleanup_volumes.py"]
 
 
