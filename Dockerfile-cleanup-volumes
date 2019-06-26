@@ -17,6 +17,7 @@ RUN yum --enablerepo=extras -y install epel-release && yum -y install python36-p
 
 COPY scripts/ci/cleanup_volumes.py /scripts/cleanup_volumes.py
 RUN pip3 install pyxcli
+RUN pip3 install munch
 
 RUN groupadd -g 9999 appuser && \
     useradd -r -u 9999 -g appuser appuser
