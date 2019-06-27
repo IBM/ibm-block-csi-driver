@@ -27,11 +27,6 @@ import (
 	//"k8s.io/kubernetes/pkg/util/mount" // TODO since there is error "loading module requirements" I comment it out for now.
 )
 
-const (
-	PublishContextParamLun          string = "lun_param"
-	PublishContextParamConnectivity string = "connectivity_param"
-	// TODO should be in common yml file since the controller also use it.
-)
 
 var (
 	nodeCaps = []csi.NodeServiceCapability_RPC_Type{
@@ -51,13 +46,14 @@ var (
 // nodeService represents the node service of CSI driver
 type nodeService struct {
 	//mounter  *mount.SafeFormatAndMount  // TODO fix k8s mount import
+	configYaml ConfigFile
 }
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
-func newNodeService() nodeService {
-
+func newNodeService(configYaml ConfigFile) nodeService {
 	return nodeService{
+		configYaml: configYaml,
 		//		mounter:  newSafeMounter(),
 	}
 }
@@ -65,8 +61,14 @@ func newNodeService() nodeService {
 func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
 	klog.V(5).Infof("NodeStageVolume: called with args %+v", *req)
 
-	if err := d.nodeStageVolumeRequestValidation(req); err != nil {
-		return nil, err
+	err := d.nodeStageVolumeRequestValidation(req)
+	if err != nil {
+        switch err.(type) {
+        	case *RequestValidationError:
+		        return nil, status.Error(codes.InvalidArgument, err.Error())
+	        default:
+		        return nil, status.Error(codes.Internal, err.Error())
+        }
 	}
 
 	return nil, status.Errorf(codes.Unimplemented, "NodeStageVolume - Not implemented yet") // TODO
@@ -76,34 +78,24 @@ func (d *nodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
-		return status.Error(codes.InvalidArgument, "Volume ID not provided")
+		return &RequestValidationError{"Volume ID not provided"}
 	}
 
 	target := req.GetStagingTargetPath()
 	if len(target) == 0 {
-		return status.Error(codes.InvalidArgument, "Staging target not provided")
+		return &RequestValidationError{"Staging target not provided"}
 	}
 
 	volCap := req.GetVolumeCapability()
 	if volCap == nil {
-		return status.Error(codes.InvalidArgument, "Volume capability not provided")
+		return &RequestValidationError{"Volume capability not provided"}
 	}
 
 	if !isValidVolumeCapabilities([]*csi.VolumeCapability{volCap}) {
-		return status.Error(codes.InvalidArgument, "Volume capability not supported")
+		return &RequestValidationError{"Volume capability not supported"}
 	}
 
-	// TODO add check if its a mount volume.
-
-	_, ok := req.PublishContext[PublishContextParamLun]
-	if !ok {
-		return status.Error(codes.InvalidArgument, "Device path not provided")
-	}
-
-	_, ok = req.PublishContext[PublishContextParamConnectivity]
-	if !ok {
-		return status.Error(codes.InvalidArgument, "Device path not provided")
-	}
+	// TODO add check if its a mount volume and publish context
 
 	return nil
 }
@@ -159,8 +151,14 @@ func (d *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	klog.V(5).Infof("NodePublishVolume: called with args %+v", *req)
 
-	if err := d.nodePublishVolumeRequestValidation(req); err != nil {
-		return nil, err
+	err := d.nodePublishVolumeRequestValidation(req)
+	if err != nil {
+        switch err.(type) {
+        	case *RequestValidationError:
+		        return nil, status.Error(codes.InvalidArgument, err.Error())
+	        default:
+		        return nil, status.Error(codes.Internal, err.Error())
+        }
 	}
 
 	if err := d.nodePublishVolumeForFileSystem(req); err != nil {
@@ -173,26 +171,26 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 func (d *nodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVolumeRequest) error {
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
-		return status.Error(codes.InvalidArgument, "Volume ID not provided")
+		return &RequestValidationError{"Volume ID not provided"}
 	}
 
 	source := req.GetStagingTargetPath()
 	if len(source) == 0 {
-		return status.Error(codes.InvalidArgument, "Staging target not provided")
+		return &RequestValidationError{"Staging target not provided"}
 	}
 
 	target := req.GetTargetPath()
 	if len(target) == 0 {
-		return status.Error(codes.InvalidArgument, "Target path not provided")
+		return &RequestValidationError{"Target path not provided"}
 	}
 
 	volCap := req.GetVolumeCapability()
 	if volCap == nil {
-		return status.Error(codes.InvalidArgument, "Volume capability not provided")
+		return &RequestValidationError{"Volume capability not provided"}
 	}
 
 	if !isValidVolumeCapabilities([]*csi.VolumeCapability{volCap}) {
-		return status.Error(codes.InvalidArgument, "Volume capability not supported")
+		return &RequestValidationError{"Volume capability not supported"}
 	}
 
 	// TODO add verification of volume mode
@@ -278,7 +276,7 @@ func (d *nodeService) nodePublishVolumeForFileSystem(req *csi.NodePublishVolumeR
 			return status.Errorf(codes.Internal, "Could not mount %q at %q: %v", source, target, err)
 		}
 	*/
-		return nil
+	return nil
 }
 
 func isValidVolumeCapabilities(volCaps []*csi.VolumeCapability) bool {
