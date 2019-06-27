@@ -167,7 +167,7 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, err
 	}
 
-	return &csi.NodePublishVolumeResponse{}, nil
+	return nil, status.Errorf(codes.Unimplemented, "nodePublishVolumeForFileSystem - Not implemented yet") // TODO
 }
 
 func (d *nodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVolumeRequest) error {
@@ -277,11 +277,8 @@ func (d *nodeService) nodePublishVolumeForFileSystem(req *csi.NodePublishVolumeR
 		if err := d.mounter.Mount(source, target, ""); err != nil { // TODO add support for mountOptions
 			return status.Errorf(codes.Internal, "Could not mount %q at %q: %v", source, target, err)
 		}
-
-		return nil
 	*/
-
-	return status.Errorf(codes.Unimplemented, "nodePublishVolumeForFileSystem - Not implemented yet") // TODO
+		return nil
 }
 
 func isValidVolumeCapabilities(volCaps []*csi.VolumeCapability) bool {

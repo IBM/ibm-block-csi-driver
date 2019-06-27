@@ -19,8 +19,9 @@ IMAGE=ibmcom/ibm-block-csi-driver
 GIT_COMMIT?=$(shell git rev-parse HEAD)
 BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS?="-X ${PKG}/node/pkg/driver.gitCommit=${GIT_COMMIT} -X ${PKG}/node/pkg/driver.buildDate=${BUILD_DATE} -s -w"
-
 GO111MODULE=on
+DRIVER_CONFIG_YML=$(shell pwd)/common/config.yaml
+
 .EXPORT_ALL_VARIABLES:
 
 .PHONY: ibm-block-csi-driver
