@@ -18,16 +18,16 @@ package driver
 
 import (
 	"context"
-	"reflect"
-	"testing"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"reflect"
+	"testing"
 )
 
-const(
-   PublishContextParamLun string = "PUBLISH_CONTEXT_LUN"  // TODO for some reason I coun't take it from config.yaml
-   PublishContextParamConnectivity string = "PUBLISH_CONTEXT_CONNECTIVITY"
+const (
+	PublishContextParamLun          string = "PUBLISH_CONTEXT_LUN" // TODO for some reason I coun't take it from config.yaml
+	PublishContextParamConnectivity string = "PUBLISH_CONTEXT_CONNECTIVITY"
 )
 
 func TestNodeStageVolume(t *testing.T) {
@@ -82,7 +82,7 @@ func TestNodeStageVolume(t *testing.T) {
 					},
 					AccessType: &csi.VolumeCapability_Block{
 						Block: &csi.VolumeCapability_BlockVolume{},
-					},					
+					},
 				},
 				VolumeId: "vol-test",
 			},

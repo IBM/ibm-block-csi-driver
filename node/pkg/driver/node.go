@@ -27,7 +27,6 @@ import (
 	//"k8s.io/kubernetes/pkg/util/mount" // TODO since there is error "loading module requirements" I comment it out for now.
 )
 
-
 var (
 	nodeCaps = []csi.NodeServiceCapability_RPC_Type{
 		csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
@@ -41,7 +40,6 @@ var (
 			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 		},
 	}
-
 )
 
 // nodeService represents the node service of CSI driver
@@ -64,12 +62,12 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	err := d.nodeStageVolumeRequestValidation(req)
 	if err != nil {
-        switch err.(type) {
-        	case *RequestValidationError:
-		        return nil, status.Error(codes.InvalidArgument, err.Error())
-	        default:
-		        return nil, status.Error(codes.Internal, err.Error())
-        }
+		switch err.(type) {
+		case *RequestValidationError:
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, err.Error())
+		}
 	}
 
 	return nil, status.Errorf(codes.Unimplemented, "NodeStageVolume - Not implemented yet") // TODO
@@ -160,12 +158,12 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 	err := d.nodePublishVolumeRequestValidation(req)
 	if err != nil {
-        switch err.(type) {
-        	case *RequestValidationError:
-		        return nil, status.Error(codes.InvalidArgument, err.Error())
-	        default:
-		        return nil, status.Error(codes.Internal, err.Error())
-        }
+		switch err.(type) {
+		case *RequestValidationError:
+			return nil, status.Error(codes.InvalidArgument, err.Error())
+		default:
+			return nil, status.Error(codes.Internal, err.Error())
+		}
 	}
 
 	if err := d.nodePublishVolumeForFileSystem(req); err != nil {
@@ -303,6 +301,6 @@ func isValidVolumeCapabilitiesAccessMode(volCaps []*csi.VolumeCapability) bool {
 			break
 		}
 	}
-	
+
 	return foundAll
 }
