@@ -41,6 +41,7 @@ var (
 			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 		},
 	}
+
 )
 
 // nodeService represents the node service of CSI driver
@@ -91,8 +92,14 @@ func (d *nodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{"Volume capability not provided"}
 	}
 
-	if !isValidVolumeCapabilities([]*csi.VolumeCapability{volCap}) {
-		return &RequestValidationError{"Volume capability not supported"}
+	if !isValidVolumeCapabilitiesAccessMode([]*csi.VolumeCapability{volCap}) {
+		return &RequestValidationError{"Volume capability AccessMode not supported"}
+	}
+
+	// If the access type is block, do nothing for stage
+	switch volCap.GetAccessType().(type) {
+	case *csi.VolumeCapability_Block:
+		return &RequestValidationError{"Volume Access Type Block is not supported yet"}
 	}
 
 	// TODO add check if its a mount volume and publish context
@@ -189,8 +196,8 @@ func (d *nodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVol
 		return &RequestValidationError{"Volume capability not provided"}
 	}
 
-	if !isValidVolumeCapabilities([]*csi.VolumeCapability{volCap}) {
-		return &RequestValidationError{"Volume capability not supported"}
+	if !isValidVolumeCapabilitiesAccessMode([]*csi.VolumeCapability{volCap}) {
+		return &RequestValidationError{"Volume capability AccessMode not supported"}
 	}
 
 	// TODO add verification of volume mode
@@ -279,7 +286,7 @@ func (d *nodeService) nodePublishVolumeForFileSystem(req *csi.NodePublishVolumeR
 	return nil
 }
 
-func isValidVolumeCapabilities(volCaps []*csi.VolumeCapability) bool {
+func isValidVolumeCapabilitiesAccessMode(volCaps []*csi.VolumeCapability) bool {
 	hasSupport := func(cap *csi.VolumeCapability) bool {
 		for _, c := range volumeCaps {
 			if c.GetMode() == cap.AccessMode.GetMode() {
@@ -296,5 +303,6 @@ func isValidVolumeCapabilities(volCaps []*csi.VolumeCapability) bool {
 			break
 		}
 	}
+	
 	return foundAll
 }
