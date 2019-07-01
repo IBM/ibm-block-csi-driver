@@ -33,6 +33,12 @@ ibm-block-csi-driver:
 test:
 	go test -v -race ./node/...
 
+.PHONY: test-xunit
+test-xunit:
+	mkdir -p ./driver/coverage/
+	go test -v -race ./node/... | go2xunit -output ./driver/coverage/.unitests.xml
+	go test -v -race ./node/...	# run again so the makefile will fail in case tests failing
+
 .PHONY: gofmt
 gofmt:
 	gofmt -w .
