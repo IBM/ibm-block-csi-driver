@@ -47,3 +47,7 @@ func ParseEndpoint(endpoint string) (string, string, error) {
 
 	return scheme, addr, nil
 }
+
+func ParseIscsiInitiators(path string) (string, error){
+	return "iqn.1994-05.com.redhat:875831148e69"
+}

@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	utils "github.com/ibm/ibm-block-csi-driver/node/util"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog"
@@ -255,6 +256,14 @@ func (d *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 
 func (d *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	klog.V(5).Infof("NodeGetInfo: called with args %+v", *req)
+	
+	iscsiIQN, err := utils.ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi")
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	
+	delimiter := ";"
+	
 
 	return nil, status.Error(codes.Unimplemented, "NodeGetInfo is not implemented yet") // TODO
 
