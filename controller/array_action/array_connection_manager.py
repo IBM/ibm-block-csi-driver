@@ -64,7 +64,7 @@ class ArrayConnectionManager(object):
             if self.connected:
                 self.med_class.disconnect()
                 logger.debug("reducing the connection count")
-                if array_connections_dict[self.endpoint_key]  == 1 :
+                if array_connections_dict[self.endpoint_key] == 1:
                     del array_connections_dict[self.endpoint_key]
                 else:
                     array_connections_dict[self.endpoint_key] -= 1
@@ -106,7 +106,7 @@ class ArrayConnectionManager(object):
 
     def detect_array_type(self):
         logger.debug("detecting array connection type")
-        for storage_type, port in [(XIVArrayMediator.array_type, XIVArrayMediator.port), (SVCArrayMediator.array_type, XIVArrayMediator.port)]:  # ds8k : 8452
+        for storage_type, port in [(XIVArrayMediator.array_type, XIVArrayMediator.port), (SVCArrayMediator.array_type, SVCArrayMediator.port)]:  # ds8k : 8452
             for endpoint in self.endpoints:
                 if _socket_connect_test(endpoint, port) == 0:
                     logger.debug("storage array type is : {0}".format(storage_type))

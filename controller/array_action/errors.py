@@ -49,6 +49,18 @@ class VolumeAlreadyExists(BaseArrayActionException):
         self.message = messages.VolumeAlreadyExists_message.format(volume, array)
 
 
+class VolumeDeleteError(BaseArrayActionException):
+
+    def __init__(self, vol_id, array):
+        self.message = messages.VolumeDeleteError_message.format(vol_id, array)
+
+
+class VolumeCreateError(BaseArrayActionException):
+
+    def __init__(self, vol_name, array):
+        self.message = messages.VolumeCreateError_message.format(vol_name, array)
+
+
 class PoolDoesNotExist(BaseArrayActionException):
 
     def __init__(self, pool, array):
