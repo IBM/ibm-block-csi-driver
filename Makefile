@@ -35,8 +35,8 @@ test:
 
 .PHONY: test-xunit
 test-xunit:
-	mkdir -p ./driver/coverage/
-	go test -v -race ./node/... | go2xunit -output ./driver/coverage/.unitests.xml
+	mkdir -p ./build/reports
+	go test -v -race ./node/... | go2xunit -output build/reports/.csi-node-unitests.xml
 	go test -v -race ./node/...	# run again so the makefile will fail in case tests failing
 
 .PHONY: gofmt
