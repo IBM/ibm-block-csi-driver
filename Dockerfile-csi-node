@@ -24,7 +24,7 @@ COPY go.sum .
 RUN go mod download
 
 COPY . .
-RUN make 
+RUN make ibm-block-csi-driver
 
 # Final stage
 FROM centos:7

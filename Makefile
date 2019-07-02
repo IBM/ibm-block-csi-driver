@@ -14,7 +14,8 @@
 # limitations under the License.
 #
 
-# Note: this Makefile currently applicable only for CSI node component.
+# Note: this Makefile currently applicable responsible for CSI compile, test and build image. Later will should add csi-controller to the makefile party.
+
 PKG=github.com/ibm/ibm-block-csi-driver
 IMAGE=ibmcom/ibm-block-csi-driver
 GIT_COMMIT?=$(shell git rev-parse HEAD)
