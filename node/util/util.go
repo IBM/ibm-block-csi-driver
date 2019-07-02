@@ -23,6 +23,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"io/ioutil"
 )
 
 func ParseEndpoint(endpoint string) (string, string, error) {
@@ -49,5 +50,20 @@ func ParseEndpoint(endpoint string) (string, string, error) {
 }
 
 func ParseIscsiInitiators(path string) (string, error){
-	return "iqn.1994-05.com.redhat:875831148e69"
+	
+	file, err := os.Open(path)
+    if err != nil {
+        return "", fmt.Errorf("Error while trying to open file path : %v.  %v", path, err)
+    }
+    defer file.Close()
+
+	
+	file_out, err := ioutil.ReadAll(file)
+	if err != nil{
+		return "", fmt.Errorf("Error while trying to read file path : %v.  %v", path, err)
+	}
+	
+	iscsiIqn := strings.TrimSpace(strings.Split(string(file_out),"InitiatorName=")[1])
+		
+	return iscsiIqn, nil
 }

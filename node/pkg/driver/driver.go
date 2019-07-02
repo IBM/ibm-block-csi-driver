@@ -22,7 +22,6 @@ import (
 	util "github.com/ibm/ibm-block-csi-driver/node/util"
 	"io/ioutil"
 	"net"
-	"os"
 
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v2"
@@ -36,8 +35,8 @@ type Driver struct {
 	config   ConfigFile
 }
 
-func NewDriver(endpoint string) (*Driver, error) {
-	configFile, err := ReadConfigFile()
+func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver, error) {
+	configFile, err := ReadConfigFile(configFilePath)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +45,7 @@ func NewDriver(endpoint string) (*Driver, error) {
 	return &Driver{
 		endpoint:    endpoint,
 		config:      configFile,
-		nodeService: newNodeService(configFile),
+		nodeService: newNodeService(configFile, hostname),
 	}, nil
 }
 
@@ -102,10 +101,10 @@ const (
 	EnvNameDriverConfFile string = "DRIVER_CONFIG_YML"
 )
 
-func ReadConfigFile() (ConfigFile, error) {
+func ReadConfigFile(configFilePath string) (ConfigFile, error) {
 	var configFile ConfigFile
 
-	configYamlPath := os.Getenv(EnvNameDriverConfFile)
+	configYamlPath := configFilePath
 	if configYamlPath == "" {
 		configYamlPath = DefualtConfigFile
 		klog.V(4).Infof("Not found config file environment variable %s. Set default value %s.", EnvNameDriverConfFile, configYamlPath)

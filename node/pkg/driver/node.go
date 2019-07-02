@@ -47,13 +47,15 @@ var (
 type nodeService struct {
 	//mounter  *mount.SafeFormatAndMount  // TODO fix k8s mount import
 	configYaml ConfigFile
+	hostname string
 }
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
-func newNodeService(configYaml ConfigFile) nodeService {
+func newNodeService(configYaml ConfigFile, hostname string) nodeService {
 	return nodeService{
 		configYaml: configYaml,
+		hostname : hostname,
 		//		mounter:  newSafeMounter(),
 	}
 }
@@ -263,16 +265,15 @@ func (d *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	}
 	
 	delimiter := ";"
+	hostname := d.hostname
 	
-
-	return nil, status.Error(codes.Unimplemented, "NodeGetInfo is not implemented yet") // TODO
-
-	/* TODO
+	nodeId := hostname + delimiter + iscsiIQN
+	klog.V(4).Infof("node id is : %s", nodeId)
 
 	return &csi.NodeGetInfoResponse{
-		NodeId:             "TODO", // TODO need to implement this function.
+		NodeId:           nodeId, 
 	}, nil
-	*/
+	
 }
 
 func (d *nodeService) nodePublishVolumeForFileSystem(req *csi.NodePublishVolumeRequest) error {

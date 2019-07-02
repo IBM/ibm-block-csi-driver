@@ -37,8 +37,8 @@ type VersionInfo struct {
 	Platform      string `json:"platform"`
 }
 
-func GetVersion() (VersionInfo, error) {
-	configFile, err := ReadConfigFile()
+func GetVersion(configFilePath string) (VersionInfo, error) {
+	configFile, err := ReadConfigFile(configFilePath)
 	if err != nil {
 		return VersionInfo{}, err
 	}
@@ -53,8 +53,8 @@ func GetVersion() (VersionInfo, error) {
 	}, nil
 }
 
-func GetVersionJSON() (string, error) {
-	info, err := GetVersion()
+func GetVersionJSON(configFilePath string) (string, error) {
+	info, err := GetVersion(configFilePath)
 	if err != nil {
 		return "", err
 	}

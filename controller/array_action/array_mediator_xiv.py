@@ -133,7 +133,7 @@ class XIVArrayMediator(ArrayMediator):
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
     def _get_vol_by_wwn(self, volume_id):
-        vol_by_wwn = self.client.cmd.vol_list(vol=volume_id).as_single_element
+        vol_by_wwn = self.client.cmd.vol_list(wwn=volume_id).as_single_element
         if not vol_by_wwn:
             raise controller_errors.VolumeNotFoundError(volume_id)
 
@@ -163,8 +163,7 @@ class XIVArrayMediator(ArrayMediator):
         logger.debug("host list : {0}".format(host_list))
         current_host = None
         for host in host_list:
-            logger.debug("type ports list : {}".format(type(host.iscsi_ports)))
-            if iscsi_iqn == host.iscsi_ports:
+            if iscsi_iqn.strip() == host.iscsi_ports.strip():
                 logger.debug("found iscsi iqn in list : {0} for host : {1}".format(host.iscsi_ports, host.name))
                 current_host = host.name
                 break
