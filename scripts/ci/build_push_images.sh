@@ -15,6 +15,7 @@ specific_tag="${IMAGE_VERSION}_b${BUILD_NUMBER}_${branch}"
 
 
 # CSI controller
+# --------------
 ctl_registry="${DOCKER_REGISTRY}/${CSI_CONTROLLER_IMAGE}"
 ctl_tag_specific="${ctl_registry}:${specific_tag}"
 ctl_tag_latest=${ctl_registry}:latest
@@ -26,13 +27,14 @@ docker push ${ctl_tag_specific}
 [ "$tag_latest" = "true" ] && docker push ${ctl_tag_latest} || :
 
 # CSI node
+# --------
 node_registry="${DOCKER_REGISTRY}/${CSI_NODE_IMAGE}"
 node_tag_specific="${node_registry}:${specific_tag}"
 node_tag_latest=${node_registry}:latest
 [ "$tag_latest" = "true" ] && taglatestflag="-t ${node_tag_latest}" 
 
 echo "Build and push the CSI node image"
-docker build -t ${node_tag_specific} $taglatestflag -f Dockerfile-csi-controller .
+docker build -t ${node_tag_specific} $taglatestflag -f Dockerfile-csi-node .
 docker push ${node_tag_specific}
 [ "$tag_latest" = "true" ] && docker push ${node_tag_latest} || :
 
