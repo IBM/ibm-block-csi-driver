@@ -31,7 +31,7 @@ pipeline {
                 sh './scripts/run_yamlcheck.sh'
             }
         }
-        stage ('CSI-controller: Build and push image') {
+        stage ('CSI-controller & node: Build and push images') {
             steps {
                 sh './scripts/ci/build_push_images.sh build/reports/images_url'
             }
