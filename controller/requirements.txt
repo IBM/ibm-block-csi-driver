@@ -6,4 +6,4 @@ pyyaml==5.1
 munch==2.3.2
 
 # A9000 python client
-pyxcli==1.2.0
+pyxcli==1.2.1
