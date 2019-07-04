@@ -19,6 +19,7 @@ package util
 import (
 	"fmt"
 	"testing"
+	"github.com/Flaque/filet"
 )
 
 func TestParseEndpoint(t *testing.T) {
@@ -74,6 +75,51 @@ func TestParseEndpoint(t *testing.T) {
 				if addr != tc.expAddr {
 					t.Fatalf("addr mismatches: expected %v, got %v", tc.expAddr, addr)
 				}
+			}
+		})
+	}
+
+}
+
+
+
+
+func TestParseIscsiInitiators(t *testing.T) {
+	testCases := []struct {
+		name      string
+		file_content  string
+		expErr    error
+		expIqn string
+	}{
+		{
+			name : "wrong iqn file" ,
+			file_content:      "wrong-content",
+		},
+		{
+			name : "non existing file" ,
+			file_content:      "wrong-content",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			defer filet.CleanUp(t)
+			file := filet.TmpFile(t, "", "some content")
+			iqn, err := ParseIscsiInitiators(file.path)
+
+			if tc.expErr != nil {
+				if err.Error() != tc.expErr.Error() {
+					t.Fatalf("Expecting err: expected %v, got %v", tc.expErr, err)
+				}
+
+			} else {
+				if err != nil {
+					t.Fatalf("err is not nil. got: %v", err)
+				}
+				if iqn != tc.expIqn {
+					t.Fatalf("scheme mismatches: expected %v, got %v", tc.expScheme, scheme)
+				}
+
 			}
 		})
 	}

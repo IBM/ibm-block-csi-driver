@@ -265,9 +265,8 @@ func (d *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	}
 	
 	delimiter := ";"
-	hostname := d.hostname
 	
-	nodeId := hostname + delimiter + iscsiIQN
+	nodeId := d.hostname + delimiter + iscsiIQN
 	klog.V(4).Infof("node id is : %s", nodeId)
 
 	return &csi.NodeGetInfoResponse{
