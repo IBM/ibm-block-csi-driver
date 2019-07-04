@@ -217,7 +217,7 @@ spec:
           imagePullPolicy: "IfNotPresent"
           args :
             - --csi-endpoint=$(CSI_ENDPOINT)
-            - --loglevel=$(CSI_LOGLEVEL)
+            #- --loglevel=$(CSI_LOGLEVEL)
           env:
             - name: CSI_ENDPOINT
               value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
@@ -357,12 +357,11 @@ spec:
                   fieldPath: spec.nodeName
           volumeMounts:
             - name: mountpoint-dir
-              mountPath: /var/lib/kubelet
+              mountPath: /var/lib/kubelet/pods
               mountPropagation: "Bidirectional"
-            - name: plugins-mount-dir
-              mountPath: /var/lib/kubelet/plugins
             - name: socket-dir
               mountPath: /csi
+
             - name: device-dir
               mountPath: /dev
             - name: iscsi-dir
@@ -382,11 +381,12 @@ spec:
             periodSeconds: 10
             failureThreshold: 5
 
+
         - name: node-driver-registrar
           image: quay.io/k8scsi/csi-node-driver-registrar:v1.0.2
           imagePullPolicy: "IfNotPresent"
           args:
-            - --csi-address=$(ADDRESS)
+           - --csi-address=$(ADDRESS)
             - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
             - --v=5
           lifecycle:
@@ -397,7 +397,7 @@ spec:
             - name: ADDRESS
               value: /csi/csi.sock
             - name: DRIVER_REG_SOCK_PATH
-              value: /var/lib/kubelet/plugins/ibm-block-csi-driver/csi.sock
+              value: /registration/csi.sock
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
@@ -426,11 +426,6 @@ spec:
             path: /var/lib/kubelet/plugins/ibm-block-csi-driver/
             type: DirectoryOrCreate
 
-        - name: plugins-mount-dir
-          hostPath:
-            path: /var/lib/kubelet/plugins
-            type: DirectoryOrCreate
-
         ## This volume is where the node-driver-registrar registers the plugin with kubelet
         - name: registration-dir
           hostPath:
@@ -453,5 +448,4 @@ spec:
           hostPath:
             path: /sys
             type: Directory
-
 
