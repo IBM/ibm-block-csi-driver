@@ -10,10 +10,6 @@ StorageClassCapabilityNotSupported_message = "Storage class capability is not su
 
 VolumeAlreadyExists_message = "Volume already exists : {0} , array : {1}"
 
-VolumeDeleteError_message = "Volume deletion error : {0} , array : {1}"
-
-VolumeCreateError_message = "Volume Creation error : {0} , array : {1}"
-
 PoolDoesNotExist_message = "Pool does not exist: {0} , array : {1}"
 
 FailedToFindStorageSystemType_message = "Could not identify the type for endpoint: {0} "

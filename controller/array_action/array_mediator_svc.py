@@ -4,15 +4,14 @@ from pysvc.unified.response import CLIFailureError
 from controller.common.csi_logger import get_stdout_logger
 from controller.array_action.array_mediator_interface import ArrayMediator
 from controller.array_action.array_action_types import Volume
-from controller.array_action.errors import CredentialsError, \
-    VolumeNotFoundError, IllegalObjectName, VolumeCreateError, \
-    VolumeDeleteError, NoConnectionAvailableException, \
-    VolumeAlreadyExists, PoolDoesNotExist
+import controller.array_action.errors as controller_errors
 from controller.array_action.utils import classproperty
 
 array_connections_dict = {}
 logger = get_stdout_logger()
-
+VOL_NOT_FOUND = 'CMMVC8957E'
+OBJ_NOT_FOUND = 'CMMVC5753E'
+NAME_NOT_MEET = 'CMMVC5754E'
 
 def is_warning_message(ex):
     """ Return True if the exception message is warning """
@@ -29,17 +28,17 @@ def build_kwargs_from_capabilities(capabilities, pool_name, volume_name,
                                    volume_size):
     cli_kwargs = {}
     cli_kwargs.update({
-        'object_id': volume_name,
+        'name': volume_name,
         'unit': 'b',
         'size': volume_size,
         'pool': pool_name
     })
     # if capabilities == None, create default capability volume thick
-    if capabilities.get('SpaceEfficiency') == 'Thin':
+    if capabilities == 'Thin':
         cli_kwargs.update({'thin': True})
-    elif capabilities.get('SpaceEfficiency') == 'Compression':
+    elif capabilities == 'Compression':
         cli_kwargs.update({'compressed': True})
-    elif capabilities.get('SpaceEfficiency') == 'Dedup':
+    elif capabilities == 'Dedup':
         cli_kwargs.update({'compressed': True, 'deduplicated': True})
 
     return cli_kwargs
@@ -72,29 +71,28 @@ class SVCArrayMediator(ArrayMediator):
     def __init__(self, user, password, endpoint):
         self.user = user
         self.password = password
-        self.endpoint = endpoint
         self.client = None
+        self._is_connected = False
+        # SVC only accept one IP address
+        self.endpoint = endpoint[0]
 
         logger.debug("in init")
         self._connect()
 
     def _connect(self):
-        logger.debug("connecting to endpoint")
+        logger.debug("Connecting to SVC {0}".format(self.endpoint))
         try:
             self.client = connect(self.endpoint, username=self.user,
                                   password=self.password)
-
-        except svc_errors.IncorrectCredentials:
-            raise CredentialsError(self.endpoint)
-        except (svc_errors.ConnectionTimedoutException,
-                svc_errors.UnableToConnectException):
-            raise NoConnectionAvailableException(self.endpoint)
-        except svc_errors.StorageArrayClientException:
-            raise CredentialsError(self.endpoint)
+            self._is_connected = True
+        except (svc_errors.IncorrectCredentials,
+                svc_errors.StorageArrayClientException):
+            raise controller_errors.CredentialsError(self.endpoint)
 
     def disconnect(self):
-        if self.client and self.client.is_connected():
+        if self.client and self._is_connected:
             self.client.close()
+            self._is_connected = False
 
     def _generate_volume_response(self, cli_volume):
         return Volume(
@@ -107,24 +105,44 @@ class SVCArrayMediator(ArrayMediator):
 
     def get_volume(self, vol_name):
         logger.debug("Get volume : {}".format(vol_name))
+        cli_volume = None
         try:
             cli_volume = self.client.svcinfo.lsvdisk(
                 bytes=True, object_id=vol_name).as_single_element
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if not is_warning_message(ex.my_message):
+                if (OBJ_NOT_FOUND in ex.my_message or
+                        NAME_NOT_MEET in ex.my_message):
+                    logger.debug("Volume not found")
+        except Exception as ex:
             logger.exception(ex)
-            raise IllegalObjectName("Failed to get the "
-                                    "volume : {0}".format(vol_name))
+            raise ex
 
-        logger.debug("cli volume returned : {}".format(cli_volume))
         if not cli_volume:
-            raise VolumeNotFoundError(vol_name)
-        array_vol = self._generate_volume_response(cli_volume)
-        return array_vol
+            raise controller_errors.VolumeNotFoundError(vol_name)
+        logger.debug("cli volume returned : {}".format(cli_volume))
+        return self._generate_volume_response(cli_volume)
+
+    def validate_supported_capabilities(self, capabilities, pool=None):
+        logger.info("validate_supported_capabilities for "
+                    "capabilities : {0}".format(capabilities))
+        # For SVC, we only support capabilities
+        # "SpaceEfficiency": "Thin/Thick/Compression/Dedup"
+        if ((len(capabilities) > 0 and capabilities
+             not in ['Thin', 'Thick', 'Compression', 'Dedup'])):
+            logger.error("capabilities is not "
+                         "supported {0}".format(capabilities))
+            raise controller_errors.StorageClassCapabilityNotSupported(
+                capabilities)
+
+        logger.info("Finished validate_supported_capabilities")
 
     def _convert_size_bytes(self, size_in_bytes):
         # SVC volume size must be the multiple of 512 bytes
-        return (size_in_bytes // self.BLOCK_SIZE_IN_BYTES
-                ) * self.BLOCK_SIZE_IN_BYTES + self.BLOCK_SIZE_IN_BYTES
+        ret = size_in_bytes % self.BLOCK_SIZE_IN_BYTES
+        if ret > 0:
+            return size_in_bytes - ret + 512
+        return size_in_bytes
 
     def create_volume(self, name, size_in_bytes, capabilities, pool):
         logger.info("creating volume with name : {}. size : {} . in pool : {} "
@@ -142,34 +160,29 @@ class SVCArrayMediator(ArrayMediator):
             if not is_warning_message(ex.my_message):
                 logger.error(msg="Cannot create volume {0}, "
                                  "Reason is: {1}".format(name, ex))
-                if 'CMMVC5753E' in ex.my_message:
-                    raise VolumeAlreadyExists(name, self.endpoint)
-                if 'CMMVC5754E' in ex.my_message:
-                    raise PoolDoesNotExist(pool, self.endpoint)
-                else:
-                    raise VolumeCreateError(name, self.endpoint)
+                if OBJ_NOT_FOUND in ex.my_message:
+                    raise controller_errors.VolumeAlreadyExists(name,
+                                                                self.endpoint)
+                if NAME_NOT_MEET in ex.my_message:
+                    raise controller_errors.PoolDoesNotExist(pool,
+                                                             self.endpoint)
         except Exception as ex:
-            logger.error(msg="Cannot create volume {0}, {1}".format(name, ex))
-            raise VolumeCreateError(name, self.endpoint)
+            logger.exception(ex)
+            raise ex
 
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
         try:
-            self.client.svctask.rmvolume(object_id=volume_id)
+            self.client.svctask.rmvolume(vdisk_id=volume_id)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
-                if ('CMMVC5753E' in ex.my_message
-                        or 'CMMVC8957E' in ex.my_message):
+                if (OBJ_NOT_FOUND in ex.my_message
+                        or VOL_NOT_FOUND in ex.my_message):
                     logger.warning("Failed to delete volume {}, "
                                    "it's already deleted.".format(volume_id))
-                    raise VolumeNotFoundError(volume_id)
-                else:
-                    logger.error(msg="Cannot delete volume {0}, Reason "
-                                     "is: {1}".format(volume_id, ex))
-                    raise VolumeDeleteError(volume_id, self.endpoint)
+                    raise controller_errors.VolumeNotFoundError(volume_id)
         except Exception as ex:
-            logger.info("Cannot delete volume {0}, Reason "
-                        "is: {1}".format(volume_id, ex))
-            raise VolumeDeleteError(volume_id, self.endpoint)
+            logger.exception(ex)
+            raise ex
 
         logger.info("Finished volume deletion. id : {0}".format(volume_id))

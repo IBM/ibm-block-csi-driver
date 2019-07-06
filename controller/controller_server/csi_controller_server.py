@@ -52,7 +52,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         pool = request.parameters[config.PARAMETERS_CAPACITY].split(config.PARAMETERS_CAPACITY_DELIMITER)[1]
         try:
-            capabilities = request.parameters[config.PARAMETERS_CAPABILITIES]
+            capabilities = request.parameters[config.PARAMETERS_CAPABILITIES].split(config.PARAMETERS_CAPACITY_DELIMITER)[1]
         except KeyError as ex:
             logger.debug("no capabilities passed for this volume creation")
             capabilities = None
