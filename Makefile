@@ -14,6 +14,8 @@
 # limitations under the License.
 #
 
+# Note: this Makefile currently applicable responsible for CSI compile, test and build image. Later will should add csi-controller to the makefile party.
+
 PKG=github.com/ibm/ibm-block-csi-driver
 IMAGE=ibmcom/ibm-block-csi-driver
 GIT_COMMIT?=$(shell git rev-parse HEAD)
@@ -34,17 +36,26 @@ test:
 	go generate ./...
 	go test -v -race ./node/...
 
+.PHONY: test-xunit
+test-xunit:
+	mkdir -p ./build/reports
+	go test -v -race ./node/... | go2xunit -output build/reports/csi-node-unitests.xml
+	go test -v -race ./node/...	# run again so the makefile will fail in case tests failing
+
+.PHONY: test-xunit-in-container
+test-xunit-in-container:
+    # Run make test-xunit inside csi node container for testing (to avoid go and other testing utils on your laptop).
+	docker build -f Dockerfile-csi-node.test -t csi-node-unitests .
+	docker run --rm -t -v $(CURDIR)/build/reports/:/go/src/github.com/ibm/ibm-block-csi-driver/build/reports/ csi-node-unitests
+
+
 .PHONY: gofmt
 gofmt:
 	gofmt -w .
 
-#.PHONY: image-release
-#image-release:
-#	docker build -t $(IMAGE):$(VERSION) .
-#
-#.PHONY: push-release
-#push-release:
-#	docker push $(IMAGE):$(VERSION)
+.PHONY: csi-build-images-and-push-artifactory
+csi-build-images-and-push-artifactory:
+	./scripts/ci/build_push_images.sh
 
 .PHONY: list
 list:
