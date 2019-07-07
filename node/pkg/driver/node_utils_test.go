@@ -2,10 +2,8 @@ package driver
 
 import (
 	"fmt"
-	"os"
-	//"path/filepath"
-	//"strings"
 	"io/ioutil"
+	"os"
 	"syscall"
 	"testing"
 )

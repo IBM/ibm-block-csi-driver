@@ -25,7 +25,6 @@ import (
 	"google.golang.org/grpc/status"
 	"reflect"
 	"testing"
-	//driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 	"fmt"
 )
 
