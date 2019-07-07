@@ -31,6 +31,7 @@ ibm-block-csi-driver:
 
 .PHONY: test
 test:
+	go generate ./...
 	go test -v -race ./node/...
 
 .PHONY: gofmt

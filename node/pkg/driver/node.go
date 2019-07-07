@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	utils "github.com/ibm/ibm-block-csi-driver/node/util"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog"
@@ -47,15 +46,18 @@ var (
 type nodeService struct {
 	//mounter  *mount.SafeFormatAndMount  // TODO fix k8s mount import
 	configYaml ConfigFile
-	hostname string
+	hostname   string
+	nodeUtils  NodeUtilsInterface
 }
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
-func newNodeService(configYaml ConfigFile, hostname string) nodeService {
+func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface) nodeService {
 	return nodeService{
 		configYaml: configYaml,
-		hostname : hostname,
+		hostname:   hostname,
+		nodeUtils:  nodeUtils,
+
 		//		mounter:  newSafeMounter(),
 	}
 }
@@ -258,21 +260,21 @@ func (d *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 
 func (d *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	klog.V(5).Infof("NodeGetInfo: called with args %+v", *req)
-	
-	iscsiIQN, err := utils.ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi")
+
+	iscsiIQN, err := d.nodeUtils.ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi")
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	
+
 	delimiter := ";"
-	
+
 	nodeId := d.hostname + delimiter + iscsiIQN
 	klog.V(4).Infof("node id is : %s", nodeId)
 
 	return &csi.NodeGetInfoResponse{
-		NodeId:           nodeId, 
+		NodeId: nodeId,
 	}, nil
-	
+
 }
 
 func (d *nodeService) nodePublishVolumeForFileSystem(req *csi.NodePublishVolumeRequest) error {

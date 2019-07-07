@@ -18,13 +18,32 @@ package driver
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"testing"
 )
 
+func getConfigFilePath() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	dir = filepath.Join(dir, "../../../", "common", "config.yaml")
+	return dir, nil
+}
+
 func TestGetVersion(t *testing.T) {
-	version, err := GetVersion()
+
+	dir, err := getConfigFilePath()
+	if err != nil {
+		t.Fatalf("Getting config file returned an error")
+	}
+
+	fmt.Println(dir)
+
+	version, err := GetVersion(dir)
 
 	expected := VersionInfo{
 		DriverVersion: "1.0.0",
@@ -45,7 +64,13 @@ func TestGetVersion(t *testing.T) {
 }
 
 func TestGetVersionJSON(t *testing.T) {
-	version, err := GetVersionJSON()
+	dir, err := getConfigFilePath()
+
+	if err != nil {
+		t.Fatalf("Getting config file returned an error")
+	}
+
+	version, err := GetVersionJSON(dir)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
