@@ -9,9 +9,13 @@ from controller.array_action.utils import classproperty
 
 array_connections_dict = {}
 logger = get_stdout_logger()
-VOL_NOT_FOUND = 'CMMVC8957E'
+
 OBJ_NOT_FOUND = 'CMMVC5753E'
 NAME_NOT_MEET = 'CMMVC5754E'
+VOL_NOT_FOUND = 'CMMVC8957E'
+POOL_NOT_MATCH_VOL_CAPABILITIES = 'CMMVC9292E'
+NOT_REDUCTION_POOL = 'CMMVC9301E'
+
 
 def is_warning_message(ex):
     """ Return True if the exception message is warning """
@@ -166,6 +170,11 @@ class SVCArrayMediator(ArrayMediator):
                 if NAME_NOT_MEET in ex.my_message:
                     raise controller_errors.PoolDoesNotExist(pool,
                                                              self.endpoint)
+                if (POOL_NOT_MATCH_VOL_CAPABILITIES in ex.my_message
+                        or NOT_REDUCTION_POOL in ex.my_message):
+                    raise controller_errors.PoolDoesNotMatchCapabilities(
+                        pool, capabilities, ex)
+                raise ex
         except Exception as ex:
             logger.exception(ex)
             raise ex
@@ -176,11 +185,13 @@ class SVCArrayMediator(ArrayMediator):
             self.client.svctask.rmvolume(vdisk_id=volume_id)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
+                logger.warning("Failed to delete volume {}, "
+                               "it's already deleted.".format(volume_id))
                 if (OBJ_NOT_FOUND in ex.my_message
                         or VOL_NOT_FOUND in ex.my_message):
-                    logger.warning("Failed to delete volume {}, "
-                                   "it's already deleted.".format(volume_id))
                     raise controller_errors.VolumeNotFoundError(volume_id)
+                else:
+                    raise ex
         except Exception as ex:
             logger.exception(ex)
             raise ex
