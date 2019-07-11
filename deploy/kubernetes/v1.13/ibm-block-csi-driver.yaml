@@ -344,7 +344,7 @@ spec:
           args:
             - --csi-endpoint=$(CSI_ENDPOINT)
             #- --hostname=$(KUBE_NODE_NAME)
-            - -v=$(CSI_LOGLEVEL)
+            - --v=$(CSI_LOGLEVEL)
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
@@ -387,7 +387,7 @@ spec:
           imagePullPolicy: "IfNotPresent"
           args:
             - --csi-address=$(ADDRESS)
-            - --kubelet-registration-path=/var/lib/kubelet/plugins/ibm-block-csi-driver/csi.sock
+            - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
             - --v=5
           lifecycle:
             preStop:
@@ -397,7 +397,7 @@ spec:
             - name: ADDRESS
               value: /csi/csi.sock
             - name: DRIVER_REG_SOCK_PATH
-              value: /registration/csi.sock
+              value: /var/lib/kubelet/plugins/ibm-block-csi-driver/csi.sock
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
@@ -408,7 +408,7 @@ spec:
           image: quay.io/k8scsi/livenessprobe:v1.1.0  # TODO v1.1.0 is for k8s 1.13+, but v1.0.2 was the first k8s 1.13 version.
           args:
             - --csi-address=/csi/csi.sock
-            - --connection-timeout=3s   # TODO this line is deprecated from v1.1.0. So if exist its ignore it.
+            - --connection-timeout=3s   # NOTE: this line is deprecated from v1.1.0. So if exist its ignore it.
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
