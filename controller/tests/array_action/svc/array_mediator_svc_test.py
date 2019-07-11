@@ -79,7 +79,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_create_volume_return_volume_exists_error(self, mock_warning):
         mock_warning.return_value = False
         self.svc.client.svctask.mkvolume.side_effect = [
-            CLIFailureError("CMMVC5753E")]
+            CLIFailureError("CMMVC6035E")]
         with self.assertRaises(array_errors.VolumeAlreadyExists):
             self.svc.create_volume("vol", 10, {}, "pool")
 

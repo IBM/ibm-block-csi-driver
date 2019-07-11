@@ -6,12 +6,14 @@ from controller.array_action.array_mediator_interface import ArrayMediator
 from controller.array_action.array_action_types import Volume
 import controller.array_action.errors as controller_errors
 from controller.array_action.utils import classproperty
+import controller.array_action.config as config
 
 array_connections_dict = {}
 logger = get_stdout_logger()
 
 OBJ_NOT_FOUND = 'CMMVC5753E'
 NAME_NOT_MEET = 'CMMVC5754E'
+OBJ_ALREADY_EXIST = 'CMMVC6035E'
 VOL_NOT_FOUND = 'CMMVC8957E'
 POOL_NOT_MATCH_VOL_CAPABILITIES = 'CMMVC9292E'
 NOT_REDUCTION_POOL = 'CMMVC9301E'
@@ -38,11 +40,11 @@ def build_kwargs_from_capabilities(capabilities, pool_name, volume_name,
         'pool': pool_name
     })
     # if capabilities == None, create default capability volume thick
-    if capabilities == 'Thin':
+    if capabilities == config.CAPABILITY_THIN:
         cli_kwargs.update({'thin': True})
-    elif capabilities == 'Compression':
+    elif capabilities == config.CAPABILITY_COMPRESSION:
         cli_kwargs.update({'compressed': True})
-    elif capabilities == 'Dedup':
+    elif capabilities == config.CAPABILITY_DEDUP:
         cli_kwargs.update({'compressed': True, 'deduplicated': True})
 
     return cli_kwargs
@@ -127,13 +129,14 @@ class SVCArrayMediator(ArrayMediator):
         logger.debug("cli volume returned : {}".format(cli_volume))
         return self._generate_volume_response(cli_volume)
 
-    def validate_supported_capabilities(self, capabilities, pool=None):
+    def validate_supported_capabilities(self, capabilities):
         logger.info("validate_supported_capabilities for "
                     "capabilities : {0}".format(capabilities))
         # For SVC, we only support capabilities
         # "SpaceEfficiency": "Thin/Thick/Compression/Dedup"
         if ((len(capabilities) > 0 and capabilities
-             not in ['Thin', 'Thick', 'Compression', 'Dedup'])):
+             not in [config.CAPABILITY_THIN, config.CAPABILITY_THICK,
+                     config.CAPABILITY_COMPRESSION, config.CAPABILITY_DEDUP])):
             logger.error("capabilities is not "
                          "supported {0}".format(capabilities))
             raise controller_errors.StorageClassCapabilityNotSupported(
@@ -164,7 +167,7 @@ class SVCArrayMediator(ArrayMediator):
             if not is_warning_message(ex.my_message):
                 logger.error(msg="Cannot create volume {0}, "
                                  "Reason is: {1}".format(name, ex))
-                if OBJ_NOT_FOUND in ex.my_message:
+                if OBJ_ALREADY_EXIST in ex.my_message:
                     raise controller_errors.VolumeAlreadyExists(name,
                                                                 self.endpoint)
                 if NAME_NOT_MEET in ex.my_message:
