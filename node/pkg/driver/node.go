@@ -16,10 +16,11 @@
 
 package driver
 
+
 import (
 	"context"
 	"fmt"
-
+    "math/rand"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -256,14 +257,11 @@ func (d *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 func (d *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	klog.V(5).Infof("NodeGetInfo: called with args %+v", *req)
 
-	return nil, status.Error(codes.Unimplemented, "NodeGetInfo is not implemented yet") // TODO
-
-	/* TODO
+	//return nil, status.Error(codes.Unimplemented, "NodeGetInfo is not implemented yet") // TODO
 
 	return &csi.NodeGetInfoResponse{
-		NodeId:             "TODO", // TODO need to implement this function.
+		NodeId: string(rand.Intn(100)),
 	}, nil
-	*/
 }
 
 func (d *nodeService) nodePublishVolumeForFileSystem(req *csi.NodePublishVolumeRequest) error {
