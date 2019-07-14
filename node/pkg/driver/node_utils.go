@@ -6,6 +6,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"k8s.io/klog"
+	"path/filepath"
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
@@ -13,7 +15,7 @@ import (
 type NodeUtilsInterface interface {
 	ParseIscsiInitiators(path string) (string, error)
 	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, string, error)
-	GetIscsiSessionHostsForArrayIQN(array_iqn string) (hosts []int, error)
+	GetIscsiSessionHostsForArrayIQN(array_iqn string) ([]int, error)
 }
 
 type NodeUtils struct {
@@ -64,23 +66,26 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, c
 }
 
 
-func (n NodeUtils) GetIscsiSessionHostsForArrayIQN(array_iqn string) (hosts []int, error){
-	hosts := int[]
+func (n NodeUtils) GetIscsiSessionHostsForArrayIQN(array_iqn string) ([]int, error){
 	sysPath := "/sys/class/iscsi_host/"
-	sessionHosts := []int
+	var sessionHosts []int
 	if hostDirs, err := ioutil.ReadDir(sysPath); err != nil {
 		klog.Errorf("cannot read sys dir : {%v}. error : {%v}", sysPath, err)
 		return sessionHosts, err
 	} else {
 		klog.V(5).Infof("host dirs : {%v}", hostDirs)
-	}
 		for _, hostDir := range hostDirs {
 			// get the host session number : "host34"
+			hostName := hostDir.Name()
+			hostNumber := -1
 			if !strings.HasPrefix(hostName, "host") {
 				continue
-			} else if hostNumber, err = strconv.Atoi(strings.TrimPrefix(hostName, "host")); err != nil {
-				klog.V(4).Infof("cannot get host id from host : {%V}", hostName)
-				continue
+			} else{
+				hostNumber, err = strconv.Atoi(strings.TrimPrefix(hostName, "host"))
+				if err != nil {
+					klog.V(4).Infof("cannot get host id from host : {%V}", hostName)
+					continue
+				 }
 			}
 
 			targetPath := sysPath + hostName + "/device/session*/iscsi_session/session*/targetname" 
@@ -88,7 +93,7 @@ func (n NodeUtils) GetIscsiSessionHostsForArrayIQN(array_iqn string) (hosts []in
 			//devicePath + sessionName + "/iscsi_session/" + sessionName + "/targetname"
 			matches, err := filepath.Glob(targetPath)
 			if err != nil{
-				klog.Errorf("error while finding session number for hostname : {%V}. err : {%v}", hostName, sessionNumber)
+				klog.Errorf("error while finding targetPath : {%V}. err : {%v}", targetPath, err)
 				return sessionHosts, err
 			}
 			
@@ -103,7 +108,8 @@ func (n NodeUtils) GetIscsiSessionHostsForArrayIQN(array_iqn string) (hosts []in
 			}
 			
 			targetNamePath := matches[0]
-			if targetName, err := ioutil.ReadFile(targetNamePath); err != nil {
+			targetName, err := ioutil.ReadFile(targetNamePath)
+			if err != nil {
 				klog.V(4).Infof("could not read target name from file : {%v}, error : {%v}", targetNamePath, err)
 				continue
 			}
@@ -111,12 +117,12 @@ func (n NodeUtils) GetIscsiSessionHostsForArrayIQN(array_iqn string) (hosts []in
 			klog.V(5).Infof("target name found : {%V}", targetName)
 
 			 if strings.TrimSpace(string(targetName)) == array_iqn{
-			 	aappend(sessionHosts, hostNumber)
+			 	sessionHosts = append(sessionHosts, hostNumber)
 			 	klog.V(5).Infof("host nunber appended : {%V}. sessionhosts is : {%v}", hostNumber, sessionHosts)
 			 }
 		}
 		
-		return sessionHosts
+		return sessionHosts, nil
 	}
 }
 

@@ -3,9 +3,7 @@ package driver
 import (
 	"k8s.io/klog"
 	"fmt"
-	"strings"
-	"path/filepath"
-
+	"os"
 )
 
 
@@ -35,13 +33,17 @@ func NewRescanUtils(connectivityType string, nodeUtils NodeUtilsInterface) (Resc
 
 func (r RescanUtilsIscsi) RescanSpecificLun(lunId int, array_iqn string) (error){
 	klog.V(5).Infof("Starging Rescan specific lun, on lun : {%v}, with array iqn : {%v}", lunId, array_iqn)
-	sessionHosts := r.nodeUtils.GetIscsiSessionHostsForArrayIQNg(array_iqn)
+	sessionHosts, err := r.nodeUtils.GetIscsiSessionHostsForArrayIQN(array_iqn)
+	if err != nil{
+		return err
+	}
 
 	
 	for _, hostNumber := range sessionHosts {
 
 		filename := fmt.Sprintf("/sys/class/scsi_host/host%d/scan", hostNumber)
-		if f, err = os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200); err != nil {
+		f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200)
+		if err != nil {
 			klog.Errorf("could not open filename : {%v}. err : {%v}", filename, err) 
 			return err
 		}
