@@ -45,7 +45,7 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 	return &Driver{
 		endpoint:    endpoint,
 		config:      configFile,
-		nodeService: NewNodeService(configFile, hostname, *NewNodeUtils()),
+		nodeService: NewNodeService(configFile, hostname, *NewNodeUtils(), NewRescanUtils),
 	}, nil
 }
 
@@ -93,6 +93,7 @@ type ConfigFile struct {
 	Controller struct {
 		Publish_context_lun_parameter          string
 		Publish_context_connectivity_parameter string
+		Publish_context_array_iqn              string
 	}
 }
 

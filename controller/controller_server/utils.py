@@ -186,14 +186,16 @@ def choose_connectivity_type(connecitvity_types):
     return res
 
 
-def generate_csi_publish_volume_response(lun, connectivity_type, config):
+def generate_csi_publish_volume_response(lun, connectivity_type, config, array_iqn):
     logger.debug("generating publish volume response for lun :{0}, connectivity : {1}".format(lun, connectivity_type))
 
     lun_param = config["controller"]["publish_context_lun_parameter"]
     connectivity_param = config["controller"]["publish_context_connectivity_parameter"]
+    array_iqn_param = config["controller"]["publish_context_array_iqn"]
 
     res = csi_pb2.ControllerPublishVolumeResponse(publish_context={lun_param: str(lun),
-                                                                   connectivity_param: connectivity_type})
+                                                                   connectivity_param: connectivity_type,
+																   array_iqn_param : array_iqn})
 
     logger.debug("publish volume response is :{0}".format(res))
     return res

@@ -257,3 +257,13 @@ class XIVArrayMediator(ArrayMediator):
                 raise controller_errors.VolumeAlreadyUnmappedError(vol_name)
             else:
                 raise controller_errors.UnMappingError(vol_name, host_name, ex)
+
+
+    def get_array_iscsi_name(self):
+        config_get_list = self.client.cmd.config_get().as_list
+        array_iqn = [a for a in config_get_list if a["name"] == "iscsi_name"][0]["value"]
+        return array_iqn
+
+
+
+		

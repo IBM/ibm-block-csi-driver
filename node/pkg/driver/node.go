@@ -21,10 +21,11 @@ import (
 	"fmt"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	iscsilib "github.com/kubernetes-csi/csi-lib-iscsi/iscsi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog"
-	//"k8s.io/kubernetes/pkg/util/mount" // TODO since there is error "loading module requirements" I comment it out for now.
+	mount "k8s.io/kubernetes/pkg/util/mount" // TODO since there is error "loading module requirements" I comment it out for now.
 )
 
 var (
@@ -44,21 +45,27 @@ var (
 
 // nodeService represents the node service of CSI driver
 type nodeService struct {
-	//mounter  *mount.SafeFormatAndMount  // TODO fix k8s mount import
-	configYaml ConfigFile
-	hostname   string
-	nodeUtils  NodeUtilsInterface
+	mounter     *mount.SafeFormatAndMount // TODO fix k8s mount import
+	configYaml  ConfigFile
+	hostname    string
+	nodeUtils   NodeUtilsInterface
+	newRescanUtils NewRescanUtilsFunction
 }
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
-func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface) nodeService {
+func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, newRescanUtils NewRescanUtilsFunction) nodeService {
 	return nodeService{
-		configYaml: configYaml,
-		hostname:   hostname,
-		nodeUtils:  nodeUtils,
+		configYaml:  configYaml,
+		hostname:    hostname,
+		nodeUtils:   nodeUtils,
+		newRescanUtils : newRescanUtils,
+		
 
-		//		mounter:  newSafeMounter(),
+		mounter: &mount.SafeFormatAndMount{
+			Interface: mount.New(""),
+			Exec:      mount.NewOsExec(),
+		},
 	}
 }
 
@@ -74,6 +81,37 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
+
+	// get the volume device
+	//get connectivity from publish context
+	connectivityType, lun, array_iqn, err := d.nodeUtils.GetInfoFromPublishContext(req.PublishContext, d.configYaml)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	klog.V(4).Infof("connectivityType : %v", connectivityType)
+
+	klog.V(4).Infof("lun : %v", lun)
+
+	klog.V(4).Infof("array_iqn : %v", array_iqn)
+	//
+	connector := iscsilib.Connector{}
+	klog.V(4).Infof("connector : %v", connector)
+	
+	rescanUtils, err := d.newRescanUtils(connectivityType, d.nodeUtils)
+	
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	err = rescanUtils.RescanSpecificLun(lun, array_iqn)
+	
+
+	// rescan the specific lun
+	// rescan multiplath device
+	//discover the mpath device -> if not found do sg_inq -> still not found retuen NOT_FOUND
+	// valdate the discovered device
+
+	klog.V(4).Infof("mounter : %v", d.mounter)
 
 	return nil, status.Errorf(codes.Unimplemented, "NodeStageVolume - Not implemented yet") // TODO
 }

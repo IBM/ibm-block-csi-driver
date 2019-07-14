@@ -225,8 +225,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     context.set_details(ex)
                     return csi_pb2.ControllerPublishVolumeResponse()
 
+                array_iqn = array_mediator.get_array_iscsi_name()
+
                 logger.info("finished ControllerPublishVolume")
-                res = utils.generate_csi_publish_volume_response(lun, connectivity_type, self.cfg)
+                res = utils.generate_csi_publish_volume_response(lun, connectivity_type, self.cfg, array_iqn)
                 logger.debug("after res")
                 return res
 
