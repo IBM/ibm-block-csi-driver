@@ -49,13 +49,19 @@ clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-cluster-driver-regist
 clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-snapshotter-role created
 clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-external-snapshotter-binding created
 statefulset.apps/ibm-block-csi-controller created
+daemonset.apps/ibm-block-csi-node created
 ```
 
 Verify driver is running (The csi-controller pod should be in Running state):
 ```sh
-#> kubectl get -n kube-system pod/ibm-block-csi-controller-0
+#> kubectl get -n kube-system pod --selector=app=ibm-block-csi-controller
 NAME                         READY   STATUS    RESTARTS   AGE
 ibm-block-csi-controller-0   5/5     Running   0          10m
+
+#> kubectl get -n kube-system pod --selector=app=ibm-block-csi-node
+NAME                       READY   STATUS    RESTARTS   AGE
+ibm-block-csi-node-xnfgp   3/3     Running   0          10m
+ibm-block-csi-node-zgh5h   3/3     Running   0          10m
 
 ### NOTE if pod/ibm-block-csi-controller-0 is not in Running state, then troubleshoot by running:
 #> kubectl describe -n kube-system pod/ibm-block-csi-controller-0
@@ -83,7 +89,7 @@ Spec:
 Events:               <none>
 
 
-#> kubectl get -n kube-system  csidriver,sa,clusterrole,clusterrolebinding,statefulset,pod | grep ibm
+#> kubectl get -n kube-system  csidriver,sa,clusterrole,clusterrolebinding,statefulset,pod,daemonset | grep ibm-block-csi
 csidriver.storage.k8s.io/ibm-block-csi-driver   2019-06-02T09:30:36Z
 serviceaccount/ibm-block-csi-controller-sa          1         2m16s
 clusterrole.rbac.authorization.k8s.io/ibm-block-csi-cluster-driver-registrar-role                            2m16s
@@ -95,16 +101,23 @@ clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-external-attacher-bin
 clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-external-provisioner-binding             2m16s
 clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-external-snapshotter-binding             2m16s
 statefulset.apps/ibm-block-csi-controller   1/1     2m16s
-pod/ibm-block-csi-controller-0                    5/5     Running   0          2m16s
+pod/ibm-block-csi-controller-0              5/5     Running   0          2m16s
+pod/ibm-block-csi-node-xnfgp                3/3     Running   0          13m
+pod/ibm-block-csi-node-zgh5h                3/3     Running   0          13m
+daemonset.extensions/ibm-block-csi-node     2       2         2          2            2           <none>                        13m
 
 
 #> kubectl get -n kube-system -o jsonpath="{..image}" statefulset.apps/ibm-block-csi-controller | tr -s '[[:space:]]' '\n'; echo ""
 ibm/ibm-block-csi-controller-driver:1.0.0
 quay.io/k8scsi/csi-cluster-driver-registrar:v1.0.1
 quay.io/k8scsi/csi-provisioner:v1.1.1
-quay.io/k8scsi/csi-attacher:v1.1.1
+quay.io/k8scsi/csi-attacher:v1.0.1
 quay.io/k8scsi/livenessprobe:v1.1.0
 
+#> kubectl get -n kube-system -o jsonpath="{..image}" daemonset.apps/ibm-block-csi-node | tr -s '[[:space:]]' '\n'; echo ""
+ibm/ibm-block-csi-node-driver:1.0.0
+quay.io/k8scsi/csi-node-driver-registrar:v1.0.2
+quay.io/k8scsi/livenessprobe:v1.1.0
 
 ### Watch the driver logs
 #> kubectl log -f -n kube-system ibm-block-csi-controller-0 ibm-block-csi-controller
