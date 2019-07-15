@@ -212,7 +212,7 @@ spec:
           imagePullPolicy: "IfNotPresent"
           args :
             - --csi-endpoint=$(CSI_ENDPOINT)
-            - --loglevel=$(CSI_LOGLEVEL)
+            #- --loglevel=$(CSI_LOGLEVEL)
           env:
             - name: CSI_ENDPOINT
               value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
@@ -338,12 +338,12 @@ spec:
           image: ibmcom/ibm-block-csi-node-driver:1.0.0
           imagePullPolicy: "IfNotPresent"
           args:
-            - --endpoint=$(CSI_ENDPOINT)
-            - --hostname=$(KUBE_NODE_NAME)
-            - -v=$(CSI_LOGLEVEL)
+            - --csi-endpoint=$(CSI_ENDPOINT)
+            #- --hostname=$(KUBE_NODE_NAME)
+            - --v=$(CSI_LOGLEVEL)
           env:
             - name: CSI_ENDPOINT
-              value: unix:/csi/csi.sock
+              value: unix:///csi/csi.sock
             - name: CSI_LOGLEVEL
               value: "5"
             ## KUBE_NODE_NAME needed for the GetNodeInfo API
@@ -353,12 +353,11 @@ spec:
                   fieldPath: spec.nodeName
           volumeMounts:
             - name: mountpoint-dir
-              mountPath: /var/lib/kubelet
+              mountPath: /var/lib/kubelet/pods
               mountPropagation: "Bidirectional"
-            - name: plugins-mount-dir
-              mountPath: /var/lib/kubelet/plugins
-            - name: plugin-dir
+            - name: socket-dir
               mountPath: /csi
+
             - name: device-dir
               mountPath: /dev
             - name: iscsi-dir
@@ -378,6 +377,7 @@ spec:
             periodSeconds: 10
             failureThreshold: 5
 
+
         - name: node-driver-registrar
           image: quay.io/k8scsi/csi-node-driver-registrar:v1.0.2
           imagePullPolicy: "IfNotPresent"
@@ -395,10 +395,11 @@ spec:
             - name: DRIVER_REG_SOCK_PATH
               value: /var/lib/kubelet/plugins/ibm-block-csi-driver/csi.sock
           volumeMounts:
-            - name: plugin-dir
+            - name: socket-dir
               mountPath: /csi
             - name: registration-dir
               mountPath: /registration
+
         - name: liveness-probe
           image: quay.io/k8scsi/livenessprobe:v1.1.0  # TODO v1.1.0 is for k8s 1.13+, but v1.0.2 was the first k8s 1.13 version.
           args:
@@ -416,14 +417,9 @@ spec:
             type: Directory
 
         ## This volume is where the socket for kubelet->driver communication is done
-        - name: plugin-dir
+        - name: socket-dir
           hostPath:
             path: /var/lib/kubelet/plugins/ibm-block-csi-driver/
-            type: DirectoryOrCreate
-
-        - name: plugins-mount-dir
-          hostPath:
-            path: /var/lib/kubelet/plugins
             type: DirectoryOrCreate
 
         ## This volume is where the node-driver-registrar registers the plugin with kubelet
