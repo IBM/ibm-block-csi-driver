@@ -16,10 +16,11 @@
 
 package driver
 
+
 import (
 	"context"
 	"fmt"
-
+    "math/rand"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -274,7 +275,6 @@ func (d *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	return &csi.NodeGetInfoResponse{
 		NodeId: nodeId,
 	}, nil
-
 }
 
 func (d *nodeService) nodePublishVolumeForFileSystem(req *csi.NodePublishVolumeRequest) error {
