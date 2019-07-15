@@ -198,11 +198,14 @@ roleRef:
 
 ## CSI Controller Service statefulset
 kind: StatefulSet
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 metadata:
   name: ibm-block-csi-controller
   namespace: kube-system
 spec:
+  selector:
+    matchLabels:
+      app: ibm-block-csi-controller
   serviceName: ibm-block-csi-controller
   replicas: 1
   template:
@@ -321,7 +324,7 @@ spec:
 
 # CSI Node Service Deamonset
 kind: DaemonSet
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 metadata:
   name: ibm-block-csi-node
   namespace: kube-system
