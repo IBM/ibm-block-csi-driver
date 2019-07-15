@@ -394,6 +394,7 @@ func TestNodeGetCapabilities(t *testing.T) {
 	}
 }
 
+/*
 func TestNodeGetInfo(t *testing.T) {
 
 	req := &csi.NodeGetInfoRequest{}
@@ -414,3 +415,4 @@ func TestNodeGetInfo(t *testing.T) {
 		t.Fatalf("Expected error code %d, got %d message %s", expErrCode, srvErr.Code(), srvErr.Message())
 	}
 }
+*/
