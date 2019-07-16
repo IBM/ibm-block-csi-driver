@@ -12,6 +12,7 @@ import (
 
 type RescanUtilsInterface interface {
 	RescanSpecificLun(Lun int, array_iqn string) (error)
+	GetMpathDevice(lunId int, array_iqn string) (string, error)
 }
 
 type RescanUtilsIscsi struct {
@@ -65,6 +66,133 @@ func (r RescanUtilsIscsi) RescanSpecificLun(lunId int, array_iqn string) (error)
 	return nil
 	
 }
+
+
+func (r RescanUtilsIscsi) GetMpathDevice(lunId int, array_iqn string) (string, error){
+	var devicePaths []string
+
+	devicePath := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", array_iqn, "lun", lunId}, "-")
+	klog.V(4).Infof("device path is : {%v}", devicePath)
+
+	
+	if exists, err := waitForPathToExist(devicePath, retries, int(c.CheckInterval), iscsiTransport); exists {
+		devicePaths = append(devicePaths, devicePath)
+		continue
+	} else if err != nil {
+		return "", err
+	}
+	if len(devicePaths) < 1 {
+		return "", fmt.Errorf("failed to find device path: %s", devicePath)
+	}
+
+	for i, path := range devicePaths {
+		if path != "" {
+			if mappedDevicePath, err := getMultipathDisk(path); mappedDevicePath != "" {
+				devicePaths[i] = mappedDevicePath
+				if err != nil {
+					return "", err
+				}
+			}
+		}
+	}
+	debug.Printf("After connect we're returning devicePaths: %s", devicePaths)
+	if len(devicePaths) > 0 {
+		return devicePaths[0], err
+
+	}
+	return "", err
+
+}
+
+
+//return waitForPathToExistImpl(devicePath, maxRetries, intervalSeconds, deviceTransport, os.Stat, filepath.Glob)
+
+
+func waitForPathToExist(devicePath string, maxRetries, intervalSeconds int, deviceTransport string) (string, bool, error) {
+	if devicePath == nil {
+		return false, fmt.Errorf("Unable to check unspecified devicePath")
+	}
+	
+	devicePaths = string[]
+
+	var err error
+	for i := 0; i < maxRetries; i++ {
+		err = nil		
+		fpaths, _ := filepath.Glob(devicePath)
+		if fpath == nil {
+			err = os.ErrNotExist
+		} else {
+			// There might be a case that fpath contains multiple device paths if
+			// multiple PCI devices connect to same iscsi target. We handle this
+			// case at subsequent logic. Pick up only first path here.
+			*devicePath = fpath[0]
+		}
+		if err == nil {
+			return true, nil
+		}
+		if i == maxRetries-1 {
+			break
+		}
+		time.Sleep(time.Second * time.Duration(intervalSeconds))
+	}
+	return false, err
+}
+
+func getMultipathDisk(path string) (string, error) {
+	// Follow link to destination directory
+	debug.Printf("Checking for multipath device for path: %s", path)
+	devicePath, err := os.Readlink(path)
+	if err != nil {
+		debug.Printf("Failed reading link for multipath disk: %s -- error: %s\n", path, err.Error())
+		return "", err
+	}
+	sdevice := filepath.Base(devicePath)
+	// If destination directory is already identified as a multipath device,
+	// just return its path
+	if strings.HasPrefix(sdevice, "dm-") {
+		debug.Printf("Already found multipath device: %s", sdevice)
+		return path, nil
+	}
+	// Fallback to iterating through all the entries under /sys/block/dm-* and
+	// check to see if any have an entry under /sys/block/dm-*/slaves matching
+	// the device the symlink was pointing at
+	dmPaths, err := filepath.Glob("/sys/block/dm-*")
+	if err != nil {
+		debug.Printf("Glob error: %s", err)
+		return "", err
+	}
+	for _, dmPath := range dmPaths {
+		sdevices, err := filepath.Glob(filepath.Join(dmPath, "slaves", "*"))
+		if err != nil {
+			debug.Printf("Glob error: %s", err)
+		}
+		for _, spath := range sdevices {
+			s := filepath.Base(spath)
+			debug.Printf("Basepath: %s", s)
+			if sdevice == s {
+				// We've found a matching entry, return the path for the
+				// dm-* device it was found under
+				p := filepath.Join("/dev", filepath.Base(dmPath))
+				debug.Printf("Found matching multipath device: %s under dm-* device path %s", sdevice, dmPath)
+				return p, nil
+			}
+		}
+	}
+	debug.Printf("Couldn't find dm-* path for path: %s, found non dm-* path: %s", path, devicePath)
+	return "", fmt.Errorf("Couldn't find dm-* path for path: %s, found non dm-* path: %s", path, devicePath)
+}
+//
+
+
+
+
+
+
+
+
+
+
+
 
 //
 //func getISCSIHostSessionMapForTarget(iSCSINodeName string) map[int]int {
