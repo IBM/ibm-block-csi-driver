@@ -78,6 +78,9 @@ class SVCArrayMediator(ArrayMediator):
         self.password = password
         self.client = None
         # SVC only accept one IP address
+        if len(endpoint) > 1:
+            logger.error("SVC only support one cluster IP")
+            raise controller_errors.MultipleIPsNotSupportError(endpoint)
         self.endpoint = endpoint[0]
 
         logger.debug("in init")

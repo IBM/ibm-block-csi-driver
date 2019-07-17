@@ -13,9 +13,16 @@ class TestArrayMediatorSVC(unittest.TestCase):
     @patch(
         "controller.array_action.array_mediator_svc.SVCArrayMediator._connect")
     def setUp(self, connect):
-        self.endpoint = "endpoint"
+        self.endpoint = ["IP_1"]
         self.svc = SVCArrayMediator("user", "password", self.endpoint)
         self.svc.client = Mock()
+
+    @patch(
+        "controller.array_action.array_mediator_svc.SVCArrayMediator._connect")
+    def test_raise_MultipleIPsNotSupportError_in_init(self, connect):
+        self.endpoint = ["IP_1", "IP_2"]
+        with self.assertRaises(array_errors.MultipleIPsNotSupportError):
+            SVCArrayMediator("user", "password", self.endpoint)
 
     @patch("pysvc.unified.client.connect")
     def test_connect_errors(self, mock_connect):
@@ -23,7 +30,6 @@ class TestArrayMediatorSVC(unittest.TestCase):
             svc_errors.IncorrectCredentials('Failed_a')]
         with self.assertRaises(array_errors.CredentialsError):
             self.svc._connect()
-            self.assertTrue(self.svc._is_connected)
 
     def test_close(self):
         self.svc.disconnect()
