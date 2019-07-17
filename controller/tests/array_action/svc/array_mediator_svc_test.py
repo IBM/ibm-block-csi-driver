@@ -26,10 +26,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.assertTrue(self.svc._is_connected)
 
     def test_close(self):
-        self.svc._is_connected = lambda: True
         self.svc.disconnect()
         self.svc.client.close.assert_called_with()
-        self.assertFalse(self.svc._is_connected)
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_get_volume_return_CLI_Failure_errors(self, mock_warning):
@@ -153,12 +151,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertDictEqual(result_a, {'name': 'V1', 'unit': 'b',
                                         'size': 1024, 'pool': 'P1',
                                         'thin': True})
-        result_b = build_kwargs_from_capabilities('Compression',
+        result_b = build_kwargs_from_capabilities('compressed',
                                                   'P2', 'V2', size)
         self.assertDictEqual(result_b, {'name': 'V2', 'unit': 'b',
                                         'size': 1024, 'pool': 'P2',
                                         'compressed': True})
-        result_c = build_kwargs_from_capabilities('Dedup',
+        result_c = build_kwargs_from_capabilities('deduplicated',
                                                   'P3', 'V3',
                                                   self.svc._convert_size_bytes(
                                                       2048))

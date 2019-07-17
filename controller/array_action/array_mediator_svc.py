@@ -42,13 +42,12 @@ def build_kwargs_from_capabilities(capabilities, pool_name, volume_name,
     # if capabilities == None, create default capability volume thick
     if capabilities == config.CAPABILITY_THIN:
         cli_kwargs.update({'thin': True})
-    elif capabilities == config.CAPABILITY_COMPRESSION:
+    elif capabilities == config.CAPABILITY_COMPRESSED:
         cli_kwargs.update({'compressed': True})
-    elif capabilities == config.CAPABILITY_DEDUP:
+    elif capabilities == config.CAPABILITY_DEDUPLICATED:
         cli_kwargs.update({'compressed': True, 'deduplicated': True})
 
     return cli_kwargs
-
 
 class SVCArrayMediator(ArrayMediator):
     ARRAY_ACTIONS = {}
@@ -78,7 +77,6 @@ class SVCArrayMediator(ArrayMediator):
         self.user = user
         self.password = password
         self.client = None
-        self._is_connected = False
         # SVC only accept one IP address
         self.endpoint = endpoint[0]
 
@@ -90,15 +88,13 @@ class SVCArrayMediator(ArrayMediator):
         try:
             self.client = connect(self.endpoint, username=self.user,
                                   password=self.password)
-            self._is_connected = True
         except (svc_errors.IncorrectCredentials,
                 svc_errors.StorageArrayClientException):
             raise controller_errors.CredentialsError(self.endpoint)
 
     def disconnect(self):
-        if self.client and self._is_connected:
+        if self.client:
             self.client.close()
-            self._is_connected = False
 
     def _generate_volume_response(self, cli_volume):
         return Volume(
@@ -119,7 +115,8 @@ class SVCArrayMediator(ArrayMediator):
             if not is_warning_message(ex.my_message):
                 if (OBJ_NOT_FOUND in ex.my_message or
                         NAME_NOT_MEET in ex.my_message):
-                    logger.debug("Volume not found")
+                    logger.error("Volume not found")
+                    raise controller_errors.VolumeNotFoundError(vol_name)
         except Exception as ex:
             logger.exception(ex)
             raise ex
