@@ -21,7 +21,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
         "controller.array_action.array_mediator_svc.SVCArrayMediator._connect")
     def test_raise_MultipleIPsNotSupportError_in_init(self, connect):
         self.endpoint = ["IP_1", "IP_2"]
-        with self.assertRaises(array_errors.MultipleIPsNotSupportError):
+        with self.assertRaises(
+                array_errors.StorageManagementIPsNotSupportError):
+            SVCArrayMediator("user", "password", self.endpoint)
+
+        self.endpoint = []
+        with self.assertRaises(
+                array_errors.StorageManagementIPsNotSupportError):
             SVCArrayMediator("user", "password", self.endpoint)
 
     @patch("pysvc.unified.client.connect")

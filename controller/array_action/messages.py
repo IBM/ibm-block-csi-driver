@@ -2,7 +2,7 @@ NoConnectionAvailableException_message = "No connection available to endpoint : 
 
 CredentialsError_message = "Credential error has occurred while connecting to endpoint : {0} "
 
-MultipleIPsNotSupportError_message = "SVC doesn't support Multiple IPs : {0} "
+StorageManagementIPsNotSupportError_message = "Invalid Management IP for SVC : {0} "
 
 VolumeNotFoundError_message = "Volume was not found : {0} "
 

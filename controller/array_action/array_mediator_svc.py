@@ -78,9 +78,10 @@ class SVCArrayMediator(ArrayMediator):
         self.password = password
         self.client = None
         # SVC only accept one IP address
-        if len(endpoint) > 1:
+        if len(endpoint) == 0 or len(endpoint) > 1:
             logger.error("SVC only support one cluster IP")
-            raise controller_errors.MultipleIPsNotSupportError(endpoint)
+            raise controller_errors.StorageManagementIPsNotSupportError(
+                endpoint)
         self.endpoint = endpoint[0]
 
         logger.debug("in init")
@@ -130,13 +131,15 @@ class SVCArrayMediator(ArrayMediator):
         return self._generate_volume_response(cli_volume)
 
     def validate_supported_capabilities(self, capabilities):
-        logger.info("validate_supported_capabilities for "
-                    "capabilities : {0}".format(capabilities))
+        logger.debug("validate_supported_capabilities for "
+                     "capabilities : {0}".format(capabilities))
         # For SVC, we only support capabilities
-        # "SpaceEfficiency": "Thin/Thick/Compression/Dedup"
+        # "SpaceEfficiency": "thin/thick/compressed/deduplicated"
         if ((len(capabilities) > 0 and capabilities
-             not in [config.CAPABILITY_THIN, config.CAPABILITY_THICK,
-                     config.CAPABILITY_COMPRESSION, config.CAPABILITY_DEDUP])):
+             not in [config.CAPABILITY_THIN,
+                     config.CAPABILITY_THICK,
+                     config.CAPABILITY_COMPRESSED,
+                     config.CAPABILITY_DEDUPLICATED])):
             logger.error("capabilities is not "
                          "supported {0}".format(capabilities))
             raise controller_errors.StorageClassCapabilityNotSupported(
