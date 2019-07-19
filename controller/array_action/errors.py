@@ -13,6 +13,12 @@ class NoConnectionAvailableException(BaseArrayActionException):
         self.message = messages.NoConnectionAvailableException_message.format(endpoint)
 
 
+class StorageManagementIPsNotSupportError(BaseArrayActionException):
+
+    def __init__(self, endpoint):
+        self.message = messages.StorageManagementIPsNotSupportError_message.format(endpoint)
+
+
 class CredentialsError(BaseArrayActionException):
 
     def __init__(self, endpoint):
