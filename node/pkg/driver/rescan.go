@@ -75,10 +75,11 @@ func (r RescanUtilsIscsi) GetMpathDevice(lunId int, array_iqn string) (string, e
 	klog.V(4).Infof("device path is : {%v}", devicePath)
 
 	
-	if exists, err := waitForPathToExist(devicePath, 5, 1); exists {
-		devicePaths = append(devicePaths, devicePath)
-		continue
-	} else if err != nil {
+	devicePaths, exists, err := waitForPathToExist(devicePath, 5, 1);  
+	
+	devicePathTosysfs := map[string]string {}
+	
+	if err != nil {
 		return "", err
 	}
 	if len(devicePaths) < 1 {
@@ -88,16 +89,16 @@ func (r RescanUtilsIscsi) GetMpathDevice(lunId int, array_iqn string) (string, e
 	for i, path := range devicePaths {
 		if path != "" {
 			if mappedDevicePath, err := getMultipathDisk(path); mappedDevicePath != "" {
-				devicePaths[i] = mappedDevicePath
+				devicePathTosysfs[path] = mappedDevicePath
 				if err != nil {
 					return "", err
 				}
 			}
 		}
 	}
-	debug.Printf("After connect we're returning devicePaths: %s", devicePaths)
-	if len(devicePaths) > 0 {
-		return devicePaths[0], err
+	klog.V(4).Infof("After connect we're returning devicePaths: %s", devicePathTosysfs)
+	if len(devicePathTosysfs) > 0 {
+		return devicePathTosysfs[0], err
 
 	}
 	return "", err
@@ -108,9 +109,9 @@ func (r RescanUtilsIscsi) GetMpathDevice(lunId int, array_iqn string) (string, e
 //return waitForPathToExistImpl(devicePath, maxRetries, intervalSeconds, deviceTransport, os.Stat, filepath.Glob)
 
 
-func waitForPathToExist(devicePath string, maxRetries, intervalSeconds int) (string, bool, error) {
+func waitForPathToExist(devicePath string, maxRetries, intervalSeconds int) (string[], bool, error) {
 	if devicePath == nil {
-		return false, fmt.Errorf("Unable to check unspecified devicePath")
+		return false, fmt.Errorf("devicaPath was not passed.")
 	}
 	
 	devicePaths = string[]
@@ -124,7 +125,7 @@ func waitForPathToExist(devicePath string, maxRetries, intervalSeconds int) (str
 		if fpaths == nil {
 			err = os.ErrNotExist
 		} else {
-			return fpaths[0], true, nil
+			return fpaths, true, nil
 		}
 
 		time.Sleep(time.Second * time.Duration(intervalSeconds))
@@ -134,10 +135,10 @@ func waitForPathToExist(devicePath string, maxRetries, intervalSeconds int) (str
 
 func getMultipathDisk(path string) (string, error) {
 	// Follow link to destination directory
-	debug.Printf("Checking for multipath device for path: %s", path)
+	klog.V(5).Infof("Getting multipaht disk")
 	devicePath, err := os.Readlink(path)
 	if err != nil {
-		debug.Printf("Failed reading link for multipath disk: %s -- error: %s\n", path, err.Error())
+		klog.V(4).Infof("Failed reading link for multipath disk: %s. error: {%s}\n", path, err.Error())
 		return "", err
 	}
 	sdevice := filepath.Base(devicePath)
@@ -152,27 +153,27 @@ func getMultipathDisk(path string) (string, error) {
 	// the device the symlink was pointing at
 	dmPaths, err := filepath.Glob("/sys/block/dm-*")
 	if err != nil {
-		debug.Printf("Glob error: %s", err)
+		klog.V(4).Infof("Glob error: %s", err)
 		return "", err
 	}
 	for _, dmPath := range dmPaths {
 		sdevices, err := filepath.Glob(filepath.Join(dmPath, "slaves", "*"))
 		if err != nil {
-			debug.Printf("Glob error: %s", err)
+			klog.V(4).Infof("Glob error: %s", err)
 		}
 		for _, spath := range sdevices {
 			s := filepath.Base(spath)
-			debug.Printf("Basepath: %s", s)
+			klog.V(4).Infof("Basepath: %s", s)
 			if sdevice == s {
 				// We've found a matching entry, return the path for the
 				// dm-* device it was found under
 				p := filepath.Join("/dev", filepath.Base(dmPath))
-				debug.Printf("Found matching multipath device: %s under dm-* device path %s", sdevice, dmPath)
+				klog.V(4).Infof("Found matching multipath device: %s under dm-* device path %s", sdevice, dmPath)
 				return p, nil
 			}
 		}
 	}
-	debug.Printf("Couldn't find dm-* path for path: %s, found non dm-* path: %s", path, devicePath)
+	klog.V(4).Infof("Couldn't find dm-* path for path: %s, found non dm-* path: %s", path, devicePath)
 	return "", fmt.Errorf("Couldn't find dm-* path for path: %s, found non dm-* path: %s", path, devicePath)
 }
 //

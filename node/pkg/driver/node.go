@@ -105,6 +105,10 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	err = rescanUtils.RescanSpecificLun(lun, array_iqn)
 	
+	device, err := rescanUtils.GetMpathDevice(lun, array_iqn)
+	klog.V(4).Infof("Discovered device : {%v}", device)
+	
+	
 
 	// rescan the specific lun
 	// rescan multiplath device
