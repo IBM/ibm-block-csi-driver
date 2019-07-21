@@ -19,7 +19,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @patch(
         "controller.array_action.array_mediator_svc.SVCArrayMediator._connect")
-    def test_raise_MultipleIPsNotSupportError_in_init(self, connect):
+    def test_raise_ManagementIPsNotSupportError_in_init(self, connect):
         self.endpoint = ["IP_1", "IP_2"]
         with self.assertRaises(
                 array_errors.StorageManagementIPsNotSupportError):
@@ -156,19 +156,47 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.rmvolume = Mock()
         self.svc.delete_volume("vol")
 
+    def test_validate_supported_capabilities_raise_error(self):
+        capabilities_a = {"Space": "Test"}
+        with self.assertRaises(
+                array_errors.StorageClassCapabilityNotSupported):
+            self.svc.validate_supported_capabilities(capabilities_a)
+        capabilities_b = {"SpaceEfficiency": "Test"}
+        with self.assertRaises(
+                array_errors.StorageClassCapabilityNotSupported):
+            self.svc.validate_supported_capabilities(capabilities_b)
+        capabilities_c = {"SpaceEfficiency": ""}
+        with self.assertRaises(
+                array_errors.StorageClassCapabilityNotSupported):
+            self.svc.validate_supported_capabilities(capabilities_c)
+        capabilities_d = {}
+        self.svc.validate_supported_capabilities(capabilities_d)
+        capabilities_e = None
+        self.svc.validate_supported_capabilities(capabilities_e)
+
+    def test_validate_supported_capabilities_success(self):
+        capabilities = {"SpaceEfficiency": "thin"}
+        self.svc.validate_supported_capabilities(capabilities)
+        capabilities = {"SpaceEfficiency": "thick"}
+        self.svc.validate_supported_capabilities(capabilities)
+        capabilities = {"SpaceEfficiency": "compressed"}
+        self.svc.validate_supported_capabilities(capabilities)
+        capabilities = {"SpaceEfficiency": "deduplicated"}
+        self.svc.validate_supported_capabilities(capabilities)
+
     def test_build_kwargs_from_capabilities(self):
         size = self.svc._convert_size_bytes(1000)
-        result_a = build_kwargs_from_capabilities('Thin',
+        result_a = build_kwargs_from_capabilities({'SpaceEfficiency': 'thin'},
                                                   'P1', 'V1', size)
         self.assertDictEqual(result_a, {'name': 'V1', 'unit': 'b',
                                         'size': 1024, 'pool': 'P1',
                                         'thin': True})
-        result_b = build_kwargs_from_capabilities('compressed',
+        result_b = build_kwargs_from_capabilities({'SpaceEfficiency': 'compressed'},
                                                   'P2', 'V2', size)
         self.assertDictEqual(result_b, {'name': 'V2', 'unit': 'b',
                                         'size': 1024, 'pool': 'P2',
                                         'compressed': True})
-        result_c = build_kwargs_from_capabilities('deduplicated',
+        result_c = build_kwargs_from_capabilities({'SpaceEfficiency': 'deduplicated'},
                                                   'P3', 'V3',
                                                   self.svc._convert_size_bytes(
                                                       2048))
@@ -176,3 +204,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                         'size': 2048, 'pool': 'P3',
                                         'compressed': True,
                                         'deduplicated': True})
+
+    def test_properties(self):
+        self.assertEqual(SVCArrayMediator.port, 22)
+        self.assertEqual(SVCArrayMediator.minimal_volume_size_in_bytes, 512)
+        self.assertEqual(SVCArrayMediator.array_type, 'SVC')
+        self.assertEqual(SVCArrayMediator.max_vol_name_length, 64)
+        self.assertEqual(SVCArrayMediator.max_connections, 2)

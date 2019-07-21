@@ -39,7 +39,7 @@ class TestControllerServerCreateVolume(unittest.TestCase):
 
         self.pool = 'pool1'
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
-        self.request.parameters = {"capacity": "pool={0}".format(self.pool), "capabilities": ""}
+        self.request.parameters = {"pool": self.pool}
         self.capacity_bytes = 10
         self.request.capacity_range.required_bytes = self.capacity_bytes
         self.request.name = vol_name
@@ -68,7 +68,7 @@ class TestControllerServerCreateVolume(unittest.TestCase):
         res = self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.mediator.get_volume.assert_called_once_with(vol_name)
-        self.mediator.create_volume.assert_called_once_with(vol_name, 10, '', 'pool1')
+        self.mediator.create_volume.assert_called_once_with(vol_name, 10, {}, 'pool1')
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
@@ -101,13 +101,14 @@ class TestControllerServerCreateVolume(unittest.TestCase):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
 
-        self.request.parameters = {"capacity": "pool=pool1"}
+        self.request.parameters = {"pool": "pool1"}
         res = self.servicer.CreateVolume(self.request, context)
         self.assertNotEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
 
-        self.request.parameters = {"capabilities": ""}
+        self.request.parameters = {"Test": ""}
         res = self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "capacity is missing in secrets")
+        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "pool parameter is missing")
         self.assertTrue("parameter" in context.details)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
@@ -198,7 +199,7 @@ class TestControllerServerCreateVolume(unittest.TestCase):
         self.assertEqual(context.code, return_code)
         self.assertTrue(msg in context.details)
         self.mediator.get_volume.assert_called_once_with(vol_name)
-        self.mediator.create_volume.assert_called_once_with(vol_name, self.capacity_bytes, "", self.pool)
+        self.mediator.create_volume.assert_called_once_with(vol_name, self.capacity_bytes, {}, self.pool)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
@@ -253,7 +254,7 @@ class TestControllerServerCreateVolume(unittest.TestCase):
         array_type.return_value = "a9k"
         res = self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
-        self.mediator.create_volume.assert_called_once_with("prefix_some_name", 10, "", "pool1")
+        self.mediator.create_volume.assert_called_once_with("prefix_some_name", 10, {}, "pool1")
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
@@ -268,7 +269,7 @@ class TestControllerServerCreateVolume(unittest.TestCase):
         array_type.return_value = "a9k"
         res = self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
-        self.mediator.create_volume.assert_called_once_with(self.request.name, 1 * 1024 * 1024 * 1024, "", "pool1")
+        self.mediator.create_volume.assert_called_once_with(self.request.name, 1 * 1024 * 1024 * 1024, {}, "pool1")
 
 
 class TestControllerServerDeleteVolume(unittest.TestCase):

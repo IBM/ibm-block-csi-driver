@@ -120,11 +120,11 @@ class TestUtils(unittest.TestCase):
             utils.validate_create_volume_request(request)
             self.assertTrue("parameters" in ex.message)
 
-        request.parameters = {"capacity": "pool=pool1", "capabilities": ""}
+        request.parameters = {"pool": "pool1", "SpaceEfficiency": "thin "}
 
         utils.validate_create_volume_request(request)
 
-        request.parameters = {"capacity": "pool=pool1"}
+        request.parameters = {"pool": "pool1"}
         utils.validate_create_volume_request(request)
 
         request.capacity_range.required_bytes = 0
