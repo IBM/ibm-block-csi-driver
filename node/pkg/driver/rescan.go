@@ -4,6 +4,9 @@ import (
 	"k8s.io/klog"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
+	"time"
 )
 
 
@@ -71,13 +74,21 @@ func (r RescanUtilsIscsi) RescanSpecificLun(lunId int, array_iqn string) (error)
 func (r RescanUtilsIscsi) GetMpathDevice(lunId int, array_iqn string) (string, error){
 	var devicePaths []string
 
-	devicePath := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", array_iqn, "lun", lunId}, "-")
+	devicePath := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", array_iqn, "lun", string(lunId)}, "-")
 	klog.V(4).Infof("device path is : {%v}", devicePath)
 
 	
 	devicePaths, exists, err := waitForPathToExist(devicePath, 5, 1);  
+	if !exists {
+		klog.V(4).Infof("return error because file was not found")
+		return "", fmt.Errorf("could not find path")
+	}
+	if err != nil {
+		klog.V(4).Infof("founr error : %v ", err.Error())
+		return "", err
+	}
 	
-	devicePathTosysfs := map[string]string {}
+	devicePathTosysfs := make([]string, len(devicePaths))
 	
 	if err != nil {
 		return "", err
@@ -89,7 +100,7 @@ func (r RescanUtilsIscsi) GetMpathDevice(lunId int, array_iqn string) (string, e
 	for i, path := range devicePaths {
 		if path != "" {
 			if mappedDevicePath, err := getMultipathDisk(path); mappedDevicePath != "" {
-				devicePathTosysfs[path] = mappedDevicePath
+				devicePathTosysfs[i] = mappedDevicePath
 				if err != nil {
 					return "", err
 				}
@@ -109,17 +120,12 @@ func (r RescanUtilsIscsi) GetMpathDevice(lunId int, array_iqn string) (string, e
 //return waitForPathToExistImpl(devicePath, maxRetries, intervalSeconds, deviceTransport, os.Stat, filepath.Glob)
 
 
-func waitForPathToExist(devicePath string, maxRetries, intervalSeconds int) (string[], bool, error) {
-	if devicePath == nil {
-		return false, fmt.Errorf("devicaPath was not passed.")
-	}
+func waitForPathToExist(devicePath string, maxRetries int, intervalSeconds int) ([]string, bool, error) {
 	
-	devicePaths = string[]
-
 	var err error
 	for i := 0; i < maxRetries; i++ {
 		err = nil		
-		fpaths, err := filepath.Glob(devicePath)
+		fpaths, _ := filepath.Glob(devicePath)
 		klog.V(4).Infof("fpaths : {%v}", fpaths)
 
 		if fpaths == nil {
@@ -130,7 +136,7 @@ func waitForPathToExist(devicePath string, maxRetries, intervalSeconds int) (str
 
 		time.Sleep(time.Second * time.Duration(intervalSeconds))
 	}
-	return "", false, err
+	return nil, false, err
 }
 
 func getMultipathDisk(path string) (string, error) {
@@ -145,7 +151,7 @@ func getMultipathDisk(path string) (string, error) {
 	// If destination directory is already identified as a multipath device,
 	// just return its path
 	if strings.HasPrefix(sdevice, "dm-") {
-		debug.Printf("Already found multipath device: %s", sdevice)
+		klog.V(4).Infof("Already found multipath device: %s", sdevice)
 		return path, nil
 	}
 	// Fallback to iterating through all the entries under /sys/block/dm-* and
