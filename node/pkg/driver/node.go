@@ -20,7 +20,6 @@ package driver
 import (
 	"context"
 	"fmt"
-    "math/rand"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -47,13 +46,18 @@ var (
 type nodeService struct {
 	//mounter  *mount.SafeFormatAndMount  // TODO fix k8s mount import
 	configYaml ConfigFile
+	hostname   string
+	nodeUtils  NodeUtilsInterface
 }
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
-func newNodeService(configYaml ConfigFile) nodeService {
+func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface) nodeService {
 	return nodeService{
 		configYaml: configYaml,
+		hostname:   hostname,
+		nodeUtils:  nodeUtils,
+
 		//		mounter:  newSafeMounter(),
 	}
 }
@@ -257,10 +261,18 @@ func (d *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 func (d *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	klog.V(5).Infof("NodeGetInfo: called with args %+v", *req)
 
-	//return nil, status.Error(codes.Unimplemented, "NodeGetInfo is not implemented yet") // TODO
+	iscsiIQN, err := d.nodeUtils.ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi")
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	delimiter := ";"
+
+	nodeId := d.hostname + delimiter + iscsiIQN
+	klog.V(4).Infof("node id is : %s", nodeId)
 
 	return &csi.NodeGetInfoResponse{
-		NodeId: string(rand.Intn(100)),
+		NodeId: nodeId,
 	}, nil
 }
 

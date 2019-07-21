@@ -19,10 +19,13 @@ package driver
 import (
 	"context"
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	gomock "github.com/golang/mock/gomock"
+	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"reflect"
 	"testing"
+	"fmt"
 )
 
 const (
@@ -118,7 +121,7 @@ func TestNodeStageVolume(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 
-			d := newTestNodeService()
+			d := newTestNodeService(nil)
 
 			_, err := d.NodeStageVolume(context.TODO(), tc.req)
 			if err != nil {
@@ -136,8 +139,12 @@ func TestNodeStageVolume(t *testing.T) {
 	}
 }
 
-func newTestNodeService() nodeService {
-	return nodeService{}
+func newTestNodeService(nodeUtils NodeUtilsInterface) nodeService {
+	return nodeService{
+		hostname:   "test-host",
+		configYaml: ConfigFile{},
+		nodeUtils:  nodeUtils,
+	}
 }
 
 func TestNodeUnstageVolume(t *testing.T) {
@@ -172,7 +179,7 @@ func TestNodeUnstageVolume(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			d := newTestNodeService()
+			d := newTestNodeService(nil)
 
 			_, err := d.NodeUnstageVolume(context.TODO(), tc.req)
 			if err != nil {
@@ -274,7 +281,7 @@ func TestNodePublishVolume(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			d := newTestNodeService()
+			d := newTestNodeService(nil)
 
 			_, err := d.NodePublishVolume(context.TODO(), tc.req)
 			if err != nil {
@@ -326,7 +333,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			d := newTestNodeService()
+			d := newTestNodeService(nil)
 
 			_, err := d.NodeUnpublishVolume(context.TODO(), tc.req)
 			if err != nil {
@@ -348,7 +355,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 
 	req := &csi.NodeGetVolumeStatsRequest{}
 
-	d := newTestNodeService()
+	d := newTestNodeService(nil)
 
 	expErrCode := codes.Unimplemented
 
@@ -368,7 +375,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 func TestNodeGetCapabilities(t *testing.T) {
 	req := &csi.NodeGetCapabilitiesRequest{}
 
-	d := newTestNodeService()
+	d := newTestNodeService(nil)
 
 	caps := []*csi.NodeServiceCapability{
 		{
@@ -394,25 +401,58 @@ func TestNodeGetCapabilities(t *testing.T) {
 	}
 }
 
-/*
+
 func TestNodeGetInfo(t *testing.T) {
-
-	req := &csi.NodeGetInfoRequest{}
-
-	d := newTestNodeService()
-
-	expErrCode := codes.Unimplemented
-
-	_, err := d.NodeGetInfo(context.TODO(), req)
-	if err == nil {
-		t.Fatalf("Expected error code %d, got nil", expErrCode)
+	testCases := []struct {
+		name           string
+		returned_iqn   string
+		returned_error error
+		expErr         error
+		expNodeId      string
+	}{
+		{
+			name:         "good IQN",
+			returned_iqn: "iqn.1994-07.com.redhat:e123456789",
+			expNodeId:    "test-host;iqn.1994-07.com.redhat:e123456789",
+		},
+		{
+			name:           "error from node_utils",
+			returned_iqn:   "",
+			returned_error: fmt.Errorf("some error "),
+			expErr:         status.Error(codes.Internal, fmt.Errorf("some error ").Error()),
+		},
 	}
-	srvErr, ok := status.FromError(err)
-	if !ok {
-		t.Fatalf("Could not get error status code from error: %v", srvErr)
-	}
-	if srvErr.Code() != expErrCode {
-		t.Fatalf("Expected error code %d, got %d message %s", expErrCode, srvErr.Code(), srvErr.Message())
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := &csi.NodeGetInfoRequest{}
+
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			fake_nodeutils := mocks.NewMockNodeUtilsInterface(mockCtrl)
+			fake_nodeutils.EXPECT().ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi").Return(tc.returned_iqn, tc.returned_error)
+
+			d := newTestNodeService(fake_nodeutils)
+
+			expReponse := &csi.NodeGetInfoResponse{NodeId: tc.expNodeId}
+
+			res, err := d.NodeGetInfo(context.TODO(), req)
+			if tc.expErr != nil {
+				if err == nil {
+					t.Fatalf("Expected error to be thrown : {%v}", tc.expErr)
+				} else {
+					if err.Error() != tc.expErr.Error() {
+						t.Fatalf("Expected error : {%v} to be equal to expected error : {%v}", err, tc.expErr)
+					}
+				}
+			} else {
+				if res.NodeId != expReponse.NodeId {
+					t.Fatalf("Expected res : {%v}, and got {%v}", expReponse, res)
+				}
+			}
+
+		})
+
 	}
 }
-*/
+
