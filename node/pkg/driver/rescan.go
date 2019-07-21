@@ -75,7 +75,7 @@ func (r RescanUtilsIscsi) GetMpathDevice(lunId int, array_iqn string) (string, e
 	klog.V(4).Infof("device path is : {%v}", devicePath)
 
 	
-	if exists, err := waitForPathToExist(devicePath, retries, int(c.CheckInterval), iscsiTransport); exists {
+	if exists, err := waitForPathToExist(devicePath, 5, 1); exists {
 		devicePaths = append(devicePaths, devicePath)
 		continue
 	} else if err != nil {
@@ -108,7 +108,7 @@ func (r RescanUtilsIscsi) GetMpathDevice(lunId int, array_iqn string) (string, e
 //return waitForPathToExistImpl(devicePath, maxRetries, intervalSeconds, deviceTransport, os.Stat, filepath.Glob)
 
 
-func waitForPathToExist(devicePath string, maxRetries, intervalSeconds int, deviceTransport string) (string, bool, error) {
+func waitForPathToExist(devicePath string, maxRetries, intervalSeconds int) (string, bool, error) {
 	if devicePath == nil {
 		return false, fmt.Errorf("Unable to check unspecified devicePath")
 	}
@@ -118,24 +118,18 @@ func waitForPathToExist(devicePath string, maxRetries, intervalSeconds int, devi
 	var err error
 	for i := 0; i < maxRetries; i++ {
 		err = nil		
-		fpaths, _ := filepath.Glob(devicePath)
-		if fpath == nil {
+		fpaths, err := filepath.Glob(devicePath)
+		klog.V(4).Infof("fpaths : {%v}", fpaths)
+
+		if fpaths == nil {
 			err = os.ErrNotExist
 		} else {
-			// There might be a case that fpath contains multiple device paths if
-			// multiple PCI devices connect to same iscsi target. We handle this
-			// case at subsequent logic. Pick up only first path here.
-			*devicePath = fpath[0]
+			return fpaths[0], true, nil
 		}
-		if err == nil {
-			return true, nil
-		}
-		if i == maxRetries-1 {
-			break
-		}
+
 		time.Sleep(time.Second * time.Duration(intervalSeconds))
 	}
-	return false, err
+	return "", false, err
 }
 
 func getMultipathDisk(path string) (string, error) {
