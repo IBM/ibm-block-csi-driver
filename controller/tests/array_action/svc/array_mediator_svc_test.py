@@ -186,7 +186,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_build_kwargs_from_capabilities(self):
         size = self.svc._convert_size_bytes(1000)
-        result_a = build_kwargs_from_capabilities({'SpaceEfficiency': 'thin'},
+        result_a = build_kwargs_from_capabilities({'SpaceEfficiency': 'Thin'},
                                                   'P1', 'V1', size)
         self.assertDictEqual(result_a, {'name': 'V1', 'unit': 'b',
                                         'size': 1024, 'pool': 'P1',
@@ -196,7 +196,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertDictEqual(result_b, {'name': 'V2', 'unit': 'b',
                                         'size': 1024, 'pool': 'P2',
                                         'compressed': True})
-        result_c = build_kwargs_from_capabilities({'SpaceEfficiency': 'deduplicated'},
+        result_c = build_kwargs_from_capabilities({'SpaceEfficiency': 'Deduplicated'},
                                                   'P3', 'V3',
                                                   self.svc._convert_size_bytes(
                                                       2048))

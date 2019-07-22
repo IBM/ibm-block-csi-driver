@@ -41,12 +41,14 @@ def build_kwargs_from_capabilities(capabilities, pool_name, volume_name,
     })
     # if capabilities == None, create default capability volume thick
     capability = capabilities.get(config.CAPABILITIES_SPACEEFFICIENCY)
-    if capability == config.CAPABILITY_THIN:
-        cli_kwargs.update({'thin': True})
-    elif capability == config.CAPABILITY_COMPRESSED:
-        cli_kwargs.update({'compressed': True})
-    elif capability == config.CAPABILITY_DEDUPLICATED:
-        cli_kwargs.update({'compressed': True, 'deduplicated': True})
+    if capability:
+        capability = capability.lower()
+        if capability == config.CAPABILITY_THIN:
+            cli_kwargs.update({'thin': True})
+        elif capability == config.CAPABILITY_COMPRESSED:
+            cli_kwargs.update({'compressed': True})
+        elif capability == config.CAPABILITY_DEDUPLICATED:
+            cli_kwargs.update({'compressed': True, 'deduplicated': True})
 
     return cli_kwargs
 
@@ -143,10 +145,10 @@ class SVCArrayMediator(ArrayMediator):
                              "support for SVC".format(capabilities))
                 raise controller_errors.StorageClassCapabilityNotSupported(
                     capabilities)
-            if (capabilities.get(config.CAPABILITIES_SPACEEFFICIENCY) not in
-                    [config.CAPABILITY_THIN, config.CAPABILITY_THICK,
-                     config.CAPABILITY_COMPRESSED,
-                     config.CAPABILITY_DEDUPLICATED]):
+            if (capabilities.get(config.CAPABILITIES_SPACEEFFICIENCY).lower()
+                    not in [config.CAPABILITY_THIN, config.CAPABILITY_THICK,
+                            config.CAPABILITY_COMPRESSED,
+                            config.CAPABILITY_DEDUPLICATED]):
                 logger.error("capability value is not "
                              "supported {0}".format(capabilities))
                 raise controller_errors.StorageClassCapabilityNotSupported(

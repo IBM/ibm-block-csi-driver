@@ -105,7 +105,7 @@ class TestControllerServerCreateVolume(unittest.TestCase):
         res = self.servicer.CreateVolume(self.request, context)
         self.assertNotEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
 
-        self.request.parameters = {"Test": ""}
+        self.request.parameters = {"capabilities": ""}
         res = self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "capacity is missing in secrets")
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "pool parameter is missing")
