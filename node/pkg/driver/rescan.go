@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+	"strconv"
 )
 
 
@@ -74,7 +75,7 @@ func (r RescanUtilsIscsi) RescanSpecificLun(lunId int, array_iqn string) (error)
 func (r RescanUtilsIscsi) GetMpathDevice(lunId int, array_iqn string) (string, error){
 	var devicePaths []string
 
-	devicePath := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", array_iqn, "lun", string(lunId)}, "-")
+	devicePath := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", array_iqn, "lun", strconv.Itoa(lunId)}, "-")
 	klog.V(4).Infof("device path is : {%v}", devicePath)
 
 	
