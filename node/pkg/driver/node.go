@@ -107,17 +107,48 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	
 	device, err := rescanUtils.GetMpathDevice(lun, array_iqn)
 	klog.V(4).Infof("Discovered device : {%v}", device)
+	if err != nil {
+		klog.V(4).Infof("error while discovring the device : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	
+	isMountPoint, err := d.mounter.IsLikelyNotMountPoint(device)
+	if err != nil {
+		klog.V(4).Infof("error while trying to check mountpoint: {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	
+	klog.V(4).Infof("Return isMountPoint: {%v}", isMountPoint)
+	
+	if isMountPoint {
+		isCorrectMountpoint := d.mounter.IsMountPointMatch(device, req.GetStagingTargetPath())
+		klog.V(4).Infof("Return isCorrectMountpoint: {%v}. for device : {%v}, staging target path : {%v}", 
+			isCorrectMountpoint,device, req.GetStagingTargetPath())
+		if isCorrectMountpoint {
+			klog.V(4).Infof("Returning ok result")
+			return &csi.NodeStageVolumeResponse{}, nil
+		} else{
+			 return nil, status.Errorf(codes.AlreadyExists, "Mount point is already mounted to.") 
+		}
+		
+	} 
+
+	// if the device is not mounted then we are mounting it.
+	
+	volumeCap := req.GetVolumeCapability()
+	fs_type := volumeCap.MountVolume.fs_type
+	klog.V(4).Infof("fs_type : {%v}", fs_type)
 	
 	
+	err := d.mounter.FormatAndMount(device, req.GetStagingTargetPath(),  fs_type, nil)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	
+	
+	klog.V(4).Infof("mounter succeeded!: %v", d.mounter)
 
-	// rescan the specific lun
-	// rescan multiplath device
-	//discover the mpath device -> if not found do sg_inq -> still not found retuen NOT_FOUND
-	// valdate the discovered device
-
-	klog.V(4).Infof("mounter : %v", d.mounter)
-
-	return nil, status.Errorf(codes.Unimplemented, "NodeStageVolume - Not implemented yet") // TODO
+	return &csi.NodeStageVolumeResponse{}, nil
 }
 
 func (d *nodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeRequest) error {
