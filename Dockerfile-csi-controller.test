@@ -21,6 +21,7 @@ FROM centos:7
 RUN yum --enablerepo=extras -y install epel-release && yum -y install python36-pip
 
 COPY controller/requirements.txt /driver/controller/
+RUN pip3 install --upgrade pip==19.1.1
 RUN pip3 install -r /driver/controller/requirements.txt
 
 # Requires to run unit testing
