@@ -293,7 +293,7 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 	
 	// bind mount!
-	 err = d.mounter.FormatAndMount(stagingPath, targetPath,  "", []string{"bind"})
+	 err = d.mounter.Mount(stagingPath, targetPath,  "", []string{"bind"})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
