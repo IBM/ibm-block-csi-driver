@@ -16,7 +16,7 @@ logger = get_stdout_logger()
 class XIVArrayMediator(ArrayMediator):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
-    MAX_LUN_NUMBER = 511
+    MAX_LUN_NUMBER = 250
     MIN_LUN_NUMBER = 1
 
     @classproperty
