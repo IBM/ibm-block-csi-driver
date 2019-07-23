@@ -120,8 +120,13 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	
 	klog.V(4).Infof("Return isMountPoint: {%v}", isMountPoint)
 	
+	mountList, err := d.mounter.List()
+	klog.V(4).Infof("Return mountList: {%v}", mountList)
+	
+	deviceMP, err := d.getMountPointFromList(device, mountList)
+	
 	if isMountPoint {
-		isCorrectMountpoint := d.mounter.IsMountPointMatch(device, req.GetStagingTargetPath())
+		isCorrectMountpoint := d.mounter.IsMountPointMatch(deviceMP, req.GetStagingTargetPath())
 		klog.V(4).Infof("Return isCorrectMountpoint: {%v}. for device : {%v}, staging target path : {%v}", 
 			isCorrectMountpoint,device, req.GetStagingTargetPath())
 		if isCorrectMountpoint {
@@ -136,11 +141,11 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	// if the device is not mounted then we are mounting it.
 	
 	volumeCap := req.GetVolumeCapability()
-	fs_type := volumeCap.MountVolume.fs_type
+	fs_type := volumeCap.GetMount().FsType
 	klog.V(4).Infof("fs_type : {%v}", fs_type)
 	
 	
-	err := d.mounter.FormatAndMount(device, req.GetStagingTargetPath(),  fs_type, nil)
+	err = d.mounter.FormatAndMount(device, req.GetStagingTargetPath(),  fs_type, nil)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -149,6 +154,16 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	klog.V(4).Infof("mounter succeeded!: %v", d.mounter)
 
 	return &csi.NodeStageVolumeResponse{}, nil
+}
+
+func (d *nodeService)  getMountPointFromList(devicePath string, mountList []mount.MountPoint) (mount.MountPoint, error){
+	klog.V(4).Infof("mretruning : %v", mountList[0])
+	klog.V(4).Infof("current device : %v ",devicePath)
+	for _, mount := range mountList{
+		klog.V(4).Infof("moutn : {%v}, device : {%v}",mount, mount.Device)
+	}
+	return mountList[0], nil
+	
 }
 
 func (d *nodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeRequest) error {
