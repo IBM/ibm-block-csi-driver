@@ -112,7 +112,7 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	
-	isMountPoint, err := d.mounter.IsLikelyNotMountPoint(device)
+	isNotMountPoint, err := d.mounter.IsLikelyNotMountPoint(device)
 	if err != nil {
 		klog.V(4).Infof("error while trying to check mountpoint: {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
@@ -125,7 +125,7 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	
 	deviceMP, err := d.getMountPointFromList(device, mountList)
 	
-	if isMountPoint {
+	if !isNotMountPoint {
 		isCorrectMountpoint := d.mounter.IsMountPointMatch(deviceMP, req.GetStagingTargetPath())
 		klog.V(4).Infof("Return isCorrectMountpoint: {%v}. for device : {%v}, staging target path : {%v}", 
 			isCorrectMountpoint,device, req.GetStagingTargetPath())
