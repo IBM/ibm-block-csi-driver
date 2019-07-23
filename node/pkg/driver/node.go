@@ -258,12 +258,48 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
-
-	if err := d.nodePublishVolumeForFileSystem(req); err != nil {
-		return nil, err
+	
+	
+	// checking if the node staging path was mpounted into
+	stagingPath := req.GetStagingTargetPath()
+	targetPath := req.GetTargetPath())
+	klog.V(4).Infof("stagingPath : {%v}, targetPath : {%v}",stagingPath, targetPath)
+	
+	mountList :=  d.mounter.List()
+	found := false
+	for _, mount := range mountList{
+		klog.V(4).Infof("mount device : {%v}, path : {%v}", mount.Device, mount.Path)
+		if mount.Path == stagingPath{
+			found = true
+			break
+		}
+	} 
+	if !found {
+		return nil, status.Error(codes.FailedPrecondition, "staging target path was not mounted into.")
 	}
+	
+	//checking if there is a mount FROM staging target path
+	for _, mount := range mountList{
+		klog.V(4).Infof("#mount device : {%v}, path : {%v}", mount.Device, mount.Path)
+		if mount.Device == stagingPath{
+			if mount.Path == targetPath{
+				klog.V(4).Infof("Idempotent case : path was already mounted.")
+				return &csi.NodePublishVolumeResponse{}, nil
+			} else {
+				klog.V(4).Infof("Failed pre condition, staging path already mounted somewhere else")
+				return nil, status.Error(codes.FailedPrecondition, "staging target path is already mounted elsewhere")
+			}
+		}
+	}
+	
+	// bind mount!
+	 err = d.mounter.FormatAndMount(stagingPath, targetPath,  "", []string{"bind"})
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	
 
-	return nil, status.Errorf(codes.Unimplemented, "nodePublishVolumeForFileSystem - Not implemented yet") // TODO
+	return &csi.NodePublishVolumeResponse{}, nil
 }
 
 func (d *nodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVolumeRequest) error {
@@ -365,23 +401,23 @@ func (d *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 
 }
 
-func (d *nodeService) nodePublishVolumeForFileSystem(req *csi.NodePublishVolumeRequest) error {
-	/*
-		target := req.GetTargetPath()
-		source := req.GetStagingTargetPath()
-
-		klog.V(5).Infof("NodePublishVolume: creating dir %s", target)
-		if err := d.mounter.MakeDir(target); err != nil {
-			return status.Errorf(codes.Internal, "Could not create dir %q: %v", target, err)
-		}
-
-		klog.V(5).Infof("NodePublishVolume: mounting %s at %s", source, target)
-		if err := d.mounter.Mount(source, target, ""); err != nil { // TODO add support for mountOptions
-			return status.Errorf(codes.Internal, "Could not mount %q at %q: %v", source, target, err)
-		}
-	*/
-	return nil
-}
+//func (d *nodeService) nodePublishVolumeForFileSystem(req *csi.NodePublishVolumeRequest) error {
+//	/*
+//		target := req.GetTargetPath()
+//		source := req.GetStagingTargetPath()
+//
+//		klog.V(5).Infof("NodePublishVolume: creating dir %s", target)
+//		if err := d.mounter.MakeDir(target); err != nil {
+//			return status.Errorf(codes.Internal, "Could not create dir %q: %v", target, err)
+//		}
+//
+//		klog.V(5).Infof("NodePublishVolume: mounting %s at %s", source, target)
+//		if err := d.mounter.Mount(source, target, ""); err != nil { // TODO add support for mountOptions
+//			return status.Errorf(codes.Internal, "Could not mount %q at %q: %v", source, target, err)
+//		}
+//	*/
+//	return nil
+//}
 
 func isValidVolumeCapabilitiesAccessMode(volCaps []*csi.VolumeCapability) bool {
 	hasSupport := func(cap *csi.VolumeCapability) bool {
