@@ -19,6 +19,7 @@ package driver
 import (
 	"context"
 	"fmt"
+	"os"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	iscsilib "github.com/kubernetes-csi/csi-lib-iscsi/iscsi"
@@ -292,13 +293,22 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		}
 	}
 	
+	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+		klog.V(4).Infof("Target path directory does not exist. creating : {%v}",targetPath)
+		d.mounter.MakeDir(targetPath)
+
+	}
+	
+	//TODO: add default?
+	fsType := req.GetVolumeCapability().GetMount().FsType
+
+	
 	// bind mount!
-	 err = d.mounter.Mount(stagingPath, targetPath,  "", []string{"bind"})
+	 err = d.mounter.Mount(stagingPath, targetPath,  fsType, []string{"bind"})
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	
-
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
