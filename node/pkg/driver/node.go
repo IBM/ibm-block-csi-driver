@@ -262,10 +262,10 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	
 	// checking if the node staging path was mpounted into
 	stagingPath := req.GetStagingTargetPath()
-	targetPath := req.GetTargetPath())
+	targetPath := req.GetTargetPath()
 	klog.V(4).Infof("stagingPath : {%v}, targetPath : {%v}",stagingPath, targetPath)
 	
-	mountList :=  d.mounter.List()
+	mountList, err :=  d.mounter.List()
 	found := false
 	for _, mount := range mountList{
 		klog.V(4).Infof("mount device : {%v}, path : {%v}", mount.Device, mount.Path)
