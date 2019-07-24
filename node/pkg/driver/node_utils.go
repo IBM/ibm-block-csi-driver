@@ -158,7 +158,7 @@ func (n NodeUtils) ReadFromStagingInfoFile(filePath string) (map[string]string, 
 		return nil, err
 	}
 
-	infoMap := new(map[string]string)
+	infoMap := make(map[string]string)
 
 	err = json.Unmarshal(stageInfo, &infoMap)
 	if err != nil {

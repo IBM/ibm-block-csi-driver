@@ -167,7 +167,7 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	// TODO : need to write the device info for unstage use, and iscsi connectivity
 
 	stageInfoPath := path.Join(req.GetStagingTargetPath(), stageInfoFilename)
-	stageInfo := *new(map[string]string)
+	stageInfo := *make(map[string]string)
 	baseDevice := path.Base(device)
 	stageInfo["mpathDevice"] = baseDevice                                    //this should return the mathhh for example
 	sysDevices, err := d.nodeUtils.GetSysDevicesFromMpath(baseDevice)
