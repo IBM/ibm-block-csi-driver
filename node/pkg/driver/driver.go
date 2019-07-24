@@ -26,6 +26,8 @@ import (
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v2"
 	"k8s.io/klog"
+	
+	mount "k8s.io/kubernetes/pkg/util/mount" 
 )
 
 type Driver struct {
@@ -41,11 +43,17 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 		return nil, err
 	}
 	klog.Infof("Driver: %v Version: %v", configFile.Identity.Name, configFile.Identity.Version)
+	
+	
+	mounter:= &mount.SafeFormatAndMount{
+		Interface: mount.New(""),
+		Exec:      mount.NewOsExec(),
+	}
 
 	return &Driver{
 		endpoint:    endpoint,
 		config:      configFile,
-		nodeService: NewNodeService(configFile, hostname, *NewNodeUtils(), NewRescanUtils),
+		nodeService: NewNodeService(configFile, hostname, *NewNodeUtils(), NewRescanUtils, &Executer{}, mounter),
 	}, nil
 }
 
