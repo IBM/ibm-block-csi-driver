@@ -23,6 +23,8 @@ COPY go.mod .
 COPY go.sum .
 RUN go mod download
 RUN go get github.com/tebeka/go2xunit   # when GO111MODULE=on the module will not become executable, so get it here to run it as binary.
+RUN go get github.com/golang/mock/gomock
+RUN go install github.com/golang/mock/mockgen
 
 COPY . .
 ENTRYPOINT ["make", "test-xunit"]
