@@ -21,6 +21,7 @@ type NodeUtilsInterface interface {
 	WriteStageInfoToFile(path string, info map[string]string) error
 	GetSysDevicesFromMpath(baseDevice string) (string, error)
 	ReadFromStagingInfoFile(filePath string) (map[string]string, error)
+	ClearStageInfoFile(filePath string) error
 }
 
 type NodeUtils struct {
@@ -189,4 +190,9 @@ func (n NodeUtils) GetSysDevicesFromMpath(device string) (string, error) {
 	klog.V(4).Infof("returning slave string with delimieter : {%v}", slaves)
 	return slavesString, nil
 
+}
+
+
+func (n NodeUtils) ClearStageInfoFile(filePath string) (error) {
+	return os.Remove(filePath)
 }

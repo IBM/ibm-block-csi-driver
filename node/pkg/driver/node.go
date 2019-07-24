@@ -281,8 +281,10 @@ func (d *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	}
 
 	rescanUtils, err := d.newRescanUtils(connectivityType, d.nodeUtils, d.executer)
-	rescanUtils.FlushMultipathDevice(mpathDevice)
+	//rescanUtils.FlushMultipathDevice(mpathDevice)
 	rescanUtils.RemoveIscsiDevice(sysDevices)
+	
+	d.nodeUtils.ClearStageInfoFile(stageInfoPath)
 
 	klog.V(4).Infof("Sleeping for a second") //TODO: is this necessary?
 	time.Sleep(time.Second)
@@ -352,6 +354,7 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	
 
 	return &csi.NodePublishVolumeResponse{}, nil
 }
@@ -398,12 +401,23 @@ func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return nil, status.Error(codes.InvalidArgument, "Target path not provided")
 	}
 
-	
 	klog.V(5).Infof("NodeUnpublishVolume: unmounting %s", target)
 	err := d.mounter.Unmount(target)
 	if err != nil {
+		if "not mounted" in err.Error(){
+			klog.V(4).Infof("Idempotent case - target was already unmounted %s", target)
+			return  &csi.NodeUnpublishVolumeResponse{}, nil
+		}
 		return nil, status.Errorf(codes.Internal, "Could not unmount %q: %v", target, err)
 	}
+	
+	// TODO: do we need this??
+//	klog.V(4).Infof("Delting target path  %s", target)
+//	
+//	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+//		klog.V(4).Infof("Target path directory does not exist. creating : {%v}", targetPath)
+//		os.RemoveAll(targetPath)
+//	}
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 	
