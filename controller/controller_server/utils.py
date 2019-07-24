@@ -89,11 +89,11 @@ def validate_create_volume_request(request):
 
     logger.debug("validating storage class parameters")
     if request.parameters:
-        if not (config.PARAMETERS_CAPACITY in request.parameters):
-            raise ValidationException(messages.capacity_is_missing_message)
+        if not (config.PARAMETERS_POOL in request.parameters):
+            raise ValidationException(messages.pool_is_missing_message)
 
-        if not len(request.parameters[config.PARAMETERS_CAPACITY].split(config.PARAMETERS_CAPACITY_DELIMITER)) == 2:
-            raise ValidationException(messages.wrong_cpacity_passed_message)
+        if not request.parameters[config.PARAMETERS_POOL]:
+            raise ValidationException(messages.wrong_pool_passed_message)
     else:
         raise ValidationException(messages.params_are_missing_message)
 

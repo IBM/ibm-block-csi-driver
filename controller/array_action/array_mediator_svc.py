@@ -40,14 +40,18 @@ def build_kwargs_from_capabilities(capabilities, pool_name, volume_name,
         'pool': pool_name
     })
     # if capabilities == None, create default capability volume thick
-    if capabilities == config.CAPABILITY_THIN:
-        cli_kwargs.update({'thin': True})
-    elif capabilities == config.CAPABILITY_COMPRESSED:
-        cli_kwargs.update({'compressed': True})
-    elif capabilities == config.CAPABILITY_DEDUPLICATED:
-        cli_kwargs.update({'compressed': True, 'deduplicated': True})
+    capability = capabilities.get(config.CAPABILITIES_SPACEEFFICIENCY)
+    if capability:
+        capability = capability.lower()
+        if capability == config.CAPABILITY_THIN:
+            cli_kwargs.update({'thin': True})
+        elif capability == config.CAPABILITY_COMPRESSED:
+            cli_kwargs.update({'compressed': True})
+        elif capability == config.CAPABILITY_DEDUPLICATED:
+            cli_kwargs.update({'compressed': True, 'deduplicated': True})
 
     return cli_kwargs
+
 
 class SVCArrayMediator(ArrayMediator):
     ARRAY_ACTIONS = {}
@@ -133,17 +137,17 @@ class SVCArrayMediator(ArrayMediator):
     def validate_supported_capabilities(self, capabilities):
         logger.debug("validate_supported_capabilities for "
                      "capabilities : {0}".format(capabilities))
-        # For SVC, we only support capabilities
-        # "SpaceEfficiency": "thin/thick/compressed/deduplicated"
-        if ((len(capabilities) > 0 and capabilities
-             not in [config.CAPABILITY_THIN,
-                     config.CAPABILITY_THICK,
-                     config.CAPABILITY_COMPRESSED,
-                     config.CAPABILITY_DEDUPLICATED])):
-            logger.error("capabilities is not "
+        # Currently, we only support one capability "SpaceEfficiency"
+        # The value should be: "thin/thick/compressed/deduplicated"
+        if (capabilities and capabilities.get(
+                config.CAPABILITIES_SPACEEFFICIENCY).lower() not in
+                [config.CAPABILITY_THIN, config.CAPABILITY_THICK,
+                 config.CAPABILITY_COMPRESSED,
+                 config.CAPABILITY_DEDUPLICATED]):
+            logger.error("capability value is not "
                          "supported {0}".format(capabilities))
             raise controller_errors.StorageClassCapabilityNotSupported(
-                capabilities)
+                    capabilities)
 
         logger.info("Finished validate_supported_capabilities")
 
