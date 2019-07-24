@@ -404,7 +404,7 @@ func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	klog.V(5).Infof("NodeUnpublishVolume: unmounting %s", target)
 	err := d.mounter.Unmount(target)
 	if err != nil {
-		if "not mounted" in err.Error(){
+		if strings.Contains(err.Error(), "not mounted" ) {
 			klog.V(4).Infof("Idempotent case - target was already unmounted %s", target)
 			return  &csi.NodeUnpublishVolumeResponse{}, nil
 		}
