@@ -208,7 +208,7 @@ func (r RescanUtilsIscsi) RemoveIscsiDevice(sysDevices []string) error {
 		if deviceName == ""{
 			continue
 		}
-		log.V(5).Infof("opening device for device name : {%v}",deviceName)
+		klog.V(5).Infof("opening device for device name : {%v}",deviceName)
 		filename := fmt.Sprintf("/sys/block/%s/device/delete", deviceName)
 		if f, err = os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200); err != nil {
 			klog.Errorf("errow while opening file : {%v}. error: {%v}", filename, err.Error())
