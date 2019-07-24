@@ -51,11 +51,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
 
         pool = request.parameters[config.PARAMETERS_POOL]
-        try:
-            capabilities = {key: value for key, value in request.parameters.items() if key in [config.PARAMETERS_CAPABILITIES_SPACEEFFICIENCY]}
-        except KeyError as ex:
-            logger.debug("no capabilities passed for this volume creation")
-            capabilities = None
+        capabilities = {key: value for key, value in request.parameters.items() if key in [config.PARAMETERS_CAPABILITIES_SPACEEFFICIENCY]}
 
         if config.PARAMETERS_PREFIX in request.parameters:
             volume_prefix = request.parameters[config.PARAMETERS_PREFIX]

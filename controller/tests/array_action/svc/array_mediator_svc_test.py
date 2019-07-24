@@ -157,22 +157,16 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.delete_volume("vol")
 
     def test_validate_supported_capabilities_raise_error(self):
-        capabilities_a = {"Space": "Test"}
+        capabilities_a = {"SpaceEfficiency": "Test"}
         with self.assertRaises(
                 array_errors.StorageClassCapabilityNotSupported):
             self.svc.validate_supported_capabilities(capabilities_a)
-        capabilities_b = {"SpaceEfficiency": "Test"}
+        capabilities_b = {"SpaceEfficiency": ""}
         with self.assertRaises(
                 array_errors.StorageClassCapabilityNotSupported):
             self.svc.validate_supported_capabilities(capabilities_b)
-        capabilities_c = {"SpaceEfficiency": ""}
-        with self.assertRaises(
-                array_errors.StorageClassCapabilityNotSupported):
-            self.svc.validate_supported_capabilities(capabilities_c)
-        capabilities_d = {}
-        self.svc.validate_supported_capabilities(capabilities_d)
-        capabilities_e = None
-        self.svc.validate_supported_capabilities(capabilities_e)
+        capabilities_c = {}
+        self.svc.validate_supported_capabilities(capabilities_c)
 
     def test_validate_supported_capabilities_success(self):
         capabilities = {"SpaceEfficiency": "thin"}

@@ -139,19 +139,14 @@ class SVCArrayMediator(ArrayMediator):
                      "capabilities : {0}".format(capabilities))
         # Currently, we only support one capability "SpaceEfficiency"
         # The value should be: "thin/thick/compressed/deduplicated"
-        if capabilities:
-            if config.CAPABILITIES_SPACEEFFICIENCY not in capabilities:
-                logger.error("Currently, the capability {0} is not "
-                             "support for SVC".format(capabilities))
-                raise controller_errors.StorageClassCapabilityNotSupported(
-                    capabilities)
-            if (capabilities.get(config.CAPABILITIES_SPACEEFFICIENCY).lower()
-                    not in [config.CAPABILITY_THIN, config.CAPABILITY_THICK,
-                            config.CAPABILITY_COMPRESSED,
-                            config.CAPABILITY_DEDUPLICATED]):
-                logger.error("capability value is not "
-                             "supported {0}".format(capabilities))
-                raise controller_errors.StorageClassCapabilityNotSupported(
+        if (capabilities and capabilities.get(
+                config.CAPABILITIES_SPACEEFFICIENCY).lower() not in
+                [config.CAPABILITY_THIN, config.CAPABILITY_THICK,
+                 config.CAPABILITY_COMPRESSED,
+                 config.CAPABILITY_DEDUPLICATED]):
+            logger.error("capability value is not "
+                         "supported {0}".format(capabilities))
+            raise controller_errors.StorageClassCapabilityNotSupported(
                     capabilities)
 
         logger.info("Finished validate_supported_capabilities")
