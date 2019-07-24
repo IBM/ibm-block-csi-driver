@@ -166,7 +166,7 @@ func (n NodeUtils) ReadFromStagingInfoFile(filePath string) (map[string]string, 
 		return nil, err
 	}
 
-	return *infoMap, nil
+	return infoMap, nil
 
 }
 
