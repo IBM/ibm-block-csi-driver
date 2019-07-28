@@ -375,6 +375,7 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.mediator.map_volume = Mock()
         self.mediator.map_volume.return_value = 1
 
+        self.mediator.get_array_iscsi_name = Mock()
         self.mediator.get_array_iscsi_name.return_value = "array-iqn"
 
         self.servicer = ControllerServicer(self.fqdn)
