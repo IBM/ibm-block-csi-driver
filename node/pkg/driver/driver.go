@@ -31,7 +31,7 @@ import (
 )
 
 type Driver struct {
-	nodeService
+	NodeService
 	srv      *grpc.Server
 	endpoint string
 	config   ConfigFile
@@ -53,7 +53,7 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 	return &Driver{
 		endpoint:    endpoint,
 		config:      configFile,
-		nodeService: NewNodeService(configFile, hostname, *NewNodeUtils(), NewRescanUtils, &Executer{}, mounter),
+		NodeService: NewNodeService(configFile, hostname, *NewNodeUtils(), NewRescanUtils, &Executer{}, mounter),
 	}, nil
 }
 

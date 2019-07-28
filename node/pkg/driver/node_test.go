@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package driver
+package driver_test
 
 import (
 	"context"
@@ -23,6 +23,7 @@ import (
 	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 	"reflect"
 	"testing"
 	"fmt"
@@ -139,11 +140,11 @@ func TestNodeStageVolume(t *testing.T) {
 	}
 }
 
-func newTestNodeService(nodeUtils NodeUtilsInterface) nodeService {
-	return nodeService{
-		hostname:   "test-host",
-		configYaml: ConfigFile{},
-		nodeUtils:  nodeUtils,
+func newTestNodeService(nodeUtils driver.NodeUtilsInterface) driver.NodeService {
+	return driver.NodeService{
+		Hostname:   "test-host",
+		ConfigYaml: driver.ConfigFile{},
+		NodeUtils:  nodeUtils,
 	}
 }
 

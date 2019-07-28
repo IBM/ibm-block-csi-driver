@@ -51,22 +51,22 @@ var (
 )
 
 // nodeService represents the node service of CSI driver
-type nodeService struct {
+type NodeService struct {
 	mounter        *mount.SafeFormatAndMount // TODO fix k8s mount import
-	configYaml     ConfigFile
-	hostname       string
-	nodeUtils      NodeUtilsInterface
+	ConfigYaml     ConfigFile
+	Hostname       string
+	NodeUtils      NodeUtilsInterface
 	newRescanUtils NewRescanUtilsFunction
 	executer       ExecutorInterface
 }
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
-func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, newRescanUtils NewRescanUtilsFunction, executer ExecutorInterface, mounter *mount.SafeFormatAndMount) nodeService {
-	return nodeService{
-		configYaml:     configYaml,
-		hostname:       hostname,
-		nodeUtils:      nodeUtils,
+func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, newRescanUtils NewRescanUtilsFunction, executer ExecutorInterface, mounter *mount.SafeFormatAndMount) NodeService {
+	return NodeService{
+		ConfigYaml:     configYaml,
+		Hostname:       hostname,
+		NodeUtils:      nodeUtils,
 		newRescanUtils: newRescanUtils,
 		executer:       executer,
 
@@ -79,7 +79,7 @@ func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsI
 	}
 }
 
-func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
+func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
 	klog.V(5).Infof("NodeStageVolume: called with args %+v", *req)
 
 	err := d.nodeStageVolumeRequestValidation(req)
@@ -94,7 +94,7 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	// get the volume device
 	//get connectivity from publish context
-	connectivityType, lun, array_iqn, err := d.nodeUtils.GetInfoFromPublishContext(req.PublishContext, d.configYaml)
+	connectivityType, lun, array_iqn, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -107,7 +107,7 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	connector := iscsilib.Connector{}
 	klog.V(4).Infof("connector : %v", connector)
 
-	rescanUtils, err := d.newRescanUtils(connectivityType, d.nodeUtils, d.executer)
+	rescanUtils, err := d.newRescanUtils(connectivityType, d.NodeUtils, d.executer)
 
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -170,7 +170,7 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	stageInfo := make(map[string]string)
 	baseDevice := path.Base(device)
 	stageInfo["mpathDevice"] = baseDevice //this should return the mathhh for example
-	sysDevices, err := d.nodeUtils.GetSysDevicesFromMpath(baseDevice)
+	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
 	if err != nil {
 		klog.Errorf("error while trying to get sys devices : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
@@ -178,14 +178,14 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	stageInfo["sysDevices"] = sysDevices // like sda,sdb,...
 	stageInfo["connectivity"] = connectivityType
 
-	d.nodeUtils.WriteStageInfoToFile(stageInfoPath, stageInfo)
+	d.NodeUtils.WriteStageInfoToFile(stageInfoPath, stageInfo)
 
 	klog.V(4).Infof("mounter succeeded!: %v", d.mounter)
 
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
-func (d *nodeService) getMountPointFromList(devicePath string, mountList []mount.MountPoint) *mount.MountPoint {
+func (d *NodeService) getMountPointFromList(devicePath string, mountList []mount.MountPoint) *mount.MountPoint {
 	//klog.V(4).Infof("current device : %v ", devicePath)
 	for _, mount := range mountList {
 		klog.V(4).Infof("devicePath : {%v}, device : {%v}", devicePath, mount.Device)
@@ -198,7 +198,7 @@ func (d *nodeService) getMountPointFromList(devicePath string, mountList []mount
 
 }
 
-func (d *nodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeRequest) error {
+func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeRequest) error {
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
@@ -230,7 +230,7 @@ func (d *nodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 	return nil
 }
 
-func (d *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
+func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
 	klog.V(5).Infof("NodeUnstageVolume: called with args %+v", *req)
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
@@ -261,7 +261,7 @@ func (d *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 	klog.V(4).Infof("Reading statge info file")
 	stageInfoPath := path.Join(req.GetStagingTargetPath(), stageInfoFilename)
-	infoMap, err := d.nodeUtils.ReadFromStagingInfoFile(stageInfoPath)
+	infoMap, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
 	if err != nil {
 		klog.Errorf("error while trying to read from the staging info file : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
@@ -280,11 +280,11 @@ func (d *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return nil, status.Errorf(codes.Internal, "Could not unmount target %q: %v", target, err)
 	}
 
-	rescanUtils, err := d.newRescanUtils(connectivityType, d.nodeUtils, d.executer)
+	rescanUtils, err := d.newRescanUtils(connectivityType, d.NodeUtils, d.executer)
 	//rescanUtils.FlushMultipathDevice(mpathDevice)
 	rescanUtils.RemoveIscsiDevice(sysDevices)
 
-	d.nodeUtils.ClearStageInfoFile(stageInfoPath)
+	d.NodeUtils.ClearStageInfoFile(stageInfoPath)
 
 	klog.V(4).Infof("Sleeping for a second") //TODO: is this necessary?
 	time.Sleep(time.Second)
@@ -292,7 +292,7 @@ func (d *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
-func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
+func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	klog.V(5).Infof("NodePublishVolume: called with args %+v", *req)
 
 	err := d.nodePublishVolumeRequestValidation(req)
@@ -358,7 +358,7 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
-func (d *nodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVolumeRequest) error {
+func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVolumeRequest) error {
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		return &RequestValidationError{"Volume ID not provided"}
@@ -388,7 +388,7 @@ func (d *nodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVol
 	return nil
 }
 
-func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
+func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	klog.V(5).Infof("NodeUnpublishVolume: called with args %+v", *req)
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
@@ -422,15 +422,15 @@ func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 
 }
 
-func (d *nodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "NodeGetVolumeStats is not implemented yet")
 }
 
-func (d *nodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("NodeExpandVolume is not yet implemented"))
 }
 
-func (d *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
+func (d *NodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
 	klog.V(5).Infof("NodeGetCapabilities: called with args %+v", *req)
 	var caps []*csi.NodeServiceCapability
 	for _, cap := range nodeCaps {
@@ -446,17 +446,17 @@ func (d *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 	return &csi.NodeGetCapabilitiesResponse{Capabilities: caps}, nil
 }
 
-func (d *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	klog.V(5).Infof("NodeGetInfo: called with args %+v", *req)
 
-	iscsiIQN, err := d.nodeUtils.ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi")
+	iscsiIQN, err := d.NodeUtils.ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi")
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	delimiter := ";"
 
-	nodeId := d.hostname + delimiter + iscsiIQN
+	nodeId := d.Hostname + delimiter + iscsiIQN
 	klog.V(4).Infof("node id is : %s", nodeId)
 
 	return &csi.NodeGetInfoResponse{

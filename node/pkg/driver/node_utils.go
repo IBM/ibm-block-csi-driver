@@ -88,7 +88,7 @@ func (n NodeUtils) GetIscsiSessionHostsForArrayIQN(array_iqn string) ([]int, err
 			} else {
 				hostNumber, err = strconv.Atoi(strings.TrimPrefix(hostName, "host"))
 				if err != nil {
-					klog.V(4).Infof("cannot get host id from host : {%V}", hostName)
+					klog.V(4).Infof("cannot get host id from host : {%v}", hostName)
 					continue
 				}
 			}
@@ -98,11 +98,11 @@ func (n NodeUtils) GetIscsiSessionHostsForArrayIQN(array_iqn string) ([]int, err
 			//devicePath + sessionName + "/iscsi_session/" + sessionName + "/targetname"
 			matches, err := filepath.Glob(targetPath)
 			if err != nil {
-				klog.Errorf("error while finding targetPath : {%V}. err : {%v}", targetPath, err)
+				klog.Errorf("error while finding targetPath : {%v}. err : {%v}", targetPath, err)
 				return sessionHosts, err
 			}
 
-			klog.V(5).Infof("matches were found : {%V}", matches)
+			klog.V(5).Infof("matches were found : {%v}", matches)
 
 			//TODO: can there be more then 1 session??
 			//sessionNumber, err :=  strconv.Atoi(strings.TrimPrefix(matches[0], "session"))
@@ -119,11 +119,11 @@ func (n NodeUtils) GetIscsiSessionHostsForArrayIQN(array_iqn string) ([]int, err
 				continue
 			}
 
-			klog.V(5).Infof("target name found : {%V}", targetName)
+			klog.V(5).Infof("target name found : {%v}", targetName)
 
 			if strings.TrimSpace(string(targetName)) == array_iqn {
 				sessionHosts = append(sessionHosts, hostNumber)
-				klog.V(5).Infof("host nunber appended : {%V}. sessionhosts is : {%v}", hostNumber, sessionHosts)
+				klog.V(5).Infof("host nunber appended : {%v}. sessionhosts is : {%v}", hostNumber, sessionHosts)
 			}
 		}
 
