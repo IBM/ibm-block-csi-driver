@@ -185,7 +185,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 connectivity_type = utils.choose_connectivity_type(connectivity_types)
 
-				array_iqn = array_mediator.get_array_iscsi_name()
+                array_iqn = array_mediator.get_array_iscsi_name()
 
                 mappings = array_mediator.get_volume_mappings(vol_id)
                 if len(mappings) >= 1:
