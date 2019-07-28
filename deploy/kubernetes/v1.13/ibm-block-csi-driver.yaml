@@ -346,7 +346,8 @@ spec:
           imagePullPolicy: "IfNotPresent"
           args:
             - --csi-endpoint=$(CSI_ENDPOINT)
-            #- --hostname=$(KUBE_NODE_NAME)
+            - --hostname=$(KUBE_NODE_NAME)
+            - --config-file-path=./config.yaml
             - --v=$(CSI_LOGLEVEL)
           env:
             - name: CSI_ENDPOINT
