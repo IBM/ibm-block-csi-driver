@@ -103,9 +103,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	klog.V(4).Infof("lun : %v", lun)
 
 	klog.V(4).Infof("array_iqn : %v", array_iqn)
-	//
-	connector := iscsilib.Connector{}
-	klog.V(4).Infof("connector : %v", connector)
+	
 
 	rescanUtils, err := d.newRescanUtils(connectivityType, d.NodeUtils, d.executer)
 
@@ -159,7 +157,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	klog.V(4).Infof("fs_type : {%v}", fsType)
 
-	err = d.mounter.FormatAndMount(device, req.GetStagingTargetPath(), fsType, nil)
+	err = d.mounter.FormatAndMount(device, req.GetStagingTargetPath(), fsType, nil) // TODO: pass mount options
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -238,13 +236,13 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
 	}
 
-	target := req.GetStagingTargetPath()
+	stagingTargetPath := req.GetStagingTargetPath()
 	if len(target) == 0 {
 		klog.Errorf("Staging target not provided")
 		return nil, status.Error(codes.InvalidArgument, "Staging target not provided")
 	}
 
-	dev, refs, err := mount.GetDeviceNameFromMount(d.mounter, target)
+	dev, refs, err := mount.GetDeviceNameFromMount(d.mounter, stagingTargetPath)
 	if err != nil {
 		klog.Errorf("error while trying to get device from mount : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
@@ -257,7 +255,6 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return &csi.NodeUnstageVolumeResponse{}, nil
 	}
 
-	// remove the mpath device //TODO: maybe this is before? the unmount??
 
 	klog.V(4).Infof("Reading statge info file")
 	stageInfoPath := path.Join(req.GetStagingTargetPath(), stageInfoFilename)
@@ -279,15 +276,19 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not unmount target %q: %v", target, err)
 	}
+	
+	//TODO: there might be an indempotent issue here if we fail after the unmount there will be  faulty devices left 
+	// (since the next time we run unpstange we will reutrn that everytjing is OK since the path is unmounted) 
 
 	rescanUtils, err := d.newRescanUtils(connectivityType, d.NodeUtils, d.executer)
-	//rescanUtils.FlushMultipathDevice(mpathDevice)
+	
+	rescanUtils.FlushMultipathDevice(mpathDevice)
 	rescanUtils.RemoveIscsiDevice(sysDevices)
 
 	d.NodeUtils.ClearStageInfoFile(stageInfoPath)
 
-	klog.V(4).Infof("Sleeping for a second") //TODO: is this necessary?
-	time.Sleep(time.Second)
+//	klog.V(4).Infof("Sleeping for a second") //TODO: is this necessary?
+//	time.Sleep(time.Second)
 
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
@@ -326,7 +327,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	//checking if there is a mount FROM staging target path
 	for _, mount := range mountList {
 		//klog.V(4).Infof("#mount device : {%v}, path : {%v}", mount.Device, mount.Path)
-		if mount.Device == stagingPath {
+		if mount.Device == stagingPath { //TODO: !!!!!!!change to use device! (from the file) 
 			if mount.Path == targetPath {
 				klog.V(4).Infof("Idempotent case : path was already mounted.")
 				return &csi.NodePublishVolumeResponse{}, nil
@@ -340,7 +341,6 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
 		klog.V(4).Infof("Target path directory does not exist. creating : {%v}", targetPath)
 		d.mounter.MakeDir(targetPath)
-
 	}
 
 	fsType := req.GetVolumeCapability().GetMount().FsType
@@ -348,9 +348,10 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		fsType = defaultFSType
 
 	}
+	mountOptions :=  []string{"bind"}
 
-	// bind mount!
-	err = d.mounter.Mount(stagingPath, targetPath, fsType, []string{"bind"})
+	// bind mount
+	err = d.mounter.Mount(stagingPath, targetPath, fsType, mountOptions)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -410,13 +411,12 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return nil, status.Errorf(codes.Internal, "Could not unmount %q: %v", target, err)
 	}
 
-	// TODO: do we need this??
-	//	klog.V(4).Infof("Delting target path  %s", target)
-	//
-	//	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
-	//		klog.V(4).Infof("Target path directory does not exist. creating : {%v}", targetPath)
-	//		os.RemoveAll(targetPath)
-	//	}
+	klog.V(4).Infof("Deleting target path  %s", target)
+
+	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+		klog.V(4).Infof("Target path directory does not exist. creating : {%v}", targetPath)
+		os.RemoveAll(targetPath)
+	}
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 
