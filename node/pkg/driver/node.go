@@ -169,10 +169,10 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	stageInfoPath := path.Join(req.GetStagingTargetPath(), stageInfoFilename)
 	stageInfo := make(map[string]string)
 	baseDevice := path.Base(device)
-	stageInfo["mpathDevice"] = baseDevice                                    //this should return the mathhh for example
+	stageInfo["mpathDevice"] = baseDevice //this should return the mathhh for example
 	sysDevices, err := d.nodeUtils.GetSysDevicesFromMpath(baseDevice)
 	if err != nil {
-		klog.Errorf("error while trying to get sys devices : {%v}",err.Error())
+		klog.Errorf("error while trying to get sys devices : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	stageInfo["sysDevices"] = sysDevices // like sda,sdb,...
@@ -283,7 +283,7 @@ func (d *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	rescanUtils, err := d.newRescanUtils(connectivityType, d.nodeUtils, d.executer)
 	//rescanUtils.FlushMultipathDevice(mpathDevice)
 	rescanUtils.RemoveIscsiDevice(sysDevices)
-	
+
 	d.nodeUtils.ClearStageInfoFile(stageInfoPath)
 
 	klog.V(4).Infof("Sleeping for a second") //TODO: is this necessary?
@@ -354,7 +354,6 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	
 
 	return &csi.NodePublishVolumeResponse{}, nil
 }
@@ -404,23 +403,23 @@ func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	klog.V(5).Infof("NodeUnpublishVolume: unmounting %s", target)
 	err := d.mounter.Unmount(target)
 	if err != nil {
-		if strings.Contains(err.Error(), "not mounted" ) {
+		if strings.Contains(err.Error(), "not mounted") {
 			klog.V(4).Infof("Idempotent case - target was already unmounted %s", target)
-			return  &csi.NodeUnpublishVolumeResponse{}, nil
+			return &csi.NodeUnpublishVolumeResponse{}, nil
 		}
 		return nil, status.Errorf(codes.Internal, "Could not unmount %q: %v", target, err)
 	}
-	
+
 	// TODO: do we need this??
-//	klog.V(4).Infof("Delting target path  %s", target)
-//	
-//	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
-//		klog.V(4).Infof("Target path directory does not exist. creating : {%v}", targetPath)
-//		os.RemoveAll(targetPath)
-//	}
+	//	klog.V(4).Infof("Delting target path  %s", target)
+	//
+	//	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
+	//		klog.V(4).Infof("Target path directory does not exist. creating : {%v}", targetPath)
+	//		os.RemoveAll(targetPath)
+	//	}
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
-	
+
 }
 
 func (d *nodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
@@ -463,7 +462,6 @@ func (d *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	return &csi.NodeGetInfoResponse{
 		NodeId: nodeId,
 	}, nil
-
 }
 
 //func (d *nodeService) nodePublishVolumeForFileSystem(req *csi.NodePublishVolumeRequest) error {

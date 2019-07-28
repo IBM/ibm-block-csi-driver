@@ -401,6 +401,7 @@ func TestNodeGetCapabilities(t *testing.T) {
 	}
 }
 
+
 func TestNodeGetInfo(t *testing.T) {
 	testCases := []struct {
 		name           string
@@ -454,3 +455,4 @@ func TestNodeGetInfo(t *testing.T) {
 
 	}
 }
+
