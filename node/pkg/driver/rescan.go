@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-//go:generate mockgen -destination=../../mocks/mock_rescan_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver RescanUtils
+//go:generate mockgen -destination=../../mocks/mock_rescan_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver RescanUtilsInterface
 
 type RescanUtilsInterface interface {
 	RescanSpecificLun(Lun int, array_iqn string) error
