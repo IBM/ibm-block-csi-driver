@@ -375,6 +375,8 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.mediator.map_volume = Mock()
         self.mediator.map_volume.return_value = 1
 
+        self.mediator.get_array_iscsi_name.return_value = "array-iqn"
+
         self.servicer = ControllerServicer(self.fqdn)
 
         self.request = Mock()
@@ -396,6 +398,7 @@ class TestControllerServerPublishVolume(unittest.TestCase):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_publish_volume_success(self, enter):
         enter.return_value = self.mediator
+
         context = utils.FakeContext()
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -480,6 +483,7 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         context = utils.FakeContext()
 
         self.mediator.map_volume.side_effect = [array_errors.PermissionDeniedError("msg")]
+
         enter.return_value = self.mediator
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.PERMISSION_DENIED)
@@ -506,6 +510,7 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         context = utils.FakeContext()
 
         self.mediator.map_volume.side_effect = [array_errors.LunAlreadyInUseError("", ""), 2]
+        self.mediator.map_volume.get_array_iscsi_name.return_value = "array-iqn"
         enter.return_value = self.mediator
         res = self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
