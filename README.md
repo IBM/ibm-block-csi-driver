@@ -156,10 +156,8 @@ metadata:
   name: gold   # Storage class name
 provisioner: ibm-block-csi-driver
 parameters:
-  #capabilities:                               # Optional.
-  #  SpaceEfficiency=<VALUE>
-  capacity:
-    pool=<VALUE_POOL_NAME>
+  #SpaceEfficiency: <VALUE>                    # Optional.
+  pool: <VALUE_POOL_NAME>
 
   csi.storage.k8s.io/provisioner-secret-name: <VALUE_ARRAY_SECRET>
   csi.storage.k8s.io/provisioner-secret-namespace: <VALUE_ARRAY_SECRET_NAMESPACE>
