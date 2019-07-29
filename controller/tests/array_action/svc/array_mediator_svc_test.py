@@ -50,7 +50,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.get_volume("vol_name")
 
     def test_get_volume_return_correct_value(self):
-        vol_ret = Mock(as_single_element=Munch({'id': 'vol_id',
+        vol_ret = Mock(as_single_element=Munch({'vdisk_UID': 'vol_id',
                                                 'name': 'test_vol',
                                                 'capacity': '1024',
                                                 'mdisk_grp_name': 'pool_name'
@@ -117,7 +117,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_create_volume_success(self):
         self.svc.client.svctask.mkvolume.return_value = Mock()
-        vol_ret = Mock(as_single_element=Munch({'id': 'vol_id',
+        vol_ret = Mock(as_single_element=Munch({'vdisk_UID': 'vol_id',
                                                 'name': 'test_vol',
                                                 'capacity': '1024',
                                                 'mdisk_grp_name': 'pool_name'
@@ -127,6 +127,22 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(volume.capacity_bytes, 1024)
         self.assertEqual(volume.array_type, 'SVC')
         self.assertEqual(volume.id, 'vol_id')
+
+    def test_get_vol_by_wwn_return_error(self):
+        vol_ret = Mock(as_single_element=Munch({}))
+        self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
+        with self.assertRaises(array_errors.VolumeNotFoundError):
+            self.svc._get_vol_by_wwn("vol")
+
+    def test_get_vol_by_wwn_return_success(self):
+        vol_ret = Mock(as_single_element=Munch({'vdisk_UID': 'vol_id',
+                                                'name': 'test_vol',
+                                                'capacity': '1024',
+                                                'mdisk_grp_name': 'pool_name'
+                                                }))
+        self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
+        ret = self.svc._get_vol_by_wwn("vol_id")
+        self.assertEqual(ret, 'test_vol')
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_delete_volume_return_volume_not_found(self, mock_warning):

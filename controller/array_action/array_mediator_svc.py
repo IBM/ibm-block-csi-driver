@@ -107,7 +107,7 @@ class SVCArrayMediator(ArrayMediator):
     def _generate_volume_response(self, cli_volume):
         return Volume(
             int(cli_volume.capacity),
-            cli_volume.id,
+            cli_volume.vdisk_UID,
             cli_volume.name,
             self.endpoint,
             cli_volume.mdisk_grp_name,
@@ -158,6 +158,17 @@ class SVCArrayMediator(ArrayMediator):
             return size_in_bytes - ret + 512
         return size_in_bytes
 
+    def _get_vol_by_wwn(self, volume_id):
+        filter_value = 'vdisk_UID=' + volume_id
+        vol_by_wwn = self.client.svcinfo.lsvdisk(
+            filtervalue=filter_value).as_single_element
+        if not vol_by_wwn:
+            raise controller_errors.VolumeNotFoundError(volume_id)
+
+        vol_name = vol_by_wwn.name
+        logger.debug("found volume name : {0}".format(vol_name))
+        return vol_name
+
     def create_volume(self, name, size_in_bytes, capabilities, pool):
         logger.info("creating volume with name : {}. size : {} . in pool : {} "
                     "with capabilities : {}".format(name, size_in_bytes, pool,
@@ -191,15 +202,16 @@ class SVCArrayMediator(ArrayMediator):
 
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
+        vol_name = self._get_vol_by_wwn(volume_id)
         try:
-            self.client.svctask.rmvolume(vdisk_id=volume_id)
+            self.client.svctask.rmvolume(vdisk_id=vol_name)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 logger.warning("Failed to delete volume {}, "
-                               "it's already deleted.".format(volume_id))
+                               "it's already deleted.".format(vol_name))
                 if (OBJ_NOT_FOUND in ex.my_message
                         or VOL_NOT_FOUND in ex.my_message):
-                    raise controller_errors.VolumeNotFoundError(volume_id)
+                    raise controller_errors.VolumeNotFoundError(vol_name)
                 else:
                     raise ex
         except Exception as ex:
