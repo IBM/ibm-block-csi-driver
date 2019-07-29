@@ -22,10 +22,8 @@ import (
 	"os"
 	"path"
 	"strings"
-	"time"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	iscsilib "github.com/kubernetes-csi/csi-lib-iscsi/iscsi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog"
@@ -237,7 +235,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	}
 
 	stagingTargetPath := req.GetStagingTargetPath()
-	if len(target) == 0 {
+	if len(stagingTargetPath) == 0 {
 		klog.Errorf("Staging target not provided")
 		return nil, status.Error(codes.InvalidArgument, "Staging target not provided")
 	}
@@ -251,7 +249,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	klog.V(4).Infof("dev : {%v}, refs: {%v}", dev, refs)
 
 	if refs == 0 {
-		klog.V(5).Infof("Idempotent case : %s target not mounted", target)
+		klog.V(5).Infof("Idempotent case : %s target not mounted", stagingTargetPath)
 		return &csi.NodeUnstageVolumeResponse{}, nil
 	}
 
@@ -272,9 +270,9 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	klog.V(4).Infof("got info from stageInfo file . connectivity : {%v}. device : {%v}, sysDevices : {%v}", connectivityType, mpathDevice, sysDevices)
 
 	klog.V(4).Infof("Calling unmount")
-	err = d.mounter.Unmount(target)
+	err = d.mounter.Unmount(stagingTargetPath)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not unmount target %q: %v", target, err)
+		return nil, status.Errorf(codes.Internal, "Could not unmount target %q: %v", stagingTargetPath, err)
 	}
 	
 	//TODO: there might be an indempotent issue here if we fail after the unmount there will be  faulty devices left 
@@ -287,8 +285,6 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 	d.NodeUtils.ClearStageInfoFile(stageInfoPath)
 
-//	klog.V(4).Infof("Sleeping for a second") //TODO: is this necessary?
-//	time.Sleep(time.Second)
 
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
@@ -413,9 +409,9 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 
 	klog.V(4).Infof("Deleting target path  %s", target)
 
-	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
-		klog.V(4).Infof("Target path directory does not exist. creating : {%v}", targetPath)
-		os.RemoveAll(targetPath)
+	if _, err := os.Stat(target); os.IsNotExist(err) {
+		klog.V(4).Infof("Target path directory does not exist. creating : {%v}", target)
+		os.RemoveAll(target)
 	}
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
