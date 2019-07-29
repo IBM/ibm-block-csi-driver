@@ -183,7 +183,7 @@ func getMultipathDisk(path string) (string, error) {
 			}
 		}
 	}
-	errorMsg := fmt.Sprint("Couldn't find dm-* path for path: %s, found non dm-* path: %s", path, devicePath)
+	errorMsg := fmt.Sprintf("Couldn't find dm-* path for path: %s, found non dm-* path: %s", path, devicePath)
 	klog.Errorf(errorMsg)
 	return "", fmt.Errorf(errorMsg)
 }
