@@ -35,3 +35,13 @@ type RequestValidationError struct {
 func (e *RequestValidationError) Error() string {
 	return fmt.Sprintf("Request Validation Error: %s", e.Msg)
 }
+
+
+type ConnectivityIscsiStorageTargetNotFoundError struct {
+	StorageTargetName string
+	DirectoryPath string
+}
+
+func (e *ConnectivityIscsiStorageTargetNotFoundError) Error() string {
+	return fmt.Sprintf("Connectivity Error: Storage target name [%s] was not found on the host, under directory %s", e.StorageTargetName, e.DirectoryPath)
+}

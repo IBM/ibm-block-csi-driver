@@ -119,7 +119,7 @@ func (n NodeUtils) GetIscsiSessionHostsForArrayIQN(array_iqn string) ([]int, err
 				continue
 			}
 
-			klog.V(5).Infof("target name found : {%v}", targetName)
+			klog.V(5).Infof("target name found : {%v}", string(targetName))
 
 			if strings.TrimSpace(string(targetName)) == array_iqn {
 				sessionHosts = append(sessionHosts, hostNumber)
@@ -127,6 +127,12 @@ func (n NodeUtils) GetIscsiSessionHostsForArrayIQN(array_iqn string) ([]int, err
 			}
 		}
 
+
+
+		if len(sessionHosts) == 0 {
+			genericTargetPath := sysPath + "host*" + "/device/session*/iscsi_session/session*/targetname"
+			return []int{}, &ConnectivityIscsiStorageTargetNotFoundError{StorageTargetName:array_iqn, DirectoryPath:genericTargetPath}
+		}
 		return sessionHosts, nil
 	}
 }
