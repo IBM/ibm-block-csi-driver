@@ -8,8 +8,7 @@ metadata:
   name: gold
 provisioner: ibm-block-csi-driver
 parameters:
-  capacity:
-    pool=gold
+  pool: gold
 
   csi.storage.k8s.io/provisioner-secret-name: a9000-array1
   csi.storage.k8s.io/provisioner-secret-namespace: kube-system
