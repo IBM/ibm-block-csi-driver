@@ -55,6 +55,7 @@ func (r RescanUtilsIscsi) RescanSpecificLun(lunId int, array_iqn string) error {
 		defer f.Close()
 
 		scanCmd := fmt.Sprintf("0 0 %d", lunId)
+		klog.V(5).Infof("Rescan host device : echo %s > %s", scanCmd, filename)
 		if written, err := f.WriteString(scanCmd); err != nil {
 			klog.Errorf("could not write to file :{%v}, error : {%v}", filename, err)
 			return err
@@ -95,6 +96,7 @@ func (r RescanUtilsIscsi) GetMpathDevice(lunId int, array_iqn string) (string, e
 		return "", fmt.Errorf("failed to find device path: %s", devicePath)
 	}
 
+	// Looping over the physical devices of the volume - /dev/sdX (multiple since its with multipathing) 
 	for i, path := range devicePaths {
 		if path != "" {
 			if mappedDevicePath, err := getMultipathDisk(path); mappedDevicePath != "" {
@@ -108,7 +110,7 @@ func (r RescanUtilsIscsi) GetMpathDevice(lunId int, array_iqn string) (string, e
 	klog.V(4).Infof("After connect we're returning devicePaths: %s", devicePathTosysfs)
 	if len(devicePathTosysfs) > 0 {
 		return devicePathTosysfs[0], err
-
+		// TODO consider to validate that all the devicePathTosysfs are the same DM device, and if not maybe raise Error
 	}
 	return "", err
 
@@ -143,10 +145,11 @@ func getMultipathDisk(path string) (string, error) {
 		klog.V(4).Infof("Failed reading link for multipath disk: %s. error: {%s}\n", path, err.Error())
 		return "", err
 	}
+	// Get only the physical device from /dev/disk/by-path/TARGET-iscsi-iqn:<LUNID> -> ../../sdb
 	sdevice := filepath.Base(devicePath)
 	// If destination directory is already identified as a multipath device,
 	// just return its path
-	if strings.HasPrefix(sdevice, "dm-") {
+	if strings.HasPrefix(sdevice, "dm-") { 
 		klog.V(4).Infof("Already found multipath device: %s", sdevice)
 		return path, nil
 	}
@@ -154,6 +157,8 @@ func getMultipathDisk(path string) (string, error) {
 	// check to see if any have an entry under /sys/block/dm-*/slaves matching
 	// the device the symlink was pointing at
 	dmPaths, err := filepath.Glob("/sys/block/dm-*")
+	// TODO improve looping by just filepath.Glob("/sys/block/dm-*/slaves/" + sdevice) and then no loops needed below, since it will just find the device directly.	
+
 	if err != nil {
 		klog.V(4).Infof("Glob error: %s", err)
 		return "", err
@@ -165,18 +170,22 @@ func getMultipathDisk(path string) (string, error) {
 		}
 		for _, spath := range sdevices {
 			s := filepath.Base(spath)
-			klog.V(4).Infof("Basepath: %s", s)
 			if sdevice == s {
 				// We've found a matching entry, return the path for the
 				// dm-* device it was found under
+				// for Example, return /dev/dm-3 
+				//   ls -l  /sys/block/dm-*/slaves/*
+				//    /sys/block/dm-3/slaves/sdb -> ../../../../platform/host41/session9/target41:0:0/41:0:0:13/block/sdb
+				
 				p := filepath.Join("/dev", filepath.Base(dmPath))
 				klog.V(4).Infof("Found matching multipath device: %s under dm-* device path %s", sdevice, dmPath)
 				return p, nil
 			}
 		}
 	}
-	klog.V(4).Infof("Couldn't find dm-* path for path: %s, found non dm-* path: %s", path, devicePath)
-	return "", fmt.Errorf("Couldn't find dm-* path for path: %s, found non dm-* path: %s", path, devicePath)
+	errorMsg := fmt.Sprint("Couldn't find dm-* path for path: %s, found non dm-* path: %s", path, devicePath)
+	klog.Errorf(errorMsg)
+	return "", fmt.Errorf(errorMsg)
 }
 
 func (r RescanUtilsIscsi) FlushMultipathDevice(mpathDevice string) error {
