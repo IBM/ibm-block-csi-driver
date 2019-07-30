@@ -372,6 +372,10 @@ spec:
               mountPath: /etc/iscsi
             - name: sys-dir
               mountPath: /sys
+            - name: host-dir
+              mountPath: /host
+              mountPropagation: "Bidirectional"
+
           ports:
             - name: healthz
               containerPort: 9808
@@ -451,5 +455,10 @@ spec:
         - name: sys-dir
           hostPath:
             path: /sys
+            type: Directory
+
+        - name: host-dir
+          hostPath:
+            path: /
             type: Directory
 
