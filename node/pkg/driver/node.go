@@ -126,6 +126,10 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	klog.V(4).Infof("Return isMountPoint: {%v}", isNotMountPoint)
 
+
+	mountRefs, err := d.mounter.GetMountRefs(device)
+	klog.V(4).Infof("mountRefs: {%v}", mountRefs)
+
 	mountList, err := d.mounter.List()
 	klog.V(4).Infof("Return mountList: {%v}", mountList)
 
