@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"path/filepath"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
@@ -102,7 +103,8 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	klog.V(4).Infof("array_iqn : %v", array_iqn)
 	
-
+	stagingPath := req.GetStagingTargetPath()
+	
 	rescanUtils, err := d.newRescanUtils(connectivityType, d.NodeUtils, d.executer)
 
 	if err != nil {
@@ -118,35 +120,67 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	isNotMountPoint, err := d.mounter.IsLikelyNotMountPoint(device)
+//
+//	isNotMountPoint, err := d.mounter.IsLikelyNotMountPoint(stagingPath)
+//	
+//	if err != nil {
+//		if  os.IsNotExist(err) {
+//			isNotMountPoint = true
+//		}  else {
+//			klog.V(4).Infof("error while trying to check mountpoint: {%v}", err.Error())
+//			return nil, status.Error(codes.Internal, err.Error())
+//		}	
+//	}
+//
+//
+//	klog.V(4).Infof("Return isMountPoint: {%v}", isNotMountPoint)
+//
+//
+//	if !isNotMountPoint {
+//		mountList,err := d.mounter.List()
+//		if err != nil {
+//			klog.Errorf("error while getting mount list: {%v}", err.Error())
+//			return nil, status.Error(codes.Internal, err.Error())
+//		}
+//		
+//		klog.V(4).Infof("Return mountList: {%v}", mountList)
+//		deviceMP := d.getMountPointFromList(device, mountList)
+//		
+//		if deviceMP != nil {
+//			isCorrectMountpoint := d.mounter.IsMountPointMatch(*deviceMP, req.GetStagingTargetPath())
+//			klog.V(4).Infof("Return isCorrectMountpoint: {%v}. for device : {%v}, staging target path : {%v}",
+//				isCorrectMountpoint, device, req.GetStagingTargetPath())
+//			if isCorrectMountpoint {
+//				klog.V(4).Infof("Returning ok result")
+//				return &csi.NodeStageVolumeResponse{}, nil
+//			} else {
+//				return nil, status.Errorf(codes.AlreadyExists, "Mount point is already mounted to.")
+//			}
+//		}
+//	}
+	
+	
+	dev, refs, err := mount.GetDeviceNameFromMount(d.mounter, stagingPath)
+	klog.V(4).Infof("dev : {%v}. refs : {%v}", dev, refs)
 	if err != nil {
-		klog.V(4).Infof("error while trying to check mountpoint: {%v}", err.Error())
+		klog.Errorf("error while trying to get device from mount : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-
-	klog.V(4).Infof("Return isMountPoint: {%v}", isNotMountPoint)
-
-
-	mountRefs, err := d.mounter.GetMountRefs(device)
-	klog.V(4).Infof("mountRefs: {%v}", mountRefs)
-
-	mountList, err := d.mounter.List()
-	klog.V(4).Infof("Return mountList: {%v}", mountList)
-
-	if !isNotMountPoint {
-		deviceMP := d.getMountPointFromList(device, mountList)
-		if deviceMP != nil {
-			isCorrectMountpoint := d.mounter.IsMountPointMatch(*deviceMP, req.GetStagingTargetPath())
-			klog.V(4).Infof("Return isCorrectMountpoint: {%v}. for device : {%v}, staging target path : {%v}",
-				isCorrectMountpoint, device, req.GetStagingTargetPath())
-			if isCorrectMountpoint {
-				klog.V(4).Infof("Returning ok result")
-				return &csi.NodeStageVolumeResponse{}, nil
-			} else {
-				return nil, status.Errorf(codes.AlreadyExists, "Mount point is already mounted to.")
-			}
+	
+	if refs != 0 {
+		dmDevice, err := filepath.EvalSymlinks(dev)
+		if err != nil {
+			klog.Errorf("error while reading symlink : {%v}. err : {%v}",dev, err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
 		}
-	}
+		klog.V(4).Infof("comparing dev : {%v} with device : {%v}", dmDevice, device)
+		if dmDevice == device {
+			klog.V(4).Infof("Returning ok result")
+			return &csi.NodeStageVolumeResponse{}, nil
+		} else {
+			return nil, status.Errorf(codes.AlreadyExists, "Mount point is already mounted to.")
+		}
+	} 
 
 	// if the device is not mounted then we are mounting it.
 
@@ -158,8 +192,6 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	klog.V(4).Infof("fs_type : {%v}", fsType)
-	
-	stagingPath := req.GetStagingTargetPath()
 	
 	// creating the stagingPath if it is missing
 	if _, err := os.Stat(stagingPath); os.IsNotExist(err) {
