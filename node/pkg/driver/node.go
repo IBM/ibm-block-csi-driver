@@ -359,7 +359,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	mountList, err := d.mounter.List()
 	found := false
 	for _, mount := range mountList {
-		klog.V(4).Infof("mount device : {%v}, path : {%v}", mount.Device, mount.Path)
+		klog.V(6).Infof("mount device : {%v}, path : {%v}", mount.Device, mount.Path)
 		if mount.Path == stagingPath {
 			found = true
 			break
@@ -372,7 +372,9 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	//checking if there is a mount FROM staging target path
 	for _, mount := range mountList {
 		//klog.V(4).Infof("#mount device : {%v}, path : {%v}", mount.Device, mount.Path)
-		if mount.Device == stagingPath { //TODO: !!!!!!!change to use device! (from the file) 
+		if mount.Device == strings.TrimPrefix(stagingPath, "/host") { 
+			// The /host prefix remove is for mount command inside the node with /host mounted 
+			//TODO: !!!!!!!change to use device! (from the file) 
 			if mount.Path == targetPath {
 				klog.V(4).Infof("Idempotent case : path was already mounted.")
 				return &csi.NodePublishVolumeResponse{}, nil
