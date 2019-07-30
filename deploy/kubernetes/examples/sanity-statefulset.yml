@@ -1,0 +1,32 @@
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: sanity-statefulset
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: sanity-statefulset
+  serviceName: sanity-statefulset
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: sanity-statefulset
+    spec:
+      containers:
+      - name: container1
+        image: registry.access.redhat.com/ubi8/ubi:latest
+        command: [ "/bin/sh", "-c", "--" ]
+        args: [ "while true; do sleep 30; done;" ]
+        volumeMounts:
+          - name: sanity-pvc2
+            mountPath: "/data"
+      volumes:
+      - name: sanity-pvc2
+        persistentVolumeClaim:
+          claimName: sanity-pvc2
+
+#      nodeSelector:
+#        kubernetes.io/hostname: NODESELECTOR
+      
