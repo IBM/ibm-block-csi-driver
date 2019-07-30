@@ -328,7 +328,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	
 	err = rescanUtils.FlushMultipathDevice(mpathDevice)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Multipath -f command failed with error: %v", stagingTargetPath, err)
+		return nil, status.Errorf(codes.Internal, "Multipath -f %v command failed with error: %v", stagingTargetPath, err)
 	}
 	err = rescanUtils.RemoveIscsiDevice(sysDevices)
 	if err != nil {
