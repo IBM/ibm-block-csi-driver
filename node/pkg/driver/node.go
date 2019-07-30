@@ -136,7 +136,12 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 
 	if !isNotMountPoint {
-		mountList, err := d.mounter.List()
+		mountList,err := d.mounter.List()
+		if err != nil {
+			klog.Errorf("error while getting mount list: {%v}", err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		
 		klog.V(4).Infof("Return mountList: {%v}", mountList)
 		deviceMP := d.getMountPointFromList(device, mountList)
 		
