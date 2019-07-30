@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"path/filepath"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
@@ -167,7 +168,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 	
 	if refs != 0 {
-		dmDevice, err := os.Readlink(dev)
+		dmDevice, err := filepath.EvalSymlinks(dev)
 		if err != nil {
 			klog.Errorf("error while reading symlink : {%v}. err : {%v}",dev, err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
