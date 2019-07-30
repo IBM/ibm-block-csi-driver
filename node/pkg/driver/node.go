@@ -167,8 +167,13 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 	
 	if refs != 0 {
-		klog.V(4).Infof("comparing dev : {%v} with device : {%v}", dev, device)
-		if dev == device {
+		dmDevice, err := os.Readlink(dev)
+		if err != nil {
+			klog.Errorf("error while reading symlink : {%v}. err : {%v}",dev, err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		klog.V(4).Infof("comparing dev : {%v} with device : {%v}", dmDevice, device)
+		if dmDevice == device {
 			klog.V(4).Infof("Returning ok result")
 			return &csi.NodeStageVolumeResponse{}, nil
 		} else {
