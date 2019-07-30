@@ -46,7 +46,7 @@ var (
 	}
 
 	defaultFSType     = "ext4"
-	stageInfoFilename = "stageInfo.json"
+	stageInfoFilename = ".stageInfo.json"
 )
 
 // nodeService represents the node service of CSI driver
@@ -313,6 +313,8 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 	klog.V(4).Infof("got info from stageInfo file . connectivity : {%v}. device : {%v}, sysDevices : {%v}", connectivityType, mpathDevice, sysDevices)
 
+	d.NodeUtils.ClearStageInfoFile(stageInfoPath)
+
 	klog.V(4).Infof("Calling unmount")
 	err = d.mounter.Unmount(stagingTargetPath)
 	if err != nil {
@@ -324,11 +326,14 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 	rescanUtils, err := d.newRescanUtils(connectivityType, d.NodeUtils, d.executer)
 	
-	rescanUtils.FlushMultipathDevice(mpathDevice)
-	rescanUtils.RemoveIscsiDevice(sysDevices)
-
-	d.NodeUtils.ClearStageInfoFile(stageInfoPath)
-
+	err = rescanUtils.FlushMultipathDevice(mpathDevice)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Multipath -f command failed with error: %v", stagingTargetPath, err)
+	}
+	err = rescanUtils.RemoveIscsiDevice(sysDevices)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "remove iscsi device failed with error: %v", err)
+	}
 
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
