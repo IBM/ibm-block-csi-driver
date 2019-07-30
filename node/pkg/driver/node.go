@@ -102,7 +102,8 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	klog.V(4).Infof("array_iqn : %v", array_iqn)
 	
-
+	stagingPath := req.GetStagingTargetPath()
+	
 	rescanUtils, err := d.newRescanUtils(connectivityType, d.NodeUtils, d.executer)
 
 	if err != nil {
@@ -118,11 +119,12 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	isNotMountPoint, err := d.mounter.IsLikelyNotMountPoint(device)
+	isNotMountPoint, err := d.mounter.IsLikelyNotMountPoint(stagingPath)
 	if err != nil {
 		klog.V(4).Infof("error while trying to check mountpoint: {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	
 
 	klog.V(4).Infof("Return isMountPoint: {%v}", isNotMountPoint)
 
@@ -158,8 +160,6 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	klog.V(4).Infof("fs_type : {%v}", fsType)
-	
-	stagingPath := req.GetStagingTargetPath()
 	
 	// creating the stagingPath if it is missing
 	if _, err := os.Stat(stagingPath); os.IsNotExist(err) {
