@@ -160,14 +160,14 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	
 	
 	dev, refs, err := mount.GetDeviceNameFromMount(d.mounter, stagingPath)
-	klog.v(4).Infof("dev : {%v}. refs : {%v}", dev, refs)
+	klog.V(4).Infof("dev : {%v}. refs : {%v}", dev, refs)
 	if err != nil {
 		klog.Errorf("error while trying to get device from mount : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	
 	if refs != 0 {
-		klog.v(4).Infof("comparing dev : {%v} with device : {%v}", dev, device)
+		klog.V(4).Infof("comparing dev : {%v} with device : {%v}", dev, device)
 		if dev == device {
 			klog.V(4).Infof("Returning ok result")
 			return &csi.NodeStageVolumeResponse{}, nil
