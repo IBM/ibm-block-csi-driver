@@ -154,8 +154,16 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	klog.V(4).Infof("fs_type : {%v}", fsType)
+	
+	stagingPath := req.GetStagingTargetPath()
+	
+	// creating the stagingPath if it is missing
+	if _, err := os.Stat(stagingPath); os.IsNotExist(err) {
+		klog.V(4).Infof("Target path directory does not exist. creating : {%v}", stagingPath)
+		d.mounter.MakeDir(stagingPath)
+	}
 
-	err = d.mounter.FormatAndMount(device, req.GetStagingTargetPath(), fsType, nil) // TODO: pass mount options
+	err = d.mounter.FormatAndMount(device, stagingPath, fsType, nil) // TODO: pass mount options
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
