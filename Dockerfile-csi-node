@@ -33,6 +33,6 @@ COPY --from=builder /go/src/github.com/ibm/ibm-block-csi-driver/common/config.ya
 COPY --from=builder /go/src/github.com/ibm/ibm-block-csi-driver/bin/ibm-block-csi-node-driver .
 
 # install xfs (used for mkfs.xfs)
-RUN yum install xfsprogs xfsdump
+RUN yum -y install xfsprogs xfsdump
 
 ENTRYPOINT ["/root/ibm-block-csi-node-driver"]
