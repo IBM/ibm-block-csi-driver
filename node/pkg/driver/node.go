@@ -119,24 +119,27 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+
 	isNotMountPoint, err := d.mounter.IsLikelyNotMountPoint(stagingPath)
-	if err != nil {
-		klog.V(4).Infof("error while trying to check mountpoint: {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
-	}
 	
+	if err != nil {
+		if  os.IsNotExist(err) {
+			isNotMountPoint = true
+		}  else {
+			klog.V(4).Infof("error while trying to check mountpoint: {%v}", err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}	
+	}
+
 
 	klog.V(4).Infof("Return isMountPoint: {%v}", isNotMountPoint)
 
 
-	mountRefs, err := d.mounter.GetMountRefs(stagingPath)
-	klog.V(4).Infof("mountRefs: {%v}", mountRefs)
-
-	mountList, err := d.mounter.List()
-	klog.V(4).Infof("Return mountList: {%v}", mountList)
-
 	if !isNotMountPoint {
+		mountList, err := d.mounter.List()
+		klog.V(4).Infof("Return mountList: {%v}", mountList)
 		deviceMP := d.getMountPointFromList(device, mountList)
+		
 		if deviceMP != nil {
 			isCorrectMountpoint := d.mounter.IsMountPointMatch(*deviceMP, req.GetStagingTargetPath())
 			klog.V(4).Infof("Return isCorrectMountpoint: {%v}. for device : {%v}, staging target path : {%v}",
