@@ -193,7 +193,7 @@ func (r RescanUtilsIscsi) FlushMultipathDevice(mpathDevice string) error {
 
 	klog.V(5).Infof("flushing mpath device : {%v}", mpathDevice)
 
-	_, err := r.executor.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", "/dev/" + mpathDevice})
+	_, err := r.executor.ExecuteWithTimeout(30*1000, "multipath", []string{"-f", "/dev/" + mpathDevice})
 	if err != nil {
 		klog.Errorf("error while running multipath command : {%v}", err.Error())
 		return err
