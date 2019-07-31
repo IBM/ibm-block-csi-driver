@@ -284,7 +284,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return nil, status.Error(codes.InvalidArgument, "Staging target not provided")
 	}
 
-	dev, refs, err := mount.GetDeviceNameFromMount(d.mounter, stagingTargetPath)
+	dev, refs, err := mount.GetDeviceNameFromMount(d.mounter, "/host" + stagingTargetPath)
 	if err != nil {
 		klog.Errorf("error while trying to get device from mount : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())

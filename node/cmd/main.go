@@ -36,7 +36,8 @@ func main() {
 	klog.InitFlags(nil)
 	flag.Parse()
 	
-
+	path := os.Getenv("PATH")
+	klog.V(4).Infof("PATH=%s", path)
 	if *version {
 		info, err := driver.GetVersionJSON(*configFile)
 		if err != nil {
