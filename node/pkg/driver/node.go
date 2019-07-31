@@ -278,7 +278,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	klog.V(5).Infof("NodeUnstageVolume: called with args %+v", *req)
 	
 	// TDO: remove me
-	mountList,_ = d.mounter.List()
+	mountList,_ := d.mounter.List()
 	klog.V(4).Infof("MONT LIST BEFORE UNSTAGE : {%v}", mountList)
 	
 	volumeID := req.GetVolumeId()
@@ -464,7 +464,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	klog.V(5).Infof("NodeUnpublishVolume: called with args %+v", *req)
 	
 	// TDO: remove me
-	mountList,_ = d.mounter.List()
+	mountList,_ := d.mounter.List()
 	klog.V(4).Infof("MONT LIST BEFORE UNPUBISH : {%v}", mountList)
 	
 	volumeID := req.GetVolumeId()
