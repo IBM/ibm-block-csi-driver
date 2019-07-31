@@ -38,7 +38,10 @@ RUN yum -y install xfsprogs xfsdump
 RUN mkdir /chroot
 ADD chroot-host-wrapper.sh /chroot
 RUN chmod 777 /chroot/chroot-host-wrapper.sh
-RUN  #  ln -s /chroot/chroot-host-wrapper.sh /chroot/blkid \
+RUN  ln -s /chroot/chroot-host-wrapper.sh /chroot/multipath \
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/multipathd \
+    
+#RUN    ln -s /chroot/chroot-host-wrapper.sh /chroot/blkid \
 #    && ln -s /chroot/chroot-host-wrapper.sh /chroot/blockdev \
 #    && ln -s /chroot/chroot-host-wrapper.sh /chroot/cat \
 #    && ln -s /chroot/chroot-host-wrapper.sh /chroot/df \
@@ -52,8 +55,8 @@ RUN  #  ln -s /chroot/chroot-host-wrapper.sh /chroot/blkid \
 #    && ln -s /chroot/chroot-host-wrapper.sh /chroot/mkfs.ext4 \
 #    && ln -s /chroot/chroot-host-wrapper.sh /chroot/mkfs.xfs \
 #    && ln -s /chroot/chroot-host-wrapper.sh /chroot/mount \
-    && ln -s /chroot/chroot-host-wrapper.sh /chroot/multipath \
-    && ln -s /chroot/chroot-host-wrapper.sh /chroot/multipathd \
+#    && ln -s /chroot/chroot-host-wrapper.sh /chroot/multipath \
+#    && ln -s /chroot/chroot-host-wrapper.sh /chroot/multipathd \
 #    && ln -s /chroot/chroot-host-wrapper.sh /chroot/pgrep \
 #    && ln -s /chroot/chroot-host-wrapper.sh /chroot/rmdir \
 #    && ln -s /chroot/chroot-host-wrapper.sh /chroot/stat \
