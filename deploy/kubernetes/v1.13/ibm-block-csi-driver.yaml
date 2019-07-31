@@ -372,9 +372,9 @@ spec:
               mountPath: /etc/iscsi
             - name: sys-dir
               mountPath: /sys
-           # - name: host-dir
-           #   mountPath: /host
-           #   mountPropagation: "Bidirectional"
+            - name: host-dir
+              mountPath: /host
+              mountPropagation: "Bidirectional"
 
           ports:
             - name: healthz
@@ -457,8 +457,8 @@ spec:
             path: /sys
             type: Directory
 
-        #- name: host-dir
-        #  hostPath:
-        #    path: /
-        #    type: Directory
+        - name: host-dir
+          hostPath:
+            path: /
+            type: Directory
 
