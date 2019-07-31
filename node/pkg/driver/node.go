@@ -373,7 +373,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, status.Error(codes.FailedPrecondition, "staging target path was not mounted into.")
 	}
 	
-	mountedDevice := ""
+	//mountedDevice := ""
 
 	//checking if there is a mount FROM staging target path
 	for _, mount := range mountList {
@@ -404,7 +404,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	mountOptions :=  []string{"bind"}
 	
 	// TDO: remove me
-	mountList,_ := d.mounter.List()
+	mountList,_ = d.mounter.List()
 	klog.V(4).Infof("MONT LIST BEFORE : {%v}", mountList)
 
 	// bind mount
@@ -414,7 +414,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 	
 	// TDO: remove me
-	mountList,_ := d.mounter.List()
+	mountList,_ = d.mounter.List()
 	klog.V(4).Infof("MONT LIST AFTER : {%v}", mountList)
 	
 
