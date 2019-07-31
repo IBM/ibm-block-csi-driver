@@ -79,7 +79,7 @@ func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsI
 }
 
 func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	klog.V(4).Infof("NodeStageVolume: called with args %+v", *req)
+	klog.V(5).Infof("NodeStageVolume: called with args %+v", *req)
 
 	err := d.nodeStageVolumeRequestValidation(req)
 	if err != nil {
@@ -219,10 +219,6 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	stageInfo["connectivity"] = connectivityType
 
 	d.NodeUtils.WriteStageInfoToFile(stageInfoPath, stageInfo)
-
-
-	
-
 
 	klog.V(4).Infof("mounter succeeded!: %v", d.mounter)
 
@@ -372,8 +368,6 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	if !found {
 		return nil, status.Error(codes.FailedPrecondition, "staging target path was not mounted into.")
 	}
-	
-	mountedDevice := ""
 
 	//checking if there is a mount FROM staging target path
 	for _, mount := range mountList {
@@ -402,21 +396,12 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 	}
 	mountOptions :=  []string{"bind"}
-	
-	// TDO: remove me
-	mountList,_ := d.mounter.List()
-	klog.V(4).Infof("MONT LIST BEFORE : {%v}", mountList)
 
 	// bind mount
 	err = d.mounter.Mount(stagingPath, targetPath, fsType, mountOptions)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	
-	// TDO: remove me
-	mountList,_ := d.mounter.List()
-	klog.V(4).Infof("MONT LIST AFTER : {%v}", mountList)
-	
 
 	return &csi.NodePublishVolumeResponse{}, nil
 }
