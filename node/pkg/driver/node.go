@@ -276,6 +276,11 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 
 func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
 	klog.V(5).Infof("NodeUnstageVolume: called with args %+v", *req)
+	
+	// TDO: remove me
+	mountList,_ = d.mounter.List()
+	klog.V(4).Infof("MONT LIST BEFORE UNSTAGE : {%v}", mountList)
+	
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		klog.Errorf("Volume ID not provided")
@@ -295,6 +300,10 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	}
 
 	klog.V(4).Infof("dev : {%v}, refs: {%v}", dev, refs)
+	
+	
+	
+	
 
 	if refs == 0 {
 		klog.V(5).Infof("Idempotent case : %s target not mounted", stagingTargetPath)
@@ -453,6 +462,11 @@ func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVol
 
 func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	klog.V(5).Infof("NodeUnpublishVolume: called with args %+v", *req)
+	
+	// TDO: remove me
+	mountList,_ = d.mounter.List()
+	klog.V(4).Infof("MONT LIST BEFORE UNPUBISH : {%v}", mountList)
+	
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
