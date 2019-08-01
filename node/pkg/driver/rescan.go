@@ -1,7 +1,6 @@
 package driver
 
 import (
-	"context"
 	"fmt"
 	"k8s.io/klog"
 	"os"
@@ -202,7 +201,7 @@ func (r RescanUtilsIscsi) FlushMultipathDevice(mpathDevice string) error {
 		return err
 	}
 
-	_, err := r.executor.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", "/dev/" + mpathDevice})
+	_, err = r.executor.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", "/dev/" + mpathDevice})
 	if err != nil {
 		klog.Errorf("error while running multipath command : {%v}", err.Error())
 		return err
