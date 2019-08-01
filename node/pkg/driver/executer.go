@@ -17,7 +17,8 @@ type Executer struct {
 }
 
 func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []string) ([]byte, error) {
-
+	klog.V(5).Infof("Executing command : {%v} with args : {%v}. and timeout : {%v} mseconds",command, args, mSeconds)
+	
 	// Create a new context and add a timeout to it
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(mSeconds)*time.Millisecond)
 	defer cancel() // The cancel should be deferred so resources are cleaned up
@@ -41,6 +42,7 @@ func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []strin
 	if err != nil {
 		klog.V(4).Infof("Non-zero exit code: %s", err)
 	}
-
+	
+	klog.V(5).Infof("Finished executing command",command, args)
 	return out, err
 }
