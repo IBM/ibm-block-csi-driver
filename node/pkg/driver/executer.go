@@ -43,6 +43,6 @@ func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []strin
 		klog.V(4).Infof("Non-zero exit code: %s", err)
 	}
 	
-	klog.V(5).Infof("Finished executing command",command, args)
+	klog.V(5).Infof("Finished executing command")
 	return out, err
 }
