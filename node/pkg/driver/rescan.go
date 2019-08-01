@@ -96,7 +96,7 @@ func (r RescanUtilsIscsi) GetMpathDevice(lunId int, array_iqn string) (string, e
 		return "", fmt.Errorf("failed to find device path: %s", devicePath)
 	}
 
-	// Looping over the physical devices of the volume - /dev/sdX (multiple since its with multipathing) 
+	// Looping over the physical devices of the volume - /dev/sdX (multiple since its with multipathing)
 	for i, path := range devicePaths {
 		if path != "" {
 			if mappedDevicePath, err := getMultipathDisk(path); mappedDevicePath != "" {
@@ -149,7 +149,7 @@ func getMultipathDisk(path string) (string, error) {
 	sdevice := filepath.Base(devicePath)
 	// If destination directory is already identified as a multipath device,
 	// just return its path
-	if strings.HasPrefix(sdevice, "dm-") { 
+	if strings.HasPrefix(sdevice, "dm-") {
 		klog.V(4).Infof("Already found multipath device: %s", sdevice)
 		return path, nil
 	}
@@ -157,7 +157,7 @@ func getMultipathDisk(path string) (string, error) {
 	// check to see if any have an entry under /sys/block/dm-*/slaves matching
 	// the device the symlink was pointing at
 	dmPaths, err := filepath.Glob("/sys/block/dm-*")
-	// TODO improve looping by just filepath.Glob("/sys/block/dm-*/slaves/" + sdevice) and then no loops needed below, since it will just find the device directly.	
+	// TODO improve looping by just filepath.Glob("/sys/block/dm-*/slaves/" + sdevice) and then no loops needed below, since it will just find the device directly.
 
 	if err != nil {
 		klog.V(4).Infof("Glob error: %s", err)
@@ -173,10 +173,10 @@ func getMultipathDisk(path string) (string, error) {
 			if sdevice == s {
 				// We've found a matching entry, return the path for the
 				// dm-* device it was found under
-				// for Example, return /dev/dm-3 
+				// for Example, return /dev/dm-3
 				//   ls -l  /sys/block/dm-*/slaves/*
 				//    /sys/block/dm-3/slaves/sdb -> ../../../../platform/host41/session9/target41:0:0/41:0:0:13/block/sdb
-				
+
 				p := filepath.Join("/dev", filepath.Base(dmPath))
 				klog.V(4).Infof("Found matching multipath device: %s under dm-* device path %s", sdevice, dmPath)
 				return p, nil
@@ -193,10 +193,20 @@ func (r RescanUtilsIscsi) FlushMultipathDevice(mpathDevice string) error {
 
 	klog.V(5).Infof("flushing mpath device : {%v}", mpathDevice)
 
-	_, err := r.executor.ExecuteWithTimeout(30*1000, "multipath", []string{"-f", "/dev/" + mpathDevice})
+	_, err := r.executor.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", "/dev/" + mpathDevice})
 	if err != nil {
-		klog.Errorf("error while running multipath command : {%v}", err.Error())
-		return err
+		klog.V(5).Infof("Err : {%v} and deadling : {%v}", err.Error(), context.DeadlineExceeded)
+		if err.Error() == context.DeadlineExceeded {
+			// retrying multipath -f
+			_, err := r.executor.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", "/dev/" + mpathDevice})
+			if err != nil {
+				klog.Errorf("error while running multipath command : {%v}", err.Error())
+				return err
+			}
+		} else {
+			klog.Errorf("error while running multipath command : {%v}", err.Error())
+			return err
+		}
 	}
 
 	klog.V(5).Infof("finshed flushing mpath device : {%v}", mpathDevice)
@@ -214,10 +224,10 @@ func (r RescanUtilsIscsi) RemoveIscsiDevice(sysDevices []string) error {
 	)
 
 	for _, deviceName := range sysDevices {
-		if deviceName == ""{
+		if deviceName == "" {
 			continue
 		}
-		klog.V(5).Infof("opening device for device name : {%v}",deviceName)
+		klog.V(5).Infof("opening device for device name : {%v}", deviceName)
 		filename := fmt.Sprintf("/sys/block/%s/device/delete", deviceName)
 		if f, err = os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200); err != nil {
 			klog.Errorf("errow while opening file : {%v}. error: {%v}", filename, err.Error())

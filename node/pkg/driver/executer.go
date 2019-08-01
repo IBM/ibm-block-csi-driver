@@ -1,10 +1,10 @@
 package driver
 
 import (
-	"k8s.io/klog"
+	"context"
 	"os/exec"
 	"time"
-	"fmt"
+	"k8s.io/klog"
 )
 
 //go:generate mockgen -destination=../../mocks/mock_executer.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver ExecutorInterface
@@ -13,50 +13,34 @@ type ExecutorInterface interface { // basic host dependent functions
 }
 
 type Executer struct {
-	nodeUtils NodeUtilsInterface
-}
-
-// execCommandResult is used to return shell command results via channels between goroutines
-type execCommandResult struct {
-	Output []byte
-	Error  error
+	 nodeUtils NodeUtilsInterface
 }
 
 func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []string) ([]byte, error) {
-	klog.V(4).Infof("executing with timeout")
-	timeout :=  time.Duration(mSeconds)*time.Millisecond
-	klog.V(4).Infof("aftertimeout1")
 
-	cmd := exec.Command(command, args...)
-	klog.V(4).Infof("aftercmd")
-	done := make(chan execCommandResult, 1)
-	klog.V(4).Infof("done")
-	var result execCommandResult
-	klog.V(4).Infof("cmd : {%v}", cmd)
+	// Create a new context and add a timeout to it
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(mSeconds)*time.Millisecond)
+	defer cancel() // The cancel should be deferred so resources are cleaned up
 
-	go func() {
-		klog.V(4).Infof("go func")
-		out, err := cmd.CombinedOutput()
-		klog.V(4).Infof("out {%v} err {%v}", out, err)
-		done <- execCommandResult{Output: out, Error: err}
-		klog.V(4).Infof("done?")
-	}()
+	// Create the command with our context
+	cmd := exec.CommandContext(ctx, command, args...)
 
-	select {
-	case <-time.After(timeout):
-		klog.V(4).Infof("afte rtimeout?")
-		if err := cmd.Process.Kill(); err != nil {
-			klog.Errorf("Failed to kill process. command : {%v}, err : {%v}", command, err.Error())
-			result = execCommandResult{Output: nil, Error: err}
-		} else {
-			klog.Errorf("command :{%v} killed after timeout exceeded.", command)
-			result = execCommandResult{Output: nil, Error: fmt.Errorf("command timeout exceeded")}
-		}
-	case result = <-done:
-		klog.V(4).Infof("done aftere rtimeout?")
-		break
+	// This time we can simply use Output() to get the result.
+	out, err := cmd.Output()
+
+	// We want to check the context error to see if the timeout was executed.
+	// The error returned by cmd.Output() will be OS specific based on what
+	// happens when a process is killed.
+	if ctx.Err() == context.DeadlineExceeded {
+		klog.V(4).Infof("Command %s timeout reached", command)
+		return nil, ctx.Err()
 	}
 
-	klog.V(4).Infof("command : %v completed. output : {%v} error : {%v}", command, string(result.Output), result.Error)
-	return result.Output, result.Error
+	// If there's no context error, we know the command completed (or errored).
+	klog.V(4).Infof("Output from command: %s", string(out))
+	if err != nil {
+		klog.V(4).Infof("Non-zero exit code: %s", err)
+	}
+
+	return out, err
 }
