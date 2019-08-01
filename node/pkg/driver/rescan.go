@@ -197,10 +197,11 @@ func (r RescanUtilsIscsi) FlushMultipathDevice(mpathDevice string) error {
 	_, err := r.executor.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", "/dev/" + mpathDevice})
 	if err != nil {
 		if err.Error() == context.DeadlineExceeded.Error() {
-			out, err = r.executor.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", "/dev/" + mpathDevice})
+			out, err := r.executor.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", "/dev/" + mpathDevice})
+			strout := string(out)
 			if err != nil {
-				klog.V(4).Infof("string {%v} contains : {%v}. res : %v", out, "is not a valid argument", strings.Contains(out, "is not a valid argument"))
-				if strings.Contains(out, "is not a valid argument") {
+				klog.V(4).Infof("string {%v} contains : {%v}. res : %v", strout, "is not a valid argument", strings.Contains(strout, "is not a valid argument"))
+				if strings.Contains(strout, "is not a valid argument") {
 					klog.V(4).Infof("device was removed ")
 				} else {
 					klog.Errorf("error while running multipath command : {%v}", err.Error())
