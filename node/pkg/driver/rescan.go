@@ -1,7 +1,6 @@
 package driver
 
 import (
-	"context"
 	"fmt"
 	"k8s.io/klog"
 	"os"
@@ -194,22 +193,18 @@ func (r RescanUtilsIscsi) FlushMultipathDevice(mpathDevice string) error {
 
 	klog.V(5).Infof("flushing mpath device : {%v}", mpathDevice)
 
-	_, err := r.executor.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", "/dev/" + mpathDevice})
+	fullDevice := "/dev/" + mpathDevice
+	_, err := r.executor.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", fullDevice})
 	if err != nil {
-		if err.Error() == context.DeadlineExceeded.Error() {
-			out, err := r.executor.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", "/dev/" + mpathDevice})
-			strout := string(out)
-			if err != nil {
-				klog.V(4).Infof("string {%v} contains : {%v}. res : %v", strout, "is not a valid argument", strings.Contains(strout, "is not a valid argument"))
-				if strings.Contains(strout, "is not a valid argument") {
-					klog.V(4).Infof("device was removed ")
-				} else {
-					klog.Errorf("error while running multipath command : {%v}", err.Error())
-					return err
-				}
+		if _, errOpen := os.Open(fullDevice); errOpen != nil {
+			if os.IsNotExist(errOpen) {
+				klog.V(5).Infof("Mpath device {%v} was deleted", fullDevice)
+			} else {
+				klog.Errorf("Error while opening file : {%v}. error: {%v}. Means the multipath -f {%v} did not succeed to delete the device.", fullDevice, errOpen.Error(), fullDevice)
+				return errOpen
 			}
-		} else {
-			klog.Errorf("error while running multipath command : {%v}", err.Error())
+		} else{
+			klog.Errorf("multipath -f {%v} did not succeed to delete the device. err={%v}", fullDevice, err.Error())
 			return err
 		}
 	}
@@ -233,10 +228,16 @@ func (r RescanUtilsIscsi) RemoveIscsiDevice(sysDevices []string) error {
 			continue
 		}
 		klog.V(5).Infof("opening device for device name : {%v}", deviceName)
+		
+
 		filename := fmt.Sprintf("/sys/block/%s/device/delete", deviceName)
 		if f, err = os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200); err != nil {
-			klog.Errorf("errow while opening file : {%v}. error: {%v}", filename, err.Error())
-			return err
+			if os.IsNotExist(err) {
+				klog.V(5).Infof("Block device {%v} was not found on the system, so skip deleting it", deviceName)
+			} else {
+				klog.Errorf("errow while opening file : {%v}. error: {%v}", filename, err.Error())
+				return err
+			}
 		}
 
 		defer f.Close()
