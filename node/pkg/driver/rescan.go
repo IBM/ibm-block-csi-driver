@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"context"
 )
 
 //go:generate mockgen -destination=../../mocks/mock_rescan_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver RescanUtilsInterface
@@ -195,8 +196,8 @@ func (r RescanUtilsIscsi) FlushMultipathDevice(mpathDevice string) error {
 
 	_, err := r.executor.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", "/dev/" + mpathDevice})
 	if err != nil {
-		klog.V(5).Infof("Err : {%v} and deadling : {%v}", err.Error(), context.DeadlineExceeded)
-		if err.Error() == context.DeadlineExceeded {
+		klog.V(5).Infof("Err : {%v} and deadling : {%v}", err.Error(), context.DeadlineExceeded.Error())
+		if err.Error() == context.DeadlineExceeded.Error() {
 			// retrying multipath -f
 			_, err := r.executor.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", "/dev/" + mpathDevice})
 			if err != nil {
