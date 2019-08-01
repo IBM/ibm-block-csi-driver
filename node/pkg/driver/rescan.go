@@ -1,6 +1,7 @@
 package driver
 
 import (
+	"context"
 	"fmt"
 	"k8s.io/klog"
 	"os"
@@ -193,24 +194,25 @@ func (r RescanUtilsIscsi) FlushMultipathDevice(mpathDevice string) error {
 
 	klog.V(5).Infof("flushing mpath device : {%v}", mpathDevice)
 
-	klog.V(5).Infof("dmsetup :")
-	//dmsetup message mpathj 0 fail_if_no_path
-	_, err := r.executor.ExecuteWithTimeout(10*1000, "dmsetup", []string{"message", "/dev/" + mpathDevice, "0", "fail_if_no_path"})
+	_, err := r.executor.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", "/dev/" + mpathDevice})
 	if err != nil {
-		klog.Errorf("error while running dmsetup command : {%v}", err.Error())
-		return err
-	}
-
-	_, err = r.executor.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", "/dev/" + mpathDevice})
-	if err != nil {
-		klog.Errorf("error while running multipath command : {%v}", err.Error())
-		return err
-
+		if err.Error() == context.DeadlineExceeded.Error() {
+			_, err = r.executor.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", "/dev/" + mpathDevice})
+			if strings.Contains(err.Error(), "is not a valid argument") {
+				klog.V(4).Infof("device was removed ")
+			} else {
+				klog.Errorf("error while running multipath command : {%v}", err.Error())
+				return err
+			}
+		} else {
+			klog.Errorf("error while running multipath command : {%v}", err.Error())
+			return err
+		}
 	}
 
 	klog.V(5).Infof("finshed flushing mpath device : {%v}", mpathDevice)
-
 	return nil
+
 }
 
 func (r RescanUtilsIscsi) RemoveIscsiDevice(sysDevices []string) error {
