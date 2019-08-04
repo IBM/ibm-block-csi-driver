@@ -21,8 +21,9 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"strings"
 	"path/filepath"
+	"strings"
+	"sync"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
@@ -51,12 +52,13 @@ var (
 
 // nodeService represents the node service of CSI driver
 type NodeService struct {
-	mounter        *mount.SafeFormatAndMount // TODO fix k8s mount import
-	ConfigYaml     ConfigFile
-	Hostname       string
-	NodeUtils      NodeUtilsInterface
-	newRescanUtils NewRescanUtilsFunction
-	executer       ExecutorInterface
+	mounter          *mount.SafeFormatAndMount // TODO fix k8s mount import
+	ConfigYaml       ConfigFile
+	Hostname         string
+	NodeUtils        NodeUtilsInterface
+	newRescanUtils   NewRescanUtilsFunction
+	executer         ExecutorInterface
+	VolumeIdLocksMap sync.Map
 }
 
 // newNodeService creates a new node service
@@ -69,12 +71,9 @@ func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsI
 		newRescanUtils: newRescanUtils,
 		executer:       executer,
 
-		mounter: mounter,
+		mounter:          mounter,
+		VolumeIdLocksMap: new(sync.Map),
 
-		//		mounter: &mount.SafeFormatAndMount{
-		//			Interface: mount.New(""),
-		//			Exec:      mount.NewOsExec(),
-		//		},
 	}
 }
 
@@ -91,6 +90,14 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		}
 	}
 
+	volId = req.VolumeId
+	err = d.NodeUtils.AddVolumeLock(d.VolumeIdLocksMap, volId)
+	if err != nil {
+		klog.Errorf("Another operation is being perfomed on volume : {%s}", volId)
+		return nil, status.Error(codes.Aborted, err.Error())
+	}
+	defer d.NodeUtils.RemoveVolumeLock(d.VolumeIdLocksMap, volId)
+
 	// get the volume device
 	//get connectivity from publish context
 	connectivityType, lun, array_iqn, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
@@ -102,9 +109,9 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	klog.V(4).Infof("lun : %v", lun)
 
 	klog.V(4).Infof("array_iqn : %v", array_iqn)
-	
+
 	stagingPath := req.GetStagingTargetPath()
-	
+
 	rescanUtils, err := d.newRescanUtils(connectivityType, d.NodeUtils, d.executer)
 
 	if err != nil {
@@ -120,57 +127,56 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-//
-//	isNotMountPoint, err := d.mounter.IsLikelyNotMountPoint(stagingPath)
-//	
-//	if err != nil {
-//		if  os.IsNotExist(err) {
-//			isNotMountPoint = true
-//		}  else {
-//			klog.V(4).Infof("error while trying to check mountpoint: {%v}", err.Error())
-//			return nil, status.Error(codes.Internal, err.Error())
-//		}	
-//	}
-//
-//
-//	klog.V(4).Infof("Return isMountPoint: {%v}", isNotMountPoint)
-//
-//
-//	if !isNotMountPoint {
-//		mountList,err := d.mounter.List()
-//		if err != nil {
-//			klog.Errorf("error while getting mount list: {%v}", err.Error())
-//			return nil, status.Error(codes.Internal, err.Error())
-//		}
-//		
-//		klog.V(4).Infof("Return mountList: {%v}", mountList)
-//		deviceMP := d.getMountPointFromList(device, mountList)
-//		
-//		if deviceMP != nil {
-//			isCorrectMountpoint := d.mounter.IsMountPointMatch(*deviceMP, req.GetStagingTargetPath())
-//			klog.V(4).Infof("Return isCorrectMountpoint: {%v}. for device : {%v}, staging target path : {%v}",
-//				isCorrectMountpoint, device, req.GetStagingTargetPath())
-//			if isCorrectMountpoint {
-//				klog.V(4).Infof("Returning ok result")
-//				return &csi.NodeStageVolumeResponse{}, nil
-//			} else {
-//				return nil, status.Errorf(codes.AlreadyExists, "Mount point is already mounted to.")
-//			}
-//		}
-//	}
-	
-	
+	//
+	//	isNotMountPoint, err := d.mounter.IsLikelyNotMountPoint(stagingPath)
+	//
+	//	if err != nil {
+	//		if  os.IsNotExist(err) {
+	//			isNotMountPoint = true
+	//		}  else {
+	//			klog.V(4).Infof("error while trying to check mountpoint: {%v}", err.Error())
+	//			return nil, status.Error(codes.Internal, err.Error())
+	//		}
+	//	}
+	//
+	//
+	//	klog.V(4).Infof("Return isMountPoint: {%v}", isNotMountPoint)
+	//
+	//
+	//	if !isNotMountPoint {
+	//		mountList,err := d.mounter.List()
+	//		if err != nil {
+	//			klog.Errorf("error while getting mount list: {%v}", err.Error())
+	//			return nil, status.Error(codes.Internal, err.Error())
+	//		}
+	//
+	//		klog.V(4).Infof("Return mountList: {%v}", mountList)
+	//		deviceMP := d.getMountPointFromList(device, mountList)
+	//
+	//		if deviceMP != nil {
+	//			isCorrectMountpoint := d.mounter.IsMountPointMatch(*deviceMP, req.GetStagingTargetPath())
+	//			klog.V(4).Infof("Return isCorrectMountpoint: {%v}. for device : {%v}, staging target path : {%v}",
+	//				isCorrectMountpoint, device, req.GetStagingTargetPath())
+	//			if isCorrectMountpoint {
+	//				klog.V(4).Infof("Returning ok result")
+	//				return &csi.NodeStageVolumeResponse{}, nil
+	//			} else {
+	//				return nil, status.Errorf(codes.AlreadyExists, "Mount point is already mounted to.")
+	//			}
+	//		}
+	//	}
+
 	dev, refs, err := mount.GetDeviceNameFromMount(d.mounter, stagingPath)
 	klog.V(4).Infof("dev : {%v}. refs : {%v}", dev, refs)
 	if err != nil {
 		klog.Errorf("error while trying to get device from mount : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	
+
 	if refs != 0 {
 		dmDevice, err := filepath.EvalSymlinks(dev)
 		if err != nil {
-			klog.Errorf("error while reading symlink : {%v}. err : {%v}",dev, err.Error())
+			klog.Errorf("error while reading symlink : {%v}. err : {%v}", dev, err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 		klog.V(4).Infof("comparing dev : {%v} with device : {%v}", dmDevice, device)
@@ -180,7 +186,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		} else {
 			return nil, status.Errorf(codes.AlreadyExists, "Mount point is already mounted to.")
 		}
-	} 
+	}
 
 	// if the device is not mounted then we are mounting it.
 
@@ -192,7 +198,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	klog.V(4).Infof("fs_type : {%v}", fsType)
-	
+
 	// creating the stagingPath if it is missing
 	if _, err := os.Stat(stagingPath); os.IsNotExist(err) {
 		klog.V(4).Infof("Target path directory does not exist. creating : {%v}", stagingPath)
@@ -278,13 +284,20 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
 	}
 
+	err = d.NodeUtils.AddVolumeLock(d.VolumeIdLocksMap, volumeID)
+	if err != nil {
+		klog.Errorf("Another operation is being perfomed on volume : {%s}", volId)
+		return nil, status.Error(codes.Aborted, err.Error())
+	}
+	defer d.NodeUtils.RemoveVolumeLock(d.VolumeIdLocksMap, volumeID)
+
 	stagingTargetPath := req.GetStagingTargetPath()
 	if len(stagingTargetPath) == 0 {
 		klog.Errorf("Staging target not provided")
 		return nil, status.Error(codes.InvalidArgument, "Staging target not provided")
 	}
 
-	dev, refs, err := mount.GetDeviceNameFromMount(d.mounter, "/host" + stagingTargetPath)
+	dev, refs, err := mount.GetDeviceNameFromMount(d.mounter, "/host"+stagingTargetPath)
 	if err != nil {
 		klog.Errorf("error while trying to get device from mount : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
@@ -296,7 +309,6 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		klog.V(5).Infof("Idempotent case : %s target not mounted", stagingTargetPath)
 		return &csi.NodeUnstageVolumeResponse{}, nil
 	}
-
 
 	klog.V(4).Infof("Reading statge info file")
 	stageInfoPath := path.Join(req.GetStagingTargetPath(), stageInfoFilename)
@@ -320,15 +332,15 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not unmount target %q: %v", stagingTargetPath, err)
 	}
-	
-	//TODO: there might be an indempotent issue here if we fail after the unmount there will be  faulty devices left 
-	// (since the next time we run unpstange we will reutrn that everytjing is OK since the path is unmounted) 
+
+	//TODO: there might be an indempotent issue here if we fail after the unmount there will be  faulty devices left
+	// (since the next time we run unpstange we will reutrn that everytjing is OK since the path is unmounted)
 
 	rescanUtils, err := d.newRescanUtils(connectivityType, d.NodeUtils, d.executer)
-	
+
 	err = rescanUtils.FlushMultipathDevice(mpathDevice)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Multipath -f  command failed with error: %v",  err)
+		return nil, status.Errorf(codes.Internal, "Multipath -f  command failed with error: %v", err)
 	}
 	err = rescanUtils.RemoveIscsiDevice(sysDevices)
 	if err != nil {
@@ -350,6 +362,14 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
+	volumeID := req.VolumeId
+
+	err = d.NodeUtils.AddVolumeLock(d.VolumeIdLocksMap, volumeID)
+	if err != nil {
+		klog.Errorf("Another operation is being perfomed on volume : {%s}", volId)
+		return nil, status.Error(codes.Aborted, err.Error())
+	}
+	defer d.NodeUtils.RemoveVolumeLock(d.VolumeIdLocksMap, volumeID)
 
 	// checking if the node staging path was mpounted into
 	stagingPath := req.GetStagingTargetPath()
@@ -372,9 +392,9 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	//checking if there is a mount FROM staging target path
 	for _, mount := range mountList {
 		klog.V(4).Infof("mount device : {%v}, path : {%v}", mount.Device, mount.Path)
-		if mount.Device == stagingPath { 
-			// The /host prefix remove is for mount command inside the node with /host mounted 
-			//TODO: !!!!!!!change to use device! (from the file) 
+		if mount.Device == stagingPath {
+			// The /host prefix remove is for mount command inside the node with /host mounted
+			//TODO: !!!!!!!change to use device! (from the file)
 			if mount.Path == targetPath {
 				klog.V(4).Infof("Idempotent case : path was already mounted.")
 				return &csi.NodePublishVolumeResponse{}, nil
@@ -395,7 +415,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		fsType = defaultFSType
 
 	}
-	mountOptions :=  []string{"bind"}
+	mountOptions := []string{"bind"}
 
 	// bind mount
 	err = d.mounter.Mount(stagingPath, targetPath, fsType, mountOptions)
@@ -442,6 +462,15 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
 	}
+
+	volumeID := req.VolumeId
+
+	err = d.NodeUtils.AddVolumeLock(d.VolumeIdLocksMap, volumeID)
+	if err != nil {
+		klog.Errorf("Another operation is being perfomed on volume : {%s}", volId)
+		return nil, status.Error(codes.Aborted, err.Error())
+	}
+	defer d.NodeUtils.RemoveVolumeLock(d.VolumeIdLocksMap, volumeID)
 
 	target := req.GetTargetPath()
 	if len(target) == 0 {

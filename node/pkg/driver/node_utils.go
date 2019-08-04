@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
@@ -22,6 +23,8 @@ type NodeUtilsInterface interface {
 	GetSysDevicesFromMpath(baseDevice string) (string, error)
 	ReadFromStagingInfoFile(filePath string) (map[string]string, error)
 	ClearStageInfoFile(filePath string) error
+	AddVolumeLock(locksMap map[string]int, string volId) ( error)
+	RemoveVolumeLock(locksMap map[string]int, string volId) (sync.Mutex, error)
 }
 
 type NodeUtils struct {
@@ -202,3 +205,23 @@ func (n NodeUtils) GetSysDevicesFromMpath(device string) (string, error) {
 func (n NodeUtils) ClearStageInfoFile(filePath string) (error) {
 	return os.Remove(filePath)
 }
+
+func  (n NodeUtils)  AddVolumeLock(locksMap map[string]int, string volId) ( error){
+	// lets use WWN? as key
+	_, exists := m.Load(volId)
+	if !exists{
+		m.Store(volId, 0)
+		return nil
+	} else{
+		return &VolumeAlreadyProcessingError{volId}
+	}
+}
+
+
+func  (n NodeUtils)  RemoveVolumeLock(locksMap map[string]int, string volId) (sync.Mutex, error){
+	lock, exists := m.Load(volId)
+	if exists{
+		m.Delete(volId)
+	}
+}
+

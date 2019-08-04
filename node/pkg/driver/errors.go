@@ -45,3 +45,12 @@ type ConnectivityIscsiStorageTargetNotFoundError struct {
 func (e *ConnectivityIscsiStorageTargetNotFoundError) Error() string {
 	return fmt.Sprintf("Connectivity Error: Storage target name [%s] was not found on the host, under directory %s", e.StorageTargetName, e.DirectoryPath)
 }
+
+
+type VolumeAlreadyProcessingError struct {
+	volId string
+}
+
+func (e *VolumeAlreadyProcessingError) Error() string {
+	return fmt.Sprintf("Volume %s is already processing. request cannot be completed.", e.volId)
+}
