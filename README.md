@@ -22,8 +22,8 @@ Enabling CSIDriver on Kubernetes (more details -> https://kubernetes-csi.github.
 
 In Kubernetes v1.13, because the feature was alpha, it was disabled by default. To enable the use of CSIDriver on these versions, do the following:
 
-1. Ensure the feature gate is enabled via the following Kubernetes feature flag: --feature-gates=CSIDriverRegistry=true
-   For example on kubeadm installation add the flag inside the /etc/kubernetes/manifests/kube-apiserver.yaml.
+1. Ensure the feature gate is enabled via the following Kubernetes feature flag: `--feature-gates=CSIDriverRegistry=true`
+   For example on kubeadm installation add the flag inside the `/etc/kubernetes/manifests/kube-apiserver.yaml`.
 2. Either ensure the CSIDriver CRD is automatically installed via the Kubernetes Storage CRD addon OR manually install the CSIDriver CRD on the Kubernetes cluster with the following command:
    ```sh
    #> kubectl create -f https://raw.githubusercontent.com/kubernetes/csi-api/master/pkg/crd/manifests/csidriver.yaml
@@ -179,7 +179,7 @@ Apply the storage class:
 
 ## Usage
 
-Create pvc-demo.yaml file as follow:
+Create `pvc-demo.yaml` file as follow:
 ```
 apiVersion: v1
 kind: PersistentVolumeClaim
