@@ -249,7 +249,8 @@ class SVCArrayMediator(ArrayMediator):
         if not current_host:
             raise controller_errors.HostNotFoundError(iscsi_iqn)
 
-        logger.debug("found host : {0}".format(current_host))
+        logger.debug("found host : {0} with iqn : {1}".format(current_host,
+                                                              iscsi_iqn))
         return current_host, [ISCSI_CONNECTIVITY_TYPE]
 
     def get_volume_mappings(self, volume_id):
