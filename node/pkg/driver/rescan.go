@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
     "sync"
+	"io/ioutil"    
 )
 
 //go:generate mockgen -destination=../../mocks/mock_rescan_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver RescanUtilsInterface
@@ -18,6 +19,7 @@ type RescanUtilsInterface interface {
 	GetMpathDevice(volumeId string, lunId int, array_iqn string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
 	RemoveIscsiDevice(sysDevices []string) error
+	GetIscsiSessionHostsForArrayIQN(array_iqn string) ([]int, error)	
 }
 
 type RescanUtilsIscsi struct {
@@ -40,7 +42,7 @@ func NewRescanUtils(connectivityType string, nodeUtils NodeUtilsInterface, execu
 
 func (r RescanUtilsIscsi) RescanSpecificLun(lunId int, array_iqn string) error {
 	klog.V(5).Infof("Starging Rescan specific lun, on lun : {%v}, with array iqn : {%v}", lunId, array_iqn)
-	sessionHosts, err := r.nodeUtils.GetIscsiSessionHostsForArrayIQN(array_iqn)
+	sessionHosts, err := r.GetIscsiSessionHostsForArrayIQN(array_iqn)
 	if err != nil {
 		return err
 	}
@@ -281,6 +283,79 @@ func (r RescanUtilsIscsi) RemoveIscsiDevice(sysDevices []string) error {
 	}
 	klog.V(5).Infof("finshed removing iscsi device : {%v}", sysDevices)
 	return nil
+}
+
+func (r RescanUtilsIscsi) GetIscsiSessionHostsForArrayIQN(array_iqn string) ([]int, error) {
+	/*
+		Description:
+			This function find all the hosts IDs under which has targetname that equal to the array_iqn.  
+			/sys/class/iscsi_host/host<IDs>/device/session*\/iscsi_session/session*\/targetname"
+			So the function goes over all the above hosts and return back only the host numbers as a list.
+	*/
+	
+	sysPath := "/sys/class/iscsi_host/"
+	var sessionHosts []int
+	if hostDirs, err := ioutil.ReadDir(sysPath); err != nil {
+		klog.Errorf("cannot read sys dir : {%v}. error : {%v}", sysPath, err)
+		return sessionHosts, err
+	} else {
+		klog.V(5).Infof("host dirs : {%v}", hostDirs)
+		for _, hostDir := range hostDirs {
+			// get the host session number : "host34"
+			hostName := hostDir.Name()
+			hostNumber := -1
+			if !strings.HasPrefix(hostName, "host") {
+				continue
+			} else {
+				hostNumber, err = strconv.Atoi(strings.TrimPrefix(hostName, "host"))
+				if err != nil {
+					klog.V(4).Infof("cannot get host id from host : {%v}", hostName)
+					continue
+				}
+			}
+
+			targetPath := sysPath + hostName + "/device/session*/iscsi_session/session*/targetname"
+
+			//devicePath + sessionName + "/iscsi_session/" + sessionName + "/targetname"
+			matches, err := filepath.Glob(targetPath)
+			if err != nil {
+				klog.Errorf("error while finding targetPath : {%v}. err : {%v}", targetPath, err)
+				return sessionHosts, err
+			}
+
+			klog.V(5).Infof("matches were found : {%v}", matches)
+
+			//TODO: can there be more then 1 session??
+			//sessionNumber, err :=  strconv.Atoi(strings.TrimPrefix(matches[0], "session"))
+
+			if len(matches) == 0 {
+				klog.V(4).Infof("could not find targe name for host : {%v}, path : {%v}", hostName, targetPath)
+				continue
+			}
+
+			targetNamePath := matches[0]
+			targetName, err := ioutil.ReadFile(targetNamePath)
+			if err != nil {
+				klog.V(4).Infof("could not read target name from file : {%v}, error : {%v}", targetNamePath, err)
+				continue
+			}
+
+			klog.V(5).Infof("target name found : {%v}", string(targetName))
+
+			if strings.TrimSpace(string(targetName)) == array_iqn {
+				sessionHosts = append(sessionHosts, hostNumber)
+				klog.V(5).Infof("host nunber appended : {%v}. sessionhosts is : {%v}", hostNumber, sessionHosts)
+			}
+		}
+
+
+
+		if len(sessionHosts) == 0 {
+			genericTargetPath := sysPath + "host*" + "/device/session*/iscsi_session/session*/targetname"
+			return []int{}, &ConnectivityIscsiStorageTargetNotFoundError{StorageTargetName:array_iqn, DirectoryPath:genericTargetPath}
+		}
+		return sessionHosts, nil
+	}
 }
 
 /*
