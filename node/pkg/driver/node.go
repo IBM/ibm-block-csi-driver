@@ -52,7 +52,7 @@ var (
 
 // nodeService represents the node service of CSI driver
 type NodeService struct {
-	mounter          *mount.SafeFormatAndMount // TODO fix k8s mount import
+	mounter          *mount.SafeFormatAndMount
 	ConfigYaml       ConfigFile
 	Hostname         string
 	NodeUtils        NodeUtilsInterface
