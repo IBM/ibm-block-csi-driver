@@ -160,7 +160,6 @@ class XIVArrayMediator(ArrayMediator):
     def get_host_by_host_identifiers(self, iscsi_iqn):
         logger.debug("Getting host id for initiators . iscsi_iqn : {0}".format(iscsi_iqn))
         host_list = self.client.cmd.host_list().as_list
-        logger.debug("host list : {0}".format(host_list))
         current_host = None
         for host in host_list:
             if iscsi_iqn.strip() == host.iscsi_ports.strip():
