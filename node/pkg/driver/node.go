@@ -23,7 +23,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"google.golang.org/grpc/codes"
@@ -58,12 +57,12 @@ type NodeService struct {
 	NodeUtils        NodeUtilsInterface
 	newRescanUtils   NewRescanUtilsFunction
 	executer         ExecutorInterface
-	VolumeIdLocksMap sync.Map
+	VolumeIdLocksMap SyncLockInterface
 }
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
-func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, newRescanUtils NewRescanUtilsFunction, executer ExecutorInterface, mounter *mount.SafeFormatAndMount) NodeService {
+func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, newRescanUtils NewRescanUtilsFunction, executer ExecutorInterface, mounter *mount.SafeFormatAndMount, syncLock SyncLockInterface) NodeService {
 	return NodeService{
 		ConfigYaml:     configYaml,
 		Hostname:       hostname,
@@ -72,7 +71,7 @@ func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsI
 		executer:       executer,
 
 		mounter:          mounter,
-		VolumeIdLocksMap: sync.Map{},
+		VolumeIdLocksMap: syncLock,
 
 	}
 }
@@ -91,12 +90,12 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	volId := req.VolumeId
-	err = d.NodeUtils.AddVolumeLock(&d.VolumeIdLocksMap, volId)
+	err = d.VolumeIdLocksMap.AddVolumeLock(volId)
 	if err != nil {
 		klog.Errorf("Another operation is being perfomed on volume : {%s}", volId)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
-	defer d.NodeUtils.RemoveVolumeLock(&d.VolumeIdLocksMap, volId)
+	defer d.VolumeIdLocksMap.RemoveVolumeLock(volId)
 
 	// get the volume device
 	//get connectivity from publish context
@@ -284,12 +283,12 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
 	}
 
-	err := d.NodeUtils.AddVolumeLock(&d.VolumeIdLocksMap, volumeID)
+	err := d.VolumeIdLocksMap.AddVolumeLock(volumeID)
 	if err != nil {
 		klog.Errorf("Another operation is being perfomed on volume : {%s}", volumeID)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
-	defer d.NodeUtils.RemoveVolumeLock(&d.VolumeIdLocksMap, volumeID)
+	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID)
 
 	stagingTargetPath := req.GetStagingTargetPath()
 	if len(stagingTargetPath) == 0 {
@@ -364,12 +363,12 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 	volumeID := req.VolumeId
 
-	err = d.NodeUtils.AddVolumeLock(&d.VolumeIdLocksMap, volumeID)
+	err = d.VolumeIdLocksMap.AddVolumeLock(volumeID)
 	if err != nil {
 		klog.Errorf("Another operation is being perfomed on volume : {%s}", volumeID)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
-	defer d.NodeUtils.RemoveVolumeLock(&d.VolumeIdLocksMap, volumeID)
+	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID)
 
 	// checking if the node staging path was mpounted into
 	stagingPath := req.GetStagingTargetPath()
@@ -463,12 +462,12 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
 	}
 
-	err := d.NodeUtils.AddVolumeLock(&d.VolumeIdLocksMap, volumeID)
+	err := d.VolumeIdLocksMap.AddVolumeLock(volumeID)
 	if err != nil {
 		klog.Errorf("Another operation is being perfomed on volume : {%s}", volumeID)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
-	defer d.NodeUtils.RemoveVolumeLock(&d.VolumeIdLocksMap, volumeID)
+	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID)
 
 	target := req.GetTargetPath()
 	if len(target) == 0 {

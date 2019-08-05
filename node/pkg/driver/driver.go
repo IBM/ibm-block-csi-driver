@@ -49,11 +49,13 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 		Interface: mount.New(""),
 		Exec:      mount.NewOsExec(),
 	}
+	
+	syncLock := NewSyncLock()
 
 	return &Driver{
 		endpoint:    endpoint,
 		config:      configFile,
-		NodeService: NewNodeService(configFile, hostname, *NewNodeUtils(), NewRescanUtils, &Executer{}, mounter),
+		NodeService: NewNodeService(configFile, hostname, *NewNodeUtils(), NewRescanUtils, &Executer{}, mounter, syncLock),
 	}, nil
 }
 
