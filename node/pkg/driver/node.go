@@ -91,12 +91,12 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	volId := req.VolumeId
-	err = d.NodeUtils.AddVolumeLock(d.VolumeIdLocksMap, volId)
+	err = d.NodeUtils.AddVolumeLock(&d.VolumeIdLocksMap, volId)
 	if err != nil {
 		klog.Errorf("Another operation is being perfomed on volume : {%s}", volId)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
-	defer d.NodeUtils.RemoveVolumeLock(d.VolumeIdLocksMap, volId)
+	defer d.NodeUtils.RemoveVolumeLock(&d.VolumeIdLocksMap, volId)
 
 	// get the volume device
 	//get connectivity from publish context
@@ -284,12 +284,12 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
 	}
 
-	err := d.NodeUtils.AddVolumeLock(d.VolumeIdLocksMap, volumeID)
+	err := d.NodeUtils.AddVolumeLock(&d.VolumeIdLocksMap, volumeID)
 	if err != nil {
 		klog.Errorf("Another operation is being perfomed on volume : {%s}", volumeID)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
-	defer d.NodeUtils.RemoveVolumeLock(d.VolumeIdLocksMap, volumeID)
+	defer d.NodeUtils.RemoveVolumeLock(&d.VolumeIdLocksMap, volumeID)
 
 	stagingTargetPath := req.GetStagingTargetPath()
 	if len(stagingTargetPath) == 0 {
@@ -364,12 +364,12 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 	volumeID := req.VolumeId
 
-	err = d.NodeUtils.AddVolumeLock(d.VolumeIdLocksMap, volumeID)
+	err = d.NodeUtils.AddVolumeLock(&d.VolumeIdLocksMap, volumeID)
 	if err != nil {
 		klog.Errorf("Another operation is being perfomed on volume : {%s}", volumeID)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
-	defer d.NodeUtils.RemoveVolumeLock(d.VolumeIdLocksMap, volumeID)
+	defer d.NodeUtils.RemoveVolumeLock(&d.VolumeIdLocksMap, volumeID)
 
 	// checking if the node staging path was mpounted into
 	stagingPath := req.GetStagingTargetPath()
@@ -463,12 +463,12 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
 	}
 
-	err := d.NodeUtils.AddVolumeLock(d.VolumeIdLocksMap, volumeID)
+	err := d.NodeUtils.AddVolumeLock(&d.VolumeIdLocksMap, volumeID)
 	if err != nil {
 		klog.Errorf("Another operation is being perfomed on volume : {%s}", volumeID)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
-	defer d.NodeUtils.RemoveVolumeLock(d.VolumeIdLocksMap, volumeID)
+	defer d.NodeUtils.RemoveVolumeLock(&d.VolumeIdLocksMap, volumeID)
 
 	target := req.GetTargetPath()
 	if len(target) == 0 {
@@ -476,7 +476,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	}
 
 	klog.V(5).Infof("NodeUnpublishVolume: unmounting %s", target)
-	err := d.mounter.Unmount(target)
+	err = d.mounter.Unmount(target)
 	if err != nil {
 		if strings.Contains(err.Error(), "not mounted") {
 			klog.V(4).Infof("Idempotent case - target was already unmounted %s", target)

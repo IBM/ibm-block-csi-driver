@@ -23,7 +23,7 @@ type RescanUtilsInterface interface {
 type RescanUtilsIscsi struct {
 	nodeUtils NodeUtilsInterface
 	executor  ExecutorInterface
-	mutexMultipathF sync.Mutex
+	mutexMultipathF *sync.Mutex
 }
 
 type NewRescanUtilsFunction func(connectivityType string, nodeUtils NodeUtilsInterface, executor ExecutorInterface) (RescanUtilsInterface, error)

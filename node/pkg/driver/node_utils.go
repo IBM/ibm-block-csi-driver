@@ -23,8 +23,8 @@ type NodeUtilsInterface interface {
 	GetSysDevicesFromMpath(baseDevice string) (string, error)
 	ReadFromStagingInfoFile(filePath string) (map[string]string, error)
 	ClearStageInfoFile(filePath string) error
-	AddVolumeLock(locksMap map[string]int, string volId) ( error)
-	RemoveVolumeLock(locksMap map[string]int, string volId) (sync.Mutex, error)
+	AddVolumeLock(locksMap *sync.Map, volId string ) ( error)
+	RemoveVolumeLock(locksMap *sync.Map, volId string )
 }
 
 type NodeUtils struct {
@@ -130,6 +130,8 @@ func (n NodeUtils) GetIscsiSessionHostsForArrayIQN(array_iqn string) ([]int, err
 			}
 		}
 
+
+
 		if len(sessionHosts) == 0 {
 			genericTargetPath := sysPath + "host*" + "/device/session*/iscsi_session/session*/targetname"
 			return []int{}, &ConnectivityIscsiStorageTargetNotFoundError{StorageTargetName:array_iqn, DirectoryPath:genericTargetPath}
@@ -204,22 +206,23 @@ func (n NodeUtils) ClearStageInfoFile(filePath string) (error) {
 	return os.Remove(filePath)
 }
 
-func  (n NodeUtils)  AddVolumeLock(locksMap map[string]int, string volId) ( error){
+func  (n NodeUtils)  AddVolumeLock(locksMap *sync.Map,  volId string) ( error){
 	// lets use WWN? as key
-	_, exists := m.Load(volId)
+	_, exists := locksMap.Load(volId)
 	if !exists{
-		m.Store(volId, 0)
+		locksMap.Store(volId, 0)
 		return nil
 	} else{
 		return &VolumeAlreadyProcessingError{volId}
 	}
+	return nil
 }
 
 
-func  (n NodeUtils)  RemoveVolumeLock(locksMap map[string]int, string volId) (sync.Mutex, error){
-	lock, exists := m.Load(volId)
+func  (n NodeUtils)  RemoveVolumeLock(locksMap *sync.Map, volId string ){
+	_, exists := locksMap.Load(volId)
 	if exists{
-		m.Delete(volId)
+		locksMap.Delete(volId)
 	}
 }
 
