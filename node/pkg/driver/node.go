@@ -72,7 +72,7 @@ func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsI
 		executer:       executer,
 
 		mounter:          mounter,
-		VolumeIdLocksMap: new(sync.Map),
+		VolumeIdLocksMap: sync.Map{},
 
 	}
 }
@@ -90,7 +90,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		}
 	}
 
-	volId = req.VolumeId
+	volId := req.VolumeId
 	err = d.NodeUtils.AddVolumeLock(d.VolumeIdLocksMap, volId)
 	if err != nil {
 		klog.Errorf("Another operation is being perfomed on volume : {%s}", volId)
@@ -284,9 +284,9 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
 	}
 
-	err = d.NodeUtils.AddVolumeLock(d.VolumeIdLocksMap, volumeID)
+	err := d.NodeUtils.AddVolumeLock(d.VolumeIdLocksMap, volumeID)
 	if err != nil {
-		klog.Errorf("Another operation is being perfomed on volume : {%s}", volId)
+		klog.Errorf("Another operation is being perfomed on volume : {%s}", volumeID)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
 	defer d.NodeUtils.RemoveVolumeLock(d.VolumeIdLocksMap, volumeID)
@@ -366,7 +366,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 	err = d.NodeUtils.AddVolumeLock(d.VolumeIdLocksMap, volumeID)
 	if err != nil {
-		klog.Errorf("Another operation is being perfomed on volume : {%s}", volId)
+		klog.Errorf("Another operation is being perfomed on volume : {%s}", volumeID)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
 	defer d.NodeUtils.RemoveVolumeLock(d.VolumeIdLocksMap, volumeID)
@@ -463,11 +463,9 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
 	}
 
-	volumeID := req.VolumeId
-
-	err = d.NodeUtils.AddVolumeLock(d.VolumeIdLocksMap, volumeID)
+	err := d.NodeUtils.AddVolumeLock(d.VolumeIdLocksMap, volumeID)
 	if err != nil {
-		klog.Errorf("Another operation is being perfomed on volume : {%s}", volId)
+		klog.Errorf("Another operation is being perfomed on volume : {%s}", volumeID)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
 	defer d.NodeUtils.RemoveVolumeLock(d.VolumeIdLocksMap, volumeID)
