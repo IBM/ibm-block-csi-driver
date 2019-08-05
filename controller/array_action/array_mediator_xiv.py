@@ -198,7 +198,6 @@ class XIVArrayMediator(ArrayMediator):
 
         # try to use random lun number just in case there are many calls at the same time to reduce re-tries
         all_available_luns = [i for i in range(self.MIN_LUN_NUMBER, self.MAX_LUN_NUMBER + 1) if i not in luns_in_use]
-        logger.debug("all_available_luns : {0}".format(all_available_luns))
 
         if len(all_available_luns) == 0:
             raise controller_errors.NoAvailableLunError(host_name)
