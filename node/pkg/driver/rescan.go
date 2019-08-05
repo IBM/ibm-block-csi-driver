@@ -202,7 +202,8 @@ func (r RescanUtilsIscsi) FlushMultipathDevice(mpathDevice string) error {
 	r.mutexMultipathF.Lock()
 	klog.V(5).Infof("Accured lock for multipath -f command")
 	_, err := r.executor.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", fullDevice})
-	defer r.mutexMultipathF.Unlock()
+	r.mutexMultipathF.Unlock()
+		
 	if err != nil {
 		if _, errOpen := os.Open(fullDevice); errOpen != nil {
 			if os.IsNotExist(errOpen) {
