@@ -316,11 +316,10 @@ class SVCArrayMediator(ArrayMediator):
             'object_id': vol_name,
             'force': True
         }
-        lun = self.get_first_free_lun(host_name)
-        if lun:
-            cli_kwargs.update({'scsi': lun})
 
         try:
+            lun = self.get_first_free_lun(host_name)
+            cli_kwargs.update({'scsi': lun})
             self.client.svctask.mkvdiskhostmap(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
