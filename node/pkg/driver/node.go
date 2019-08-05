@@ -97,16 +97,12 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volId)
 
-	// get the volume device
-	//get connectivity from publish context
 	connectivityType, lun, array_iqn, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	klog.V(4).Infof("connectivityType : %v", connectivityType)
-
 	klog.V(4).Infof("lun : %v", lun)
-
 	klog.V(4).Infof("array_iqn : %v", array_iqn)
 
 	stagingPath := req.GetStagingTargetPath()
@@ -119,51 +115,13 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	err = rescanUtils.RescanSpecificLun(lun, array_iqn)
 
-	device, err := rescanUtils.GetMpathDevice(lun, array_iqn)
+	device, err := rescanUtils.GetMpathDevice(volId, lun, array_iqn)
 	klog.V(4).Infof("Discovered device : {%v}", device)
 	if err != nil {
 		klog.V(4).Infof("error while discovring the device : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	//
-	//	isNotMountPoint, err := d.mounter.IsLikelyNotMountPoint(stagingPath)
-	//
-	//	if err != nil {
-	//		if  os.IsNotExist(err) {
-	//			isNotMountPoint = true
-	//		}  else {
-	//			klog.V(4).Infof("error while trying to check mountpoint: {%v}", err.Error())
-	//			return nil, status.Error(codes.Internal, err.Error())
-	//		}
-	//	}
-	//
-	//
-	//	klog.V(4).Infof("Return isMountPoint: {%v}", isNotMountPoint)
-	//
-	//
-	//	if !isNotMountPoint {
-	//		mountList,err := d.mounter.List()
-	//		if err != nil {
-	//			klog.Errorf("error while getting mount list: {%v}", err.Error())
-	//			return nil, status.Error(codes.Internal, err.Error())
-	//		}
-	//
-	//		klog.V(4).Infof("Return mountList: {%v}", mountList)
-	//		deviceMP := d.getMountPointFromList(device, mountList)
-	//
-	//		if deviceMP != nil {
-	//			isCorrectMountpoint := d.mounter.IsMountPointMatch(*deviceMP, req.GetStagingTargetPath())
-	//			klog.V(4).Infof("Return isCorrectMountpoint: {%v}. for device : {%v}, staging target path : {%v}",
-	//				isCorrectMountpoint, device, req.GetStagingTargetPath())
-	//			if isCorrectMountpoint {
-	//				klog.V(4).Infof("Returning ok result")
-	//				return &csi.NodeStageVolumeResponse{}, nil
-	//			} else {
-	//				return nil, status.Errorf(codes.AlreadyExists, "Mount point is already mounted to.")
-	//			}
-	//		}
-	//	}
 
 	dev, refs, err := mount.GetDeviceNameFromMount(d.mounter, stagingPath)
 	klog.V(4).Infof("dev : {%v}. refs : {%v}", dev, refs)

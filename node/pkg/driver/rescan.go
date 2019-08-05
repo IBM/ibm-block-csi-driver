@@ -15,7 +15,7 @@ import (
 
 type RescanUtilsInterface interface {
 	RescanSpecificLun(Lun int, array_iqn string) error
-	GetMpathDevice(lunId int, array_iqn string) (string, error)
+	GetMpathDevice(volumeId string, lunId int, array_iqn string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
 	RemoveIscsiDevice(sysDevices []string) error
 }
@@ -73,7 +73,17 @@ func (r RescanUtilsIscsi) RescanSpecificLun(lunId int, array_iqn string) error {
 
 }
 
-func (r RescanUtilsIscsi) GetMpathDevice(lunId int, array_iqn string) (string, error) {
+func (r RescanUtilsIscsi) GetMpathDevice(volumeId string, lunId int, array_iqn string) (string, error) {
+	/*
+	   Description: 
+		   1. Find all the files "/dev/disk/by-path/ip-<ARRAY-IP>-iscsi-<IQN storage>-lun-<LUN-ID> -> ../../sd<X>
+ 	          Note: <ARRAY-IP> Instead of setting here the IP we just search for * on that.
+ 	       2. Get the sd<X> devices.
+ 	       3. Search '/sys/block/dm-*\/slaves/*' and get the <DM device name>. For example dm-3 below:
+ 	          /sys/block/dm-3/slaves/sdb -> ../../../../platform/host41/session9/target41:0:0/41:0:0:13/block/sdb
+
+	   Return Value: "dm-X" of the volumeID by using the LunID and the arrayIqn.
+	*/
 	var devicePaths []string
 
 	devicePath := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", array_iqn, "lun", strconv.Itoa(lunId)}, "-")
@@ -89,36 +99,39 @@ func (r RescanUtilsIscsi) GetMpathDevice(lunId int, array_iqn string) (string, e
 		return "", err
 	}
 
-	devicePathTosysfs := make([]string, len(devicePaths))
-
-	if err != nil {
-		return "", err
-	}
 	if len(devicePaths) < 1 {
 		return "", fmt.Errorf("failed to find device path: %s", devicePath)
 	}
 
+	devicePathTosysfs := make(map[string]bool)
 	// Looping over the physical devices of the volume - /dev/sdX (multiple since its with multipathing)
-	for i, path := range devicePaths {
+	for _, path := range devicePaths {
 		if path != "" {
-			if mappedDevicePath, err := getMultipathDisk(path); mappedDevicePath != "" {
-				devicePathTosysfs[i] = mappedDevicePath
+			if mappedDevicePath, err := getMultipathDisk(path); mappedDevicePath != "" {				
+				devicePathTosysfs[mappedDevicePath] = true
 				if err != nil {
 					return "", err
 				}
 			}
 		}
 	}
-	klog.V(4).Infof("After connect we're returning devicePaths: %s", devicePathTosysfs)
-	if len(devicePathTosysfs) > 0 {
-		return devicePathTosysfs[0], err
-		// TODO consider to validate that all the devicePathTosysfs are the same DM device, and if not maybe raise Error
-	}
-	return "", err
 
+	var mps string
+	for key := range devicePathTosysfs{
+		mps += ", " + key
+	}
+
+	klog.V(4).Infof("Found multipath devices: %s", mps)
+	if len(devicePathTosysfs) > 1 {
+		return "", &MultipleDmDevicesError{volumeId, lunId, array_iqn, devicePathTosysfs}
+	} else if len(devicePathTosysfs) == 0 {
+		return "", &MultipleDeviceNotFoundForLunError{volumeId, lunId, array_iqn}
+	}
+	var md string
+	for md=range devicePathTosysfs{ break }  // because its the single value in the map, so just take the first
+	return md, nil
 }
 
-//return waitForPathToExistImpl(devicePath, maxRetries, intervalSeconds, deviceTransport, os.Stat, filepath.Glob)
 
 func waitForPathToExist(devicePath string, maxRetries int, intervalSeconds int) ([]string, bool, error) {
 
@@ -140,6 +153,15 @@ func waitForPathToExist(devicePath string, maxRetries int, intervalSeconds int) 
 }
 
 func getMultipathDisk(path string) (string, error) {
+	/*
+		Description:
+			Find the dm device based on path /dev/disk/by-path/TARGET-iscsi-iqn:<LUNID> -> ../../sdX
+			By loop up on the /sys/block/dm-*\/slaves/sd<X> and return the <dm-*>
+			
+		Return Value: 
+			dm-<X>
+	*/
+	
 	// Follow link to destination directory
 	klog.V(5).Infof("Getting multipaht disk")
 	devicePath, err := os.Readlink(path)
@@ -185,9 +207,10 @@ func getMultipathDisk(path string) (string, error) {
 			}
 		}
 	}
-	errorMsg := fmt.Sprintf("Couldn't find dm-* path for path: %s, found non dm-* path: %s", path, devicePath)
-	klog.Errorf(errorMsg)
-	return "", fmt.Errorf(errorMsg)
+	
+	err = &MultipleDeviceNotFoundError{path, devicePath}
+	klog.Errorf(err.Error())
+	return "", err
 }
 
 func (r RescanUtilsIscsi) FlushMultipathDevice(mpathDevice string) error {
