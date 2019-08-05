@@ -130,8 +130,6 @@ func (n NodeUtils) GetIscsiSessionHostsForArrayIQN(array_iqn string) ([]int, err
 			}
 		}
 
-
-
 		if len(sessionHosts) == 0 {
 			genericTargetPath := sysPath + "host*" + "/device/session*/iscsi_session/session*/targetname"
 			return []int{}, &ConnectivityIscsiStorageTargetNotFoundError{StorageTargetName:array_iqn, DirectoryPath:genericTargetPath}

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+    "sync"
 )
 
 //go:generate mockgen -destination=../../mocks/mock_rescan_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver RescanUtilsInterface
@@ -22,6 +23,7 @@ type RescanUtilsInterface interface {
 type RescanUtilsIscsi struct {
 	nodeUtils NodeUtilsInterface
 	executor  ExecutorInterface
+	mutexMultipathF sync.Mutex
 }
 
 type NewRescanUtilsFunction func(connectivityType string, nodeUtils NodeUtilsInterface, executor ExecutorInterface) (RescanUtilsInterface, error)
@@ -30,7 +32,7 @@ func NewRescanUtils(connectivityType string, nodeUtils NodeUtilsInterface, execu
 	klog.V(5).Infof("NewRescanUtils was called with connectivity type: %v", connectivityType)
 	switch connectivityType {
 	case "iscsi":
-		return &RescanUtilsIscsi{nodeUtils: nodeUtils, executor: executor}, nil
+		return &RescanUtilsIscsi{nodeUtils: nodeUtils, executor: executor, mutexMultipathF: &sync.Mutex{}}, nil
 	default:
 		return nil, fmt.Errorf(ErrorUnsupportedConnectivityType, connectivityType)
 	}
@@ -194,7 +196,13 @@ func (r RescanUtilsIscsi) FlushMultipathDevice(mpathDevice string) error {
 	klog.V(5).Infof("flushing mpath device : {%v}", mpathDevice)
 
 	fullDevice := "/dev/" + mpathDevice
+
+
+	klog.V(5).Infof("Try to accure lock for running the command multipath -f {%v} (to avoid concurrent multipath commands)", mpathDevice)
+	r.mutexMultipathF.Lock()
+	klog.V(5).Infof("Accured lock for multipath -f command")
 	_, err := r.executor.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", fullDevice})
+	defer r.mutexMultipathF.Unlock()
 	if err != nil {
 		if _, errOpen := os.Open(fullDevice); errOpen != nil {
 			if os.IsNotExist(errOpen) {
