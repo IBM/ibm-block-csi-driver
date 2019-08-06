@@ -47,6 +47,10 @@ var (
 
 	defaultFSType     = "ext4"
 	stageInfoFilename = ".stageInfo.json"
+	supportedConnectivityTypes = map[string]bool{ 
+		"iscsi":true,
+		// TODO add fc later on 
+	}
 )
 
 // nodeService represents the node service of CSI driver
@@ -55,21 +59,20 @@ type NodeService struct {
 	ConfigYaml       ConfigFile
 	Hostname         string
 	NodeUtils        NodeUtilsInterface
-	newRescanUtils   NewRescanUtilsFunction
 	executer         ExecutorInterface
 	VolumeIdLocksMap SyncLockInterface
+	OsDeviceConnectivityMapping   map[string]OsDeviceConnectivityInterface
 }
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
-func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, newRescanUtils NewRescanUtilsFunction, executer ExecutorInterface, mounter *mount.SafeFormatAndMount, syncLock SyncLockInterface) NodeService {
+func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, OsDeviceConnectivityMapping  map[string]OsDeviceConnectivityInterface, executer ExecutorInterface, mounter *mount.SafeFormatAndMount, syncLock SyncLockInterface) NodeService {
 	return NodeService{
 		ConfigYaml:     configYaml,
 		Hostname:       hostname,
 		NodeUtils:      nodeUtils,
-		newRescanUtils: newRescanUtils,
 		executer:       executer,
-
+		OsDeviceConnectivityMapping: OsDeviceConnectivityMapping,
 		mounter:          mounter,
 		VolumeIdLocksMap: syncLock,
 
@@ -107,15 +110,14 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	stagingPath := req.GetStagingTargetPath()
 
-	rescanUtils, err := d.newRescanUtils(connectivityType, d.NodeUtils, d.executer)
-
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
+	if !ok{ 
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
 	}
 
-	err = rescanUtils.RescanDevices(lun, array_iqn)
+	err = osDeviceConnectivity.RescanDevices(lun, array_iqn)
 
-	device, err := rescanUtils.GetMpathDevice(volId, lun, array_iqn)
+	device, err := osDeviceConnectivity.GetMpathDevice(volId, lun, array_iqn)
 	klog.V(4).Infof("Discovered device : {%v}", device)
 	if err != nil {
 		klog.V(4).Infof("error while discovring the device : {%v}", err.Error())
@@ -228,7 +230,22 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{"Volume Access Type Block is not supported yet"}
 	}
 
-	// TODO add check if its a mount volume and publish context
+	connectivityType, lun, array_iqn, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)	
+	if err != nil{
+		return &RequestValidationError{fmt.Sprintf("Fail to parse PublishContext %v with err = %v", req.PublishContext, err)}
+	}
+	
+	if _, ok := supportedConnectivityTypes[connectivityType]; !ok{  
+		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong connectivity type %s. Supported connectivities %v", connectivityType, supportedConnectivityTypes)}
+	}
+	
+	if lun < 0{  
+		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong lun id %d.", lun)}
+	}
+
+	if len(array_iqn) == 0 {  
+		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong array_iqn %s.", array_iqn)}
+	}	
 
 	return nil
 }
@@ -293,13 +310,16 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	//TODO: there might be an indempotent issue here if we fail after the unmount there will be  faulty devices left
 	// (since the next time we run unpstange we will reutrn that everytjing is OK since the path is unmounted)
 
-	rescanUtils, err := d.newRescanUtils(connectivityType, d.NodeUtils, d.executer)
+	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
+	if !ok{ 
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
+	}
 
-	err = rescanUtils.FlushMultipathDevice(mpathDevice)
+	err = osDeviceConnectivity.FlushMultipathDevice(mpathDevice)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Multipath -f  command failed with error: %v", err)
 	}
-	err = rescanUtils.RemovePhysicalDevice(sysDevices)
+	err = osDeviceConnectivity.RemovePhysicalDevice(sysDevices)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "remove iscsi device failed with error: %v", err)
 	}

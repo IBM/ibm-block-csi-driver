@@ -22,23 +22,11 @@ type OsDeviceConnectivityInterface interface {
 }
 
 type OsDeviceConnectivityIscsi struct {
-	nodeUtils NodeUtilsInterface
 	executor  ExecutorInterface
 	mutexMultipathF *sync.Mutex
 }
 
 
-type NewRescanUtilsFunction func(connectivityType string, nodeUtils NodeUtilsInterface, executor ExecutorInterface) (OsDeviceConnectivityInterface, error)
-
-func NewRescanUtils(connectivityType string, nodeUtils NodeUtilsInterface, executor ExecutorInterface) (OsDeviceConnectivityInterface, error) {
-	klog.V(5).Infof("NewRescanUtils was called with connectivity type: %v", connectivityType)
-	switch connectivityType {
-	case "iscsi":
-		return &OsDeviceConnectivityIscsi{nodeUtils: nodeUtils, executor: executor, mutexMultipathF: &sync.Mutex{}}, nil
-	default:
-		return nil, fmt.Errorf(ErrorUnsupportedConnectivityType, connectivityType)
-	}
-}
 
 func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier string) error {
 	klog.V(5).Infof("Starging Rescan specific lun, on lun : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
