@@ -113,7 +113,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	err = rescanUtils.RescanSpecificLun(lun, array_iqn)
+	err = rescanUtils.RescanDevices(lun, array_iqn)
 
 	device, err := rescanUtils.GetMpathDevice(volId, lun, array_iqn)
 	klog.V(4).Infof("Discovered device : {%v}", device)
@@ -299,7 +299,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Multipath -f  command failed with error: %v", err)
 	}
-	err = rescanUtils.RemoveIscsiDevice(sysDevices)
+	err = rescanUtils.RemovePhysicalDevice(sysDevices)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "remove iscsi device failed with error: %v", err)
 	}

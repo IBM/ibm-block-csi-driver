@@ -12,37 +12,37 @@ import (
 	"io/ioutil"    
 )
 
-//go:generate mockgen -destination=../../mocks/mock_rescan_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver RescanUtilsInterface
+//go:generate mockgen -destination=../../mocks/mock_rescan_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver OsDeviceConnectivityInterface
 
-type RescanUtilsInterface interface {
-	RescanSpecificLun(Lun int, array_iqn string) error
-	GetMpathDevice(volumeId string, lunId int, array_iqn string) (string, error)
+type OsDeviceConnectivityInterface interface {
+	RescanDevices(lunId int, arrayIdentifier string) error // For NVME lunID will be namespace ID.
+	GetMpathDevice(volumeId string, lunId int, arrayIdentifier string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
-	RemoveIscsiDevice(sysDevices []string) error
-	GetIscsiSessionHostsForArrayIQN(array_iqn string) ([]int, error)	
+	RemovePhysicalDevice(sysDevices []string) error
 }
 
-type RescanUtilsIscsi struct {
+type OsDeviceConnectivityIscsi struct {
 	nodeUtils NodeUtilsInterface
 	executor  ExecutorInterface
 	mutexMultipathF *sync.Mutex
 }
 
-type NewRescanUtilsFunction func(connectivityType string, nodeUtils NodeUtilsInterface, executor ExecutorInterface) (RescanUtilsInterface, error)
 
-func NewRescanUtils(connectivityType string, nodeUtils NodeUtilsInterface, executor ExecutorInterface) (RescanUtilsInterface, error) {
+type NewRescanUtilsFunction func(connectivityType string, nodeUtils NodeUtilsInterface, executor ExecutorInterface) (OsDeviceConnectivityInterface, error)
+
+func NewRescanUtils(connectivityType string, nodeUtils NodeUtilsInterface, executor ExecutorInterface) (OsDeviceConnectivityInterface, error) {
 	klog.V(5).Infof("NewRescanUtils was called with connectivity type: %v", connectivityType)
 	switch connectivityType {
 	case "iscsi":
-		return &RescanUtilsIscsi{nodeUtils: nodeUtils, executor: executor, mutexMultipathF: &sync.Mutex{}}, nil
+		return &OsDeviceConnectivityIscsi{nodeUtils: nodeUtils, executor: executor, mutexMultipathF: &sync.Mutex{}}, nil
 	default:
 		return nil, fmt.Errorf(ErrorUnsupportedConnectivityType, connectivityType)
 	}
 }
 
-func (r RescanUtilsIscsi) RescanSpecificLun(lunId int, array_iqn string) error {
-	klog.V(5).Infof("Starging Rescan specific lun, on lun : {%v}, with array iqn : {%v}", lunId, array_iqn)
-	sessionHosts, err := r.GetIscsiSessionHostsForArrayIQN(array_iqn)
+func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier string) error {
+	klog.V(5).Infof("Starging Rescan specific lun, on lun : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
+	sessionHosts, err := r.getIscsiSessionHostsForArrayIQN(arrayIdentifier)
 	if err != nil {
 		return err
 	}
@@ -70,12 +70,12 @@ func (r RescanUtilsIscsi) RescanSpecificLun(lunId int, array_iqn string) error {
 
 	}
 
-	klog.V(5).Infof("finsihed rescan lun on lun id : {%v}, with array iqn : {%v}", lunId, array_iqn)
+	klog.V(5).Infof("finsihed rescan lun on lun id : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
 	return nil
 
 }
 
-func (r RescanUtilsIscsi) GetMpathDevice(volumeId string, lunId int, array_iqn string) (string, error) {
+func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, arrayIdentifier string) (string, error) {
 	/*
 	   Description: 
 		   1. Find all the files "/dev/disk/by-path/ip-<ARRAY-IP>-iscsi-<IQN storage>-lun-<LUN-ID> -> ../../sd<X>
@@ -88,7 +88,7 @@ func (r RescanUtilsIscsi) GetMpathDevice(volumeId string, lunId int, array_iqn s
 	*/
 	var devicePaths []string
 
-	devicePath := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", array_iqn, "lun", strconv.Itoa(lunId)}, "-")
+	devicePath := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", arrayIdentifier, "lun", strconv.Itoa(lunId)}, "-")
 	klog.V(4).Infof("device path is : {%v}", devicePath)
 
 	devicePaths, exists, err := waitForPathToExist(devicePath, 5, 1)
@@ -125,9 +125,9 @@ func (r RescanUtilsIscsi) GetMpathDevice(volumeId string, lunId int, array_iqn s
 
 	klog.V(4).Infof("Found multipath devices: %s", mps)
 	if len(devicePathTosysfs) > 1 {
-		return "", &MultipleDmDevicesError{volumeId, lunId, array_iqn, devicePathTosysfs}
+		return "", &MultipleDmDevicesError{volumeId, lunId, arrayIdentifier, devicePathTosysfs}
 	} else if len(devicePathTosysfs) == 0 {
-		return "", &MultipleDeviceNotFoundForLunError{volumeId, lunId, array_iqn}
+		return "", &MultipleDeviceNotFoundForLunError{volumeId, lunId, arrayIdentifier}
 	}
 	var md string
 	for md=range devicePathTosysfs{ break }  // because its the single value in the map, so just take the first
@@ -215,7 +215,7 @@ func getMultipathDisk(path string) (string, error) {
 	return "", err
 }
 
-func (r RescanUtilsIscsi) FlushMultipathDevice(mpathDevice string) error {
+func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(mpathDevice string) error {
 	// mpathdevice is dm-4 for example
 
 	klog.V(5).Infof("flushing mpath device : {%v}", mpathDevice)
@@ -248,7 +248,7 @@ func (r RescanUtilsIscsi) FlushMultipathDevice(mpathDevice string) error {
 
 }
 
-func (r RescanUtilsIscsi) RemoveIscsiDevice(sysDevices []string) error {
+func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(sysDevices []string) error {
 	// sysDevices  = sdb, sda,...
 	klog.V(5).Infof("Removing iscsi device : {%v}", sysDevices)
 
@@ -285,10 +285,10 @@ func (r RescanUtilsIscsi) RemoveIscsiDevice(sysDevices []string) error {
 	return nil
 }
 
-func (r RescanUtilsIscsi) GetIscsiSessionHostsForArrayIQN(array_iqn string) ([]int, error) {
+func (r OsDeviceConnectivityIscsi) getIscsiSessionHostsForArrayIQN(arrayIdentifier string) ([]int, error) {
 	/*
 		Description:
-			This function find all the hosts IDs under which has targetname that equal to the array_iqn.  
+			This function find all the hosts IDs under which has targetname that equal to the arrayIdentifier.  
 			/sys/class/iscsi_host/host<IDs>/device/session*\/iscsi_session/session*\/targetname"
 			So the function goes over all the above hosts and return back only the host numbers as a list.
 	*/
@@ -342,7 +342,7 @@ func (r RescanUtilsIscsi) GetIscsiSessionHostsForArrayIQN(array_iqn string) ([]i
 
 			klog.V(5).Infof("target name found : {%v}", string(targetName))
 
-			if strings.TrimSpace(string(targetName)) == array_iqn {
+			if strings.TrimSpace(string(targetName)) == arrayIdentifier {
 				sessionHosts = append(sessionHosts, hostNumber)
 				klog.V(5).Infof("host nunber appended : {%v}. sessionhosts is : {%v}", hostNumber, sessionHosts)
 			}
@@ -352,7 +352,7 @@ func (r RescanUtilsIscsi) GetIscsiSessionHostsForArrayIQN(array_iqn string) ([]i
 
 		if len(sessionHosts) == 0 {
 			genericTargetPath := sysPath + "host*" + "/device/session*/iscsi_session/session*/targetname"
-			return []int{}, &ConnectivityIscsiStorageTargetNotFoundError{StorageTargetName:array_iqn, DirectoryPath:genericTargetPath}
+			return []int{}, &ConnectivityIscsiStorageTargetNotFoundError{StorageTargetName:arrayIdentifier, DirectoryPath:genericTargetPath}
 		}
 		return sessionHosts, nil
 	}
