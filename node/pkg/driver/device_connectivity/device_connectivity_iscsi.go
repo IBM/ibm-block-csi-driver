@@ -8,9 +8,8 @@ import (
 	"strings"
 	"time"
     "sync"
-	"path/filepath"   
- 	driver "github.com/ibm/ibm-block-csi-driver/node/driver"
- 	executer "github.com/ibm/ibm-block-csi-driver/node/driver/executer"
+	"path/filepath"
+ 	"github.com/ibm/ibm-block-csi-driver/node/driver/executer"
 )
 
 type OsDeviceConnectivityIscsi struct {
