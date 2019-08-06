@@ -29,6 +29,7 @@ import (
 	"google.golang.org/grpc/status"
 	"k8s.io/klog"
 	mount "k8s.io/kubernetes/pkg/util/mount"
+ 	"executer"	
 )
 
 var (
@@ -59,14 +60,14 @@ type NodeService struct {
 	ConfigYaml       ConfigFile
 	Hostname         string
 	NodeUtils        NodeUtilsInterface
-	executer         ExecutorInterface
+	executer         myexecuter.ExecuterInterface
 	VolumeIdLocksMap SyncLockInterface
 	OsDeviceConnectivityMapping   map[string]OsDeviceConnectivityInterface
 }
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
-func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, OsDeviceConnectivityMapping  map[string]OsDeviceConnectivityInterface, executer ExecutorInterface, mounter *mount.SafeFormatAndMount, syncLock SyncLockInterface) NodeService {
+func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, OsDeviceConnectivityMapping  map[string]OsDeviceConnectivityInterface, executer myexecuter.ExecuterInterface, mounter *mount.SafeFormatAndMount, syncLock SyncLockInterface) NodeService {
 	return NodeService{
 		ConfigYaml:     configYaml,
 		Hostname:       hostname,

@@ -18,7 +18,6 @@ package driver
 
 import (
 	"context"
-    "sync"
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	util "github.com/ibm/ibm-block-csi-driver/node/util"
 	"io/ioutil"
@@ -54,8 +53,8 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 	syncLock := NewSyncLock()
 	executer := &Executer{}
 	osDeviceConnectivityMapping:= map[string]OsDeviceConnectivityInterface{
-		"iscsi": &OsDeviceConnectivityIscsi{executor: executer, mutexMultipathF: &sync.Mutex{}},
-		//"fc": &OsDeviceConnectivityIscsi{executor: executer, mutexMultipathF: &sync.Mutex{}}
+		"iscsi": NewOsDeviceConnectivityIscsi(executer),
+		//"fc": NewOsDeviceConnectivityFc(executer),
 		// TODO nvme
 	}
 	return &Driver{

@@ -1,15 +1,23 @@
-package driver
+package executer
 
 import (
 	"context"
 	"os/exec"
 	"time"
 	"k8s.io/klog"
+	"os"
+	"path/filepath"
+	"io/ioutil"    
 )
 
-//go:generate mockgen -destination=../../mocks/mock_executer.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver ExecutorInterface
-type ExecutorInterface interface { // basic host dependent functions
+//go:generate mockgen -destination=../../../mocks/mock_executer.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer ExecuterInterface
+type ExecuterInterface interface { // basic host dependent functions
 	ExecuteWithTimeout(mSeconds int, command string, args []string) ([]byte, error)
+	OsOpenFile(name string, flag int, perm os.FileMode) (*os.File, error)
+    OsReadlink(name string) (string, error)
+    FilepathGlob(pattern string) (matches []string, err error)
+	IoutilReadDir(dirname string) ([]os.FileInfo, error)
+	IoutilReadFile(filename string) ([]byte, error)
 }
 
 type Executer struct {
@@ -45,4 +53,25 @@ func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []strin
 	
 	klog.V(5).Infof("Finished executing command")
 	return out, err
+}
+
+
+func (e *Executer) OsOpenFile(name string, flag int, perm os.FileMode) (*os.File, error){
+	return os.OpenFile(name, flag, perm)
+}
+
+func (e *Executer) OsReadlink(name string) (string, error){
+	return os.Readlink(name)
+}
+
+func (e *Executer) FilepathGlob(pattern string) (matches []string, err error){
+	return filepath.Glob(pattern)
+}
+
+func (e *Executer) IoutilReadDir(dirname string) ([]os.FileInfo, error){
+	return ioutil.ReadDir(dirname)
+}
+
+func (e *Executer) IoutilReadFile(filename string) ([]byte, error){
+	return ioutil.ReadFile(filename)
 }
