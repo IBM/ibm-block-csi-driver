@@ -3,13 +3,13 @@ package driver
 import (
 	"fmt"
 	"k8s.io/klog"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
     "sync"
-    "path/filepath"
-    "os"
-    "github.com/spf13/afero"
+	"io/ioutil"    
 )
 
 //go:generate mockgen -destination=../../mocks/mock_rescan_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver RescanUtilsInterface
@@ -26,9 +26,7 @@ type RescanUtilsIscsi struct {
 	nodeUtils NodeUtilsInterface
 	executor  ExecutorInterface
 	mutexMultipathF *sync.Mutex
-	aferoFs afero.Fs 
 }
-
 
 type NewRescanUtilsFunction func(connectivityType string, nodeUtils NodeUtilsInterface, executor ExecutorInterface) (RescanUtilsInterface, error)
 
@@ -36,7 +34,7 @@ func NewRescanUtils(connectivityType string, nodeUtils NodeUtilsInterface, execu
 	klog.V(5).Infof("NewRescanUtils was called with connectivity type: %v", connectivityType)
 	switch connectivityType {
 	case "iscsi":
-		return &RescanUtilsIscsi{nodeUtils: nodeUtils, executor: executor, mutexMultipathF: &sync.Mutex{}, aferoFs: afero.NewOsFs()}, nil
+		return &RescanUtilsIscsi{nodeUtils: nodeUtils, executor: executor, mutexMultipathF: &sync.Mutex{}}, nil
 	default:
 		return nil, fmt.Errorf(ErrorUnsupportedConnectivityType, connectivityType)
 	}
@@ -52,7 +50,7 @@ func (r RescanUtilsIscsi) RescanSpecificLun(lunId int, array_iqn string) error {
 	for _, hostNumber := range sessionHosts {
 
 		filename := fmt.Sprintf("/sys/class/scsi_host/host%d/scan", hostNumber)
-		f, err := r.aferoFs.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200)
+		f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200)
 		if err != nil {
 			klog.Errorf("could not open filename : {%v}. err : {%v}", filename, err)
 			return err
@@ -93,7 +91,7 @@ func (r RescanUtilsIscsi) GetMpathDevice(volumeId string, lunId int, array_iqn s
 	devicePath := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", array_iqn, "lun", strconv.Itoa(lunId)}, "-")
 	klog.V(4).Infof("device path is : {%v}", devicePath)
 
-	devicePaths, exists, err := waitForPathToExist(devicePath, 5, 1, r.aferoFs)
+	devicePaths, exists, err := waitForPathToExist(devicePath, 5, 1)
 	if !exists {
 		klog.V(4).Infof("return error because file was not found")
 		return "", fmt.Errorf("could not find path")
@@ -111,7 +109,7 @@ func (r RescanUtilsIscsi) GetMpathDevice(volumeId string, lunId int, array_iqn s
 	// Looping over the physical devices of the volume - /dev/sdX (multiple since its with multipathing)
 	for _, path := range devicePaths {
 		if path != "" {
-			if mappedDevicePath, err := getMultipathDisk(path, r.aferoFs); mappedDevicePath != "" {				
+			if mappedDevicePath, err := getMultipathDisk(path); mappedDevicePath != "" {				
 				devicePathTosysfs[mappedDevicePath] = true
 				if err != nil {
 					return "", err
@@ -137,12 +135,12 @@ func (r RescanUtilsIscsi) GetMpathDevice(volumeId string, lunId int, array_iqn s
 }
 
 
-func waitForPathToExist(devicePath string, maxRetries int, intervalSeconds int, aferoFs afero.Fs) ([]string, bool, error) {
+func waitForPathToExist(devicePath string, maxRetries int, intervalSeconds int) ([]string, bool, error) {
 
 	var err error
 	for i := 0; i < maxRetries; i++ {
 		err = nil
-		fpaths, _ := afero.Glob(aferoFs, devicePath)
+		fpaths, _ := filepath.Glob(devicePath)
 		klog.V(4).Infof("fpaths : {%v}", fpaths)
 
 		if fpaths == nil {
@@ -156,7 +154,7 @@ func waitForPathToExist(devicePath string, maxRetries int, intervalSeconds int, 
 	return nil, false, err
 }
 
-func getMultipathDisk(path string, aferoFs afero.Fs) (string, error) {
+func getMultipathDisk(path string) (string, error) {
 	/*
 		Description:
 			Find the dm device based on path /dev/disk/by-path/TARGET-iscsi-iqn:<LUNID> -> ../../sdX
@@ -184,7 +182,7 @@ func getMultipathDisk(path string, aferoFs afero.Fs) (string, error) {
 	// Fallback to iterating through all the entries under /sys/block/dm-* and
 	// check to see if any have an entry under /sys/block/dm-*/slaves matching
 	// the device the symlink was pointing at
-	dmPaths, err := afero.Glob(aferoFs, "/sys/block/dm-*")
+	dmPaths, err := filepath.Glob("/sys/block/dm-*")
 	// TODO improve looping by just filepath.Glob("/sys/block/dm-*/slaves/" + sdevice) and then no loops needed below, since it will just find the device directly.
 
 	if err != nil {
@@ -192,7 +190,7 @@ func getMultipathDisk(path string, aferoFs afero.Fs) (string, error) {
 		return "", err
 	}
 	for _, dmPath := range dmPaths {
-		sdevices, err := afero.Glob(aferoFs, filepath.Join(dmPath, "slaves", "*"))
+		sdevices, err := filepath.Glob(filepath.Join(dmPath, "slaves", "*"))
 		if err != nil {
 			klog.V(4).Infof("Glob error: %s", err)
 		}
@@ -297,7 +295,7 @@ func (r RescanUtilsIscsi) GetIscsiSessionHostsForArrayIQN(array_iqn string) ([]i
 	
 	sysPath := "/sys/class/iscsi_host/"
 	var sessionHosts []int
-	if hostDirs, err := afero.ReadDir(r.aferoFs, sysPath); err != nil {
+	if hostDirs, err := ioutil.ReadDir(sysPath); err != nil {
 		klog.Errorf("cannot read sys dir : {%v}. error : {%v}", sysPath, err)
 		return sessionHosts, err
 	} else {
@@ -319,7 +317,7 @@ func (r RescanUtilsIscsi) GetIscsiSessionHostsForArrayIQN(array_iqn string) ([]i
 			targetPath := sysPath + hostName + "/device/session*/iscsi_session/session*/targetname"
 
 			//devicePath + sessionName + "/iscsi_session/" + sessionName + "/targetname"
-			matches, err := afero.Glob(r.aferoFs, targetPath)
+			matches, err := filepath.Glob(targetPath)
 			if err != nil {
 				klog.Errorf("error while finding targetPath : {%v}. err : {%v}", targetPath, err)
 				return sessionHosts, err
@@ -336,7 +334,7 @@ func (r RescanUtilsIscsi) GetIscsiSessionHostsForArrayIQN(array_iqn string) ([]i
 			}
 
 			targetNamePath := matches[0]
-			targetName, err := afero.ReadFile(r.aferoFs, targetNamePath)
+			targetName, err := ioutil.ReadFile(targetNamePath)
 			if err != nil {
 				klog.V(4).Infof("could not read target name from file : {%v}, error : {%v}", targetNamePath, err)
 				continue
