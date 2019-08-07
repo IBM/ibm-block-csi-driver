@@ -242,15 +242,16 @@ func NewOsDeviceConnectivityHelperIscsi(executer executer.ExecuterInterface) OsD
 
 func (o OsDeviceConnectivityHelperIscsi) WaitForPathToExist(devicePath string, maxRetries int, intervalSeconds int) ([]string, bool, error) {
 	/*
-		return back all the files apply to /dev/disk/by-path/ip-*-iscsi-ARRAYIQN-lun-LUNID
-		"/dev/disk/by-path/ip-*-iscsi-ARRAYIQN-lun-LUNID" -> 
+		Description:
+			Try to find all the files /dev/disk/by-path/ip-*-iscsi-ARRAYIQN-lun-LUNID. If not find then try again maxRetries.	
 	*/
+	
 	var err error
 	for i := 0; i < maxRetries; i++ {
 		err = nil
 		fpaths, err := o.executer.FilepathGlob(devicePath)
 		if err != nil{
-			return "", err
+			return nil, false, err
 		}
 		
 		klog.V(4).Infof("fpaths : {%v}", fpaths)

@@ -18,36 +18,28 @@
 package device_connectivity_test
 
 import (
-	"context"
-	"github.com/container-storage-interface/spec/lib/go/csi"
 	gomock "github.com/golang/mock/gomock"
 	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
-	"reflect"
+	//"reflect"
 	"testing"
 	"fmt"
 )
 
 func TestHelperWaitForPathToExist(t *testing.T) {
-	stdVolCap := &csi.VolumeCapability{
-		AccessType: &csi.VolumeCapability_Mount{
-			Mount: &csi.VolumeCapability_MountVolume{},
-		},
-		AccessMode: &csi.VolumeCapability_AccessMode{
-			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-		},
-	}
 	testCases := []struct {
+		name string
 		fpaths []string
 		expErr error
+		expFound bool
+		globReturnErr error
 	}{
 		{
 			name: "Should fail when Glob return error",
 			fpaths: nil,
-			globErroreturned_error: fmt.Errorf("error"),
-			expErr:  ,
+			globReturnErr: fmt.Errorf("error"),
+			expErr: fmt.Errorf("error"),
+			expFound: false,
 		},
 		
 	}
@@ -60,22 +52,20 @@ func TestHelperWaitForPathToExist(t *testing.T) {
 
 			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
 			devicePath := "/dev/disk/by-path/ip-ARRAYIP-iscsi-ARRAYIQN-lun-LUNID"
-			fake_executer.EXPECT().FilepathGlob(devicePath).Return(tc.fpaths, tc.expErr)
-
+			fake_executer.EXPECT().FilepathGlob(devicePath).Return(tc.fpaths, tc.globReturnErr)
 			helperIscsi := device_connectivity.NewOsDeviceConnectivityHelperIscsi(fake_executer)
 			
-			_, err := d.NodeStageVolume(context.TODO(), tc.req)
+			_, found, err := helperIscsi.WaitForPathToExist(devicePath, 1, 1)
 			if err != nil {
-				srvErr, ok := status.FromError(err)
-				if !ok {
-					t.Fatalf("Could not get error status code from error: %v", srvErr)
+				if err.Error() != tc.expErr.Error() {
+					t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())
 				}
-				if srvErr.Code() != tc.expErrCode {
-					t.Fatalf("Expected error code %d, got %d message %s", tc.expErrCode, srvErr.Code(), srvErr.Message())
-				}
-			} else if tc.expErrCode != codes.OK {
-				t.Fatalf("Expected error %v, got no error", tc.expErrCode)
 			}
+			if found != tc.expFound{
+					t.Fatalf("Expected found boolean code %t, got %t", tc.expFound, found)
+			}
+			
+
 		})
 	}
 }
