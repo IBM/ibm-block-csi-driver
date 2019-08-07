@@ -270,27 +270,37 @@ func (o OsDeviceConnectivityHelperIscsi) WaitForPathToExist(devicePath string, m
 func (o OsDeviceConnectivityHelperIscsi) GetMultipathDisk(path string) (string, error) {
 	/*
 		Description:
-			Find the dm device based on path /dev/disk/by-path/TARGET-iscsi-iqn:<LUNID> -> ../../sdX
-			By loop up on the /sys/block/dm-*\/slaves/sd<X> and return the <dm-*>
+			1. Get the name of the device(e.g: sdX) by check `path` as slink to the device. 
+			   e.g: Where path=/dev/disk/by-path/TARGET-iscsi-iqn:<LUNID> which slink to "../../sdX"
+			        /dev/disk/by-path/TARGET-iscsi-iqn:<LUNID> -> ../../sdX
+			2. After having sdX, the function loop over all the files in /sys/block/dm-*\/slaves/sd<X> and return its relevant <dm-*>.
+			   The <dm-*> is actually the second directory of the path /sys/block/dm-*\/slaves/sd<X>.
+			   e.g: function will return dm-1 for this path=/dev/disk/by-path/TARGET-iscsi-iqn:5,
+					Because the /dev/disk/by-path/TARGET-iscsi-iqn:5 -> ../../sda
+					And listing all the /sys/block/dm-*\/slaves/sda  will be with dm-1. So the fucntion will return dm-1.			           
 			
 		Return Value: 
 			dm-<X>
 	*/
 	
 	// Follow link to destination directory
-	klog.V(5).Infof("Getting multipaht disk")
+	klog.V(5).Infof("Getting multipath disk")
+	
+	// Get the sdX which is the file that path link to. 
 	devicePath, err := o.executer.OsReadlink(path)
 	if err != nil {
 		klog.V(4).Infof("Failed reading link for multipath disk: %s. error: {%s}\n", path, err.Error())
 		return "", err
 	}
+	
 	// Get only the physical device from /dev/disk/by-path/TARGET-iscsi-iqn:<LUNID> -> ../../sdb
 	sdevice := filepath.Base(devicePath)
+	
 	// If destination directory is already identified as a multipath device,
 	// just return its path
 	if strings.HasPrefix(sdevice, "dm-") {
 		klog.V(4).Infof("Already found multipath device: %s", sdevice)
-		return path, nil
+		return sdevice, nil
 	}
 	// Fallback to iterating through all the entries under /sys/block/dm-* and
 	// check to see if any have an entry under /sys/block/dm-*/slaves matching
