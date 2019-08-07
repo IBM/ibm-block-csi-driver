@@ -29,7 +29,8 @@ import (
 	"google.golang.org/grpc/status"
 	"k8s.io/klog"
 	mount "k8s.io/kubernetes/pkg/util/mount"
- 	"github.com/ibm/ibm-block-csi-driver/node/driver/executer"
+ 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+ 	device_connectivity "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 )
 
 var (
@@ -60,14 +61,14 @@ type NodeService struct {
 	ConfigYaml       ConfigFile
 	Hostname         string
 	NodeUtils        NodeUtilsInterface
-	executer         myexecuter.ExecuterInterface
+	executer         executer.ExecuterInterface
 	VolumeIdLocksMap SyncLockInterface
-	OsDeviceConnectivityMapping   map[string]OsDeviceConnectivityInterface
+	OsDeviceConnectivityMapping   map[string]device_connectivity.OsDeviceConnectivityInterface
 }
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
-func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, OsDeviceConnectivityMapping  map[string]OsDeviceConnectivityInterface, executer myexecuter.ExecuterInterface, mounter *mount.SafeFormatAndMount, syncLock SyncLockInterface) NodeService {
+func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, OsDeviceConnectivityMapping  map[string]device_connectivity.OsDeviceConnectivityInterface, executer executer.ExecuterInterface, mounter *mount.SafeFormatAndMount, syncLock SyncLockInterface) NodeService {
 	return NodeService{
 		ConfigYaml:     configYaml,
 		Hostname:       hostname,

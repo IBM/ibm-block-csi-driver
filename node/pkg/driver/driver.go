@@ -28,6 +28,8 @@ import (
 	"k8s.io/klog"
 	
 	mount "k8s.io/kubernetes/pkg/util/mount" 
+	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	device_connectivity "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 )
 
 type Driver struct {
@@ -51,9 +53,9 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 	}
 	
 	syncLock := NewSyncLock()
-	executer := &Executer{}
-	osDeviceConnectivityMapping:= map[string]OsDeviceConnectivityInterface{
-		"iscsi": NewOsDeviceConnectivityIscsi(executer),
+	executer := &executer.Executer{}
+	osDeviceConnectivityMapping:= map[string]device_connectivity.OsDeviceConnectivityInterface{
+		"iscsi": device_connectivity.NewOsDeviceConnectivityIscsi(executer),
 		//"fc": NewOsDeviceConnectivityFc(executer),
 		// TODO nvme
 	}
