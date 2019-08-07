@@ -46,7 +46,7 @@ func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface) OsDeviceC
 
 func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier string) error {
 	klog.V(5).Infof("Starging Rescan specific lun, on lun : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
-	sessionHosts, err := r.getIscsiSessionHostsForArrayIQN(arrayIdentifier)
+	sessionHosts, err := r.helper.GetIscsiSessionHostsForArrayIQN(arrayIdentifier)
 	if err != nil {
 		return err
 	}
@@ -54,7 +54,7 @@ func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier stri
 	for _, hostNumber := range sessionHosts {
 
 		filename := fmt.Sprintf("/sys/class/scsi_host/host%d/scan", hostNumber)
-		f, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200)
+		f, err := r.executer.OsOpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200)
 		if err != nil {
 			klog.Errorf("could not open filename : {%v}. err : {%v}", filename, err)
 			return err
@@ -64,7 +64,7 @@ func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier stri
 
 		scanCmd := fmt.Sprintf("0 0 %d", lunId)
 		klog.V(5).Infof("Rescan host device : echo %s > %s", scanCmd, filename)
-		if written, err := f.WriteString(scanCmd); err != nil {
+		if written, err := r.executer.FileWriteString(f, scanCmd); err != nil {
 			klog.Errorf("could not write to file :{%v}, error : {%v}", filename, err)
 			return err
 		} else if written == 0 {
@@ -210,78 +210,6 @@ func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(sysDevices []string) err
 	return nil
 }
 
-func (r OsDeviceConnectivityIscsi) getIscsiSessionHostsForArrayIQN(arrayIdentifier string) ([]int, error) {
-	/*
-		Description:
-			This function find all the hosts IDs under which has targetname that equal to the arrayIdentifier.  
-			/sys/class/iscsi_host/host<IDs>/device/session*\/iscsi_session/session*\/targetname"
-			So the function goes over all the above hosts and return back only the host numbers as a list.
-	*/
-	
-	sysPath := "/sys/class/iscsi_host/"
-	var sessionHosts []int
-	if hostDirs, err := r.executer.IoutilReadDir(sysPath); err != nil {
-		klog.Errorf("cannot read sys dir : {%v}. error : {%v}", sysPath, err)
-		return sessionHosts, err
-	} else {
-		klog.V(5).Infof("host dirs : {%v}", hostDirs)
-		for _, hostDir := range hostDirs {
-			// get the host session number : "host34"
-			hostName := hostDir.Name()
-			hostNumber := -1
-			if !strings.HasPrefix(hostName, "host") {
-				continue
-			} else {
-				hostNumber, err = strconv.Atoi(strings.TrimPrefix(hostName, "host"))
-				if err != nil {
-					klog.V(4).Infof("cannot get host id from host : {%v}", hostName)
-					continue
-				}
-			}
-
-			targetPath := sysPath + hostName + "/device/session*/iscsi_session/session*/targetname"
-
-			//devicePath + sessionName + "/iscsi_session/" + sessionName + "/targetname"
-			matches, err := r.executer.FilepathGlob(targetPath)
-			if err != nil {
-				klog.Errorf("error while finding targetPath : {%v}. err : {%v}", targetPath, err)
-				return sessionHosts, err
-			}
-
-			klog.V(5).Infof("matches were found : {%v}", matches)
-
-			//TODO: can there be more then 1 session??
-			//sessionNumber, err :=  strconv.Atoi(strings.TrimPrefix(matches[0], "session"))
-
-			if len(matches) == 0 {
-				klog.V(4).Infof("could not find targe name for host : {%v}, path : {%v}", hostName, targetPath)
-				continue
-			}
-
-			targetNamePath := matches[0]
-			targetName, err := r.executer.IoutilReadFile(targetNamePath)
-			if err != nil {
-				klog.V(4).Infof("could not read target name from file : {%v}, error : {%v}", targetNamePath, err)
-				continue
-			}
-
-			klog.V(5).Infof("target name found : {%v}", string(targetName))
-
-			if strings.TrimSpace(string(targetName)) == arrayIdentifier {
-				sessionHosts = append(sessionHosts, hostNumber)
-				klog.V(5).Infof("host nunber appended : {%v}. sessionhosts is : {%v}", hostNumber, sessionHosts)
-			}
-		}
-
-
-
-		if len(sessionHosts) == 0 {
-			genericTargetPath := sysPath + "host*" + "/device/session*/iscsi_session/session*/targetname"
-			return []int{}, &ConnectivityIscsiStorageTargetNotFoundError{StorageTargetName:arrayIdentifier, DirectoryPath:genericTargetPath}
-		}
-		return sessionHosts, nil
-	}
-}
 
 
 
@@ -293,11 +221,12 @@ func (r OsDeviceConnectivityIscsi) getIscsiSessionHostsForArrayIQN(arrayIdentifi
 
 
 
-//go:generate mockgen -destination=../../mocks/mock_OsDeviceConnectivityHelperIscsiInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver OsDeviceConnectivityHelperIscsiInterface
+//go:generate mockgen -destination=../../../mocks/mock_OsDeviceConnectivityHelperIscsiInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity OsDeviceConnectivityHelperIscsiInterface
 
 type OsDeviceConnectivityHelperIscsiInterface interface {
 	WaitForPathToExist(devicePath string, maxRetries int, intervalSeconds int) ([]string, bool, error) 
 	GetMultipathDisk(path string) (string, error) 
+    GetIscsiSessionHostsForArrayIQN(arrayIdentifier string) ([]int, error)
 }
 
 type OsDeviceConnectivityHelperIscsi struct {
@@ -312,11 +241,18 @@ func NewOsDeviceConnectivityHelperIscsi(executer executer.ExecuterInterface) OsD
 
 
 func (o OsDeviceConnectivityHelperIscsi) WaitForPathToExist(devicePath string, maxRetries int, intervalSeconds int) ([]string, bool, error) {
-
+	/*
+		return back all the files apply to /dev/disk/by-path/ip-*-iscsi-ARRAYIQN-lun-LUNID
+		"/dev/disk/by-path/ip-*-iscsi-ARRAYIQN-lun-LUNID" -> 
+	*/
 	var err error
 	for i := 0; i < maxRetries; i++ {
 		err = nil
-		fpaths, _ := o.executer.FilepathGlob(devicePath)
+		fpaths, err := o.executer.FilepathGlob(devicePath)
+		if err != nil{
+			return "", err
+		}
+		
 		klog.V(4).Infof("fpaths : {%v}", fpaths)
 
 		if fpaths == nil {
@@ -391,3 +327,75 @@ func (o OsDeviceConnectivityHelperIscsi) GetMultipathDisk(path string) (string, 
 	return "", err
 }
 
+func (o OsDeviceConnectivityHelperIscsi) GetIscsiSessionHostsForArrayIQN(arrayIdentifier string) ([]int, error) {
+	/*
+		Description:
+			This function find all the hosts IDs under which has targetname that equal to the arrayIdentifier.  
+			/sys/class/iscsi_host/host<IDs>/device/session*\/iscsi_session/session*\/targetname"
+			So the function goes over all the above hosts and return back only the host numbers as a list.
+	*/
+	
+	sysPath := "/sys/class/iscsi_host/"
+	var sessionHosts []int
+	if hostDirs, err := o.executer.IoutilReadDir(sysPath); err != nil {
+		klog.Errorf("cannot read sys dir : {%v}. error : {%v}", sysPath, err)
+		return sessionHosts, err
+	} else {
+		klog.V(5).Infof("host dirs : {%v}", hostDirs)
+		for _, hostDir := range hostDirs {
+			// get the host session number : "host34"
+			hostName := hostDir.Name()
+			hostNumber := -1
+			if !strings.HasPrefix(hostName, "host") {
+				continue
+			} else {
+				hostNumber, err = strconv.Atoi(strings.TrimPrefix(hostName, "host"))
+				if err != nil {
+					klog.V(4).Infof("cannot get host id from host : {%v}", hostName)
+					continue
+				}
+			}
+
+			targetPath := sysPath + hostName + "/device/session*/iscsi_session/session*/targetname"
+
+			//devicePath + sessionName + "/iscsi_session/" + sessionName + "/targetname"
+			matches, err := o.executer.FilepathGlob(targetPath)
+			if err != nil {
+				klog.Errorf("error while finding targetPath : {%v}. err : {%v}", targetPath, err)
+				return sessionHosts, err
+			}
+
+			klog.V(5).Infof("matches were found : {%v}", matches)
+
+			//TODO: can there be more then 1 session??
+			//sessionNumber, err :=  strconv.Atoi(strings.TrimPrefix(matches[0], "session"))
+
+			if len(matches) == 0 {
+				klog.V(4).Infof("could not find targe name for host : {%v}, path : {%v}", hostName, targetPath)
+				continue
+			}
+
+			targetNamePath := matches[0]
+			targetName, err := o.executer.IoutilReadFile(targetNamePath)
+			if err != nil {
+				klog.V(4).Infof("could not read target name from file : {%v}, error : {%v}", targetNamePath, err)
+				continue
+			}
+
+			klog.V(5).Infof("target name found : {%v}", string(targetName))
+
+			if strings.TrimSpace(string(targetName)) == arrayIdentifier {
+				sessionHosts = append(sessionHosts, hostNumber)
+				klog.V(5).Infof("host nunber appended : {%v}. sessionhosts is : {%v}", hostNumber, sessionHosts)
+			}
+		}
+
+
+
+		if len(sessionHosts) == 0 {
+			genericTargetPath := sysPath + "host*" + "/device/session*/iscsi_session/session*/targetname"
+			return []int{}, &ConnectivityIscsiStorageTargetNotFoundError{StorageTargetName:arrayIdentifier, DirectoryPath:genericTargetPath}
+		}
+		return sessionHosts, nil
+	}
+}

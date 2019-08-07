@@ -34,6 +34,7 @@ type ExecuterInterface interface { // basic host dependent functions
     FilepathGlob(pattern string) (matches []string, err error)
 	IoutilReadDir(dirname string) ([]os.FileInfo, error)
 	IoutilReadFile(filename string) ([]byte, error)
+	FileWriteString(f *os.File, s string) (n int, err error)
 }
 
 type Executer struct {
@@ -90,3 +91,8 @@ func (e *Executer) IoutilReadDir(dirname string) ([]os.FileInfo, error){
 func (e *Executer) IoutilReadFile(filename string) ([]byte, error){
 	return ioutil.ReadFile(filename)
 }
+
+func (e *Executer) FileWriteString(f *os.File, s string) (n int, err error){
+	return f.WriteString(s)
+}
+	
