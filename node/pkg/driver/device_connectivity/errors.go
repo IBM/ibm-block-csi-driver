@@ -26,7 +26,7 @@ type MultipleDeviceNotFoundForLunError struct {
 }
 
 func (e *MultipleDeviceNotFoundForLunError) Error() string {
-	return fmt.Sprintf("Couldn't find multipath device for volumeID [%s] lunID [%d] from array [%s]", e.VolumeId, e.LunId, e.ArrayIqn)
+	return fmt.Sprintf("Couldn't find multipath device for volumeID [%s] lunID [%d] from array [%s]. Please check the host connectivity to the storage.", e.VolumeId, e.LunId, e.ArrayIqn)
 }
 
 type ConnectivityIscsiStorageTargetNotFoundError struct {

@@ -96,11 +96,12 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 
 	devicePaths, exists, err := r.helper.WaitForPathToExist(devicePath, 5, 1)
 	if !exists {
-		klog.V(4).Infof("return error because file was not found")
-		return "", fmt.Errorf("could not find path")
+		e := &MultipleDeviceNotFoundForLunError{volumeId, lunId, arrayIdentifier}
+		klog.V(4).Infof(e.Error())
+		return "", e
 	}
 	if err != nil {
-		klog.V(4).Infof("founr error : %v ", err.Error())
+		klog.V(4).Infof("found error : %v ", err.Error())
 		return "", err
 	}
 
@@ -109,11 +110,11 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 	}
 
 	devicePathTosysfs := make(map[string]bool)
-	// Looping over the physical devices of the volume - /dev/sdX (multiple since its with multipathing)
+	// Looping over the physical devices of the volume - /dev/sdX and store all the dm devices inside map.
 	for _, path := range devicePaths {
 		if path != "" {
 			if mappedDevicePath, err := r.helper.GetMultipathDisk(path); mappedDevicePath != "" {
-				devicePathTosysfs[mappedDevicePath] = true
+				devicePathTosysfs[mappedDevicePath] = true // map it in order to save uniq dm devices
 				if err != nil {
 					return "", err
 				}
@@ -134,8 +135,8 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 	}
 	var md string
 	for md = range devicePathTosysfs {
-		break
-	} // because its the single value in the map, so just take the first
+		break  // because its the single value in the map, so just take the first
+	} 
 	return md, nil
 }
 
