@@ -30,22 +30,22 @@ import (
 )
 
 type OsDeviceConnectivityIscsi struct {
-	executer        executer.ExecuterInterface
-	mutexMultipathF *sync.Mutex
-	helper          OsDeviceConnectivityHelperIscsiInterface
+	Executer        executer.ExecuterInterface
+	MutexMultipathF *sync.Mutex
+	Helper          OsDeviceConnectivityHelperIscsiInterface
 }
 
 func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityIscsi{
-		executer:        executer,
-		mutexMultipathF: &sync.Mutex{},
-		helper:          NewOsDeviceConnectivityHelperIscsi(executer),
+		Executer:        executer,
+		MutexMultipathF: &sync.Mutex{},
+		Helper:          NewOsDeviceConnectivityHelperIscsi(executer),
 	}
 }
 
 func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier string) error {
 	klog.V(5).Infof("Starging Rescan specific lun, on lun : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
-	sessionHosts, err := r.helper.GetIscsiSessionHostsForArrayIQN(arrayIdentifier)
+	sessionHosts, err := r.Helper.GetIscsiSessionHostsForArrayIQN(arrayIdentifier)
 	if err != nil {
 		return err
 	}
@@ -53,7 +53,7 @@ func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier stri
 	for _, hostNumber := range sessionHosts {
 
 		filename := fmt.Sprintf("/sys/class/scsi_host/host%d/scan", hostNumber)
-		f, err := r.executer.OsOpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200)
+		f, err := r.Executer.OsOpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200)
 		if err != nil {
 			klog.Errorf("could not open filename : {%v}. err : {%v}", filename, err)
 			return err
@@ -63,7 +63,7 @@ func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier stri
 
 		scanCmd := fmt.Sprintf("0 0 %d", lunId)
 		klog.V(5).Infof("Rescan host device : echo %s > %s", scanCmd, filename)
-		if written, err := r.executer.FileWriteString(f, scanCmd); err != nil {
+		if written, err := r.Executer.FileWriteString(f, scanCmd); err != nil {
 			klog.Errorf("could not write to file :{%v}, error : {%v}", filename, err)
 			return err
 		} else if written == 0 {
@@ -94,7 +94,7 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 	devicePath := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", arrayIdentifier, "lun", strconv.Itoa(lunId)}, "-")
 	klog.V(4).Infof("device path is : {%v}", devicePath)
 
-	devicePaths, exists, err := r.helper.WaitForPathToExist(devicePath, 5, 1)
+	devicePaths, exists, err := r.Helper.WaitForPathToExist(devicePath, 5, 1)
 	if !exists {
 		e := &MultipleDeviceNotFoundForLunError{volumeId, lunId, arrayIdentifier}
 		klog.V(4).Infof(e.Error())
@@ -113,7 +113,7 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 	// Looping over the physical devices of the volume - /dev/sdX and store all the dm devices inside map.
 	for _, path := range devicePaths {
 		if path != "" {
-			if mappedDevicePath, err := r.helper.GetMultipathDisk(path); mappedDevicePath != "" {
+			if mappedDevicePath, err := r.Helper.GetMultipathDisk(path); mappedDevicePath != "" {
 				devicePathTosysfs[mappedDevicePath] = true // map it in order to save uniq dm devices
 				if err != nil {
 					return "", err
@@ -148,10 +148,10 @@ func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(mpathDevice string) erro
 	fullDevice := "/dev/" + mpathDevice
 
 	klog.V(5).Infof("Try to accure lock for running the command multipath -f {%v} (to avoid concurrent multipath commands)", mpathDevice)
-	r.mutexMultipathF.Lock()
+	r.MutexMultipathF.Lock()
 	klog.V(5).Infof("Accured lock for multipath -f command")
-	_, err := r.executer.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", fullDevice})
-	r.mutexMultipathF.Unlock()
+	_, err := r.Executer.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", fullDevice})
+	r.MutexMultipathF.Unlock()
 
 	if err != nil {
 		if _, errOpen := os.Open(fullDevice); errOpen != nil {

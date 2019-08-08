@@ -14,53 +14,52 @@
  * limitations under the License.
  */
 
-
 package device_connectivity_test
 
 import (
-	"fmt"
 	gomock "github.com/golang/mock/gomock"
 	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
-	"reflect"
-	"testing"
 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"reflect"
+	"strconv"
+	"strings"
 	"sync"
+	"testing"
 )
 
-
-type WaitForPathToExistReturn struct{
+type WaitForPathToExistReturn struct {
 	devicePaths []string
-	exists bool
-	err error
+	exists      bool
+	err         error
 }
 
 func NewOsDeviceConnectivityIscsiForTest(executer executer.ExecuterInterface,
-										 helper device_connectivity.OsDeviceConnectivityHelperIscsiInterface) device_connectivity.OsDeviceConnectivityInterface{
+	helper device_connectivity.OsDeviceConnectivityHelperIscsiInterface) device_connectivity.OsDeviceConnectivityInterface {
 	return &device_connectivity.OsDeviceConnectivityIscsi{
-		executer:        executer,
-		mutexMultipathF: &sync.Mutex{},
-		helper:          helper,
+		Executer:        executer,
+		MutexMultipathF: &sync.Mutex{},
+		Helper:          helper,
 	}
 }
 
 func TestGetMpathDevice(t *testing.T) {
 	testCases := []struct {
-		name                  string
+		name string
 
-		expErrType        reflect.Type
-		expErr            error
-		expDMdevice       []int
+		expErrType               reflect.Type
+		expErr                   error
+		expDMdevice              string
 		waitForPathToExistReturn WaitForPathToExistReturn
 	}{
 		{
-			name:              "Should fail when WaitForPathToExist not found any sd device",
-			expErr:            fmt.Errorf("error"),
-			expDMdevice:       nil,
+			name:        "Should fail when WaitForPathToExist not found any sd device",
+			expErrType: reflect.TypeOf(&device_connectivity.MultipleDeviceNotFoundForLunError{}),
+			expDMdevice: "",
 			waitForPathToExistReturn: WaitForPathToExistReturn{
 				devicePaths: nil,
-				exists: false,
-				err: nil,
+				exists:      false,
+				err:         nil,
 			},
 		},
 	}
@@ -72,17 +71,17 @@ func TestGetMpathDevice(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
-			fake_helper := mocks.NewMockOsDeviceConnectivityHelperIscsiInterface(mockCtrl)	
+			fake_helper := mocks.NewMockOsDeviceConnectivityHelperIscsiInterface(mockCtrl)
 			lunId := 0
 			arrayIdentifier := "X"
 			path := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", arrayIdentifier, "lun", strconv.Itoa(lunId)}, "-")
-			fake_helper.EXPECT().WaitForPathToExist(path ,5, 1).Return(
+			fake_helper.EXPECT().WaitForPathToExist(path, 5, 1).Return(
 				tc.waitForPathToExistReturn.devicePaths,
 				tc.waitForPathToExistReturn.exists,
 				tc.waitForPathToExistReturn.err,
 			)
 
-			o := device_connectivity.NewOsDeviceConnectivityIscsiForTest(fake_executer, fake_helper)
+			o := NewOsDeviceConnectivityIscsiForTest(fake_executer, fake_helper)
 			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, arrayIdentifier)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
@@ -99,7 +98,7 @@ func TestGetMpathDevice(t *testing.T) {
 				}
 			}
 
-			if tc.expDMdevice == DMdevice {
+			if tc.expDMdevice != DMdevice {
 				t.Fatalf("Expected found mpath device %v, got %v", tc.expDMdevice, DMdevice)
 			}
 
