@@ -140,7 +140,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		}
 		klog.V(4).Infof("comparing dev : {%v} with device : {%v}", dmDevice, device)
 		if dmDevice == device {
-			klog.V(4).Infof("Returning ok result")  // TODO double check
+			klog.V(4).Infof("Returning ok result") // TODO double check
 			return &csi.NodeStageVolumeResponse{}, nil
 		} else {
 			return nil, status.Errorf(codes.AlreadyExists, "Mount point is already mounted to.")
@@ -463,10 +463,9 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return nil, status.Errorf(codes.Internal, "Could not unmount %q: %v", target, err)
 	}
 
-
 	if _, err := os.Stat(target); os.IsNotExist(err) {
 		klog.V(4).Infof("Deleting target path [%s] after successfully unmount it.", target)
-		if err := os.RemoveAll(target); err != nil{
+		if err := os.RemoveAll(target); err != nil {
 			klog.Warningf("Fail to remove the target path [%s] after successfully unmount it. Error %v", target, err)
 		}
 	}
