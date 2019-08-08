@@ -17,6 +17,7 @@
 package device_connectivity_test
 
 import (
+	"fmt"
 	gomock "github.com/golang/mock/gomock"
 	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
@@ -43,6 +44,12 @@ func NewOsDeviceConnectivityIscsiForTest(executer executer.ExecuterInterface,
 	}
 }
 
+type GetMultipathDiskReturn struct {
+	pathParam string
+	path      string
+	err       error
+}
+
 func TestGetMpathDevice(t *testing.T) {
 	testCases := []struct {
 		name string
@@ -51,16 +58,134 @@ func TestGetMpathDevice(t *testing.T) {
 		expErr                   error
 		expDMdevice              string
 		waitForPathToExistReturn WaitForPathToExistReturn
+		getMultipathDiskReturns  []GetMultipathDiskReturn
 	}{
 		{
-			name:        "Should fail when WaitForPathToExist not found any sd device",
-			expErrType: reflect.TypeOf(&device_connectivity.MultipleDeviceNotFoundForLunError{}),
-			expDMdevice: "",
+			name: "Should fail when WaitForPathToExist not found any sd device",
 			waitForPathToExistReturn: WaitForPathToExistReturn{
 				devicePaths: nil,
 				exists:      false,
 				err:         nil,
 			},
+
+			expErrType:  reflect.TypeOf(&device_connectivity.MultipleDeviceNotFoundForLunError{}),
+			expDMdevice: "",
+		},
+		{
+			name: "Should fail when WaitForPathToExist fail for some reason",
+			waitForPathToExistReturn: WaitForPathToExistReturn{
+				devicePaths: nil,
+				exists:      false,
+				err:         fmt.Errorf("error"),
+			},
+
+			expErr:      fmt.Errorf("error"),
+			expDMdevice: "",
+		},
+
+		{
+			name: "Should fail when GetMultipathDisk fail for some reason",
+			waitForPathToExistReturn: WaitForPathToExistReturn{
+				devicePaths: []string{"/dev/disk/by-path/ip1-iscsi-ID1-lun1"},
+				exists:      true,
+				err:         nil,
+			},
+			getMultipathDiskReturns: []GetMultipathDiskReturn{
+				GetMultipathDiskReturn{
+					pathParam: "/dev/disk/by-path/ip1-iscsi-ID1-lun1",
+					path:      "",
+					err:       fmt.Errorf("error"),
+				},
+			},
+
+			expErr:      fmt.Errorf("error"),
+			expDMdevice: "",
+		},
+
+		{
+			name: "Should fail when GetMultipathDisk fail for some reason",
+			waitForPathToExistReturn: WaitForPathToExistReturn{
+				devicePaths: []string{"/dev/disk/by-path/ip1-iscsi-ID1-lun1"},
+				exists:      true,
+				err:         nil,
+			},
+			getMultipathDiskReturns: []GetMultipathDiskReturn{
+				GetMultipathDiskReturn{
+					pathParam: "/dev/disk/by-path/ip1-iscsi-ID1-lun1",
+					path:      "",
+					err:       fmt.Errorf("error"),
+				},
+			},
+
+			expErr:      fmt.Errorf("error"),
+			expDMdevice: "",
+		},
+
+		{
+			name: "Should fail when GetMultipathDisk provide 2 different dms that apply to the same lun (bas multipathing case)",
+			waitForPathToExistReturn: WaitForPathToExistReturn{
+				devicePaths: []string{"/dev/disk/by-path/ip1-iscsi-ID1-lun1", "/dev/disk/by-path/ip1-iscsi-ID1-lun1___2"},
+				exists:      true,
+				err:         nil,
+			},
+			getMultipathDiskReturns: []GetMultipathDiskReturn{
+				GetMultipathDiskReturn{
+					pathParam: "/dev/disk/by-path/ip1-iscsi-ID1-lun1",
+					path:      "dm-1",
+					err:       nil,
+				},
+				GetMultipathDiskReturn{
+					pathParam: "/dev/disk/by-path/ip1-iscsi-ID1-lun1___2",
+					path:      "dm-2", // The main point, look like multipath crazy and give to the same vol but different path a different md device, which is wrong case - so we check it.
+					err:       nil,
+				},
+			},
+
+			expErrType:  reflect.TypeOf(&device_connectivity.MultipleDmDevicesError{}),
+			expDMdevice: "",
+		},
+
+		{
+			name: "Should fail when GetMultipathDisk is ok but return no dm devices - empty string)",
+			waitForPathToExistReturn: WaitForPathToExistReturn{
+				devicePaths: []string{"/dev/disk/by-path/ip1-iscsi-ID1-lun1"},
+				exists:      true,
+				err:         nil,
+			},
+			getMultipathDiskReturns: []GetMultipathDiskReturn{
+				GetMultipathDiskReturn{
+					pathParam: "/dev/disk/by-path/ip1-iscsi-ID1-lun1",
+					path:      "", // this is the thing for this test
+					err:       nil,
+				},
+			},
+
+			expErrType:  reflect.TypeOf(&device_connectivity.MultipleDeviceNotFoundForLunError{}),
+			expDMdevice: "",
+		},
+
+		{
+			name: "Should succeed to GetMpathDevice - good path",
+			waitForPathToExistReturn: WaitForPathToExistReturn{
+				devicePaths: []string{"/dev/disk/by-path/ip1-iscsi-ID1-lun1", "/dev/disk/by-path/ip1-iscsi-ID1-lun1___2"},
+				exists:      true,
+				err:         nil,
+			},
+			getMultipathDiskReturns: []GetMultipathDiskReturn{
+				GetMultipathDiskReturn{
+					pathParam: "/dev/disk/by-path/ip1-iscsi-ID1-lun1",
+					path:      "dm-1",
+					err:       nil,
+				},
+				GetMultipathDiskReturn{
+					pathParam: "/dev/disk/by-path/ip1-iscsi-ID1-lun1___2",
+					path:      "dm-1", // the same because there are 2 paths to the storage, so we should find 2 sd devices that point to the same dm device
+					err:       nil,
+				},
+			},
+
+			expErr:      nil,
+			expDMdevice: "dm-1",
 		},
 	}
 
@@ -80,6 +205,13 @@ func TestGetMpathDevice(t *testing.T) {
 				tc.waitForPathToExistReturn.exists,
 				tc.waitForPathToExistReturn.err,
 			)
+
+			var mcalls []*gomock.Call
+			for _, r := range tc.getMultipathDiskReturns {
+				call := fake_helper.EXPECT().GetMultipathDisk(r.pathParam).Return(r.path, r.err)
+				mcalls = append(mcalls, call)
+			}
+			gomock.InOrder(mcalls...)
 
 			o := NewOsDeviceConnectivityIscsiForTest(fake_executer, fake_helper)
 			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, arrayIdentifier)

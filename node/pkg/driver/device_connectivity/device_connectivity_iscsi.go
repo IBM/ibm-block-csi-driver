@@ -95,30 +95,29 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 	klog.V(4).Infof("device path is : {%v}", devicePath)
 
 	devicePaths, exists, err := r.Helper.WaitForPathToExist(devicePath, 5, 1)
+	if err != nil {
+		klog.V(4).Infof("found error : %v ", err.Error())
+		return "", err
+	}
 	if !exists {
 		e := &MultipleDeviceNotFoundForLunError{volumeId, lunId, arrayIdentifier}
 		klog.V(4).Infof(e.Error())
 		return "", e
 	}
-	if err != nil {
-		klog.V(4).Infof("found error : %v ", err.Error())
-		return "", err
-	}
-
-	if len(devicePaths) < 1 {
-		return "", fmt.Errorf("failed to find device path: %s", devicePath)
-	}
 
 	devicePathTosysfs := make(map[string]bool)
 	// Looping over the physical devices of the volume - /dev/sdX and store all the dm devices inside map.
 	for _, path := range devicePaths {
-		if path != "" {
-			if mappedDevicePath, err := r.Helper.GetMultipathDisk(path); mappedDevicePath != "" {
-				devicePathTosysfs[mappedDevicePath] = true // map it in order to save uniq dm devices
-				if err != nil {
-					return "", err
-				}
+		if path != "" { // since it may return empty items
+			mappedDevicePath, err := r.Helper.GetMultipathDisk(path)
+			if err != nil {
+				return "", err
 			}
+
+			if mappedDevicePath != "" {
+				devicePathTosysfs[mappedDevicePath] = true // map it in order to save uniq dm devices
+			}
+
 		}
 	}
 
@@ -126,8 +125,8 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 	for key := range devicePathTosysfs {
 		mps += ", " + key
 	}
+	klog.V(4).Infof("Found multipath devices: [%s] that apply to lunId=%d and arrayIdentifier=%s", mps, lunId, arrayIdentifier)
 
-	klog.V(4).Infof("Found multipath devices: %s", mps)
 	if len(devicePathTosysfs) > 1 {
 		return "", &MultipleDmDevicesError{volumeId, lunId, arrayIdentifier, devicePathTosysfs}
 	} else if len(devicePathTosysfs) == 0 {
@@ -135,8 +134,8 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 	}
 	var md string
 	for md = range devicePathTosysfs {
-		break  // because its the single value in the map, so just take the first
-	} 
+		break // because its the single value in the map, so just take the first
+	}
 	return md, nil
 }
 
