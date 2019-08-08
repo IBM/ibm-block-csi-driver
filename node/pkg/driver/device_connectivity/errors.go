@@ -46,3 +46,11 @@ type MultipleDeviceNotFoundError struct {
 func (e *MultipleDeviceNotFoundError) Error() string {
 	return fmt.Sprintf("Couldn't find dm-* of the physical device path [%s -> %s] ", e.DiskByPathDevice, e.LinkToPhysicalDevice)
 }
+
+type ErrorNothingWasWrittenToScanFileError struct {
+	path string
+}
+
+func (e *ErrorNothingWasWrittenToScanFileError) Error() string {
+	return fmt.Sprintf("Rescan Error: Nothing was written to rescan file : {%s}", e.path)
+}
