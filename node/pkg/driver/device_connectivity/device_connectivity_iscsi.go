@@ -219,6 +219,10 @@ type OsDeviceConnectivityHelperIscsi struct {
 	executer executer.ExecuterInterface
 }
 
+const (
+	IscsiHostRexExPath = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
+)
+
 func NewOsDeviceConnectivityHelperIscsi(executer executer.ExecuterInterface) OsDeviceConnectivityHelperIscsiInterface {
 	return &OsDeviceConnectivityHelperIscsi{executer: executer}
 }
@@ -329,7 +333,7 @@ func (o OsDeviceConnectivityHelperIscsi) GetIscsiSessionHostsForArrayIQN(arrayId
 			So the function goes over all the above hosts and return back only the host numbers as a list.
 	*/
 
-	targetNamePath := "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
+	targetNamePath := IscsiHostRexExPath
 	var sessionHosts []int
 	matches, err := o.executer.FilepathGlob(targetNamePath)
 	if err != nil {
