@@ -318,7 +318,6 @@ func TestHelperGetIscsiSessionHostsForArrayIQN(t *testing.T) {
 					data:          nil,
 					err:           fmt.Errorf("error"),
 				},
-				
 			},
 			arrayIdentifier: "fakeIQN",
 
