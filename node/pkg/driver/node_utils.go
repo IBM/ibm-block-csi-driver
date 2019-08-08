@@ -3,12 +3,12 @@ package driver
 import (
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"k8s.io/klog"
 	"os"
 	"path"
 	"strconv"
 	"strings"
-	"io/ioutil"
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
@@ -68,7 +68,6 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, c
 
 	return connectivityType, lun, array_iqn, nil
 }
-
 
 func (n NodeUtils) WriteStageInfoToFile(filePath string, info map[string]string) error {
 	// writes to stageTargetPath/filename
@@ -131,8 +130,6 @@ func (n NodeUtils) GetSysDevicesFromMpath(device string) (string, error) {
 
 }
 
-
-func (n NodeUtils) ClearStageInfoFile(filePath string) (error) {
+func (n NodeUtils) ClearStageInfoFile(filePath string) error {
 	return os.Remove(filePath)
 }
-

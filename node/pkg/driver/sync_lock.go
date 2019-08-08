@@ -8,7 +8,7 @@ import (
 
 type SyncLockInterface interface {
 	AddVolumeLock(id string) error
-	RemoveVolumeLock( id string)
+	RemoveVolumeLock(id string)
 }
 
 type SyncLock struct {
@@ -22,7 +22,7 @@ func NewSyncLock() *SyncLock {
 
 }
 
-func (s SyncLock) AddVolumeLock( id string) error {
+func (s SyncLock) AddVolumeLock(id string) error {
 	_, exists := s.syncMap.Load(id)
 	if !exists {
 		s.syncMap.Store(id, 0)

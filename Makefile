@@ -54,7 +54,7 @@ test-xunit-in-container:
 
 .PHONY: gofmt
 gofmt:
-	gofmt -w .
+	gofmt -w ./node
 
 .PHONY: csi-build-images-and-push-artifactory
 csi-build-images-and-push-artifactory:

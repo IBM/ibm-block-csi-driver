@@ -26,10 +26,10 @@ import (
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v2"
 	"k8s.io/klog"
-	
-	mount "k8s.io/kubernetes/pkg/util/mount" 
-	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+
 	device_connectivity "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
+	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	mount "k8s.io/kubernetes/pkg/util/mount"
 )
 
 type Driver struct {
@@ -45,16 +45,15 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 		return nil, err
 	}
 	klog.Infof("Driver: %v Version: %v", configFile.Identity.Name, configFile.Identity.Version)
-	
-	
-	mounter:= &mount.SafeFormatAndMount{
+
+	mounter := &mount.SafeFormatAndMount{
 		Interface: mount.New(""),
 		Exec:      mount.NewOsExec(),
 	}
-	
+
 	syncLock := NewSyncLock()
 	executer := &executer.Executer{}
-	osDeviceConnectivityMapping:= map[string]device_connectivity.OsDeviceConnectivityInterface{
+	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
 		"iscsi": device_connectivity.NewOsDeviceConnectivityIscsi(executer),
 		//"fc": NewOsDeviceConnectivityFc(executer),
 		// TODO nvme

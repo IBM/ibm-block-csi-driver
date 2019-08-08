@@ -18,20 +18,20 @@ package executer
 
 import (
 	"context"
-	"os/exec"
-	"time"
+	"io/ioutil"
 	"k8s.io/klog"
 	"os"
+	"os/exec"
 	"path/filepath"
-	"io/ioutil"    
+	"time"
 )
 
 //go:generate mockgen -destination=../../../mocks/mock_executer.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer ExecuterInterface
 type ExecuterInterface interface { // basic host dependent functions
 	ExecuteWithTimeout(mSeconds int, command string, args []string) ([]byte, error)
 	OsOpenFile(name string, flag int, perm os.FileMode) (*os.File, error)
-    OsReadlink(name string) (string, error)
-    FilepathGlob(pattern string) (matches []string, err error)
+	OsReadlink(name string) (string, error)
+	FilepathGlob(pattern string) (matches []string, err error)
 	IoutilReadDir(dirname string) ([]os.FileInfo, error)
 	IoutilReadFile(filename string) ([]byte, error)
 	FileWriteString(f *os.File, s string) (n int, err error)
@@ -41,8 +41,8 @@ type Executer struct {
 }
 
 func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []string) ([]byte, error) {
-	klog.V(5).Infof("Executing command : {%v} with args : {%v}. and timeout : {%v} mseconds",command, args, mSeconds)
-	
+	klog.V(5).Infof("Executing command : {%v} with args : {%v}. and timeout : {%v} mseconds", command, args, mSeconds)
+
 	// Create a new context and add a timeout to it
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(mSeconds)*time.Millisecond)
 	defer cancel() // The cancel should be deferred so resources are cleaned up
@@ -66,33 +66,31 @@ func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []strin
 	if err != nil {
 		klog.V(4).Infof("Non-zero exit code: %s", err)
 	}
-	
+
 	klog.V(5).Infof("Finished executing command")
 	return out, err
 }
 
-
-func (e *Executer) OsOpenFile(name string, flag int, perm os.FileMode) (*os.File, error){
+func (e *Executer) OsOpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
 	return os.OpenFile(name, flag, perm)
 }
 
-func (e *Executer) OsReadlink(name string) (string, error){
+func (e *Executer) OsReadlink(name string) (string, error) {
 	return os.Readlink(name)
 }
 
-func (e *Executer) FilepathGlob(pattern string) (matches []string, err error){
+func (e *Executer) FilepathGlob(pattern string) (matches []string, err error) {
 	return filepath.Glob(pattern)
 }
 
-func (e *Executer) IoutilReadDir(dirname string) ([]os.FileInfo, error){
+func (e *Executer) IoutilReadDir(dirname string) ([]os.FileInfo, error) {
 	return ioutil.ReadDir(dirname)
 }
 
-func (e *Executer) IoutilReadFile(filename string) ([]byte, error){
+func (e *Executer) IoutilReadFile(filename string) ([]byte, error) {
 	return ioutil.ReadFile(filename)
 }
 
-func (e *Executer) FileWriteString(f *os.File, s string) (n int, err error){
+func (e *Executer) FileWriteString(f *os.File, s string) (n int, err error) {
 	return f.WriteString(s)
 }
-	

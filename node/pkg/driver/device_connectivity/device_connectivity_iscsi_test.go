@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-
 package device_connectivity_test
 
 import (
@@ -22,41 +21,40 @@ import (
 	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	//"reflect"
-	"testing"
 	"fmt"
 	"os"
+	"testing"
 )
 
 func TestHelperWaitForPathToExist(t *testing.T) {
 	testCases := []struct {
-		name string
-		fpaths []string
-		expErr error
-		expFound bool
+		name          string
+		fpaths        []string
+		expErr        error
+		expFound      bool
 		globReturnErr error
 	}{
 		{
-			name: "Should fail when Glob return error",
-			fpaths: nil,
+			name:          "Should fail when Glob return error",
+			fpaths:        nil,
 			globReturnErr: fmt.Errorf("error"),
-			expErr: fmt.Errorf("error"),
-			expFound: false,
+			expErr:        fmt.Errorf("error"),
+			expFound:      false,
 		},
 		{
-			name: "Should fail when Glob succeed but with no paths",
-			fpaths: nil,
+			name:          "Should fail when Glob succeed but with no paths",
+			fpaths:        nil,
 			globReturnErr: nil,
-			expErr: os.ErrNotExist,
-			expFound: false,
+			expErr:        os.ErrNotExist,
+			expFound:      false,
 		},
 		{
-			name: "Should fail when Glob return error",
-			fpaths: []string{"/a/a", "/a/b"},
+			name:          "Should fail when Glob return error",
+			fpaths:        []string{"/a/a", "/a/b"},
 			globReturnErr: nil,
-			expErr: nil,
-			expFound: true,
+			expErr:        nil,
+			expFound:      true,
 		},
-
 	}
 
 	for _, tc := range testCases {
@@ -69,17 +67,16 @@ func TestHelperWaitForPathToExist(t *testing.T) {
 			devicePath := "/dev/disk/by-path/ip-ARRAYIP-iscsi-ARRAYIQN-lun-LUNID"
 			fake_executer.EXPECT().FilepathGlob(devicePath).Return(tc.fpaths, tc.globReturnErr)
 			helperIscsi := device_connectivity.NewOsDeviceConnectivityHelperIscsi(fake_executer)
-			
+
 			_, found, err := helperIscsi.WaitForPathToExist(devicePath, 1, 1)
 			if err != nil {
 				if err.Error() != tc.expErr.Error() {
 					t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())
 				}
 			}
-			if found != tc.expFound{
-					t.Fatalf("Expected found boolean code %t, got %t", tc.expFound, found)
+			if found != tc.expFound {
+				t.Fatalf("Expected found boolean code %t, got %t", tc.expFound, found)
 			}
-			
 
 		})
 	}
@@ -87,99 +84,93 @@ func TestHelperWaitForPathToExist(t *testing.T) {
 
 type globReturn struct {
 	globReturnfpaths []string
-	globReturnErr error
-
+	globReturnErr    error
 }
 
 func TestHelperGetMultipathDisk(t *testing.T) {
 	testCases := []struct {
-		name    string
+		name                 string
 		osReadLinkReturnPath string
-		osReadLinkReturnExc error
-		globReturns []globReturn
-		
-		expErr  error
+		osReadLinkReturnExc  error
+		globReturns          []globReturn
+
+		expErr             error
 		notCheckExpErrType bool // if true then test will check the specific ExpErrType
-		expPath string
-		
+		expPath            string
 	}{
 		{
-			name: "Should fail to if OsReadlink return error",
+			name:                 "Should fail to if OsReadlink return error",
 			osReadLinkReturnPath: "",
-			osReadLinkReturnExc: fmt.Errorf("error"),
-			globReturns: nil,
+			osReadLinkReturnExc:  fmt.Errorf("error"),
+			globReturns:          nil,
 
-			expErr: fmt.Errorf("error"),
+			expErr:  fmt.Errorf("error"),
 			expPath: "",
 		},
 		{
-			name: "Succeed if OsReadlink return md-* device instead of sdX",
+			name:                 "Succeed if OsReadlink return md-* device instead of sdX",
 			osReadLinkReturnPath: "../../dm-4",
-			osReadLinkReturnExc: nil,
-			globReturns: nil,
-			
-			expErr: nil,
+			osReadLinkReturnExc:  nil,
+			globReturns:          nil,
+
+			expErr:  nil,
 			expPath: "dm-4",
 			// TODO add here some way to check that FilepathGlobs was not called at all.
 		},
 
 		{
-			name: "Fail if OsReadlink return sdX but FilepathGlob failed",
+			name:                 "Fail if OsReadlink return sdX but FilepathGlob failed",
 			osReadLinkReturnPath: "../../sdb",
-			osReadLinkReturnExc: nil,
+			osReadLinkReturnExc:  nil,
 			globReturns: []globReturn{
 				globReturn{
 					globReturnfpaths: nil,
-					globReturnErr: fmt.Errorf("error"),
+					globReturnErr:    fmt.Errorf("error"),
 				},
 			},
-			
-			expErr: fmt.Errorf("error"),
+
+			expErr:  fmt.Errorf("error"),
 			expPath: "",
 		},
 		{
-			name: "Fail if OsReadlink return sdX but FilepathGlob not show any of the sdX",
+			name:                 "Fail if OsReadlink return sdX but FilepathGlob not show any of the sdX",
 			osReadLinkReturnPath: "../../sdb",
-			osReadLinkReturnExc: nil,
-			
+			osReadLinkReturnExc:  nil,
+
 			globReturns: []globReturn{
 				globReturn{
 					globReturnfpaths: []string{"/sys/block/dm-4"},
-					globReturnErr: nil,
+					globReturnErr:    nil,
 				},
 				globReturn{
 					globReturnfpaths: nil, // so no dm devices found at all /sys/block/dm-*/slaves
-					globReturnErr: nil,
+					globReturnErr:    nil,
 				},
-				
 			},
-			
+
 			notCheckExpErrType: true,
-			expPath: "",
+			expPath:            "",
 		},
 
 		{
-			name: "Should succeed to find the /dev/dm-4",
+			name:                 "Should succeed to find the /dev/dm-4",
 			osReadLinkReturnPath: "../../sdb",
-			osReadLinkReturnExc: nil,
-			
+			osReadLinkReturnExc:  nil,
+
 			globReturns: []globReturn{
 				globReturn{
 					globReturnfpaths: []string{"/sys/block/dm-4"},
-					globReturnErr: nil,
+					globReturnErr:    nil,
 				},
 				globReturn{
 					globReturnfpaths: []string{"/sys/block/dm-4/slaves/sdb"},
-					globReturnErr: nil,
+					globReturnErr:    nil,
 				},
-				
 			},
-			
-			expErr: nil,
+
+			expErr:  nil,
 			expPath: "/dev/dm-4",
 		},
-
-
 	}
 
 	for _, tc := range testCases {
@@ -191,7 +182,7 @@ func TestHelperGetMultipathDisk(t *testing.T) {
 			path := "/dev/disk/by-path/TARGET-iscsi-iqn:5"
 			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
 			fake_executer.EXPECT().OsReadlink(path).Return(tc.osReadLinkReturnPath, tc.osReadLinkReturnExc)
-			
+
 			if len(tc.globReturns) == 1 {
 				fake_executer.EXPECT().FilepathGlob("/sys/block/dm-*").Return(tc.globReturns[0].globReturnfpaths, tc.globReturns[0].globReturnErr)
 			} else if len(tc.globReturns) == 2 {
@@ -201,22 +192,22 @@ func TestHelperGetMultipathDisk(t *testing.T) {
 				gomock.InOrder(first, second)
 			}
 			helperIscsi := device_connectivity.NewOsDeviceConnectivityHelperIscsi(fake_executer)
-			
+
 			returnPath, err := helperIscsi.GetMultipathDisk(path)
 			if err != nil {
 				if tc.notCheckExpErrType {
 					_, ok := err.(*device_connectivity.MultipleDeviceNotFoundError)
-					if 	!ok{
+					if !ok {
 						t.Fatalf("Expected error type MultipleDeviceNotFoundError, got different error")
 					}
-				}else {
+				} else {
 					if err.Error() != tc.expErr.Error() {
 						t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())
 					}
 				}
 			}
-			if returnPath != tc.expPath{
-					t.Fatalf("Expected found multipath device %s, got %s", tc.expPath, returnPath)
+			if returnPath != tc.expPath {
+				t.Fatalf("Expected found multipath device %s, got %s", tc.expPath, returnPath)
 			}
 
 		})

@@ -18,31 +18,29 @@ package device_connectivity
 
 import (
 	"fmt"
+	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"k8s.io/klog"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
-    "sync"
-	"path/filepath"
- 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
 type OsDeviceConnectivityIscsi struct {
-	executer  		executer.ExecuterInterface
+	executer        executer.ExecuterInterface
 	mutexMultipathF *sync.Mutex
-	helper 			OsDeviceConnectivityHelperIscsiInterface
+	helper          OsDeviceConnectivityHelperIscsiInterface
 }
 
-
-func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface) OsDeviceConnectivityInterface{
+func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityIscsi{
-		executer: executer, 
-		mutexMultipathF: &sync.Mutex{}, 
-		helper: NewOsDeviceConnectivityHelperIscsi(executer),
+		executer:        executer,
+		mutexMultipathF: &sync.Mutex{},
+		helper:          NewOsDeviceConnectivityHelperIscsi(executer),
 	}
 }
-
 
 func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier string) error {
 	klog.V(5).Infof("Starging Rescan specific lun, on lun : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
@@ -81,14 +79,14 @@ func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier stri
 
 func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, arrayIdentifier string) (string, error) {
 	/*
-	   Description: 
-		   1. Find all the files "/dev/disk/by-path/ip-<ARRAY-IP>-iscsi-<IQN storage>-lun-<LUN-ID> -> ../../sd<X>
- 	          Note: <ARRAY-IP> Instead of setting here the IP we just search for * on that.
- 	       2. Get the sd<X> devices.
- 	       3. Search '/sys/block/dm-*\/slaves/*' and get the <DM device name>. For example dm-3 below:
- 	          /sys/block/dm-3/slaves/sdb -> ../../../../platform/host41/session9/target41:0:0/41:0:0:13/block/sdb
+			   Description:
+				   1. Find all the files "/dev/disk/by-path/ip-<ARRAY-IP>-iscsi-<IQN storage>-lun-<LUN-ID> -> ../../sd<X>
+		 	          Note: <ARRAY-IP> Instead of setting here the IP we just search for * on that.
+		 	       2. Get the sd<X> devices.
+		 	       3. Search '/sys/block/dm-*\/slaves/*' and get the <DM device name>. For example dm-3 below:
+		 	          /sys/block/dm-3/slaves/sdb -> ../../../../platform/host41/session9/target41:0:0/41:0:0:13/block/sdb
 
-	   Return Value: "dm-X" of the volumeID by using the LunID and the arrayIqn.
+			   Return Value: "dm-X" of the volumeID by using the LunID and the arrayIqn.
 	*/
 	var devicePaths []string
 
@@ -113,7 +111,7 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 	// Looping over the physical devices of the volume - /dev/sdX (multiple since its with multipathing)
 	for _, path := range devicePaths {
 		if path != "" {
-			if mappedDevicePath, err := r.helper.GetMultipathDisk(path); mappedDevicePath != "" {				
+			if mappedDevicePath, err := r.helper.GetMultipathDisk(path); mappedDevicePath != "" {
 				devicePathTosysfs[mappedDevicePath] = true
 				if err != nil {
 					return "", err
@@ -123,7 +121,7 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 	}
 
 	var mps string
-	for key := range devicePathTosysfs{
+	for key := range devicePathTosysfs {
 		mps += ", " + key
 	}
 
@@ -134,11 +132,11 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 		return "", &MultipleDeviceNotFoundForLunError{volumeId, lunId, arrayIdentifier}
 	}
 	var md string
-	for md=range devicePathTosysfs{ break }  // because its the single value in the map, so just take the first
+	for md = range devicePathTosysfs {
+		break
+	} // because its the single value in the map, so just take the first
 	return md, nil
 }
-
-
 
 func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(mpathDevice string) error {
 	// mpathdevice is dm-4 for example
@@ -147,13 +145,12 @@ func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(mpathDevice string) erro
 
 	fullDevice := "/dev/" + mpathDevice
 
-
 	klog.V(5).Infof("Try to accure lock for running the command multipath -f {%v} (to avoid concurrent multipath commands)", mpathDevice)
 	r.mutexMultipathF.Lock()
 	klog.V(5).Infof("Accured lock for multipath -f command")
 	_, err := r.executer.ExecuteWithTimeout(10*1000, "multipath", []string{"-f", fullDevice})
 	r.mutexMultipathF.Unlock()
-		
+
 	if err != nil {
 		if _, errOpen := os.Open(fullDevice); errOpen != nil {
 			if os.IsNotExist(errOpen) {
@@ -162,7 +159,7 @@ func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(mpathDevice string) erro
 				klog.Errorf("Error while opening file : {%v}. error: {%v}. Means the multipath -f {%v} did not succeed to delete the device.", fullDevice, errOpen.Error(), fullDevice)
 				return errOpen
 			}
-		} else{
+		} else {
 			klog.Errorf("multipath -f {%v} did not succeed to delete the device. err={%v}", fullDevice, err.Error())
 			return err
 		}
@@ -187,7 +184,6 @@ func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(sysDevices []string) err
 			continue
 		}
 		klog.V(5).Infof("opening device for device name : {%v}", deviceName)
-		
 
 		filename := fmt.Sprintf("/sys/block/%s/device/delete", deviceName)
 		if f, err = os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200); err != nil {
@@ -210,50 +206,36 @@ func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(sysDevices []string) err
 	return nil
 }
 
-
-
-
-
-
-
-
-
-
-
-
 //go:generate mockgen -destination=../../../mocks/mock_OsDeviceConnectivityHelperIscsiInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity OsDeviceConnectivityHelperIscsiInterface
 
 type OsDeviceConnectivityHelperIscsiInterface interface {
-	WaitForPathToExist(devicePath string, maxRetries int, intervalSeconds int) ([]string, bool, error) 
-	GetMultipathDisk(path string) (string, error) 
-    GetIscsiSessionHostsForArrayIQN(arrayIdentifier string) ([]int, error)
+	WaitForPathToExist(devicePath string, maxRetries int, intervalSeconds int) ([]string, bool, error)
+	GetMultipathDisk(path string) (string, error)
+	GetIscsiSessionHostsForArrayIQN(arrayIdentifier string) ([]int, error)
 }
 
 type OsDeviceConnectivityHelperIscsi struct {
-	executer  executer.ExecuterInterface
+	executer executer.ExecuterInterface
 }
 
-
-func NewOsDeviceConnectivityHelperIscsi(executer executer.ExecuterInterface) OsDeviceConnectivityHelperIscsiInterface{
+func NewOsDeviceConnectivityHelperIscsi(executer executer.ExecuterInterface) OsDeviceConnectivityHelperIscsiInterface {
 	return &OsDeviceConnectivityHelperIscsi{executer: executer}
 }
-
-
 
 func (o OsDeviceConnectivityHelperIscsi) WaitForPathToExist(devicePath string, maxRetries int, intervalSeconds int) ([]string, bool, error) {
 	/*
 		Description:
-			Try to find all the files /dev/disk/by-path/ip-*-iscsi-ARRAYIQN-lun-LUNID. If not find then try again maxRetries.	
+			Try to find all the files /dev/disk/by-path/ip-*-iscsi-ARRAYIQN-lun-LUNID. If not find then try again maxRetries.
 	*/
-	
+
 	var err error
 	for i := 0; i < maxRetries; i++ {
 		err = nil
 		fpaths, err := o.executer.FilepathGlob(devicePath)
-		if err != nil{
+		if err != nil {
 			return nil, false, err
 		}
-		
+
 		klog.V(4).Infof("fpaths : {%v}", fpaths)
 
 		if fpaths == nil {
@@ -270,32 +252,32 @@ func (o OsDeviceConnectivityHelperIscsi) WaitForPathToExist(devicePath string, m
 func (o OsDeviceConnectivityHelperIscsi) GetMultipathDisk(path string) (string, error) {
 	/*
 		Description:
-			1. Get the name of the device(e.g: sdX) by check `path` as slink to the device. 
+			1. Get the name of the device(e.g: sdX) by check `path` as slink to the device.
 			   e.g: Where path=/dev/disk/by-path/TARGET-iscsi-iqn:<LUNID> which slink to "../../sdX"
 			        /dev/disk/by-path/TARGET-iscsi-iqn:<LUNID> -> ../../sdX
 			2. After having sdX, the function loop over all the files in /sys/block/dm-*\/slaves/sd<X> and return its relevant <dm-*>.
 			   The <dm-*> is actually the second directory of the path /sys/block/dm-*\/slaves/sd<X>.
 			   e.g: function will return dm-1 for this path=/dev/disk/by-path/TARGET-iscsi-iqn:5,
 					Because the /dev/disk/by-path/TARGET-iscsi-iqn:5 -> ../../sda
-					And listing all the /sys/block/dm-*\/slaves/sda  will be with dm-1. So the fucntion will return dm-1.			           
-			
-		Return Value: 
+					And listing all the /sys/block/dm-*\/slaves/sda  will be with dm-1. So the fucntion will return dm-1.
+
+		Return Value:
 			dm-<X>
 	*/
-	
+
 	// Follow link to destination directory
 	klog.V(5).Infof("Getting multipath disk")
-	
-	// Get the sdX which is the file that path link to. 
+
+	// Get the sdX which is the file that path link to.
 	devicePath, err := o.executer.OsReadlink(path)
 	if err != nil {
 		klog.V(4).Infof("Failed reading link for multipath disk: %s. error: {%s}\n", path, err.Error())
 		return "", err
 	}
-	
+
 	// Get only the physical device from /dev/disk/by-path/TARGET-iscsi-iqn:<LUNID> -> ../../sdb
 	sdevice := filepath.Base(devicePath)
-	
+
 	// If destination directory is already identified as a multipath device,
 	// just return its path
 	if strings.HasPrefix(sdevice, "dm-") {
@@ -332,7 +314,7 @@ func (o OsDeviceConnectivityHelperIscsi) GetMultipathDisk(path string) (string, 
 			}
 		}
 	}
-	
+
 	err = &MultipleDeviceNotFoundError{path, devicePath}
 	klog.Errorf(err.Error())
 	return "", err
@@ -341,11 +323,11 @@ func (o OsDeviceConnectivityHelperIscsi) GetMultipathDisk(path string) (string, 
 func (o OsDeviceConnectivityHelperIscsi) GetIscsiSessionHostsForArrayIQN(arrayIdentifier string) ([]int, error) {
 	/*
 		Description:
-			This function find all the hosts IDs under which has targetname that equal to the arrayIdentifier.  
+			This function find all the hosts IDs under which has targetname that equal to the arrayIdentifier.
 			/sys/class/iscsi_host/host<IDs>/device/session*\/iscsi_session/session*\/targetname"
 			So the function goes over all the above hosts and return back only the host numbers as a list.
 	*/
-	
+
 	sysPath := "/sys/class/iscsi_host/"
 	var sessionHosts []int
 	if hostDirs, err := o.executer.IoutilReadDir(sysPath); err != nil {
@@ -401,11 +383,9 @@ func (o OsDeviceConnectivityHelperIscsi) GetIscsiSessionHostsForArrayIQN(arrayId
 			}
 		}
 
-
-
 		if len(sessionHosts) == 0 {
 			genericTargetPath := sysPath + "host*" + "/device/session*/iscsi_session/session*/targetname"
-			return []int{}, &ConnectivityIscsiStorageTargetNotFoundError{StorageTargetName:arrayIdentifier, DirectoryPath:genericTargetPath}
+			return []int{}, &ConnectivityIscsiStorageTargetNotFoundError{StorageTargetName: arrayIdentifier, DirectoryPath: genericTargetPath}
 		}
 		return sessionHosts, nil
 	}

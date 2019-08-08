@@ -18,15 +18,15 @@ package driver_test
 
 import (
 	"context"
+	"fmt"
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	gomock "github.com/golang/mock/gomock"
 	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
+	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 	"reflect"
 	"testing"
-	"fmt"
 )
 
 const (
@@ -147,6 +147,7 @@ func newTestNodeService(nodeUtils driver.NodeUtilsInterface) driver.NodeService 
 		NodeUtils:  nodeUtils,
 	}
 }
+
 //
 //func TestNodeUnstageVolume(t *testing.T) {
 //	testCases := []struct {
@@ -402,7 +403,6 @@ func TestNodeGetCapabilities(t *testing.T) {
 	}
 }
 
-
 func TestNodeGetInfo(t *testing.T) {
 	testCases := []struct {
 		name           string
@@ -456,4 +456,3 @@ func TestNodeGetInfo(t *testing.T) {
 
 	}
 }
-

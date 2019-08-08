@@ -25,12 +25,12 @@ import (
 	"strings"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	device_connectivity "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
+	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog"
 	mount "k8s.io/kubernetes/pkg/util/mount"
- 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
- 	device_connectivity "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 )
 
 var (
@@ -47,37 +47,36 @@ var (
 		},
 	}
 
-	defaultFSType     = "ext4"
-	stageInfoFilename = ".stageInfo.json"
-	supportedConnectivityTypes = map[string]bool{ 
-		"iscsi":true,
-		// TODO add fc later on 
+	defaultFSType              = "ext4"
+	stageInfoFilename          = ".stageInfo.json"
+	supportedConnectivityTypes = map[string]bool{
+		"iscsi": true,
+		// TODO add fc later on
 	}
 )
 
 // nodeService represents the node service of CSI driver
 type NodeService struct {
-	mounter          *mount.SafeFormatAndMount
-	ConfigYaml       ConfigFile
-	Hostname         string
-	NodeUtils        NodeUtilsInterface
-	executer         executer.ExecuterInterface
-	VolumeIdLocksMap SyncLockInterface
-	OsDeviceConnectivityMapping   map[string]device_connectivity.OsDeviceConnectivityInterface
+	mounter                     *mount.SafeFormatAndMount
+	ConfigYaml                  ConfigFile
+	Hostname                    string
+	NodeUtils                   NodeUtilsInterface
+	executer                    executer.ExecuterInterface
+	VolumeIdLocksMap            SyncLockInterface
+	OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface
 }
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
-func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, OsDeviceConnectivityMapping  map[string]device_connectivity.OsDeviceConnectivityInterface, executer executer.ExecuterInterface, mounter *mount.SafeFormatAndMount, syncLock SyncLockInterface) NodeService {
+func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface, executer executer.ExecuterInterface, mounter *mount.SafeFormatAndMount, syncLock SyncLockInterface) NodeService {
 	return NodeService{
-		ConfigYaml:     configYaml,
-		Hostname:       hostname,
-		NodeUtils:      nodeUtils,
-		executer:       executer,
+		ConfigYaml:                  configYaml,
+		Hostname:                    hostname,
+		NodeUtils:                   nodeUtils,
+		executer:                    executer,
 		OsDeviceConnectivityMapping: OsDeviceConnectivityMapping,
-		mounter:          mounter,
-		VolumeIdLocksMap: syncLock,
-
+		mounter:                     mounter,
+		VolumeIdLocksMap:            syncLock,
 	}
 }
 
@@ -113,7 +112,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	stagingPath := req.GetStagingTargetPath()
 
 	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
-	if !ok{ 
+	if !ok {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
 	}
 
@@ -125,7 +124,6 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		klog.V(4).Infof("error while discovring the device : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-
 
 	dev, refs, err := mount.GetDeviceNameFromMount(d.mounter, stagingPath)
 	klog.V(4).Infof("dev : {%v}. refs : {%v}", dev, refs)
@@ -232,22 +230,22 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{"Volume Access Type Block is not supported yet"}
 	}
 
-	connectivityType, lun, array_iqn, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)	
-	if err != nil{
+	connectivityType, lun, array_iqn, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
+	if err != nil {
 		return &RequestValidationError{fmt.Sprintf("Fail to parse PublishContext %v with err = %v", req.PublishContext, err)}
 	}
-	
-	if _, ok := supportedConnectivityTypes[connectivityType]; !ok{  
+
+	if _, ok := supportedConnectivityTypes[connectivityType]; !ok {
 		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong connectivity type %s. Supported connectivities %v", connectivityType, supportedConnectivityTypes)}
 	}
-	
-	if lun < 0{  
+
+	if lun < 0 {
 		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong lun id %d.", lun)}
 	}
 
-	if len(array_iqn) == 0 {  
+	if len(array_iqn) == 0 {
 		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong array_iqn %s.", array_iqn)}
-	}	
+	}
 
 	return nil
 }
@@ -313,7 +311,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	// (since the next time we run unpstange we will reutrn that everytjing is OK since the path is unmounted)
 
 	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
-	if !ok{ 
+	if !ok {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
 	}
 
