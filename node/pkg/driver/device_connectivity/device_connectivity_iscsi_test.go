@@ -20,7 +20,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
-	//"reflect"
+	"reflect"
 	"fmt"
 	"os"
 	"testing"
@@ -95,8 +95,8 @@ func TestHelperGetMultipathDisk(t *testing.T) {
 		globReturns          []globReturn
 
 		expErr             error
-		notCheckExpErrType bool // if true then test will check the specific ExpErrType
 		expPath            string
+		expErrType   	   reflect.Type
 	}{
 		{
 			name:                 "Should fail to if OsReadlink return error",
@@ -148,7 +148,7 @@ func TestHelperGetMultipathDisk(t *testing.T) {
 				},
 			},
 
-			notCheckExpErrType: true,
+			expErrType: reflect.TypeOf(&device_connectivity.MultipleDeviceNotFoundError{}),
 			expPath:            "",
 		},
 
@@ -195,10 +195,9 @@ func TestHelperGetMultipathDisk(t *testing.T) {
 
 			returnPath, err := helperIscsi.GetMultipathDisk(path)
 			if err != nil {
-				if tc.notCheckExpErrType {
-					_, ok := err.(*device_connectivity.MultipleDeviceNotFoundError)
-					if !ok {
-						t.Fatalf("Expected error type MultipleDeviceNotFoundError, got different error")
+				if tc.expErrType !=nil {
+					if reflect.TypeOf(err) != tc.expErrType {
+						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
 					}
 				} else {
 					if err.Error() != tc.expErr.Error() {
@@ -213,3 +212,76 @@ func TestHelperGetMultipathDisk(t *testing.T) {
 		})
 	}
 }
+
+
+/*
+
+type ioutilReadDirReturn struct {
+	filesInfo 	 []os.FileInfo
+	SysPathParam string  // The param that the IoutilReadDir recive on each call.
+	err      	 error
+}
+
+func TestHelperGetIscsiSessionHostsForArrayIQN(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		ioutilReadDirReturns []ioutilReadDirReturn
+		arrayIdentifier      string
+		notCheckExpErrType   bool // if true then test will check the specific ExpErrType
+		expErr               error
+		expHostList          []int
+	}{
+		{
+			name: "Should fail when IoutilReadDir return error",
+			ioutilReadDirReturns: []ioutilReadDirReturn{
+				ioutilReadDirReturn{
+					filesInfo: 		nil,
+					SysPathParam:   "/sys/class/iscsi_host/",
+					err: 		    fmt.Errorf("error"),
+				},
+			},
+			arrayIdentifier: "fakeIQN",
+
+			expErr:  fmt.Errorf("error"),
+			expHostList: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
+			var mcalls []gomock.Call
+			for ReadDirReturn := range tc.ioutilReadDirReturns{
+				call := fake_executer.EXPECT().IoutilReadDir(ReadDirReturn.SysPathParam).Return(ReadDirReturn.filesInfo, ReadDirReturn.err)
+				mcalls = append(mcall, call)
+			}
+			gomock.InOrder(mcalls)
+
+			helperIscsi := device_connectivity.NewOsDeviceConnectivityHelperIscsi(fake_executer)
+
+			returnHostList, err := helperIscsi.GetIscsiSessionHostsForArrayIQN(tc.arrayIdentifier)
+			if err != nil {
+				if tc.notCheckExpErrType {
+					_, ok := err.(*device_connectivity.ConnectivityIscsiStorageTargetNotFoundError)
+					if !ok {
+						t.Fatalf("Expected error type MultipleDeviceNotFoundError, got different error")
+					}
+				} else {
+					if err.Error() != tc.expErr.Error() {
+						t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())
+					}
+				}
+			}
+			if returnHostList != tc.expHostList {
+				t.Fatalf("Expected HostList %v, got %v", tc.expHostList, returnHostList)
+			}
+
+		})
+	}
+}
+
+*/
