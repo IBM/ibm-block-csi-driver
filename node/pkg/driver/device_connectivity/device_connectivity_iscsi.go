@@ -22,6 +22,7 @@ import (
 	"k8s.io/klog"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -328,65 +329,50 @@ func (o OsDeviceConnectivityHelperIscsi) GetIscsiSessionHostsForArrayIQN(arrayId
 			So the function goes over all the above hosts and return back only the host numbers as a list.
 	*/
 
-	sysPath := "/sys/class/iscsi_host/"
+	targetNamePath := "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
 	var sessionHosts []int
-	if hostDirs, err := o.executer.IoutilReadDir(sysPath); err != nil {
-		klog.Errorf("cannot read sys dir : {%v}. error : {%v}", sysPath, err)
+	matches, err := o.executer.FilepathGlob(targetNamePath)
+	if err != nil {
+		klog.Errorf("error while finding targetNamePath : {%v}. err : {%v}", targetNamePath, err)
 		return sessionHosts, err
-	} else {
-		klog.V(5).Infof("host dirs : {%v}", hostDirs)
-		for _, hostDir := range hostDirs {
-			// get the host session number : "host34"
-			hostName := hostDir.Name()
+	}
+
+	klog.V(5).Infof("matches were found : {%v}", matches)
+
+	for _, targetPath := range matches {
+		klog.V(5).Infof("Going over target name path : %v", targetPath)
+		targetName, err := o.executer.IoutilReadFile(targetPath)
+		if err != nil {
+			klog.Warningf("could not read target name from file : {%v}, error : {%v}", targetPath, err)
+			continue
+		}
+
+		if strings.TrimSpace(string(targetName)) == arrayIdentifier {
+			re := regexp.MustCompile("host([0-9]+)")
+			regexMatch := re.FindStringSubmatch(targetPath)
+			klog.V(5).Infof("found regex matches : {%v}", regexMatch)
 			hostNumber := -1
-			if !strings.HasPrefix(hostName, "host") {
+
+			if len(regexMatch) < 2 {
+				klog.Warningf("could not find host number for targetNamePath : {%v}", targetPath)
 				continue
 			} else {
-				hostNumber, err = strconv.Atoi(strings.TrimPrefix(hostName, "host"))
+				hostNumber, err = strconv.Atoi(regexMatch[1])
 				if err != nil {
-					klog.V(4).Infof("cannot get host id from host : {%v}", hostName)
+					klog.Warningf("host number was not valid : {%v}", regexMatch[1])
 					continue
 				}
 			}
 
-			targetPath := sysPath + hostName + "/device/session*/iscsi_session/session*/targetname"
+			sessionHosts = append(sessionHosts, hostNumber)
+			klog.V(5).Infof("host nunber appended : {%v}. sessionhosts is : {%v}", hostNumber, sessionHosts)
 
-			//devicePath + sessionName + "/iscsi_session/" + sessionName + "/targetname"
-			matches, err := o.executer.FilepathGlob(targetPath)
-			if err != nil {
-				klog.Errorf("error while finding targetPath : {%v}. err : {%v}", targetPath, err)
-				return sessionHosts, err
-			}
-
-			klog.V(5).Infof("matches were found : {%v}", matches)
-
-			//TODO: can there be more then 1 session??
-			//sessionNumber, err :=  strconv.Atoi(strings.TrimPrefix(matches[0], "session"))
-
-			if len(matches) == 0 {
-				klog.V(4).Infof("could not find targe name for host : {%v}, path : {%v}", hostName, targetPath)
-				continue
-			}
-
-			targetNamePath := matches[0]
-			targetName, err := o.executer.IoutilReadFile(targetNamePath)
-			if err != nil {
-				klog.V(4).Infof("could not read target name from file : {%v}, error : {%v}", targetNamePath, err)
-				continue
-			}
-
-			klog.V(5).Infof("target name found : {%v}", string(targetName))
-
-			if strings.TrimSpace(string(targetName)) == arrayIdentifier {
-				sessionHosts = append(sessionHosts, hostNumber)
-				klog.V(5).Infof("host nunber appended : {%v}. sessionhosts is : {%v}", hostNumber, sessionHosts)
-			}
 		}
-
-		if len(sessionHosts) == 0 {
-			genericTargetPath := sysPath + "host*" + "/device/session*/iscsi_session/session*/targetname"
-			return []int{}, &ConnectivityIscsiStorageTargetNotFoundError{StorageTargetName: arrayIdentifier, DirectoryPath: genericTargetPath}
-		}
-		return sessionHosts, nil
 	}
+
+	if len(sessionHosts) == 0 {
+		return []int{}, &ConnectivityIscsiStorageTargetNotFoundError{StorageTargetName: arrayIdentifier, DirectoryPath: targetNamePath}
+	}
+	return sessionHosts, nil
+
 }
