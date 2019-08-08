@@ -296,7 +296,7 @@ func TestHelperGetIscsiSessionHostsForArrayIQN(t *testing.T) {
 		},
 
 		{
-			name: "Should succeed to find host1 and host2 for the array IQN (while host3 is not from this IQN)",
+			name: "Should succeed to find host1 and host2 for the array IQN (while host3 is not from this IQN and also host666 fail ignore)",
 			ioutilReadFileReturns: []ioutilReadFileReturn{
 				ioutilReadFileReturn{
 					ReadFileParam: "/sys/class/iscsi_host/host1/device/session1/iscsi_session/session1/targetname",
@@ -313,6 +313,12 @@ func TestHelperGetIscsiSessionHostsForArrayIQN(t *testing.T) {
 					data:          []byte("fakeIQN_OTHER"),
 					err:           nil,
 				},
+				ioutilReadFileReturn{
+					ReadFileParam: "/sys/class/iscsi_host/host666/device/session1/iscsi_session/session1/targetname",
+					data:          nil,
+					err:           fmt.Errorf("error"),
+				},
+				
 			},
 			arrayIdentifier: "fakeIQN",
 
@@ -320,6 +326,7 @@ func TestHelperGetIscsiSessionHostsForArrayIQN(t *testing.T) {
 				"/sys/class/iscsi_host/host1/device/session1/iscsi_session/session1/targetname",
 				"/sys/class/iscsi_host/host2/device/session1/iscsi_session/session1/targetname",
 				"/sys/class/iscsi_host/host3/device/session1/iscsi_session/session1/targetname",
+				"/sys/class/iscsi_host/host666/device/session1/iscsi_session/session1/targetname",
 			},
 			globReturnErr: nil,
 
@@ -364,9 +371,7 @@ func TestHelperGetIscsiSessionHostsForArrayIQN(t *testing.T) {
 			}
 
 			if len(tc.expHostList) == 0 && len(returnHostList) == 0 {
-
-				//} else if len(tc.expHostList) != len(returnHostList) {
-				//	t.Fatalf("Expected no found hosts, But got %v", returnHostList)
+				return
 			} else if !reflect.DeepEqual(returnHostList, tc.expHostList) {
 				t.Fatalf("Expected found hosts dirs %v, got %v", tc.expHostList, returnHostList)
 			}
