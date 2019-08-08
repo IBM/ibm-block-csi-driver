@@ -66,6 +66,7 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, c
 	connectivityType := publishContext[configYaml.Controller.Publish_context_connectivity_parameter]
 	array_iqn := publishContext[configYaml.Controller.Publish_context_array_iqn]
 
+	klog.V(4).Infof("PublishContext relevant info : connectivityType=%v, lun=%v, array_iqn=%v", connectivityType, lun, array_iqn)
 	return connectivityType, lun, array_iqn, nil
 }
 

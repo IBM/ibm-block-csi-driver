@@ -180,7 +180,7 @@ func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(mpathDevice string) erro
 func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(sysDevices []string) error {
 	// sysDevices  = sdb, sda,...
 	klog.V(5).Infof("Removing iscsi device : {%v}", sysDevices)
-
+	// NOTE: this func could be also relevant for SCSI (not only for iSCSI)
 	var (
 		f   *os.File
 		err error
