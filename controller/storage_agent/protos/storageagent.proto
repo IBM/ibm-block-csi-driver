@@ -50,8 +50,10 @@ message CreateHostReply {
 
 // Either name or identifier is required
 message DeleteHostRequest {
-  string identifier = 1;
-  string name = 2;
+  oneof unique_key {
+    string identifier = 1;
+    string name = 2;
+  }
   map<string, string> secrets = 3;
 }
 
@@ -62,8 +64,10 @@ message DeleteHostReply {
 message ListHostsRequest {
   // Either name or identifier should be specified.
   // The identifier and name are OPTIONAL, if not specified, return all.
-  string identifier = 1;
-  string name = 2;
+  oneof unique_key {
+    string identifier = 1;
+    string name = 2;
+  }
   map<string, string> secrets = 3;
 }
 
