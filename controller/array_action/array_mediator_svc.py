@@ -216,7 +216,7 @@ class SVCArrayMediator(ArrayMediator):
             self.client.svctask.mkhost(**cli_kwargs)
             logger.info("Created host {}".format(name))
             return self.list_hosts(host_name=name)[0]
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+        except CLIFailureError as ex:
             try:
                 is_error, error_code, _ = ErrorPreprocessor(ex, logger).process()
                 if is_host_port_already_assigned(error_code):
@@ -224,7 +224,7 @@ class SVCArrayMediator(ArrayMediator):
                 if is_error:
                     try:
                         self.delete_host(host_name=name)
-                    except (svc_errors.CommandExecutionError, CLIFailureError):
+                    except CLIFailureError:
                         pass
                     raise ex
                 else:
@@ -245,7 +245,7 @@ class SVCArrayMediator(ArrayMediator):
         try:
             self.client.svctask.rmhost(**cli_kwargs)
             logger.info("Deleted host {}".format(host_id or host_name))
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+        except CLIFailureError as ex:
             is_error, _, _ = ErrorPreprocessor(ex, logger, skip_not_existing_object=True).process()
             if is_error:
                 raise ex
@@ -261,7 +261,7 @@ class SVCArrayMediator(ArrayMediator):
             cli_hosts = self.client.svcinfo.lshost(**cli_kwargs)
             logger.info("Listed host")
             return [self._generate_host(cli_host) for cli_host in cli_hosts]
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+        except CLIFailureError as ex:
             is_error, _, _ = ErrorPreprocessor(ex, logger).process()
             if is_error:
                 raise ex
@@ -275,7 +275,7 @@ class SVCArrayMediator(ArrayMediator):
             targets = [self._generate_iscsi_target(cli_iscsi_target) for cli_iscsi_target in cli_iscsi_targets]
             logger.info("Found iscsi targets {}".format(targets))
             return targets
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+        except CLIFailureError as ex:
             is_error, _, _ = ErrorPreprocessor(ex, logger).process()
             if is_error:
                 raise ex
