@@ -30,6 +30,83 @@ class ArrayMediator:
         raise NotImplementedError
 
     @abc.abstractmethod
+    def create_host(self, name, iscsi_ports=None, fc_ports=None, host_type=""):
+        """
+        This function should create a host in the storage system.
+
+        Args:
+            name: name of the host to be created in the storage system
+            iscsi_ports: iscsi iqns, either iscsi_ports or fc_ports is required
+            fc_ports: fc wwpns, either iscsi_ports or fc_ports is required
+            host_type: optional, specify the type of the host
+
+        Returns:
+            Host
+
+        Raises:
+            HostAlreadyExists
+            HostPortIsAlreadyInUse
+            IllegalObjectName
+            HostTypeIsNotSupported
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def delete_host(self, host_id="", host_name=""):
+        """
+        This function should delete a host in the storage system.
+
+        Args:
+            host_id: the host id, either host_id or host_name is required.
+            host_name: the host name, either host_id or host_name is required.
+
+        Returns:
+            None
+
+        Raises:
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def list_hosts(self, host_id="", host_name=""):
+        """
+        This function should list all hosts in the storage system, if host_id and host_name is empty.
+        If host_id or host_name is specified, return the exact one.
+
+        Args:
+            host_id: the host id, either host_id or host_name should be specified.
+            host_name: the host name, either host_id or host_name should be specified.
+
+        Returns:
+            Host list
+
+        Raises:
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_iscsi_targets(self):
+        """
+        This function should list all iscsi targets in the storage system, an iscsi target has the following
+        information:
+            ip: the ip address of the system iscsi target.
+            iqn: the iqn of the system iscsi target.
+        for the system who has multiple ips and only one iqn, return multiple records with same iqn.
+
+        Args:
+
+        Returns:
+            iscsi_targets
+
+        Raises:
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def create_volume(self, vol_name, size_in_bytes, capabilities, pool):
         """ 
         This function should create a volume in the storage system. 

@@ -3,11 +3,13 @@ from pysvc import errors as svc_errors
 from pysvc.unified.response import CLIFailureError
 from controller.common.csi_logger import get_stdout_logger
 from controller.array_action.array_mediator_interface import ArrayMediator
-from controller.array_action.array_action_types import Volume
+from controller.array_action.array_action_types import Volume, Host, IscsiTarget
 import controller.array_action.errors as controller_errors
 from controller.array_action.utils import classproperty
 from controller.array_action.config import ISCSI_CONNECTIVITY_TYPE
 import controller.array_action.config as config
+from .svc.errors import ErrorPreprocessor, InvalidData, ObjectAlreadyExists
+from .svc.errors import is_host_port_already_assigned
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -178,6 +180,106 @@ class SVCArrayMediator(ArrayMediator):
         vol_name = vol_by_wwn.name
         logger.debug("found volume name : {0}".format(vol_name))
         return vol_name
+
+    def _generate_host(self, cli_host):
+        return Host(
+            host_id=cli_host.id,
+            name=cli_host.name,
+            array=self.endpoint,
+            array_type=self.array_type,
+            host_type="",
+            status=cli_host.status,
+            iqns=[],
+            wwpns=[],
+            )
+
+    def _generate_iscsi_target(self, cli_iscsi_target):
+        return IscsiTarget(
+            ip_address=cli_iscsi_target.IP_address,
+            iqn="",
+            array=self.endpoint,
+            array_type=self.array_type,
+            )
+
+    def create_host(self, name, iscsi_ports=None, fc_ports=None, host_type=""):
+        logger.info("Creating host, name: {}, ports: {}, type: {}".format(name, fc_ports or iscsi_ports, host_type))
+        if not host_type:
+            host_type = "generic"
+        cli_kwargs = {'name': name, 'type': host_type}
+        # fc only, if both fc and iscsi ports are not empty.
+        if fc_ports:
+            cli_kwargs.update({'fcwwpn': ",".join(fc_ports)})
+        elif iscsi_ports:
+            cli_kwargs.update({'iscsiname': ",".join(iscsi_ports)})
+
+        try:
+            self.client.svctask.mkhost(**cli_kwargs)
+            logger.info("Created host {}".format(name))
+            return self.list_hosts(host_name=name)[0]
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            try:
+                is_error, error_code, _ = ErrorPreprocessor(ex, logger).process()
+                if is_host_port_already_assigned(error_code):
+                    raise controller_errors.HostPortIsAlreadyInUse(str(ex))
+                if is_error:
+                    try:
+                        self.delete_host(host_name=name)
+                    except (svc_errors.CommandExecutionError, CLIFailureError):
+                        pass
+                    raise ex
+                else:
+                    return self.list_hosts(host_name=name)[0]
+            except ObjectAlreadyExists:
+                raise controller_errors.HostAlreadyExists(str(ex))
+            except InvalidData:
+                raise controller_errors.HostTypeIsNotSupported(str(ex))
+
+    # delete_host is idempotent
+    def delete_host(self, host_id="", host_name=""):
+        logger.info("Deleting host {}".format(host_id or host_name))
+        cli_kwargs = {}
+        if host_id:
+            cli_kwargs = {'host_id': host_id}
+        elif host_name:
+            cli_kwargs = {'host_name': host_name}
+        try:
+            self.client.svctask.rmhost(**cli_kwargs)
+            logger.info("Deleted host {}".format(host_id or host_name))
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            is_error, _, _ = ErrorPreprocessor(ex, logger, skip_not_existing_object=True).process()
+            if is_error:
+                raise ex
+
+    def list_hosts(self, host_id="", host_name=""):
+        logger.info("Listing host {}".format(host_id or host_name))
+        cli_kwargs = {}
+        if host_id:
+            cli_kwargs.update({'filtervalue': 'host_id={}'.format(host_id)})
+        elif host_name:
+            cli_kwargs.update({'filtervalue': 'host_name={}'.format(host_name)})
+        try:
+            cli_hosts = self.client.svcinfo.lshost(**cli_kwargs)
+            logger.info("Listed host")
+            return [self._generate_host(cli_host) for cli_host in cli_hosts]
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            is_error, _, _ = ErrorPreprocessor(ex, logger).process()
+            if is_error:
+                raise ex
+            return []
+
+    def get_iscsi_targets(self):
+        logger.info("Getting iscsi targets")
+        cli_kwargs = {'filtervalue': 'state=configured:failover=no'}
+        try:
+            cli_iscsi_targets = self.client.svcinfo.lsportip(**cli_kwargs)
+            targets = [self._generate_iscsi_target(cli_iscsi_target) for cli_iscsi_target in cli_iscsi_targets]
+            logger.info("Found iscsi targets {}".format(targets))
+            return targets
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            is_error, _, _ = ErrorPreprocessor(ex, logger).process()
+            if is_error:
+                raise ex
+            return []
 
     def create_volume(self, name, size_in_bytes, capabilities, pool):
         logger.info("creating volume with name : {}. size : {} . in pool : {} "

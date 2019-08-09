@@ -8,6 +8,7 @@ import controller.array_action.errors as array_errors
 from pysvc.unified.response import CLIFailureError
 from pysvc import errors as svc_errors
 from controller.array_action.config import ISCSI_CONNECTIVITY_TYPE
+from controller.array_action.svc import errors
 
 
 class TestArrayMediatorSVC(unittest.TestCase):
@@ -420,3 +421,86 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_unmap_volume_success(self):
         self.svc.client.svctask.rmvdiskhostmap.return_value = None
         lun = self.svc.unmap_volume("vol", "host")
+
+    def test_delete_host_succeeded(self):
+        self.svc.delete_host(host_id="1")
+
+    def test_delete_not_existing_host_succeeded(self):
+        self.svc.client.svctask.rmhost.side_effect = CLIFailureError(errors.object_not_exists)
+        self.svc.delete_host(host_id="1")
+
+    def test_delete_host_has_warning(self):
+        a_warning = "CMMVC0000W, a warning"
+        self.svc.client.svctask.rmhost.side_effect = CLIFailureError(a_warning)
+        self.svc.delete_host(host_id="1")
+
+    def test_delete_host_failed(self):
+        other_error = "CMMVC0000E, other error"
+        self.svc.client.svctask.rmhost.side_effect = CLIFailureError(other_error)
+        with self.assertRaisesRegexp(CLIFailureError, other_error):
+            self.svc.delete_host(host_id="1")
+
+    def test_list_hosts_without_host_id_or_name(self):
+        self.svc.client.svcinfo.lshost.return_value = [Munch({'id': '1', 'name': 'host1', 'status': 'online'})]
+        hosts = self.svc.list_hosts()
+        self.assertEqual(1, len(hosts))
+        self.assertEqual("1", hosts[0].id)
+
+    def test_list_hosts_with_host_id(self):
+        self.svc.client.svcinfo.lshost.return_value = [Munch({'id': '1', 'name': 'host1', 'status': 'online'})]
+        self.svc.list_hosts(host_id="1")
+        self.svc.client.svcinfo.lshost.assert_called_once_with(filtervalue='host_id=1')
+
+    def test_list_hosts_with_host_name(self):
+        self.svc.client.svcinfo.lshost.return_value = [Munch({'id': '1', 'name': 'host1', 'status': 'online'})]
+        self.svc.list_hosts(host_name="1")
+        self.svc.client.svcinfo.lshost.assert_called_once_with(filtervalue='host_name=1')
+
+    def test_get_iscsi_targets(self):
+        self.svc.client.svcinfo.lsportip.return_value = [Munch({'IP_address': '1.2.3.4'})]
+        targets = self.svc.get_iscsi_targets()
+        self.assertEqual(1, len(targets))
+        self.assertEqual("1.2.3.4", targets[0].ip_address)
+
+    def test_create_host_with_both_iqns_and_wwpns(self):
+        fc_ports = ["f1", "f2"]
+        self.svc.client.svcinfo.lshost.return_value = [Munch({'id': '1', 'name': 'host1', 'status': 'online'})]
+        self.svc.create_host("h1", iscsi_ports=["i1", "i2"], fc_ports=fc_ports)
+        # only fc ports with be set.
+        expect_kwargs = {'name': "h1", 'type': "generic", 'fcwwpn': ",".join(fc_ports)}
+        self.svc.client.svctask.mkhost.assert_called_once_with(**expect_kwargs)
+
+    def test_create_host_raise_HostPortIsAlreadyInUse(self):
+        self.svc.client.svctask.mkhost.side_effect = CLIFailureError(errors.fc_port_already_assigned)
+        with self.assertRaisesRegexp(array_errors.HostPortIsAlreadyInUse, errors.fc_port_already_assigned):
+            self.svc.create_host("h1")
+
+    def test_create_host_raise_HostPortIsAlreadyInUse(self):
+        self.svc.client.svctask.mkhost.side_effect = CLIFailureError(errors.fc_port_already_assigned)
+        with self.assertRaisesRegexp(array_errors.HostPortIsAlreadyInUse, errors.fc_port_already_assigned):
+            self.svc.create_host("h1")
+
+    def test_create_host_raise_HostAlreadyExists(self):
+        self.svc.client.svctask.mkhost.side_effect = CLIFailureError(errors.object_exists)
+        with self.assertRaisesRegexp(array_errors.HostAlreadyExists, errors.object_exists):
+            self.svc.create_host("h1")
+
+    def test_create_host_raise_HostTypeIsNotSupported(self):
+        self.svc.client.svctask.mkhost.side_effect = CLIFailureError(errors.invalid_data)
+        with self.assertRaisesRegexp(array_errors.HostTypeIsNotSupported, errors.invalid_data):
+            self.svc.create_host("h1")
+
+    def test_create_host_failed(self):
+        other_error = "CMMVC0000E, other error"
+        self.svc.client.svctask.mkhost.side_effect = CLIFailureError(other_error)
+        with self.assertRaisesRegexp(CLIFailureError, other_error):
+            self.svc.create_host("h1")
+        # delete the host after failure
+        self.svc.client.svctask.rmhost.assert_called_once_with(host_name="h1")
+
+    def test_create_host_has_warning(self):
+        a_warning = "CMMVC0000W, a warning"
+        self.svc.client.svcinfo.lshost.return_value = [Munch({'id': '1', 'name': 'h1', 'status': 'online'})]
+        self.svc.client.svctask.mkhost.side_effect = CLIFailureError(a_warning)
+        host = self.svc.create_host("h1")
+        self.assertEqual("h1", host.name)

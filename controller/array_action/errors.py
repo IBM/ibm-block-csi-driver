@@ -7,6 +7,24 @@ class BaseArrayActionException(Exception):
         return self.message
 
 
+class HostTypeIsNotSupported(BaseArrayActionException):
+
+    def __init__(self, msg):
+        self.message = "{0}".format(msg)
+
+
+class HostPortIsAlreadyInUse(BaseArrayActionException):
+
+    def __init__(self, msg):
+        self.message = "{0}".format(msg)
+
+
+class HostAlreadyExists(BaseArrayActionException):
+
+    def __init__(self, msg):
+        self.message = "{0}".format(msg)
+
+
 class NoConnectionAvailableException(BaseArrayActionException):
 
     def __init__(self, endpoint):
