@@ -141,27 +141,27 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		klog.V(4).Infof("Target path directory does not exist. creating : {%v}", stagingPath)
 		d.mounter.MakeDir(stagingPath) // TODO consider to chmod the directory
 	} else {
-		// checking idempotent case 
+		// checking idempotent case
 		_, err := os.Stat(stageInfoPath)
 		if err == nil {
 			klog.V(4).Infof("Idempotent case: node stage was already called before on this path. checking stage info")
-			// lets read the file and comprae the stageInfo 
+			// lets read the file and comprae the stageInfo
 			existingStageInfo, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
-			if err != nil{
-				klog.Warningf("could not read and compare the info inside the staging info file : {%v}. error : {%v}",stageInfoPath, err)
+			if err != nil {
+				klog.Warningf("could not read and compare the info inside the staging info file : {%v}. error : {%v}", stageInfoPath, err)
 			}
-			if (stageInfo["mpathDevice"] !=  existingStageInfo["mpathDevice"])|| 
-			(stageInfo["sysDevices"] != existingStageInfo["sysDevices"]) ||  
-			(stageInfo["connectivity"] != existingStageInfo["connectivity"] ){
-				klog.Errorf("stage info is not as expected. expected:  {%v}. got : {%v}", stageInfo,existingStageInfo )
-				return nil, status.Error(codes.AlreadyExists, err.Error())	
+			if (stageInfo["mpathDevice"] != existingStageInfo["mpathDevice"]) ||
+				(stageInfo["sysDevices"] != existingStageInfo["sysDevices"]) ||
+				(stageInfo["connectivity"] != existingStageInfo["connectivity"]) {
+				klog.Errorf("stage info is not as expected. expected:  {%v}. got : {%v}", stageInfo, existingStageInfo)
+				return nil, status.Error(codes.AlreadyExists, err.Error())
 			}
 		}
 	}
 
-	if err := d.NodeUtils.WriteStageInfoToFile(stageInfoPath, stageInfo); err != nil{
+	if err := d.NodeUtils.WriteStageInfoToFile(stageInfoPath, stageInfo); err != nil {
 		klog.Errorf("Error while trying to save the stage metadata file [%s]: {%v}", stageInfoPath, err.Error())
-		return nil, status.Error(codes.Internal, err.Error())		
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	klog.V(4).Infof("NodeStageVolume Finished: multipath device is ready [%s] to be mounted by NodePublishVolume API.", baseDevice)
@@ -302,10 +302,6 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
-
-
-
-
 func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	klog.V(5).Infof("NodePublishVolume: called with args %+v", *req)
 
@@ -343,27 +339,27 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 
 	/*
-	dev, refs, err := mount.GetDeviceNameFromMount(d.mounter, stagingPath)
-	klog.V(4).Infof("dev : {%v}. refs : {%v}", dev, refs)
-	if err != nil {
-		klog.Errorf("Error while trying to get device from mount : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	if refs != 0 {
-		dmDevice, err := filepath.EvalSymlinks(dev)
+		dev, refs, err := mount.GetDeviceNameFromMount(d.mounter, stagingPath)
+		klog.V(4).Infof("dev : {%v}. refs : {%v}", dev, refs)
 		if err != nil {
-			klog.Errorf("Error while reading symlink : {%v}. err : {%v}", dev, err.Error())
+			klog.Errorf("Error while trying to get device from mount : {%v}", err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
 		}
-		klog.V(4).Infof("comparing dev : {%v} with device : {%v}", dmDevice, device)
-		if dmDevice == device {
-			klog.V(4).Infof("Returning ok result") // TODO double check
-			return &csi.NodeStageVolumeResponse{}, nil
-		} else {
-			return nil, status.Errorf(codes.AlreadyExists, "Mount point is already mounted to.")
+
+		if refs != 0 {
+			dmDevice, err := filepath.EvalSymlinks(dev)
+			if err != nil {
+				klog.Errorf("Error while reading symlink : {%v}. err : {%v}", dev, err.Error())
+				return nil, status.Error(codes.Internal, err.Error())
+			}
+			klog.V(4).Infof("comparing dev : {%v} with device : {%v}", dmDevice, device)
+			if dmDevice == device {
+				klog.V(4).Infof("Returning ok result") // TODO double check
+				return &csi.NodeStageVolumeResponse{}, nil
+			} else {
+				return nil, status.Errorf(codes.AlreadyExists, "Mount point is already mounted to.")
+			}
 		}
-	}
 	*/
 
 	// if the device is not mounted then we are mounting it.
@@ -374,7 +370,6 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	if fsType == "" {
 		fsType = defaultFSType
 	}
-
 
 	// Read staging info file in order to find the mpath device for mounting.
 	stageInfoPath := path.Join(stagingPath, stageInfoFilename)
@@ -404,11 +399,6 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 	return &csi.NodePublishVolumeResponse{}, nil
 }
-
-
-
-
-
 
 func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVolumeRequest) error {
 	volumeID := req.GetVolumeId()

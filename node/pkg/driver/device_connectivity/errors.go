@@ -35,7 +35,7 @@ type ConnectivityIscsiStorageTargetNotFoundError struct {
 }
 
 func (e *ConnectivityIscsiStorageTargetNotFoundError) Error() string {
-	return fmt.Sprintf("Connectivity Error: Storage target name [%s] was not found on the host, under directory %s", e.StorageTargetName, e.DirectoryPath)
+	return fmt.Sprintf("Connectivity Error: Storage target name [%s] was not found on the host, under directory %s. Please check the host connectivity to the storage.", e.StorageTargetName, e.DirectoryPath)
 }
 
 type MultipleDeviceNotFoundError struct {
@@ -44,7 +44,7 @@ type MultipleDeviceNotFoundError struct {
 }
 
 func (e *MultipleDeviceNotFoundError) Error() string {
-	return fmt.Sprintf("Couldn't find dm-* of the physical device path [%s -> %s] ", e.DiskByPathDevice, e.LinkToPhysicalDevice)
+	return fmt.Sprintf("Couldn't find dm-* of the physical device path [%s -> %s]. Please check the host connectivity to the storage.", e.DiskByPathDevice, e.LinkToPhysicalDevice)
 }
 
 type ErrorNothingWasWrittenToScanFileError struct {
