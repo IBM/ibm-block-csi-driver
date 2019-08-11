@@ -15,15 +15,76 @@ DISCLAIMER: The code is provided as is, without warranty. Any issue will be hand
 
 ## Driver Installation
 
-#### Prerequisite
+### Prerequisite
 
-###### Install CSIDriver CRD - optional
+#### Worker nodes preparation
+Perform these steps for each worker node in Kubernetes cluster:
+
+##### 1. Install Linux packages to ensure Fibre Channel and iSCSI
+connectivity. Skip this step, if the packages are already installed.
+
+RHEL 7.x:
+ sg3_utils.
+ iscsi-initiator-utils (if iSCSI connection is required).
+
+```sh
+sudo yum -y install sg3_utils
+sudo yum -y install iscsi-initiator-utils
+```
+
+##### 2. Configure Linux multipath devices on the host. Create and set the relevant storage system parameters in the /etc/multipath.conf file. 
+You can also use the default multipath.conf file located in the /usr/share/doc/device-mapper-multipath-* directory.
+Verify that the systemctl status multipathd output indicates that the multipath status is active and error-free.
+
+RHEL 7.x:
+
+```sh
+yum install device-mapper-multipath
+sudo modprobe dm-multipath
+systemctl start multipathd
+systemctl status multipathd
+multipath -ll
+```
+
+Important: When configuring Linux multipath devices, verify that the find_multipaths parameter in the multipath.conf file is disabled. 
+  - RHEL 7.x: Remove the find_multipaths yes string from the multipath.conf file.
+
+##### 3. Configure storage system connectivity.
+a. Define the hostname of each Kubernetes node on the relevant storage systems with the valid WWPN or IQN of the node. 
+
+b. For Fiber Chanel, configure the relevant zoning from the storage to the host.
+
+c. For iSCSI, perform these three steps.
+– Make sure that the login used to log in to the iSCSI targets is permanent and remains available after a reboot of the worker node. To do this, verify that the node.startup in the /etc/iscsi/iscsid.conf file is set to automatic. If not, set it as required and then restart the iscsid service `$> service iscsid restart`.
+
+– Discover and log into at least two iSCSI targets on the relevant storage
+systems.
+
+```sh
+$> iscsiadm -m discoverydb -t st -p ${storage system iSCSI port IP}:3260
+--discover
+$> iscsiadm -m node -p ${storage system iSCSI port IP/hostname} --login
+```
+
+– Verify that the login was successful and display all targets that you
+logged in. The portal value must be the iSCSI target IP address.
+
+```sh
+$> iscsiadm -m session --rescan
+Rescanning session [sid: 1, target: {storage system IQN},
+portal: {storage system iSCSI port IP},{port number}
+```
+
+End of worker node setup.
+
+
+#### Install CSIDriver CRD - optional
 Enabling CSIDriver on Kubernetes (more details -> https://kubernetes-csi.github.io/docs/csi-driver-object.html#enabling-csidriver-on-kubernetes)
 
 In Kubernetes v1.13, because the feature was alpha, it was disabled by default. To enable the use of CSIDriver on these versions, do the following:
 
 1. Ensure the feature gate is enabled via the following Kubernetes feature flag: --feature-gates=CSIDriverRegistry=true
-   For example on kubeadm installation add the flag inside the /etc/kubernetes/manifests/kube-apiserver.yaml.
+   For example on kubeadm installation add the flag inside the `/etc/kubernetes/manifests/kube-apiserver.yaml`.
 2. Either ensure the CSIDriver CRD is automatically installed via the Kubernetes Storage CRD addon OR manually install the CSIDriver CRD on the Kubernetes cluster with the following command:
    ```sh
    #> kubectl create -f https://raw.githubusercontent.com/kubernetes/csi-api/master/pkg/crd/manifests/csidriver.yaml
@@ -31,7 +92,10 @@ In Kubernetes v1.13, because the feature was alpha, it was disabled by default. 
 
 If the feature gate was not enabled then CSIDriver for the ibm-block-csi-driver will not be created automatically.
 
+
 #### 1. Install the CSI driver
+Heads up: For now the driver can be installed by ibm-block-csi-driver.yaml BUT Soon we will allow to install the CSI driver via formal Operator. Stay tune.
+
 ```sh
 
 #> curl https://raw.githubusercontent.com/IBM/ibm-block-csi-driver/develop/deploy/kubernetes/v1.13/ibm-block-csi-driver.yaml > ibm-block-csi-driver.yaml 
@@ -70,7 +134,7 @@ ibm-block-csi-node-zgh5h   3/3     Running   0          10m
 
 Additional info on the driver:
 ```sh
-### if feature-gates=CSIDriverRegistry was set to `true` then CSIDriver object for the driver will be automaticaly created. Can be viewed by running: 
+### if `feature-gates=CSIDriverRegistry` was set to `true` then CSIDriver object for the driver will be automaticaly created. Can be viewed by running: 
 #> kubectl describe csidriver ibm-block-csi-driver
 Name:         ibm-block-csi-driver
 Namespace:    
@@ -166,10 +230,7 @@ parameters:
   csi.storage.k8s.io/controller-publish-secret-name: <VALUE_ARRAY_SECRET>
   csi.storage.k8s.io/controller-publish-secret-namespace: <VALUE_ARRAY_SECRET_NAMESPACE>
 
-
   #csi.storage.k8s.io/fstype: <VALUE_FSTYPE>   # Optional. values ext4\xfs. The default is ext4.
-  #volume_name_prefix: <VALUE_PREFIX>          # Optional.
-
 ```
 
 Apply the storage class:
@@ -181,7 +242,7 @@ Apply the storage class:
 
 ## Usage
 
-Create pvc-demo.yaml file as follow:
+Create `pvc-demo.yaml` file as follow:
 ```
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -240,6 +301,93 @@ Source:
 Events:                <none>
 
 ```
+
+
+
+Create statefulset
+
+```sh
+#> cat demo-statefulset.yml
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: demo-statefulset
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      app: demo-statefulset
+  serviceName: demo-statefulset
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: demo-statefulset
+    spec:
+      containers:
+      - name: container1
+        image: registry.access.redhat.com/ubi8/ubi:latest
+        command: [ "/bin/sh", "-c", "--" ]
+        args: [ "while true; do sleep 30; done;" ]
+        volumeMounts:
+          - name: demo-pvc
+            mountPath: "/data"
+      volumes:
+      - name: demo-pvc
+        persistentVolumeClaim:
+          claimName: demo-pvc
+      nodeSelector:
+        kubernetes.io/hostname: <workernode1>
+
+
+
+#> kubectl create demo-statefulset.yml
+statefulset/demo-statefulset created
+
+#> kubectl get pod demo-statefulset-0
+
+#> kubectl exec pod1 demo-statefulset-0 -- bash -c "df -h /data"
+Filesystem
+Size Used Avail Use% Mounted on
+/dev/mapper/mpathi 951M 33M 919M 4% /data
+
+#> kubectl exec pod1 -c container1 -- bash -c "mount | grep /data"
+/dev/mapper/mpathi on /data type xfs (rw,relatime,seclabel,attr2,inode64,noquota)
+
+#> kubectl exec pod1 touch /data/FILE
+
+#> kubectl exec pod1 ls /data/FILE
+File
+
+#> kubectl describe pod pod1| grep "^Node:"
+Node: k8s-node1/hostname
+```
+
+Log in to the worker node that has the running pod and display the newly attached volume on the node.
+```sh
+> multipath -ll
+mpathi (36001738cfc9035eb0ccccc5) dm-12 IBM
+,2810XIV
+size=954M features=’1 queue_if_no_path’ hwhandler=’0’ wp=rw
+`-+- policy=’service-time 0’ prio=1 status=active
+|- 3:0:0:1 sdb 8:16 active ready running
+`- 4:0:0:1 sdc 8:32 active ready running
+
+#> df | egrep pvc
+...
+
+```
+
+
+
+
+Delete statefulset
+```
+#> kubectl delete demo-statefulset
+statefulset/demo-statefulset deleted
+```
+
+
 
 
 Delete PVC:

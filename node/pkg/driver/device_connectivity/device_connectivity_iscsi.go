@@ -55,6 +55,7 @@ func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier stri
 		return err
 	}
 
+ 	// TODO the below operations are SCSI and iSCSI, we should move it out to generic package.
 	for _, hostNumber := range sessionHosts {
 
 		filename := fmt.Sprintf("/sys/class/scsi_host/host%d/scan", hostNumber)
@@ -148,6 +149,7 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 
 func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(mpathDevice string) error {
 	// mpathdevice is dm-4 for example
+	// TODO since this function can be used also for FC SCSI (not only) iSCSI, we should move it out to generic.
 
 	klog.V(5).Infof("Flushing mpath device : {%v}", mpathDevice)
 
