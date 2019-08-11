@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
@@ -125,56 +124,6 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	dev, refs, err := mount.GetDeviceNameFromMount(d.mounter, stagingPath)
-	klog.V(4).Infof("dev : {%v}. refs : {%v}", dev, refs)
-	if err != nil {
-		klog.Errorf("Error while trying to get device from mount : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	if refs != 0 {
-		dmDevice, err := filepath.EvalSymlinks(dev)
-		if err != nil {
-			klog.Errorf("Error while reading symlink : {%v}. err : {%v}", dev, err.Error())
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-		klog.V(4).Infof("comparing dev : {%v} with device : {%v}", dmDevice, device)
-		if dmDevice == device {
-			klog.V(4).Infof("Returning ok result") // TODO double check
-			return &csi.NodeStageVolumeResponse{}, nil
-		} else {
-			return nil, status.Errorf(codes.AlreadyExists, "Mount point is already mounted to.")
-		}
-	}
-
-	// if the device is not mounted then we are mounting it.
-
-	volumeCap := req.GetVolumeCapability()
-	fsType := volumeCap.GetMount().FsType
-
-	if fsType == "" {
-		fsType = defaultFSType
-	}
-
-	klog.V(4).Infof("Mount the device with fs_type = {%v}", fsType)
-
-	// creating the stagingPath if it is missing
-	if _, err := os.Stat(stagingPath); os.IsNotExist(err) {
-		klog.V(4).Infof("Target path directory does not exist. creating : {%v}", stagingPath)
-		d.mounter.MakeDir(stagingPath)
-	}
-
-	err = d.mounter.FormatAndMount(device, stagingPath, fsType, nil) // TODO: pass mount options
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	klog.V(4).Infof("Succeeded to verify the ability to mount the mpath device to stagingPath [%s]. Now unmount it from staging path so only the NodePublishVolume will do the mount on the final target path.", stagingPath)
-	err = d.mounter.Unmount(stagingPath)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not unmount target %q: %v during NodeStage mount check.", stagingPath, err)
-	}
-
 	stageInfoPath := path.Join(req.GetStagingTargetPath(), stageInfoFilename)
 	stageInfo := make(map[string]string)
 	baseDevice := path.Base(device)
@@ -187,12 +136,18 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	stageInfo["sysDevices"] = sysDevices // like sda,sdb,...
 	stageInfo["connectivity"] = connectivityType
 
+	// creating the stagingPath if it is missing
+	if _, err := os.Stat(stagingPath); os.IsNotExist(err) {
+		klog.V(4).Infof("Target path directory does not exist. creating : {%v}", stagingPath)
+		d.mounter.MakeDir(stagingPath) // TODO consider to chmod the directory
+	}
+
 	if err := d.NodeUtils.WriteStageInfoToFile(stageInfoPath, stageInfo); err != nil{
 		klog.Errorf("Error while trying to save the stage metadata file [%s]: {%v}", stageInfoPath, err.Error())
 		return nil, status.Error(codes.Internal, err.Error())		
 	}
 
-	klog.V(4).Infof("NodeStageVolume Finished: multipath device is ready [%s] and with filesystem [%s] and ready to be mounted on NodePublishVolume API.", baseDevice, fsType)
+	klog.V(4).Infof("NodeStageVolume Finished: multipath device is ready [%s] to be mounted by NodePublishVolume API.", baseDevice)
 
 	return &csi.NodeStageVolumeResponse{}, nil
 }
@@ -330,6 +285,10 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
+
+
+
+
 func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	klog.V(5).Infof("NodePublishVolume: called with args %+v", *req)
 
@@ -366,6 +325,40 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		}
 	}
 
+	/*
+	dev, refs, err := mount.GetDeviceNameFromMount(d.mounter, stagingPath)
+	klog.V(4).Infof("dev : {%v}. refs : {%v}", dev, refs)
+	if err != nil {
+		klog.Errorf("Error while trying to get device from mount : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if refs != 0 {
+		dmDevice, err := filepath.EvalSymlinks(dev)
+		if err != nil {
+			klog.Errorf("Error while reading symlink : {%v}. err : {%v}", dev, err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		klog.V(4).Infof("comparing dev : {%v} with device : {%v}", dmDevice, device)
+		if dmDevice == device {
+			klog.V(4).Infof("Returning ok result") // TODO double check
+			return &csi.NodeStageVolumeResponse{}, nil
+		} else {
+			return nil, status.Errorf(codes.AlreadyExists, "Mount point is already mounted to.")
+		}
+	}
+	*/
+
+	// if the device is not mounted then we are mounting it.
+
+	volumeCap := req.GetVolumeCapability()
+	fsType := volumeCap.GetMount().FsType
+
+	if fsType == "" {
+		fsType = defaultFSType
+	}
+
+
 	// Read staging info file in order to find the mpath device for mounting.
 	stageInfoPath := path.Join(stagingPath, stageInfoFilename)
 	infoMap, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
@@ -383,14 +376,9 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		d.mounter.MakeDir(targetPath)
 	}
 
-	fsType := req.GetVolumeCapability().GetMount().FsType
-	if fsType == "" {
-		fsType = defaultFSType
+	klog.V(4).Infof("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
 
-	}
-
-	klog.V(4).Infof("Mounting mpath-device=%s to targetPath=%s", mpathDevice, targetPath)
-	err = d.mounter.Mount(mpathDevice, targetPath, fsType, nil)
+	err = d.mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // TODO: pass mount options
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -399,6 +387,11 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 	return &csi.NodePublishVolumeResponse{}, nil
 }
+
+
+
+
+
 
 func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVolumeRequest) error {
 	volumeID := req.GetVolumeId()
