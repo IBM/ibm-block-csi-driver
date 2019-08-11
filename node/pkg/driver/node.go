@@ -22,7 +22,6 @@ import (
 	"os"
 	"path"
 	"strings"
-    "time"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	device_connectivity "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
@@ -93,9 +92,6 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
-	klog.V(5).Infof("<<<<------- Start SLEEPING ")
-    time.Sleep(180 * time.Second)
-    klog.V(5).Infof("<<<<------- End SLEEPING")
 
 	volId := req.VolumeId
 	err = d.VolumeIdLocksMap.AddVolumeLock(volId)
