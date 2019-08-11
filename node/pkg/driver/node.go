@@ -140,6 +140,23 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	if _, err := os.Stat(stagingPath); os.IsNotExist(err) {
 		klog.V(4).Infof("Target path directory does not exist. creating : {%v}", stagingPath)
 		d.mounter.MakeDir(stagingPath) // TODO consider to chmod the directory
+	} else {
+		// checking idempotent case 
+		_, err := os.Stat(stageInfoPath)
+		if err == nil {
+			klog.V(4).Infof("Idempotent case: node stage was already called before on this path. checking stage info")
+			// lets read the file and comprae the stageInfo 
+			existingStageInfo, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
+			if err != nil{
+				klog.Warningf("could not read and compare the info inside the staging info file : {%v}. error : {%v}",stageInfoPath, err)
+			}
+			if (stageInfo["mpathDevice"] !=  existingStageInfo["mpathDevice"])|| 
+			(stageInfo["sysDevices"] != existingStageInfo["sysDevices"]) ||  
+			(stageInfo["connectivity"] != existingStageInfo["connectivity"] ){
+				klog.Errorf("stage info is not as expected. expected:  {%v}. got : {%v}", stageInfo,existingStageInfo )
+				return nil, status.Error(codes.AlreadyExists, err.Error())	
+			}
+		}
 	}
 
 	if err := d.NodeUtils.WriteStageInfoToFile(stageInfoPath, stageInfo); err != nil{
