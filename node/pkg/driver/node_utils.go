@@ -126,7 +126,6 @@ func (n NodeUtils) GetSysDevicesFromMpath(device string) (string, error) {
 	for _, slave := range slaves {
 		slavesString += "," + slave.Name()
 	}
-	klog.V(4).Infof("returning slave string with delimieter : {%v}", slaves)
 	return slavesString, nil
 
 }

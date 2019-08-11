@@ -355,10 +355,10 @@ func (o OsDeviceConnectivityHelperIscsi) GetIscsiSessionHostsForArrayIQN(arrayId
 		return sessionHosts, err
 	}
 
-	klog.V(5).Infof("Targetname file matches were found : {%v}", matches)
+	klog.V(5).Infof("targetname files matches were found : {%v}", matches)
 
 	for _, targetPath := range matches {
-		klog.V(5).Infof("Going over target name path : %v", targetPath)
+		klog.V(5).Infof("Check if targetname path (%s) is relevant for storage target (%s).", targetPath, arrayIdentifier)
 		targetName, err := o.executer.IoutilReadFile(targetPath)
 		if err != nil {
 			klog.Warningf("Could not read target name from file : {%v}, error : {%v}", targetPath, err)
@@ -383,7 +383,7 @@ func (o OsDeviceConnectivityHelperIscsi) GetIscsiSessionHostsForArrayIQN(arrayId
 			}
 
 			sessionHosts = append(sessionHosts, hostNumber)
-			klog.V(5).Infof("Host nunber appended : {%v}. sessionhosts is : {%v}", hostNumber, sessionHosts)
+			klog.V(5).Infof("targetname path (%s) found relevant for the storage target (%s). Adding host number {%v} to the session list.", targetPath, arrayIdentifier, hostNumber)			
 
 		}
 	}

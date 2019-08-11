@@ -159,18 +159,23 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		_, err := os.Stat(stageInfoPath)
 		if err == nil {
 			// means the file already exist
-			klog.V(4).Infof("Idempotent case: node stage was already called before on this path. checking stage info")
+			klog.Warningf("Idempotent case: stage info file exist - indicates that node stage was already done on this path. Verify its content...")
 			// lets read the file and comprae the stageInfo
 			existingStageInfo, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
 			if err != nil {
 				klog.Warningf("Could not read and compare the info inside the staging info file : {%v}. error : {%v}", stageInfoPath, err)
 			} else {
+				klog.Warningf("Idempotent case: check if stage info file is as expected. stage info is {%v} vs expected {%v}", existingStageInfo, stageInfo)
+				
 				if (stageInfo["mpathDevice"] != existingStageInfo["mpathDevice"]) ||
 					(stageInfo["sysDevices"] != existingStageInfo["sysDevices"]) ||
 					(stageInfo["connectivity"] != existingStageInfo["connectivity"]) {
 					klog.Errorf("Stage info is not as expected. expected:  {%v}. got : {%v}", stageInfo, existingStageInfo)
 					return nil, status.Error(codes.AlreadyExists, err.Error())
 				}
+				klog.Warningf("Idempotent case: stage info file is the same as expected. NodeStageVolume Finished: multipath device is ready [%s] to be mounted by NodePublishVolume API.", baseDevice)
+				return &csi.NodeStageVolumeResponse{}, nil
+
 			}
 		}
 	}
