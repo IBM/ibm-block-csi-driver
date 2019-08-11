@@ -80,7 +80,8 @@ func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsI
 }
 
 func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	klog.V(5).Infof("NodeStageVolume: called with args %+v", *req)
+	klog.V(5).Infof(">>>> NodeStageVolume: called with args %+v", *req)
+	defer klog.V(5).Infof("<<<< NodeStageVolume")
 
 	err := d.nodeStageVolumeRequestValidation(req)
 	if err != nil {
@@ -228,7 +229,9 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 }
 
 func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	klog.V(5).Infof("NodeUnstageVolume: called with args %+v", *req)
+	klog.V(5).Infof(">>>> NodeUnstageVolume: called with args %+v", *req)
+	defer klog.V(5).Infof("<<<< NodeUnstageVolume")
+
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		klog.Errorf("Volume ID not provided")
@@ -252,8 +255,13 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	stageInfoPath := path.Join(req.GetStagingTargetPath(), stageInfoFilename)
 	infoMap, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
 	if err != nil {
-		klog.Errorf("Error while trying to read from the staging info file : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
+		if os.IsNotExist(err) {
+			klog.Warningf("Idempotent case : stage info file (%s) does not exist. Finish NodeUnstageVolume OK.", stageInfoPath)
+			return &csi.NodeUnstageVolumeResponse{}, nil
+		} else {
+			klog.Errorf("Error while trying to read from the staging info file : {%v}", err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}	
 	}
 	klog.V(4).Infof("Reading stage info file detail : {%v}", infoMap)
 
@@ -262,9 +270,6 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	sysDevices := strings.Split(infoMap["sysDevices"], ",")
 
 	klog.V(4).Infof("Got info from stageInfo file. connectivity : {%v}. device : {%v}, sysDevices : {%v}", connectivityType, mpathDevice, sysDevices)
-
-	//TODO: there might be an indempotent issue here if we fail after the unmount there will be  faulty devices left
-	// (since the next time we run unpstange we will reutrn that everytjing is OK since the path is unmounted)
 
 	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
 	if !ok {
@@ -290,7 +295,8 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 }
 
 func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	klog.V(5).Infof("NodePublishVolume: called with args %+v", *req)
+	klog.V(5).Infof(">>>> NodePublishVolume: called with args %+v", *req)
+	defer klog.V(5).Infof("<<<< NodePublishVolume")
 
 	err := d.nodePublishVolumeRequestValidation(req)
 	if err != nil {
@@ -326,9 +332,10 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	mpathDevice := "/dev/" + infoMap["mpathDevice"]
 	klog.V(4).Infof("Got info from stageInfo file. device : {%v}", mpathDevice)
 
+	klog.V(5).Infof("Check if targetPath {%s} exist in mount list", targetPath)
 	mountList, err := d.mounter.List()
 	for _, mount := range mountList {
-		klog.V(5).Infof("Check if mount path({%v}) [with device({%v})] is equel to targetPath {%s}", mount.Path, mount.Device, targetPath)
+		klog.V(6).Infof("Check if mount path({%v}) [with device({%v})] is equel to targetPath {%s}", mount.Path, mount.Device, targetPath)
 		if strings.TrimPrefix(mount.Path, "/host") == targetPath {
 			// Trim /host due to the mount of the / from the host into the /host mountpoint inside the csi node container.
 
@@ -398,7 +405,9 @@ func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVol
 }
 
 func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	klog.V(5).Infof("NodeUnpublishVolume: called with args %+v", *req)
+	klog.V(5).Infof(">>>> NodeUnpublishVolume: called with args %+v", *req)
+	defer klog.V(5).Infof("<<<< NodeUnpublishVolume")
+	
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
@@ -447,7 +456,9 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 }
 
 func (d *NodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	klog.V(5).Infof("NodeGetCapabilities: called with args %+v", *req)
+	klog.V(5).Infof(">>>> NodeGetCapabilities: called with args %+v", *req)
+	defer klog.V(5).Infof("<<<< NodeGetCapabilities")
+
 	var caps []*csi.NodeServiceCapability
 	for _, cap := range nodeCaps {
 		c := &csi.NodeServiceCapability{
@@ -463,7 +474,8 @@ func (d *NodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 }
 
 func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
-	klog.V(5).Infof("NodeGetInfo: called with args %+v", *req)
+	klog.V(5).Infof(">>>> NodeGetInfo: called with args %+v", *req)
+	defer klog.V(5).Infof("<<<< NodeGetInfo")
 
 	iscsiIQN, err := d.NodeUtils.ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi")
 	if err != nil {
