@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"path/filepath"
 	"strings"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
@@ -106,7 +105,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	stagingPath := req.GetStagingTargetPath()
+	stagingPath := req.GetStagingTargetPath() // e.g in k8s /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-21967c74-b456-11e9-b93e-005056a45d5f/globalmount
 
 	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
 	if !ok {
@@ -125,52 +124,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	dev, refs, err := mount.GetDeviceNameFromMount(d.mounter, stagingPath)
-	klog.V(4).Infof("dev : {%v}. refs : {%v}", dev, refs)
-	if err != nil {
-		klog.Errorf("Error while trying to get device from mount : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	if refs != 0 {
-		dmDevice, err := filepath.EvalSymlinks(dev)
-		if err != nil {
-			klog.Errorf("Error while reading symlink : {%v}. err : {%v}", dev, err.Error())
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-		klog.V(4).Infof("comparing dev : {%v} with device : {%v}", dmDevice, device)
-		if dmDevice == device {
-			klog.V(4).Infof("Returning ok result") // TODO double check
-			return &csi.NodeStageVolumeResponse{}, nil
-		} else {
-			return nil, status.Errorf(codes.AlreadyExists, "Mount point is already mounted to.")
-		}
-	}
-
-	// if the device is not mounted then we are mounting it.
-
-	volumeCap := req.GetVolumeCapability()
-	fsType := volumeCap.GetMount().FsType
-
-	if fsType == "" {
-		fsType = defaultFSType
-	}
-
-	klog.V(4).Infof("Mount the device with fs_type = {%v}", fsType)
-
-	// creating the stagingPath if it is missing
-	if _, err := os.Stat(stagingPath); os.IsNotExist(err) {
-		klog.V(4).Infof("Target path directory does not exist. creating : {%v}", stagingPath)
-		d.mounter.MakeDir(stagingPath)
-	}
-
-	err = d.mounter.FormatAndMount(device, stagingPath, fsType, nil) // TODO: pass mount options
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	// TODO : need to write the device info for unstage use, and iscsi connectivity
-
+	// Generate the stageInfo detail
 	stageInfoPath := path.Join(req.GetStagingTargetPath(), stageInfoFilename)
 	stageInfo := make(map[string]string)
 	baseDevice := path.Base(device)
@@ -183,24 +137,47 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	stageInfo["sysDevices"] = sysDevices // like sda,sdb,...
 	stageInfo["connectivity"] = connectivityType
 
-	d.NodeUtils.WriteStageInfoToFile(stageInfoPath, stageInfo)
+	// creating the stagingPath if it is missing
+	_, err = os.Stat(stagingPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			// Kubernetes does not create the staging target path in advance, so we should create it.
+			klog.V(4).Infof("Staging target path directory does not exist. creating : {%v}", stagingPath)
+			d.mounter.MakeDir(stagingPath) // TODO consider to chmod the directory
+		} else {
+			klog.Errorf("Error reading stagingPath directory %s. Error: {%v}", stagingPath, err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
 
-	klog.V(4).Infof("NodeStageVolume Finished: %v", d.mounter)
-
-	return &csi.NodeStageVolumeResponse{}, nil
-}
-
-func (d *NodeService) getMountPointFromList(devicePath string, mountList []mount.MountPoint) *mount.MountPoint {
-	//klog.V(4).Infof("current device : %v ", devicePath)
-	for _, mount := range mountList {
-		klog.V(4).Infof("devicePath : {%v}, device : {%v}", devicePath, mount.Device)
-		if mount.Device == devicePath {
-			klog.V(4).Infof("Found mounted device")
-			return &mount
+	} else {
+		// checking idempotent case if the stageInfoPath file is already exist
+		_, err := os.Stat(stageInfoPath)
+		if err == nil {
+			// means the file already exist
+			klog.V(4).Infof("Idempotent case: node stage was already called before on this path. checking stage info")
+			// lets read the file and comprae the stageInfo
+			existingStageInfo, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
+			if err != nil {
+				klog.Warningf("Could not read and compare the info inside the staging info file : {%v}. error : {%v}", stageInfoPath, err)
+			} else {
+				if (stageInfo["mpathDevice"] != existingStageInfo["mpathDevice"]) ||
+					(stageInfo["sysDevices"] != existingStageInfo["sysDevices"]) ||
+					(stageInfo["connectivity"] != existingStageInfo["connectivity"]) {
+					klog.Errorf("Stage info is not as expected. expected:  {%v}. got : {%v}", stageInfo, existingStageInfo)
+					return nil, status.Error(codes.AlreadyExists, err.Error())
+				}
+			}
 		}
 	}
-	return nil
 
+	if err := d.NodeUtils.WriteStageInfoToFile(stageInfoPath, stageInfo); err != nil {
+		klog.Errorf("Error while trying to save the stage metadata file [%s]: {%v}", stageInfoPath, err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	klog.V(4).Infof("NodeStageVolume Finished: multipath device is ready [%s] to be mounted by NodePublishVolume API.", baseDevice)
+
+	return &csi.NodeStageVolumeResponse{}, nil
 }
 
 func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeRequest) error {
@@ -271,19 +248,6 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return nil, status.Error(codes.InvalidArgument, "Staging target not provided")
 	}
 
-	dev, refs, err := mount.GetDeviceNameFromMount(d.mounter, "/host"+stagingTargetPath)
-	if err != nil {
-		klog.Errorf("Error while trying to get device from mount : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	klog.V(4).Infof("dev : {%v}, refs: {%v}", dev, refs)
-
-	if refs == 0 {
-		klog.Warningf("Idempotent case : %s target not mounted", stagingTargetPath)
-		return &csi.NodeUnstageVolumeResponse{}, nil
-	}
-
 	klog.V(4).Infof("Reading stage info file %s", stageInfoFilename)
 	stageInfoPath := path.Join(req.GetStagingTargetPath(), stageInfoFilename)
 	infoMap, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
@@ -298,14 +262,6 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	sysDevices := strings.Split(infoMap["sysDevices"], ",")
 
 	klog.V(4).Infof("Got info from stageInfo file. connectivity : {%v}. device : {%v}, sysDevices : {%v}", connectivityType, mpathDevice, sysDevices)
-
-	d.NodeUtils.ClearStageInfoFile(stageInfoPath)
-
-	klog.V(4).Infof("Calling umount %s", stagingTargetPath)
-	err = d.mounter.Unmount(stagingTargetPath)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not unmount target %q: %v", stagingTargetPath, err)
-	}
 
 	//TODO: there might be an indempotent issue here if we fail after the unmount there will be  faulty devices left
 	// (since the next time we run unpstange we will reutrn that everytjing is OK since the path is unmounted)
@@ -323,6 +279,12 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Remove iscsi device failed with error: %v", err)
 	}
+
+	if err := d.NodeUtils.ClearStageInfoFile(stageInfoPath); err != nil {
+		return nil, status.Errorf(codes.Internal, "Fail to clear the stage info file %s: error %v", stageInfoPath, err)
+	}
+
+	klog.V(4).Infof("NodeUnStageVolume Finished: multipath device removed from host")
 
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
@@ -353,34 +315,39 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	targetPath := req.GetTargetPath()
 	klog.V(4).Infof("stagingPath : {%v}, targetPath : {%v}", stagingPath, targetPath)
 
-	mountList, err := d.mounter.List()
-	found := false
-	for _, mount := range mountList {
-		klog.V(5).Infof("mount device : {%v}, path : {%v}", mount.Device, mount.Path)
-		if strings.TrimPrefix(mount.Path, "/host") == stagingPath {
-			// Trim /host due to the mount of the / from the host into the /host mountpoint inside the csi node container.
-			found = true
-			break
-		}
-	}
-	if !found {
-		return nil, status.Error(codes.FailedPrecondition, "staging target path was not mounted into.")
+	// Read staging info file in order to find the mpath device for mounting.
+	stageInfoPath := path.Join(stagingPath, stageInfoFilename)
+	infoMap, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
+	if err != nil {
+		klog.Errorf("Error while trying to read from the staging info file : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	//checking if there is a mount FROM staging target path
+	mpathDevice := "/dev/" + infoMap["mpathDevice"]
+	klog.V(4).Infof("Got info from stageInfo file. device : {%v}", mpathDevice)
+
+	mountList, err := d.mounter.List()
 	for _, mount := range mountList {
-		klog.V(4).Infof("Validate mount device before mounting : {%v}, path : {%v}", mount.Device, mount.Path)
-		if mount.Device == stagingPath {
-			// The /host prefix remove is for mount command inside the node with /host mounted
-			//TODO: !!!!!!!change to use device! (from the file)
-			if mount.Path == targetPath {
-				klog.Errorf("Idempotent case : path was already mounted.")
+		klog.V(5).Infof("Check if mount path({%v}) [with device({%v})] is equel to targetPath {%s}", mount.Path, mount.Device, targetPath)
+		if strings.TrimPrefix(mount.Path, "/host") == targetPath {
+			// Trim /host due to the mount of the / from the host into the /host mountpoint inside the csi node container.
+
+			if mount.Device == mpathDevice {
+				klog.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume.", targetPath)
 				return &csi.NodePublishVolumeResponse{}, nil
 			} else {
-				klog.V(4).Infof("Failed pre condition, staging path already mounted somewhere else")
-				return nil, status.Error(codes.FailedPrecondition, "staging target path is already mounted elsewhere")
+				return nil, status.Errorf(codes.AlreadyExists, "Mount point is already mounted to but with different multipath device (%s), while the expected device is %s ", mount.Device, mpathDevice)
 			}
 		}
+	}
+
+	// if the device is not mounted then we are mounting it.
+
+	volumeCap := req.GetVolumeCapability()
+	fsType := volumeCap.GetMount().FsType
+
+	if fsType == "" {
+		fsType = defaultFSType
 	}
 
 	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
@@ -388,18 +355,14 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		d.mounter.MakeDir(targetPath)
 	}
 
-	fsType := req.GetVolumeCapability().GetMount().FsType
-	if fsType == "" {
-		fsType = defaultFSType
+	klog.V(4).Infof("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
 
-	}
-	mountOptions := []string{"bind"}
-
-	// bind mount
-	err = d.mounter.Mount(stagingPath, targetPath, fsType, mountOptions)
+	err = d.mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // TODO: pass mount options
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+
+	klog.V(4).Infof("NodePublishVolume Finished: multipath device is now mounted to targetPath.")
 
 	return &csi.NodePublishVolumeResponse{}, nil
 }
@@ -457,18 +420,19 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	err = d.mounter.Unmount(target)
 	if err != nil {
 		if strings.Contains(err.Error(), "not mounted") {
-			klog.V(4).Infof("Idempotent case - target was already unmounted %s", target)
+			klog.Warningf("Idempotent case - target was already unmounted %s", target)
 			return &csi.NodeUnpublishVolumeResponse{}, nil
 		}
 		return nil, status.Errorf(codes.Internal, "Could not unmount %q: %v", target, err)
 	}
 
-	if _, err := os.Stat(target); os.IsNotExist(err) {
+	/*
+		// TODO check if we need to delete it or not. Currently we create it in the NonePublishVolume but it looks like k8s already create it by it self..
 		klog.V(4).Infof("Deleting target path [%s] after successfully unmount it.", target)
 		if err := os.RemoveAll(target); err != nil {
 			klog.Warningf("Fail to remove the target path [%s] after successfully unmount it. Error %v", target, err)
 		}
-	}
+	*/
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 
