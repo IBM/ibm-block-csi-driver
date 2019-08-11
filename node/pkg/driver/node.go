@@ -317,7 +317,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 	mountList, err := d.mounter.List()
 	for _, mount := range mountList {
-		klog.V(5).Infof("mount device : {%v}, path : {%v} is equel to targetPath {%s}", mount.Device, mount.Path, targetPath)
+		klog.V(5).Infof("Check if mount device({%v}) \path({%v}) is equel to targetPath {%s}", mount.Device, mount.Path, targetPath)
 		if strings.TrimPrefix(mount.Path, "/host") == targetPath {
 			// Trim /host due to the mount of the / from the host into the /host mountpoint inside the csi node container.
 			klog.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume.", targetPath)
