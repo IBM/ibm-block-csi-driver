@@ -18,8 +18,6 @@ package device_connectivity
 
 import (
 	"fmt"
-	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
-	"k8s.io/klog"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -27,6 +25,9 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"k8s.io/klog"
 )
 
 type OsDeviceConnectivityIscsi struct {
@@ -383,7 +384,7 @@ func (o OsDeviceConnectivityHelperIscsi) GetIscsiSessionHostsForArrayIQN(arrayId
 			}
 
 			sessionHosts = append(sessionHosts, hostNumber)
-			klog.V(5).Infof("targetname path (%s) found relevant for the storage target (%s). Adding host number {%v} to the session list.", targetPath, arrayIdentifier, hostNumber)			
+			klog.V(5).Infof("targetname path (%s) found relevant for the storage target (%s). Adding host number {%v} to the session list.", targetPath, arrayIdentifier, hostNumber)
 
 		}
 	}

@@ -18,10 +18,11 @@ package driver
 
 import (
 	"context"
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	util "github.com/ibm/ibm-block-csi-driver/node/util"
 	"io/ioutil"
 	"net"
+
+	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	util "github.com/ibm/ibm-block-csi-driver/node/util"
 
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v2"

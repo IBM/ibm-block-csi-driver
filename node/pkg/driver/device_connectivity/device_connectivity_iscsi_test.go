@@ -18,15 +18,16 @@ package device_connectivity_test
 
 import (
 	"fmt"
-	gomock "github.com/golang/mock/gomock"
-	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
-	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
-	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
+
+	gomock "github.com/golang/mock/gomock"
+	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
+	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
 type WaitForPathToExistReturn struct {

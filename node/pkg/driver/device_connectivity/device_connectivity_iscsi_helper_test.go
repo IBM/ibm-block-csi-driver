@@ -18,12 +18,13 @@ package device_connectivity_test
 
 import (
 	"fmt"
-	gomock "github.com/golang/mock/gomock"
-	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
-	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"os"
 	"reflect"
 	"testing"
+
+	gomock "github.com/golang/mock/gomock"
+	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 )
 
 func TestHelperWaitForPathToExist(t *testing.T) {

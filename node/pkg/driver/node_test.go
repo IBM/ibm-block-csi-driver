@@ -19,14 +19,15 @@ package driver_test
 import (
 	"context"
 	"fmt"
+	"reflect"
+	"testing"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	gomock "github.com/golang/mock/gomock"
 	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
 	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"reflect"
-	"testing"
 )
 
 const (

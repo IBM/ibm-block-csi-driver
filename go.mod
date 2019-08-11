@@ -7,6 +7,7 @@ require (
 	github.com/golang/mock v1.2.0
 	github.com/kubernetes-csi/csi-lib-iscsi v0.0.0-20190415173011-c545557492f4
 	github.com/tebeka/go2xunit v1.4.10
+	golang.org/x/tools v0.0.0-20190809145639-6d4652c779c4 // indirect
 	google.golang.org/grpc v1.22.0
 	gopkg.in/yaml.v2 v2.2.2
 	k8s.io/apimachinery v0.0.0-20190727130956-f97a4e5b4abc // indirect

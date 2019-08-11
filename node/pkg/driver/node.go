@@ -162,7 +162,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 				klog.Warningf("Could not read and compare the info inside the staging info file : {%v}. error : {%v}", stageInfoPath, err)
 			} else {
 				klog.Warningf("Idempotent case: check if stage info file is as expected. stage info is {%v} vs expected {%v}", existingStageInfo, stageInfo)
-				
+
 				if (stageInfo["mpathDevice"] != existingStageInfo["mpathDevice"]) ||
 					(stageInfo["sysDevices"] != existingStageInfo["sysDevices"]) ||
 					(stageInfo["connectivity"] != existingStageInfo["connectivity"]) {
@@ -266,7 +266,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		} else {
 			klog.Errorf("Error while trying to read from the staging info file : {%v}", err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
-		}	
+		}
 	}
 	klog.V(4).Infof("Reading stage info file detail : {%v}", infoMap)
 
@@ -412,7 +412,7 @@ func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVol
 func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
 	klog.V(5).Infof(">>>> NodeUnpublishVolume: called with args %+v", *req)
 	defer klog.V(5).Infof("<<<< NodeUnpublishVolume")
-	
+
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
