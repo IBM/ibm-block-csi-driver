@@ -373,7 +373,7 @@ spec:
             - name: sys-dir
               mountPath: /sys
             - name: host-dir
-              mountPath: /host
+              mountPath: /host  # Mapping the root of the host into "/host" inside the container.
               mountPropagation: "Bidirectional"
 
           ports:

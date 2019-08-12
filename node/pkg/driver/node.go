@@ -55,6 +55,13 @@ var (
 	}
 )
 
+const (
+	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
+	// Command lines inside the container will show /host prefix. 
+	PrefixChrootOfHostRoot = "/host"
+	
+)
+
 // nodeService represents the node service of CSI driver
 type NodeService struct {
 	mounter                     *mount.SafeFormatAndMount
@@ -155,14 +162,13 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	} else {
 		// checking idempotent case if the stageInfoPath file is already exist
-		_, err := os.Stat(stageInfoPath)
-		if err == nil {
+		if d.NodeUtils.StageInfoFileIsExist(stageInfoPath) {
 			// means the file already exist
 			klog.Warningf("Idempotent case: stage info file exist - indicates that node stage was already done on this path. Verify its content...")
 			// lets read the file and comprae the stageInfo
 			existingStageInfo, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
 			if err != nil {
-				klog.Warningf("Could not read and compare the info inside the staging info file : {%v}. error : {%v}", stageInfoPath, err)
+				klog.Warningf("Could not read and compare the info inside the staging info file. error : {%v}", err)
 			} else {
 				klog.Warningf("Idempotent case: check if stage info file is as expected. stage info is {%v} vs expected {%v}", existingStageInfo, stageInfo)
 
@@ -180,7 +186,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	if err := d.NodeUtils.WriteStageInfoToFile(stageInfoPath, stageInfo); err != nil {
-		klog.Errorf("Error while trying to save the stage metadata file [%s]: {%v}", stageInfoPath, err.Error())
+		klog.Errorf("Error while trying to save the stage metadata file: {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -258,12 +264,12 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return nil, status.Error(codes.InvalidArgument, "Staging target not provided")
 	}
 
-	klog.V(4).Infof("Reading stage info file %s", stageInfoFilename)
+	klog.V(4).Infof("Reading stage info file")
 	stageInfoPath := path.Join(req.GetStagingTargetPath(), stageInfoFilename)
 	infoMap, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			klog.Warningf("Idempotent case : stage info file (%s) does not exist. Finish NodeUnstageVolume OK.", stageInfoPath)
+			klog.Warningf("Idempotent case : stage info file does not exist. Finish NodeUnstageVolume OK.")
 			return &csi.NodeUnstageVolumeResponse{}, nil
 		} else {
 			klog.Errorf("Error while trying to read from the staging info file : {%v}", err.Error())
@@ -293,7 +299,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	}
 
 	if err := d.NodeUtils.ClearStageInfoFile(stageInfoPath); err != nil {
-		return nil, status.Errorf(codes.Internal, "Fail to clear the stage info file %s: error %v", stageInfoPath, err)
+		return nil, status.Errorf(codes.Internal, "Fail to clear the stage info file: error %v", err)
 	}
 
 	klog.V(4).Infof("NodeUnStageVolume Finished: multipath device removed from host")
@@ -343,7 +349,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	mountList, err := d.mounter.List()
 	for _, mount := range mountList {
 		klog.V(6).Infof("Check if mount path({%v}) [with device({%v})] is equel to targetPath {%s}", mount.Path, mount.Device, targetPath)
-		if strings.TrimPrefix(mount.Path, "/host") == targetPath {
+		if strings.TrimPrefix(mount.Path, PrefixChrootOfHostRoot) == targetPath {
 			// Trim /host due to the mount of the / from the host into the /host mountpoint inside the csi node container.
 
 			if mount.Device == mpathDevice {

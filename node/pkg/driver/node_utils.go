@@ -33,10 +33,13 @@ import (
 type NodeUtilsInterface interface {
 	ParseIscsiInitiators(path string) (string, error)
 	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, string, error)
-	WriteStageInfoToFile(path string, info map[string]string) error
 	GetSysDevicesFromMpath(baseDevice string) (string, error)
+
+	// TODO refactor and move all staging methods to dedicate interface.
+	WriteStageInfoToFile(path string, info map[string]string) error
 	ReadFromStagingInfoFile(filePath string) (map[string]string, error)
 	ClearStageInfoFile(filePath string) error
+	StageInfoFileIsExist(filePath string) bool	
 }
 
 type NodeUtils struct {
@@ -89,17 +92,19 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, c
 
 func (n NodeUtils) WriteStageInfoToFile(filePath string, info map[string]string) error {
 	// writes to stageTargetPath/filename
-	klog.V(5).Infof("WriteStageInfoToFile : path {%v}, info {%v}", filePath, info)
+	
+	filePath = PrefixChrootOfHostRoot + filePath
+	klog.V(5).Infof("WriteStageInfo file : path {%v}, info {%v}", filePath, info)
 	stageInfo, err := json.Marshal(info)
 	if err != nil {
-		klog.Errorf("errow hile marshalling info to json : {%v}", err.Error())
+		klog.Errorf("Error marshalling info file %s to json : {%v}", filePath, err.Error())
 		return err
 	}
 
 	err = ioutil.WriteFile(filePath, stageInfo, 0600)
 
 	if err != nil {
-		klog.Errorf("erro while writing to file : {%v}", err.Error())
+		klog.Errorf("Error while writing to file %s: {%v}", filePath, err.Error())
 		return err
 	}
 
@@ -108,10 +113,12 @@ func (n NodeUtils) WriteStageInfoToFile(filePath string, info map[string]string)
 
 func (n NodeUtils) ReadFromStagingInfoFile(filePath string) (map[string]string, error) {
 	// reads from stageTargetPath/filename
-	klog.V(5).Infof("readFromStagingInfoFile : path {%v},", filePath)
+	filePath = PrefixChrootOfHostRoot + filePath
+	
+	klog.V(5).Infof("Read StagingInfoFile : path {%v},", filePath)
 	stageInfo, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		klog.Errorf("error readinf file. err : {%v}", err.Error())
+		klog.Errorf("error reading file %s. err : {%v}", filePath, err.Error())
 		return nil, err
 	}
 
@@ -119,13 +126,20 @@ func (n NodeUtils) ReadFromStagingInfoFile(filePath string) (map[string]string, 
 
 	err = json.Unmarshal(stageInfo, &infoMap)
 	if err != nil {
-		klog.Errorf("error unmarshalling. err : {%v}", err.Error())
+		klog.Errorf("error unmarshalling file %s. err : {%v}", filePath, err.Error())
 		return nil, err
 	}
 
 	return infoMap, nil
-
 }
+
+func (n NodeUtils) ClearStageInfoFile(filePath string) error {
+	filePath = PrefixChrootOfHostRoot + filePath
+	klog.V(5).Infof("Delete StagingInfoFile : path {%v},", filePath)
+
+	return os.Remove(filePath)
+}
+
 
 func (n NodeUtils) GetSysDevicesFromMpath(device string) (string, error) {
 	// this will return the 	/sys/block/dm-3/slaves/
@@ -147,6 +161,10 @@ func (n NodeUtils) GetSysDevicesFromMpath(device string) (string, error) {
 
 }
 
-func (n NodeUtils) ClearStageInfoFile(filePath string) error {
-	return os.Remove(filePath)
-}
+
+func (n NodeUtils) StageInfoFileIsExist(filePath string) bool{
+	if _, err := os.Stat(filePath); err != nil{
+		return false
+	}
+	return true
+}	
