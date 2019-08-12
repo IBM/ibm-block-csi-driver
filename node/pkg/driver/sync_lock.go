@@ -29,7 +29,6 @@ type SyncLockInterface interface {
 	RemoveVolumeLock(id string, msg string)
 	GetSyncMap() *sync.Map
 //    RemoveVolumeLock(id string, msg string) func()
-
 }
 
 type SyncLock struct {
@@ -50,8 +49,7 @@ func (s SyncLock) GetSyncMap() *sync.Map {
 func (s SyncLock) AddVolumeLock(id string, msg string) error {
 	goid := util.GetGoID()
 	klog.V(5).Infof("Lock for action %s, Try to acquire lock for volume ID=%s (syncMap=%v) goid=%d", msg, id, s.SyncMap, goid)
-	result, exists := s.SyncMap.Load(id)
-	klog.V(5).Infof("Lock for action %s, Try to acquire lock for volume ID=%s  (result=%v, exists=%v) goid=%d", msg, id, result, exists, goid)
+	_, exists := s.SyncMap.Load(id)
 	if !exists {
 		s.SyncMap.Store(id, 0)
 		klog.V(5).Infof("Lock for action %s, Succeed to acquire lock for volume ID=%s (syncMap=%v) goid=%d", msg, id, s.SyncMap, goid)

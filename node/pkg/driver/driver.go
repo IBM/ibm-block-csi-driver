@@ -53,7 +53,6 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 	}
 
 	syncLock := NewSyncLock()
-	syncLock.GetSyncMap().Store("FAKE", 0)
 	executer := &executer.Executer{}
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
 		"iscsi": device_connectivity.NewOsDeviceConnectivityIscsi(executer),
