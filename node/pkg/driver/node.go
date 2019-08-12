@@ -317,7 +317,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	stagingPath := req.GetStagingTargetPath()
 	targetPath := req.GetTargetPath()
 	targetPathWithHostPrefix := path.Join(PrefixChrootOfHostRoot, targetPath)
-	
+
 	klog.V(4).Infof("stagingPath : {%v}, targetPath : {%v}", stagingPath, targetPath)
 
 	// Read staging info file in order to find the mpath device for mounting.
@@ -363,7 +363,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	klog.V(4).Infof("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
 
 	klog.V(5).Infof("FormatAndMount start [goid=%d]", util.GetGoID())
-	err = d.mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck 
+	err = d.mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 	// TODO: pass mount options
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
