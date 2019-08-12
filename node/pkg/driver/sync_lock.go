@@ -27,6 +27,7 @@ import (
 type SyncLockInterface interface {
 	AddVolumeLock(id string, msg string) error
 	RemoveVolumeLock(id string, msg string)
+	GetSyncMap() *sync.Map
 //    RemoveVolumeLock(id string, msg string) func()
 
 }
@@ -35,11 +36,15 @@ type SyncLock struct {
 	SyncMap sync.Map
 }
 
-func NewSyncLock() *SyncLock {
+func NewSyncLock() SyncLockInterface {
 	return &SyncLock{
 		SyncMap: sync.Map{},
 	}
 
+}
+
+func (s SyncLock) GetSyncMap() *sync.Map {
+	return &s.SyncMap
 }
 
 func (s SyncLock) AddVolumeLock(id string, msg string) error {

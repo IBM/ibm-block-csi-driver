@@ -100,7 +100,9 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		klog.Errorf("Another operation is being perfomed on volume : {%s}.", volId)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
+	klog.V(5).Infof("Lock for action NodeStageVolume ---> outside 1 syncmap=%v", d.VolumeIdLocksMap.GetSyncMap())
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volId, "NodeStageVolume")
+	klog.V(5).Infof("Lock for action NodeStageVolume ---> outside 2 syncmap=%v", d.VolumeIdLocksMap.GetSyncMap())
 
 	connectivityType, lun, array_iqn, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
 	if err != nil {
@@ -183,7 +185,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	klog.V(4).Infof("NodeStageVolume Finished: multipath device is ready [%s] to be mounted by NodePublishVolume API.", baseDevice)
-
+	klog.V(5).Infof("Lock for action NodeStageVolume ---> outside 3 syncmap=%v", d.VolumeIdLocksMap.GetSyncMap())
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
