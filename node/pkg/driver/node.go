@@ -57,9 +57,8 @@ var (
 
 const (
 	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
-	// Command lines inside the container will show /host prefix. 
+	// Command lines inside the container will show /host prefix.
 	PrefixChrootOfHostRoot = "/host"
-	
 )
 
 // nodeService represents the node service of CSI driver
@@ -109,7 +108,6 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volId, "NodeStageVolume")
-
 
 	connectivityType, lun, array_iqn, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
 	if err != nil {
@@ -383,7 +381,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	klog.V(5).Infof("FormatAndMount end [goid=%d]", util.GetGoID())
-	
+
 	klog.V(4).Infof("NodePublishVolume Finished: multipath device is now mounted to targetPath.")
 
 	return &csi.NodePublishVolumeResponse{}, nil

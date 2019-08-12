@@ -17,15 +17,15 @@
 package util
 
 import (
+	"bytes"
 	"fmt"
 	"net/url"
 	"os"
 	"path"
 	"path/filepath"
-	"strings"
 	"runtime"
 	"strconv"
-	"bytes"
+	"strings"
 )
 
 func ParseEndpoint(endpoint string) (string, string, error) {
@@ -50,8 +50,6 @@ func ParseEndpoint(endpoint string) (string, string, error) {
 
 	return scheme, addr, nil
 }
-
-
 
 func GetGoID() uint64 {
 	b := make([]byte, 64)

@@ -39,7 +39,7 @@ type NodeUtilsInterface interface {
 	WriteStageInfoToFile(path string, info map[string]string) error
 	ReadFromStagingInfoFile(filePath string) (map[string]string, error)
 	ClearStageInfoFile(filePath string) error
-	StageInfoFileIsExist(filePath string) bool	
+	StageInfoFileIsExist(filePath string) bool
 }
 
 type NodeUtils struct {
@@ -92,7 +92,7 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, c
 
 func (n NodeUtils) WriteStageInfoToFile(filePath string, info map[string]string) error {
 	// writes to stageTargetPath/filename
-	
+
 	filePath = PrefixChrootOfHostRoot + filePath
 	klog.V(5).Infof("WriteStageInfo file : path {%v}, info {%v}", filePath, info)
 	stageInfo, err := json.Marshal(info)
@@ -114,7 +114,7 @@ func (n NodeUtils) WriteStageInfoToFile(filePath string, info map[string]string)
 func (n NodeUtils) ReadFromStagingInfoFile(filePath string) (map[string]string, error) {
 	// reads from stageTargetPath/filename
 	filePath = PrefixChrootOfHostRoot + filePath
-	
+
 	klog.V(5).Infof("Read StagingInfoFile : path {%v},", filePath)
 	stageInfo, err := ioutil.ReadFile(filePath)
 	if err != nil {
@@ -126,7 +126,7 @@ func (n NodeUtils) ReadFromStagingInfoFile(filePath string) (map[string]string, 
 
 	err = json.Unmarshal(stageInfo, &infoMap)
 	if err != nil {
-		klog.Errorf("error unmarshalling file %s. err : {%v}", filePath, err.Error())
+		klog.Errorf("Error unmarshalling file %s. err : {%v}", filePath, err.Error())
 		return nil, err
 	}
 
@@ -139,7 +139,6 @@ func (n NodeUtils) ClearStageInfoFile(filePath string) error {
 
 	return os.Remove(filePath)
 }
-
 
 func (n NodeUtils) GetSysDevicesFromMpath(device string) (string, error) {
 	// this will return the 	/sys/block/dm-3/slaves/
@@ -161,10 +160,9 @@ func (n NodeUtils) GetSysDevicesFromMpath(device string) (string, error) {
 
 }
 
-
-func (n NodeUtils) StageInfoFileIsExist(filePath string) bool{
-	if _, err := os.Stat(filePath); err != nil{
+func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
+	if _, err := os.Stat(filePath); err != nil {
 		return false
 	}
 	return true
-}	
+}

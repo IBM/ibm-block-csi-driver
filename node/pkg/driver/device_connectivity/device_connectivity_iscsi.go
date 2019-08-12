@@ -55,7 +55,7 @@ func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier stri
 		return err
 	}
 
- 	// TODO the below operations are SCSI and iSCSI, we should move it out to generic package.
+	// TODO the below operations are SCSI and iSCSI, we should move it out to generic package.
 	for _, hostNumber := range sessionHosts {
 
 		filename := fmt.Sprintf("/sys/class/scsi_host/host%d/scan", hostNumber)
