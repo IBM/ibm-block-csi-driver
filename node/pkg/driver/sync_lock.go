@@ -25,8 +25,8 @@ import (
 
 type SyncLockInterface interface {
 	AddVolumeLock(id string, msg string) error
-	RemoveVolumeLockDo(id string, msg string)
-    RemoveVolumeLock(id string, msg string) func()
+	RemoveVolumeLock(id string, msg string)
+//    RemoveVolumeLock(id string, msg string) func()
 
 }
 
@@ -42,8 +42,9 @@ func NewSyncLock() *SyncLock {
 }
 
 func (s SyncLock) AddVolumeLock(id string, msg string) error {
-	klog.V(5).Infof("Lock for action %s, Try to acquire lock for volume ID=%s", msg, id)
-	_, exists := s.syncMap.Load(id)
+	klog.V(5).Infof("Lock for action %s, Try to acquire lock for volume ID=%s (syncMap=%v)", msg, id, s.syncMap)
+	result, exists := s.syncMap.Load(id)
+	klog.V(5).Infof("Lock for action %s, Try to acquire lock for volume ID=%s  (result=%v, exists=%v)", msg, id, result, exists)
 	if !exists {
 		s.syncMap.Store(id, 0)
 		klog.V(5).Infof("Lock for action %s, Succeed to acquire lock for volume ID=%s", msg, id)
@@ -54,8 +55,8 @@ func (s SyncLock) AddVolumeLock(id string, msg string) error {
 	}
 }
 
-func (s SyncLock) RemoveVolumeLockDo(id string, msg string) {
-	klog.V(5).Infof("Lock for action %s, release lock for volume ID=%s", msg, id)
+func (s SyncLock) RemoveVolumeLock(id string, msg string) {
+	klog.V(5).Infof("Lock for action %s, release lock for volume ID=%s (syncMap=%v)", msg, id, s.syncMap)
 
 	_, exists := s.syncMap.Load(id)
 	if exists {
@@ -63,7 +64,6 @@ func (s SyncLock) RemoveVolumeLockDo(id string, msg string) {
 	}
 }
 
-func (s SyncLock) RemoveVolumeLock(id string, msg string) func() {
+/*func (s SyncLock) RemoveVolumeLock(id string, msg string) func() {
 	return func() { s.RemoveVolumeLockDo(id, msg) }
-}
-
+}*/
