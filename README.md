@@ -458,7 +458,7 @@ persistentvolumeclaim/pvc-demo deleted
 ```
 
 Kubernetes version 1.13 automatically creates the CSIDriver `ibm-block-csi-driver`, but it does not delete it automatically when removing the driver manifest.
-So in order to clean up CSIDriver object, run the following commend:
+So in order to clean up CSIDriver object, run the following command:
 ```sh
 kubectl delete CSIDriver ibm-block-csi-driver
 ```

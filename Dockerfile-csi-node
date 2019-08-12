@@ -33,7 +33,7 @@ COPY --from=builder /go/src/github.com/ibm/ibm-block-csi-driver/common/config.ya
 COPY --from=builder /go/src/github.com/ibm/ibm-block-csi-driver/bin/ibm-block-csi-node-driver .
 
 # install xfs (used for mkfs.xfs)
-RUN yum -y install xfsprogs xfsdump
+RUN yum -y install xfsprogs xfsdump && yum clean all
 
 RUN mkdir /chroot
 ADD chroot-host-wrapper.sh /chroot
