@@ -155,9 +155,9 @@ func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(mpathDevice string) erro
 
 	fullDevice := "/dev/" + mpathDevice
 
-	klog.V(5).Infof("Try to accure lock for running the command multipath -f {%v} (to avoid concurrent multipath commands)", mpathDevice)
+	klog.V(5).Infof("Try to acquire lock for running the command multipath -f {%v} (to avoid concurrent multipath commands)", mpathDevice)
 	r.MutexMultipathF.Lock()
-	klog.V(5).Infof("Accured lock for multipath -f command")
+	klog.V(5).Infof("Acquired lock for multipath -f command")
 	_, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathFlashCmd, "multipath", []string{"-f", fullDevice})
 	r.MutexMultipathF.Unlock()
 

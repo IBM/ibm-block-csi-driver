@@ -51,7 +51,7 @@ var (
 	stageInfoFilename          = ".stageInfo.json"
 	supportedConnectivityTypes = map[string]bool{
 		"iscsi": true,
-		// TODO add fc later on
+		// TODO add fc \ nvme later on
 	}
 )
 
@@ -324,6 +324,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	stageInfoPath := path.Join(stagingPath, stageInfoFilename)
 	infoMap, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
 	if err != nil {
+		// Note: after validation it looks like k8s create the directory in advance. So we don't try to remove it at the Unpublish
 		klog.Errorf("Error while trying to read from the staging info file : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -399,7 +400,11 @@ func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVol
 		return &RequestValidationError{"Volume capability AccessMode not supported"}
 	}
 
-	// TODO add verification of volume mode
+	// If the access type is block, do nothing for stage
+	switch volCap.GetAccessType().(type) {
+	case *csi.VolumeCapability_Block:
+		return &RequestValidationError{"Volume Access Type Block is not supported yet"}
+	}
 
 	return nil
 }
@@ -434,14 +439,6 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		}
 		return nil, status.Errorf(codes.Internal, "Could not unmount %q: %v", target, err)
 	}
-
-	/*
-		// TODO check if we need to delete it or not. Currently we create it in the NonePublishVolume but it looks like k8s already create it by it self..
-		klog.V(4).Infof("Deleting target path [%s] after successfully unmount it.", target)
-		if err := os.RemoveAll(target); err != nil {
-			klog.Warningf("Fail to remove the target path [%s] after successfully unmount it. Error %v", target, err)
-		}
-	*/
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 

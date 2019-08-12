@@ -56,8 +56,8 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 	executer := &executer.Executer{}
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
 		"iscsi": device_connectivity.NewOsDeviceConnectivityIscsi(executer),
-		//"fc": NewOsDeviceConnectivityFc(executer),
-		// TODO nvme
+		//"fc": NewOsDeviceConnectivityFc(executer), 
+		// TODO nvme and FC
 	}
 	return &Driver{
 		endpoint:    endpoint,
@@ -105,7 +105,7 @@ type ConfigFile struct {
 	Identity struct {
 		Name    string
 		Version string
-		// TODO missing capabilities
+		// TODO missing capabilities - currently the csi node is setting driver capability hardcoded. fix it low priority.
 	}
 	Controller struct {
 		Publish_context_lun_parameter          string

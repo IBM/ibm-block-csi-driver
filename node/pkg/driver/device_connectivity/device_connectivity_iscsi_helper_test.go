@@ -116,7 +116,6 @@ func TestHelperGetMultipathDisk(t *testing.T) {
 
 			expErr:  nil,
 			expPath: "dm-4",
-			// TODO add here some way to check that FilepathGlobs was not called at all.
 		},
 
 		{
