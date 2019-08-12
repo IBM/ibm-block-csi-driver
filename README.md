@@ -204,6 +204,7 @@ The driver is running but in order to use it, one should create relevant storage
 First create the secret of the array for this cluster.
  
 Create a secret file as follow and update the relevant credentials:
+
 ```
 kind: Secret
 apiVersion: v1
@@ -218,6 +219,7 @@ data:
 ```
 
 Apply the secret:
+
 ```
 #> kubectl apply -f array-secret.yaml
 ```
@@ -225,7 +227,8 @@ Apply the secret:
 #### 3. Create storage classes
 
 Create a storage class yaml file as follow with the relevant capabilities, pool and array secret:
-```
+
+```sh
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
@@ -244,9 +247,10 @@ parameters:
 ```
 
 Apply the storage class:
-```
-#> kubectl apply -f storage-class.yaml
-TODO add out put
+
+```sh
+#> kubectl apply -f array-secret.yaml
+storageclass.storage.k8s.io/gold created
 ```
 
 
@@ -384,12 +388,13 @@ statefulset/demo-statefulset created
 Display the newly created pod(make sure that the pod status is Running) and write data to its persistent volume. 
 
 ```sh
-### Wait for the pod to be in Running state.
+###### Wait for the pod to be in Running state.
 #> kubectl get pod demo-statefulset-0
 NAME                 READY   STATUS    RESTARTS   AGE
 demo-statefulset-0   1/1     Running   0          43s
 
-### Review the mountpoint inside the pod:
+
+###### Review the mountpoint inside the pod:
 #> kubectl exec demo-statefulset-0 -- bash -c "df -h /data"
 Filesystem          Size  Used Avail Use% Mounted on
 /dev/mapper/mpathz 1014M   33M  982M   4% /data
@@ -398,8 +403,7 @@ Filesystem          Size  Used Avail Use% Mounted on
 /dev/mapper/mpathz on /data type xfs (rw,relatime,seclabel,attr2,inode64,noquota)
 
 
-
-### Write data in the PV inside the demo-statefulset-0 pod  (the PV mounted inside the pod at /data)
+###### Write data in the PV inside the demo-statefulset-0 pod  (the PV mounted inside the pod at /data)
 #> kubectl exec demo-statefulset-0 touch /data/FILE
 #> kubectl exec demo-statefulset-0 ls /data/FILE
 File
@@ -409,39 +413,93 @@ File
 Log in to the worker node that has the running pod and display the newly attached volume on the node.
 
 ```sh
-### Verify which worker node runs the pod demo-statefulset-0 
+###### Verify which worker node runs the pod demo-statefulset-0 
 #> kubectl describe pod demo-statefulset-0| grep "^Node:"
 Node: k8s-node1/hostname
 
-### Login to the worker node and check devices:
+###### ssh login to the worker node
+#> ssh k8s-node1
 
-> multipath -ll
-mpathi (36001738cfc9035eb0ccccc5) dm-12 IBM
-,2810XIV
-size=954M features=’1 queue_if_no_path’ hwhandler=’0’ wp=rw
-`-+- policy=’service-time 0’ prio=1 status=active
-|- 3:0:0:1 sdb 8:16 active ready running
-`- 4:0:0:1 sdc 8:32 active ready running
+###### List multipath devices on the worker node (watch the same `mpathz` that was mentioned above) 
+#>[k8s-node1]  multipath -ll
+mpathz (36001738cfc9035eb0000000000d1f68f) dm-3 IBM     ,2810XIV         
+size=1.0G features='1 queue_if_no_path' hwhandler='0' wp=rw
+`-+- policy='service-time 0' prio=1 status=active
+  |- 37:0:0:12 sdc 8:32 active ready running
+  `- 36:0:0:12 sdb 8:16 active ready running
 
-#> df | egrep pvc
-TODO
+#>[k8s-node1] ls -l /dev/mapper/mpathz
+lrwxrwxrwx. 1 root root 7 Aug 12 19:29 /dev/mapper/mpathz -> ../dm-3
+
+
+###### List the physical devices of the multipath `mpathz` and its mountpoint on the host (which is the /data inside the statefull pod). 
+#>[k8s-node1]  lsblk /dev/sdb /dev/sdc
+NAME     MAJ:MIN RM SIZE RO TYPE  MOUNTPOINT
+sdb        8:16   0   1G  0 disk  
+└─mpathz 253:3    0   1G  0 mpath /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-a04bd32f-bd0f-11e9-a1f5
+sdc        8:32   0   1G  0 disk  
+└─mpathz 253:3    0   1G  0 mpath /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-a04bd32f-bd0f-11e9-a1f5
+
+
+###### View the PV mounted on this host 
+######  (All PV mountpoints looks like : `/var/lib/kubelet/pods/*/volumes/kubernetes.io~csi/pvc-*/mount`) 
+#>[k8s-node1]  df | egrep pvc
+/dev/mapper/mpathz      1038336    32944   1005392   4% /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d5f/mount
+
+
+##### Detail about the driver internal metadata file `.stageInfo.json` stored in the k8s PV node stage path `/var/lib/kubelet/plugins/kubernetes.io/csi/pv/<PVC-ID>/globalmount/.stageInfo.json`. The CSI driver creates it during the  NodeStage API, and it been used by the NodePublishVolume, NodeUnPublishVolume and NodeUnStage CSI APIs later on.
+
+#> cat /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-711b6fef-bcf9-11e9-a1f5-005056a45d5f/globalmount/.stageInfo.json
+{"connectivity":"iscsi","mpathDevice":"dm-3","sysDevices":",sdb,sdc"}
+
 ```
 
 
-Delete statefulset and start it again to validate data remain in the PV.
+Delete statefulset and start it again to validate data(`/data/FILE`) remains in the PV.
 
 ```sh
-#> kubectl delete demo-statefulset
+#> kubectl delete statefulset/demo-statefulset
 statefulset/demo-statefulset deleted
+
+### Wait till pod is no longer exist (get returns `"demo-statefulset" not found`)
+#> kubectl get statefulset/demo-statefulset
+NAME                 READY   STATUS        RESTARTS   AGE
+demo-statefulset-0   0/1     Terminating   0          91m
+
+
+###### ssh login to the worker node just to see that multipath was deleted and the PV mountpoint is no longer exist.
+#> ssh k8s-node1
+
+#>[k8s-node1] df | egrep pvc
+#>[k8s-node1] multipath -ll
+#>[k8s-node1] lsblk /dev/sdb /dev/sdc
+lsblk: /dev/sdb: not a block device
+lsblk: /dev/sdc: not a block device
+
+
+###### Now lets create the statefulset again and verify /data/FILE exist
+#> kubectl create -f demo-statefulset-with-demo-pvc.yml
+statefulset/demo-statefulset created
+
+#> kubectl exec demo-statefulset-0 ls /data/FILE
+File
 ```
 
 
+Delete statefulset and PVC
 
+```sh
+#> kubectl delete statefulset/demo-statefulset
+statefulset/demo-statefulset deleted
 
-Delete PVC:
-```
-#> kubectl delete pvc-demo
-persistentvolumeclaim/pvc-demo deleted
+#> kubectl get statefulset/demo-statefulset
+No resources found.
+
+#> kubectl delete pvc/demo-pvc
+persistentvolumeclaim/demo-pvc deleted
+
+#> kubectl get pv,pvc
+No resources found.
 ```
 
 
@@ -449,24 +507,19 @@ persistentvolumeclaim/pvc-demo deleted
 
 ## Un-installation
 
-#### 1. Delete storage class and secret
-```
-#> kubectl delete -f storage-class.yaml
-#> kubectl delete -f array-secret.yaml
-```
-
-
-#### 2. Delete the driver
+#### Delete the storage class, secret and the driver
 
 ```sh
+#> kubectl delete storageclass/gold
+#> kubectl delete -n kube-system secret/a9000-array1
 #> kubectl delete -f ibm-block-csi-driver.yaml
+
+##### Kubernetes version 1.13 automatically creates the CSIDriver `ibm-block-csi-driver`, but it does not delete it automatically when removing the driver manifest. So in order to clean up CSIDriver object, run the following command:
+#> kubectl delete CSIDriver ibm-block-csi-driver
+
 ```
 
-Kubernetes version 1.13 automatically creates the CSIDriver `ibm-block-csi-driver`, but it does not delete it automatically when removing the driver manifest.
-So in order to clean up CSIDriver object, run the following command:
-```sh
-kubectl delete CSIDriver ibm-block-csi-driver
-```
+
 
 ## Licensing
 
