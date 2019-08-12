@@ -195,7 +195,7 @@ def generate_csi_publish_volume_response(lun, connectivity_type, config, array_i
 
     res = csi_pb2.ControllerPublishVolumeResponse(publish_context={lun_param: str(lun),
                                                                    connectivity_param: connectivity_type,
-																   array_iqn_param : array_iqn})
+                                                                   array_iqn_param: array_iqn})
 
     logger.debug("publish volume response is :{0}".format(res))
     return res
