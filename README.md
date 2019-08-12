@@ -97,14 +97,15 @@ If the feature gate was not enabled then CSIDriver for the ibm-block-csi-driver 
 ## Driver Installation
 
 ### 1. Install the CSI driver
-Heads up: For now the driver can be installed by ibm-block-csi-driver.yaml BUT Soon we will allow to install the CSI driver via formal Operator. Stay tune.
+Heads up: Soon the driver install method will be via new CSI operator (work in progress at github.com/ibm/ibm-block-csi-driver-operator). But for now the installation method is basic yaml file (`ibm-block-csi-driver.yaml`) with all the driver resources. 
 
 ```sh
-
+### Download the driver yml file from github:
 #> curl https://raw.githubusercontent.com/IBM/ibm-block-csi-driver/develop/deploy/kubernetes/v1.13/ibm-block-csi-driver.yaml > ibm-block-csi-driver.yaml 
 
 ### Optional: Edit the `ibm-block-csi-driver.yaml` file only if you need to change the driver IMAGE URL. By default its `ibmcom/ibm-block-csi-controller-driver:1.0.0`.
 
+### Install the driver:
 #> kubectl apply -f ibm-block-csi-driver.yaml
 serviceaccount/ibm-block-csi-controller-sa created
 clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-provisioner-role created
@@ -120,6 +121,7 @@ daemonset.apps/ibm-block-csi-node created
 ```
 
 Verify driver is running (The csi-controller pod should be in Running state):
+
 ```sh
 #> kubectl get -n kube-system pod --selector=app=ibm-block-csi-controller
 NAME                         READY   STATUS    RESTARTS   AGE
@@ -127,8 +129,8 @@ ibm-block-csi-controller-0   5/5     Running   0          10m
 
 #> kubectl get -n kube-system pod --selector=app=ibm-block-csi-node
 NAME                       READY   STATUS    RESTARTS   AGE
-ibm-block-csi-node-xnfgp   3/3     Running   0          10m
-ibm-block-csi-node-zgh5h   3/3     Running   0          10m
+ibm-block-csi-node-jvmvh   3/3     Running   0          74m
+ibm-block-csi-node-tsppw   3/3     Running   0          74m
 
 ### NOTE if pod/ibm-block-csi-controller-0 is not in Running state, then troubleshoot by running:
 #> kubectl describe -n kube-system pod/ibm-block-csi-controller-0
@@ -136,24 +138,27 @@ ibm-block-csi-node-zgh5h   3/3     Running   0          10m
 ```
 
 Additional info on the driver:
+
 ```sh
 ### if `feature-gates=CSIDriverRegistry` was set to `true` then CSIDriver object for the driver will be automaticaly created. Can be viewed by running: 
+
 #> kubectl describe csidriver ibm-block-csi-driver
 Name:         ibm-block-csi-driver
 Namespace:    
 Labels:       <none>
 Annotations:  <none>
-API Version:  storage.k8s.io/v1beta1
+API Version:  csi.storage.k8s.io/v1alpha1
 Kind:         CSIDriver
 Metadata:
-  Creation Timestamp:  2019-05-22T10:16:03Z
-  Resource Version:    6465312
-  Self Link:           /apis/storage.k8s.io/v1beta1/csidrivers/ibm-block-csi-driver
-  UID:                 9a7c6fd4-7c7a-11e9-a7c0-005056a41609
+  Creation Timestamp:  2019-07-15T12:04:32Z
+  Generation:          1
+  Resource Version:    1404
+  Self Link:           /apis/csi.storage.k8s.io/v1alpha1/csidrivers/ibm-block-csi-driver
+  UID:                 b46db4ed-a6f8-11e9-b93e-005056a45d5f
 Spec:
-  Attach Required:    true
-  Pod Info On Mount:  false
-Events:               <none>
+  Attach Required:            true
+  Pod Info On Mount Version:  
+Events:                       <none>
 
 
 #> kubectl get -n kube-system  csidriver,sa,clusterrole,clusterrolebinding,statefulset,pod,daemonset | grep ibm-block-csi
@@ -189,7 +194,7 @@ quay.io/k8scsi/livenessprobe:v1.1.0
 ### Watch the CSI controller logs
 #> kubectl log -f -n kube-system ibm-block-csi-controller-0 ibm-block-csi-controller
 
-### Watch the CSI node logs (per worker node)
+### Watch the CSI node logs (per worker node \ PODID)
 #> kubectl log -f -n kube-system ibm-block-csi-node-<PODID> ibm-block-csi-node
 
 ```
@@ -251,7 +256,8 @@ TODO add out put
 ## Driver Usage
 
 Create storage class with A9000R system using `demo-storageclass-gold-A9000R.yaml`:
-```
+
+```sh
 #> cat demo-storageclass-gold-A9000R.yaml
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
@@ -270,11 +276,13 @@ parameters:
   volume_name_prefix: demo1        # Optional.
 
 #> kubectl create -f demo-storageclass-gold-A9000R.yaml
-TODO output
+storageclass.storage.k8s.io/gold created
 ```
 
-Create `demo-pvc-gold.yaml` file as follow:
-```
+Create PVC demo-pvc-gold using `demo-pvc-gold.yaml`:
+
+```sh 
+#> cat demo-pvc-gold.yaml
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -287,34 +295,30 @@ spec:
       storage: 1Gi
   storageClassName: gold
 
-```
 
-Apply the PVC:
-
-```sh
 #> kubectl apply -f demo-pvc-gold.yaml
-persistentvolumeclaim/pvc-demo created
+persistentvolumeclaim/demo-pvc created
 ```
 
 View the PVC and the created PV:
 
 ```sh
 #> kubectl get pv,pvc
-NAME                                                        CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM          STORAGECLASS   REASON   AGE
-persistentvolume/pvc-efc3aae8-7c96-11e9-a7c0-005056a41609   1Gi       RWO            Delete           Bound    default/pvc1   gold                    5s
+NAME                                                        CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM              STORAGECLASS   REASON   AGE
+persistentvolume/pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d5f   1Gi        RWO            Delete           Bound    default/demo-pvc   gold                    78s
 
-NAME                         STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
-persistentvolumeclaim/pvc-demo   Bound    pvc-efc3aae8-7c96-11e9-a7c0-005056a41609  1Gi    RWO            gold           3m51s
+NAME                             STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+persistentvolumeclaim/demo-pvc   Bound    pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d5f   1Gi        RWO            gold           78s
 
 
-#> kubectl describe persistentvolume/pvc-efc3aae8-7c96-11e9-a7c0-005056a41609
-Name:            pvc-efc3aae8-7c96-11e9-a7c0-005056a41609
+#> kubectl describe persistentvolume/pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d5f
+Name:            pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d5f
 Labels:          <none>
 Annotations:     pv.kubernetes.io/provisioned-by: ibm-block-csi-driver
 Finalizers:      [kubernetes.io/pv-protection]
 StorageClass:    gold
 Status:          Bound
-Claim:           default/pvc-demo
+Claim:           default/demo-pvc
 Reclaim Policy:  Delete
 Access Modes:    RWO
 VolumeMode:      Filesystem
@@ -324,20 +328,19 @@ Message:
 Source:
     Type:              CSI (a Container Storage Interface (CSI) volume source)
     Driver:            ibm-block-csi-driver
-    VolumeHandle:      A9000:6001738CFC9035EB0000000000D1F111
+    VolumeHandle:      A9000:6001738CFC9035EB0000000000D1F68F
     ReadOnly:          false
-    VolumeAttributes:      array_name=IP
+    VolumeAttributes:      array_name=<IP>
                            pool_name=gold
-                           storage.kubernetes.io/csiProvisionerIdentity=1558522090494-8081-ibm-block-csi-driver
+                           storage.kubernetes.io/csiProvisionerIdentity=1565550204603-8081-ibm-block-csi-driver
                            storage_type=A9000
-                           volume_name=pvc-efc3aae8-7c96-11e9-a7c0-005056a41609
+                           volume_name=demo1_pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d5f
 Events:                <none>
-
 ```
 
 
 
-Create statefulset application that uses the demo-pvc.
+Create statefulset application `demo-statefulset` that uses the demo-pvc.
 
 ```sh
 #> cat demo-statefulset-with-demo-pvc.yml
@@ -374,32 +377,31 @@ spec:
       #  kubernetes.io/hostname: NODESELECTOR
 
 
-#> kubectl create demo-statefulset-with-demo-pvc.yml
+#> kubectl create -f demo-statefulset-with-demo-pvc.yml
 statefulset/demo-statefulset created
 ```
 
 Display the newly created pod(make sure that the pod status is Running) and write data to its persistent volume. 
 
 ```sh
-## Wait for the pod to be in Running state.
+### Wait for the pod to be in Running state.
 #> kubectl get pod demo-statefulset-0
-TODO
+NAME                 READY   STATUS    RESTARTS   AGE
+demo-statefulset-0   1/1     Running   0          43s
 
 ### Review the mountpoint inside the pod:
-#> kubectl exec pod demo-statefulset-0 -- bash -c "df -h /data"
-Filesystem
-Size Used Avail Use% Mounted on
-/dev/mapper/mpathi 951M 33M 919M 4% /data
+#> kubectl exec demo-statefulset-0 -- bash -c "df -h /data"
+Filesystem          Size  Used Avail Use% Mounted on
+/dev/mapper/mpathz 1014M   33M  982M   4% /data
 
 #> kubectl exec demo-statefulset-0 -- bash -c "mount | grep /data"
-/dev/mapper/mpathi on /data type xfs (rw,relatime,seclabel,attr2,inode64,noquota)
+/dev/mapper/mpathz on /data type xfs (rw,relatime,seclabel,attr2,inode64,noquota)
 
 
 
-### Write data inside the mountpoint in the pod
-#> kubectl exec pod demo-statefulset-0 touch /data/FILE
-
-#> kubectl exec pod demo-statefulset-0 ls /data/FILE
+### Write data in the PV inside the demo-statefulset-0 pod  (the PV mounted inside the pod at /data)
+#> kubectl exec demo-statefulset-0 touch /data/FILE
+#> kubectl exec demo-statefulset-0 ls /data/FILE
 File
 
 ```
@@ -407,8 +409,11 @@ File
 Log in to the worker node that has the running pod and display the newly attached volume on the node.
 
 ```sh
+### Verify which worker node runs the pod demo-statefulset-0 
 #> kubectl describe pod demo-statefulset-0| grep "^Node:"
 Node: k8s-node1/hostname
+
+### Login to the worker node and check devices:
 
 > multipath -ll
 mpathi (36001738cfc9035eb0ccccc5) dm-12 IBM

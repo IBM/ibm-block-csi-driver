@@ -2,7 +2,6 @@ kind: StatefulSet
 apiVersion: apps/v1
 metadata:
   name: demo-statefulset
-  namespace: kube-system
 spec:
   selector:
     matchLabels:
