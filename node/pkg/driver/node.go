@@ -26,6 +26,7 @@ import (
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	device_connectivity "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"github.com/ibm/ibm-block-csi-driver/node/util"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog"
@@ -80,8 +81,8 @@ func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsI
 }
 
 func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	klog.V(5).Infof(">>>> NodeStageVolume: called with args %+v", *req)
-	defer klog.V(5).Infof("<<<< NodeStageVolume")
+	klog.V(5).Infof(">>>> NodeStageVolume [ThreadID=%d]: called with args %+v", util.GetGoID(), *req)
+	defer klog.V(5).Infof("<<<< NodeStageVolume [ThreadID=%d]", util.GetGoID())
 
 	err := d.nodeStageVolumeRequestValidation(req)
 	if err != nil {
@@ -94,12 +95,12 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	volId := req.VolumeId
-	err = d.VolumeIdLocksMap.AddVolumeLock(volId)
+	err = d.VolumeIdLocksMap.AddVolumeLock(volId, "NodeStageVolume")
 	if err != nil {
 		klog.Errorf("Another operation is being perfomed on volume : {%s}.", volId)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
-	defer d.VolumeIdLocksMap.RemoveVolumeLock(volId)
+	defer d.VolumeIdLocksMap.RemoveVolumeLock(volId, "NodeStageVolume")
 
 	connectivityType, lun, array_iqn, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
 	if err != nil {
@@ -234,8 +235,8 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 }
 
 func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	klog.V(5).Infof(">>>> NodeUnstageVolume: called with args %+v", *req)
-	defer klog.V(5).Infof("<<<< NodeUnstageVolume")
+	klog.V(5).Infof(">>>> NodeUnstageVolume [ThreadID=%d]: called with args %+v", util.GetGoID(), *req)
+	defer klog.V(5).Infof("<<<< NodeUnstageVolume [ThreadID=%d]", util.GetGoID())
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
@@ -243,12 +244,12 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
 	}
 
-	err := d.VolumeIdLocksMap.AddVolumeLock(volumeID)
+	err := d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeUnstageVolume")
 	if err != nil {
 		klog.Errorf("Another operation is being perfomed on volume : {%s}", volumeID)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
-	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID)
+	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeUnstageVolume")
 
 	stagingTargetPath := req.GetStagingTargetPath()
 	if len(stagingTargetPath) == 0 {
@@ -300,8 +301,8 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 }
 
 func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	klog.V(5).Infof(">>>> NodePublishVolume: called with args %+v", *req)
-	defer klog.V(5).Infof("<<<< NodePublishVolume")
+	klog.V(5).Infof(">>>> NodePublishVolume [ThreadID=%d]: called with args %+v", util.GetGoID(), *req)
+	defer klog.V(5).Infof("<<<< NodePublishVolume [ThreadID=%d]", util.GetGoID())
 
 	err := d.nodePublishVolumeRequestValidation(req)
 	if err != nil {
@@ -314,12 +315,12 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 	volumeID := req.VolumeId
 
-	err = d.VolumeIdLocksMap.AddVolumeLock(volumeID)
+	err = d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodePublishVolume")
 	if err != nil {
 		klog.Errorf("Another operation is being perfomed on volume : {%s}", volumeID)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
-	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID)
+	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodePublishVolume")
 
 	// checking if the node staging path was mpounted into
 	stagingPath := req.GetStagingTargetPath()
@@ -369,11 +370,13 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 	klog.V(4).Infof("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
 
+	klog.V(5).Infof("FormatAndMount start [ThreadID=%d]", util.GetGoID())
 	err = d.mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // TODO: pass mount options
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-
+	klog.V(5).Infof("FormatAndMount end [ThreadID=%d]", util.GetGoID())
+	
 	klog.V(4).Infof("NodePublishVolume Finished: multipath device is now mounted to targetPath.")
 
 	return &csi.NodePublishVolumeResponse{}, nil
@@ -410,20 +413,20 @@ func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVol
 }
 
 func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	klog.V(5).Infof(">>>> NodeUnpublishVolume: called with args %+v", *req)
-	defer klog.V(5).Infof("<<<< NodeUnpublishVolume")
+	klog.V(5).Infof(">>>> NodeUnpublishVolume [ThreadID=%d]: called with args %+v", util.GetGoID(), *req)
+	defer klog.V(5).Infof("<<<< NodeUnpublishVolume [ThreadID=%d]", util.GetGoID())
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
 	}
 
-	err := d.VolumeIdLocksMap.AddVolumeLock(volumeID)
+	err := d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeUnpublishVolume")
 	if err != nil {
 		klog.Errorf("Another operation is being perfomed on volume : {%s}", volumeID)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
-	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID)
+	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeUnpublishVolume")
 
 	target := req.GetTargetPath()
 	if len(target) == 0 {
@@ -461,8 +464,8 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 }
 
 func (d *NodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	klog.V(5).Infof(">>>> NodeGetCapabilities: called with args %+v", *req)
-	defer klog.V(5).Infof("<<<< NodeGetCapabilities")
+	klog.V(5).Infof(">>>> NodeGetCapabilities [ThreadID=%d]: called with args %+v", util.GetGoID(), *req)
+	defer klog.V(5).Infof("<<<< NodeGetCapabilities [ThreadID=%d]", util.GetGoID())
 
 	var caps []*csi.NodeServiceCapability
 	for _, cap := range nodeCaps {

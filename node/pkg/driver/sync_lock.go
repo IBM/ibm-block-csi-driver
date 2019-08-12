@@ -18,13 +18,16 @@ package driver
 
 import (
 	"sync"
+	"k8s.io/klog"	
 )
 
 //go:generate mockgen -destination=../../mocks/mock_sync_lock.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver SyncLockInterface
 
 type SyncLockInterface interface {
-	AddVolumeLock(id string) error
-	RemoveVolumeLock(id string)
+	AddVolumeLock(id string, msg string) error
+	RemoveVolumeLockDo(id string, msg string)
+    RemoveVolumeLock(id string, msg string) func()
+
 }
 
 type SyncLock struct {
@@ -38,20 +41,29 @@ func NewSyncLock() *SyncLock {
 
 }
 
-func (s SyncLock) AddVolumeLock(id string) error {
+func (s SyncLock) AddVolumeLock(id string, msg string) error {
+	klog.V(5).Infof("Lock for action %s, Try to acquire lock for volume ID=%s", msg, id)
 	_, exists := s.syncMap.Load(id)
 	if !exists {
 		s.syncMap.Store(id, 0)
+		klog.V(5).Infof("Lock for action %s, Succeed to acquire lock for volume ID=%s", msg, id)
 		return nil
 	} else {
+		klog.V(5).Infof("Lock for action %s, Lock for volume ID=%s is already in use by other thread.", msg, id)		
 		return &VolumeAlreadyProcessingError{id}
 	}
-	return nil
 }
 
-func (s SyncLock) RemoveVolumeLock(id string) {
+func (s SyncLock) RemoveVolumeLockDo(id string, msg string) {
+	klog.V(5).Infof("Lock for action %s, release lock for volume ID=%s", msg, id)
+
 	_, exists := s.syncMap.Load(id)
 	if exists {
 		s.syncMap.Delete(id)
 	}
 }
+
+func (s SyncLock) RemoveVolumeLock(id string, msg string) func() {
+	return func() { s.RemoveVolumeLockDo(id, msg) }
+}
+
