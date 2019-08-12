@@ -32,24 +32,24 @@ type SyncLockInterface interface {
 }
 
 type SyncLock struct {
-	syncMap sync.Map
+	SyncMap sync.Map
 }
 
 func NewSyncLock() *SyncLock {
 	return &SyncLock{
-		syncMap: sync.Map{},
+		SyncMap: sync.Map{},
 	}
 
 }
 
 func (s SyncLock) AddVolumeLock(id string, msg string) error {
 	goid := util.GetGoID()
-	klog.V(5).Infof("Lock for action %s, Try to acquire lock for volume ID=%s (syncMap=%v) goid=%d", msg, id, s.syncMap, goid)
-	result, exists := s.syncMap.Load(id)
+	klog.V(5).Infof("Lock for action %s, Try to acquire lock for volume ID=%s (syncMap=%v) goid=%d", msg, id, s.SyncMap, goid)
+	result, exists := s.SyncMap.Load(id)
 	klog.V(5).Infof("Lock for action %s, Try to acquire lock for volume ID=%s  (result=%v, exists=%v) goid=%d", msg, id, result, exists, goid)
 	if !exists {
-		s.syncMap.Store(id, 0)
-		klog.V(5).Infof("Lock for action %s, Succeed to acquire lock for volume ID=%s (syncMap=%v) goid=%d", msg, id, s.syncMap, goid)
+		s.SyncMap.Store(id, 0)
+		klog.V(5).Infof("Lock for action %s, Succeed to acquire lock for volume ID=%s (syncMap=%v) goid=%d", msg, id, s.SyncMap, goid)
 		return nil
 	} else {
 		klog.V(5).Infof("Lock for action %s, Lock for volume ID=%s is already in use by other thread. goid=%d", msg, id, goid)		
@@ -59,11 +59,11 @@ func (s SyncLock) AddVolumeLock(id string, msg string) error {
 
 func (s SyncLock) RemoveVolumeLock(id string, msg string) {
 	goid := util.GetGoID()
-	klog.V(5).Infof("Lock for action %s, release lock for volume ID=%s (syncMap=%v) goid=%d ", msg, id, s.syncMap, goid)
+	klog.V(5).Infof("Lock for action %s, release lock for volume ID=%s (syncMap=%v) goid=%d ", msg, id, s.SyncMap, goid)
 
-	_, exists := s.syncMap.Load(id)
+	_, exists := s.SyncMap.Load(id)
 	if exists {
-		s.syncMap.Delete(id)
+		s.SyncMap.Delete(id)
 	}
 }
 
