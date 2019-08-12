@@ -33,18 +33,18 @@ type SyncLockInterface interface {
 }
 
 type SyncLock struct {
-	SyncMap sync.Map
+	SyncMap *sync.Map
 }
 
 func NewSyncLock() SyncLockInterface {
 	return &SyncLock{
-		SyncMap: sync.Map{},
+		SyncMap: &sync.Map{},
 	}
 
 }
 
 func (s SyncLock) GetSyncMap() *sync.Map {
-	return &s.SyncMap
+	return s.SyncMap
 }
 
 func (s SyncLock) AddVolumeLock(id string, msg string) error {
