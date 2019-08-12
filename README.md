@@ -13,14 +13,13 @@ Supported IBM storage systems:
 
 DISCLAIMER: The code is provided as is, without warranty. Any issue will be handled on a best-effort basis.
 
-## Driver Installation
 
-### Prerequisite
+## Prerequisite for Driver Installation
 
-#### Worker nodes preparation
+### Worker nodes preparation
 Perform these steps for each worker node in Kubernetes cluster:
 
-##### 1. Install Linux packages to ensure Fibre Channel and iSCSI
+### 1. Install Linux packages to ensure Fibre Channel and iSCSI
 connectivity. Skip this step, if the packages are already installed.
 
 RHEL 7.x:
@@ -32,7 +31,7 @@ sudo yum -y install sg3_utils
 sudo yum -y install iscsi-initiator-utils
 ```
 
-##### 2. Configure Linux multipath devices on the host. Create and set the relevant storage system parameters in the /etc/multipath.conf file. 
+#### 2. Configure Linux multipath devices on the host. Create and set the relevant storage system parameters in the /etc/multipath.conf file. 
 You can also use the default multipath.conf file located in the /usr/share/doc/device-mapper-multipath-* directory.
 Verify that the systemctl status multipathd output indicates that the multipath status is active and error-free.
 
@@ -49,7 +48,7 @@ multipath -ll
 Important: When configuring Linux multipath devices, verify that the find_multipaths parameter in the multipath.conf file is disabled. 
   - RHEL 7.x: Remove the find_multipaths yes string from the multipath.conf file.
 
-##### 3. Configure storage system connectivity.
+#### 3. Configure storage system connectivity.
 a. Define the hostname of each Kubernetes node on the relevant storage systems with the valid WWPN or IQN of the node. 
 
 b. For Fiber Chanel, configure the relevant zoning from the storage to the host.
@@ -78,7 +77,7 @@ portal: {storage system iSCSI port IP},{port number}
 End of worker node setup.
 
 
-#### Install CSIDriver CRD - optional
+### Install CSIDriver CRD - optional
 Enabling CSIDriver on Kubernetes (more details -> https://kubernetes-csi.github.io/docs/csi-driver-object.html#enabling-csidriver-on-kubernetes)
 
 In Kubernetes v1.13, because the feature was alpha, it was disabled by default. To enable the use of CSIDriver on these versions, do the following:
@@ -93,7 +92,11 @@ In Kubernetes v1.13, because the feature was alpha, it was disabled by default. 
 If the feature gate was not enabled then CSIDriver for the ibm-block-csi-driver will not be created automatically.
 
 
-#### 1. Install the CSI driver
+
+
+## Driver Installation
+
+### 1. Install the CSI driver
 Heads up: For now the driver can be installed by ibm-block-csi-driver.yaml BUT Soon we will allow to install the CSI driver via formal Operator. Stay tune.
 
 ```sh
@@ -183,8 +186,12 @@ ibm/ibm-block-csi-node-driver:1.0.0
 quay.io/k8scsi/csi-node-driver-registrar:v1.0.2
 quay.io/k8scsi/livenessprobe:v1.1.0
 
-### Watch the driver logs
+### Watch the CSI controller logs
 #> kubectl log -f -n kube-system ibm-block-csi-controller-0 ibm-block-csi-controller
+
+### Watch the CSI node logs (per worker node)
+#> kubectl log -f -n kube-system ibm-block-csi-node-<PODID> ibm-block-csi-node
+
 ```
 
 #### 2. Create array secret
@@ -217,13 +224,11 @@ Create a storage class yaml file as follow with the relevant capabilities, pool 
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
-  name: gold   # Storage class name
+  name: gold
 provisioner: ibm-block-csi-driver
 parameters:
-  #capabilities:                               # Optional.
-  #  SpaceEfficiency=<VALUE>
-  capacity:
-    pool=<VALUE_POOL_NAME>
+  SpaceEfficiency=<VALUE>   # Values applicable for Storewize: Thin, compressed or Deduplicated
+  pool=<VALUE_POOL_NAME>
 
   csi.storage.k8s.io/provisioner-secret-name: <VALUE_ARRAY_SECRET>
   csi.storage.k8s.io/provisioner-secret-namespace: <VALUE_ARRAY_SECRET_NAMESPACE>
@@ -236,13 +241,39 @@ parameters:
 Apply the storage class:
 ```
 #> kubectl apply -f storage-class.yaml
+TODO add out put
 ```
 
 
 
-## Usage
 
-Create `pvc-demo.yaml` file as follow:
+
+## Driver Usage
+
+Create storage class with A9000R system using `demo-storageclass-gold-A9000R.yaml`:
+```
+#> cat demo-storageclass-gold-A9000R.yaml
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: gold
+provisioner: ibm-block-csi-driver
+parameters:
+  pool: gold
+
+  csi.storage.k8s.io/provisioner-secret-name: a9000-array1
+  csi.storage.k8s.io/provisioner-secret-namespace: kube-system
+  csi.storage.k8s.io/controller-publish-secret-name: a9000-array1
+  csi.storage.k8s.io/controller-publish-secret-namespace: kube-system
+
+  csi.storage.k8s.io/fstype: xfs   # Optional. values ext4\xfs. The default is ext4.
+  volume_name_prefix: demo1        # Optional.
+
+#> kubectl create -f demo-storageclass-gold-A9000R.yaml
+TODO output
+```
+
+Create `demo-pvc-gold.yaml` file as follow:
 ```
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -259,13 +290,15 @@ spec:
 ```
 
 Apply the PVC:
-```
-#> kubectl apply -f pvc-demo.yaml
+
+```sh
+#> kubectl apply -f demo-pvc-gold.yaml
 persistentvolumeclaim/pvc-demo created
 ```
 
 View the PVC and the created PV:
-```
+
+```sh
 #> kubectl get pv,pvc
 NAME                                                        CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM          STORAGECLASS   REASON   AGE
 persistentvolume/pvc-efc3aae8-7c96-11e9-a7c0-005056a41609   1Gi       RWO            Delete           Bound    default/pvc1   gold                    5s
@@ -304,10 +337,10 @@ Events:                <none>
 
 
 
-Create statefulset
+Create statefulset application that uses the demo-pvc.
 
 ```sh
-#> cat demo-statefulset.yml
+#> cat demo-statefulset-with-demo-pvc.yml
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
@@ -336,35 +369,47 @@ spec:
       - name: demo-pvc
         persistentVolumeClaim:
           claimName: demo-pvc
-      nodeSelector:
-        kubernetes.io/hostname: <workernode1>
+
+      #nodeSelector:
+      #  kubernetes.io/hostname: NODESELECTOR
 
 
-
-#> kubectl create demo-statefulset.yml
+#> kubectl create demo-statefulset-with-demo-pvc.yml
 statefulset/demo-statefulset created
+```
 
+Display the newly created pod(make sure that the pod status is Running) and write data to its persistent volume. 
+
+```sh
+## Wait for the pod to be in Running state.
 #> kubectl get pod demo-statefulset-0
+TODO
 
-#> kubectl exec pod1 demo-statefulset-0 -- bash -c "df -h /data"
+### Review the mountpoint inside the pod:
+#> kubectl exec pod demo-statefulset-0 -- bash -c "df -h /data"
 Filesystem
 Size Used Avail Use% Mounted on
 /dev/mapper/mpathi 951M 33M 919M 4% /data
 
-#> kubectl exec pod1 -c container1 -- bash -c "mount | grep /data"
+#> kubectl exec demo-statefulset-0 -- bash -c "mount | grep /data"
 /dev/mapper/mpathi on /data type xfs (rw,relatime,seclabel,attr2,inode64,noquota)
 
-#> kubectl exec pod1 touch /data/FILE
 
-#> kubectl exec pod1 ls /data/FILE
+
+### Write data inside the mountpoint in the pod
+#> kubectl exec pod demo-statefulset-0 touch /data/FILE
+
+#> kubectl exec pod demo-statefulset-0 ls /data/FILE
 File
 
-#> kubectl describe pod pod1| grep "^Node:"
-Node: k8s-node1/hostname
 ```
 
 Log in to the worker node that has the running pod and display the newly attached volume on the node.
+
 ```sh
+#> kubectl describe pod demo-statefulset-0| grep "^Node:"
+Node: k8s-node1/hostname
+
 > multipath -ll
 mpathi (36001738cfc9035eb0ccccc5) dm-12 IBM
 ,2810XIV
@@ -374,15 +419,13 @@ size=954M features=’1 queue_if_no_path’ hwhandler=’0’ wp=rw
 `- 4:0:0:1 sdc 8:32 active ready running
 
 #> df | egrep pvc
-...
-
+TODO
 ```
 
 
+Delete statefulset and start it again to validate data remain in the PV.
 
-
-Delete statefulset
-```
+```sh
 #> kubectl delete demo-statefulset
 statefulset/demo-statefulset deleted
 ```

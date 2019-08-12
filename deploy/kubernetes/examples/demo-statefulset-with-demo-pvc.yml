@@ -1,18 +1,18 @@
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-  name: sanity-statefulset
+  name: demo-statefulset
   namespace: kube-system
 spec:
   selector:
     matchLabels:
-      app: sanity-statefulset
-  serviceName: sanity-statefulset
+      app: demo-statefulset
+  serviceName: demo-statefulset
   replicas: 1
   template:
     metadata:
       labels:
-        app: sanity-statefulset
+        app: demo-statefulset
     spec:
       containers:
       - name: container1
@@ -20,12 +20,12 @@ spec:
         command: [ "/bin/sh", "-c", "--" ]
         args: [ "while true; do sleep 30; done;" ]
         volumeMounts:
-          - name: sanity-pvc2
+          - name: demo-pvc
             mountPath: "/data"
       volumes:
-      - name: sanity-pvc2
+      - name: demo-pvc
         persistentVolumeClaim:
-          claimName: sanity-pvc2
+          claimName: demo-pvc
 
 #      nodeSelector:
 #        kubernetes.io/hostname: NODESELECTOR
