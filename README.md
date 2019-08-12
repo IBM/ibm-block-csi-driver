@@ -1,4 +1,5 @@
 # ibm-block-csi-drive
+
 The Container Storage Interface (CSI) Driver for IBM block storage systems enables container orchestrators such as Kubernetes to manage the life-cycle of persistent storage.
 
 Supported container platforms:
@@ -11,32 +12,37 @@ Supported IBM storage systems:
   - IBM Storwize
   - IBM FlashSystem A9000\R
 
-DISCLAIMER: The code is provided as is, without warranty. Any issue will be handled on a best-effort basis.
+DISCLAIMER: The cDriver Installationode is provided as is, without warranty. Any issue will be handled on a best-effort basis.
 
+
+## Table of content:
+* [Prerequisite for Driver Installation](#prerequisite-for-driver-installation)
+    - Install Fibre Channel and iSCSI connectivity rpms, multipathing configuration and Configure storage system connectivity.
+* [Driver Installation](#driver-installation)
+    - Install driver yaml file, storage class and Storage system secret.
+* [Driver Usage](#driver-usage)
+    - Example of how to create PVC and statefulset application, with full detail behind the scenes.
 
 ## Prerequisite for Driver Installation
 
 ### Worker nodes preparation
 Perform these steps for each worker node in Kubernetes cluster:
 
-### 1. Install Linux packages to ensure Fibre Channel and iSCSI
-connectivity. Skip this step, if the packages are already installed.
+### 1. Install Linux packages to ensure Fibre Channel and iSCSI connectivity
+Skip this step, if the packages are already installed.
 
 RHEL 7.x:
- sg3_utils.
- iscsi-initiator-utils (if iSCSI connection is required).
-
 ```sh
 sudo yum -y install sg3_utils
-sudo yum -y install iscsi-initiator-utils
+sudo yum -y install iscsi-initiator-utils   # only if iSCSI connectivity is required
 ```
 
-#### 2. Configure Linux multipath devices on the host. Create and set the relevant storage system parameters in the /etc/multipath.conf file. 
+#### 2. Configure Linux multipath devices on the host. 
+Create and set the relevant storage system parameters in the /etc/multipath.conf file. 
 You can also use the default multipath.conf file located in the /usr/share/doc/device-mapper-multipath-* directory.
-Verify that the systemctl status multipathd output indicates that the multipath status is active and error-free.
+Verify that the `systemctl status multipathd` output indicates that the multipath status is active and error-free.
 
 RHEL 7.x:
-
 ```sh
 yum install device-mapper-multipath
 sudo modprobe dm-multipath
@@ -49,11 +55,11 @@ Important: When configuring Linux multipath devices, verify that the find_multip
   - RHEL 7.x: Remove the find_multipaths yes string from the multipath.conf file.
 
 #### 3. Configure storage system connectivity.
-a. Define the hostname of each Kubernetes node on the relevant storage systems with the valid WWPN or IQN of the node. 
+3.1. Define the hostname of each Kubernetes node on the relevant storage systems with the valid WWPN or IQN of the node. 
 
-b. For Fiber Chanel, configure the relevant zoning from the storage to the host.
+3.2. For Fiber Chanel, configure the relevant zoning from the storage to the host.
 
-c. For iSCSI, perform these three steps.
+3.3. For iSCSI, perform these three steps.
 – Make sure that the login used to log in to the iSCSI targets is permanent and remains available after a reboot of the worker node. To do this, verify that the node.startup in the /etc/iscsi/iscsid.conf file is set to automatic. If not, set it as required and then restart the iscsid service `$> service iscsid restart`.
 
 – Discover and log into at least two iSCSI targets on the relevant storage
@@ -65,8 +71,7 @@ $> iscsiadm -m discoverydb -t st -p ${storage system iSCSI port IP}:3260
 $> iscsiadm -m node -p ${storage system iSCSI port IP/hostname} --login
 ```
 
-– Verify that the login was successful and display all targets that you
-logged in. The portal value must be the iSCSI target IP address.
+– Verify that the login was successful and display all targets that you logged in. The portal value must be the iSCSI target IP address.
 
 ```sh
 $> iscsiadm -m session --rescan
@@ -90,6 +95,9 @@ In Kubernetes v1.13, because the feature was alpha, it was disabled by default. 
    ```
 
 If the feature gate was not enabled then CSIDriver for the ibm-block-csi-driver will not be created automatically.
+
+
+
 
 
 
@@ -137,7 +145,7 @@ ibm-block-csi-node-tsppw   3/3     Running   0          74m
 
 ```
 
-Additional info on the driver:
+More detail on the driver can be viewed as below:
 
 ```sh
 ### if `feature-gates=CSIDriverRegistry` was set to `true` then CSIDriver object for the driver will be automaticaly created. Can be viewed by running: 
