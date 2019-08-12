@@ -49,6 +49,7 @@ RUN    ln -s /chroot/chroot-host-wrapper.sh /chroot/blkid \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/mkfs.ext3 \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/mkfs.ext4 \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/mkfs.xfs \
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/fsck \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/mount \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/multipath \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/multipathd \

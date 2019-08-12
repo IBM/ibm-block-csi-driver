@@ -133,8 +133,9 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	// TODO move stageInfo into the node_until API
 	// Generate the stageInfo detail
-	stageInfoPath := path.Join(req.GetStagingTargetPath(), stageInfoFilename)
+	stageInfoPath := path.Join(stagingPath, stageInfoFilename)
 	stageInfo := make(map[string]string)
 	baseDevice := path.Base(device)
 	stageInfo["mpathDevice"] = baseDevice //this should return the mathhh for example
@@ -146,40 +147,25 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	stageInfo["sysDevices"] = sysDevices // like sda,sdb,...
 	stageInfo["connectivity"] = connectivityType
 
-	// creating the stagingPath if it is missing
-	_, err = os.Stat(stagingPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			// Kubernetes does not create the staging target path in advance, so we should create it.
-			klog.V(4).Infof("Staging target path directory does not exist. creating : {%v}", stagingPath)
-			d.mounter.MakeDir(stagingPath) // TODO consider to chmod the directory
+	// checking idempotent case if the stageInfoPath file is already exist
+	if d.NodeUtils.StageInfoFileIsExist(stageInfoPath) {
+		// means the file already exist
+		klog.Warningf("Idempotent case: stage info file exist - indicates that node stage was already done on this path. Verify its content...")
+		// lets read the file and comprae the stageInfo
+		existingStageInfo, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
+		if err != nil {
+			klog.Warningf("Could not read and compare the info inside the staging info file. error : {%v}", err)
 		} else {
-			klog.Errorf("Error reading stagingPath directory %s. Error: {%v}", stagingPath, err.Error())
-			return nil, status.Error(codes.Internal, err.Error())
-		}
+			klog.Warningf("Idempotent case: check if stage info file is as expected. stage info is {%v} vs expected {%v}", existingStageInfo, stageInfo)
 
-	} else {
-		// checking idempotent case if the stageInfoPath file is already exist
-		if d.NodeUtils.StageInfoFileIsExist(stageInfoPath) {
-			// means the file already exist
-			klog.Warningf("Idempotent case: stage info file exist - indicates that node stage was already done on this path. Verify its content...")
-			// lets read the file and comprae the stageInfo
-			existingStageInfo, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
-			if err != nil {
-				klog.Warningf("Could not read and compare the info inside the staging info file. error : {%v}", err)
-			} else {
-				klog.Warningf("Idempotent case: check if stage info file is as expected. stage info is {%v} vs expected {%v}", existingStageInfo, stageInfo)
-
-				if (stageInfo["mpathDevice"] != existingStageInfo["mpathDevice"]) ||
-					(stageInfo["sysDevices"] != existingStageInfo["sysDevices"]) ||
-					(stageInfo["connectivity"] != existingStageInfo["connectivity"]) {
-					klog.Errorf("Stage info is not as expected. expected:  {%v}. got : {%v}", stageInfo, existingStageInfo)
-					return nil, status.Error(codes.AlreadyExists, err.Error())
-				}
-				klog.Warningf("Idempotent case: stage info file is the same as expected. NodeStageVolume Finished: multipath device is ready [%s] to be mounted by NodePublishVolume API.", baseDevice)
-				return &csi.NodeStageVolumeResponse{}, nil
-
+			if (stageInfo["mpathDevice"] != existingStageInfo["mpathDevice"]) ||
+				(stageInfo["sysDevices"] != existingStageInfo["sysDevices"]) ||
+				(stageInfo["connectivity"] != existingStageInfo["connectivity"]) {
+				klog.Errorf("Stage info is not as expected. expected:  {%v}. got : {%v}", stageInfo, existingStageInfo)
+				return nil, status.Error(codes.AlreadyExists, err.Error())
 			}
+			klog.Warningf("Idempotent case: stage info file is the same as expected. NodeStageVolume Finished: multipath device is ready [%s] to be mounted by NodePublishVolume API.", baseDevice)
+			return &csi.NodeStageVolumeResponse{}, nil
 		}
 	}
 
@@ -263,7 +249,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	}
 
 	klog.V(4).Infof("Reading stage info file")
-	stageInfoPath := path.Join(req.GetStagingTargetPath(), stageInfoFilename)
+	stageInfoPath := path.Join(stagingTargetPath, stageInfoFilename)
 	infoMap, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -330,6 +316,8 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	// checking if the node staging path was mpounted into
 	stagingPath := req.GetStagingTargetPath()
 	targetPath := req.GetTargetPath()
+	targetPathWithHostPrefix := path.Join(PrefixChrootOfHostRoot, targetPath)
+	
 	klog.V(4).Infof("stagingPath : {%v}, targetPath : {%v}", stagingPath, targetPath)
 
 	// Read staging info file in order to find the mpath device for mounting.
@@ -347,9 +335,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	mountList, err := d.mounter.List()
 	for _, mount := range mountList {
 		klog.V(6).Infof("Check if mount path({%v}) [with device({%v})] is equel to targetPath {%s}", mount.Path, mount.Device, targetPath)
-		if strings.TrimPrefix(mount.Path, PrefixChrootOfHostRoot) == targetPath {
-			// Trim /host due to the mount of the / from the host into the /host mountpoint inside the csi node container.
-
+		if mount.Path == targetPathWithHostPrefix {
 			if mount.Device == mpathDevice {
 				klog.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume.", targetPath)
 				return &csi.NodePublishVolumeResponse{}, nil
@@ -368,15 +354,16 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		fsType = defaultFSType
 	}
 
-	if _, err := os.Stat(targetPath); os.IsNotExist(err) {
-		klog.V(4).Infof("Target path directory does not exist. creating : {%v}", targetPath)
-		d.mounter.MakeDir(targetPath)
+	if _, err := os.Stat(targetPathWithHostPrefix); os.IsNotExist(err) {
+		klog.V(4).Infof("Target path directory does not exist. creating : {%v}", targetPathWithHostPrefix)
+		d.mounter.MakeDir(targetPathWithHostPrefix)
 	}
 
 	klog.V(4).Infof("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
 
 	klog.V(5).Infof("FormatAndMount start [goid=%d]", util.GetGoID())
-	err = d.mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // TODO: pass mount options
+	err = d.mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck 
+	// TODO: pass mount options
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
