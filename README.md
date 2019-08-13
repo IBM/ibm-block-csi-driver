@@ -195,14 +195,6 @@ pod/ibm-block-csi-node-xnfgp                3/3     Running   0          13m
 pod/ibm-block-csi-node-zgh5h                3/3     Running   0          13m
 daemonset.extensions/ibm-block-csi-node     2       2         2          2            2           <none>                        13m
 
-
-$> kubectl get -n kube-system -o jsonpath="{..image}" statefulset.apps/ibm-block-csi-controller | tr -s '[[:space:]]' '\n'; echo ""
-ibm/ibm-block-csi-controller-driver:1.0.0
-quay.io/k8scsi/csi-cluster-driver-registrar:v1.0.1
-quay.io/k8scsi/csi-provisioner:v1.1.1
-quay.io/k8scsi/csi-attacher:v1.0.1
-quay.io/k8scsi/livenessprobe:v1.1.0
-
 ###### Watch the CSI controller logs
 $> kubectl log -f -n kube-system ibm-block-csi-controller-0 ibm-block-csi-controller
 
@@ -213,12 +205,11 @@ $> kubectl log -f -n kube-system ibm-block-csi-node-<PODID> ibm-block-csi-node
 
 
 ## Configure k8s storage class and secret
-The driver is running but in order to use it, one should create the relevant storage classes.
+The driver is running but in order to use it, one should create the relevant storage classes and secrets as needed.
 
 This section describe how to:
  1. Configure the k8s storage class - to define the storage system pool name, secret referance, SpaceEfficiency(Thin, compressed or Deduplicated) and fstype(xfs\ext4).
  2. Storage system secret - to define the storage credential(user and password) and its address.
- Note: Repeat steps 2 & 3 to create as many storage classes as needed.
 
 #### 1. Create array secret 
 Create a secret file as follow and update the relevant credentials:
@@ -277,13 +268,30 @@ Now you can run stateful applications using IBM block storage systems.
 
 ## Driver Usage
 This section describes:
-- Create storage class `gold`(Using A9000R as example, same can be used for FS9100.)
+- Create k8s secret `a9000-array1` for the storage system (Using A9000R as example, same can be used for FS9100).
+- Create storage class `gold`.
 - Create PVC `demo-pvc`from the storage class `gold` and show some detail on the created PVC and PV.
 - Create statefulset application `demo-statefulset` and observe the mountpoint \ multipath device that was created by the driver. 
 - Write some data inside the `demo-statefull`, delete the `demo-statefull` and create it again to validate that the data remains.
 
-
 ```sh
+###### Create secret 
+$> cat demo-secret-a9000-array1.yaml
+kind: Secret
+apiVersion: v1
+metadata:
+  name: a9000-array1
+  namespace: kube-system
+type: Opaque
+data:
+  username: <VALUE-2 base64>   # replace with valid user
+  password: <VALUE-3 base64>   # replace with valid password
+  management_address: <VALUE-4 base64>   # replace with valid A9000 managment address
+  
+$> kubectl create -f demo-secret-a9000-array1.yaml
+secret/a9000-array1 created
+
+###### Create storage class
 $> cat demo-storageclass-gold-A9000R.yaml
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
@@ -542,7 +550,7 @@ $> kubectl delete CSIDriver ibm-block-csi-driver
 
 
 ## Roadmap
-- CSI Operator as improved deployment method -> github.com/ibm/ibm-block-csi-driver-operator
+- CSI Operator as improved deployment method -> [github.com/ibm/ibm-block-csi-driver-operator](github.com/ibm/ibm-block-csi-driver-operator)
 - Openshift 4.2 support (+CoreOS worker nodes)
 - CSI Snapshots
 - NVME support
