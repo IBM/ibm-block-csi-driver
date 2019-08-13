@@ -19,4 +19,4 @@ sed -i -e "s/POOL_NAME/${POOL_NAME}/g" ${PARAM_FILE}
 # get tests to run
 TESTS=`cat ${TESTS_TO_RUN_FILE}| tr '\n' "|"`
 
-/usr/local/go/src/github.com/kubernetes-csi/csi-test/cmd/csi-sanity/csi-sanity  --csi.endpoint ${ENDPOINT} --csi.secrets ${SECRET_FILE} --csi.testvolumeparameters ${PARAM_FILE}  --csi.junitfile ${JUNIT_OUTPUT} --ginkgo.focus ${TESTS}
+/usr/local/go/src/github.com/kubernetes-csi/csi-test/cmd/csi-sanity/csi-sanity  --csi.endpoint ${ENDPOINT} --csi.controllerendpoint ${ENDPOINT_CONTROLLER} --csi.secrets ${SECRET_FILE} --csi.testvolumeparameters ${PARAM_FILE}  --csi.junitfile ${JUNIT_OUTPUT} --ginkgo.focus ${TESTS}

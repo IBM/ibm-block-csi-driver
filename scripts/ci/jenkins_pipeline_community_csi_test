@@ -77,7 +77,7 @@ pipeline {
                 docker build -f Dockerfile-cleanup-volumes -t csi-cleanupvolumes .  && docker run  -e STORAGE_ARRAYS=${STORAGE_ARRAYS} -e USERNAME=${USERNAME} -e PASSWORD=${PASSWORD}  -e POOL_NAME=${POOL_NAME}  --rm  --name csi-cleanupvolumes csi-cleanupvolumes
                 ./scripts/ci/community_csi_test_cleanup.sh csi-cleanupvolumes
             '''
-            archiveArtifacts "${env.CONTROLLER_LOGS}"
+            archiveArtifacts "${env.CONTROLLER_LOGS}, ${env.CONTROLLER_LOGS}_node"
 	        sh 'ls build/reports'
             junit 'build/reports/*.xml'
             sh '[ -d build/reports ] && rm -rf build/reports'
