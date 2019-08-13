@@ -8,3 +8,5 @@ echo `pwd`
 sleep 2
 mkdir -p build/reports && chmod 777 build/reports
 ./scripts/ci/run_csi_test_client.sh csi-sanity-test `pwd`/build/reports/
+
+docker kill csi-controller
