@@ -23,10 +23,10 @@ DISCLAIMER: The cDriver Installationode is provided as is, without warranty. Any
     - Install Fibre Channel and iSCSI connectivity rpms, multipathing configuration and Configure storage system connectivity.
 * [Driver Installation](#driver-installation)
 * [Configure k8s storage class and secret](#configure-k8s-storage-class-and-secret)
-    - Configure the k8s storage class - to define the storage system pool name, secret referance, SpaceEfficiency(Thin, compressed or Deduplicated) and fstype(xfs\ext4).
+    - Configure the k8s storage class - to define the storage system pool name, secret referance, SpaceEfficiency(Thin, Compressed or Deduplicated) and fstype(xfs\ext4).
     - Storage system secret - to define the storage credential(user and password) and its address.
 * [Driver Usage](#driver-usage)
-    - Example of how to create PVC and statefulset application, with full detail behind the scenes.
+    - Example of how to create PVC and Statefulset application, with full detail behind the scenes.
 * [Driver Uninstallation](#driver-uninstallation)
 * [Roadmap](#roadmap)
 
@@ -47,8 +47,8 @@ yum -y install xfsprogs                # Only if xfs filesystem is required.
 ```
 
 #### 2. Configure Linux multipath devices on the host. 
-Create and set the relevant storage system parameters in the /etc/multipath.conf file. 
-You can also use the default multipath.conf file located in the /usr/share/doc/device-mapper-multipath-* directory.
+Create and set the relevant storage system parameters in the `/etc/multipath.conf` file. 
+You can also use the default `multipath.conf` file located in the `/usr/share/doc/device-mapper-multipath-*` directory.
 Verify that the `systemctl status multipathd` output indicates that the multipath status is active and error-free.
 
 RHEL 7.x:
@@ -60,8 +60,8 @@ systemctl status multipathd
 multipath -ll
 ```
 
-Important: When configuring Linux multipath devices, verify that the find_multipaths parameter in the multipath.conf file is disabled. 
-  - RHEL 7.x: Remove the find_multipaths yes string from the multipath.conf file.
+Important: When configuring Linux multipath devices, verify that the `find_multipaths` parameter in the `multipath.conf` file is disabled. 
+  - RHEL 7.x: Remove the `find_multipaths yes` string from the `multipath.conf` file.
 
 #### 3. Configure storage system connectivity.
 3.1. Define the hostname of each Kubernetes node on the relevant storage systems with the valid WWPN or IQN of the node. 
@@ -69,6 +69,7 @@ Important: When configuring Linux multipath devices, verify that the find_multip
 3.2. For Fiber Chanel, configure the relevant zoning from the storage to the host.
 
 3.3. For iSCSI, perform these three steps.
+
 3.3.1. Make sure that the login used to log in to the iSCSI targets is permanent and remains available after a reboot of the worker node. To do this, verify that the node.startup in the /etc/iscsi/iscsid.conf file is set to automatic. If not, set it as required and then restart the iscsid service `$> service iscsid restart`.
 
 3.3.2. Discover and log into at least two iSCSI targets on the relevant storage
@@ -208,7 +209,7 @@ $> kubectl log -f -n kube-system ibm-block-csi-node-<PODID> ibm-block-csi-node
 The driver is running but in order to use it, one should create the relevant storage classes and secrets as needed.
 
 This section describe how to:
- 1. Configure the k8s storage class - to define the storage system pool name, secret referance, SpaceEfficiency(Thin, compressed or Deduplicated) and fstype(xfs\ext4).
+ 1. Configure the k8s storage class - to define the storage system pool name, secret referance, SpaceEfficiency(Thin, Compressed or Deduplicated) and fstype(xfs\ext4).
  2. Storage system secret - to define the storage credential(user and password) and its address.
 
 #### 1. Create array secret 
@@ -235,7 +236,7 @@ $> kubectl apply -f array-secret.yaml
 
 #### 2. Create storage classes
 
-Create a storage class yaml file as follow with the relevant capabilities, pool and array secret:
+Create a storage class yaml file `storageclass-gold.yaml` as follow with the relevant capabilities, pool and array secret:
 
 ```sh
 kind: StorageClass
@@ -244,8 +245,8 @@ metadata:
   name: gold
 provisioner: ibm-block-csi-driver
 parameters:
-  SpaceEfficiency=<VALUE>   # Values applicable for Storewize: Thin, compressed or Deduplicated
-  pool=<VALUE_POOL_NAME>
+  SpaceEfficiency: <VALUE>   # Values applicable for Storewize: Thin, compressed or Deduplicated
+  pool: <VALUE_POOL_NAME>
 
   csi.storage.k8s.io/provisioner-secret-name: <VALUE_ARRAY_SECRET>
   csi.storage.k8s.io/provisioner-secret-namespace: <VALUE_ARRAY_SECRET_NAMESPACE>
@@ -258,7 +259,7 @@ parameters:
 Apply the storage class:
 
 ```sh
-$> kubectl apply -f array-secret.yaml
+$> kubectl apply -f storageclass-gold.yaml
 storageclass.storage.k8s.io/gold created
 ```
 Now you can run stateful applications using IBM block storage systems.
@@ -382,7 +383,6 @@ kind: StatefulSet
 apiVersion: apps/v1
 metadata:
   name: demo-statefulset
-  namespace: kube-system
 spec:
   selector:
     matchLabels:
