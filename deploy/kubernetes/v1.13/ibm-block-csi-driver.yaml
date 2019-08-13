@@ -346,7 +346,8 @@ spec:
           imagePullPolicy: "IfNotPresent"
           args:
             - --csi-endpoint=$(CSI_ENDPOINT)
-            #- --hostname=$(KUBE_NODE_NAME)
+            - --hostname=$(KUBE_NODE_NAME)
+            - --config-file-path=./config.yaml
             - --v=$(CSI_LOGLEVEL)
           env:
             - name: CSI_ENDPOINT
@@ -371,6 +372,10 @@ spec:
               mountPath: /etc/iscsi
             - name: sys-dir
               mountPath: /sys
+            - name: host-dir
+              mountPath: /host  # Mapping the root of the host into "/host" inside the container.
+              mountPropagation: "Bidirectional"
+
           ports:
             - name: healthz
               containerPort: 9808
@@ -450,5 +455,10 @@ spec:
         - name: sys-dir
           hostPath:
             path: /sys
+            type: Directory
+
+        - name: host-dir
+          hostPath:
+            path: /
             type: Directory
 

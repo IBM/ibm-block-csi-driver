@@ -1,0 +1,29 @@
+apiVersion: "apps/v1"
+kind: Deployment
+metadata:
+  name: sanity-deployment
+spec:
+  selector:
+    matchLabels:
+      app: sanity-deployment
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: sanity-deployment
+    spec:
+      containers:
+      - name: container1
+        image: registry.access.redhat.com/ubi8/ubi:latest
+        command: [ "/bin/sh", "-c", "--" ]
+        args: [ "while true; do sleep 30; done;" ]
+        volumeMounts:
+          - name: sanity-pvc
+            mountPath: "/data"
+      volumes:
+      - name: sanity-pvc
+        persistentVolumeClaim:
+          claimName: sanity-pvc
+
+#      nodeSelector:
+#        kubernetes.io/hostname: NODESELECTOR

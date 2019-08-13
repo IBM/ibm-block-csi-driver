@@ -1,0 +1,31 @@
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: demo-statefulset
+spec:
+  selector:
+    matchLabels:
+      app: demo-statefulset
+  serviceName: demo-statefulset
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: demo-statefulset
+    spec:
+      containers:
+      - name: container1
+        image: registry.access.redhat.com/ubi8/ubi:latest
+        command: [ "/bin/sh", "-c", "--" ]
+        args: [ "while true; do sleep 30; done;" ]
+        volumeMounts:
+          - name: demo-pvc
+            mountPath: "/data"
+      volumes:
+      - name: demo-pvc
+        persistentVolumeClaim:
+          claimName: demo-pvc
+
+#      nodeSelector:
+#        kubernetes.io/hostname: NODESELECTOR
+      

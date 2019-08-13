@@ -18,18 +18,23 @@ package driver
 
 import (
 	"context"
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	util "github.com/ibm/ibm-block-csi-driver/node/util"
 	"io/ioutil"
 	"net"
+
+	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	util "github.com/ibm/ibm-block-csi-driver/node/util"
 
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v2"
 	"k8s.io/klog"
+
+	device_connectivity "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
+	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	mount "k8s.io/kubernetes/pkg/util/mount"
 )
 
 type Driver struct {
-	nodeService
+	NodeService
 	srv      *grpc.Server
 	endpoint string
 	config   ConfigFile
@@ -42,10 +47,22 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 	}
 	klog.Infof("Driver: %v Version: %v", configFile.Identity.Name, configFile.Identity.Version)
 
+	mounter := &mount.SafeFormatAndMount{
+		Interface: mount.New(""),
+		Exec:      mount.NewOsExec(),
+	}
+
+	syncLock := NewSyncLock()
+	executer := &executer.Executer{}
+	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
+		"iscsi": device_connectivity.NewOsDeviceConnectivityIscsi(executer),
+		//"fc": NewOsDeviceConnectivityFc(executer),
+		// TODO nvme and FC
+	}
 	return &Driver{
 		endpoint:    endpoint,
 		config:      configFile,
-		nodeService: NewNodeService(configFile, hostname, *NewNodeUtils()),
+		NodeService: NewNodeService(configFile, hostname, *NewNodeUtils(), osDeviceConnectivityMapping, executer, mounter, syncLock),
 	}, nil
 }
 
@@ -88,11 +105,12 @@ type ConfigFile struct {
 	Identity struct {
 		Name    string
 		Version string
-		// TODO missing capabilities
+		// TODO missing capabilities - currently the csi node is setting driver capability hardcoded. fix it low priority.
 	}
 	Controller struct {
 		Publish_context_lun_parameter          string
 		Publish_context_connectivity_parameter string
+		Publish_context_array_iqn              string
 	}
 }
 

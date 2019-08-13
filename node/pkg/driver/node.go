@@ -16,15 +16,21 @@
 
 package driver
 
-
 import (
 	"context"
 	"fmt"
+	"os"
+	"path"
+	"strings"
+
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	device_connectivity "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
+	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"github.com/ibm/ibm-block-csi-driver/node/util"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog"
-	//"k8s.io/kubernetes/pkg/util/mount" // TODO since there is error "loading module requirements" I comment it out for now.
+	mount "k8s.io/kubernetes/pkg/util/mount"
 )
 
 var (
@@ -40,30 +46,49 @@ var (
 			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 		},
 	}
+
+	defaultFSType              = "ext4"
+	stageInfoFilename          = ".stageInfo.json"
+	supportedConnectivityTypes = map[string]bool{
+		"iscsi": true,
+		// TODO add fc \ nvme later on
+	}
+)
+
+const (
+	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
+	// Command lines inside the container will show /host prefix.
+	PrefixChrootOfHostRoot = "/host"
 )
 
 // nodeService represents the node service of CSI driver
-type nodeService struct {
-	//mounter  *mount.SafeFormatAndMount  // TODO fix k8s mount import
-	configYaml ConfigFile
-	hostname   string
-	nodeUtils  NodeUtilsInterface
+type NodeService struct {
+	mounter                     *mount.SafeFormatAndMount
+	ConfigYaml                  ConfigFile
+	Hostname                    string
+	NodeUtils                   NodeUtilsInterface
+	executer                    executer.ExecuterInterface
+	VolumeIdLocksMap            SyncLockInterface
+	OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface
 }
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
-func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface) nodeService {
-	return nodeService{
-		configYaml: configYaml,
-		hostname:   hostname,
-		nodeUtils:  nodeUtils,
-
-		//		mounter:  newSafeMounter(),
+func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface, executer executer.ExecuterInterface, mounter *mount.SafeFormatAndMount, syncLock SyncLockInterface) NodeService {
+	return NodeService{
+		ConfigYaml:                  configYaml,
+		Hostname:                    hostname,
+		NodeUtils:                   nodeUtils,
+		executer:                    executer,
+		OsDeviceConnectivityMapping: OsDeviceConnectivityMapping,
+		mounter:                     mounter,
+		VolumeIdLocksMap:            syncLock,
 	}
 }
 
-func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	klog.V(5).Infof("NodeStageVolume: called with args %+v", *req)
+func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
+	klog.V(5).Infof(">>>> NodeStageVolume [goid=%d]: called with args %+v", util.GetGoID(), *req)
+	defer klog.V(5).Infof("<<<< NodeStageVolume [goid=%d]", util.GetGoID())
 
 	err := d.nodeStageVolumeRequestValidation(req)
 	if err != nil {
@@ -75,10 +100,85 @@ func (d *nodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		}
 	}
 
-	return nil, status.Errorf(codes.Unimplemented, "NodeStageVolume - Not implemented yet") // TODO
+	volId := req.VolumeId
+	err = d.VolumeIdLocksMap.AddVolumeLock(volId, "NodeStageVolume")
+	if err != nil {
+		klog.Errorf("Another operation is being perfomed on volume : {%s}.", volId)
+		return nil, status.Error(codes.Aborted, err.Error())
+	}
+
+	defer d.VolumeIdLocksMap.RemoveVolumeLock(volId, "NodeStageVolume")
+
+	connectivityType, lun, array_iqn, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	stagingPath := req.GetStagingTargetPath() // e.g in k8s /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-21967c74-b456-11e9-b93e-005056a45d5f/globalmount
+
+	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
+	}
+
+	err = osDeviceConnectivity.RescanDevices(lun, array_iqn)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	device, err := osDeviceConnectivity.GetMpathDevice(volId, lun, array_iqn)
+	klog.V(4).Infof("Discovered device : {%v}", device)
+	if err != nil {
+		klog.Errorf("Error while discovring the device : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	// TODO move stageInfo into the node_until API
+	// Generate the stageInfo detail
+	stageInfoPath := path.Join(stagingPath, stageInfoFilename)
+	stageInfo := make(map[string]string)
+	baseDevice := path.Base(device)
+	stageInfo["mpathDevice"] = baseDevice //this should return the mathhh for example
+	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+	if err != nil {
+		klog.Errorf("Error while trying to get sys devices : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	stageInfo["sysDevices"] = sysDevices // like sda,sdb,...
+	stageInfo["connectivity"] = connectivityType
+
+	// checking idempotent case if the stageInfoPath file is already exist
+	if d.NodeUtils.StageInfoFileIsExist(stageInfoPath) {
+		// means the file already exist
+		klog.Warningf("Idempotent case: stage info file exist - indicates that node stage was already done on this path. Verify its content...")
+		// lets read the file and comprae the stageInfo
+		existingStageInfo, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
+		if err != nil {
+			klog.Warningf("Could not read and compare the info inside the staging info file. error : {%v}", err)
+		} else {
+			klog.Warningf("Idempotent case: check if stage info file is as expected. stage info is {%v} vs expected {%v}", existingStageInfo, stageInfo)
+
+			if (stageInfo["mpathDevice"] != existingStageInfo["mpathDevice"]) ||
+				(stageInfo["sysDevices"] != existingStageInfo["sysDevices"]) ||
+				(stageInfo["connectivity"] != existingStageInfo["connectivity"]) {
+				klog.Errorf("Stage info is not as expected. expected:  {%v}. got : {%v}", stageInfo, existingStageInfo)
+				return nil, status.Error(codes.AlreadyExists, err.Error())
+			}
+			klog.Warningf("Idempotent case: stage info file is the same as expected. NodeStageVolume Finished: multipath device is ready [%s] to be mounted by NodePublishVolume API.", baseDevice)
+			return &csi.NodeStageVolumeResponse{}, nil
+		}
+	}
+
+	if err := d.NodeUtils.WriteStageInfoToFile(stageInfoPath, stageInfo); err != nil {
+		klog.Errorf("Error while trying to save the stage metadata file: {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	klog.V(4).Infof("NodeStageVolume Finished: multipath device is ready [%s] to be mounted by NodePublishVolume API.", baseDevice)
+	return &csi.NodeStageVolumeResponse{}, nil
 }
 
-func (d *nodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeRequest) error {
+func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeRequest) error {
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
@@ -105,61 +205,95 @@ func (d *nodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{"Volume Access Type Block is not supported yet"}
 	}
 
-	// TODO add check if its a mount volume and publish context
+	connectivityType, lun, array_iqn, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
+	if err != nil {
+		return &RequestValidationError{fmt.Sprintf("Fail to parse PublishContext %v with err = %v", req.PublishContext, err)}
+	}
+
+	if _, ok := supportedConnectivityTypes[connectivityType]; !ok {
+		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong connectivity type %s. Supported connectivities %v", connectivityType, supportedConnectivityTypes)}
+	}
+
+	if lun < 0 {
+		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong lun id %d.", lun)}
+	}
+
+	if len(array_iqn) == 0 {
+		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong array_iqn %s.", array_iqn)}
+	}
 
 	return nil
 }
 
-func (d *nodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	klog.V(5).Infof("NodeUnstageVolume: called with args %+v", *req)
+func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
+	klog.V(5).Infof(">>>> NodeUnstageVolume [goid=%d]: called with args %+v", util.GetGoID(), *req)
+	defer klog.V(5).Infof("<<<< NodeUnstageVolume [goid=%d]", util.GetGoID())
+
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
+		klog.Errorf("Volume ID not provided")
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
 	}
 
-	target := req.GetStagingTargetPath()
-	if len(target) == 0 {
+	err := d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeUnstageVolume")
+	if err != nil {
+		klog.Errorf("Another operation is being perfomed on volume : {%s}", volumeID)
+		return nil, status.Error(codes.Aborted, err.Error())
+	}
+	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeUnstageVolume")
+
+	stagingTargetPath := req.GetStagingTargetPath()
+	if len(stagingTargetPath) == 0 {
+		klog.Errorf("Staging target not provided")
 		return nil, status.Error(codes.InvalidArgument, "Staging target not provided")
 	}
 
-	/*
-		TODO: fix issue with k8s mount in the import section and then uncomment this one.
-		// Check if target directory is a mount point. GetDeviceNameFromMount
-		// given a mnt point, finds the device from /proc/mounts
-		// returns the device name, reference count, and error code
-		dev, refCount, err := mount.GetDeviceNameFromMount(d.mounter, target)
-		// TODO but its not enough for idempotancy, need to add additional find of the device even if the mountpoint not exist.
-		if err != nil {
-			msg := fmt.Sprintf("failed to check if volume is mounted: %v", err)
-			return nil, status.Error(codes.Internal, msg)
-		}
-
-
-		// From the spec: If the volume corresponding to the volume_id
-		// is not staged to the staging_target_path, the Plugin MUST
-		// reply 0 OK.
-		if refCount == 0 {
-			klog.V(5).Infof("NodeUnstageVolume: %s target not mounted", target)
+	klog.V(4).Infof("Reading stage info file")
+	stageInfoPath := path.Join(stagingTargetPath, stageInfoFilename)
+	infoMap, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			klog.Warningf("Idempotent case : stage info file does not exist. Finish NodeUnstageVolume OK.")
 			return &csi.NodeUnstageVolumeResponse{}, nil
+		} else {
+			klog.Errorf("Error while trying to read from the staging info file : {%v}", err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
 		}
+	}
+	klog.V(4).Infof("Reading stage info file detail : {%v}", infoMap)
 
-		if refCount > 1 {
-			klog.Warningf("NodeUnstageVolume: found %d references to device %s mounted at target path %s", refCount, dev, target)
-		}
+	connectivityType := infoMap["connectivity"]
+	mpathDevice := infoMap["mpathDevice"]
+	sysDevices := strings.Split(infoMap["sysDevices"], ",")
 
-		klog.V(5).Infof("NodeUnstageVolume: unmounting %s", target)
-		err = d.mounter.Unmount(target)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Could not unmount target %q: %v", target, err)
-		}
-		return &csi.NodeUnstageVolumeResponse{}, nil
-	*/
+	klog.V(4).Infof("Got info from stageInfo file. connectivity : {%v}. device : {%v}, sysDevices : {%v}", connectivityType, mpathDevice, sysDevices)
 
-	return nil, status.Errorf(codes.Unimplemented, "NodeUnstageVolume - Not implemented yet") // TODO
+	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
+	}
+
+	err = osDeviceConnectivity.FlushMultipathDevice(mpathDevice)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Multipath -f command failed with error: %v", err)
+	}
+	err = osDeviceConnectivity.RemovePhysicalDevice(sysDevices)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Remove iscsi device failed with error: %v", err)
+	}
+
+	if err := d.NodeUtils.ClearStageInfoFile(stageInfoPath); err != nil {
+		return nil, status.Errorf(codes.Internal, "Fail to clear the stage info file: error %v", err)
+	}
+
+	klog.V(4).Infof("NodeUnStageVolume Finished: multipath device removed from host")
+
+	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
-func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	klog.V(5).Infof("NodePublishVolume: called with args %+v", *req)
+func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
+	klog.V(5).Infof(">>>> NodePublishVolume [goid=%d]: called with args %+v", util.GetGoID(), *req)
+	defer klog.V(5).Infof("<<<< NodePublishVolume [goid=%d]", util.GetGoID())
 
 	err := d.nodePublishVolumeRequestValidation(req)
 	if err != nil {
@@ -170,15 +304,78 @@ func (d *nodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
+	volumeID := req.VolumeId
 
-	if err := d.nodePublishVolumeForFileSystem(req); err != nil {
-		return nil, err
+	err = d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodePublishVolume")
+	if err != nil {
+		klog.Errorf("Another operation is being perfomed on volume : {%s}", volumeID)
+		return nil, status.Error(codes.Aborted, err.Error())
+	}
+	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodePublishVolume")
+
+	// checking if the node staging path was mpounted into
+	stagingPath := req.GetStagingTargetPath()
+	targetPath := req.GetTargetPath()
+	targetPathWithHostPrefix := path.Join(PrefixChrootOfHostRoot, targetPath)
+
+	klog.V(4).Infof("stagingPath : {%v}, targetPath : {%v}", stagingPath, targetPath)
+
+	// Read staging info file in order to find the mpath device for mounting.
+	stageInfoPath := path.Join(stagingPath, stageInfoFilename)
+	infoMap, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
+	if err != nil {
+		// Note: after validation it looks like k8s create the directory in advance. So we don't try to remove it at the Unpublish
+		klog.Errorf("Error while trying to read from the staging info file : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	return nil, status.Errorf(codes.Unimplemented, "nodePublishVolumeForFileSystem - Not implemented yet") // TODO
+	mpathDevice := "/dev/" + infoMap["mpathDevice"]
+	klog.V(4).Infof("Got info from stageInfo file. device : {%v}", mpathDevice)
+
+	klog.V(5).Infof("Check if targetPath {%s} exist in mount list", targetPath)
+	mountList, err := d.mounter.List()
+	for _, mount := range mountList {
+		klog.V(6).Infof("Check if mount path({%v}) [with device({%v})] is equel to targetPath {%s}", mount.Path, mount.Device, targetPath)
+		if mount.Path == targetPathWithHostPrefix {
+			if mount.Device == mpathDevice {
+				klog.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume.", targetPath)
+				return &csi.NodePublishVolumeResponse{}, nil
+			} else {
+				return nil, status.Errorf(codes.AlreadyExists, "Mount point is already mounted to but with different multipath device (%s), while the expected device is %s ", mount.Device, mpathDevice)
+			}
+		}
+	}
+
+	// if the device is not mounted then we are mounting it.
+
+	volumeCap := req.GetVolumeCapability()
+	fsType := volumeCap.GetMount().FsType
+
+	if fsType == "" {
+		fsType = defaultFSType
+	}
+
+	if _, err := os.Stat(targetPathWithHostPrefix); os.IsNotExist(err) {
+		klog.V(4).Infof("Target path directory does not exist. creating : {%v}", targetPathWithHostPrefix)
+		d.mounter.MakeDir(targetPathWithHostPrefix)
+	}
+
+	klog.V(4).Infof("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
+
+	klog.V(5).Infof("FormatAndMount start [goid=%d]", util.GetGoID())
+	err = d.mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
+	// TODO: pass mount options
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	klog.V(5).Infof("FormatAndMount end [goid=%d]", util.GetGoID())
+
+	klog.V(4).Infof("NodePublishVolume Finished: multipath device is now mounted to targetPath.")
+
+	return &csi.NodePublishVolumeResponse{}, nil
 }
 
-func (d *nodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVolumeRequest) error {
+func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVolumeRequest) error {
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		return &RequestValidationError{"Volume ID not provided"}
@@ -203,47 +400,62 @@ func (d *nodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVol
 		return &RequestValidationError{"Volume capability AccessMode not supported"}
 	}
 
-	// TODO add verification of volume mode
+	// If the access type is block, do nothing for stage
+	switch volCap.GetAccessType().(type) {
+	case *csi.VolumeCapability_Block:
+		return &RequestValidationError{"Volume Access Type Block is not supported yet"}
+	}
 
 	return nil
 }
 
-func (d *nodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	klog.V(5).Infof("NodeUnpublishVolume: called with args %+v", *req)
+func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
+	klog.V(5).Infof(">>>> NodeUnpublishVolume [goid=%d]: called with args %+v", util.GetGoID(), *req)
+	defer klog.V(5).Infof("<<<< NodeUnpublishVolume [goid=%d]", util.GetGoID())
+
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
 	}
+
+	err := d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeUnpublishVolume")
+	if err != nil {
+		klog.Errorf("Another operation is being perfomed on volume : {%s}", volumeID)
+		return nil, status.Error(codes.Aborted, err.Error())
+	}
+	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeUnpublishVolume")
 
 	target := req.GetTargetPath()
 	if len(target) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path not provided")
 	}
 
-	// TODO fix k8s mount import and then uncomment this section
-	/*
-		klog.V(5).Infof("NodeUnpublishVolume: unmounting %s", target)
-		err := d.mounter.Unmount(target)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Could not unmount %q: %v", target, err)
+	klog.V(5).Infof("NodeUnpublishVolume: unmounting %s", target)
+	err = d.mounter.Unmount(target)
+	if err != nil {
+		if strings.Contains(err.Error(), "not mounted") {
+			klog.Warningf("Idempotent case - target was already unmounted %s", target)
+			return &csi.NodeUnpublishVolumeResponse{}, nil
 		}
+		return nil, status.Errorf(codes.Internal, "Could not unmount %q: %v", target, err)
+	}
 
-		return &csi.NodeUnpublishVolumeResponse{}, nil
-	*/
+	return &csi.NodeUnpublishVolumeResponse{}, nil
 
-	return nil, status.Errorf(codes.Unimplemented, "NodeUnpublishVolume - Not implemented yet")
 }
 
-func (d *nodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "NodeGetVolumeStats is not implemented yet")
 }
 
-func (d *nodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("NodeExpandVolume is not yet implemented"))
 }
 
-func (d *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	klog.V(5).Infof("NodeGetCapabilities: called with args %+v", *req)
+func (d *NodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
+	klog.V(5).Infof(">>>> NodeGetCapabilities [goid=%d]: called with args %+v", util.GetGoID(), *req)
+	defer klog.V(5).Infof("<<<< NodeGetCapabilities [goid=%d]", util.GetGoID())
+
 	var caps []*csi.NodeServiceCapability
 	for _, cap := range nodeCaps {
 		c := &csi.NodeServiceCapability{
@@ -258,40 +470,23 @@ func (d *nodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 	return &csi.NodeGetCapabilitiesResponse{Capabilities: caps}, nil
 }
 
-func (d *nodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
-	klog.V(5).Infof("NodeGetInfo: called with args %+v", *req)
+func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+	klog.V(5).Infof(">>>> NodeGetInfo: called with args %+v", *req)
+	defer klog.V(5).Infof("<<<< NodeGetInfo")
 
-	iscsiIQN, err := d.nodeUtils.ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi")
+	iscsiIQN, err := d.NodeUtils.ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi")
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	delimiter := ";"
 
-	nodeId := d.hostname + delimiter + iscsiIQN
+	nodeId := d.Hostname + delimiter + iscsiIQN
 	klog.V(4).Infof("node id is : %s", nodeId)
 
 	return &csi.NodeGetInfoResponse{
 		NodeId: nodeId,
 	}, nil
-}
-
-func (d *nodeService) nodePublishVolumeForFileSystem(req *csi.NodePublishVolumeRequest) error {
-	/*
-		target := req.GetTargetPath()
-		source := req.GetStagingTargetPath()
-
-		klog.V(5).Infof("NodePublishVolume: creating dir %s", target)
-		if err := d.mounter.MakeDir(target); err != nil {
-			return status.Errorf(codes.Internal, "Could not create dir %q: %v", target, err)
-		}
-
-		klog.V(5).Infof("NodePublishVolume: mounting %s at %s", source, target)
-		if err := d.mounter.Mount(source, target, ""); err != nil { // TODO add support for mountOptions
-			return status.Errorf(codes.Internal, "Could not mount %q at %q: %v", source, target, err)
-		}
-	*/
-	return nil
 }
 
 func isValidVolumeCapabilitiesAccessMode(volCaps []*csi.VolumeCapability) bool {

@@ -34,14 +34,13 @@ func (d *Driver) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoReques
 }
 
 func (d *Driver) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
-	// TODO take it from ini file
 	klog.V(5).Infof("GetPluginCapabilities: called with args %+v", *req)
 	resp := &csi.GetPluginCapabilitiesResponse{
 		Capabilities: []*csi.PluginCapability{
 			{
 				Type: &csi.PluginCapability_Service_{
 					Service: &csi.PluginCapability_Service{
-						Type: csi.PluginCapability_Service_CONTROLLER_SERVICE,
+						Type: csi.PluginCapability_Service_CONTROLLER_SERVICE, // Note: its not taken from the config.yaml like the csi controller.
 					},
 				},
 			},
@@ -52,6 +51,6 @@ func (d *Driver) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCa
 }
 
 func (d *Driver) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
-	klog.V(5).Infof("Probe: called with args %+v", *req)
+	klog.V(6).Infof("Probe: called with args %+v", *req) // Set the debug to 6 so by default it will not be printed.
 	return &csi.ProbeResponse{}, nil
 }

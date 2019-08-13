@@ -27,15 +27,14 @@ import (
 
 func main() {
 	var (
-		endpoint = flag.String("csi-endpoint", "unix://csi/csi.sock", "CSI Endpoint")
-		version  = flag.Bool("version", false, "Print the version and exit.")
-		configFile  = flag.String("config-file-path",  "./common/config.yaml", "Shared config file.")
-		hostname  = flag.String("hostname",  "host-dns-name", "The name of the host the node is running on.")
+		endpoint   = flag.String("csi-endpoint", "unix://csi/csi.sock", "CSI Endpoint")
+		version    = flag.Bool("version", false, "Print the version and exit.")
+		configFile = flag.String("config-file-path", "./config.yaml", "Shared config file.")
+		hostname   = flag.String("hostname", "host-dns-name", "The name of the host the node is running on.")
 	)
 
 	klog.InitFlags(nil)
 	flag.Parse()
-	
 
 	if *version {
 		info, err := driver.GetVersionJSON(*configFile)

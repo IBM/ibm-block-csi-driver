@@ -127,23 +127,40 @@ class ArrayMediator:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def unmap_volume(self, volume_id, host_name):
+    def map_volume(self, volume_id, host_name):
         """ 
-        This function will find the name of the volume by the volume_id and unmap the volume from the host.
+        This function will find the next available lun for the host and map the volume to it.  
                 
         Args:
            volume_id : the volume WWN.
            host_name : the name of the host to map the volume to.
+        
+        Returns:  
+           lun : the lun_id the volume was mapped to.
+            
+        Raises:
+            NoAvailableLun
+            LunAlreadyInUse
+            volumeNotFound
+            hostNotFound
+            PermissionDenied
+            MappingError
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_array_iscsi_name(self):
+        """ 
+        This function will return the iscsi name of the storage array
+                
+        Args:
+			None
 
         Returns:
-            None
+            iscsi_name : the iscsi address of the storage
 
         Raises:
-            volumeNotFound
-            volAlreadyUnmapped
-            hostNotFound
-            UnMappingError
-            PermissionDenied
+			None
         """
         raise NotImplementedError
 
