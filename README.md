@@ -21,15 +21,22 @@ DISCLAIMER: The cDriver Installationode is provided as is, without warranty. Any
 ## Table of content:
 * [Prerequisite for Driver Installation](#prerequisite-for-driver-installation)
     - Install Fibre Channel and iSCSI connectivity rpms, multipathing configuration and Configure storage system connectivity.
-* [Driver Installation and storage class creation](#driver-installation-and-storage-class-creation)
+* [Driver Installation](#driver-installation)
     - Install driver yaml file.
+
+* [Driver Installation](#driver-installation)
+    - Install driver yaml file.
+
+* [Configure k8s storage class and secret](#configure-k8s-storage-class-and-secret)
     - Configure the k8s storage class - to define the storage system pool name, secret referance, SpaceEfficiency(Thin, compressed or Deduplicated) and fstype(xfs\ext4).
     - Storage system secret - to define the storage credential(user and password) and its address.
 
 * [Driver Usage](#driver-usage)
     - Example of how to create PVC and statefulset application, with full detail behind the scenes.
-* [Un-installation](#un-installation-driver)
-* [Roadmap](#un-installation-driver)
+
+* [Driver Uninstallation](#driver-uninstallation)
+
+* [Roadmap](#roadmap)
 
 
 ## Prerequisite for Driver Installation
@@ -42,9 +49,9 @@ Skip this step, if the packages are already installed.
 
 RHEL 7.x:
 ```sh
-sudo yum -y install sg3_utils
-sudo yum -y install iscsi-initiator-utils   # only if iSCSI connectivity is required
-sudo yum -y install xfsprogs                # Only if xfs filesystem is required.
+yum -y install sg3_utils
+yum -y install iscsi-initiator-utils   # only if iSCSI connectivity is required
+yum -y install xfsprogs                # Only if xfs filesystem is required.
 ```
 
 #### 2. Configure Linux multipath devices on the host. 
@@ -55,7 +62,7 @@ Verify that the `systemctl status multipathd` output indicates that the multipat
 RHEL 7.x:
 ```sh
 yum install device-mapper-multipath
-sudo modprobe dm-multipath
+modprobe dm-multipath
 systemctl start multipathd
 systemctl status multipathd
 multipath -ll
@@ -112,14 +119,9 @@ If the feature gate was not enabled then CSIDriver for the ibm-block-csi-driver 
 
 
 
-## Driver Installation and storage class creation
-This section describe how to:
- 1. Install the driver yaml file
- 2. Configure the k8s storage class - to define the storage system pool name, secret referance, SpaceEfficiency(Thin, compressed or Deduplicated) and fstype(xfs\ext4).
- 3. Storage system secret - to define the storage credential(user and password) and its address.
- Note: Repeat steps 2 & 3 to create as many storage classes as needed.
+## Driver Installation
+This section describe how to install the CSI driver.
 
-### 1. Install the CSI driver
 Heads up: Soon the driver install method will be via new CSI operator (work in progress at github.com/ibm/ibm-block-csi-driver-operator). But for now the installation method is basic yaml file (`ibm-block-csi-driver.yaml`) with all the driver resources. 
 
 ```sh
@@ -286,7 +288,8 @@ This section describes:
 - Create storage class `gold`(Using A9000R as example, same can be used for FS9100.)
 - Create PVC `demo-pvc`from the storage class `gold` and show some detail on the created PVC and PV.
 - Create statefulset application `demo-statefulset` and observe the mountpoint \ multipath device that was created by the driver. 
-- Write some data inside the `demo-statefull`
+- Write some data inside the `demo-statefull`, delete the `demo-statefull` and create it again to validate that the data remains.
+
 
 ```sh
 $> cat demo-storageclass-gold-A9000R.yaml
@@ -531,7 +534,7 @@ No resources found.
 
 
 
-## Un-installation Driver
+## Driver Uninstallation
 
 ### Delete the storage class, secret and the driver
 
@@ -546,6 +549,12 @@ $> kubectl delete CSIDriver ibm-block-csi-driver
 ```
 
 
+## Roadmap
+- CSI Operator as improved deployment method -> github.com/ibm/ibm-block-csi-driver-operator
+- Openshift 4.2 support (+CoreOS worker nodes)
+- CSI Snapshots
+- NVME support
+- Stay tune...
 
 ## Licensing
 
