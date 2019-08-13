@@ -12,17 +12,24 @@ Supported IBM storage systems:
   - IBM Storwize
   - IBM FlashSystem A9000\R
 
+Supported operating systems:
+  - RHEL 7.x (x86 architecture)
+
 DISCLAIMER: The cDriver Installationode is provided as is, without warranty. Any issue will be handled on a best-effort basis.
 
 
 ## Table of content:
 * [Prerequisite for Driver Installation](#prerequisite-for-driver-installation)
     - Install Fibre Channel and iSCSI connectivity rpms, multipathing configuration and Configure storage system connectivity.
-* [Driver Installation](#driver-installation)
-    - Install driver yaml file, storage class and Storage system secret.
+* [Driver Installation and storage class creation](#driver-installation-and-storage-class-creation)
+    - Install driver yaml file.
+    - Configure the k8s storage class - to define the storage system pool name, secret referance, SpaceEfficiency(Thin, compressed or Deduplicated) and fstype(xfs\ext4).
+    - Storage system secret - to define the storage credential(user and password) and its address.
+
 * [Driver Usage](#driver-usage)
     - Example of how to create PVC and statefulset application, with full detail behind the scenes.
 * [Un-installation](#un-installation-driver)
+* [Roadmap](#un-installation-driver)
 
 
 ## Prerequisite for Driver Installation
@@ -37,6 +44,7 @@ RHEL 7.x:
 ```sh
 sudo yum -y install sg3_utils
 sudo yum -y install iscsi-initiator-utils   # only if iSCSI connectivity is required
+sudo yum -y install xfsprogs                # Only if xfs filesystem is required.
 ```
 
 #### 2. Configure Linux multipath devices on the host. 
@@ -62,9 +70,9 @@ Important: When configuring Linux multipath devices, verify that the find_multip
 3.2. For Fiber Chanel, configure the relevant zoning from the storage to the host.
 
 3.3. For iSCSI, perform these three steps.
-– Make sure that the login used to log in to the iSCSI targets is permanent and remains available after a reboot of the worker node. To do this, verify that the node.startup in the /etc/iscsi/iscsid.conf file is set to automatic. If not, set it as required and then restart the iscsid service `$> service iscsid restart`.
+3.3.1. Make sure that the login used to log in to the iSCSI targets is permanent and remains available after a reboot of the worker node. To do this, verify that the node.startup in the /etc/iscsi/iscsid.conf file is set to automatic. If not, set it as required and then restart the iscsid service `$> service iscsid restart`.
 
-– Discover and log into at least two iSCSI targets on the relevant storage
+3.3.2. Discover and log into at least two iSCSI targets on the relevant storage
 systems.
 
 ```sh
@@ -73,7 +81,7 @@ $> iscsiadm -m discoverydb -t st -p ${storage system iSCSI port IP}:3260
 $> iscsiadm -m node -p ${storage system iSCSI port IP/hostname} --login
 ```
 
-– Verify that the login was successful and display all targets that you logged in. The portal value must be the iSCSI target IP address.
+3.3.3. Verify that the login was successful and display all targets that you logged in. The portal value must be the iSCSI target IP address.
 
 ```sh
 $> iscsiadm -m session --rescan
@@ -104,18 +112,23 @@ If the feature gate was not enabled then CSIDriver for the ibm-block-csi-driver 
 
 
 
-## Driver Installation
+## Driver Installation and storage class creation
+This section describe how to:
+ 1. Install the driver yaml file
+ 2. Configure the k8s storage class - to define the storage system pool name, secret referance, SpaceEfficiency(Thin, compressed or Deduplicated) and fstype(xfs\ext4).
+ 3. Storage system secret - to define the storage credential(user and password) and its address.
+ Note: Repeat steps 2 & 3 to create as many storage classes as needed.
 
 ### 1. Install the CSI driver
 Heads up: Soon the driver install method will be via new CSI operator (work in progress at github.com/ibm/ibm-block-csi-driver-operator). But for now the installation method is basic yaml file (`ibm-block-csi-driver.yaml`) with all the driver resources. 
 
 ```sh
-### Download the driver yml file from github:
-$> curl https://raw.githubusercontent.com/IBM/ibm-block-csi-driver/develop/deploy/kubernetes/v1.13/ibm-block-csi-driver.yaml > ibm-block-csi-driver.yaml 
+###### Download the driver yml file from github:
+$> curl https://raw.githubusercontent.com/IBM/ibm-block-csi-driver/master/deploy/kubernetes/v1.13/ibm-block-csi-driver.yaml > ibm-block-csi-driver.yaml 
 
-### Optional: Edit the `ibm-block-csi-driver.yaml` file only if you need to change the driver IMAGE URL. By default its `ibmcom/ibm-block-csi-controller-driver:1.0.0`.
+###### Optional: Edit the `ibm-block-csi-driver.yaml` file only if you need to change the driver IMAGE URL. By default its `ibmcom/ibm-block-csi-controller-driver:1.0.0`.
 
-### Install the driver:
+###### Install the driver:
 $> kubectl apply -f ibm-block-csi-driver.yaml
 serviceaccount/ibm-block-csi-controller-sa created
 clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-provisioner-role created
@@ -142,15 +155,15 @@ NAME                       READY   STATUS    RESTARTS   AGE
 ibm-block-csi-node-jvmvh   3/3     Running   0          74m
 ibm-block-csi-node-tsppw   3/3     Running   0          74m
 
-### NOTE if pod/ibm-block-csi-controller-0 is not in Running state, then troubleshoot by running:
+###### if pod/ibm-block-csi-controller-0 is not in Running state, then troubleshoot by running:
 $> kubectl describe -n kube-system pod/ibm-block-csi-controller-0
 
 ```
 
-More detail on the driver can be viewed as below:
+More detail on the installed driver can be viewed as below:
 
 ```sh
-### if `feature-gates=CSIDriverRegistry` was set to `true` then CSIDriver object for the driver will be automaticaly created. Can be viewed by running: 
+###### if `feature-gates=CSIDriverRegistry` was set to `true` then CSIDriver object for the driver will be automaticaly created. Can be viewed by running: 
 
 $> kubectl describe csidriver ibm-block-csi-driver
 Name:         ibm-block-csi-driver
@@ -196,23 +209,24 @@ quay.io/k8scsi/csi-provisioner:v1.1.1
 quay.io/k8scsi/csi-attacher:v1.0.1
 quay.io/k8scsi/livenessprobe:v1.1.0
 
-$> kubectl get -n kube-system -o jsonpath="{..image}" daemonset.apps/ibm-block-csi-node | tr -s '[[:space:]]' '\n'; echo ""
-ibm/ibm-block-csi-node-driver:1.0.0
-quay.io/k8scsi/csi-node-driver-registrar:v1.0.2
-quay.io/k8scsi/livenessprobe:v1.1.0
-
-### Watch the CSI controller logs
+###### Watch the CSI controller logs
 $> kubectl log -f -n kube-system ibm-block-csi-controller-0 ibm-block-csi-controller
 
-### Watch the CSI node logs (per worker node \ PODID)
+###### Watch the CSI node logs (per worker node \ PODID)
 $> kubectl log -f -n kube-system ibm-block-csi-node-<PODID> ibm-block-csi-node
 
 ```
 
-#### 2. Create array secret
-The driver is running but in order to use it, one should create relevant storage classes.
-First create the secret of the array for this cluster.
- 
+
+## Configure k8s storage class and secret
+The driver is running but in order to use it, one should create the relevant storage classes.
+
+This section describe how to:
+ 1. Configure the k8s storage class - to define the storage system pool name, secret referance, SpaceEfficiency(Thin, compressed or Deduplicated) and fstype(xfs\ext4).
+ 2. Storage system secret - to define the storage credential(user and password) and its address.
+ Note: Repeat steps 2 & 3 to create as many storage classes as needed.
+
+#### 1. Create array secret 
 Create a secret file as follow and update the relevant credentials:
 
 ```
@@ -234,7 +248,7 @@ Apply the secret:
 $> kubectl apply -f array-secret.yaml
 ```
 
-#### 3. Create storage classes
+#### 2. Create storage classes
 
 Create a storage class yaml file as follow with the relevant capabilities, pool and array secret:
 
@@ -262,14 +276,17 @@ Apply the storage class:
 $> kubectl apply -f array-secret.yaml
 storageclass.storage.k8s.io/gold created
 ```
-
+Now you can run stateful applications using IBM block storage systems.
 
 
 
 
 ## Driver Usage
-
-Create storage class with A9000R system using `demo-storageclass-gold-A9000R.yaml`:
+This section describes:
+- Create storage class `gold`(Using A9000R as example, same can be used for FS9100.)
+- Create PVC `demo-pvc`from the storage class `gold` and show some detail on the created PVC and PV.
+- Create statefulset application `demo-statefulset` and observe the mountpoint \ multipath device that was created by the driver. 
+- Write some data inside the `demo-statefull`
 
 ```sh
 $> cat demo-storageclass-gold-A9000R.yaml
