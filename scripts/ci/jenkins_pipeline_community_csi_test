@@ -17,8 +17,11 @@ pipeline {
                     if (env.XAVILIB_BRANCH == null) {
                         env.XAVILIB_BRANCH = 'develop'
                     }
+					// Just bring XAVI repo (use it in different stage)
                     xaviCheckOutScm(path: 'testing/', name: 'xavi', branch: "${env.XAVILIB_BRANCH}")
 
+
+					// Generate the new storage conf yaml with relevant envs
                     env.pwd = sh(returnStdout: true, script: 'pwd').trim()
                     echo " env.pwd  ${env.pwd}"
 

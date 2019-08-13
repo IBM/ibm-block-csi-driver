@@ -1,5 +1,7 @@
 #!/bin/bash -xe
 
+[ -z "${CONTROLLER_LOGS}" ] && { echo "CONTROLLER_LOGS env is mandatory"; exit 1; }
+# assume that all the environment storage was setup in advance.
 echo "controller logs : ${CONTROLLER_LOGS}"
 ./scripts/ci/run_controller_server_for_csi_test.sh csi-controller > ${CONTROLLER_LOGS} 2>&1
 echo `pwd`

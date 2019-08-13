@@ -3,6 +3,6 @@ class Volume:
         self.capacity_bytes = vol_size_bytes
         self.id = vol_id
         self.volume_name = vol_name
-        self.array_name = array_name
+        self.array_name = array_name # TODO change to array_endpoint
         self.pool_name = pool_name
         self.array_type = array_type
