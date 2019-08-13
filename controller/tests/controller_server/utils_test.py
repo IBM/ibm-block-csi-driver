@@ -242,7 +242,7 @@ class TestUtils(unittest.TestCase):
     def test_generate_publish_volume_response(self):
         config = {"controller": {"publish_context_lun_parameter": "lun",
                                  "publish_context_connectivity_parameter": "connectivity_type",
-                                 "publish_context_array_iqn" : "array_iqn"}
+                                 "publish_context_array_iqn": "array_iqn"}
                   }
         res = utils.generate_csi_publish_volume_response(0, "iscsi", config, "1")
         self.assertEqual(res.publish_context["lun"], '0')

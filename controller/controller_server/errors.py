@@ -14,5 +14,6 @@ class ValidationException(BaseControllerServerException):
 
 
 class VolumeIdError(BaseControllerServerException):
+
     def __init__(self, id):
         self.message = messages.VolumeIdError_message.format(id)
