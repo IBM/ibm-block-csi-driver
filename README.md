@@ -22,20 +22,12 @@ DISCLAIMER: The cDriver Installationode is provided as is, without warranty. Any
 * [Prerequisite for Driver Installation](#prerequisite-for-driver-installation)
     - Install Fibre Channel and iSCSI connectivity rpms, multipathing configuration and Configure storage system connectivity.
 * [Driver Installation](#driver-installation)
-    - Install driver yaml file.
-
-* [Driver Installation](#driver-installation)
-    - Install driver yaml file.
-
 * [Configure k8s storage class and secret](#configure-k8s-storage-class-and-secret)
     - Configure the k8s storage class - to define the storage system pool name, secret referance, SpaceEfficiency(Thin, compressed or Deduplicated) and fstype(xfs\ext4).
     - Storage system secret - to define the storage credential(user and password) and its address.
-
 * [Driver Usage](#driver-usage)
     - Example of how to create PVC and statefulset application, with full detail behind the scenes.
-
 * [Driver Uninstallation](#driver-uninstallation)
-
 * [Roadmap](#roadmap)
 
 
