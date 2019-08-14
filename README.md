@@ -15,7 +15,7 @@ Supported IBM storage systems:
 Supported operating systems:
   - RHEL 7.x (x86 architecture)
 
-DISCLAIMER: The cDriver Installationode is provided as is, without warranty. Any issue will be handled on a best-effort basis.
+DISCLAIMER: The Driver is provided as is, without warranty. Any issue will be handled on a best-effort basis.
 
 
 ## Table of content:
@@ -26,7 +26,7 @@ DISCLAIMER: The cDriver Installationode is provided as is, without warranty. Any
     - Configure the k8s storage class - to define the storage system pool name, secret referance, SpaceEfficiency(Thin, Compressed or Deduplicated) and fstype(xfs\ext4).
     - Storage system secret - to define the storage credential(user and password) and its address.
 * [Driver Usage](#driver-usage)
-    - Example of how to create PVC and Statefulset application, with full detail behind the scenes.
+    - Create PVC and Statefulset application, with full detail behind the scenes.
 * [Driver Uninstallation](#driver-uninstallation)
 
 
