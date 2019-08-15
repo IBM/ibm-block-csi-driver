@@ -382,3 +382,4 @@ class SVCArrayMediator(ArrayMediator):
                              node.status == "online"])
         return array_iqn
         '''
+        return ""
