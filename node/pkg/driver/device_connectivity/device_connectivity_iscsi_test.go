@@ -199,13 +199,15 @@ func TestGetMpathDevice(t *testing.T) {
 			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
 			fake_helper := mocks.NewMockOsDeviceConnectivityHelperIscsiInterface(mockCtrl)
 			lunId := 0
-			arrayIdentifier := "X"
-			path := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", arrayIdentifier, "lun", strconv.Itoa(lunId)}, "-")
-			fake_helper.EXPECT().WaitForPathToExist(path, 5, 1).Return(
-				tc.waitForPathToExistReturn.devicePaths,
-				tc.waitForPathToExistReturn.exists,
-				tc.waitForPathToExistReturn.err,
-			)
+			arrayIdentifiers := []string{"X"}
+			for _, arrayIdentifier := range arrayIdentifiers {
+				path := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", arrayIdentifier, "lun", strconv.Itoa(lunId)}, "-")
+				fake_helper.EXPECT().WaitForPathToExist(path, 5, 1).Return(
+					tc.waitForPathToExistReturn.devicePaths,
+					tc.waitForPathToExistReturn.exists,
+					tc.waitForPathToExistReturn.err,
+				)
+			}
 
 			var mcalls []*gomock.Call
 			for _, r := range tc.getMultipathDiskReturns {
@@ -215,7 +217,7 @@ func TestGetMpathDevice(t *testing.T) {
 			gomock.InOrder(mcalls...)
 
 			o := NewOsDeviceConnectivityIscsiForTest(fake_executer, fake_helper)
-			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, arrayIdentifier)
+			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, arrayIdentifiers)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")

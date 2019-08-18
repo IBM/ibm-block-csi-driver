@@ -113,7 +113,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-
+	array_iqns := strings.Split(array_iqn, ",")
 	stagingPath := req.GetStagingTargetPath() // e.g in k8s /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-21967c74-b456-11e9-b93e-005056a45d5f/globalmount
 
 	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
@@ -121,12 +121,12 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
 	}
 
-	err = osDeviceConnectivity.RescanDevices(lun, array_iqn)
+	err = osDeviceConnectivity.RescanDevices(lun, array_iqns)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	device, err := osDeviceConnectivity.GetMpathDevice(volId, lun, array_iqn)
+	device, err := osDeviceConnectivity.GetMpathDevice(volId, lun, array_iqns)
 	klog.V(4).Infof("Discovered device : {%v}", device)
 	if err != nil {
 		klog.Errorf("Error while discovring the device : {%v}", err.Error())

@@ -48,10 +48,26 @@ var (
 	TimeOutMultipathFlashCmd = 4 * 1000
 )
 
-func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier string) error {
-	klog.V(5).Infof("Rescan : Start rescan on specific lun, on lun : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
-	sessionHosts, err := r.Helper.GetIscsiSessionHostsForArrayIQN(arrayIdentifier)
-	if err != nil {
+func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifiers []string) error {
+	klog.V(5).Infof("Rescan : Start rescan on specific lun, on lun : {%v}, with array iqn : {%v}", lunId, arrayIdentifiers)
+	var sessionHosts []int
+	var err error
+
+	if len(arrayIdentifiers) == 0 {
+		e := &ErrorNotFoundArrayIdentifiers{lunId}
+		klog.Errorf(e.Error())
+		return e
+	}
+
+	for _, iqn := range arrayIdentifiers{
+		h, e := r.Helper.GetIscsiSessionHostsForArrayIQN(iqn)
+		if e != nil {
+			klog.Errorf(e.Error())
+			err = e
+		}
+		sessionHosts = append(sessionHosts, h...)
+	}
+	if len(sessionHosts) == 0 && err != nil {
 		return err
 	}
 
@@ -80,12 +96,12 @@ func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier stri
 
 	}
 
-	klog.V(5).Infof("Rescan : finsihed rescan lun on lun id : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
+	klog.V(5).Infof("Rescan : finsihed rescan lun on lun id : {%v}, with array iqns : {%v}", lunId, arrayIdentifiers)
 	return nil
 
 }
 
-func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, arrayIdentifier string) (string, error) {
+func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string) (string, error) {
 	/*
 			   Description:
 				   1. Find all the files "/dev/disk/by-path/ip-<ARRAY-IP>-iscsi-<IQN storage>-lun-<LUN-ID> -> ../../sd<X>
@@ -97,20 +113,30 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 			   Return Value: "dm-X" of the volumeID by using the LunID and the arrayIqn.
 	*/
 	var devicePaths []string
-
+	var err error
 	lunIdStr := strconv.Itoa(lunId)
-	devicePath := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", arrayIdentifier, "lun", lunIdStr}, "-")
-	klog.V(4).Infof("GetMpathDevice: Get the mpath devices related to arrayIdentifier=%s and lunID=%s : {%v}", arrayIdentifier, lunIdStr, devicePath)
 
-	devicePaths, exists, err := r.Helper.WaitForPathToExist(devicePath, 5, 1)
-	if err != nil {
-		klog.Errorf("GetMpathDevice: No device found error : %v ", err.Error())
-		return "", err
-	}
-	if !exists {
-		e := &MultipleDeviceNotFoundForLunError{volumeId, lunId, arrayIdentifier}
-		klog.Errorf(e.Error())
+	if len(arrayIdentifiers) == 0 {
+		e := &ErrorNotFoundArrayIdentifiers{lunId}
 		return "", e
+	}
+
+	for _, iqn := range arrayIdentifiers {
+		dp := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", iqn, "lun", lunIdStr}, "-")
+		klog.V(4).Infof("GetMpathDevice: Get the mpath devices related to arrayIdentifier=%s and lunID=%s : {%v}", iqn, lunIdStr, dp)
+		dps, exists, e := r.Helper.WaitForPathToExist(dp, 5, 1)
+		if e != nil {
+			klog.Errorf("GetMpathDevice: No device found error : %v ", e.Error())
+			err = e
+		} else if !exists {
+			e := &MultipleDeviceNotFoundForLunError{volumeId, lunId, []string{iqn}}
+			klog.Errorf(e.Error())
+			err = e
+		}
+		devicePaths = append(devicePaths, dps...)
+	}
+	if len(devicePaths) == 0 && err != nil {
+		return "", err
 	}
 
 	devicePathTosysfs := make(map[string]bool)
@@ -133,12 +159,12 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 	for key := range devicePathTosysfs {
 		mps += ", " + key
 	}
-	klog.V(4).Infof("GetMpathDevice: Found multipath devices: [%s] that relats to lunId=%d and arrayIdentifier=%s", mps, lunId, arrayIdentifier)
+	klog.V(4).Infof("GetMpathDevice: Found multipath devices: [%s] that relats to lunId=%d and arrayIdentifiers=%s", mps, lunId, arrayIdentifiers)
 
 	if len(devicePathTosysfs) > 1 {
-		return "", &MultipleDmDevicesError{volumeId, lunId, arrayIdentifier, devicePathTosysfs}
+		return "", &MultipleDmDevicesError{volumeId, lunId, arrayIdentifiers, devicePathTosysfs}
 	} else if len(devicePathTosysfs) == 0 {
-		return "", &MultipleDeviceNotFoundForLunError{volumeId, lunId, arrayIdentifier}
+		return "", &MultipleDeviceNotFoundForLunError{volumeId, lunId, arrayIdentifiers}
 	}
 	var md string
 	for md = range devicePathTosysfs {
