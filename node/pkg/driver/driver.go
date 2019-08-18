@@ -19,18 +19,17 @@ package driver
 import (
 	"context"
 	"io/ioutil"
+	"k8s.io/klog"
 	"net"
 
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	util "github.com/ibm/ibm-block-csi-driver/node/util"
+	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/ibm/ibm-block-csi-driver/node/util"
 
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v2"
-	"k8s.io/klog"
-
-	device_connectivity "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
-	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
-	mount "k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 type Driver struct {
@@ -128,6 +127,8 @@ func ReadConfigFile(configFilePath string) (ConfigFile, error) {
 		klog.V(4).Infof("Not found config file environment variable %s. Set default value %s.", EnvNameDriverConfFile, configYamlPath)
 	} else {
 		klog.V(4).Infof("Config file environment variable %s=%s", EnvNameDriverConfFile, configYamlPath)
+		level := klog.V(2)
+		klog.Info(level)
 	}
 
 	yamlFile, err := ioutil.ReadFile(configYamlPath)
