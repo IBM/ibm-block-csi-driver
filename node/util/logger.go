@@ -1,3 +1,19 @@
+/**
+ * Copyright 2019 IBM Corp.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package util
 
 import (
@@ -30,11 +46,11 @@ func (f *LogFormat) Format(entry *logrus.Entry) ([]byte, error) {
 
 	b.WriteString(entry.Time.Format(f.TimestampFormat) + "\t")
 	b.WriteString(strings.ToUpper(entry.Level.String()) + "\t")
-	b.WriteString(fmt.Sprintf("%12v", "[" + gid.(string)) + "]\t")
-	b.WriteString("(" + caller.(string) + ")\t")
+	b.WriteString(fmt.Sprintf("%v", "[" + gid.(string)) + "]\t")
+	b.WriteString("(" + caller.(string) + ") - ")
 	b.WriteString(entry.Message)
 	b.WriteString("\n")
-	
+
 	return b.Bytes(), nil
 }
 
@@ -49,7 +65,7 @@ func getInstance() *logrus.Logger {
 	return instance
 }
 
-func log(level logrus.Level, isAddNewLine bool, args ...interface{}) {
+func logEntry() *logrus.Entry {
 	gid := GetGoID()
 	_, file, no, ok := runtime.Caller(2)
 	caller := "Unknown"
@@ -57,43 +73,101 @@ func log(level logrus.Level, isAddNewLine bool, args ...interface{}) {
 		caller = filepath.Base(file) + ":" + strconv.Itoa(no)
 	}
 	logEntry := getInstance().WithFields(logrus.Fields{"gid": strconv.FormatUint(gid, 10), "caller": caller})
-	if (isAddNewLine) {
-		logEntry.Logln(level, args...)
-	} else {
-		logEntry.Log(level, args...)
-	}
+	return logEntry
+}
+
+func Verbose(level int, args ...interface{}) {
+	logEntry().Trace(args...)
+}
+
+func Verboseln(level int, args ...interface{}) {
+	logEntry().Traceln(args...)
+}
+
+func Verbosef(level int, format string, args ...interface{}) {
+	logEntry().Tracef(format, args...)
+}
+
+func Trace(args ...interface{}) {
+	logEntry().Trace(args...)
+}
+
+func Traceln(args ...interface{}) {
+	logEntry().Traceln(args...)
+}
+
+func Tracef(format string, args ...interface{}) {
+	logEntry().Tracef(format, args...)
+}
+
+func Debug(args ...interface{}) {
+	logEntry().Debug(args...)
+}
+
+func Debugln(args ...interface{}) {
+	logEntry().Debugln(args...)
+}
+
+func Debugf(format string, args ...interface{}) {
+	logEntry().Debugf(format, args...)
 }
 
 func Info(args ...interface{}) {
-	log(logrus.InfoLevel, false, args...)
+	logEntry().Info(args...)
 }
 
 func Infoln(args ...interface{}) {
-	log(logrus.InfoLevel, true, args...)
+	logEntry().Infoln(args...)
 }
 
-func Warn(args ...interface{}) {
-	log(logrus.WarnLevel, false, args...)
+func Infof(format string, args ...interface{}) {
+	logEntry().Infof(format, args...)
 }
 
-func Warnln(args ...interface{}) {
-	log(logrus.WarnLevel, true, args...)
+func Warning(args ...interface{}) {
+	logEntry().Warn(args...)
+}
+
+func Warningln(args ...interface{}) {
+	logEntry().Warnln(args...)
+}
+
+func Warningf(format string, args ...interface{}) {
+	logEntry().Warnf(format, args...)
 }
 
 func Error(args ...interface{}) {
-	log(logrus.ErrorLevel, false, args...)
+	logEntry().Error(args...)
 }
 
 func Errorln(args ...interface{}) {
-	log(logrus.ErrorLevel, true, args...)
+	logEntry().Errorln(args...)
 }
 
-func Fatal(err error) {
-	log(logrus.ErrorLevel, false, err)
-	panic(err)
+func Errorf(format string, args ...interface{}) {
+	logEntry().Errorf(format, args...)
 }
 
-func Fatalln(err error) {
-	log(logrus.ErrorLevel, true, err)
-	panic(err)
+func Fatal(args ...interface{}) {
+	logEntry().Fatal(args)
+}
+
+func Fatalln(args ...interface{}) {
+	logEntry().Fatalln(args)
+}
+
+func Fatalf(format string, args ...interface{}) {
+	logEntry().Fatalf(format, args)
+}
+
+func Panic(args ...interface{}) {
+	logEntry().Panic(args)
+}
+
+func Panicln(args ...interface{}) {
+	logEntry().Panicln(args)
+}
+
+func Panicf(format string, args ...interface{}) {
+	logEntry().Panicf(format, args)
 }
