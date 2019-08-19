@@ -18,13 +18,12 @@ package driver
 
 import (
 	"context"
-
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	"k8s.io/klog"
+	"github.com/container-storage-interface/spec/lib/go/csi"
+	logger "github.com/ibm/ibm-block-csi-driver/node/util"
 )
 
 func (d *Driver) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
-	klog.V(5).Infof("GetPluginInfo: called with args %+v", *req)
+	logger.Verbosef(5, "GetPluginInfo: called with args %+v", *req)
 	resp := &csi.GetPluginInfoResponse{
 		Name:          d.config.Identity.Name,
 		VendorVersion: d.config.Identity.Version,
@@ -34,7 +33,7 @@ func (d *Driver) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoReques
 }
 
 func (d *Driver) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
-	klog.V(5).Infof("GetPluginCapabilities: called with args %+v", *req)
+	logger.Verbosef(5, "GetPluginCapabilities: called with args %+v", *req)
 	resp := &csi.GetPluginCapabilitiesResponse{
 		Capabilities: []*csi.PluginCapability{
 			{
@@ -51,6 +50,6 @@ func (d *Driver) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCa
 }
 
 func (d *Driver) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
-	klog.V(6).Infof("Probe: called with args %+v", *req) // Set the debug to 6 so by default it will not be printed.
+	logger.Verbosef(6, "Probe: called with args %+v", *req) // Set the debug to 6 so by default it will not be printed.
 	return &csi.ProbeResponse{}, nil
 }

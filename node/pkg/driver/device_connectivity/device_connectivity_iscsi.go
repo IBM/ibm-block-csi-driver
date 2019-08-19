@@ -26,8 +26,8 @@ import (
 	"sync"
 	"time"
 
-	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
-	"k8s.io/klog"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	logger "github.com/ibm/ibm-block-csi-driver/node/util"
 )
 
 type OsDeviceConnectivityIscsi struct {
@@ -49,7 +49,7 @@ var (
 )
 
 func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier string) error {
-	klog.V(5).Infof("Rescan : Start rescan on specific lun, on lun : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
+	logger.Verbosef(5, "Rescan : Start rescan on specific lun, on lun : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
 	sessionHosts, err := r.Helper.GetIscsiSessionHostsForArrayIQN(arrayIdentifier)
 	if err != nil {
 		return err
@@ -61,26 +61,26 @@ func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier stri
 		filename := fmt.Sprintf("/sys/class/scsi_host/host%d/scan", hostNumber)
 		f, err := r.Executer.OsOpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200)
 		if err != nil {
-			klog.Errorf("Rescan Error: could not open filename : {%v}. err : {%v}", filename, err)
+			logger.Errorf("Rescan Error: could not open filename : {%v}. err : {%v}", filename, err)
 			return err
 		}
 
 		defer f.Close()
 
 		scanCmd := fmt.Sprintf("0 0 %d", lunId)
-		klog.V(5).Infof("Rescan host device : echo %s > %s", scanCmd, filename)
+		logger.Verbosef(5, "Rescan host device : echo %s > %s", scanCmd, filename)
 		if written, err := r.Executer.FileWriteString(f, scanCmd); err != nil {
-			klog.Errorf("Rescan Error: could not write to rescan file :{%v}, error : {%v}", filename, err)
+			logger.Errorf("Rescan Error: could not write to rescan file :{%v}, error : {%v}", filename, err)
 			return err
 		} else if written == 0 {
 			e := &ErrorNothingWasWrittenToScanFileError{filename}
-			klog.Errorf(e.Error())
+			logger.Errorf(e.Error())
 			return e
 		}
 
 	}
 
-	klog.V(5).Infof("Rescan : finsihed rescan lun on lun id : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
+	logger.Verbosef(5, "Rescan : finsihed rescan lun on lun id : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
 	return nil
 
 }
@@ -100,16 +100,16 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 
 	lunIdStr := strconv.Itoa(lunId)
 	devicePath := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", arrayIdentifier, "lun", lunIdStr}, "-")
-	klog.V(4).Infof("GetMpathDevice: Get the mpath devices related to arrayIdentifier=%s and lunID=%s : {%v}", arrayIdentifier, lunIdStr, devicePath)
+	logger.Verbosef(4, "GetMpathDevice: Get the mpath devices related to arrayIdentifier=%s and lunID=%s : {%v}", arrayIdentifier, lunIdStr, devicePath)
 
 	devicePaths, exists, err := r.Helper.WaitForPathToExist(devicePath, 5, 1)
 	if err != nil {
-		klog.Errorf("GetMpathDevice: No device found error : %v ", err.Error())
+		logger.Errorf("GetMpathDevice: No device found error : %v ", err.Error())
 		return "", err
 	}
 	if !exists {
 		e := &MultipleDeviceNotFoundForLunError{volumeId, lunId, arrayIdentifier}
-		klog.Errorf(e.Error())
+		logger.Errorf(e.Error())
 		return "", e
 	}
 
@@ -133,7 +133,7 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 	for key := range devicePathTosysfs {
 		mps += ", " + key
 	}
-	klog.V(4).Infof("GetMpathDevice: Found multipath devices: [%s] that relats to lunId=%d and arrayIdentifier=%s", mps, lunId, arrayIdentifier)
+	logger.Verbosef(4, "GetMpathDevice: Found multipath devices: [%s] that relats to lunId=%d and arrayIdentifier=%s", mps, lunId, arrayIdentifier)
 
 	if len(devicePathTosysfs) > 1 {
 		return "", &MultipleDmDevicesError{volumeId, lunId, arrayIdentifier, devicePathTosysfs}
@@ -151,38 +151,38 @@ func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(mpathDevice string) erro
 	// mpathdevice is dm-4 for example
 	// TODO since this function can be used also for FC SCSI (not only) iSCSI, we should move it out to generic.
 
-	klog.V(5).Infof("Flushing mpath device : {%v}", mpathDevice)
+	logger.Verbosef(5, "Flushing mpath device : {%v}", mpathDevice)
 
 	fullDevice := "/dev/" + mpathDevice
 
-	klog.V(5).Infof("Try to acquire lock for running the command multipath -f {%v} (to avoid concurrent multipath commands)", mpathDevice)
+	logger.Verbosef(5, "Try to acquire lock for running the command multipath -f {%v} (to avoid concurrent multipath commands)", mpathDevice)
 	r.MutexMultipathF.Lock()
-	klog.V(5).Infof("Acquired lock for multipath -f command")
+	logger.Verbosef(5, "Acquired lock for multipath -f command")
 	_, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathFlashCmd, "multipath", []string{"-f", fullDevice})
 	r.MutexMultipathF.Unlock()
 
 	if err != nil {
 		if _, errOpen := os.Open(fullDevice); errOpen != nil {
 			if os.IsNotExist(errOpen) {
-				klog.V(5).Infof("Mpath device {%v} was deleted", fullDevice)
+				logger.Verbosef(5, "Mpath device {%v} was deleted", fullDevice)
 			} else {
-				klog.Errorf("Error while opening file : {%v}. error: {%v}. Means the multipath -f {%v} did not succeed to delete the device.", fullDevice, errOpen.Error(), fullDevice)
+				logger.Errorf("Error while opening file : {%v}. error: {%v}. Means the multipath -f {%v} did not succeed to delete the device.", fullDevice, errOpen.Error(), fullDevice)
 				return errOpen
 			}
 		} else {
-			klog.Errorf("multipath -f {%v} did not succeed to delete the device. err={%v}", fullDevice, err.Error())
+			logger.Errorf("multipath -f {%v} did not succeed to delete the device. err={%v}", fullDevice, err.Error())
 			return err
 		}
 	}
 
-	klog.V(5).Infof("Finshed flushing mpath device : {%v}", mpathDevice)
+	logger.Verbosef(5, "Finshed flushing mpath device : {%v}", mpathDevice)
 	return nil
 
 }
 
 func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(sysDevices []string) error {
 	// sysDevices  = sdb, sda,...
-	klog.V(5).Infof("Removing iscsi device : {%v}", sysDevices)
+	logger.Verbosef(5, "Removing iscsi device : {%v}", sysDevices)
 	// NOTE: this func could be also relevant for SCSI (not only for iSCSI)
 	var (
 		f   *os.File
@@ -195,13 +195,13 @@ func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(sysDevices []string) err
 		}
 
 		filename := fmt.Sprintf("/sys/block/%s/device/delete", deviceName)
-		klog.V(5).Infof("Delete scsi device by open the device delete file : {%v}", filename)
+		logger.Verbosef(5, "Delete scsi device by open the device delete file : {%v}", filename)
 
 		if f, err = os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200); err != nil {
 			if os.IsNotExist(err) {
-				klog.Warningf("Idempotency: Block device {%v} was not found on the system, so skip deleting it", deviceName)
+				logger.Warningf("Idempotency: Block device {%v} was not found on the system, so skip deleting it", deviceName)
 			} else {
-				klog.Errorf("Error while opening file : {%v}. error: {%v}", filename, err.Error())
+				logger.Errorf("Error while opening file : {%v}. error: {%v}", filename, err.Error())
 				return err
 			}
 		}
@@ -209,11 +209,11 @@ func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(sysDevices []string) err
 		defer f.Close()
 
 		if _, err := f.WriteString("1"); err != nil {
-			klog.Errorf("Error while writing to file : {%v}. error: {%v}", filename, err.Error())
+			logger.Errorf("Error while writing to file : {%v}. error: {%v}", filename, err.Error())
 			return err // TODO: maybe we need to just swallow the error and continnue??
 		}
 	}
-	klog.V(5).Infof("Finshed to remove iSCSI devices : {%v}", sysDevices)
+	logger.Verbosef(5, "Finshed to remove iSCSI devices : {%v}", sysDevices)
 	return nil
 }
 
@@ -257,7 +257,7 @@ func (o OsDeviceConnectivityHelperIscsi) WaitForPathToExist(devicePath string, m
 			return nil, false, err
 		}
 
-		klog.V(4).Infof("fpaths : {%v}", fpaths)
+		logger.Verbosef(4, "fpaths : {%v}", fpaths)
 
 		if fpaths == nil {
 			err = os.ErrNotExist
@@ -287,12 +287,12 @@ func (o OsDeviceConnectivityHelperIscsi) GetMultipathDisk(path string) (string, 
 	*/
 
 	// Follow link to destination directory
-	klog.V(5).Infof("Getting multipath device for given path %s", path)
+	logger.Verbosef(5, "Getting multipath device for given path %s", path)
 
 	// Get the sdX which is the file that path link to.
 	devicePath, err := o.executer.OsReadlink(path)
 	if err != nil {
-		klog.Errorf("Error reading link for multipath disk: %s. error: {%s}\n", path, err.Error())
+		logger.Errorf("Error reading link for multipath disk: %s. error: {%s}\n", path, err.Error())
 		return "", err
 	}
 
@@ -302,7 +302,7 @@ func (o OsDeviceConnectivityHelperIscsi) GetMultipathDisk(path string) (string, 
 	// If destination directory is already identified as a multipath device,
 	// just return its path
 	if strings.HasPrefix(sdevice, "dm-") {
-		klog.V(4).Infof("Already found multipath device: %s", sdevice)
+		logger.Verbosef(4, "Already found multipath device: %s", sdevice)
 		return sdevice, nil
 	}
 
@@ -313,13 +313,13 @@ func (o OsDeviceConnectivityHelperIscsi) GetMultipathDisk(path string) (string, 
 	// TODO improve looping by just filepath.Glob("/sys/block/dm-*/slaves/" + sdevice) and then no loops needed below, since it will just find the device directly.
 
 	if err != nil {
-		klog.Errorf("Glob error: %s", err)
+		logger.Errorf("Glob error: %s", err)
 		return "", err
 	}
 	for _, dmPath := range dmPaths {
 		sdevices, err := o.executer.FilepathGlob(filepath.Join(dmPath, "slaves", "*"))
 		if err != nil {
-			klog.Warningf("Glob error: %s", err)
+			logger.Warningf("Glob error: %s", err)
 		}
 		for _, spath := range sdevices {
 			s := filepath.Base(spath)
@@ -331,14 +331,14 @@ func (o OsDeviceConnectivityHelperIscsi) GetMultipathDisk(path string) (string, 
 				//    /sys/block/dm-3/slaves/sdb -> ../../../../platform/host41/session9/target41:0:0/41:0:0:13/block/sdb
 
 				p := filepath.Join("/dev", filepath.Base(dmPath))
-				klog.V(4).Infof("Found matching multipath device: %s under dm-* device path %s", sdevice, dmPath)
+				logger.Verbosef(4, "Found matching multipath device: %s under dm-* device path %s", sdevice, dmPath)
 				return p, nil
 			}
 		}
 	}
 
 	err = &MultipleDeviceNotFoundError{path, devicePath}
-	klog.Errorf(err.Error())
+	logger.Errorf(err.Error())
 	return "", err
 }
 
@@ -354,39 +354,39 @@ func (o OsDeviceConnectivityHelperIscsi) GetIscsiSessionHostsForArrayIQN(arrayId
 	var sessionHosts []int
 	matches, err := o.executer.FilepathGlob(targetNamePath)
 	if err != nil {
-		klog.Errorf("Error while Glob targetNamePath : {%v}. err : {%v}", targetNamePath, err)
+		logger.Errorf("Error while Glob targetNamePath : {%v}. err : {%v}", targetNamePath, err)
 		return sessionHosts, err
 	}
 
-	klog.V(5).Infof("targetname files matches were found : {%v}", matches)
+	logger.Verbosef(5, "targetname files matches were found : {%v}", matches)
 
 	for _, targetPath := range matches {
-		klog.V(5).Infof("Check if targetname path (%s) is relevant for storage target (%s).", targetPath, arrayIdentifier)
+		logger.Verbosef(5, "Check if targetname path (%s) is relevant for storage target (%s).", targetPath, arrayIdentifier)
 		targetName, err := o.executer.IoutilReadFile(targetPath)
 		if err != nil {
-			klog.Warningf("Could not read target name from file : {%v}, error : {%v}", targetPath, err)
+			logger.Warningf("Could not read target name from file : {%v}, error : {%v}", targetPath, err)
 			continue
 		}
 
 		if strings.TrimSpace(string(targetName)) == arrayIdentifier {
 			re := regexp.MustCompile("host([0-9]+)")
 			regexMatch := re.FindStringSubmatch(targetPath)
-			klog.V(6).Infof("Found regex matches : {%v}", regexMatch)
+			logger.Verbose(6, "Found regex matches : {%v}", regexMatch)
 			hostNumber := -1
 
 			if len(regexMatch) < 2 {
-				klog.Warningf("Could not find host number for targetNamePath : {%v}", targetPath)
+				logger.Warningf("Could not find host number for targetNamePath : {%v}", targetPath)
 				continue
 			} else {
 				hostNumber, err = strconv.Atoi(regexMatch[1])
 				if err != nil {
-					klog.Warningf("Host number in for target file was not valid : {%v}", regexMatch[1])
+					logger.Warningf("Host number in for target file was not valid : {%v}", regexMatch[1])
 					continue
 				}
 			}
 
 			sessionHosts = append(sessionHosts, hostNumber)
-			klog.V(5).Infof("targetname path (%s) found relevant for the storage target (%s). Adding host number {%v} to the session list.", targetPath, arrayIdentifier, hostNumber)
+			logger.Verbosef(5, "targetname path (%s) found relevant for the storage target (%s). Adding host number {%v} to the session list.", targetPath, arrayIdentifier, hostNumber)
 
 		}
 	}

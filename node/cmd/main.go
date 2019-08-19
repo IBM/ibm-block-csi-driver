@@ -19,10 +19,11 @@ package main
 import (
 	"flag"
 	"fmt"
+	"k8s.io/klog"
 	"os"
 
 	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
-	"k8s.io/klog"
+	logger "github.com/ibm/ibm-block-csi-driver/node/util"
 )
 
 func main() {
@@ -39,7 +40,7 @@ func main() {
 	if *version {
 		info, err := driver.GetVersionJSON(*configFile)
 		if err != nil {
-			klog.Fatalln(err)
+			logger.Panicln(err)
 		}
 		fmt.Println(info)
 		os.Exit(0)
@@ -47,9 +48,9 @@ func main() {
 
 	drv, err := driver.NewDriver(*endpoint, *configFile, *hostname)
 	if err != nil {
-		klog.Fatalln(err)
+		logger.Panicln(err)
 	}
 	if err := drv.Run(); err != nil {
-		klog.Fatalln(err)
+		logger.Panicln(err)
 	}
 }

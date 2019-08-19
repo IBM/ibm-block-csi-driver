@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	"k8s.io/klog"
+	logger "github.com/ibm/ibm-block-csi-driver/node/util"
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
@@ -86,7 +86,7 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, c
 	connectivityType := publishContext[configYaml.Controller.Publish_context_connectivity_parameter]
 	array_iqn := publishContext[configYaml.Controller.Publish_context_array_iqn]
 
-	klog.V(4).Infof("PublishContext relevant info : connectivityType=%v, lun=%v, array_iqn=%v", connectivityType, lun, array_iqn)
+	logger.Verbosef(4, "PublishContext relevant info : connectivityType=%v, lun=%v, array_iqn=%v", connectivityType, lun, array_iqn)
 	return connectivityType, lun, array_iqn, nil
 }
 
@@ -94,17 +94,17 @@ func (n NodeUtils) WriteStageInfoToFile(filePath string, info map[string]string)
 	// writes to stageTargetPath/filename
 
 	filePath = PrefixChrootOfHostRoot + filePath
-	klog.V(5).Infof("WriteStageInfo file : path {%v}, info {%v}", filePath, info)
+	logger.Verbosef(5, "WriteStageInfo file : path {%v}, info {%v}", filePath, info)
 	stageInfo, err := json.Marshal(info)
 	if err != nil {
-		klog.Errorf("Error marshalling info file %s to json : {%v}", filePath, err.Error())
+		logger.Errorf("Error marshalling info file %s to json : {%v}", filePath, err.Error())
 		return err
 	}
 
 	err = ioutil.WriteFile(filePath, stageInfo, 0600)
 
 	if err != nil {
-		klog.Errorf("Error while writing to file %s: {%v}", filePath, err.Error())
+		logger.Errorf("Error while writing to file %s: {%v}", filePath, err.Error())
 		return err
 	}
 
@@ -115,10 +115,10 @@ func (n NodeUtils) ReadFromStagingInfoFile(filePath string) (map[string]string, 
 	// reads from stageTargetPath/filename
 	filePath = PrefixChrootOfHostRoot + filePath
 
-	klog.V(5).Infof("Read StagingInfoFile : path {%v},", filePath)
+	logger.Verbosef(5, "Read StagingInfoFile : path {%v},", filePath)
 	stageInfo, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		klog.Errorf("error reading file %s. err : {%v}", filePath, err.Error())
+		logger.Errorf("error reading file %s. err : {%v}", filePath, err.Error())
 		return nil, err
 	}
 
@@ -126,7 +126,7 @@ func (n NodeUtils) ReadFromStagingInfoFile(filePath string) (map[string]string, 
 
 	err = json.Unmarshal(stageInfo, &infoMap)
 	if err != nil {
-		klog.Errorf("Error unmarshalling file %s. err : {%v}", filePath, err.Error())
+		logger.Errorf("Error unmarshalling file %s. err : {%v}", filePath, err.Error())
 		return nil, err
 	}
 
@@ -135,23 +135,23 @@ func (n NodeUtils) ReadFromStagingInfoFile(filePath string) (map[string]string, 
 
 func (n NodeUtils) ClearStageInfoFile(filePath string) error {
 	filePath = PrefixChrootOfHostRoot + filePath
-	klog.V(5).Infof("Delete StagingInfoFile : path {%v},", filePath)
+	logger.Verbosef(5, "Delete StagingInfoFile : path {%v},", filePath)
 
 	return os.Remove(filePath)
 }
 
 func (n NodeUtils) GetSysDevicesFromMpath(device string) (string, error) {
 	// this will return the 	/sys/block/dm-3/slaves/
-	klog.V(5).Infof("GetSysDevicesFromMpath with param : {%v}", device)
+	logger.Verbosef(5, "GetSysDevicesFromMpath with param : {%v}", device)
 	deviceSlavePath := path.Join("/sys", "block", device, "slaves")
-	klog.V(4).Infof("looking in path : {%v}", deviceSlavePath)
+	logger.Verbosef(4, "looking in path : {%v}", deviceSlavePath)
 	slaves, err := ioutil.ReadDir(deviceSlavePath)
 	if err != nil {
-		klog.Errorf("an error occured while looking for device slaves : {%v}", err.Error())
+		logger.Errorf("an error occured while looking for device slaves : {%v}", err.Error())
 		return "", err
 	}
 
-	klog.V(4).Infof("found slaves : {%v}", slaves)
+	logger.Verbosef(4, "found slaves : {%v}", slaves)
 	slavesString := ""
 	for _, slave := range slaves {
 		slavesString += "," + slave.Name()
