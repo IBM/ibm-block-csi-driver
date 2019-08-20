@@ -134,7 +134,7 @@ class TestUtils(unittest.TestCase):
     def test_get_create_volume_response(self, get_vol_id):
         new_vol = Mock()
         new_vol.volume_name = "name"
-        new_vol.array_name = ["fqdn1", "fqdn2"]
+        new_vol.array_address = ["fqdn1", "fqdn2"]
 
         new_vol.pool_name = "pool"
         new_vol.array_type = "a9k"

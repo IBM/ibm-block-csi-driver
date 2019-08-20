@@ -375,7 +375,7 @@ Source:
     Driver:            ibm-block-csi-driver
     VolumeHandle:      A9000:6001738CFC9035EB0000000000D1F68F
     ReadOnly:          false
-    VolumeAttributes:      array_name=<IP>
+    VolumeAttributes:      array_address=<IP>
                            pool_name=gold
                            storage.kubernetes.io/csiProvisionerIdentity=1565550204603-8081-ibm-block-csi-driver
                            storage_type=A9000
