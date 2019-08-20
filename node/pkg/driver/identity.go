@@ -23,7 +23,7 @@ import (
 )
 
 func (d *Driver) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
-	logger.Verbosef(5, "GetPluginInfo: called with args %+v", *req)
+	logger.Debugf("GetPluginInfo: called with args %+v", *req)
 	resp := &csi.GetPluginInfoResponse{
 		Name:          d.config.Identity.Name,
 		VendorVersion: d.config.Identity.Version,
@@ -33,7 +33,7 @@ func (d *Driver) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoReques
 }
 
 func (d *Driver) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
-	logger.Verbosef(5, "GetPluginCapabilities: called with args %+v", *req)
+	logger.Debugf("GetPluginCapabilities: called with args %+v", *req)
 	resp := &csi.GetPluginCapabilitiesResponse{
 		Capabilities: []*csi.PluginCapability{
 			{
@@ -50,6 +50,6 @@ func (d *Driver) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCa
 }
 
 func (d *Driver) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
-	logger.Verbosef(6, "Probe: called with args %+v", *req) // Set the debug to 6 so by default it will not be printed.
+	logger.Tracef("Probe: called with args %+v", *req) // Set the debug to 6 so by default it will not be printed.
 	return &csi.ProbeResponse{}, nil
 }

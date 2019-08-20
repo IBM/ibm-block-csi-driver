@@ -124,11 +124,10 @@ func ReadConfigFile(configFilePath string) (ConfigFile, error) {
 	configYamlPath := configFilePath
 	if configYamlPath == "" {
 		configYamlPath = DefualtConfigFile
-		logger.Verbosef(4, "Not found config file environment variable %s. Set default value %s.", EnvNameDriverConfFile, configYamlPath)
+		logger.Debugf("Not found config file environment variable %s. Set default value %s.", EnvNameDriverConfFile, configYamlPath)
 	} else {
-		logger.Verbosef(4, "Config file environment variable %s=%s", EnvNameDriverConfFile, configYamlPath)
-		//level := klog.V(2)
-		//klog.Info(level)
+		logger.Debugf("Config file environment variable %s=%s", EnvNameDriverConfFile, configYamlPath)
+		logger.Info(logger.GetLevel())
 	}
 
 	yamlFile, err := ioutil.ReadFile(configYamlPath)

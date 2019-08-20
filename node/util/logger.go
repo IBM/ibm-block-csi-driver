@@ -18,6 +18,7 @@ package util
 
 import (
 	"bytes"
+	"flag"
 	"fmt"
 	"github.com/sirupsen/logrus"
 	"path/filepath"
@@ -61,6 +62,13 @@ func getInstance() *logrus.Logger {
 		instance.SetReportCaller(true)
 		formatter.TimestampFormat = "2006-01-02 15:04:05.1234567"
 		instance.SetFormatter(&formatter)
+		// set log level
+		logLevel := flag.String("log-level", "debug1", "The level of logs (error, warning info, debug, trace etc...).")
+		level, err := logrus.ParseLevel(*logLevel)
+		if err != nil {
+			logEntry().Panic(err)
+		}
+		instance.SetLevel(level)
 	}
 	return instance
 }
@@ -74,18 +82,6 @@ func logEntry() *logrus.Entry {
 	}
 	logEntry := getInstance().WithFields(logrus.Fields{"gid": strconv.FormatUint(gid, 10), "caller": caller})
 	return logEntry
-}
-
-func Verbose(level int, args ...interface{}) {
-	logEntry().Trace(args...)
-}
-
-func Verboseln(level int, args ...interface{}) {
-	logEntry().Traceln(args...)
-}
-
-func Verbosef(level int, format string, args ...interface{}) {
-	logEntry().Tracef(format, args...)
 }
 
 func Trace(args ...interface{}) {
@@ -170,4 +166,8 @@ func Panicln(args ...interface{}) {
 
 func Panicf(format string, args ...interface{}) {
 	logEntry().Panicf(format, args)
+}
+
+func GetLevel() string {
+	return getInstance().GetLevel().String()
 }

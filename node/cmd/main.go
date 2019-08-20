@@ -19,7 +19,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"k8s.io/klog"
 	"os"
 
 	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
@@ -34,7 +33,6 @@ func main() {
 		hostname   = flag.String("hostname", "host-dns-name", "The name of the host the node is running on.")
 	)
 
-	klog.InitFlags(nil)
 	flag.Parse()
 
 	if *version {

@@ -49,7 +49,7 @@ var (
 )
 
 func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier string) error {
-	logger.Verbosef(5, "Rescan : Start rescan on specific lun, on lun : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
+	logger.Debugf( "Rescan : Start rescan on specific lun, on lun : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
 	sessionHosts, err := r.Helper.GetIscsiSessionHostsForArrayIQN(arrayIdentifier)
 	if err != nil {
 		return err
@@ -68,7 +68,7 @@ func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier stri
 		defer f.Close()
 
 		scanCmd := fmt.Sprintf("0 0 %d", lunId)
-		logger.Verbosef(5, "Rescan host device : echo %s > %s", scanCmd, filename)
+		logger.Debugf( "Rescan host device : echo %s > %s", scanCmd, filename)
 		if written, err := r.Executer.FileWriteString(f, scanCmd); err != nil {
 			logger.Errorf("Rescan Error: could not write to rescan file :{%v}, error : {%v}", filename, err)
 			return err
@@ -80,7 +80,7 @@ func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier stri
 
 	}
 
-	logger.Verbosef(5, "Rescan : finsihed rescan lun on lun id : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
+	logger.Debugf( "Rescan : finsihed rescan lun on lun id : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
 	return nil
 
 }
@@ -100,7 +100,7 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 
 	lunIdStr := strconv.Itoa(lunId)
 	devicePath := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", arrayIdentifier, "lun", lunIdStr}, "-")
-	logger.Verbosef(4, "GetMpathDevice: Get the mpath devices related to arrayIdentifier=%s and lunID=%s : {%v}", arrayIdentifier, lunIdStr, devicePath)
+	logger.Debugf( "GetMpathDevice: Get the mpath devices related to arrayIdentifier=%s and lunID=%s : {%v}", arrayIdentifier, lunIdStr, devicePath)
 
 	devicePaths, exists, err := r.Helper.WaitForPathToExist(devicePath, 5, 1)
 	if err != nil {
@@ -133,7 +133,7 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 	for key := range devicePathTosysfs {
 		mps += ", " + key
 	}
-	logger.Verbosef(4, "GetMpathDevice: Found multipath devices: [%s] that relats to lunId=%d and arrayIdentifier=%s", mps, lunId, arrayIdentifier)
+	logger.Debugf( "GetMpathDevice: Found multipath devices: [%s] that relats to lunId=%d and arrayIdentifier=%s", mps, lunId, arrayIdentifier)
 
 	if len(devicePathTosysfs) > 1 {
 		return "", &MultipleDmDevicesError{volumeId, lunId, arrayIdentifier, devicePathTosysfs}
@@ -151,20 +151,20 @@ func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(mpathDevice string) erro
 	// mpathdevice is dm-4 for example
 	// TODO since this function can be used also for FC SCSI (not only) iSCSI, we should move it out to generic.
 
-	logger.Verbosef(5, "Flushing mpath device : {%v}", mpathDevice)
+	logger.Debugf( "Flushing mpath device : {%v}", mpathDevice)
 
 	fullDevice := "/dev/" + mpathDevice
 
-	logger.Verbosef(5, "Try to acquire lock for running the command multipath -f {%v} (to avoid concurrent multipath commands)", mpathDevice)
+	logger.Debugf( "Try to acquire lock for running the command multipath -f {%v} (to avoid concurrent multipath commands)", mpathDevice)
 	r.MutexMultipathF.Lock()
-	logger.Verbosef(5, "Acquired lock for multipath -f command")
+	logger.Debugf( "Acquired lock for multipath -f command")
 	_, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathFlashCmd, "multipath", []string{"-f", fullDevice})
 	r.MutexMultipathF.Unlock()
 
 	if err != nil {
 		if _, errOpen := os.Open(fullDevice); errOpen != nil {
 			if os.IsNotExist(errOpen) {
-				logger.Verbosef(5, "Mpath device {%v} was deleted", fullDevice)
+				logger.Debugf( "Mpath device {%v} was deleted", fullDevice)
 			} else {
 				logger.Errorf("Error while opening file : {%v}. error: {%v}. Means the multipath -f {%v} did not succeed to delete the device.", fullDevice, errOpen.Error(), fullDevice)
 				return errOpen
@@ -175,14 +175,14 @@ func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(mpathDevice string) erro
 		}
 	}
 
-	logger.Verbosef(5, "Finshed flushing mpath device : {%v}", mpathDevice)
+	logger.Debugf( "Finshed flushing mpath device : {%v}", mpathDevice)
 	return nil
 
 }
 
 func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(sysDevices []string) error {
 	// sysDevices  = sdb, sda,...
-	logger.Verbosef(5, "Removing iscsi device : {%v}", sysDevices)
+	logger.Debugf( "Removing iscsi device : {%v}", sysDevices)
 	// NOTE: this func could be also relevant for SCSI (not only for iSCSI)
 	var (
 		f   *os.File
@@ -195,7 +195,7 @@ func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(sysDevices []string) err
 		}
 
 		filename := fmt.Sprintf("/sys/block/%s/device/delete", deviceName)
-		logger.Verbosef(5, "Delete scsi device by open the device delete file : {%v}", filename)
+		logger.Debugf( "Delete scsi device by open the device delete file : {%v}", filename)
 
 		if f, err = os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200); err != nil {
 			if os.IsNotExist(err) {
@@ -213,7 +213,7 @@ func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(sysDevices []string) err
 			return err // TODO: maybe we need to just swallow the error and continnue??
 		}
 	}
-	logger.Verbosef(5, "Finshed to remove iSCSI devices : {%v}", sysDevices)
+	logger.Debugf( "Finshed to remove iSCSI devices : {%v}", sysDevices)
 	return nil
 }
 
@@ -257,7 +257,7 @@ func (o OsDeviceConnectivityHelperIscsi) WaitForPathToExist(devicePath string, m
 			return nil, false, err
 		}
 
-		logger.Verbosef(4, "fpaths : {%v}", fpaths)
+		logger.Debugf( "fpaths : {%v}", fpaths)
 
 		if fpaths == nil {
 			err = os.ErrNotExist
@@ -287,7 +287,7 @@ func (o OsDeviceConnectivityHelperIscsi) GetMultipathDisk(path string) (string, 
 	*/
 
 	// Follow link to destination directory
-	logger.Verbosef(5, "Getting multipath device for given path %s", path)
+	logger.Debugf( "Getting multipath device for given path %s", path)
 
 	// Get the sdX which is the file that path link to.
 	devicePath, err := o.executer.OsReadlink(path)
@@ -302,7 +302,7 @@ func (o OsDeviceConnectivityHelperIscsi) GetMultipathDisk(path string) (string, 
 	// If destination directory is already identified as a multipath device,
 	// just return its path
 	if strings.HasPrefix(sdevice, "dm-") {
-		logger.Verbosef(4, "Already found multipath device: %s", sdevice)
+		logger.Debugf( "Already found multipath device: %s", sdevice)
 		return sdevice, nil
 	}
 
@@ -331,7 +331,7 @@ func (o OsDeviceConnectivityHelperIscsi) GetMultipathDisk(path string) (string, 
 				//    /sys/block/dm-3/slaves/sdb -> ../../../../platform/host41/session9/target41:0:0/41:0:0:13/block/sdb
 
 				p := filepath.Join("/dev", filepath.Base(dmPath))
-				logger.Verbosef(4, "Found matching multipath device: %s under dm-* device path %s", sdevice, dmPath)
+				logger.Debugf( "Found matching multipath device: %s under dm-* device path %s", sdevice, dmPath)
 				return p, nil
 			}
 		}
@@ -358,10 +358,10 @@ func (o OsDeviceConnectivityHelperIscsi) GetIscsiSessionHostsForArrayIQN(arrayId
 		return sessionHosts, err
 	}
 
-	logger.Verbosef(5, "targetname files matches were found : {%v}", matches)
+	logger.Debugf( "targetname files matches were found : {%v}", matches)
 
 	for _, targetPath := range matches {
-		logger.Verbosef(5, "Check if targetname path (%s) is relevant for storage target (%s).", targetPath, arrayIdentifier)
+		logger.Debugf( "Check if targetname path (%s) is relevant for storage target (%s).", targetPath, arrayIdentifier)
 		targetName, err := o.executer.IoutilReadFile(targetPath)
 		if err != nil {
 			logger.Warningf("Could not read target name from file : {%v}, error : {%v}", targetPath, err)
@@ -371,7 +371,7 @@ func (o OsDeviceConnectivityHelperIscsi) GetIscsiSessionHostsForArrayIQN(arrayId
 		if strings.TrimSpace(string(targetName)) == arrayIdentifier {
 			re := regexp.MustCompile("host([0-9]+)")
 			regexMatch := re.FindStringSubmatch(targetPath)
-			logger.Verbose(6, "Found regex matches : {%v}", regexMatch)
+			logger.Tracef("Found regex matches : {%v}", regexMatch)
 			hostNumber := -1
 
 			if len(regexMatch) < 2 {
@@ -386,7 +386,7 @@ func (o OsDeviceConnectivityHelperIscsi) GetIscsiSessionHostsForArrayIQN(arrayId
 			}
 
 			sessionHosts = append(sessionHosts, hostNumber)
-			logger.Verbosef(5, "targetname path (%s) found relevant for the storage target (%s). Adding host number {%v} to the session list.", targetPath, arrayIdentifier, hostNumber)
+			logger.Debugf( "targetname path (%s) found relevant for the storage target (%s). Adding host number {%v} to the session list.", targetPath, arrayIdentifier, hostNumber)
 
 		}
 	}
