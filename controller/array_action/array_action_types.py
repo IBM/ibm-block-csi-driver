@@ -1,4 +1,5 @@
 class Volume:
+
     def __init__(self, vol_size_bytes, vol_id, vol_name, array_name, pool_name, array_type):
         self.capacity_bytes = vol_size_bytes
         self.id = vol_id

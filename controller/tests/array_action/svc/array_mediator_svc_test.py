@@ -11,6 +11,7 @@ from controller.array_action.config import ISCSI_CONNECTIVITY_TYPE
 
 
 class TestArrayMediatorSVC(unittest.TestCase):
+
     @patch(
         "controller.array_action.array_mediator_svc.SVCArrayMediator._connect")
     def setUp(self, connect):

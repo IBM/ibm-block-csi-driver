@@ -51,7 +51,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
 
         pool = request.parameters[config.PARAMETERS_POOL]
-        capabilities = {key: value for key, value in request.parameters.items() if key in [config.PARAMETERS_CAPABILITIES_SPACEEFFICIENCY]}
+        capabilities = {
+            key: value for key, value in request.parameters.items() if key in [
+                config.PARAMETERS_CAPABILITIES_SPACEEFFICIENCY,
+            ]
+        }
 
         if config.PARAMETERS_PREFIX in request.parameters:
             volume_prefix = request.parameters[config.PARAMETERS_PREFIX]
@@ -102,9 +106,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateVolumeResponse()
         except controller_errors.PermissionDeniedError as ex:
-                context.set_code(grpc.StatusCode.PERMISSION_DENIED)
-                context.set_details(ex)
-                return csi_pb2.CreateVolumeResponse()
+            context.set_code(grpc.StatusCode.PERMISSION_DENIED)
+            context.set_details(ex)
+            return csi_pb2.CreateVolumeResponse()
         except controller_errors.VolumeAlreadyExists as ex:
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.ALREADY_EXISTS)
@@ -189,10 +193,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 mappings = array_mediator.get_volume_mappings(vol_id)
                 if len(mappings) >= 1:
-                    logger.debug("{0} mappings have been found for volume. the mappings are: {1}".format(len(mappings), mappings))
+                    logger.debug(
+                        "{0} mappings have been found for volume. the mappings are: {1}".format(
+                            len(mappings), mappings))
                     if len(mappings) == 1:
                         mapping = list(mappings)[0]
-                        if  mapping == host_name:
+                        if mapping == host_name:
                             logger.debug("idempotent case - volume is already mapped to host.")
                             return utils.generate_csi_publish_volume_response(mappings[mapping], connectivity_type,
                                                                               self.cfg, array_iqn)
@@ -228,13 +234,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.debug("after res")
                 return res
 
-        except (controller_errors.LunAlreadyInUseError, controller_errors.NoAvailableLunError) as ex :
+        except (controller_errors.LunAlreadyInUseError, controller_errors.NoAvailableLunError) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.RESOURCE_EXHAUSTED)
             return csi_pb2.ControllerPublishVolumeResponse()
 
-        except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError, controller_errors.BadNodeIdError) as ex :
+        except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError, controller_errors.BadNodeIdError) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)
@@ -277,7 +283,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 try:
                     array_mediator.unmap_volume(vol_id, host_name)
 
-                except controller_errors.VolumeAlreadyUnmappedError as ex :
+                except controller_errors.VolumeAlreadyUnmappedError as ex:
                     logger.debug("Idempotent case. volume is already unmapped.")
                     return csi_pb2.ControllerUnpublishVolumeResponse()
 
@@ -289,7 +295,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.info("finished ControllerUnpublishVolume")
             return csi_pb2.ControllerUnpublishVolumeResponse()
 
-        except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError) as ex :
+        except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)

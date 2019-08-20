@@ -1,7 +1,7 @@
 from controller.csi_general import csi_pb2
 
 SUPPORTED_FS_TYPES = ["ext4", "xfs"]
- 
+
 access_types = csi_pb2.VolumeCapability.AccessMode
 SUPPORTED_ACCESS_MODE = [access_types.SINGLE_NODE_WRITER]
 
@@ -18,5 +18,3 @@ PARAMETERS_VOLUME_ID_DELIMITER = ":"
 PARAMETERS_NODE_ID_DELIMITER = ";"
 
 SUPPORTED_CONNECTIVITY_TYPES = 1
-
-
