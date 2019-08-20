@@ -52,9 +52,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         pool = request.parameters[config.PARAMETERS_POOL]
         capabilities = {
-            key: value for key,
-            value in request.parameters.items() if key in [
-                config.PARAMETERS_CAPABILITIES_SPACEEFFICIENCY]}
+            key: value for key, value in request.parameters.items() if key in [
+                config.PARAMETERS_CAPABILITIES_SPACEEFFICIENCY,
+            ]
+        }
 
         if config.PARAMETERS_PREFIX in request.parameters:
             volume_prefix = request.parameters[config.PARAMETERS_PREFIX]

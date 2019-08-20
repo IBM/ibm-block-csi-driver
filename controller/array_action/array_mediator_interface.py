@@ -10,7 +10,7 @@ class ArrayMediator:
         it should establish the connection to the storage system.
 
         Args:
-            user : user name for connecting to the endpoint
+            user     : user name for connecting to the endpoint
             password : password for connecting to the endpoint
             endpoint : storage array fqdn or ip
 
@@ -35,10 +35,10 @@ class ArrayMediator:
         This function should create a volume in the storage system.
 
         Args:
-            vol_name : name of the volume to be created in the stoarge system
-            size_in_bytes: size in bytes of the volume
-            capabilities : dict of capabilities {<capbility_name>:<value>}
-            pool : pool name to create the volume in.
+            vol_name      : name of the volume to be created in the stoarge system
+            size_in_bytes : size in bytes of the volume
+            capabilities  : dict of capabilities {<capbility_name>:<value>}
+            pool          : pool name to create the volume in.
 
         Returns:
             volume_id : the volume WWN.
@@ -154,13 +154,13 @@ class ArrayMediator:
         This function will return the iscsi name of the storage array
 
         Args:
-                        None
+            None
 
         Returns:
             iscsi_name : the iscsi address of the storage
 
         Raises:
-                        None
+            None
         """
         raise NotImplementedError
 
@@ -174,7 +174,7 @@ class ArrayMediator:
 
         Returns:
            connectivity_types : list of connectivity types ([iscis, fc] or just [iscsi],..)
-           hostname : the name of the host
+           hostname           : the name of the host
 
         Raises:
             hostNotFound
@@ -211,7 +211,7 @@ class ArrayMediator:
     @abc.abstractmethod
     def port(self):
         """
-        The storage system managment port number.
+        The storage system management port number.
         """
         raise NotImplementedError
 
