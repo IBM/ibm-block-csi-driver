@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"time"
 
-	logger "github.com/ibm/ibm-block-csi-driver/node/util"
+	"github.com/ibm/ibm-block-csi-driver/node/logger"
 )
 
 //go:generate mockgen -destination=../../../mocks/mock_executer.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer ExecuterInterface

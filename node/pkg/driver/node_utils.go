@@ -25,7 +25,7 @@ import (
 	"strconv"
 	"strings"
 
-	logger "github.com/ibm/ibm-block-csi-driver/node/util"
+	"github.com/ibm/ibm-block-csi-driver/node/logger"
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface

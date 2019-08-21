@@ -27,7 +27,7 @@ import (
 	"time"
 
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
-	logger "github.com/ibm/ibm-block-csi-driver/node/util"
+	"github.com/ibm/ibm-block-csi-driver/node/logger"
 )
 
 type OsDeviceConnectivityIscsi struct {

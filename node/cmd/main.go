@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"os"
 
-	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
-	logger "github.com/ibm/ibm-block-csi-driver/node/util"
+	"github.com/ibm/ibm-block-csi-driver/node/logger"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 )
 
 func main() {

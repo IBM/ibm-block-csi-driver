@@ -19,7 +19,7 @@ package driver
 import (
 	"context"
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	logger "github.com/ibm/ibm-block-csi-driver/node/util"
+	"github.com/ibm/ibm-block-csi-driver/node/logger"
 )
 
 func (d *Driver) GetPluginInfo(ctx context.Context, req *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
