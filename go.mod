@@ -5,9 +5,9 @@ go 1.12
 require (
 	github.com/container-storage-interface/spec v1.1.0
 	github.com/golang/mock v1.2.0
-	github.com/kubernetes-csi/csi-lib-iscsi v0.0.0-20190415173011-c545557492f4
-	github.com/tebeka/go2xunit v1.4.10
-	golang.org/x/tools v0.0.0-20190809145639-6d4652c779c4 // indirect
+	github.com/pkg/errors v0.8.1
+	github.com/sirupsen/logrus v1.4.2
+	golang.org/x/net v0.0.0-20190620200207-3b0461eec859 // indirect
 	google.golang.org/grpc v1.22.0
 	gopkg.in/yaml.v2 v2.2.2
 	k8s.io/apimachinery v0.0.0-20190727130956-f97a4e5b4abc // indirect
