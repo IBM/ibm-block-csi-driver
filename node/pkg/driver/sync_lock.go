@@ -19,8 +19,8 @@ package driver
 import (
 	"sync"
 
-	"github.com/ibm/ibm-block-csi-driver/node/util"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
+	"github.com/ibm/ibm-block-csi-driver/node/util"
 )
 
 //go:generate mockgen -destination=../../mocks/mock_sync_lock.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver SyncLockInterface

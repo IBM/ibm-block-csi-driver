@@ -18,7 +18,7 @@
 // It is implemented as decorator for logrus which formats messages in specific manner
 // while adding additional data to each message like goroutine id.
 // E.g. 2019-08-20 17:57:01.820557167	info	[1]	(main.go:83) - my logg message
-// To change log level add argument -log-level <level> (e.g. -log-level debug). Default is info.
+// To change log level add argument -loglevel <level> (e.g. -log-level debug). Default is info.
 
 package logger
 
@@ -44,7 +44,10 @@ var instance *logrus.Logger
 
 // Format the entry which contains log message info
 func (f *LogFormat) Format(entry *logrus.Entry) ([]byte, error) {
-	gid := entry.Data["gid"]
+	goid := entry.Data["goid"]
+	if goid == nil {
+		goid = "unknown"
+	}
 	caller := entry.Data["caller"] // file and line this log is caled from
 	var b *bytes.Buffer
 	if entry.Buffer != nil {
@@ -54,7 +57,7 @@ func (f *LogFormat) Format(entry *logrus.Entry) ([]byte, error) {
 	}
 	b.WriteString(entry.Time.Format(f.TimestampFormat) + "\t")
 	b.WriteString(strings.ToUpper(entry.Level.String()) + "\t")
-	b.WriteString(fmt.Sprintf("%v", "[" + gid.(string)) + "]\t")
+	b.WriteString(fmt.Sprintf("%v", "[" + goid.(string)) + "]\t")
 	b.WriteString("(" + caller.(string) + ") - ")
 	b.WriteString(entry.Message)
 	b.WriteString("\n")
@@ -62,16 +65,17 @@ func (f *LogFormat) Format(entry *logrus.Entry) ([]byte, error) {
 }
 
 // Initialize logrus instance if it was not initialized yet
-// It panics if -log=level is specified but as illegal value
+// It panics if -loglevel is specified but as illegal value
 func getInstance() *logrus.Logger {
 	if instance == nil {
 		formatter := LogFormat{}
 		instance = logrus.New()
 		instance.SetReportCaller(true)
+		// in logrus timestamp format is specified using example
 		formatter.TimestampFormat = "2006-01-02 15:04:05.1234567"
 		instance.SetFormatter(&formatter)
 		// set log level
-		logLevel := flag.String("log-level", "info", "The level of logs (error, warning info, debug, trace etc...).")
+		logLevel := flag.String("loglevel", "trace", "The level of logs (error, warning info, debug, trace etc...).")
 		level, err := logrus.ParseLevel(*logLevel)
 		if err != nil {
 			logEntry().Panic(err)
@@ -85,13 +89,13 @@ func getInstance() *logrus.Logger {
 // 1) goroutine id
 // 2) caller: file and line log was called from
 func logEntry() *logrus.Entry {
-	gid := util.GetGoID()
+	goid := util.GetGoID()
 	_, file, no, ok := runtime.Caller(2)
 	caller := "Unknown"
 	if ok {
 		caller = filepath.Base(file) + ":" + strconv.Itoa(no)
 	}
-	logEntry := getInstance().WithFields(logrus.Fields{"gid": strconv.FormatUint(gid, 10), "caller": caller})
+	logEntry := getInstance().WithFields(logrus.Fields{"goid": strconv.FormatUint(goid, 10), "caller": caller})
 	return logEntry
 }
 

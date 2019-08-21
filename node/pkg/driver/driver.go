@@ -22,8 +22,8 @@ import (
 	"net"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/ibm/ibm-block-csi-driver/node/util"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
+	"github.com/ibm/ibm-block-csi-driver/node/util"
 
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
