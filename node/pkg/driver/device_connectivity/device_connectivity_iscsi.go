@@ -17,13 +17,11 @@
 package device_connectivity
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
@@ -32,15 +30,15 @@ import (
 
 type OsDeviceConnectivityIscsi struct {
 	Executer        executer.ExecuterInterface
-	MutexMultipathF *sync.Mutex
 	Helper          OsDeviceConnectivityHelperIscsiInterface
+	HelperScsiGeneric	OsDeviceConnectivityHelperScsiGenericInterface	
 }
 
 func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityIscsi{
 		Executer:        executer,
-		MutexMultipathF: &sync.Mutex{},
 		Helper:          NewOsDeviceConnectivityHelperIscsi(executer),
+		HelperScsiGeneric:          NewOsDeviceConnectivityHelperScsiGeneric(executer),
 	}
 }
 
@@ -54,35 +52,7 @@ func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier stri
 	if err != nil {
 		return err
 	}
-
-	// TODO the below operations are SCSI and iSCSI, we should move it out to generic package.
-	for _, hostNumber := range sessionHosts {
-
-		filename := fmt.Sprintf("/sys/class/scsi_host/host%d/scan", hostNumber)
-		f, err := r.Executer.OsOpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200)
-		if err != nil {
-			klog.Errorf("Rescan Error: could not open filename : {%v}. err : {%v}", filename, err)
-			return err
-		}
-
-		defer f.Close()
-
-		scanCmd := fmt.Sprintf("0 0 %d", lunId)
-		klog.V(5).Infof("Rescan host device : echo %s > %s", scanCmd, filename)
-		if written, err := r.Executer.FileWriteString(f, scanCmd); err != nil {
-			klog.Errorf("Rescan Error: could not write to rescan file :{%v}, error : {%v}", filename, err)
-			return err
-		} else if written == 0 {
-			e := &ErrorNothingWasWrittenToScanFileError{filename}
-			klog.Errorf(e.Error())
-			return e
-		}
-
-	}
-
-	klog.V(5).Infof("Rescan : finsihed rescan lun on lun id : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
-	return nil
-
+	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifier, sessionHosts)
 }
 
 func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, arrayIdentifier string) (string, error) {
@@ -148,73 +118,11 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 }
 
 func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(mpathDevice string) error {
-	// mpathdevice is dm-4 for example
-	// TODO since this function can be used also for FC SCSI (not only) iSCSI, we should move it out to generic.
-
-	klog.V(5).Infof("Flushing mpath device : {%v}", mpathDevice)
-
-	fullDevice := "/dev/" + mpathDevice
-
-	klog.V(5).Infof("Try to acquire lock for running the command multipath -f {%v} (to avoid concurrent multipath commands)", mpathDevice)
-	r.MutexMultipathF.Lock()
-	klog.V(5).Infof("Acquired lock for multipath -f command")
-	_, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathFlashCmd, "multipath", []string{"-f", fullDevice})
-	r.MutexMultipathF.Unlock()
-
-	if err != nil {
-		if _, errOpen := os.Open(fullDevice); errOpen != nil {
-			if os.IsNotExist(errOpen) {
-				klog.V(5).Infof("Mpath device {%v} was deleted", fullDevice)
-			} else {
-				klog.Errorf("Error while opening file : {%v}. error: {%v}. Means the multipath -f {%v} did not succeed to delete the device.", fullDevice, errOpen.Error(), fullDevice)
-				return errOpen
-			}
-		} else {
-			klog.Errorf("multipath -f {%v} did not succeed to delete the device. err={%v}", fullDevice, err.Error())
-			return err
-		}
-	}
-
-	klog.V(5).Infof("Finshed flushing mpath device : {%v}", mpathDevice)
-	return nil
-
+	return r.HelperScsiGeneric.FlushMultipathDevice(mpathDevice)
 }
 
 func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(sysDevices []string) error {
-	// sysDevices  = sdb, sda,...
-	klog.V(5).Infof("Removing iscsi device : {%v}", sysDevices)
-	// NOTE: this func could be also relevant for SCSI (not only for iSCSI)
-	var (
-		f   *os.File
-		err error
-	)
-
-	for _, deviceName := range sysDevices {
-		if deviceName == "" {
-			continue
-		}
-
-		filename := fmt.Sprintf("/sys/block/%s/device/delete", deviceName)
-		klog.V(5).Infof("Delete scsi device by open the device delete file : {%v}", filename)
-
-		if f, err = os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200); err != nil {
-			if os.IsNotExist(err) {
-				klog.Warningf("Idempotency: Block device {%v} was not found on the system, so skip deleting it", deviceName)
-			} else {
-				klog.Errorf("Error while opening file : {%v}. error: {%v}", filename, err.Error())
-				return err
-			}
-		}
-
-		defer f.Close()
-
-		if _, err := f.WriteString("1"); err != nil {
-			klog.Errorf("Error while writing to file : {%v}. error: {%v}", filename, err.Error())
-			return err // TODO: maybe we need to just swallow the error and continnue??
-		}
-	}
-	klog.V(5).Infof("Finshed to remove iSCSI devices : {%v}", sysDevices)
-	return nil
+	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
 }
 
 // ============== OsDeviceConnectivityHelperIscsiInterface ==========================
@@ -397,3 +305,6 @@ func (o OsDeviceConnectivityHelperIscsi) GetIscsiSessionHostsForArrayIQN(arrayId
 	return sessionHosts, nil
 
 }
+
+
+
