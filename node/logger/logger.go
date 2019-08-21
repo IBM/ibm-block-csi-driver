@@ -160,27 +160,27 @@ func Errorf(format string, args ...interface{}) {
 }
 
 func Fatal(args ...interface{}) {
-	logEntry().Fatal(args)
+	logEntry().Fatal(args...)
 }
 
 func Fatalln(args ...interface{}) {
-	logEntry().Fatalln(args)
+	logEntry().Fatalln(args...)
 }
 
 func Fatalf(format string, args ...interface{}) {
-	logEntry().Fatalf(format, args)
+	logEntry().Fatalf(format, args...)
 }
 
 func Panic(args ...interface{}) {
-	logEntry().Panic(args)
+	logEntry().Panic(args...)
 }
 
 func Panicln(args ...interface{}) {
-	logEntry().Panicln(args)
+	logEntry().Panicln(args...)
 }
 
 func Panicf(format string, args ...interface{}) {
-	logEntry().Panicf(format, args)
+	logEntry().Panicf(format, args...)
 }
 
 func GetLevel() string {
