@@ -15,7 +15,7 @@ Supported IBM storage systems:
 Supported operating systems:
   - RHEL 7.x (x86 architecture)
 
-DISCLAIMER: The cDriver Installationode is provided as is, without warranty. Any issue will be handled on a best-effort basis.
+DISCLAIMER: The Driver is provided as is, without warranty. Any issue will be handled on a best-effort basis.
 
 
 ## Table of content:
@@ -26,9 +26,8 @@ DISCLAIMER: The cDriver Installationode is provided as is, without warranty. Any
     - Configure the k8s storage class - to define the storage system pool name, secret referance, SpaceEfficiency(Thin, Compressed or Deduplicated) and fstype(xfs\ext4).
     - Storage system secret - to define the storage credential(user and password) and its address.
 * [Driver Usage](#driver-usage)
-    - Example of how to create PVC and Statefulset application, with full detail behind the scenes.
+    - Create PVC and Statefulset application, with full detail behind the scenes.
 * [Driver Uninstallation](#driver-uninstallation)
-* [Roadmap](#roadmap)
 
 
 ## Prerequisite for Driver Installation
@@ -107,7 +106,9 @@ In Kubernetes v1.13, because the feature was alpha, it was disabled by default. 
 If the feature gate was not enabled then CSIDriver for the ibm-block-csi-driver will not be created automatically.
 
 
-
+<br/>
+<br/>
+<br/>
 
 
 
@@ -205,6 +206,10 @@ $> kubectl log -f -n kube-system ibm-block-csi-node-<PODID> ibm-block-csi-node
 ```
 
 
+<br/>
+<br/>
+<br/>
+
 ## Configure k8s storage class and secret
 The driver is running but in order to use it, one should create the relevant storage classes and secrets as needed.
 
@@ -265,6 +270,11 @@ storageclass.storage.k8s.io/gold created
 Now you can run stateful applications using IBM block storage systems.
 
 
+
+
+<br/>
+<br/>
+<br/>
 
 
 ## Driver Usage
@@ -371,6 +381,13 @@ Source:
                            storage_type=A9000
                            volume_name=demo1_pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d5f
 Events:                <none>
+
+##### View the newly created volume on the storage system side of thing (Using XCLI utility):
+$> xcli vol_list pool=gold 
+Name                                             Size (GB)   Master Name   Consistency Group   Pool   Creator   Written (GB)   
+------------------------------------------------ ----------- ------------- ------------------- ------ --------- -------------- 
+demo1_pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d5f   1                                             gold   admin     0
+
 ```
 
 
@@ -533,6 +550,9 @@ No resources found.
 
 
 
+<br/>
+<br/>
+<br/>
 
 ## Driver Uninstallation
 
@@ -549,12 +569,9 @@ $> kubectl delete CSIDriver ibm-block-csi-driver
 ```
 
 
-## Roadmap
-- CSI Operator as improved deployment method -> [github.com/ibm/ibm-block-csi-driver-operator](github.com/ibm/ibm-block-csi-driver-operator)
-- Openshift 4.2 support (+CoreOS worker nodes)
-- CSI Snapshots
-- NVME support
-- Stay tune...
+<br/>
+<br/>
+<br/>
 
 ## Licensing
 
