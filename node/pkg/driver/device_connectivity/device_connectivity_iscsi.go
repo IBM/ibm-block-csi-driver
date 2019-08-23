@@ -28,6 +28,7 @@ import (
 
 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"k8s.io/klog"
+	"errors"
 )
 
 type OsDeviceConnectivityIscsi struct {
@@ -51,7 +52,7 @@ var (
 func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifiers []string) error {
 	klog.V(5).Infof("Rescan : Start rescan on specific lun, on lun : {%v}, with array iqn : {%v}", lunId, arrayIdentifiers)
 	var sessionHosts []int
-	var err error
+	var errStrings []string
 
 	if len(arrayIdentifiers) == 0 {
 		e := &ErrorNotFoundArrayIdentifiers{lunId}
@@ -60,14 +61,15 @@ func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifiers []s
 	}
 
 	for _, iqn := range arrayIdentifiers{
-		h, e := r.Helper.GetIscsiSessionHostsForArrayIQN(iqn)
+		hostsId, e := r.Helper.GetIscsiSessionHostsForArrayIQN(iqn)
 		if e != nil {
 			klog.Errorf(e.Error())
-			err = e
+			errStrings = append(errStrings, e.Error())
 		}
-		sessionHosts = append(sessionHosts, h...)
+		sessionHosts = append(sessionHosts, hostsId...)
 	}
-	if len(sessionHosts) == 0 && err != nil {
+	if len(sessionHosts) == 0 && len(errStrings) != 0 {
+		err := errors.New(strings.Join(errStrings, ","))
 		return err
 	}
 
@@ -113,7 +115,7 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 			   Return Value: "dm-X" of the volumeID by using the LunID and the arrayIqn.
 	*/
 	var devicePaths []string
-	var err error
+	var errStrings []string
 	lunIdStr := strconv.Itoa(lunId)
 
 	if len(arrayIdentifiers) == 0 {
@@ -127,15 +129,16 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 		dps, exists, e := r.Helper.WaitForPathToExist(dp, 5, 1)
 		if e != nil {
 			klog.Errorf("GetMpathDevice: No device found error : %v ", e.Error())
-			err = e
+			errStrings = append(errStrings, e.Error())
 		} else if !exists {
 			e := &MultipleDeviceNotFoundForLunError{volumeId, lunId, []string{iqn}}
 			klog.Errorf(e.Error())
-			err = e
+			errStrings = append(errStrings, e.Error())
 		}
 		devicePaths = append(devicePaths, dps...)
 	}
-	if len(devicePaths) == 0 && err != nil {
+	if len(devicePaths) == 0 && len(errStrings) != 0 {
+		err := errors.New(strings.Join(errStrings, ","))
 		return "", err
 	}
 
@@ -163,9 +166,8 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 
 	if len(devicePathTosysfs) > 1 {
 		return "", &MultipleDmDevicesError{volumeId, lunId, arrayIdentifiers, devicePathTosysfs}
-	} else if len(devicePathTosysfs) == 0 {
-		return "", &MultipleDeviceNotFoundForLunError{volumeId, lunId, arrayIdentifiers}
 	}
+
 	var md string
 	for md = range devicePathTosysfs {
 		break // because its a single value in the map(1 mpath device, if not it should fail above), so just take the first
