@@ -29,16 +29,16 @@ import (
 )
 
 type OsDeviceConnectivityIscsi struct {
-	Executer        executer.ExecuterInterface
-	Helper          OsDeviceConnectivityHelperIscsiInterface
-	HelperScsiGeneric	OsDeviceConnectivityHelperScsiGenericInterface	
+	Executer          executer.ExecuterInterface
+	Helper            OsDeviceConnectivityHelperIscsiInterface
+	HelperScsiGeneric OsDeviceConnectivityHelperScsiGenericInterface
 }
 
 func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityIscsi{
-		Executer:        executer,
-		Helper:          NewOsDeviceConnectivityHelperIscsi(executer),
-		HelperScsiGeneric:          NewOsDeviceConnectivityHelperScsiGeneric(executer),
+		Executer:          executer,
+		Helper:            NewOsDeviceConnectivityHelperIscsi(executer),
+		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer),
 	}
 }
 
@@ -305,6 +305,3 @@ func (o OsDeviceConnectivityHelperIscsi) GetIscsiSessionHostsForArrayIQN(arrayId
 	return sessionHosts, nil
 
 }
-
-
-

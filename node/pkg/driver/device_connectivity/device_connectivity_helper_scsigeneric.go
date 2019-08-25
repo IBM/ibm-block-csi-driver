@@ -25,7 +25,6 @@ import (
 	"k8s.io/klog"
 )
 
-
 //go:generate mockgen -destination=../../../mocks/mock_OsDeviceConnectivityHelperScsiGenericInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity OsDeviceConnectivityHelperScsiGenericInterface
 
 type OsDeviceConnectivityHelperScsiGenericInterface interface {
@@ -39,13 +38,13 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 }
 
 type OsDeviceConnectivityHelperScsiGeneric struct {
-	Executer executer.ExecuterInterface
-	MutexMultipathF *sync.Mutex	
+	Executer        executer.ExecuterInterface
+	MutexMultipathF *sync.Mutex
 }
 
 func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperScsiGenericInterface {
 	return &OsDeviceConnectivityHelperScsiGeneric{
-		Executer: executer,
+		Executer:        executer,
 		MutexMultipathF: &sync.Mutex{},
 	}
 }
@@ -79,8 +78,6 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 	return nil
 }
 
-
-
 func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice string) error {
 	// mpathdevice is dm-4 for example
 	klog.V(5).Infof("Flushing mpath device : {%v}", mpathDevice)
@@ -111,8 +108,6 @@ func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice 
 	return nil
 
 }
-
-
 
 func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices []string) error {
 	// sysDevices  = sdb, sda,...
@@ -150,4 +145,3 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 	klog.V(5).Infof("Finshed to remove iSCSI devices : {%v}", sysDevices)
 	return nil
 }
-

@@ -38,12 +38,12 @@ type WaitForPathToExistReturn struct {
 func NewOsDeviceConnectivityIscsiForTest(
 	executer executer.ExecuterInterface,
 	helper device_connectivity.OsDeviceConnectivityHelperIscsiInterface,
-    helperScsiGeneric	device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface,
+	helperScsiGeneric device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface,
 ) device_connectivity.OsDeviceConnectivityInterface {
 	return &device_connectivity.OsDeviceConnectivityIscsi{
-		Executer:          executer,		
+		Executer:          executer,
 		Helper:            helper,
-		HelperScsiGeneric: helperScsiGeneric,		
+		HelperScsiGeneric: helperScsiGeneric,
 	}
 }
 
