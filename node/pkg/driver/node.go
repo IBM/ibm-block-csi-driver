@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"os"
 	"path"
-	"strings"
 	"path/filepath"
+	"strings"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	device_connectivity "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"

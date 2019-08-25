@@ -19,8 +19,8 @@ package device_connectivity
 import (
 	"fmt"
 	"os"
-	"sync"
 	"path/filepath"
+	"sync"
 
 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"k8s.io/klog"
