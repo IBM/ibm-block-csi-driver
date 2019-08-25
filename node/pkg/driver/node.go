@@ -22,6 +22,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"path/filepath"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	device_connectivity "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
@@ -329,7 +330,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	mpathDevice := "/dev/" + infoMap["mpathDevice"]
+	mpathDevice := filepath.Join(device_connectivity.DevPath, infoMap["mpathDevice"])
 	klog.V(4).Infof("Got info from stageInfo file. device : {%v}", mpathDevice)
 
 	klog.V(5).Infof("Check if targetPath {%s} exist in mount list", targetPath)

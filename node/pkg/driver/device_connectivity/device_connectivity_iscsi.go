@@ -46,6 +46,10 @@ var (
 	TimeOutMultipathFlashCmd = 4 * 1000
 )
 
+const (
+	DevPath = "/dev"
+)
+
 func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier string) error {
 	klog.V(5).Infof("Rescan : Start rescan on specific lun, on lun : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
 	sessionHosts, err := r.Helper.GetIscsiSessionHostsForArrayIQN(arrayIdentifier)
@@ -242,7 +246,7 @@ func (o OsDeviceConnectivityHelperIscsi) GetMultipathDisk(path string) (string, 
 				//   ls -l  /sys/block/dm-*/slaves/*
 				//    /sys/block/dm-3/slaves/sdb -> ../../../../platform/host41/session9/target41:0:0/41:0:0:13/block/sdb
 
-				p := filepath.Join("/dev", filepath.Base(dmPath))
+				p := filepath.Join(DevPath, filepath.Base(dmPath))
 				klog.V(4).Infof("Found matching multipath device: %s under dm-* device path %s", sdevice, dmPath)
 				return p, nil
 			}

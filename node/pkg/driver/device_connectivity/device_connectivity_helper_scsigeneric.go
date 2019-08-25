@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"path/filepath"
 
 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"k8s.io/klog"
@@ -82,7 +83,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice 
 	// mpathdevice is dm-4 for example
 	klog.V(5).Infof("Flushing mpath device : {%v}", mpathDevice)
 
-	fullDevice := "/dev/" + mpathDevice
+	fullDevice := filepath.Join(DevPath, mpathDevice)
 
 	klog.V(5).Infof("Try to acquire lock for running the command multipath -f {%v} (to avoid concurrent multipath commands)", mpathDevice)
 	r.MutexMultipathF.Lock()
