@@ -21,7 +21,6 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
-	"sync"
 	"testing"
 
 	gomock "github.com/golang/mock/gomock"
@@ -36,12 +35,15 @@ type WaitForPathToExistReturn struct {
 	err         error
 }
 
-func NewOsDeviceConnectivityIscsiForTest(executer executer.ExecuterInterface,
-	helper device_connectivity.OsDeviceConnectivityHelperIscsiInterface) device_connectivity.OsDeviceConnectivityInterface {
+func NewOsDeviceConnectivityIscsiForTest(
+	executer executer.ExecuterInterface,
+	helper device_connectivity.OsDeviceConnectivityHelperIscsiInterface,
+    helperScsiGeneric	device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface,
+) device_connectivity.OsDeviceConnectivityInterface {
 	return &device_connectivity.OsDeviceConnectivityIscsi{
-		Executer:        executer,
-		MutexMultipathF: &sync.Mutex{},
-		Helper:          helper,
+		Executer:          executer,		
+		Helper:            helper,
+		HelperScsiGeneric: helperScsiGeneric,		
 	}
 }
 
@@ -198,6 +200,7 @@ func TestGetMpathDevice(t *testing.T) {
 
 			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
 			fake_helper := mocks.NewMockOsDeviceConnectivityHelperIscsiInterface(mockCtrl)
+			fake_helper_scsi_generic := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtrl)
 			lunId := 0
 			arrayIdentifier := "X"
 			path := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", arrayIdentifier, "lun", strconv.Itoa(lunId)}, "-")
@@ -214,7 +217,7 @@ func TestGetMpathDevice(t *testing.T) {
 			}
 			gomock.InOrder(mcalls...)
 
-			o := NewOsDeviceConnectivityIscsiForTest(fake_executer, fake_helper)
+			o := NewOsDeviceConnectivityIscsiForTest(fake_executer, fake_helper, fake_helper_scsi_generic)
 			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, arrayIdentifier)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
