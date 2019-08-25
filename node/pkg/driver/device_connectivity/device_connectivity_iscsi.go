@@ -68,6 +68,10 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 	*/
 	var devicePaths []string
 
+	// TODO this function also can be generic for FC\iscsi, consider to refactor. See potential change below:
+	//      iSCSI -> /dev/disk/by-path/ip*-iscsi-<Array-WWN>-lun-<LUN-ID>
+	//      FC    -> /dev/disk/by-path/pci-*-fc-<Array-WWN>-lun-<LUN-ID>
+
 	lunIdStr := strconv.Itoa(lunId)
 	devicePath := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", arrayIdentifier, "lun", lunIdStr}, "-")
 	klog.V(4).Infof("GetMpathDevice: Get the mpath devices related to arrayIdentifier=%s and lunID=%s : {%v}", arrayIdentifier, lunIdStr, devicePath)
