@@ -429,8 +429,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_get_array_iscsi_name_without_node(self):
         self.svc.client.svcinfo.lsnode.return_value = []
-        iqn = self.svc.get_array_iscsi_name()
-        self.assertEqual(iqn, '')
+        iqns = self.svc.get_array_iscsi_name()
+        self.assertEqual(iqns, [])
 
     def test_get_array_iscsi_name_with_no_online_node(self):
         node = Munch({'id': '1',
@@ -438,8 +438,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
                       'iscsi_name': 'iqn.1986-03.com.ibm:2145.v7k1.node1',
                       'status': 'offline'})
         self.svc.client.svcinfo.lsnode.return_value = [node]
-        iqn = self.svc.get_array_iscsi_name()
-        self.assertEqual(iqn, '')
+        iqns = self.svc.get_array_iscsi_name()
+        self.assertEqual(iqns, [])
 
     def test_get_array_iscsi_name_with_nore_nodes(self):
         node1 = Munch({'id': '1',
@@ -451,6 +451,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                        'iscsi_name': 'iqn.1986-03.com.ibm:2145.v7k1.node2',
                        'status': 'online'})
         self.svc.client.svcinfo.lsnode.return_value = [node1, node2]
-        iqn = self.svc.get_array_iscsi_name()
-        self.assertEqual(
-            iqn, "iqn.1986-03.com.ibm:2145.v7k1.node1,iqn.1986-03.com.ibm:2145.v7k1.node2")
+        iqns = self.svc.get_array_iscsi_name()
+        self.assertEqual(iqns,
+                         ["iqn.1986-03.com.ibm:2145.v7k1.node1",
+                          "iqn.1986-03.com.ibm:2145.v7k1.node2"])

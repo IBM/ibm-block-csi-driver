@@ -185,7 +185,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 connectivity_type = utils.choose_connectivity_type(connectivity_types)
 
-                array_iqn = array_mediator.get_array_iscsi_name()
+                array_iqns = array_mediator.get_array_iscsi_name()
 
                 mappings = array_mediator.get_volume_mappings(vol_id)
                 if len(mappings) >= 1:
@@ -195,7 +195,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         if  mapping == host_name:
                             logger.debug("idempotent case - volume is already mapped to host.")
                             return utils.generate_csi_publish_volume_response(mappings[mapping], connectivity_type,
-                                                                              self.cfg, array_iqn)
+                                                                              self.cfg, array_iqns)
 
                     logger.error(messages.more_then_one_mapping_message.format(mappings))
                     context.set_details(messages.more_then_one_mapping_message.format(mappings))
@@ -224,7 +224,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     return csi_pb2.ControllerPublishVolumeResponse()
 
                 logger.info("finished ControllerPublishVolume")
-                res = utils.generate_csi_publish_volume_response(lun, connectivity_type, self.cfg, array_iqn)
+                res = utils.generate_csi_publish_volume_response(lun, connectivity_type, self.cfg, array_iqns)
                 logger.debug("after res")
                 return res
 
