@@ -49,8 +49,8 @@ var (
 	TimeOutMultipathFlashCmd = 4 * 1000
 )
 
-func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier string) error {
-	logger.Debugf( "Rescan : Start rescan on specific lun, on lun : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
+func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifiers []string) error {
+	logger.Debugf( "Rescan : Start rescan on specific lun, on lun : {%v}, with array iqn : {%v}", lunId, arrayIdentifiers)
 	var sessionHosts []int
 	var errStrings []string
 
@@ -97,7 +97,6 @@ func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier stri
 		}
 
 	}
-
 
 	logger.Infof("Rescan : finsihed rescan lun on lun id : {%v}, with array iqns : {%v}", lunId, arrayIdentifiers)
 	return nil
