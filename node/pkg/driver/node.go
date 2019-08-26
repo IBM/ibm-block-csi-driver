@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -87,8 +88,8 @@ func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsI
 }
 
 func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	logger.Debugf( ">>>> NodeStageVolume [goid=%d]: called with args %+v", util.GetGoID(), *req)
-	defer logger.Debugf( "<<<< NodeStageVolume [goid=%d]", util.GetGoID())
+	logger.Debugf(">>>> NodeStageVolume [goid=%d]: called with args %+v", util.GetGoID(), *req)
+	defer logger.Debugf("<<<< NodeStageVolume [goid=%d]", util.GetGoID())
 
 	err := d.nodeStageVolumeRequestValidation(req)
 	if err != nil {
@@ -174,7 +175,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	logger.Debugf( "NodeStageVolume Finished: multipath device is ready [%s] to be mounted by NodePublishVolume API.", baseDevice)
+	logger.Debugf("NodeStageVolume Finished: multipath device is ready [%s] to be mounted by NodePublishVolume API.", baseDevice)
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
@@ -226,8 +227,8 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 }
 
 func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	logger.Debugf( ">>>> NodeUnstageVolume [goid=%d]: called with args %+v", util.GetGoID(), *req)
-	defer logger.Debugf( "<<<< NodeUnstageVolume [goid=%d]", util.GetGoID())
+	logger.Debugf(">>>> NodeUnstageVolume [goid=%d]: called with args %+v", util.GetGoID(), *req)
+	defer logger.Debugf("<<<< NodeUnstageVolume [goid=%d]", util.GetGoID())
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
@@ -248,7 +249,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return nil, status.Error(codes.InvalidArgument, "Staging target not provided")
 	}
 
-	logger.Debugf( "Reading stage info file")
+	logger.Debugf("Reading stage info file")
 	stageInfoPath := path.Join(stagingTargetPath, stageInfoFilename)
 	infoMap, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
 	if err != nil {
@@ -260,13 +261,13 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
-	logger.Debugf( "Reading stage info file detail : {%v}", infoMap)
+	logger.Debugf("Reading stage info file detail : {%v}", infoMap)
 
 	connectivityType := infoMap["connectivity"]
 	mpathDevice := infoMap["mpathDevice"]
 	sysDevices := strings.Split(infoMap["sysDevices"], ",")
 
-	logger.Debugf( "Got info from stageInfo file. connectivity : {%v}. device : {%v}, sysDevices : {%v}", connectivityType, mpathDevice, sysDevices)
+	logger.Debugf("Got info from stageInfo file. connectivity : {%v}. device : {%v}, sysDevices : {%v}", connectivityType, mpathDevice, sysDevices)
 
 	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
 	if !ok {
@@ -286,14 +287,14 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return nil, status.Errorf(codes.Internal, "Fail to clear the stage info file: error %v", err)
 	}
 
-	logger.Debugf( "NodeUnStageVolume Finished: multipath device removed from host")
+	logger.Debugf("NodeUnStageVolume Finished: multipath device removed from host")
 
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
 func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	logger.Debugf( ">>>> NodePublishVolume [goid=%d]: called with args %+v", util.GetGoID(), *req)
-	defer logger.Debugf( "<<<< NodePublishVolume [goid=%d]", util.GetGoID())
+	logger.Debugf(">>>> NodePublishVolume [goid=%d]: called with args %+v", util.GetGoID(), *req)
+	defer logger.Debugf("<<<< NodePublishVolume [goid=%d]", util.GetGoID())
 
 	err := d.nodePublishVolumeRequestValidation(req)
 	if err != nil {
@@ -318,7 +319,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	targetPath := req.GetTargetPath()
 	targetPathWithHostPrefix := path.Join(PrefixChrootOfHostRoot, targetPath)
 
-	logger.Debugf( "stagingPath : {%v}, targetPath : {%v}", stagingPath, targetPath)
+	logger.Debugf("stagingPath : {%v}, targetPath : {%v}", stagingPath, targetPath)
 
 	// Read staging info file in order to find the mpath device for mounting.
 	stageInfoPath := path.Join(stagingPath, stageInfoFilename)
@@ -329,13 +330,13 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	mpathDevice := "/dev/" + infoMap["mpathDevice"]
-	logger.Debugf( "Got info from stageInfo file. device : {%v}", mpathDevice)
+	mpathDevice := filepath.Join(device_connectivity.DevPath, infoMap["mpathDevice"])
+	logger.Debugf("Got info from stageInfo file. device : {%v}", mpathDevice)
 
-	logger.Debugf( "Check if targetPath {%s} exist in mount list", targetPath)
+	logger.Debugf("Check if targetPath {%s} exist in mount list", targetPath)
 	mountList, err := d.mounter.List()
 	for _, mount := range mountList {
-		logger.Tracef( "Check if mount path({%v}) [with device({%v})] is equel to targetPath {%s}", mount.Path, mount.Device, targetPath)
+		logger.Tracef("Check if mount path({%v}) [with device({%v})] is equel to targetPath {%s}", mount.Path, mount.Device, targetPath)
 		if mount.Path == targetPathWithHostPrefix {
 			if mount.Device == mpathDevice {
 				logger.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume.", targetPath)
@@ -356,21 +357,21 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 
 	if _, err := os.Stat(targetPathWithHostPrefix); os.IsNotExist(err) {
-		logger.Debugf( "Target path directory does not exist. creating : {%v}", targetPathWithHostPrefix)
+		logger.Debugf("Target path directory does not exist. creating : {%v}", targetPathWithHostPrefix)
 		d.mounter.MakeDir(targetPathWithHostPrefix)
 	}
 
-	logger.Debugf( "Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
+	logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
 
-	logger.Debugf( "FormatAndMount start [goid=%d]", util.GetGoID())
+	logger.Debugf("FormatAndMount start [goid=%d]", util.GetGoID())
 	err = d.mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 	// TODO: pass mount options
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	logger.Debugf( "FormatAndMount end [goid=%d]", util.GetGoID())
+	logger.Debugf("FormatAndMount end [goid=%d]", util.GetGoID())
 
-	logger.Debugf( "NodePublishVolume Finished: multipath device is now mounted to targetPath.")
+	logger.Debugf("NodePublishVolume Finished: multipath device is now mounted to targetPath.")
 
 	return &csi.NodePublishVolumeResponse{}, nil
 }
@@ -410,8 +411,8 @@ func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVol
 }
 
 func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	logger.Debugf( ">>>> NodeUnpublishVolume [goid=%d]: called with args %+v", util.GetGoID(), *req)
-	defer logger.Debugf( "<<<< NodeUnpublishVolume [goid=%d]", util.GetGoID())
+	logger.Debugf(">>>> NodeUnpublishVolume [goid=%d]: called with args %+v", util.GetGoID(), *req)
+	defer logger.Debugf("<<<< NodeUnpublishVolume [goid=%d]", util.GetGoID())
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
@@ -430,7 +431,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return nil, status.Error(codes.InvalidArgument, "Target path not provided")
 	}
 
-	logger.Debugf( "NodeUnpublishVolume: unmounting %s", target)
+	logger.Debugf("NodeUnpublishVolume: unmounting %s", target)
 	err = d.mounter.Unmount(target)
 	if err != nil {
 		if strings.Contains(err.Error(), "not mounted") {
@@ -453,8 +454,8 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 }
 
 func (d *NodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	logger.Debugf( ">>>> NodeGetCapabilities [goid=%d]: called with args %+v", util.GetGoID(), *req)
-	defer logger.Debugf( "<<<< NodeGetCapabilities [goid=%d]", util.GetGoID())
+	logger.Debugf(">>>> NodeGetCapabilities [goid=%d]: called with args %+v", util.GetGoID(), *req)
+	defer logger.Debugf("<<<< NodeGetCapabilities [goid=%d]", util.GetGoID())
 
 	var caps []*csi.NodeServiceCapability
 	for _, cap := range nodeCaps {
@@ -471,8 +472,8 @@ func (d *NodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 }
 
 func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
-	logger.Debugf( ">>>> NodeGetInfo: called with args %+v", *req)
-	defer logger.Debugf( "<<<< NodeGetInfo")
+	logger.Debugf(">>>> NodeGetInfo: called with args %+v", *req)
+	defer logger.Debugf("<<<< NodeGetInfo")
 
 	iscsiIQN, err := d.NodeUtils.ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi")
 	if err != nil {
@@ -482,7 +483,7 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	delimiter := ";"
 
 	nodeId := d.Hostname + delimiter + iscsiIQN
-	logger.Debugf( "node id is : %s", nodeId)
+	logger.Debugf("node id is : %s", nodeId)
 
 	return &csi.NodeGetInfoResponse{
 		NodeId: nodeId,

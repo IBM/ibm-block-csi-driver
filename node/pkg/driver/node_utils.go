@@ -94,7 +94,7 @@ func (n NodeUtils) WriteStageInfoToFile(filePath string, info map[string]string)
 	// writes to stageTargetPath/filename
 
 	filePath = PrefixChrootOfHostRoot + filePath
-	logger.Debugf( "WriteStageInfo file : path {%v}, info {%v}", filePath, info)
+	logger.Debugf("WriteStageInfo file : path {%v}, info {%v}", filePath, info)
 	stageInfo, err := json.Marshal(info)
 	if err != nil {
 		logger.Errorf("Error marshalling info file %s to json : {%v}", filePath, err.Error())
@@ -115,7 +115,7 @@ func (n NodeUtils) ReadFromStagingInfoFile(filePath string) (map[string]string, 
 	// reads from stageTargetPath/filename
 	filePath = PrefixChrootOfHostRoot + filePath
 
-	logger.Debugf( "Read StagingInfoFile : path {%v},", filePath)
+	logger.Debugf("Read StagingInfoFile : path {%v},", filePath)
 	stageInfo, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		logger.Errorf("error reading file %s. err : {%v}", filePath, err.Error())
@@ -135,23 +135,23 @@ func (n NodeUtils) ReadFromStagingInfoFile(filePath string) (map[string]string, 
 
 func (n NodeUtils) ClearStageInfoFile(filePath string) error {
 	filePath = PrefixChrootOfHostRoot + filePath
-	logger.Debugf( "Delete StagingInfoFile : path {%v},", filePath)
+	logger.Debugf("Delete StagingInfoFile : path {%v},", filePath)
 
 	return os.Remove(filePath)
 }
 
 func (n NodeUtils) GetSysDevicesFromMpath(device string) (string, error) {
 	// this will return the 	/sys/block/dm-3/slaves/
-	logger.Debugf( "GetSysDevicesFromMpath with param : {%v}", device)
+	logger.Debugf("GetSysDevicesFromMpath with param : {%v}", device)
 	deviceSlavePath := path.Join("/sys", "block", device, "slaves")
-	logger.Debugf( "looking in path : {%v}", deviceSlavePath)
+	logger.Debugf("looking in path : {%v}", deviceSlavePath)
 	slaves, err := ioutil.ReadDir(deviceSlavePath)
 	if err != nil {
 		logger.Errorf("an error occured while looking for device slaves : {%v}", err.Error())
 		return "", err
 	}
 
-	logger.Debugf( "found slaves : {%v}", slaves)
+	logger.Debugf("found slaves : {%v}", slaves)
 	slavesString := ""
 	for _, slave := range slaves {
 		slavesString += "," + slave.Name()

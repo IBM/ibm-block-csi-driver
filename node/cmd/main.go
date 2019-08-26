@@ -26,6 +26,7 @@ import (
 )
 
 func main() {
+	logger.Debugf("Starting CSI node...") // Note - must set this in the first line in order to define the -loglevel in the flags
 	var (
 		endpoint   = flag.String("csi-endpoint", "unix://csi/csi.sock", "CSI Endpoint")
 		version    = flag.Bool("version", false, "Print the version and exit.")
