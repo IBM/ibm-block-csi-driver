@@ -30,7 +30,7 @@ import (
 )
 
 type WaitForPathToExistReturn struct {
-	path string
+	path        string
 	devicePaths []string
 	exists      bool
 	err         error
@@ -56,18 +56,18 @@ type GetMultipathDiskReturn struct {
 
 func TestGetMpathDevice(t *testing.T) {
 	testCases := []struct {
-		name string
+		name             string
 		arrayIdentifiers []string
 
-		expErrType               reflect.Type
-		expErr                   error
-		expDMdevice              string
-		waitForPathToExistReturns  []WaitForPathToExistReturn
-		getMultipathDiskReturns  []GetMultipathDiskReturn
+		expErrType                reflect.Type
+		expErr                    error
+		expDMdevice               string
+		waitForPathToExistReturns []WaitForPathToExistReturn
+		getMultipathDiskReturns   []GetMultipathDiskReturn
 	}{
 		{
-			name: "Should fail when WaitForPathToExist not found any sd device",
-			arrayIdentifiers : []string{"X"},
+			name:             "Should fail when WaitForPathToExist not found any sd device",
+			arrayIdentifiers: []string{"X"},
 			waitForPathToExistReturns: []WaitForPathToExistReturn{
 				WaitForPathToExistReturn{
 					devicePaths: nil,
@@ -76,13 +76,13 @@ func TestGetMpathDevice(t *testing.T) {
 				},
 			},
 
-			expErr: fmt.Errorf("Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[X]]. Please check the host connectivity to the storage."),
+			expErr:      fmt.Errorf("Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[X]]. Please check the host connectivity to the storage."),
 			expDMdevice: "",
 		},
 
 		{
-			name: "Should fail when WaitForPathToExist fail for some reason",
-			arrayIdentifiers : []string{"X"},
+			name:             "Should fail when WaitForPathToExist fail for some reason",
+			arrayIdentifiers: []string{"X"},
 			waitForPathToExistReturns: []WaitForPathToExistReturn{
 				WaitForPathToExistReturn{
 					devicePaths: nil,
@@ -96,8 +96,8 @@ func TestGetMpathDevice(t *testing.T) {
 		},
 
 		{
-			name: "Should fail when GetMultipathDisk fail for some reason",
-			arrayIdentifiers : []string{"X"},
+			name:             "Should fail when GetMultipathDisk fail for some reason",
+			arrayIdentifiers: []string{"X"},
 			waitForPathToExistReturns: []WaitForPathToExistReturn{
 				WaitForPathToExistReturn{
 					devicePaths: []string{"/dev/disk/by-path/ip1-iscsi-ID1-lun1"},
@@ -117,10 +117,9 @@ func TestGetMpathDevice(t *testing.T) {
 			expDMdevice: "",
 		},
 
-
 		{
-			name: "Should fail when GetMultipathDisk provide 2 different dms that apply to the same lun (bas multipathing case)",
-			arrayIdentifiers : []string{"X"},
+			name:             "Should fail when GetMultipathDisk provide 2 different dms that apply to the same lun (bas multipathing case)",
+			arrayIdentifiers: []string{"X"},
 			waitForPathToExistReturns: []WaitForPathToExistReturn{
 				WaitForPathToExistReturn{
 					devicePaths: []string{"/dev/disk/by-path/ip1-iscsi-ID1-lun1", "/dev/disk/by-path/ip1-iscsi-ID1-lun1___2"},
@@ -146,8 +145,8 @@ func TestGetMpathDevice(t *testing.T) {
 		},
 
 		{
-			name: "Should succeed to GetMpathDevice - good path",
-			arrayIdentifiers : []string{"X"},
+			name:             "Should succeed to GetMpathDevice - good path",
+			arrayIdentifiers: []string{"X"},
 			waitForPathToExistReturns: []WaitForPathToExistReturn{
 				WaitForPathToExistReturn{
 					devicePaths: []string{"/dev/disk/by-path/ip1-iscsi-ID1-lun1", "/dev/disk/by-path/ip1-iscsi-ID1-lun1___2"},
@@ -173,25 +172,24 @@ func TestGetMpathDevice(t *testing.T) {
 		},
 
 		{
-			name: "Should failed when arrayIdentifiers is empty",
-			arrayIdentifiers : []string{},
-			expErrType:  reflect.TypeOf(&device_connectivity.ErrorNotFoundArrayIdentifiers{}),
+			name:             "Should failed when arrayIdentifiers is empty",
+			arrayIdentifiers: []string{},
+			expErrType:       reflect.TypeOf(&device_connectivity.ErrorNotFoundArrayIdentifiers{}),
 		},
 
-
 		{
-			name: "Should succeed to GetMpathDevice with one more iqns",
-			arrayIdentifiers : []string{"X","Y"},
+			name:             "Should succeed to GetMpathDevice with one more iqns",
+			arrayIdentifiers: []string{"X", "Y"},
 			waitForPathToExistReturns: []WaitForPathToExistReturn{
 				WaitForPathToExistReturn{
 					devicePaths: []string{"/dev/disk/by-path/ip1-iscsi-X-lun1"},
 					exists:      true,
-					err: 	nil,
+					err:         nil,
 				},
 				WaitForPathToExistReturn{
 					devicePaths: []string{"/dev/disk/by-path/ip1-iscsi-Y-lun2"},
 					exists:      true,
-					err: 	     nil,
+					err:         nil,
 				},
 			},
 			getMultipathDiskReturns: []GetMultipathDiskReturn{
@@ -209,12 +207,11 @@ func TestGetMpathDevice(t *testing.T) {
 
 			expErr:      nil,
 			expDMdevice: "dm-1",
-
 		},
 
 		{
-			name: "Should fail when WaitForPathToExist return error with the first array iqn, and found no sd device with the second array iqn",
-			arrayIdentifiers : []string{"X", "Y"},
+			name:             "Should fail when WaitForPathToExist return error with the first array iqn, and found no sd device with the second array iqn",
+			arrayIdentifiers: []string{"X", "Y"},
 			waitForPathToExistReturns: []WaitForPathToExistReturn{
 				WaitForPathToExistReturn{
 					devicePaths: nil,
@@ -228,7 +225,7 @@ func TestGetMpathDevice(t *testing.T) {
 				},
 			},
 
-			expErr: fmt.Errorf("error,Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[Y]]. Please check the host connectivity to the storage."),
+			expErr:      fmt.Errorf("error,Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[Y]]. Please check the host connectivity to the storage."),
 			expDMdevice: "",
 		},
 	}

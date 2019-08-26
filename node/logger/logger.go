@@ -57,7 +57,7 @@ func (f *LogFormat) Format(entry *logrus.Entry) ([]byte, error) {
 	}
 	b.WriteString(entry.Time.Format(f.TimestampFormat) + "\t")
 	b.WriteString(strings.ToUpper(entry.Level.String()) + "\t")
-	b.WriteString(fmt.Sprintf("%v", "[" + goid.(string)) + "]\t")
+	b.WriteString(fmt.Sprintf("%v", "["+goid.(string)) + "]\t")
 	b.WriteString("(" + caller.(string) + ") - ")
 	b.WriteString(entry.Message)
 	b.WriteString("\n")

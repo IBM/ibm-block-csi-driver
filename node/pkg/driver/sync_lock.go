@@ -49,21 +49,21 @@ func (s SyncLock) GetSyncMap() *sync.Map {
 
 func (s SyncLock) AddVolumeLock(id string, msg string) error {
 	goid := util.GetGoID()
-	logger.Debugf( "Lock for action %s, Try to acquire lock for volume ID=%s (syncMap=%v) goid=%d", msg, id, s.SyncMap, goid)
+	logger.Debugf("Lock for action %s, Try to acquire lock for volume ID=%s (syncMap=%v) goid=%d", msg, id, s.SyncMap, goid)
 	_, exists := s.SyncMap.Load(id)
 	if !exists {
 		s.SyncMap.Store(id, 0)
-		logger.Debugf( "Lock for action %s, Succeed to acquire lock for volume ID=%s (syncMap=%v) goid=%d", msg, id, s.SyncMap, goid)
+		logger.Debugf("Lock for action %s, Succeed to acquire lock for volume ID=%s (syncMap=%v) goid=%d", msg, id, s.SyncMap, goid)
 		return nil
 	} else {
-		logger.Debugf( "Lock for action %s, Lock for volume ID=%s is already in use by other thread. goid=%d", msg, id, goid)
+		logger.Debugf("Lock for action %s, Lock for volume ID=%s is already in use by other thread. goid=%d", msg, id, goid)
 		return &VolumeAlreadyProcessingError{id}
 	}
 }
 
 func (s SyncLock) RemoveVolumeLock(id string, msg string) {
 	goid := util.GetGoID()
-	logger.Debugf( "Lock for action %s, release lock for volume ID=%s (syncMap=%v) goid=%d ", msg, id, s.SyncMap, goid)
+	logger.Debugf("Lock for action %s, release lock for volume ID=%s (syncMap=%v) goid=%d ", msg, id, s.SyncMap, goid)
 
 	_, exists := s.SyncMap.Load(id)
 	if exists {

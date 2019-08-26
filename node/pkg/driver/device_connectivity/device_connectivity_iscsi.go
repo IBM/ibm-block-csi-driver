@@ -24,9 +24,9 @@ import (
 	"strings"
 	"time"
 
+	"errors"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
-	"errors"
 )
 
 type OsDeviceConnectivityIscsi struct {
@@ -50,11 +50,11 @@ var (
 const (
 	DevPath = "/dev"
 )
+
 func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifiers []string) error {
-	logger.Debugf( "Rescan : Start rescan on specific lun, on lun : {%v}, with array iqn : {%v}", lunId, arrayIdentifiers)
+	logger.Debugf("Rescan : Start rescan on specific lun, on lun : {%v}, with array iqn : {%v}", lunId, arrayIdentifiers)
 	var sessionHosts []int
 	var errStrings []string
-
 
 	if len(arrayIdentifiers) == 0 {
 		e := &ErrorNotFoundArrayIdentifiers{lunId}
@@ -62,8 +62,8 @@ func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifiers []s
 		return e
 	}
 
-	for _, iqn := range arrayIdentifiers{
-  		hostsId, e := r.Helper.GetIscsiSessionHostsForArrayIQN(iqn)
+	for _, iqn := range arrayIdentifiers {
+		hostsId, e := r.Helper.GetIscsiSessionHostsForArrayIQN(iqn)
 		if e != nil {
 			logger.Errorf(e.Error())
 			errStrings = append(errStrings, e.Error())
@@ -98,7 +98,7 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 	var errStrings []string
 	lunIdStr := strconv.Itoa(lunId)
 
-  if len(arrayIdentifiers) == 0 {
+	if len(arrayIdentifiers) == 0 {
 		e := &ErrorNotFoundArrayIdentifiers{lunId}
 		return "", e
 	}
@@ -203,7 +203,7 @@ func (o OsDeviceConnectivityHelperIscsi) WaitForPathToExist(devicePath string, m
 			return nil, false, err
 		}
 
-		logger.Debugf( "fpaths : {%v}", fpaths)
+		logger.Debugf("fpaths : {%v}", fpaths)
 
 		if fpaths == nil {
 			err = os.ErrNotExist
@@ -233,7 +233,7 @@ func (o OsDeviceConnectivityHelperIscsi) GetMultipathDisk(path string) (string, 
 	*/
 
 	// Follow link to destination directory
-	logger.Debugf( "Getting multipath device for given path %s", path)
+	logger.Debugf("Getting multipath device for given path %s", path)
 
 	// Get the sdX which is the file that path link to.
 	devicePath, err := o.executer.OsReadlink(path)
@@ -248,7 +248,7 @@ func (o OsDeviceConnectivityHelperIscsi) GetMultipathDisk(path string) (string, 
 	// If destination directory is already identified as a multipath device,
 	// just return its path
 	if strings.HasPrefix(sdevice, "dm-") {
-		logger.Debugf( "Already found multipath device: %s", sdevice)
+		logger.Debugf("Already found multipath device: %s", sdevice)
 		return sdevice, nil
 	}
 
@@ -277,7 +277,7 @@ func (o OsDeviceConnectivityHelperIscsi) GetMultipathDisk(path string) (string, 
 				//    /sys/block/dm-3/slaves/sdb -> ../../../../platform/host41/session9/target41:0:0/41:0:0:13/block/sdb
 
 				p := filepath.Join(DevPath, filepath.Base(dmPath))
-				logger.Debugf( "Found matching multipath device: %s under dm-* device path %s", sdevice, dmPath)
+				logger.Debugf("Found matching multipath device: %s under dm-* device path %s", sdevice, dmPath)
 				return p, nil
 			}
 		}
@@ -304,10 +304,10 @@ func (o OsDeviceConnectivityHelperIscsi) GetIscsiSessionHostsForArrayIQN(arrayId
 		return sessionHosts, err
 	}
 
-	logger.Debugf( "targetname files matches were found : {%v}", matches)
+	logger.Debugf("targetname files matches were found : {%v}", matches)
 
 	for _, targetPath := range matches {
-		logger.Debugf( "Check if targetname path (%s) is relevant for storage target (%s).", targetPath, arrayIdentifier)
+		logger.Debugf("Check if targetname path (%s) is relevant for storage target (%s).", targetPath, arrayIdentifier)
 		targetName, err := o.executer.IoutilReadFile(targetPath)
 		if err != nil {
 			logger.Warningf("Could not read target name from file : {%v}, error : {%v}", targetPath, err)
@@ -332,7 +332,7 @@ func (o OsDeviceConnectivityHelperIscsi) GetIscsiSessionHostsForArrayIQN(arrayId
 			}
 
 			sessionHosts = append(sessionHosts, hostNumber)
-			logger.Debugf( "targetname path (%s) found relevant for the storage target (%s). Adding host number {%v} to the session list.", targetPath, arrayIdentifier, hostNumber)
+			logger.Debugf("targetname path (%s) found relevant for the storage target (%s). Adding host number {%v} to the session list.", targetPath, arrayIdentifier, hostNumber)
 
 		}
 	}
