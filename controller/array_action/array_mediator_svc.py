@@ -366,19 +366,14 @@ class SVCArrayMediator(ArrayMediator):
         except Exception as ex:
             logger.exception(ex)
             raise ex
-
-
+    
     def get_array_iscsi_name(self):
         logger.debug("Getting array nodes iscsi name")
-        nodes_list = self.client.svcinfo.lsnode().as_list
-        for node in nodes_list:
-            if node.status == "online":
-                return node.iscsi_name
-        '''
-        TODO: to support one more iqns
-        array_iqn = ",".join([
-                             node.iscsi_name for node in nodes_list if
-                             node.status == "online"])
-        return array_iqn
-        '''
-        return ""
+        try:
+            nodes_list = self.client.svcinfo.lsnode()
+            array_iqns = [node.iscsi_name for node in nodes_list
+                          if node.status.lower() == "online"]
+        except Exception as ex:
+            logger.exception(ex)
+            raise ex
+        return array_iqns

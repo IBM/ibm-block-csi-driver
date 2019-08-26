@@ -244,6 +244,6 @@ class TestUtils(unittest.TestCase):
                                  "publish_context_connectivity_parameter": "connectivity_type",
                                  "publish_context_array_iqn": "array_iqn"}
                   }
-        res = utils.generate_csi_publish_volume_response(0, "iscsi", config, "1")
+        res = utils.generate_csi_publish_volume_response(0, "iscsi", config, ["1"])
         self.assertEqual(res.publish_context["lun"], '0')
         self.assertEqual(res.publish_context["connectivity_type"], "iscsi")

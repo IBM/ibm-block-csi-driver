@@ -32,7 +32,7 @@ import (
 
 type NodeUtilsInterface interface {
 	ParseIscsiInitiators(path string) (string, error)
-	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, string, error)
+	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, []string, error)
 	GetSysDevicesFromMpath(baseDevice string) (string, error)
 
 	// TODO refactor and move all staging methods to dedicate interface.
@@ -74,20 +74,20 @@ func (n NodeUtils) ParseIscsiInitiators(path string) (string, error) {
 	return iscsiIqn, nil
 }
 
-func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, string, error) {
+func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, []string, error) {
 	// this will return :  connectivityType, lun, array_iqn, error
 	str_lun := publishContext[configYaml.Controller.Publish_context_lun_parameter]
 
 	lun, err := strconv.Atoi(str_lun)
 	if err != nil {
-		return "", -1, "", err
+		return "", -1, nil, err
 	}
 
 	connectivityType := publishContext[configYaml.Controller.Publish_context_connectivity_parameter]
-	array_iqn := publishContext[configYaml.Controller.Publish_context_array_iqn]
+	array_iqns := strings.Split(publishContext[configYaml.Controller.Publish_context_array_iqn], ",")
 
-	klog.V(4).Infof("PublishContext relevant info : connectivityType=%v, lun=%v, array_iqn=%v", connectivityType, lun, array_iqn)
-	return connectivityType, lun, array_iqn, nil
+	klog.V(4).Infof("PublishContext relevant info : connectivityType=%v, lun=%v, array_iqn=%v", connectivityType, lun, array_iqns)
+	return connectivityType, lun, array_iqns, nil
 }
 
 func (n NodeUtils) WriteStageInfoToFile(filePath string, info map[string]string) error {

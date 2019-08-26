@@ -203,8 +203,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertDictEqual(result_a, {'name': 'V1', 'unit': 'b',
                                         'size': 1024, 'pool': 'P1',
                                         'thin': True})
-        result_b = build_kwargs_from_capabilities({'SpaceEfficiency': 'compressed'},
-                                                  'P2', 'V2', size)
+        result_b = build_kwargs_from_capabilities(
+            {'SpaceEfficiency': 'compressed'}, 'P2', 'V2', size)
         self.assertDictEqual(result_b, {'name': 'V2', 'unit': 'b',
                                         'size': 1024, 'pool': 'P2',
                                         'compressed': True})
@@ -361,7 +361,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     @patch("controller.array_action.array_mediator_svc.SVCArrayMediator.get_first_free_lun")
-    def test_map_volume_raise_mapping_error(self, mock_get_first_free_lun, mock_is_warning_message):
+    def test_map_volume_raise_mapping_error(
+            self, mock_get_first_free_lun, mock_is_warning_message):
         mock_is_warning_message.return_value = False
         mock_get_first_free_lun.return_value = '4'
         self.svc.client.svctask.mkvdiskhostmap.side_effect = [
@@ -421,3 +422,37 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_unmap_volume_success(self):
         self.svc.client.svctask.rmvdiskhostmap.return_value = None
         lun = self.svc.unmap_volume("vol", "host")
+
+    def test_get_array_iscsi_name_with_exception(self):
+        self.svc.client.svcinfo.lsnode.side_effect = [Exception]
+        with self.assertRaises(Exception):
+            self.svc.get_array_iscsi_name()
+
+    def test_get_array_iscsi_name_without_node(self):
+        self.svc.client.svcinfo.lsnode.return_value = []
+        iqns = self.svc.get_array_iscsi_name()
+        self.assertEqual(iqns, [])
+
+    def test_get_array_iscsi_name_with_no_online_node(self):
+        node = Munch({'id': '1',
+                      'name': 'node1',
+                      'iscsi_name': 'iqn.1986-03.com.ibm:2145.v7k1.node1',
+                      'status': 'offline'})
+        self.svc.client.svcinfo.lsnode.return_value = [node]
+        iqns = self.svc.get_array_iscsi_name()
+        self.assertEqual(iqns, [])
+
+    def test_get_array_iscsi_name_with_nore_nodes(self):
+        node1 = Munch({'id': '1',
+                       'name': 'node1',
+                       'iscsi_name': 'iqn.1986-03.com.ibm:2145.v7k1.node1',
+                       'status': 'online'})
+        node2 = Munch({'id': '2',
+                       'name': 'node2',
+                       'iscsi_name': 'iqn.1986-03.com.ibm:2145.v7k1.node2',
+                       'status': 'online'})
+        self.svc.client.svcinfo.lsnode.return_value = [node1, node2]
+        iqns = self.svc.get_array_iscsi_name()
+        self.assertEqual(iqns,
+                         ["iqn.1986-03.com.ibm:2145.v7k1.node1",
+                          "iqn.1986-03.com.ibm:2145.v7k1.node2"])
