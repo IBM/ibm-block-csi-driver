@@ -348,12 +348,12 @@ spec:
             - --csi-endpoint=$(CSI_ENDPOINT)
             - --hostname=$(KUBE_NODE_NAME)
             - --config-file-path=./config.yaml
-            - --v=$(CSI_LOGLEVEL)
+            - --loglevel=$(CSI_LOGLEVEL)
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
             - name: CSI_LOGLEVEL
-              value: "5"
+              value: "trace"
             ## KUBE_NODE_NAME needed for the GetNodeInfo API
             - name: KUBE_NODE_NAME
               valueFrom:

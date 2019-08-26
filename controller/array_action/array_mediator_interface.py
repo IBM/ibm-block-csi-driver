@@ -157,7 +157,7 @@ class ArrayMediator:
             None
 
         Returns:
-            iscsi_name : the iscsi address of the storage
+            iscsi_names : list of iscsi addressses of the storage
 
         Raises:
             None
