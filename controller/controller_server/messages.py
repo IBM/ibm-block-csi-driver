@@ -4,7 +4,7 @@ VolumeIdError_message = "Wrong volume id format : {0}"
 
 more_then_one_mapping_message = "Volume is already mapped to a different host : {0}"
 
-################## validation error messages
+# validation error messages
 invalid_secret_message = "invalid secret was passed"
 secret_missing_message = 'secret is missing'
 capabilities_not_set_message = "capbilities were not set"

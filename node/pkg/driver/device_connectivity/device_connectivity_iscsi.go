@@ -28,6 +28,7 @@ import (
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"errors"
 )
 
 type OsDeviceConnectivityIscsi struct {
@@ -50,8 +51,25 @@ var (
 
 func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier string) error {
 	logger.Debugf( "Rescan : Start rescan on specific lun, on lun : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
-	sessionHosts, err := r.Helper.GetIscsiSessionHostsForArrayIQN(arrayIdentifier)
-	if err != nil {
+	var sessionHosts []int
+	var errStrings []string
+
+	if len(arrayIdentifiers) == 0 {
+		e := &ErrorNotFoundArrayIdentifiers{lunId}
+		logger.Errorf(e.Error())
+		return e
+	}
+
+	for _, iqn := range arrayIdentifiers{
+		hostsId, e := r.Helper.GetIscsiSessionHostsForArrayIQN(iqn)
+		if e != nil {
+			logger.Errorf(e.Error())
+			errStrings = append(errStrings, e.Error())
+		}
+		sessionHosts = append(sessionHosts, hostsId...)
+	}
+	if len(sessionHosts) == 0 && len(errStrings) != 0 {
+		err := errors.New(strings.Join(errStrings, ","))
 		return err
 	}
 
@@ -80,12 +98,13 @@ func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifier stri
 
 	}
 
-	logger.Debugf( "Rescan : finsihed rescan lun on lun id : {%v}, with array iqn : {%v}", lunId, arrayIdentifier)
+
+	logger.Infof("Rescan : finsihed rescan lun on lun id : {%v}, with array iqns : {%v}", lunId, arrayIdentifiers)
 	return nil
 
 }
 
-func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, arrayIdentifier string) (string, error) {
+func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string) (string, error) {
 	/*
 			   Description:
 				   1. Find all the files "/dev/disk/by-path/ip-<ARRAY-IP>-iscsi-<IQN storage>-lun-<LUN-ID> -> ../../sd<X>
@@ -97,20 +116,31 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 			   Return Value: "dm-X" of the volumeID by using the LunID and the arrayIqn.
 	*/
 	var devicePaths []string
-
+	var errStrings []string
 	lunIdStr := strconv.Itoa(lunId)
-	devicePath := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", arrayIdentifier, "lun", lunIdStr}, "-")
-	logger.Debugf( "GetMpathDevice: Get the mpath devices related to arrayIdentifier=%s and lunID=%s : {%v}", arrayIdentifier, lunIdStr, devicePath)
 
-	devicePaths, exists, err := r.Helper.WaitForPathToExist(devicePath, 5, 1)
-	if err != nil {
-		logger.Errorf("GetMpathDevice: No device found error : %v ", err.Error())
-		return "", err
-	}
-	if !exists {
-		e := &MultipleDeviceNotFoundForLunError{volumeId, lunId, arrayIdentifier}
-		logger.Errorf(e.Error())
+  if len(arrayIdentifiers) == 0 {
+		e := &ErrorNotFoundArrayIdentifiers{lunId}
 		return "", e
+	}
+
+	for _, iqn := range arrayIdentifiers {
+		dp := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", iqn, "lun", lunIdStr}, "-")
+		logger.Infof("GetMpathDevice: Get the mpath devices related to arrayIdentifier=%s and lunID=%s : {%v}", iqn, lunIdStr, dp)
+		dps, exists, e := r.Helper.WaitForPathToExist(dp, 5, 1)
+		if e != nil {
+			logger.Errorf("GetMpathDevice: No device found error : %v ", e.Error())
+			errStrings = append(errStrings, e.Error())
+		} else if !exists {
+			e := &MultipleDeviceNotFoundForLunError{volumeId, lunId, []string{iqn}}
+			logger.Errorf(e.Error())
+			errStrings = append(errStrings, e.Error())
+		}
+		devicePaths = append(devicePaths, dps...)
+	}
+	if len(devicePaths) == 0 && len(errStrings) != 0 {
+		err := errors.New(strings.Join(errStrings, ","))
+		return "", err
 	}
 
 	devicePathTosysfs := make(map[string]bool)
@@ -133,13 +163,12 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 	for key := range devicePathTosysfs {
 		mps += ", " + key
 	}
-	logger.Debugf( "GetMpathDevice: Found multipath devices: [%s] that relats to lunId=%d and arrayIdentifier=%s", mps, lunId, arrayIdentifier)
+	logger.Infof("GetMpathDevice: Found multipath devices: [%s] that relats to lunId=%d and arrayIdentifiers=%s", mps, lunId, arrayIdentifiers)
 
 	if len(devicePathTosysfs) > 1 {
-		return "", &MultipleDmDevicesError{volumeId, lunId, arrayIdentifier, devicePathTosysfs}
-	} else if len(devicePathTosysfs) == 0 {
-		return "", &MultipleDeviceNotFoundForLunError{volumeId, lunId, arrayIdentifier}
+		return "", &MultipleDmDevicesError{volumeId, lunId, arrayIdentifiers, devicePathTosysfs}
 	}
+
 	var md string
 	for md = range devicePathTosysfs {
 		break // because its a single value in the map(1 mpath device, if not it should fail above), so just take the first

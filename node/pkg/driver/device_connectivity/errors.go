@@ -7,7 +7,7 @@ import (
 type MultipleDmDevicesError struct {
 	VolumeId            string
 	LunId               int
-	ArrayIqn            string
+	ArrayIqns            []string
 	MultipathDevicesMap map[string]bool
 }
 
@@ -16,17 +16,17 @@ func (e *MultipleDmDevicesError) Error() string {
 	for key := range e.MultipathDevicesMap {
 		mps += ", " + key
 	}
-	return fmt.Sprintf("Detected more then one multipath devices (%s) for single volume (%s) with lunID %d from array target iqn %s", mps, e.VolumeId, e.LunId, e.ArrayIqn)
+	return fmt.Sprintf("Detected more then one multipath devices (%s) for single volume (%s) with lunID %d from array target iqn %v", mps, e.VolumeId, e.LunId, e.ArrayIqns)
 }
 
 type MultipleDeviceNotFoundForLunError struct {
 	VolumeId string
 	LunId    int
-	ArrayIqn string
+	ArrayIqns []string
 }
 
 func (e *MultipleDeviceNotFoundForLunError) Error() string {
-	return fmt.Sprintf("Couldn't find multipath device for volumeID [%s] lunID [%d] from array [%s]. Please check the host connectivity to the storage.", e.VolumeId, e.LunId, e.ArrayIqn)
+	return fmt.Sprintf("Couldn't find multipath device for volumeID [%s] lunID [%d] from array [%s]. Please check the host connectivity to the storage.", e.VolumeId, e.LunId, e.ArrayIqns)
 }
 
 type ConnectivityIscsiStorageTargetNotFoundError struct {
@@ -53,4 +53,12 @@ type ErrorNothingWasWrittenToScanFileError struct {
 
 func (e *ErrorNothingWasWrittenToScanFileError) Error() string {
 	return fmt.Sprintf("Rescan Error: Nothing was written to rescan file : {%s}", e.path)
+}
+
+type ErrorNotFoundArrayIdentifiers struct {
+	lunId int
+}
+
+func (e *ErrorNotFoundArrayIdentifiers) Error() string {
+	return fmt.Sprintf("Couldn't find arrayIdentifiers found for lunId: {%d}", e.lunId)
 }

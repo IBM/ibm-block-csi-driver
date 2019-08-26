@@ -15,6 +15,7 @@ def get_mock_mediator_response_volume(size, name, wwn, array_type):
 
 
 class FakeContext:
+
     def __init__(self):
         self.code = grpc.StatusCode.OK
         self.details = ""
