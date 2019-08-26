@@ -157,7 +157,7 @@ class SVCArrayMediator(ArrayMediator):
             logger.error("capability value is not "
                          "supported {0}".format(capabilities))
             raise controller_errors.StorageClassCapabilityNotSupported(
-                    capabilities)
+                capabilities)
 
         logger.info("Finished validate_supported_capabilities")
 
@@ -259,8 +259,7 @@ class SVCArrayMediator(ArrayMediator):
         vol_name = self._get_vol_by_wwn(volume_id)
         logger.debug("vol name : {0}".format(vol_name))
         try:
-            mapping_list = self.client.svcinfo.lsvdiskhostmap(vdisk_name=
-                                                              vol_name)
+            mapping_list = self.client.svcinfo.lsvdiskhostmap(vdisk_name=vol_name)
             res = {}
             for mapping in mapping_list:
                 logger.debug("mapping for vol is :{0}".format(mapping))
@@ -367,3 +366,14 @@ class SVCArrayMediator(ArrayMediator):
         except Exception as ex:
             logger.exception(ex)
             raise ex
+    
+    def get_array_iscsi_name(self):
+        logger.debug("Getting array nodes iscsi name")
+        try:
+            nodes_list = self.client.svcinfo.lsnode()
+            array_iqns = [node.iscsi_name for node in nodes_list
+                          if node.status.lower() == "online"]
+        except Exception as ex:
+            logger.exception(ex)
+            raise ex
+        return array_iqns

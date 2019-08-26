@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"os"
 
-	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
-	"k8s.io/klog"
+	"github.com/ibm/ibm-block-csi-driver/node/logger"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 )
 
 func main() {
@@ -33,13 +33,12 @@ func main() {
 		hostname   = flag.String("hostname", "host-dns-name", "The name of the host the node is running on.")
 	)
 
-	klog.InitFlags(nil)
 	flag.Parse()
 
 	if *version {
 		info, err := driver.GetVersionJSON(*configFile)
 		if err != nil {
-			klog.Fatalln(err)
+			logger.Panicln(err)
 		}
 		fmt.Println(info)
 		os.Exit(0)
@@ -47,9 +46,9 @@ func main() {
 
 	drv, err := driver.NewDriver(*endpoint, *configFile, *hostname)
 	if err != nil {
-		klog.Fatalln(err)
+		logger.Panicln(err)
 	}
 	if err := drv.Run(); err != nil {
-		klog.Fatalln(err)
+		logger.Panicln(err)
 	}
 }
