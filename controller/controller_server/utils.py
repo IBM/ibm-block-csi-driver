@@ -104,7 +104,7 @@ def generate_csi_create_volume_response(new_vol):
     logger.debug("creating volume response for vol : {0}".format(new_vol))
 
     vol_context = {"volume_name": new_vol.volume_name,
-                   "array_name": ",".join(new_vol.array_name),
+                   "array_address": ",".join(new_vol.array_address),
                    "pool_name": new_vol.pool_name,
                    "storage_type": new_vol.array_type
                    }
