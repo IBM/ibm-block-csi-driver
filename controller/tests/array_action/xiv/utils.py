@@ -9,6 +9,7 @@ def get_mock_xiv_volume(size, name, wwn):
     vol.pool_name = "vol-name"
     return vol
 
+
 def get_mock_xiv_host(name, ports):
     host = Mock()
     host.iscsi_ports = ports
@@ -21,6 +22,7 @@ def get_mock_xiv_vol_mapping(lun, host):
     mapping.lun = lun
     mapping.host = host
     return mapping
+
 
 def get_mock_xiv_host_mapping(lun):
     mapping = Mock()
