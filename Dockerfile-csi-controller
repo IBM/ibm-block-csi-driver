@@ -13,6 +13,19 @@
 # limitations under the License.
 
 FROM registry.access.redhat.com/ubi8/python-36:1
+MAINTAINER IBM Systems Engineering <TBD>
+
+###Required Labels
+LABEL name="CSI controller for IBM Block CSI Driver"
+LABEL vendor="IBM"
+LABEL version="1.0.0"
+# TODO inject release automatically
+LABEL release="b1" 
+LABEL summary="The CSI controller component of the IBM block storage CSI driver"
+LABEL description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and Openshift, to manage the life-cycle of persistent storage."
+LABEL io.k8s.display-name="CSI node for IBM Block CSI Driver"
+LABEL io.k8s.description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and Openshift, to manage the life-cycle of persistent storage."
+LABEL io.openshift.tags=ibm,csi,ibm-block-csi-driver,ibm-block-csi-node
 
 COPY controller/requirements.txt /driver/controller/
 RUN pip3 install --upgrade pip==19.1.1
@@ -20,6 +33,7 @@ RUN pip3 install -r /driver/controller/requirements.txt
 
 COPY ./common /driver/common
 COPY ./controller /driver/controller
+#COPY ./image_license /licenses   # TODO need to add relevant license before GA
 WORKDIR /driver
 ENV PYTHONPATH=/driver
 
