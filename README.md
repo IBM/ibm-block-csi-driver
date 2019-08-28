@@ -146,6 +146,21 @@ daemonset.apps/ibm-block-csi-node created
 Verify the driver is running. (Make sure the csi-controller pod status is Running):
 
 ```sh
+
+$> kubectl get all -n kube-system  -l csi
+NAME                             READY   STATUS    RESTARTS   AGE
+pod/ibm-block-csi-controller-0   5/5     Running   0          9m36s
+pod/ibm-block-csi-node-jvmvh     3/3     Running   0          9m36s
+pod/ibm-block-csi-node-tsppw     3/3     Running   0          9m36s
+
+NAME                                DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
+daemonset.apps/ibm-block-csi-node   2         2         2       2            2           <none>          9m36s
+
+NAME                                        READY   AGE
+statefulset.apps/ibm-block-csi-controller   1/1     9m36s
+
+###### One can also use the following labels: app=ibm-block-csi-node, app=ibm-block-csi-controller, csi=ibm or product=ibm-block-csi-driver 
+
 $> kubectl get -n kube-system pod --selector=app=ibm-block-csi-controller
 NAME                         READY   STATUS    RESTARTS   AGE
 ibm-block-csi-controller-0   5/5     Running   0          10m
@@ -250,7 +265,7 @@ kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
   name: gold
-provisioner: ibm-block-csi-driver
+provisioner: block.csi.ibm.com
 parameters:
   SpaceEfficiency: <VALUE>   # Values applicable for Storewize are: Thin, Compressed, or Deduplicated
   pool: <VALUE_POOL_NAME>
@@ -312,7 +327,7 @@ kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
   name: gold
-provisioner: ibm-block-csi-driver
+provisioner: block.csi.ibm.com
 parameters:
   pool: gold
 
