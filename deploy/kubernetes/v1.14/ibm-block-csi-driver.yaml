@@ -24,6 +24,9 @@ kind: ServiceAccount
 metadata:
   name: ibm-block-csi-controller-sa
   namespace: kube-system
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
 
 ---
 
@@ -32,6 +35,10 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: ibm-block-csi-external-provisioner-role
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
+  
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
@@ -69,6 +76,10 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: ibm-block-csi-external-provisioner-binding
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
+
 subjects:
   - kind: ServiceAccount
     name: ibm-block-csi-controller-sa
@@ -84,6 +95,9 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: ibm-block-csi-external-attacher-role
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
 rules:
   - apiGroups: [""]
     resources: ["persistentvolumes"]
@@ -104,6 +118,9 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: ibm-block-csi-external-attacher-binding
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
 subjects:
   - kind: ServiceAccount
     name: ibm-block-csi-controller-sa
@@ -119,6 +136,9 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: ibm-block-csi-cluster-driver-registrar-role
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
 rules:
   - apiGroups: ["csi.storage.k8s.io"]
     resources: ["csidrivers"]
@@ -130,6 +150,9 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: ibm-block-csi-cluster-driver-registrar-binding
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
 subjects:
   - kind: ServiceAccount
     name: ibm-block-csi-controller-sa
@@ -145,6 +168,9 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: ibm-block-csi-external-snapshotter-role
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
 rules:
   - apiGroups: [""]
     resources: ["persistentvolumes"]
@@ -180,6 +206,9 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: ibm-block-csi-external-snapshotter-binding
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
 subjects:
   - kind: ServiceAccount
     name: ibm-block-csi-controller-sa
@@ -193,17 +222,25 @@ roleRef:
 
 ## CSI Controller Service statefulset
 kind: StatefulSet
-apiVersion: apps/v1beta1
+apiVersion: apps/v1
 metadata:
   name: ibm-block-csi-controller
   namespace: kube-system
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
 spec:
+  selector:
+    matchLabels:
+      app: ibm-block-csi-controller
   serviceName: ibm-block-csi-controller
   replicas: 1
   template:
     metadata:
       labels:
         app: ibm-block-csi-controller
+        product: ibm-block-csi-driver
+        csi: ibm
     spec:
       serviceAccount: ibm-block-csi-controller-sa
       containers:
@@ -317,10 +354,13 @@ spec:
 
 # CSI Node Service Deamonset
 kind: DaemonSet
-apiVersion: apps/v1beta2
+apiVersion: apps/v1
 metadata:
   name: ibm-block-csi-node
   namespace: kube-system
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
 spec:
   selector:
     matchLabels:
@@ -329,6 +369,8 @@ spec:
     metadata:
       labels:
         app: ibm-block-csi-node
+        product: ibm-block-csi-driver
+        csi: ibm
     spec:
       hostNetwork: true
       containers:
@@ -339,7 +381,8 @@ spec:
           imagePullPolicy: "IfNotPresent"
           args:
             - --csi-endpoint=$(CSI_ENDPOINT)
-            #- --hostname=$(KUBE_NODE_NAME)
+            - --hostname=$(KUBE_NODE_NAME)
+            - --config-file-path=./config.yaml
             - --loglevel=$(CSI_LOGLEVEL)
           env:
             - name: CSI_ENDPOINT
@@ -364,6 +407,10 @@ spec:
               mountPath: /etc/iscsi
             - name: sys-dir
               mountPath: /sys
+            - name: host-dir
+              mountPath: /host  # Mapping the root of the host into "/host" inside the container.
+              mountPropagation: "Bidirectional"
+
           ports:
             - name: healthz
               containerPort: 9808
@@ -388,12 +435,12 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["/bin/sh", "-c", "rm -rf /registration/ibm-block-csi-driver-reg.sock /csi/csi.sock"]
+                command: ["/bin/sh", "-c", "rm -rf /registration/block.csi.ibm.com-reg.sock /csi/csi.sock"]
           env:
             - name: ADDRESS
               value: /csi/csi.sock
             - name: DRIVER_REG_SOCK_PATH
-              value: /var/lib/kubelet/plugins/ibm-block-csi-driver/csi.sock
+              value: /var/lib/kubelet/plugins/block.csi.ibm.com/csi.sock
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
@@ -404,7 +451,7 @@ spec:
           image: quay.io/k8scsi/livenessprobe:v1.1.0  # TODO v1.1.0 is for k8s 1.13+, but v1.0.2 was the first k8s 1.13 version.
           args:
             - --csi-address=/csi/csi.sock
-            - --connection-timeout=3s   # TODO this line is deprecated from v1.1.0. So if exist its ignore it.
+            - --connection-timeout=3s   # NOTE: this line is deprecated from v1.1.0. So if exist its ignore it.
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
@@ -419,7 +466,7 @@ spec:
         ## This volume is where the socket for kubelet->driver communication is done
         - name: socket-dir
           hostPath:
-            path: /var/lib/kubelet/plugins/ibm-block-csi-driver/
+            path: /var/lib/kubelet/plugins/block.csi.ibm.com/
             type: DirectoryOrCreate
 
         ## This volume is where the node-driver-registrar registers the plugin with kubelet
@@ -445,6 +492,10 @@ spec:
             path: /sys
             type: Directory
 
+        - name: host-dir
+          hostPath:
+            path: /
+            type: Directory
 
 
 ## The below CSIDriver object is required to define (k8s 1.14 its still needed to be added due to redesign -> https://kubernetes-csi.github.io/docs/cluster-driver-registrar.html)
