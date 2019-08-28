@@ -439,12 +439,12 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["/bin/sh", "-c", "rm -rf /registration/ibm-block-csi-driver-reg.sock /csi/csi.sock"]
+                command: ["/bin/sh", "-c", "rm -rf /registration/block.csi.ibm.com-reg.sock /csi/csi.sock"]
           env:
             - name: ADDRESS
               value: /csi/csi.sock
             - name: DRIVER_REG_SOCK_PATH
-              value: /var/lib/kubelet/plugins/ibm-block-csi-driver/csi.sock
+              value: /var/lib/kubelet/plugins/block.csi.ibm.com/csi.sock
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
@@ -470,7 +470,7 @@ spec:
         ## This volume is where the socket for kubelet->driver communication is done
         - name: socket-dir
           hostPath:
-            path: /var/lib/kubelet/plugins/ibm-block-csi-driver/
+            path: /var/lib/kubelet/plugins/block.csi.ibm.com/
             type: DirectoryOrCreate
 
         ## This volume is where the node-driver-registrar registers the plugin with kubelet
