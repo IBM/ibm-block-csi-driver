@@ -16,13 +16,13 @@ FROM registry.access.redhat.com/ubi8/python-36:1
 MAINTAINER IBM Storage
 
 ###Required Labels
-LABEL name="CSI controller for IBM Block CSI Driver" \
+LABEL name="IBM Block CSI Driver Controller" \
       vendor="IBM" \
       version="1.0.0" \
       release="b1" \
-      summary="The CSI controller component of the IBM block storage CSI driver" \
+      summary="The controller component of the IBM Block CSI driver" \
       description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and Openshift, to manage the life-cycle of persistent storage." \
-      io.k8s.display-name="CSI node for IBM Block CSI Driver" \
+      io.k8s.display-name="IBM Block CSI Driver Controller" \
       io.k8s.description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and Openshift, to manage the life-cycle of persistent storage." \
       io.openshift.tags=ibm,csi,ibm-block-csi-driver,ibm-block-csi-node
 
