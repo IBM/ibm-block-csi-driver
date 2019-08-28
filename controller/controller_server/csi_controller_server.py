@@ -10,6 +10,7 @@ from controller.csi_general import csi_pb2_grpc
 from controller.array_action.array_connection_manager import ArrayConnectionManager
 from controller.common.csi_logger import get_stdout_logger
 import controller.controller_server.config as config
+from controller.array_action.config import FC_CONNECTIVITY_TYPE
 import controller.controller_server.utils as utils
 import controller.array_action.errors as controller_errors
 from controller.controller_server.errors import ValidationException
@@ -176,21 +177,26 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             array_type, vol_id = utils.get_volume_id_info(request.volume_id)
 
-            node_name, iscsi_iqn = utils.get_node_id_info(request.node_id)
+            node_name, iscsi_iqn, fc_wwns = utils.get_node_id_info(request.node_id)
+            wwns_list = fc_wwns.split(config.PARAMETERS_FC_WWN_DELIMITER)
+
             logger.debug("node name for this publish operation is : {0}".format(node_name))
 
             user, password, array_addresses = utils.get_array_connection_info_from_secret(request.secrets)
 
             with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
 
-                host_name, connectivity_types = array_mediator.get_host_by_host_identifiers(iscsi_iqn)
+                host_name, connectivity_types = array_mediator.get_host_by_host_identifiers(iscsi_iqn, wwns_list)
 
                 logger.debug("hostname : {}, connectiivity_types  : {}".format(host_name, connectivity_types))
 
                 connectivity_type = utils.choose_connectivity_type(connectivity_types)
-
-                array_iqns = array_mediator.get_array_iscsi_name()
-
+                array_wwns, array_iqns = None, None
+                if FC_CONNECTIVITY_TYPE == connectivity_type:
+                    array_wwns = array_mediator.get_array_fc_wwns()
+                else:
+                    array_iqns = array_mediator.get_array_iscsi_name()
+                array_connectivity_ports = array_wwns if array_wwns else array_iqns
                 mappings = array_mediator.get_volume_mappings(vol_id)
                 if len(mappings) >= 1:
                     logger.debug(
@@ -201,7 +207,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         if mapping == host_name:
                             logger.debug("idempotent case - volume is already mapped to host.")
                             return utils.generate_csi_publish_volume_response(mappings[mapping], connectivity_type,
-                                                                              self.cfg, array_iqns)
+                                                                              self.cfg, array_connectivity_ports)
 
                     logger.error(messages.more_then_one_mapping_message.format(mappings))
                     context.set_details(messages.more_then_one_mapping_message.format(mappings))
@@ -230,7 +236,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     return csi_pb2.ControllerPublishVolumeResponse()
 
                 logger.info("finished ControllerPublishVolume")
-                res = utils.generate_csi_publish_volume_response(lun, connectivity_type, self.cfg, array_iqns)
+                res = utils.generate_csi_publish_volume_response(lun, connectivity_type, self.cfg, array_connectivity_ports)
                 logger.debug("after res")
                 return res
 
@@ -272,14 +278,15 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             array_type, vol_id = utils.get_volume_id_info(request.volume_id)
 
-            node_name, iscsi_iqn = utils.get_node_id_info(request.node_id)
+            node_name, iscsi_iqn, fc_wwns = utils.get_node_id_info(request.node_id)
+            wwns_list = fc_wwns.split(config.PARAMETERS_FC_WWN_DELIMITER)
             logger.debug("node name for this unpublish operation is : {0}".format(node_name))
 
             user, password, array_addresses = utils.get_array_connection_info_from_secret(request.secrets)
 
             with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
 
-                host_name, _ = array_mediator.get_host_by_host_identifiers(iscsi_iqn)
+                host_name, _ = array_mediator.get_host_by_host_identifiers(iscsi_iqn, wwns_list)
                 try:
                     array_mediator.unmap_volume(vol_id, host_name)
 

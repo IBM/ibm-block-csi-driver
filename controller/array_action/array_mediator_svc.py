@@ -230,28 +230,46 @@ class SVCArrayMediator(ArrayMediator):
 
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
-    def get_host_by_host_identifiers(self, iscsi_iqn):
-        logger.debug("Getting host id for initiators . iscsi_iqn : "
-                     "{0}".format(iscsi_iqn))
+    def get_host_by_host_identifiers(self, iscsi_iqn, fc_wwns):
+        logger.debug("Getting host id for initiators iscsi iqn : {0} and "
+                     "fc wwns : {1}".format(iscsi_iqn, fc_wwns))
+        wwns_list = [wwn.lower() for wwn in fc_wwns]
         host_list = self.client.svcinfo.lshost()
-        current_host = None
+        iscsi_host, fc_host = None, None
         for host in host_list:
             host_detail = self.client.svcinfo.lshost(
                 object_id=host.get('id', '')).as_single_element
             iscsi_names = host_detail.get('iscsi_name', '')
+            wwns_value = host_detail.get('WWPN', [])
+            wwns = [wwn.lower() for wwn in wwns_value]
             if iscsi_iqn == iscsi_names:
+                iscsi_host = host_detail.get('name', '')
                 logger.debug("found iscsi iqn in list : {0} for host : "
-                             "{1}".format(iscsi_names,
-                                          host_detail.get('name', '')))
-                current_host = host_detail.get('name', '')
-                break
-
-        if not current_host:
-            raise controller_errors.HostNotFoundError(iscsi_iqn)
-
-        logger.debug("found host : {0} with iqn : {1}".format(current_host,
-                                                              iscsi_iqn))
-        return current_host, [ISCSI_CONNECTIVITY_TYPE]
+                             "{1}".format(iscsi_iqn, iscsi_host))
+            if set(wwns_list) == set(wwns):
+                fc_host = host_detail.get('name', '')
+                logger.debug("found fc wwns in list : {0} for host : "
+                             "{1}".format(wwns_list, fc_host))
+        if iscsi_host and fc_host:
+            if iscsi_host == fc_host:
+                return fc_host, [config.ISCSI_CONNECTIVITY_TYPE,
+                                 config.FC_CONNECTIVITY_TYPE]
+            else:
+                raise controller_errors.MultipleHostsFoundError(fc_wwns,
+                                                                fc_host)
+        elif iscsi_host:
+            logger.debug("found host : {0} with iqn : {1}".format(iscsi_host,
+                                                                  iscsi_iqn))
+            return iscsi_host, [config.ISCSI_CONNECTIVITY_TYPE]
+        elif fc_host:
+            logger.debug("found host : {0} with fc wwn : {1}".format(fc_host,
+                                                                     fc_wwns))
+            return fc_host, [config.FC_CONNECTIVITY_TYPE]
+        else:
+            logger.debug("can not found host by using fc wwns: {0} "
+                         "and iscsi iqn : {1}".format(fc_wwns, iscsi_iqn))
+            port_value = fc_wwns if fc_wwns else iscsi_iqn
+            raise controller_errors.HostNotFoundError(port_value)
 
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume id : "

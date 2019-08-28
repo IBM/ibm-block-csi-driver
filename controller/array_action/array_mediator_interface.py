@@ -165,12 +165,27 @@ class ArrayMediator:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get_host_by_host_identifiers(self, iscis_iqn):
+    def get_array_fc_wwns(self):
         """
-        This function will find the name of the volume by the volume_id and unmap the volume from the host.
+        This function will return the wwn of the connected
+        FC port of the storage array
+        Args:
+            None
+        Returns:
+            wwn : the wwn of the storage
+        Raises:
+            None
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_host_by_host_identifiers(self, iscsi_iqn, fc_wwns):
+        """
+        This function will find the host by iscsi iqn or fc wwns.
 
         Args:
            iscis_iqn : the iscsi iqn of the wanted host.
+           fc_wwns : the fc wwns of the wanted host.
 
         Returns:
            connectivity_types : list of connectivity types ([iscis, fc] or just [iscsi],..)

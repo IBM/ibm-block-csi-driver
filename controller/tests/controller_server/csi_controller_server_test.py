@@ -7,6 +7,7 @@ from controller.tests import utils
 
 from controller.csi_general import csi_pb2
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
+from controller.array_action.array_mediator_svc import SVCArrayMediator
 from controller.controller_server.csi_controller_server import ControllerServicer
 from controller.controller_server.test_settings import vol_name
 import controller.array_action.errors as array_errors
@@ -383,7 +384,7 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.request = Mock()
         arr_type = XIVArrayMediator.array_type
         self.request.volume_id = "{}:wwn1".format(arr_type)
-        self.request.node_id = "hostname;iqn.1994-05.com.redhat:686358c930fe"
+        self.request.node_id = "hostname;iqn.1994-05.com.redhat:686358c930fe;"
         self.request.readonly = False
         self.request.readonly = False
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
@@ -456,6 +457,21 @@ class TestControllerServerPublishVolume(unittest.TestCase):
 
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '2')
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "iscsi")
+
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_publish_volume_with_connectivity_type_fc(self, enter):
+        context = utils.FakeContext()
+        self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi", "fc"]
+        self.mediator.get_array_fc_wwns = Mock()
+        self.mediator.get_array_fc_wwns.return_value = ["wwn"]
+        enter.return_value = self.mediator
+
+        res = self.servicer.ControllerPublishVolume(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.OK)
+
+        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '1')
+        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "fc")
+        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_ARRAY_FC_INITIATORS"], "wwn")
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_publish_volume_get_volume_mappings_one_map_for_other_host(self, enter):
@@ -553,7 +569,7 @@ class TestControllerServerUnPublishVolume(unittest.TestCase):
         self.request = Mock()
         arr_type = XIVArrayMediator.array_type
         self.request.volume_id = "{}:wwn1".format(arr_type)
-        self.request.node_id = "hostname;iqn1"
+        self.request.node_id = "hostname;iqn1;"
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
         self.request.volume_context = {}
 
