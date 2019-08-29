@@ -476,13 +476,17 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	defer logger.Debugf("<<<< NodeGetInfo")
 
 	iscsiIQN, iscsi_err := d.NodeUtils.ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi")
-	logger.Debugf("when get iqn from node %v, got the error %v", d.Hostname, iscsi_err.Error())
 	fcList, fc_err := d.NodeUtils.ParseFCPortsName("/sys/class/fc_host/host*/port_name")
-	logger.Debugf("when get fc ports from node %v, got the error is %v", d.Hostname, fc_err.Error())
 
 	if iscsiIQN == "" && fcList == nil {
 		errMessage := "errs when get iqn: " + iscsi_err.Error() + ";err when get FC ports: " + fc_err.Error()
 		return nil, status.Error(codes.Internal, errMessage)
+	}
+
+	if iscsi_err != nil {
+		logger.Debugf("when get iqn from node %v, got the error %v", d.Hostname, iscsi_err.Error())
+	} else if fc_err != nil {
+		logger.Debugf("when get fc ports from node %v, got the error is %v", d.Hostname, fc_err.Error())
 	}
 
 	delimiter := ";"
