@@ -474,14 +474,20 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	klog.V(5).Infof(">>>> NodeGetInfo: called with args %+v", *req)
 	defer klog.V(5).Infof("<<<< NodeGetInfo")
 
-	iscsiIQN, err := d.NodeUtils.ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi")
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+	iscsiIQN, iscsi_err := d.NodeUtils.ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi")
+	klog.V(4).Infof("when get iqn from node %v, got the error %v", d.Hostname, iscsi_err.Error())
+	fcList, fc_err := d.NodeUtils.ParseFCPortsName("/sys/class/fc_host/host*/port_name")
+	klog.V(4).Infof("when get fc ports from node %v, got the error is %v", d.Hostname, fc_err.Error())
+
+	if iscsiIQN == "" && fcList == nil {
+		errMessage := "errs when get iqn: " + iscsi_err.Error() + ";err when get FC ports: " + fc_err.Error()
+		return nil, status.Error(codes.Internal, errMessage)
 	}
 
 	delimiter := ";"
+	fcPorts := strings.Join(fcList, ":")
 
-	nodeId := d.Hostname + delimiter + iscsiIQN
+	nodeId := d.Hostname + delimiter + iscsiIQN + delimiter +fcPorts
 	klog.V(4).Infof("node id is : %s", nodeId)
 
 	return &csi.NodeGetInfoResponse{

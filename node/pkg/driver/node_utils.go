@@ -24,14 +24,18 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"errors"
 
 	"k8s.io/klog"
+
+	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
 
 type NodeUtilsInterface interface {
 	ParseIscsiInitiators(path string) (string, error)
+	ParseFCPortsName(paths string) ([]string, error)
 	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, []string, error)
 	GetSysDevicesFromMpath(baseDevice string) (string, error)
 
@@ -43,11 +47,11 @@ type NodeUtilsInterface interface {
 }
 
 type NodeUtils struct {
+	Executer executer.ExecuterInterface
 }
 
-func NewNodeUtils() *NodeUtils {
-	return &NodeUtils{}
-
+func NewNodeUtils(executer executer.ExecuterInterface) *NodeUtils {
+	return &NodeUtils{Executer: executer}
 }
 
 func (n NodeUtils) ParseIscsiInitiators(path string) (string, error) {
@@ -165,4 +169,46 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 		return false
 	}
 	return true
+}
+
+func (n NodeUtils) ParseFCPortsName(path string) ([]string, error) {
+	//FC port path is /sys/class/fc_host/host*/port_name
+	var errStrings []string
+	var FCPorts []string
+
+	fpaths, err := n.Executer.FilepathGlob(path)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, fpath := range fpaths {
+		file, err := os.Open(fpath)
+		if err != nil {
+			errStrings = append(errStrings, err.Error())
+			break
+		}
+		defer file.Close()
+		file_out, err := ioutil.ReadAll(file)
+		if err != nil {
+			errStrings = append(errStrings, err.Error())
+		}
+		//need to consider:if the port status is inactive, it will not be returned
+		fileSplit := strings.Split(string(file_out), "0x")
+		if len(fileSplit) != 2 {
+			err := fmt.Errorf(ErrorWhileTryingToReadFC, string(file_out))
+			errStrings = append(errStrings, err.Error())
+		} else {
+			FCPorts = append(FCPorts, strings.TrimSpace(fileSplit[1]))
+		}
+	}
+
+	if errStrings != nil {
+		klog.Errorf("errors occured while looking for FC ports : {%v}", strings.Join(errStrings, ","))
+		if FCPorts == nil {
+			err := errors.New(strings.Join(errStrings, ","))
+			return nil, err
+		}
+	}
+
+	return FCPorts, nil
 }

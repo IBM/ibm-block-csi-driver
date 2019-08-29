@@ -407,21 +407,42 @@ func TestNodeGetCapabilities(t *testing.T) {
 func TestNodeGetInfo(t *testing.T) {
 	testCases := []struct {
 		name           string
-		returned_iqn   string
-		returned_error error
+		return_iqn     string
+		return_iqn_err error
+		return_fcs     []string
+		return_fc_err  error
 		expErr         error
 		expNodeId      string
 	}{
 		{
-			name:         "good IQN",
-			returned_iqn: "iqn.1994-07.com.redhat:e123456789",
-			expNodeId:    "test-host;iqn.1994-07.com.redhat:e123456789",
+			name: "good iqn, empty fc with error from node_utils",
+			return_iqn: "iqn.1994-07.com.redhat:e123456789",
+			return_fcs: nil,
+			return_fc_err: fmt.Errorf("some error "),
+			expNodeId:   "test-host;iqn.1994-07.com.redhat:e123456789;",
 		},
 		{
-			name:           "error from node_utils",
-			returned_iqn:   "",
-			returned_error: fmt.Errorf("some error "),
-			expErr:         status.Error(codes.Internal, fmt.Errorf("some error ").Error()),
+			name: "empty iqn with error, one fc port",
+			return_fcs: []string{"10000000c9934d9f"},
+			expNodeId: "test-host;;10000000c9934d9f",
+		},
+		{
+			name: "empty iqn with error from node_utils, one more fc ports",
+			return_iqn: "",
+			return_fcs: []string{"10000000c9934d9f","10000000c9934d9h"},
+			expNodeId: "test-host;;10000000c9934d9f:10000000c9934d9h",
+		},
+		{
+			name: "good iqn and good fcs",
+			return_iqn: "iqn.1994-07.com.redhat:e123456789",
+			return_fcs: []string{"10000000c9934d9f","10000000c9934d9h"},
+			expNodeId: "test-host;iqn.1994-07.com.redhat:e123456789;10000000c9934d9f:10000000c9934d9h",
+		},
+		{
+			name: "epmty iqn and fc with errors from node_utils",
+			return_iqn_err: fmt.Errorf("iqn error "),
+			return_fc_err: fmt.Errorf("fc error"),
+			expErr: status.Error(codes.Internal, fmt.Errorf("errs when get iqn: iqn error ;err when get FC ports: fc error").Error()),
 		},
 	}
 	for _, tc := range testCases {
@@ -432,11 +453,12 @@ func TestNodeGetInfo(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fake_nodeutils := mocks.NewMockNodeUtilsInterface(mockCtrl)
-			fake_nodeutils.EXPECT().ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi").Return(tc.returned_iqn, tc.returned_error)
+			fake_nodeutils.EXPECT().ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi").Return(tc.return_iqn, tc.return_iqn_err)
+			fake_nodeutils.EXPECT().ParseFCPortsName("/sys/class/fc_host/host*/port_name").Return(tc.return_fcs, tc.return_fc_err)
 
-			d := newTestNodeService(fake_nodeutils)
+			d:= newTestNodeService(fake_nodeutils)
 
-			expReponse := &csi.NodeGetInfoResponse{NodeId: tc.expNodeId}
+			expResponse := &csi.NodeGetInfoResponse{NodeId: tc.expNodeId}
 
 			res, err := d.NodeGetInfo(context.TODO(), req)
 			if tc.expErr != nil {
@@ -448,12 +470,11 @@ func TestNodeGetInfo(t *testing.T) {
 					}
 				}
 			} else {
-				if res.NodeId != expReponse.NodeId {
-					t.Fatalf("Expected res : {%v}, and got {%v}", expReponse, res)
+				if res.NodeId != expResponse.NodeId {
+					t.Fatalf("Expected res : {%v}, and got {%v}", expResponse, res)
 				}
 			}
-
 		})
-
 	}
+
 }
