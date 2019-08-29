@@ -35,6 +35,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+const (
+	callerField = "caller"
+	goIDField = "goid"
+	additionalIDField = "addId"
+	unknownValue = "unknown"
+)
+
 type LogFormat struct {
 	TimestampFormat string
 }
@@ -44,11 +51,16 @@ var instance *logrus.Logger
 
 // Format the entry which contains log message info
 func (f *LogFormat) Format(entry *logrus.Entry) ([]byte, error) {
-	goid := entry.Data["goid"]
-	if goid == nil {
-		goid = "unknown"
+	goid := entry.Data[goIDField]
+	id := unknownValue
+	if goid != nil {
+		id = goid.(string)
+		additionalId := entry.Data[additionalIDField]
+		if additionalId != nil && len(additionalId.(string)) > 0 {
+			id = id + "~" + additionalId.(string)
+		}
 	}
-	caller := entry.Data["caller"] // file and line this log is caled from
+	caller := entry.Data[callerField] // file and line this log is caled from
 	var b *bytes.Buffer
 	if entry.Buffer != nil {
 		b = entry.Buffer
@@ -57,7 +69,7 @@ func (f *LogFormat) Format(entry *logrus.Entry) ([]byte, error) {
 	}
 	b.WriteString(entry.Time.Format(f.TimestampFormat) + "\t")
 	b.WriteString(strings.ToUpper(entry.Level.String()) + "\t")
-	b.WriteString(fmt.Sprintf("%v", "["+goid.(string)) + "]\t")
+	b.WriteString(fmt.Sprintf("%v", "[" + id) + "]\t")
 	b.WriteString("(" + caller.(string) + ") - ")
 	b.WriteString(entry.Message)
 	b.WriteString("\n")
@@ -90,12 +102,15 @@ func getInstance() *logrus.Logger {
 // 2) caller: file and line log was called from
 func logEntry() *logrus.Entry {
 	goid := util.GetGoID()
+	additionalId, _ := util.GetAdditionalIDInfoByGoID()
 	_, file, no, ok := runtime.Caller(2)
-	caller := "Unknown"
+	caller := unknownValue
 	if ok {
 		caller = filepath.Base(file) + ":" + strconv.Itoa(no)
 	}
-	logEntry := getInstance().WithFields(logrus.Fields{"goid": strconv.FormatUint(goid, 10), "caller": caller})
+	logEntry := getInstance().WithFields(logrus.Fields{goIDField: strconv.FormatUint(goid, 10),
+													   additionalIDField : additionalId,
+													   callerField: caller})
 	return logEntry
 }
 

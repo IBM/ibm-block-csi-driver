@@ -26,6 +26,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
+	"github.com/ibm/ibm-block-csi-driver/node/goid_info"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"github.com/ibm/ibm-block-csi-driver/node/util"
@@ -88,8 +89,10 @@ func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsI
 }
 
 func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	logger.Debugf(">>>> NodeStageVolume [goid=%d]: called with args %+v", util.GetGoID(), *req)
-	defer logger.Debugf("<<<< NodeStageVolume [goid=%d]", util.GetGoID())
+	logger.Debugf(">>>> NodeStageVolume: called with args %+v", *req)
+	defer logger.Debugf("<<<< NodeStageVolume")
+	goid_info.SetAdditionalIDInfo(req.VolumeId)
+	defer goid_info.DeleteAdditionalIDInfo()
 
 	err := d.nodeStageVolumeRequestValidation(req)
 	if err != nil {
@@ -227,14 +230,16 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 }
 
 func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	logger.Debugf(">>>> NodeUnstageVolume [goid=%d]: called with args %+v", util.GetGoID(), *req)
-	defer logger.Debugf("<<<< NodeUnstageVolume [goid=%d]", util.GetGoID())
-
+	logger.Debugf(">>>> NodeUnstageVolume: called with args %+v", *req)
+	defer logger.Debugf("<<<< NodeUnstageVolume")
 	volumeID := req.GetVolumeId()
+
 	if len(volumeID) == 0 {
 		logger.Errorf("Volume ID not provided")
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
 	}
+	goid_info.SetAdditionalIDInfo(volumeID)
+	defer goid_info.DeleteAdditionalIDInfo()
 
 	err := d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeUnstageVolume")
 	if err != nil {
@@ -293,8 +298,10 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 }
 
 func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	logger.Debugf(">>>> NodePublishVolume [goid=%d]: called with args %+v", util.GetGoID(), *req)
-	defer logger.Debugf("<<<< NodePublishVolume [goid=%d]", util.GetGoID())
+	logger.Debugf(">>>> NodePublishVolume: called with args %+v", *req)
+	defer logger.Debugf("<<<< NodePublishVolume")
+	goid_info.SetAdditionalIDInfo(req.VolumeId)
+	defer goid_info.DeleteAdditionalIDInfo()
 
 	err := d.nodePublishVolumeRequestValidation(req)
 	if err != nil {
@@ -411,13 +418,15 @@ func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVol
 }
 
 func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	logger.Debugf(">>>> NodeUnpublishVolume [goid=%d]: called with args %+v", util.GetGoID(), *req)
-	defer logger.Debugf("<<<< NodeUnpublishVolume [goid=%d]", util.GetGoID())
+	logger.Debugf(">>>> NodeUnpublishVolume: called with args %+v", *req)
+	defer logger.Debugf("<<<< NodeUnpublishVolume")
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
 	}
+	goid_info.SetAdditionalIDInfo(volumeID)
+	defer goid_info.DeleteAdditionalIDInfo()
 
 	err := d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeUnpublishVolume")
 	if err != nil {
@@ -446,16 +455,22 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 }
 
 func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+	goid_info.SetAdditionalIDInfo(req.VolumeId)
+	defer goid_info.DeleteAdditionalIDInfo()
 	return nil, status.Error(codes.Unimplemented, "NodeGetVolumeStats is not implemented yet")
 }
 
 func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+	goid_info.SetAdditionalIDInfo(req.VolumeId)
+	defer goid_info.DeleteAdditionalIDInfo()
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("NodeExpandVolume is not yet implemented"))
 }
 
 func (d *NodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	logger.Debugf(">>>> NodeGetCapabilities [goid=%d]: called with args %+v", util.GetGoID(), *req)
-	defer logger.Debugf("<<<< NodeGetCapabilities [goid=%d]", util.GetGoID())
+	logger.Debugf(">>>> NodeGetCapabilities: called with args %+v", *req)
+	defer logger.Debugf("<<<< NodeGetCapabilities")
+	goid_info.SetAdditionalIDInfo("NodeGetCapabilities")
+	defer goid_info.DeleteAdditionalIDInfo()
 
 	var caps []*csi.NodeServiceCapability
 	for _, cap := range nodeCaps {
@@ -474,6 +489,8 @@ func (d *NodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	logger.Debugf(">>>> NodeGetInfo: called with args %+v", *req)
 	defer logger.Debugf("<<<< NodeGetInfo")
+	goid_info.SetAdditionalIDInfo("NodeGetInfo")
+	defer goid_info.DeleteAdditionalIDInfo()
 
 	iscsiIQN, err := d.NodeUtils.ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi")
 	if err != nil {
