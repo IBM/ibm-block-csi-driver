@@ -1,9 +1,9 @@
 # IBM block storage CSI driver 
 
-The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and Openshift, to manage the life-cycle of persistent storage.
+The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage.
 
 Supported container platforms:
-  - Openshift v4.1
+  - OpenShift v4.1
   - Kubernetes v1.13
 
 Supported IBM storage systems:
