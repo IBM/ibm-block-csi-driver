@@ -12,22 +12,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM centos:7
-RUN yum --enablerepo=extras -y install epel-release && yum -y install python36-pip
+FROM registry.access.redhat.com/ubi8/python-36:1
+MAINTAINER IBM Storage
+
+###Required Labels
+LABEL name="IBM Block CSI Driver Controller" \
+      vendor="IBM" \
+      version="1.0.0" \
+      release="b1" \
+      summary="The controller component of the IBM Block CSI driver" \
+      description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and Openshift, to manage the life-cycle of persistent storage." \
+      io.k8s.display-name="IBM Block CSI Driver Controller" \
+      io.k8s.description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and Openshift, to manage the life-cycle of persistent storage." \
+      io.openshift.tags=ibm,csi,ibm-block-csi-driver,ibm-block-csi-node
 
 COPY controller/requirements.txt /driver/controller/
 RUN pip3 install --upgrade pip==19.1.1
 RUN pip3 install -r /driver/controller/requirements.txt
 
-
 COPY ./common /driver/common
 COPY ./controller /driver/controller
-RUN groupadd -g 9999 appuser && \
-    useradd -r -u 9999 -g appuser appuser
-RUN chown -R appuser:appuser /driver
-USER appuser
+COPY ./LICENSE /licenses/
+
 WORKDIR /driver
 ENV PYTHONPATH=/driver
+
+# Note, UBI runs with app-user by default.
 
 ENTRYPOINT ["/driver/controller/scripts/entrypoint.sh"]
 

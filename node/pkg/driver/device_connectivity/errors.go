@@ -7,7 +7,7 @@ import (
 type MultipleDmDevicesError struct {
 	VolumeId            string
 	LunId               int
-	ArrayIqns            []string
+	ArrayIqns           []string
 	MultipathDevicesMap map[string]bool
 }
 
@@ -20,8 +20,8 @@ func (e *MultipleDmDevicesError) Error() string {
 }
 
 type MultipleDeviceNotFoundForLunError struct {
-	VolumeId string
-	LunId    int
+	VolumeId  string
+	LunId     int
 	ArrayIqns []string
 }
 

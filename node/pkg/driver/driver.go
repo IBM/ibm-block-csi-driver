@@ -21,16 +21,15 @@ import (
 	"io/ioutil"
 	"net"
 
-	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	util "github.com/ibm/ibm-block-csi-driver/node/util"
+	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/ibm/ibm-block-csi-driver/node/logger"
+	"github.com/ibm/ibm-block-csi-driver/node/util"
 
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v2"
-	"k8s.io/klog"
-
-	device_connectivity "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
-	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
-	mount "k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 type Driver struct {
@@ -45,7 +44,7 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 	if err != nil {
 		return nil, err
 	}
-	klog.Infof("Driver: %v Version: %v", configFile.Identity.Name, configFile.Identity.Version)
+	logger.Infof("Driver: %v Version: %v", configFile.Identity.Name, configFile.Identity.Version)
 
 	mounter := &mount.SafeFormatAndMount{
 		Interface: mount.New(""),
@@ -80,7 +79,7 @@ func (d *Driver) Run() error {
 	logErr := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 		resp, err := handler(ctx, req)
 		if err != nil {
-			klog.Errorf("GRPC error: %v", err)
+			logger.Errorf("GRPC error: %v", err)
 		}
 		return resp, err
 	}
@@ -92,12 +91,12 @@ func (d *Driver) Run() error {
 	csi.RegisterIdentityServer(d.srv, d)
 	csi.RegisterNodeServer(d.srv, d)
 
-	klog.Infof("Listening for connections on address: %#v", listener.Addr())
+	logger.Infof("Listening for connections on address: %#v", listener.Addr())
 	return d.srv.Serve(listener)
 }
 
 func (d *Driver) Stop() {
-	klog.Infof("Stopping server")
+	logger.Infof("Stopping server")
 	d.srv.Stop()
 }
 
@@ -125,33 +124,34 @@ func ReadConfigFile(configFilePath string) (ConfigFile, error) {
 	configYamlPath := configFilePath
 	if configYamlPath == "" {
 		configYamlPath = DefualtConfigFile
-		klog.V(4).Infof("Not found config file environment variable %s. Set default value %s.", EnvNameDriverConfFile, configYamlPath)
+		logger.Debugf("Not found config file environment variable %s. Set default value %s.", EnvNameDriverConfFile, configYamlPath)
 	} else {
-		klog.V(4).Infof("Config file environment variable %s=%s", EnvNameDriverConfFile, configYamlPath)
+		logger.Debugf("Config file environment variable %s=%s", EnvNameDriverConfFile, configYamlPath)
+		logger.Info(logger.GetLevel())
 	}
 
 	yamlFile, err := ioutil.ReadFile(configYamlPath)
 	if err != nil {
-		klog.Errorf("failed to read file %q: %v", yamlFile, err)
+		logger.Errorf("failed to read file %q: %v", yamlFile, err)
 		return ConfigFile{}, err
 	}
 
 	err = yaml.Unmarshal(yamlFile, &configFile)
 	if err != nil {
-		klog.Errorf("error unmarshaling yaml: %v", err)
+		logger.Errorf("error unmarshaling yaml: %v", err)
 		return ConfigFile{}, err
 	}
 
 	// Verify mandatory attributes in config file
 	if configFile.Identity.Name == "" {
 		err := &ConfigYmlEmptyAttribute{"Identity.Name"}
-		klog.Errorf("%v", err)
+		logger.Errorf("%v", err)
 		return ConfigFile{}, err
 	}
 
 	if configFile.Identity.Version == "" {
 		err := &ConfigYmlEmptyAttribute{"Identity.Version"}
-		klog.Errorf("%v", err)
+		logger.Errorf("%v", err)
 		return ConfigFile{}, err
 	}
 

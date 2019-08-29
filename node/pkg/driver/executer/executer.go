@@ -24,7 +24,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"k8s.io/klog"
+	"github.com/ibm/ibm-block-csi-driver/node/logger"
 )
 
 //go:generate mockgen -destination=../../../mocks/mock_executer.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer ExecuterInterface
@@ -42,7 +42,7 @@ type Executer struct {
 }
 
 func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []string) ([]byte, error) {
-	klog.V(5).Infof("Executing command : {%v} with args : {%v}. and timeout : {%v} mseconds", command, args, mSeconds)
+	logger.Debugf("Executing command : {%v} with args : {%v}. and timeout : {%v} mseconds", command, args, mSeconds)
 
 	// Create a new context and add a timeout to it
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(mSeconds)*time.Millisecond)
@@ -58,17 +58,17 @@ func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []strin
 	// The error returned by cmd.Output() will be OS specific based on what
 	// happens when a process is killed.
 	if ctx.Err() == context.DeadlineExceeded {
-		klog.V(4).Infof("Command %s timeout reached", command)
+		logger.Debugf("Command %s timeout reached", command)
 		return nil, ctx.Err()
 	}
 
 	// If there's no context error, we know the command completed (or errored).
-	klog.V(4).Infof("Output from command: %s", string(out))
+	logger.Debugf("Output from command: %s", string(out))
 	if err != nil {
-		klog.V(4).Infof("Non-zero exit code: %s", err)
+		logger.Debugf("Non-zero exit code: %s", err)
 	}
 
-	klog.V(5).Infof("Finished executing command")
+	logger.Debugf("Finished executing command")
 	return out, err
 }
 

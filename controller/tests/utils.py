@@ -7,7 +7,7 @@ def get_mock_mediator_response_volume(size, name, wwn, array_type):
     vol.capacity_bytes = size
     vol.id = wwn
     vol.volume_name = name
-    vol.array_name = "arr1"
+    vol.array_address = "arr1"
     vol.pool_name = "pool1"
     vol.array_type = array_type
 
