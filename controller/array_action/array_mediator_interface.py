@@ -127,7 +127,7 @@ class ArrayMediator:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get_array_iscsi_name(self):
+    def get_array_iqns(self):
         """
         This function will return the iscsi name of the storage array
 

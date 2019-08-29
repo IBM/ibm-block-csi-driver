@@ -267,8 +267,8 @@ class SVCArrayMediator(ArrayMediator):
         else:
             logger.debug("can not found host by using fc wwns: {0} "
                          "and iscsi iqn : {1}".format(fc_wwns, iscsi_iqn))
-            port_value = fc_wwns if fc_wwns else iscsi_iqn
-            raise controller_errors.HostNotFoundError(port_value)
+            initiators = fc_wwns if fc_wwns else iscsi_iqn
+            raise controller_errors.HostNotFoundError(initiators)
 
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume id : "
@@ -384,7 +384,7 @@ class SVCArrayMediator(ArrayMediator):
             logger.exception(ex)
             raise ex
     
-    def get_array_iscsi_name(self):
+    def get_array_iqns(self):
         logger.debug("Getting array nodes iscsi name")
         try:
             nodes_list = self.client.svcinfo.lsnode()

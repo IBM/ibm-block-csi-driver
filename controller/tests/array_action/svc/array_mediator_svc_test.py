@@ -493,26 +493,26 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.rmvdiskhostmap.return_value = None
         lun = self.svc.unmap_volume("vol", "host")
 
-    def test_get_array_iscsi_name_with_exception(self):
+    def test_get_array_iqns_with_exception(self):
         self.svc.client.svcinfo.lsnode.side_effect = [Exception]
         with self.assertRaises(Exception):
-            self.svc.get_array_iscsi_name()
+            self.svc.get_array_iqns()
 
-    def test_get_array_iscsi_name_without_node(self):
+    def test_get_array_iqns_without_node(self):
         self.svc.client.svcinfo.lsnode.return_value = []
-        iqns = self.svc.get_array_iscsi_name()
+        iqns = self.svc.get_array_iqns()
         self.assertEqual(iqns, [])
 
-    def test_get_array_iscsi_name_with_no_online_node(self):
+    def test_get_array_iqns_with_no_online_node(self):
         node = Munch({'id': '1',
                       'name': 'node1',
                       'iscsi_name': 'iqn.1986-03.com.ibm:2145.v7k1.node1',
                       'status': 'offline'})
         self.svc.client.svcinfo.lsnode.return_value = [node]
-        iqns = self.svc.get_array_iscsi_name()
+        iqns = self.svc.get_array_iqns()
         self.assertEqual(iqns, [])
 
-    def test_get_array_iscsi_name_with_multi_nodes(self):
+    def test_get_array_iqns_with_multi_nodes(self):
         node1 = Munch({'id': '1',
                        'name': 'node1',
                        'iscsi_name': 'iqn.1986-03.com.ibm:2145.v7k1.node1',
@@ -522,7 +522,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                        'iscsi_name': 'iqn.1986-03.com.ibm:2145.v7k1.node2',
                        'status': 'online'})
         self.svc.client.svcinfo.lsnode.return_value = [node1, node2]
-        iqns = self.svc.get_array_iscsi_name()
+        iqns = self.svc.get_array_iqns()
         self.assertEqual(iqns,
                          ["iqn.1986-03.com.ibm:2145.v7k1.node1",
                           "iqn.1986-03.com.ibm:2145.v7k1.node2"])

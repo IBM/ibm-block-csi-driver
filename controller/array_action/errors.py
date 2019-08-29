@@ -75,9 +75,8 @@ class PermissionDeniedError(BaseArrayActionException):
 
 class MultipleHostsFoundError(BaseArrayActionException):
 
-    def __init__(self, port, hosts):
-        self.message = messages.MultipleHostsFoundError_message.format(port,
-                                                                       hosts)
+    def __init__(self, initiators, hosts):
+        self.message = messages.MultipleHostsFoundError_message.format(initiators, hosts)
 
 
 class HostNotFoundError(BaseArrayActionException):
