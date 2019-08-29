@@ -159,7 +159,7 @@ daemonset.apps/ibm-block-csi-node   2         2         2       2            2  
 NAME                                        READY   AGE
 statefulset.apps/ibm-block-csi-controller   1/1     9m36s
 
-###### One can also use the following labels: app=ibm-block-csi-node, app=ibm-block-csi-controller, csi=ibm or product=ibm-block-csi-driver 
+###### The following labels can also be used: app=ibm-block-csi-node, app=ibm-block-csi-controller, csi=ibm or product=ibm-block-csi-driver.
 
 $> kubectl get -n kube-system pod --selector=app=ibm-block-csi-controller
 NAME                         READY   STATUS    RESTARTS   AGE

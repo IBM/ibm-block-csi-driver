@@ -412,7 +412,7 @@ spec:
             - name: sys-dir
               mountPath: /sys
             - name: host-dir
-              mountPath: /host  # Mapping the root of the host into "/host" inside the container.
+              mountPath: /host  # Maps the host root into "/host", inside the container.
               mountPropagation: "Bidirectional"
 
           ports:
