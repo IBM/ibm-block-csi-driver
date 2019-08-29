@@ -18,6 +18,10 @@
 // It is implemented as decorator for logrus which formats messages in specific manner
 // while adding additional data to each message like goroutine id.
 // E.g. 2019-08-20 17:57:01.820557167	info	[1]	(main.go:83) - my logg message
+//
+// We can add additional info to goid which is specified in the log by mapping it to some string value
+// using goid_info acage. E.g. to volume id
+//
 // To change log level add argument -loglevel <level> (e.g. -log-level debug). Default is info.
 
 package logger
@@ -31,6 +35,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ibm/ibm-block-csi-driver/node/goid_info"
 	"github.com/ibm/ibm-block-csi-driver/node/util"
 	"github.com/sirupsen/logrus"
 )
@@ -102,7 +107,7 @@ func getInstance() *logrus.Logger {
 // 2) caller: file and line log was called from
 func logEntry() *logrus.Entry {
 	goid := util.GetGoID()
-	additionalId, _ := util.GetAdditionalIDInfoByGoID()
+	additionalId, _ := goid_info.GetAdditionalIDInfo()
 	_, file, no, ok := runtime.Caller(2)
 	caller := unknownValue
 	if ok {

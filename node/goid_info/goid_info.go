@@ -14,20 +14,24 @@
  * limitations under the License.
  */
 
+// We can map goid to a string which will appear in log entry  wkith this goid
+// In most places it will be vlume id.
+// Note: after adding don't forget to remove using defer DeleteAdditionalIDInfo()
+
 package goid_info
 
 import (
-	"golang.org/x/sync/syncmap"
 	"github.com/ibm/ibm-block-csi-driver/node/util"
+	"golang.org/x/sync/syncmap"
 )
 
 var additionalIDInfoByGoID = new(syncmap.Map)
 
 func GetAdditionalIDInfo() (string, bool) {
 	goId := util.GetGoID()
-	volID, hasValue := additionalIDInfoByGoID.Load(goId)
+	additionalIDInfo, hasValue := additionalIDInfoByGoID.Load(goId)
 	if hasValue {
-		return volID.(string), hasValue
+		return additionalIDInfo.(string), hasValue
 	} else {
 		return "", hasValue
 	}
@@ -42,4 +46,3 @@ func DeleteAdditionalIDInfo() {
 	goId := util.GetGoID()
 	additionalIDInfoByGoID.Delete(goId)
 }
-
