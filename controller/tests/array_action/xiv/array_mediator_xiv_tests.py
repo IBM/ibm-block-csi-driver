@@ -114,7 +114,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
     def test_get_host_by_identifiers_returns_host_not_found(self):
         iqn = "iqn"
-
+        wwns = ['wwn1', 'wwn2']
         host1 = utils.get_mock_xiv_host("host1", "iqn1")
         host2 = utils.get_mock_xiv_host("host2", "iqn1")
         host3 = utils.get_mock_xiv_host("host3", "iqn2")
@@ -123,7 +123,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
         self.mediator.client.cmd.host_list.return_value = ret
         with self.assertRaises(array_errors.HostNotFoundError):
-            self.mediator.get_host_by_host_identifiers(iqn)
+            self.mediator.get_host_by_host_identifiers(iqn, wwns)
 
     def test_get_host_by_identifiers_returns_host_not_found_when_no_hosts_exist(self):
         iqn = "iqn"
@@ -136,6 +136,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
     def test_get_host_by_identifiers_succeeds(self):
         iqn = "iqn1"
+        wwns = []
         right_host = "host2"
 
         host1 = utils.get_mock_xiv_host(right_host, "iqn1")
@@ -146,7 +147,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         ret.as_list = [host1, host2, host3, host4]
 
         self.mediator.client.cmd.host_list.return_value = ret
-        host, connectivity_type = self.mediator.get_host_by_host_identifiers(iqn)
+        host, connectivity_type = self.mediator.get_host_by_host_identifiers(iqn, wwns)
         self.assertEqual(host, right_host)
         self.assertEqual(connectivity_type, [ISCSI_CONNECTIVITY_TYPE])
 
