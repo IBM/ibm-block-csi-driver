@@ -176,6 +176,9 @@ func (n NodeUtils) ParseFCPortsName(path string) ([]string, error) {
 	var FCPorts []string
 
 	fpaths, err := n.Executer.FilepathGlob(path)
+	if fpaths == nil {
+		err = fmt.Errorf(ErrorUnsupportedConnectivityType, "FC")
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -187,11 +190,13 @@ func (n NodeUtils) ParseFCPortsName(path string) ([]string, error) {
 			break
 		}
 		defer file.Close()
+
 		file_out, err := ioutil.ReadAll(file)
 		if err != nil {
 			errStrings = append(errStrings, err.Error())
+			break
 		}
-		//need to consider:if the port status is inactive, it will not be returned
+
 		fileSplit := strings.Split(string(file_out), "0x")
 		if len(fileSplit) != 2 {
 			err := fmt.Errorf(ErrorWhileTryingToReadFC, string(file_out))

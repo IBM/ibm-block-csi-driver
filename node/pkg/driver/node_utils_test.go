@@ -122,9 +122,8 @@ func TestParseFCPortsName(t *testing.T) {
 			expErr: fmt.Errorf(driver.ErrorWhileTryingToReadFC, "wrong content"),
 		},
 		{
-			name: "fc port file path is inexistent",
-			err : &os.PathError{"open", "/non/existent/path", syscall.ENOENT},
-			expErr: &os.PathError{"open", "/non/existent/path", syscall.ENOENT},
+			name: "fc unsupported",
+			expErr: fmt.Errorf(driver.ErrorUnsupportedConnectivityType, "FC"),
 		},
 		{
 			name: "one FC port",

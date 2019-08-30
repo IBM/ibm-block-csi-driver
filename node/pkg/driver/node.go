@@ -478,7 +478,7 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	iscsiIQN, iscsi_err := d.NodeUtils.ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi")
 	fcList, fc_err := d.NodeUtils.ParseFCPortsName("/sys/class/fc_host/host*/port_name")
 
-	if iscsiIQN == "" && fcList == nil {
+	if iscsi_err != nil && fc_err != nil {
 		errMessage := "errs when get iqn: " + iscsi_err.Error() + ";err when get FC ports: " + fc_err.Error()
 		return nil, status.Error(codes.Internal, errMessage)
 	}
