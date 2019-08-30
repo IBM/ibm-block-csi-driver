@@ -27,6 +27,7 @@ import (
 
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	mountwrapper "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/mount"
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v2"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -47,7 +48,7 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 	logger.Infof("Driver: %v Version: %v", configFile.Identity.Name, configFile.Identity.Version)
 
 	mounter := &mount.SafeFormatAndMount{
-		Interface: mount.New(""),
+		Interface: mountwrapper.New(""),
 		Exec:      mount.NewOsExec(),
 	}
 
