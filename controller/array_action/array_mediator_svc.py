@@ -6,7 +6,6 @@ from controller.array_action.array_mediator_interface import ArrayMediator
 from controller.array_action.array_action_types import Volume
 import controller.array_action.errors as controller_errors
 from controller.array_action.utils import classproperty
-from controller.array_action.config import ISCSI_CONNECTIVITY_TYPE
 import controller.array_action.config as config
 
 array_connections_dict = {}
@@ -233,6 +232,7 @@ class SVCArrayMediator(ArrayMediator):
     def get_host_by_host_identifiers(self, iscsi_iqn, fc_wwns):
         logger.debug("Getting host id for initiators iscsi iqn : {0} and "
                      "fc wwns : {1}".format(iscsi_iqn, fc_wwns))
+
         fc_wwns = [wwn.lower() for wwn in fc_wwns]
         host_list = self.client.svcinfo.lshost()
         iscsi_host, fc_host = None, None
@@ -268,8 +268,8 @@ class SVCArrayMediator(ArrayMediator):
         else:
             logger.debug("can not found host by using fc wwns: {0} "
                          "and iscsi iqn : {1}".format(fc_wwns, iscsi_iqn))
-            port_value = fc_wwns if fc_wwns else iscsi_iqn
-            raise controller_errors.HostNotFoundError(port_value)
+            initiators = fc_wwns if fc_wwns else iscsi_iqn
+            raise controller_errors.HostNotFoundError(initiators)
 
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume id : "
@@ -385,7 +385,7 @@ class SVCArrayMediator(ArrayMediator):
             logger.exception(ex)
             raise ex
     
-    def get_array_iscsi_name(self):
+    def get_array_iqns(self):
         logger.debug("Getting array nodes iscsi name")
         try:
             nodes_list = self.client.svcinfo.lsnode()
@@ -395,3 +395,19 @@ class SVCArrayMediator(ArrayMediator):
             logger.exception(ex)
             raise ex
         return array_iqns
+
+    def get_array_fc_wwns(self):
+        logger.debug("Getting the connected fc port wwn value from array.")
+        filter_value = 'host_io_permitted=yes'
+        fc_port_wwns = []
+        try:
+            fc_wwns = self.client.svcinfo.lstargetportfc(
+                filtervalue=filter_value)
+            for wwn in fc_wwns:
+                if wwn.get('current_node_id', ''):
+                    fc_port_wwns.append(wwn.get('WWPN', ''))
+            return fc_port_wwns
+        except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            logger.error(msg="Failed to get array fc wwn. Reason "
+                             "is: {0}".format(ex))
+            raise ex

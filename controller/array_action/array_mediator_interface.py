@@ -127,29 +127,7 @@ class ArrayMediator:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def map_volume(self, volume_id, host_name):
-        """
-        This function will find the next available lun for the host and map the volume to it.
-
-        Args:
-           volume_id : the volume WWN.
-           host_name : the name of the host to map the volume to.
-
-        Returns:
-           lun : the lun_id the volume was mapped to.
-
-        Raises:
-            NoAvailableLun
-            LunAlreadyInUse
-            volumeNotFound
-            hostNotFound
-            PermissionDenied
-            MappingError
-        """
-        raise NotImplementedError
-
-    @abc.abstractmethod
-    def get_array_iscsi_name(self):
+    def get_array_iqns(self):
         """
         This function will return the iscsi name of the storage array
 
@@ -169,10 +147,13 @@ class ArrayMediator:
         """
         This function will return the wwn of the connected
         FC port of the storage array
+
         Args:
             None
+
         Returns:
             wwn : the wwn of the storage
+
         Raises:
             None
         """
@@ -181,7 +162,7 @@ class ArrayMediator:
     @abc.abstractmethod
     def get_host_by_host_identifiers(self, iscsi_iqn, fc_wwns):
         """
-        This function will find the host by iscsi iqn or fc wwns.
+        This function will find the host name by iscsi iqn or fc wwns.
 
         Args:
            iscis_iqn : the iscsi iqn of the wanted host.

@@ -191,11 +191,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.debug("hostname : {}, connectiivity_types  : {}".format(host_name, connectivity_types))
 
                 connectivity_type = utils.choose_connectivity_type(connectivity_types)
+
                 array_wwns, array_iqns = None, None
                 if FC_CONNECTIVITY_TYPE == connectivity_type:
                     array_wwns = array_mediator.get_array_fc_wwns()
                 else:
-                    array_iqns = array_mediator.get_array_iscsi_name()
+                    array_iqns = array_mediator.get_array_iqns()
                 array_initiators = array_wwns if array_wwns else array_iqns
                 mappings = array_mediator.get_volume_mappings(vol_id)
                 if len(mappings) >= 1:

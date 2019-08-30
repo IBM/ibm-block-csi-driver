@@ -157,8 +157,9 @@ class XIVArrayMediator(ArrayMediator):
 
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
-    def get_host_by_host_identifiers(self, iscsi_iqn):
-        logger.debug("Getting host id for initiators . iscsi_iqn : {0}".format(iscsi_iqn))
+    def get_host_by_host_identifiers(self, iscsi_iqn, fc_wwns=None):
+        logger.debug("Getting host id for initiators iscsi iqn : {0} and "
+                     "fc wwns : {1}".format(iscsi_iqn, fc_wwns))
         host_list = self.client.cmd.host_list().as_list
         current_host = None
         for host in host_list:
@@ -256,7 +257,7 @@ class XIVArrayMediator(ArrayMediator):
             else:
                 raise controller_errors.UnMappingError(vol_name, host_name, ex)
 
-    def get_array_iscsi_name(self):
+    def get_array_iqns(self):
         config_get_list = self.client.cmd.config_get().as_list
         array_iqn = [a for a in config_get_list if a["name"] == "iscsi_name"][0]["value"]
         return [array_iqn]

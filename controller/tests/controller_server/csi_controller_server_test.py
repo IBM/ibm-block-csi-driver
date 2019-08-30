@@ -376,8 +376,8 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.mediator.map_volume = Mock()
         self.mediator.map_volume.return_value = 1
 
-        self.mediator.get_array_iscsi_name = Mock()
-        self.mediator.get_array_iscsi_name.return_value = "array-iqn"
+        self.mediator.get_array_iqns = Mock()
+        self.mediator.get_array_iqns.return_value = "array-iqn"
 
         self.servicer = ControllerServicer(self.fqdn)
 
@@ -464,8 +464,8 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi", "fc"]
         self.mediator.get_array_fc_wwns = Mock()
         self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
-        self.mediator.get_array_iscsi_name = Mock()
-        self.mediator.get_array_iscsi_name.return_value = [
+        self.mediator.get_array_iqns = Mock()
+        self.mediator.get_array_iqns.return_value = [
             "iqn.1994-05.com.redhat:686358c930fe"]
         enter.return_value = self.mediator
 
@@ -480,8 +480,8 @@ class TestControllerServerPublishVolume(unittest.TestCase):
     def test_publish_volume_with_connectivity_type_iscsi(self, enter):
         context = utils.FakeContext()
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi"]
-        self.mediator.get_array_iscsi_name = Mock()
-        self.mediator.get_array_iscsi_name.return_value = ["iqn.1994-05.com.redhat:686358c930fe"]
+        self.mediator.get_array_iqns = Mock()
+        self.mediator.get_array_iqns.return_value = ["iqn.1994-05.com.redhat:686358c930fe"]
         self.mediator.get_array_fc_wwns = Mock()
         self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
         enter.return_value = self.mediator
@@ -550,7 +550,7 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         context = utils.FakeContext()
 
         self.mediator.map_volume.side_effect = [array_errors.LunAlreadyInUseError("", ""), 2]
-        self.mediator.map_volume.get_array_iscsi_name.return_value = "array-iqn"
+        self.mediator.map_volume.get_array_iqns.return_value = "array-iqn"
         enter.return_value = self.mediator
         res = self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
