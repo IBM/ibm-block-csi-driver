@@ -7,7 +7,6 @@ from controller.tests import utils
 
 from controller.csi_general import csi_pb2
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
-from controller.array_action.array_mediator_svc import SVCArrayMediator
 from controller.controller_server.csi_controller_server import ControllerServicer
 from controller.controller_server.test_settings import vol_name
 import controller.array_action.errors as array_errors
