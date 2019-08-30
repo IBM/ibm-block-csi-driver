@@ -262,5 +262,5 @@ class XIVArrayMediator(ArrayMediator):
         return [array_iqn]
 
     def get_array_fc_wwns(self):
-        # add it to pass the UT
-        pass
+        # TODO need to be implemented
+        return []

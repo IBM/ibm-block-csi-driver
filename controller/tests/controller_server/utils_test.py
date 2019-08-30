@@ -235,6 +235,11 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(iscsi_iqn, "iqn.ibm")
         self.assertEqual(fc_wwns, "wwn1:wwn2")
 
+        hostname, iscsi_iqn, fc_wwns = utils.get_node_id_info("hostabc;;wwn1:wwn2")
+        self.assertEqual(hostname, "hostabc")
+        self.assertEqual(iscsi_iqn, "")
+        self.assertEqual(fc_wwns, "wwn1:wwn2")
+
     def test_choose_connectivity_types(self):
         res = utils.choose_connectivity_type(["iscsi"])
         self.assertEqual(res, "iscsi")
@@ -249,7 +254,8 @@ class TestUtils(unittest.TestCase):
         config_a = {"controller": {"publish_context_lun_parameter": "lun",
                                    "publish_context_connectivity_parameter":
                                        "connectivity_type",
-                                   "publish_context_array_iqn": "array_iqn"}
+                                   "publish_context_array_iqn": "array_iqn",
+                                   "publish_context_fc_initiators": "fc_wwns"}
                   }
         res = utils.generate_csi_publish_volume_response(0, "iscsi", config_a,
                                                          ["1"])
@@ -259,6 +265,7 @@ class TestUtils(unittest.TestCase):
 
         config_b = {"controller": {"publish_context_lun_parameter": "lun",
                                    "publish_context_connectivity_parameter": "connectivity_type",
+                                   "publish_context_array_iqn": "array_iqn",
                                    "publish_context_fc_initiators": "fc_wwns"}
                     }
         res = utils.generate_csi_publish_volume_response(1, "fc", config_b,

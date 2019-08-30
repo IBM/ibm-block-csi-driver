@@ -233,7 +233,7 @@ class SVCArrayMediator(ArrayMediator):
     def get_host_by_host_identifiers(self, iscsi_iqn, fc_wwns):
         logger.debug("Getting host id for initiators iscsi iqn : {0} and "
                      "fc wwns : {1}".format(iscsi_iqn, fc_wwns))
-        wwns_list = [wwn.lower() for wwn in fc_wwns]
+        fc_wwns = [wwn.lower() for wwn in fc_wwns]
         host_list = self.client.svcinfo.lshost()
         iscsi_host, fc_host = None, None
         for host in host_list:
@@ -241,15 +241,15 @@ class SVCArrayMediator(ArrayMediator):
                 object_id=host.get('id', '')).as_single_element
             iscsi_names = host_detail.get('iscsi_name', '')
             wwns_value = host_detail.get('WWPN', [])
-            wwns = [wwn.lower() for wwn in wwns_value]
+            host_initiator_wwns = [wwn.lower() for wwn in wwns_value]
             if iscsi_iqn == iscsi_names:
                 iscsi_host = host_detail.get('name', '')
                 logger.debug("found iscsi iqn in list : {0} for host : "
                              "{1}".format(iscsi_iqn, iscsi_host))
-            if set(wwns_list) == set(wwns):
+            if set(fc_wwns) == set(host_initiator_wwns):
                 fc_host = host_detail.get('name', '')
                 logger.debug("found fc wwns in list : {0} for host : "
-                             "{1}".format(wwns_list, fc_host))
+                             "{1}".format(fc_wwns, fc_host))
         if iscsi_host and fc_host:
             if iscsi_host == fc_host:
                 return fc_host, [config.ISCSI_CONNECTIVITY_TYPE,
