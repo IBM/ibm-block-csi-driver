@@ -194,7 +194,7 @@ func (o OsDeviceConnectivityHelperFc) GetFcHostIDs() ([]int, error) {
 			continue
 		}
 
-		if strings.TrimSpace(string(targetName)) == "Online" {
+		if strings.EqualFold(strings.TrimSpace(string(targetName)), "online") {
 			re := regexp.MustCompile("host([0-9]+)")
 			regexMatch := re.FindStringSubmatch(targetPath)
 			logger.Tracef("Found regex matches : {%v}", regexMatch)
