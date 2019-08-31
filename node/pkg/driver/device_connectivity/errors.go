@@ -38,6 +38,14 @@ func (e *ConnectivityIscsiStorageTargetNotFoundError) Error() string {
 	return fmt.Sprintf("Connectivity Error: Storage target name [%s] was not found on the host, under directory %s. Please check the host connectivity to the storage.", e.StorageTargetName, e.DirectoryPath)
 }
 
+type ConnectivityFcHostTargetNotFoundError struct {
+	DirectoryPath string
+}
+
+func (e *ConnectivityFcHostTargetNotFoundError) Error() string {
+	return fmt.Sprintf("Connectivity Error: The target directory [%s] was not found on the hos. Please check the host FC HBA configuration.", e.DirectoryPath)
+}
+
 type MultipleDeviceNotFoundError struct {
 	DiskByPathDevice     string
 	LinkToPhysicalDevice string

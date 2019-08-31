@@ -62,7 +62,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 
 		defer f.Close()
 
-		scanCmd := fmt.Sprintf("0 0 %d", lunId)
+		scanCmd := fmt.Sprintf("- - %d", lunId)
 		logger.Debugf("Rescan host device : echo %s > %s", scanCmd, filename)
 		if written, err := r.Executer.FileWriteString(f, scanCmd); err != nil {
 			logger.Errorf("Rescan Error: could not write to rescan file :{%v}, error : {%v}", filename, err)

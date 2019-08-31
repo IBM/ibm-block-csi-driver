@@ -52,7 +52,8 @@ var (
 	stageInfoFilename          = ".stageInfo.json"
 	supportedConnectivityTypes = map[string]bool{
 		"iscsi": true,
-		// TODO add fc \ nvme later on
+		"fc":    true,
+		// TODO add nvme later on
 	}
 )
 
@@ -110,7 +111,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volId, "NodeStageVolume")
 
-	connectivityType, lun, array_iqns, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
+	connectivityType, lun, array_initiators, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -122,12 +123,12 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
 	}
 
-	err = osDeviceConnectivity.RescanDevices(lun, array_iqns)
+	err = osDeviceConnectivity.RescanDevices(lun, array_initiators)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	device, err := osDeviceConnectivity.GetMpathDevice(volId, lun, array_iqns)
+	device, err := osDeviceConnectivity.GetMpathDevice(volId, lun, array_initiators)
 	logger.Debugf("Discovered device : {%v}", device)
 	if err != nil {
 		logger.Errorf("Error while discovring the device : {%v}", err.Error())
@@ -206,7 +207,7 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{"Volume Access Type Block is not supported yet"}
 	}
 
-	connectivityType, lun, array_iqns, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
+	connectivityType, lun, array_initiators, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
 	if err != nil {
 		return &RequestValidationError{fmt.Sprintf("Fail to parse PublishContext %v with err = %v", req.PublishContext, err)}
 	}
@@ -219,8 +220,8 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong lun id %d.", lun)}
 	}
 
-	if len(array_iqns) == 0 {
-		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong array_iqn %s.", array_iqns)}
+	if len(array_initiators) == 0 {
+		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong array_initiators %s.", array_initiators)}
 	}
 
 	return nil

@@ -55,8 +55,8 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 	executer := &executer.Executer{}
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
 		"iscsi": device_connectivity.NewOsDeviceConnectivityIscsi(executer),
-		//"fc": NewOsDeviceConnectivityFc(executer),
-		// TODO nvme and FC
+		"fc":    device_connectivity.NewOsDeviceConnectivityFc(executer),
+		// TODO nvme
 	}
 	return &Driver{
 		endpoint:    endpoint,
@@ -110,6 +110,7 @@ type ConfigFile struct {
 		Publish_context_lun_parameter          string
 		Publish_context_connectivity_parameter string
 		Publish_context_array_iqn              string
+		Publish_context_fc_initiators          string
 	}
 }
 
