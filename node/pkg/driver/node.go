@@ -467,8 +467,6 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 }
 
 func (d *NodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	goid_info.SetAdditionalIDInfo("NodeGetCapabilities")
-	defer goid_info.DeleteAdditionalIDInfo()
 	logger.Debugf(">>>> NodeGetCapabilities: called with args %+v", *req)
 	defer logger.Debugf("<<<< NodeGetCapabilities")
 
@@ -487,8 +485,6 @@ func (d *NodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 }
 
 func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
-	goid_info.SetAdditionalIDInfo("NodeGetInfo")
-	defer goid_info.DeleteAdditionalIDInfo()
 	logger.Debugf(">>>> NodeGetInfo: called with args %+v", *req)
 	defer logger.Debugf("<<<< NodeGetInfo")
 
