@@ -17,7 +17,7 @@
 // This package is used for logging.
 // It is implemented as decorator for logrus which formats messages in specific manner
 // while adding additional data to each message like goroutine id.
-// E.g. 2019-08-20 17:57:01.820557167	info	[1]	(main.go:83) - my logg message
+// E.g. 2019-08-20 17:57:01.82 info	[1] (main.go:83) - my logg message
 //
 // We can add additional info to goid which is specified in the log by mapping it to some string value
 // using goid_info acage. E.g. to volume id
@@ -72,9 +72,9 @@ func (f *LogFormat) Format(entry *logrus.Entry) ([]byte, error) {
 	} else {
 		b = &bytes.Buffer{}
 	}
-	b.WriteString(entry.Time.Format(f.TimestampFormat) + "\t")
+	b.WriteString(entry.Time.Format(f.TimestampFormat) + " ")
 	b.WriteString(strings.ToUpper(entry.Level.String()) + "\t")
-	b.WriteString(fmt.Sprintf("%v", "[" + id) + "]\t")
+	b.WriteString(fmt.Sprintf("%v", "[" + id) + "] ")
 	b.WriteString("(" + caller.(string) + ") - ")
 	b.WriteString(entry.Message)
 	b.WriteString("\n")
@@ -89,7 +89,7 @@ func getInstance() *logrus.Logger {
 		instance = logrus.New()
 		instance.SetReportCaller(true)
 		// in logrus timestamp format is specified using example
-		formatter.TimestampFormat = "2006-01-02 15:04:05.1234567"
+		formatter.TimestampFormat = "2006-01-02 15:04:05,123"
 		instance.SetFormatter(&formatter)
 		// set log level
 		logLevel := flag.String("loglevel", "trace", "The level of logs (error, warning info, debug, trace etc...).")
