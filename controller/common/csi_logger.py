@@ -10,7 +10,7 @@ def get_stdout_logger():
         handler = logging.StreamHandler(sys.stdout)
         handler.setLevel(logging.DEBUG)
         formatter = logging.Formatter(
-            '[%(asctime)s %(thread)d %(levelname)s %(filename)s %(lineno)d %(funcName)s] %(message)s')
+            '%(asctime)s %(levelname)s\t[%(thread)d] (%(filename)s:%(lineno)d %(funcName)s) - %(message)s')
         handler.setFormatter(formatter)
         csi_logger.addHandler(handler)
 
