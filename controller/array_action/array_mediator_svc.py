@@ -241,6 +241,8 @@ class SVCArrayMediator(ArrayMediator):
                 object_id=host.get('id', '')).as_single_element
             iscsi_names = host_detail.get('iscsi_name', '')
             wwns_value = host_detail.get('WWPN', [])
+            if not isinstance(wwns_value, list):
+                wwns_value = [wwns_value, ]
             host_initiator_wwns = [wwn.lower() for wwn in wwns_value]
             if iscsi_iqn == iscsi_names:
                 iscsi_host = host_detail.get('name', '')
@@ -396,16 +398,15 @@ class SVCArrayMediator(ArrayMediator):
             raise ex
         return array_iqns
 
-    def get_array_fc_wwns(self):
-        logger.debug("Getting the connected fc port wwn value from array.")
-        filter_value = 'host_io_permitted=yes'
+    def get_array_fc_wwns(self, host_name):
+        logger.debug("Getting the connected fc port wwn value from array "
+                     "related to host : {}.".format(host_name))
         fc_port_wwns = []
         try:
-            fc_wwns = self.client.svcinfo.lstargetportfc(
-                filtervalue=filter_value)
+            fc_wwns = self.client.svcinfo.lsfabric(host='csi_host')
             for wwn in fc_wwns:
-                if wwn.get('current_node_id', ''):
-                    fc_port_wwns.append(wwn.get('WWPN', ''))
+                if wwn.get('state', '') == 'active':
+                    fc_port_wwns.append(wwn.get('local_wwpn', ''))
             return fc_port_wwns
         except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.error(msg="Failed to get array fc wwn. Reason "

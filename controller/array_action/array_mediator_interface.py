@@ -143,7 +143,7 @@ class ArrayMediator:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get_array_fc_wwns(self):
+    def get_array_fc_wwns(self, host_name):
         """
         This function will return the wwn of the connected
         FC port of the storage array
