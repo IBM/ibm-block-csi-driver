@@ -407,6 +407,7 @@ class SVCArrayMediator(ArrayMediator):
             for wwn in fc_wwns:
                 if wwn.get('state', '') == 'active':
                     fc_port_wwns.append(wwn.get('local_wwpn', ''))
+            logger.debug("Getting fc wwns : {}".format(fc_port_wwns))
             return fc_port_wwns
         except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.error(msg="Failed to get array fc wwn. Reason "

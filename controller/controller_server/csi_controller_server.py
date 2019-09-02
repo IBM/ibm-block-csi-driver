@@ -194,7 +194,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 array_wwns, array_iqns = None, None
                 if FC_CONNECTIVITY_TYPE == connectivity_type:
-                    array_wwns = array_mediator.get_array_fc_wwns()
+                    array_wwns = array_mediator.get_array_fc_wwns(host_name)
                 else:
                     array_iqns = array_mediator.get_array_iqns()
                 array_initiators = array_wwns if array_wwns else array_iqns
