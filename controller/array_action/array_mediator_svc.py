@@ -318,7 +318,7 @@ class SVCArrayMediator(ArrayMediator):
         for candidate in range(self.MIN_LUN_NUMBER, self.MAX_LUN_NUMBER + 1):
             if str(candidate) not in luns_in_use:
                 logger.debug("First available LUN number for {0} is "
-                             "{1}".format(list(host_name), str(candidate)))
+                             "{1}".format(host_name, str(candidate)))
                 lun = str(candidate)
                 break
         if not lun:
