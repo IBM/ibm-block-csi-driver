@@ -82,7 +82,7 @@ func (r OsDeviceConnectivityFc) GetMpathDevice(volumeId string, lunId int, array
 	}
 
 	for _, arrayIdentifier := range arrayIdentifiers {
-		wwn := "0x" + arrayIdentifier
+		wwn := "0x" + strings.ToLower(string(arrayIdentifier))
 		dp := strings.Join([]string{"/dev/disk/by-path/pci*", "fc", wwn, "lun", lunIdStr}, "-")
 		logger.Infof("GetMpathDevice: Get the mpath devices related to wwn=%s and lunID=%s : {%v}", wwn, lunIdStr, dp)
 		dps, exists, e := r.Helper.WaitForPathToExist(dp, 5, 1)
