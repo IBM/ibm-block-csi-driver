@@ -17,7 +17,7 @@
 // This package is used for logging.
 // It is implemented as decorator for logrus which formats messages in specific manner
 // while adding additional data to each message like goroutine id.
-// E.g. 2019-08-20 17:57:01.82 info	[1] (main.go:83) - my logg message
+// E.g. 2019-08-20 17:57:01.821 info	[1] [vol] (main.go:83) - my logg message
 //
 // We can add additional info to goid which is specified in the log by mapping it to some string value
 // using goid_info acage. E.g. to volume id
@@ -41,10 +41,11 @@ import (
 )
 
 const (
-	callerField = "caller"
-	goIDField = "goid"
-	additionalIDField = "addId"
-	unknownValue = "unknown"
+	callerField             = "caller"
+	goIDField               = "goid"
+	additionalGoIDInfoField = "addId"
+	unknownValue            = "unknown"
+	noAdditionalIDValue     = "-"
 )
 
 type LogFormat struct {
@@ -57,13 +58,12 @@ var instance *logrus.Logger
 // Format the entry which contains log message info
 func (f *LogFormat) Format(entry *logrus.Entry) ([]byte, error) {
 	goid := entry.Data[goIDField]
-	id := unknownValue
 	if goid != nil {
-		id = goid.(string)
-		additionalId := entry.Data[additionalIDField]
-		if additionalId != nil && len(additionalId.(string)) > 0 {
-			id = id + "~" + additionalId.(string)
-		}
+		goid = unknownValue
+	}
+	additionalGoIDInfo := entry.Data[additionalGoIDInfoField]
+	if additionalGoIDInfo == nil || len(additionalGoIDInfo.(string)) == 0 {
+		additionalGoIDInfo = noAdditionalIDValue
 	}
 	caller := entry.Data[callerField] // file and line this log is caled from
 	var b *bytes.Buffer
@@ -74,7 +74,8 @@ func (f *LogFormat) Format(entry *logrus.Entry) ([]byte, error) {
 	}
 	b.WriteString(entry.Time.Format(f.TimestampFormat) + " ")
 	b.WriteString(strings.ToUpper(entry.Level.String()) + "\t")
-	b.WriteString(fmt.Sprintf("%v", "[" + id) + "] ")
+	b.WriteString(fmt.Sprintf("%v", "[" + goid.(string)) + "] ")
+	b.WriteString(fmt.Sprintf("%v", "[" + additionalGoIDInfo.(string)) + "] ")
 	b.WriteString("(" + caller.(string) + ") - ")
 	b.WriteString(entry.Message)
 	b.WriteString("\n")
@@ -114,8 +115,8 @@ func logEntry() *logrus.Entry {
 		caller = filepath.Base(file) + ":" + strconv.Itoa(no)
 	}
 	logEntry := getInstance().WithFields(logrus.Fields{goIDField: strconv.FormatUint(goid, 10),
-													   additionalIDField : additionalId,
-													   callerField: caller})
+													   additionalGoIDInfoField: additionalId,
+													   callerField:             caller})
 	return logEntry
 }
 

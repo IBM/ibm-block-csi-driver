@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-// We can map goid to a string which will appear in log entry  wkith this goid
-// In most places it will be vlume id.
-// Note: after adding don't forget to remove using defer DeleteAdditionalIDInfo()
+// We can map goid to a string which will appear in log entry with this goid. In most places it will be volume id.
+// Use "SetAdditionalIDInfo(<info>)" at the begining of API method to specify additional info for current goid.
+// Directly after use "defer DeleteAdditionalIDInfo()" to remove the info so additionalIDInfoByGoID will not grow endlessly.
 
 package goid_info
 
