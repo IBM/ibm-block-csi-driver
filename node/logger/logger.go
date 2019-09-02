@@ -17,7 +17,11 @@
 // This package is used for logging.
 // It is implemented as decorator for logrus which formats messages in specific manner
 // while adding additional data to each message like goroutine id.
-// E.g. 2019-08-20 17:57:01.820557167	info	[1]	(main.go:83) - my logg message
+// E.g. 2019-08-20 17:57:01.821 info	[1] [vol] (main.go:83) - my logg message
+//
+// We can add additional info to goid which is specified in the log by mapping it to some string value
+// using goid_info acage. E.g. to volume id
+//
 // To change log level add argument -loglevel <level> (e.g. -log-level debug). Default is info.
 
 package logger
@@ -31,8 +35,17 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ibm/ibm-block-csi-driver/node/goid_info"
 	"github.com/ibm/ibm-block-csi-driver/node/util"
 	"github.com/sirupsen/logrus"
+)
+
+const (
+	callerField             = "caller"
+	goIDField               = "goid"
+	additionalGoIDInfoField = "addId"
+	unknownValue            = "unknown"
+	noAdditionalIDValue     = "-"
 )
 
 type LogFormat struct {
@@ -44,20 +57,25 @@ var instance *logrus.Logger
 
 // Format the entry which contains log message info
 func (f *LogFormat) Format(entry *logrus.Entry) ([]byte, error) {
-	goid := entry.Data["goid"]
-	if goid == nil {
-		goid = "unknown"
+	goid := entry.Data[goIDField]
+	if goid != nil {
+		goid = unknownValue
 	}
-	caller := entry.Data["caller"] // file and line this log is caled from
+	additionalGoIDInfo := entry.Data[additionalGoIDInfoField]
+	if additionalGoIDInfo == nil || len(additionalGoIDInfo.(string)) == 0 {
+		additionalGoIDInfo = noAdditionalIDValue
+	}
+	caller := entry.Data[callerField] // file and line this log is caled from
 	var b *bytes.Buffer
 	if entry.Buffer != nil {
 		b = entry.Buffer
 	} else {
 		b = &bytes.Buffer{}
 	}
-	b.WriteString(entry.Time.Format(f.TimestampFormat) + "\t")
+	b.WriteString(entry.Time.Format(f.TimestampFormat) + " ")
 	b.WriteString(strings.ToUpper(entry.Level.String()) + "\t")
-	b.WriteString(fmt.Sprintf("%v", "["+goid.(string)) + "]\t")
+	b.WriteString(fmt.Sprintf("%v", "[" + goid.(string)) + "] ")
+	b.WriteString(fmt.Sprintf("%v", "[" + additionalGoIDInfo.(string)) + "] ")
 	b.WriteString("(" + caller.(string) + ") - ")
 	b.WriteString(entry.Message)
 	b.WriteString("\n")
@@ -72,7 +90,7 @@ func getInstance() *logrus.Logger {
 		instance = logrus.New()
 		instance.SetReportCaller(true)
 		// in logrus timestamp format is specified using example
-		formatter.TimestampFormat = "2006-01-02 15:04:05.1234567"
+		formatter.TimestampFormat = "2006-01-02 15:04:05,123"
 		instance.SetFormatter(&formatter)
 		// set log level
 		logLevel := flag.String("loglevel", "trace", "The level of logs (error, warning info, debug, trace etc...).")
@@ -90,12 +108,15 @@ func getInstance() *logrus.Logger {
 // 2) caller: file and line log was called from
 func logEntry() *logrus.Entry {
 	goid := util.GetGoID()
+	additionalId, _ := goid_info.GetAdditionalIDInfo()
 	_, file, no, ok := runtime.Caller(2)
-	caller := "Unknown"
+	caller := unknownValue
 	if ok {
 		caller = filepath.Base(file) + ":" + strconv.Itoa(no)
 	}
-	logEntry := getInstance().WithFields(logrus.Fields{"goid": strconv.FormatUint(goid, 10), "caller": caller})
+	logEntry := getInstance().WithFields(logrus.Fields{goIDField: strconv.FormatUint(goid, 10),
+													   additionalGoIDInfoField: additionalId,
+													   callerField:             caller})
 	return logEntry
 }
 
