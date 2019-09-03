@@ -405,7 +405,8 @@ class SVCArrayMediator(ArrayMediator):
         try:
             fc_wwns = self.client.svcinfo.lsfabric(host=host_name)
             for wwn in fc_wwns:
-                if wwn.get('state', '') == 'active':
+                state = wwn.get('state', '')
+                if state == 'active' or state == 'inactive':
                     fc_port_wwns.append(wwn.get('local_wwpn', ''))
             logger.debug("Getting fc wwns : {}".format(fc_port_wwns))
             return fc_port_wwns

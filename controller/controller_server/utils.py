@@ -168,7 +168,7 @@ def get_node_id_info(node_id):
         raise HostNotFoundError(node_id)
 
     hostname, iscsi_iqn, fc_wwns = split_node
-    logger.debug("hostname : {0}, iscsi_iqn : {1}, fc_wwns : {2} ".format(
+    logger.debug("node name : {0}, iscsi_iqn : {1}, fc_wwns : {2} ".format(
         hostname, iscsi_iqn, fc_wwns))
     return hostname, iscsi_iqn, fc_wwns
 

@@ -554,4 +554,4 @@ class TestArrayMediatorSVC(unittest.TestCase):
                         'cluster_name': '', 'type': 'host'})
         self.svc.client.svcinfo.lsfabric.return_value = [port_1, port_2]
         wwns = self.svc.get_array_fc_wwns('host')
-        self.assertEqual(wwns, ['5005076810282CD8'])
+        self.assertEqual(wwns, ['5005076810282CD8', '5005076810262CD8'])
