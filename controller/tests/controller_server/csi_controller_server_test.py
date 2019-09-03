@@ -496,6 +496,62 @@ class TestControllerServerPublishVolume(unittest.TestCase):
             "iqn.1994-05.com.redhat:686358c930fe")
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_publish_volume_with_node_id_only_has_iqns(self, enter):
+        context = utils.FakeContext()
+        self.request.node_id = "hostname;iqn.1994-05.com.redhat:686358c930fe;"
+        self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi"]
+        self.mediator.get_array_iqns = Mock()
+        self.mediator.get_array_iqns.return_value = [
+            "iqn.1994-05.com.redhat:686358c930fe"]
+        enter.return_value = self.mediator
+
+        res = self.servicer.ControllerPublishVolume(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.OK)
+
+        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '1')
+        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
+                         "iscsi")
+        self.assertEqual(
+            res.publish_context["PUBLISH_CONTEXT_ARRAY_IQN"],
+            "iqn.1994-05.com.redhat:686358c930fe")
+
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_publish_volume_with_node_id_only_has_wwns(self, enter):
+        context = utils.FakeContext()
+        self.request.node_id = "hostname;;500143802426baf4"
+        self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["fc"]
+        self.mediator.get_array_fc_wwns = Mock()
+        self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
+        enter.return_value = self.mediator
+
+        res = self.servicer.ControllerPublishVolume(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.OK)
+
+        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '1')
+        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
+                         "fc")
+        self.assertEqual(
+            res.publish_context["PUBLISH_CONTEXT_ARRAY_FC_INITIATORS"],
+            "500143802426baf4")
+
+        self.request.node_id = "hostname;;500143802426baf4:500143806626bae2"
+        self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["fc"]
+        self.mediator.get_array_fc_wwns = Mock()
+        self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4",
+                                                        "500143806626bae2"]
+        enter.return_value = self.mediator
+
+        res = self.servicer.ControllerPublishVolume(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.OK)
+
+        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '1')
+        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
+                         "fc")
+        self.assertEqual(
+            res.publish_context["PUBLISH_CONTEXT_ARRAY_FC_INITIATORS"],
+            "500143802426baf4,500143806626bae2")
+
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_publish_volume_get_volume_mappings_one_map_for_other_host(self, enter):
         context = utils.FakeContext()
         self.mediator.get_volume_mappings = Mock()
