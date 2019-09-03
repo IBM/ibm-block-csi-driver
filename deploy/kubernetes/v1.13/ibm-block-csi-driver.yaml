@@ -24,6 +24,9 @@ kind: ServiceAccount
 metadata:
   name: ibm-block-csi-controller-sa
   namespace: kube-system
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
 
 ---
 
@@ -32,6 +35,10 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: ibm-block-csi-external-provisioner-role
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
+  
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
@@ -69,6 +76,10 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: ibm-block-csi-external-provisioner-binding
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
+
 subjects:
   - kind: ServiceAccount
     name: ibm-block-csi-controller-sa
@@ -84,6 +95,9 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: ibm-block-csi-external-attacher-role
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
 rules:
   - apiGroups: [""]
     resources: ["persistentvolumes"]
@@ -104,6 +118,9 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: ibm-block-csi-external-attacher-binding
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
 subjects:
   - kind: ServiceAccount
     name: ibm-block-csi-controller-sa
@@ -119,6 +136,9 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: ibm-block-csi-cluster-driver-registrar-role
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
 rules:
   ## Only needed for k8s 1.13 since it was automatic install the CSIDriver. But for 1.14+ its not available.
   - apiGroups: ["apiextensions.k8s.io"]
@@ -135,6 +155,9 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: ibm-block-csi-cluster-driver-registrar-binding
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
 subjects:
   - kind: ServiceAccount
     name: ibm-block-csi-controller-sa
@@ -150,6 +173,9 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: ibm-block-csi-external-snapshotter-role
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
 rules:
   - apiGroups: [""]
     resources: ["persistentvolumes"]
@@ -185,6 +211,9 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: ibm-block-csi-external-snapshotter-binding
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
 subjects:
   - kind: ServiceAccount
     name: ibm-block-csi-controller-sa
@@ -202,6 +231,9 @@ apiVersion: apps/v1
 metadata:
   name: ibm-block-csi-controller
   namespace: kube-system
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
 spec:
   selector:
     matchLabels:
@@ -212,6 +244,8 @@ spec:
     metadata:
       labels:
         app: ibm-block-csi-controller
+        product: ibm-block-csi-driver
+        csi: ibm
     spec:
       serviceAccount: ibm-block-csi-controller-sa
       containers:
@@ -328,6 +362,9 @@ apiVersion: apps/v1
 metadata:
   name: ibm-block-csi-node
   namespace: kube-system
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
 spec:
   selector:
     matchLabels:
@@ -336,6 +373,8 @@ spec:
     metadata:
       labels:
         app: ibm-block-csi-node
+        product: ibm-block-csi-driver
+        csi: ibm
     spec:
       hostNetwork: true
       containers:
@@ -373,7 +412,7 @@ spec:
             - name: sys-dir
               mountPath: /sys
             - name: host-dir
-              mountPath: /host  # Mapping the root of the host into "/host" inside the container.
+              mountPath: /host  # Maps the host root into "/host", inside the container.
               mountPropagation: "Bidirectional"
 
           ports:
@@ -400,12 +439,12 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["/bin/sh", "-c", "rm -rf /registration/ibm-block-csi-driver-reg.sock /csi/csi.sock"]
+                command: ["/bin/sh", "-c", "rm -rf /registration/block.csi.ibm.com-reg.sock /csi/csi.sock"]
           env:
             - name: ADDRESS
               value: /csi/csi.sock
             - name: DRIVER_REG_SOCK_PATH
-              value: /var/lib/kubelet/plugins/ibm-block-csi-driver/csi.sock
+              value: /var/lib/kubelet/plugins/block.csi.ibm.com/csi.sock
           volumeMounts:
             - name: socket-dir
               mountPath: /csi
@@ -431,7 +470,7 @@ spec:
         ## This volume is where the socket for kubelet->driver communication is done
         - name: socket-dir
           hostPath:
-            path: /var/lib/kubelet/plugins/ibm-block-csi-driver/
+            path: /var/lib/kubelet/plugins/block.csi.ibm.com/
             type: DirectoryOrCreate
 
         ## This volume is where the node-driver-registrar registers the plugin with kubelet
