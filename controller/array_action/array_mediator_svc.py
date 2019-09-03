@@ -403,7 +403,7 @@ class SVCArrayMediator(ArrayMediator):
                      "related to host : {}.".format(host_name))
         fc_port_wwns = []
         try:
-            fc_wwns = self.client.svcinfo.lsfabric(host='csi_host')
+            fc_wwns = self.client.svcinfo.lsfabric(host=host_name)
             for wwn in fc_wwns:
                 if wwn.get('state', '') == 'active':
                     fc_port_wwns.append(wwn.get('local_wwpn', ''))
