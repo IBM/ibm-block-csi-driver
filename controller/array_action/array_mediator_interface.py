@@ -143,7 +143,7 @@ class ArrayMediator:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get_array_fc_wwns(self):
+    def get_array_fc_wwns(self, host_name):
         """
         This function will return the wwn of the connected
         FC port of the storage array
@@ -160,13 +160,17 @@ class ArrayMediator:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get_host_by_host_identifiers(self, iscis_iqn, fc_wwns):
+    def get_host_by_host_identifiers(self, iscsi_iqn, fc_wwns):
         """
-        This function will find the name of the host by the iscis_iqn or fc_wwns.
+        This function will find the host name by iscsi iqn or fc wwns.
 
         Args:
            iscis_iqn : the iscsi iqn of the wanted host.
-           fc_wwns : the wwns of the wanted host.
+           fc_wwns : the fc wwns of the wanted host.
+
+        Returns:
+           connectivity_types : list of connectivity types ([iscis, fc] or just [iscsi],..)
+           hostname           : the name of the host
 
         Raises:
             hostNotFound

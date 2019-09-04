@@ -232,7 +232,8 @@ class SVCArrayMediator(ArrayMediator):
     def get_host_by_host_identifiers(self, iscsi_iqn, fc_wwns):
         logger.debug("Getting host id for initiators iscsi iqn : {0} and "
                      "fc wwns : {1}".format(iscsi_iqn, fc_wwns))
-        wwns_list = [wwn.lower() for wwn in fc_wwns]
+
+        fc_wwns = [wwn.lower() for wwn in fc_wwns]
         host_list = self.client.svcinfo.lshost()
         iscsi_host, fc_host = None, None
         for host in host_list:
@@ -240,15 +241,17 @@ class SVCArrayMediator(ArrayMediator):
                 object_id=host.get('id', '')).as_single_element
             iscsi_names = host_detail.get('iscsi_name', '')
             wwns_value = host_detail.get('WWPN', [])
-            wwns = [wwn.lower() for wwn in wwns_value]
+            if not isinstance(wwns_value, list):
+                wwns_value = [wwns_value, ]
+            host_initiator_wwns = [wwn.lower() for wwn in wwns_value]
             if iscsi_iqn == iscsi_names:
                 iscsi_host = host_detail.get('name', '')
                 logger.debug("found iscsi iqn in list : {0} for host : "
                              "{1}".format(iscsi_iqn, iscsi_host))
-            if set(wwns_list) == set(wwns):
+            if set(fc_wwns) == set(host_initiator_wwns):
                 fc_host = host_detail.get('name', '')
                 logger.debug("found fc wwns in list : {0} for host : "
-                             "{1}".format(wwns_list, fc_host))
+                             "{1}".format(fc_wwns, fc_host))
         if iscsi_host and fc_host:
             if iscsi_host == fc_host:
                 return fc_host, [config.ISCSI_CONNECTIVITY_TYPE,
@@ -315,7 +318,7 @@ class SVCArrayMediator(ArrayMediator):
         for candidate in range(self.MIN_LUN_NUMBER, self.MAX_LUN_NUMBER + 1):
             if str(candidate) not in luns_in_use:
                 logger.debug("First available LUN number for {0} is "
-                             "{1}".format(list(host_name), str(candidate)))
+                             "{1}".format(host_name, str(candidate)))
                 lun = str(candidate)
                 break
         if not lun:
@@ -395,16 +398,17 @@ class SVCArrayMediator(ArrayMediator):
             raise ex
         return array_iqns
 
-    def get_array_fc_wwns(self):
-        logger.debug("Getting the connected fc port wwn value from array.")
-        filter_value = 'host_io_permitted=yes'
+    def get_array_fc_wwns(self, host_name):
+        logger.debug("Getting the connected fc port wwn value from array "
+                     "related to host : {}.".format(host_name))
         fc_port_wwns = []
         try:
-            fc_wwns = self.client.svcinfo.lstargetportfc(
-                filtervalue=filter_value)
+            fc_wwns = self.client.svcinfo.lsfabric(host=host_name)
             for wwn in fc_wwns:
-                if wwn.get('current_node_id', ''):
-                    fc_port_wwns.append(wwn.get('WWPN', ''))
+                state = wwn.get('state', '')
+                if state == 'active' or state == 'inactive':
+                    fc_port_wwns.append(wwn.get('local_wwpn', ''))
+            logger.debug("Getting fc wwns : {}".format(fc_port_wwns))
             return fc_port_wwns
         except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.error(msg="Failed to get array fc wwn. Reason "
