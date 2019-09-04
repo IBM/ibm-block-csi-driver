@@ -442,10 +442,12 @@ func TestNodeGetInfo(t *testing.T) {
 			name: "epmty iqn and fc with errors from node_utils",
 			return_iqn_err: fmt.Errorf("iqn error "),
 			return_fc_err: fmt.Errorf("fc error"),
-			expErr: status.Error(codes.Internal, fmt.Errorf("errs when get iqn: iqn error ;err when get FC ports: fc error").Error()),
+			expErr: status.Error(codes.Internal, fmt.Errorf("[iqn error , fc error]").Error()),
 		},
 	}
 	for _, tc := range testCases {
+		fcPath := "/sys/class/fc_host"
+		iscsiPath := "/etc/iscsi/initiatorname.iscsi"
 		t.Run(tc.name, func(t *testing.T) {
 			req := &csi.NodeGetInfoRequest{}
 
@@ -453,8 +455,11 @@ func TestNodeGetInfo(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fake_nodeutils := mocks.NewMockNodeUtilsInterface(mockCtrl)
-			fake_nodeutils.EXPECT().ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi").Return(tc.return_iqn, tc.return_iqn_err)
-			fake_nodeutils.EXPECT().ParseFCPortsName("/sys/class/fc_host/host*/port_name").Return(tc.return_fcs, tc.return_fc_err)
+			fake_nodeutils.EXPECT().ParseIscsiInitiators().Return(tc.return_iqn, tc.return_iqn_err)
+			fake_nodeutils.EXPECT().ParseFCPorts().Return(tc.return_fcs, tc.return_fc_err)
+
+			fake_nodeutils.EXPECT().Exists(fcPath).Return(true)
+			fake_nodeutils.EXPECT().Exists(iscsiPath).Return(true)
 
 			d:= newTestNodeService(fake_nodeutils)
 

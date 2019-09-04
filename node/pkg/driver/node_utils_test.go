@@ -86,7 +86,8 @@ func TestParseIscsiInitiators(t *testing.T) {
 				filePath = "/non/existent/path"
 			}
 
-			isci, err := nodeUtils.ParseIscsiInitiators(filePath)
+			driver.IscsiFullPath = filePath
+			isci, err := nodeUtils.ParseIscsiInitiators()
 
 			if tc.expErr != nil {
 				if err.Error() != tc.expErr.Error() {
@@ -138,7 +139,7 @@ func TestParseFCPortsName(t *testing.T) {
 		{
 			name: "one fc port file with wrong content, aonther file path is inexistent",
 			file_contents: []string{"wrong content", ""},
-			expErr: errors.New("Error while tring to get FC port from string: wrong content.,open /non/existent/path: no such file or directory"),
+			expErr: errors.New("[Error while tring to get FC port from string: wrong content., open /non/existent/path: no such file or directory]"),
 		},
 		{
 			name: "two FC ports",
@@ -186,7 +187,7 @@ func TestParseFCPortsName(t *testing.T) {
 			fake_executer.EXPECT().FilepathGlob(devicePath).Return(fpaths, tc.err)
 			nodeUtils := driver.NewNodeUtils(fake_executer)
 
-			fcs, err := nodeUtils.ParseFCPortsName(devicePath)
+			fcs, err := nodeUtils.ParseFCPorts()
 
 			if tc.expErr != nil {
 				if err.Error() != tc.expErr.Error() {

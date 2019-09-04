@@ -24,17 +24,19 @@ import (
 	"path"
 	"strconv"
 	"strings"
-	"errors"
+	"k8s.io/apimachinery/pkg/util/errors"
 
 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 )
 
+var fcPortPath = "/sys/class/fc_host/host*/port_name"
+
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
 
 type NodeUtilsInterface interface {
-	ParseIscsiInitiators(path string) (string, error)
-	ParseFCPortsName(paths string) ([]string, error)
+	ParseIscsiInitiators() (string, error)
+	ParseFCPorts() ([]string, error)
 	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, []string, error)
 	GetSysDevicesFromMpath(baseDevice string) (string, error)
 
@@ -43,6 +45,7 @@ type NodeUtilsInterface interface {
 	ReadFromStagingInfoFile(filePath string) (map[string]string, error)
 	ClearStageInfoFile(filePath string) error
 	StageInfoFileIsExist(filePath string) bool
+	Exists(filePath string) bool
 }
 
 type NodeUtils struct {
@@ -53,9 +56,8 @@ func NewNodeUtils(executer executer.ExecuterInterface) *NodeUtils {
 	return &NodeUtils{Executer: executer}
 }
 
-func (n NodeUtils) ParseIscsiInitiators(path string) (string, error) {
-
-	file, err := os.Open(path)
+func (n NodeUtils) ParseIscsiInitiators() (string, error) {
+	file, err := os.Open(IscsiFullPath)
 	if err != nil {
 		return "", err
 	}
@@ -170,12 +172,11 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 	return true
 }
 
-func (n NodeUtils) ParseFCPortsName(path string) ([]string, error) {
-	//FC port path is /sys/class/fc_host/host*/port_name
-	var errStrings []string
+func (n NodeUtils) ParseFCPorts() ([]string, error) {
+	var errs []error
 	var FCPorts []string
 
-	fpaths, err := n.Executer.FilepathGlob(path)
+	fpaths, err := n.Executer.FilepathGlob(fcPortPath)
 	if fpaths == nil {
 		err = fmt.Errorf(ErrorUnsupportedConnectivityType, "FC")
 	}
@@ -186,33 +187,44 @@ func (n NodeUtils) ParseFCPortsName(path string) ([]string, error) {
 	for _, fpath := range fpaths {
 		file, err := os.Open(fpath)
 		if err != nil {
-			errStrings = append(errStrings, err.Error())
+			errs = append(errs, err)
 			break
 		}
 		defer file.Close()
 
-		file_out, err := ioutil.ReadAll(file)
+		fileOut, err := ioutil.ReadAll(file)
 		if err != nil {
-			errStrings = append(errStrings, err.Error())
+			errs = append(errs, err)
 			break
 		}
 
-		fileSplit := strings.Split(string(file_out), "0x")
+		fileSplit := strings.Split(string(fileOut), "0x")
+
 		if len(fileSplit) != 2 {
-			err := fmt.Errorf(ErrorWhileTryingToReadFC, string(file_out))
-			errStrings = append(errStrings, err.Error())
+			err := fmt.Errorf(ErrorWhileTryingToReadFC, string(fileOut))
+			errs = append(errs, err)
 		} else {
 			FCPorts = append(FCPorts, strings.TrimSpace(fileSplit[1]))
 		}
 	}
 
-	if errStrings != nil {
-		logger.Errorf("errors occured while looking for FC ports : {%v}", strings.Join(errStrings, ","))
+	if errs != nil {
+		logger.Errorf("errors occured while looking for FC ports: {%v}", errs)
 		if FCPorts == nil {
-			err := errors.New(strings.Join(errStrings, ","))
+			err := errors.NewAggregate(errs)
 			return nil, err
 		}
+
 	}
 
 	return FCPorts, nil
+}
+
+func (n NodeUtils) Exists(path string) bool {
+	_, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return false
+	}
+
+	return true
 }

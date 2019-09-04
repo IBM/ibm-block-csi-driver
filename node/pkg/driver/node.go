@@ -32,6 +32,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/apimachinery/pkg/util/errors"
 )
 
 var (
@@ -54,6 +55,11 @@ var (
 		"iscsi": true,
 		// TODO add fc \ nvme later on
 	}
+
+	iscsiPath = "/etc/iscsi"
+	iscsiFile = "initiatorname.iscsi"
+	IscsiFullPath = path.Join(iscsiPath, iscsiFile)
+	fcPath = "/sys/class/fc_host"
 )
 
 const (
@@ -475,23 +481,32 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	logger.Debugf(">>>> NodeGetInfo: called with args %+v", *req)
 	defer logger.Debugf("<<<< NodeGetInfo")
 
-	iscsiIQN, iscsi_err := d.NodeUtils.ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi")
-	fcList, fc_err := d.NodeUtils.ParseFCPortsName("/sys/class/fc_host/host*/port_name")
+	var iscsiIQN string
+	var fcWWNs []string
+	var iscsiErr, fcErr error
 
-	if iscsi_err != nil && fc_err != nil {
-		errMessage := "errs when get iqn: " + iscsi_err.Error() + ";err when get FC ports: " + fc_err.Error()
-		return nil, status.Error(codes.Internal, errMessage)
+	iscsiExists := d.NodeUtils.Exists(IscsiFullPath)
+	if iscsiExists {
+		iscsiIQN, iscsiErr = d.NodeUtils.ParseIscsiInitiators()
 	}
 
-	if iscsi_err != nil {
-		logger.Debugf("when get iqn from node %v, got the error %v", d.Hostname, iscsi_err.Error())
-	} else if fc_err != nil {
-		logger.Debugf("when get fc ports from node %v, got the error is %v", d.Hostname, fc_err.Error())
+	fcExists := d.NodeUtils.Exists(fcPath)
+	if fcExists {
+		fcWWNs, fcErr = d.NodeUtils.ParseFCPorts()
+	}
+
+	if  ! fcExists && ! iscsiExists {
+		err := fmt.Errorf(ErrorUnsupportedConnectivityType, "iscsi and fc")
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	if iscsiErr != nil && fcErr != nil{
+		err := errors.NewAggregate([]error{iscsiErr, fcErr})
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	delimiter := ";"
-	fcPorts := strings.Join(fcList, ":")
-
+	fcPorts := strings.Join(fcWWNs, ":")
 	nodeId := d.Hostname + delimiter + iscsiIQN + delimiter +fcPorts
 	logger.Debugf("node id is : %s", nodeId)
 
