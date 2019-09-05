@@ -75,8 +75,8 @@ class PermissionDeniedError(BaseArrayActionException):
 
 class MultipleHostsFoundError(BaseArrayActionException):
 
-    def __init__(self, iscsi_iqn, hosts):
-        self.message = messages.MultipleHostsFoundError_message.format(iscsi_iqn, hosts)
+    def __init__(self, initiators, hosts):
+        self.message = messages.MultipleHostsFoundError_message.format(initiators, hosts)
 
 
 class HostNotFoundError(BaseArrayActionException):
@@ -113,6 +113,7 @@ class UnMappingError(BaseArrayActionException):
 
     def __init__(self, vol, host, err):
         self.message = messages.UnMappingError_message.format(vol, host, err)
+
 
 class BadNodeIdError(BaseArrayActionException):
 

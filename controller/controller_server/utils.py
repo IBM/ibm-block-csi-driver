@@ -3,7 +3,7 @@ import controller.controller_server.config as config
 from controller.csi_general import csi_pb2
 from controller.controller_server.errors import ValidationException
 import controller.controller_server.messages as messages
-from controller.array_action.config import ISCSI_CONNECTIVITY_TYPE
+from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.errors import HostNotFoundError, VolumeNotFoundError
 
 logger = get_stdout_logger()
@@ -104,7 +104,7 @@ def generate_csi_create_volume_response(new_vol):
     logger.debug("creating volume response for vol : {0}".format(new_vol))
 
     vol_context = {"volume_name": new_vol.volume_name,
-                   "array_name": ",".join(new_vol.array_name),
+                   "array_address": ",".join(new_vol.array_address),
                    "pool_name": new_vol.pool_name,
                    "storage_type": new_vol.array_type
                    }
@@ -157,7 +157,7 @@ def get_volume_id_info(volume_id):
         raise VolumeNotFoundError(volume_id)
 
     array_type, vol_id = split_vol
-    logger.debug("volume id : {0}, array type :{1}".format(volume_id, array_type))
+    logger.debug("volume id : {0}, array type :{1}".format(vol_id, array_type))
     return array_type, vol_id
 
 
@@ -167,33 +167,37 @@ def get_node_id_info(node_id):
     if len(split_node) != config.SUPPORTED_CONNECTIVITY_TYPES + 1:  # the 1 is for the hostname
         raise HostNotFoundError(node_id)
 
-    hostname, iscsi_iqn = split_node  # TODO: for FC : fc wwns will need to be added here.
-    logger.debug("hostname : {0}, iscsi_iqn : {1} ".format(hostname, iscsi_iqn))
-    return hostname, iscsi_iqn
+    hostname, iscsi_iqn, fc_wwns = split_node
+    logger.debug("node name : {0}, iscsi_iqn : {1}, fc_wwns : {2} ".format(
+        hostname, iscsi_iqn, fc_wwns))
+    return hostname, iscsi_iqn, fc_wwns
 
 
 def choose_connectivity_type(connecitvity_types):
-    # TODO: when adding support for FC need to add here the logic for choosing the correct connctivity type
+    # If connectivity type support FC and iSCSI at the same time, chose FC
     logger.debug("choosing connectivity type for connectivity types : {0}".format(connecitvity_types))
     res = None
-    if len(connecitvity_types) == 1:
-        res = connecitvity_types[0]
-    else:
-        res = ISCSI_CONNECTIVITY_TYPE
+    if FC_CONNECTIVITY_TYPE in connecitvity_types:
+        logger.debug("connectivity type is : {0}".format(FC_CONNECTIVITY_TYPE))
+        return FC_CONNECTIVITY_TYPE
+    if ISCSI_CONNECTIVITY_TYPE in connecitvity_types:
+        logger.debug("connectivity type is : {0}".format(ISCSI_CONNECTIVITY_TYPE))
+        return ISCSI_CONNECTIVITY_TYPE
 
-    logger.debug("connectivity type is : {0}".format(res))
-
-    return res
-
-
-def generate_csi_publish_volume_response(lun, connectivity_type, config):
+def generate_csi_publish_volume_response(lun, connectivity_type, config, array_initiators):
     logger.debug("generating publish volume response for lun :{0}, connectivity : {1}".format(lun, connectivity_type))
 
     lun_param = config["controller"]["publish_context_lun_parameter"]
     connectivity_param = config["controller"]["publish_context_connectivity_parameter"]
+    hash_by_connectivity = {
+        'iscsi': config["controller"]["publish_context_array_iqn"],
+        'fc': config["controller"]["publish_context_fc_initiators"]}
 
-    res = csi_pb2.ControllerPublishVolumeResponse(publish_context={lun_param: str(lun),
-                                                                   connectivity_param: connectivity_type})
+    array_initiators = ",".join(array_initiators)
+    res = csi_pb2.ControllerPublishVolumeResponse(
+        publish_context={lun_param: str(lun),
+                         connectivity_param: connectivity_type,
+                         hash_by_connectivity[connectivity_type]: array_initiators})
 
     logger.debug("publish volume response is :{0}".format(res))
     return res

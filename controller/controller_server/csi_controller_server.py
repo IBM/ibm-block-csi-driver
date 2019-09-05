@@ -10,6 +10,7 @@ from controller.csi_general import csi_pb2_grpc
 from controller.array_action.array_connection_manager import ArrayConnectionManager
 from controller.common.csi_logger import get_stdout_logger
 import controller.controller_server.config as config
+from controller.array_action.config import FC_CONNECTIVITY_TYPE
 import controller.controller_server.utils as utils
 import controller.array_action.errors as controller_errors
 from controller.controller_server.errors import ValidationException
@@ -51,7 +52,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
 
         pool = request.parameters[config.PARAMETERS_POOL]
-        capabilities = {key: value for key, value in request.parameters.items() if key in [config.PARAMETERS_CAPABILITIES_SPACEEFFICIENCY]}
+        capabilities = {
+            key: value for key, value in request.parameters.items() if key in [
+                config.PARAMETERS_CAPABILITIES_SPACEEFFICIENCY,
+            ]
+        }
 
         if config.PARAMETERS_PREFIX in request.parameters:
             volume_prefix = request.parameters[config.PARAMETERS_PREFIX]
@@ -102,9 +107,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateVolumeResponse()
         except controller_errors.PermissionDeniedError as ex:
-                context.set_code(grpc.StatusCode.PERMISSION_DENIED)
-                context.set_details(ex)
-                return csi_pb2.CreateVolumeResponse()
+            context.set_code(grpc.StatusCode.PERMISSION_DENIED)
+            context.set_details(ex)
+            return csi_pb2.CreateVolumeResponse()
         except controller_errors.VolumeAlreadyExists as ex:
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.ALREADY_EXISTS)
@@ -172,28 +177,36 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             array_type, vol_id = utils.get_volume_id_info(request.volume_id)
 
-            node_name, iscsi_iqn = utils.get_node_id_info(request.node_id)
+            node_name, iscsi_iqn, fc_wwns_str = utils.get_node_id_info(request.node_id)
+            fc_wwns = fc_wwns_str.split(config.PARAMETERS_FC_WWN_DELIMITER)
+
             logger.debug("node name for this publish operation is : {0}".format(node_name))
 
             user, password, array_addresses = utils.get_array_connection_info_from_secret(request.secrets)
 
             with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
 
-                host_name, connectivity_types = array_mediator.get_host_by_host_identifiers(iscsi_iqn)
+                host_name, connectivity_types = array_mediator.get_host_by_host_identifiers(iscsi_iqn, fc_wwns)
 
                 logger.debug("hostname : {}, connectiivity_types  : {}".format(host_name, connectivity_types))
 
                 connectivity_type = utils.choose_connectivity_type(connectivity_types)
 
+                if FC_CONNECTIVITY_TYPE == connectivity_type:
+                    array_initiators = array_mediator.get_array_fc_wwns(host_name)
+                else:
+                    array_initiators = array_mediator.get_array_iqns()
                 mappings = array_mediator.get_volume_mappings(vol_id)
                 if len(mappings) >= 1:
-                    logger.debug("{0} mappings have been found for volume. the mappings are: {1}".format(len(mappings), mappings))
+                    logger.debug(
+                        "{0} mappings have been found for volume. the mappings are: {1}".format(
+                            len(mappings), mappings))
                     if len(mappings) == 1:
                         mapping = list(mappings)[0]
-                        if  mapping == host_name:
+                        if mapping == host_name:
                             logger.debug("idempotent case - volume is already mapped to host.")
                             return utils.generate_csi_publish_volume_response(mappings[mapping], connectivity_type,
-                                                                              self.cfg)
+                                                                              self.cfg, array_initiators)
 
                     logger.error(messages.more_then_one_mapping_message.format(mappings))
                     context.set_details(messages.more_then_one_mapping_message.format(mappings))
@@ -222,17 +235,17 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     return csi_pb2.ControllerPublishVolumeResponse()
 
                 logger.info("finished ControllerPublishVolume")
-                res = utils.generate_csi_publish_volume_response(lun, connectivity_type, self.cfg)
+                res = utils.generate_csi_publish_volume_response(lun, connectivity_type, self.cfg, array_initiators)
                 logger.debug("after res")
                 return res
 
-        except (controller_errors.LunAlreadyInUseError, controller_errors.NoAvailableLunError) as ex :
+        except (controller_errors.LunAlreadyInUseError, controller_errors.NoAvailableLunError) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.RESOURCE_EXHAUSTED)
             return csi_pb2.ControllerPublishVolumeResponse()
 
-        except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError, controller_errors.BadNodeIdError) as ex :
+        except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError, controller_errors.BadNodeIdError) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)
@@ -264,18 +277,19 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             array_type, vol_id = utils.get_volume_id_info(request.volume_id)
 
-            node_name, iscsi_iqn = utils.get_node_id_info(request.node_id)
+            node_name, iscsi_iqn, fc_wwns_str = utils.get_node_id_info(request.node_id)
+            fc_wwns = fc_wwns_str.split(config.PARAMETERS_FC_WWN_DELIMITER)
             logger.debug("node name for this unpublish operation is : {0}".format(node_name))
 
             user, password, array_addresses = utils.get_array_connection_info_from_secret(request.secrets)
 
             with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
 
-                host_name, _ = array_mediator.get_host_by_host_identifiers(iscsi_iqn)
+                host_name, _ = array_mediator.get_host_by_host_identifiers(iscsi_iqn, fc_wwns)
                 try:
                     array_mediator.unmap_volume(vol_id, host_name)
 
-                except controller_errors.VolumeAlreadyUnmappedError as ex :
+                except controller_errors.VolumeAlreadyUnmappedError as ex:
                     logger.debug("Idempotent case. volume is already unmapped.")
                     return csi_pb2.ControllerUnpublishVolumeResponse()
 
@@ -287,7 +301,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.info("finished ControllerUnpublishVolume")
             return csi_pb2.ControllerUnpublishVolumeResponse()
 
-        except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError) as ex :
+        except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)

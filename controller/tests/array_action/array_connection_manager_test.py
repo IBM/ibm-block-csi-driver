@@ -11,7 +11,8 @@ class TestWithFunctionality(unittest.TestCase):
 
     def setUp(self):
         self.fqdn = "fqdn"
-        self.array_connection = ArrayConnectionManager("user", "password", [self.fqdn, self.fqdn] , XIVArrayMediator.array_type)
+        self.array_connection = ArrayConnectionManager(
+            "user", "password", [self.fqdn, self.fqdn], XIVArrayMediator.array_type)
 
     @patch("controller.array_action.array_connection_manager.XIVArrayMediator._connect")
     @patch("controller.array_action.array_connection_manager.XIVArrayMediator.disconnect")
@@ -39,8 +40,9 @@ class TestGetconnection(unittest.TestCase):
     def setUp(self):
         self.fqdn = "fqdn"
         self.connections = [self.fqdn, self.fqdn]
-        self.connection_key = ",".join(self.connections )
-        self.array_connection = ArrayConnectionManager("user", "password", self.connections, XIVArrayMediator.array_type)
+        self.connection_key = ",".join(self.connections)
+        self.array_connection = ArrayConnectionManager(
+            "user", "password", self.connections, XIVArrayMediator.array_type)
         array_connection_manager.array_connections_dict = {}
 
     def tearDown(self):
@@ -53,10 +55,10 @@ class TestGetconnection(unittest.TestCase):
         self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 1})
 
         new_fqdn = "new-fqdn"
-        array_connection2 = ArrayConnectionManager("user", "password",[new_fqdn], XIVArrayMediator.array_type)
+        array_connection2 = ArrayConnectionManager("user", "password", [new_fqdn], XIVArrayMediator.array_type)
 
         array_connection2.get_array_connection()
-        self.assertEqual(array_connection_manager.array_connections_dict, { self.connection_key: 1, new_fqdn: 1})
+        self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 1, new_fqdn: 1})
 
     @patch("controller.array_action.array_connection_manager.XIVArrayMediator._connect")
     def test_connection_adds_connections_to_connection_dict(self, connect):
@@ -108,7 +110,6 @@ class TestGetconnection(unittest.TestCase):
         self.array_connection.__exit__("", "", None)
         self.assertEqual(array_connection_manager.array_connections_dict, {})
 
-
     @patch("controller.array_action.array_connection_manager.XIVArrayMediator._connect")
     def test_exit_reduces_connection(self, connect):
         self.array_connection.get_array_connection()
@@ -119,4 +120,3 @@ class TestGetconnection(unittest.TestCase):
 
         self.array_connection.__exit__("", "", None)
         self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 1})
-

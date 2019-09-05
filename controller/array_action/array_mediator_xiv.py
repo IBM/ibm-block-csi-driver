@@ -16,7 +16,7 @@ logger = get_stdout_logger()
 class XIVArrayMediator(ArrayMediator):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
-    MAX_LUN_NUMBER = 511
+    MAX_LUN_NUMBER = 250
     MIN_LUN_NUMBER = 1
 
     @classproperty
@@ -157,10 +157,10 @@ class XIVArrayMediator(ArrayMediator):
 
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
-    def get_host_by_host_identifiers(self, iscsi_iqn):
-        logger.debug("Getting host id for initiators . iscsi_iqn : {0}".format(iscsi_iqn))
+    def get_host_by_host_identifiers(self, iscsi_iqn, fc_wwns=None):
+        logger.debug("Getting host id for initiators iscsi iqn : {0} and "
+                     "fc wwns : {1}".format(iscsi_iqn, fc_wwns))
         host_list = self.client.cmd.host_list().as_list
-        logger.debug("host list : {0}".format(host_list))
         current_host = None
         for host in host_list:
             if iscsi_iqn.strip() == host.iscsi_ports.strip():
@@ -199,7 +199,6 @@ class XIVArrayMediator(ArrayMediator):
 
         # try to use random lun number just in case there are many calls at the same time to reduce re-tries
         all_available_luns = [i for i in range(self.MIN_LUN_NUMBER, self.MAX_LUN_NUMBER + 1) if i not in luns_in_use]
-        logger.debug("all_available_luns : {0}".format(all_available_luns))
 
         if len(all_available_luns) == 0:
             raise controller_errors.NoAvailableLunError(host_name)
@@ -257,3 +256,12 @@ class XIVArrayMediator(ArrayMediator):
                 raise controller_errors.VolumeAlreadyUnmappedError(vol_name)
             else:
                 raise controller_errors.UnMappingError(vol_name, host_name, ex)
+
+    def get_array_iqns(self):
+        config_get_list = self.client.cmd.config_get().as_list
+        array_iqn = [a for a in config_get_list if a["name"] == "iscsi_name"][0]["value"]
+        return [array_iqn]
+
+    def get_array_fc_wwns(self, host_name):
+        # TODO need to be implemented
+        return []

@@ -35,3 +35,11 @@ type RequestValidationError struct {
 func (e *RequestValidationError) Error() string {
 	return fmt.Sprintf("Request Validation Error: %s", e.Msg)
 }
+
+type VolumeAlreadyProcessingError struct {
+	volId string
+}
+
+func (e *VolumeAlreadyProcessingError) Error() string {
+	return fmt.Sprintf("Volume %s is already processing. request cannot be completed.", e.volId)
+}

@@ -14,18 +14,20 @@
  * limitations under the License.
  */
 
-package driver
+package driver_test
 
 import (
 	"context"
+	"fmt"
+	"reflect"
+	"testing"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	gomock "github.com/golang/mock/gomock"
 	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
+	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"reflect"
-	"testing"
-	"fmt"
 )
 
 const (
@@ -105,7 +107,7 @@ func TestNodeStageVolume(t *testing.T) {
 			},
 			expErrCode: codes.InvalidArgument,
 		},
-		{
+		/*{
 			name: "fail because not implemented yet - but pass all basic verifications",
 			req: &csi.NodeStageVolumeRequest{
 				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
@@ -114,7 +116,7 @@ func TestNodeStageVolume(t *testing.T) {
 				VolumeId:          "vol-test",
 			},
 			expErrCode: codes.Unimplemented,
-		},
+		},*/
 	}
 
 	for _, tc := range testCases {
@@ -139,217 +141,218 @@ func TestNodeStageVolume(t *testing.T) {
 	}
 }
 
-func newTestNodeService(nodeUtils NodeUtilsInterface) nodeService {
-	return nodeService{
-		hostname:   "test-host",
-		configYaml: ConfigFile{},
-		nodeUtils:  nodeUtils,
+func newTestNodeService(nodeUtils driver.NodeUtilsInterface) driver.NodeService {
+	return driver.NodeService{
+		Hostname:   "test-host",
+		ConfigYaml: driver.ConfigFile{},
+		NodeUtils:  nodeUtils,
 	}
 }
 
-func TestNodeUnstageVolume(t *testing.T) {
-	testCases := []struct {
-		name       string
-		req        *csi.NodeUnstageVolumeRequest
-		expErrCode codes.Code
-	}{
-		{
-			name: "fail no VolumeId",
-			req: &csi.NodeUnstageVolumeRequest{
-				StagingTargetPath: "/test/path",
-			},
-			expErrCode: codes.InvalidArgument,
-		},
-		{
-			name: "fail no StagingTargetPath",
-			req: &csi.NodeUnstageVolumeRequest{
-				VolumeId: "vol-test",
-			},
-			expErrCode: codes.InvalidArgument,
-		},
-		{
-			name: "fail because not implemented yet - but pass all basic verifications",
-			req: &csi.NodeUnstageVolumeRequest{
-				VolumeId:          "vol-test",
-				StagingTargetPath: "/test/path",
-			},
-			expErrCode: codes.Unimplemented,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			d := newTestNodeService(nil)
-
-			_, err := d.NodeUnstageVolume(context.TODO(), tc.req)
-			if err != nil {
-				srvErr, ok := status.FromError(err)
-				if !ok {
-					t.Fatalf("Could not get error status code from error: %v", srvErr)
-				}
-				if srvErr.Code() != tc.expErrCode {
-					t.Fatalf("Expected error code %d, got %d message %s", tc.expErrCode, srvErr.Code(), srvErr.Message())
-				}
-			} else if tc.expErrCode != codes.OK {
-				t.Fatalf("Expected error %v, got no error", tc.expErrCode)
-			}
-		})
-	}
-}
-
-func TestNodePublishVolume(t *testing.T) {
-	stdVolCap := &csi.VolumeCapability{
-		AccessType: &csi.VolumeCapability_Mount{
-			Mount: &csi.VolumeCapability_MountVolume{},
-		},
-		AccessMode: &csi.VolumeCapability_AccessMode{
-			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-		},
-	}
-	testCases := []struct {
-		name       string
-		req        *csi.NodePublishVolumeRequest
-		expErrCode codes.Code
-	}{
-		{
-			name: "fail no VolumeId",
-			req: &csi.NodePublishVolumeRequest{
-				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-				StagingTargetPath: "/test/staging/path",
-				TargetPath:        "/test/target/path",
-				VolumeCapability:  stdVolCap,
-			},
-			expErrCode: codes.InvalidArgument,
-		},
-		{
-			name: "fail no StagingTargetPath",
-			req: &csi.NodePublishVolumeRequest{
-				PublishContext:   map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-				TargetPath:       "/test/target/path",
-				VolumeCapability: stdVolCap,
-				VolumeId:         "vol-test",
-			},
-			expErrCode: codes.InvalidArgument,
-		},
-		{
-			name: "fail no TargetPath",
-			req: &csi.NodePublishVolumeRequest{
-				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-				StagingTargetPath: "/test/staging/path",
-				VolumeCapability:  stdVolCap,
-				VolumeId:          "vol-test",
-			},
-			expErrCode: codes.InvalidArgument,
-		},
-		{
-			name: "fail no VolumeCapability",
-			req: &csi.NodePublishVolumeRequest{
-				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-				StagingTargetPath: "/test/staging/path",
-				TargetPath:        "/test/target/path",
-				VolumeId:          "vol-test",
-			},
-			expErrCode: codes.InvalidArgument,
-		},
-		{
-			name: "fail invalid VolumeCapability",
-			req: &csi.NodePublishVolumeRequest{
-				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-				StagingTargetPath: "/test/staging/path",
-				TargetPath:        "/test/target/path",
-				VolumeId:          "vol-test",
-				VolumeCapability: &csi.VolumeCapability{
-					AccessMode: &csi.VolumeCapability_AccessMode{
-						Mode: csi.VolumeCapability_AccessMode_UNKNOWN,
-					},
-				},
-			},
-			expErrCode: codes.InvalidArgument,
-		},
-		{
-			name: "fail because not implemented yet - but pass all basic verifications",
-			req: &csi.NodePublishVolumeRequest{
-				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-				StagingTargetPath: "/test/staging/path",
-				TargetPath:        "/test/target/path",
-				VolumeCapability:  stdVolCap,
-				VolumeId:          "vol-test",
-			},
-			expErrCode: codes.Unimplemented,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			d := newTestNodeService(nil)
-
-			_, err := d.NodePublishVolume(context.TODO(), tc.req)
-			if err != nil {
-				srvErr, ok := status.FromError(err)
-				if !ok {
-					t.Fatalf("Could not get error status code from error: %v", srvErr)
-				}
-				if srvErr.Code() != tc.expErrCode {
-					t.Fatalf("Expected error code %d, got %d message %s", tc.expErrCode, srvErr.Code(), srvErr.Message())
-				}
-			} else if tc.expErrCode != codes.OK {
-				t.Fatalf("Expected error %v and got no error", tc.expErrCode)
-			}
-
-		})
-	}
-}
-
-func TestNodeUnpublishVolume(t *testing.T) {
-	testCases := []struct {
-		name string
-		req  *csi.NodeUnpublishVolumeRequest
-		// expected test error code
-		expErrCode codes.Code
-	}{
-		{
-			name: "fail no VolumeId",
-			req: &csi.NodeUnpublishVolumeRequest{
-				TargetPath: "/test/path",
-			},
-			expErrCode: codes.InvalidArgument,
-		},
-		{
-			name: "fail no TargetPath",
-			req: &csi.NodeUnpublishVolumeRequest{
-				VolumeId: "vol-test",
-			},
-			expErrCode: codes.InvalidArgument,
-		},
-		{
-			name: "fail because not implemented yet - but pass all basic verifications",
-			req: &csi.NodeUnpublishVolumeRequest{
-				VolumeId:   "vol-test",
-				TargetPath: "/test/path",
-			},
-			expErrCode: codes.Unimplemented,
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			d := newTestNodeService(nil)
-
-			_, err := d.NodeUnpublishVolume(context.TODO(), tc.req)
-			if err != nil {
-				srvErr, ok := status.FromError(err)
-				if !ok {
-					t.Fatalf("Could not get error status code from error: %v", srvErr)
-				}
-				if srvErr.Code() != tc.expErrCode {
-					t.Fatalf("Expected error code %d, got %d message %s", tc.expErrCode, srvErr.Code(), srvErr.Message())
-				}
-			} else if tc.expErrCode != codes.OK {
-				t.Fatalf("Expected error %v, got no error", tc.expErrCode)
-			}
-		})
-	}
-}
+//
+//func TestNodeUnstageVolume(t *testing.T) {
+//	testCases := []struct {
+//		name       string
+//		req        *csi.NodeUnstageVolumeRequest
+//		expErrCode codes.Code
+//	}{
+//		{
+//			name: "fail no VolumeId",
+//			req: &csi.NodeUnstageVolumeRequest{
+//				StagingTargetPath: "/test/path",
+//			},
+//			expErrCode: codes.InvalidArgument,
+//		},
+//		{
+//			name: "fail no StagingTargetPath",
+//			req: &csi.NodeUnstageVolumeRequest{
+//				VolumeId: "vol-test",
+//			},
+//			expErrCode: codes.InvalidArgument,
+//		},
+//		{
+//			name: "fail because not implemented yet - but pass all basic verifications",
+//			req: &csi.NodeUnstageVolumeRequest{
+//				VolumeId:          "vol-test",
+//				StagingTargetPath: "/test/path",
+//			},
+//			expErrCode: codes.Unimplemented,
+//		},
+//	}
+//
+//	for _, tc := range testCases {
+//		t.Run(tc.name, func(t *testing.T) {
+//			d := newTestNodeService(nil)
+//
+//			_, err := d.NodeUnstageVolume(context.TODO(), tc.req)
+//			if err != nil {
+//				srvErr, ok := status.FromError(err)
+//				if !ok {
+//					t.Fatalf("Could not get error status code from error: %v", srvErr)
+//				}
+//				if srvErr.Code() != tc.expErrCode {
+//					t.Fatalf("Expected error code %d, got %d message %s", tc.expErrCode, srvErr.Code(), srvErr.Message())
+//				}
+//			} else if tc.expErrCode != codes.OK {
+//				t.Fatalf("Expected error %v, got no error", tc.expErrCode)
+//			}
+//		})
+//	}
+//}
+//
+//func TestNodePublishVolume(t *testing.T) {
+//	stdVolCap := &csi.VolumeCapability{
+//		AccessType: &csi.VolumeCapability_Mount{
+//			Mount: &csi.VolumeCapability_MountVolume{},
+//		},
+//		AccessMode: &csi.VolumeCapability_AccessMode{
+//			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+//		},
+//	}
+//	testCases := []struct {
+//		name       string
+//		req        *csi.NodePublishVolumeRequest
+//		expErrCode codes.Code
+//	}{
+//		{
+//			name: "fail no VolumeId",
+//			req: &csi.NodePublishVolumeRequest{
+//				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+//				StagingTargetPath: "/test/staging/path",
+//				TargetPath:        "/test/target/path",
+//				VolumeCapability:  stdVolCap,
+//			},
+//			expErrCode: codes.InvalidArgument,
+//		},
+//		{
+//			name: "fail no StagingTargetPath",
+//			req: &csi.NodePublishVolumeRequest{
+//				PublishContext:   map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+//				TargetPath:       "/test/target/path",
+//				VolumeCapability: stdVolCap,
+//				VolumeId:         "vol-test",
+//			},
+//			expErrCode: codes.InvalidArgument,
+//		},
+//		{
+//			name: "fail no TargetPath",
+//			req: &csi.NodePublishVolumeRequest{
+//				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+//				StagingTargetPath: "/test/staging/path",
+//				VolumeCapability:  stdVolCap,
+//				VolumeId:          "vol-test",
+//			},
+//			expErrCode: codes.InvalidArgument,
+//		},
+//		{
+//			name: "fail no VolumeCapability",
+//			req: &csi.NodePublishVolumeRequest{
+//				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+//				StagingTargetPath: "/test/staging/path",
+//				TargetPath:        "/test/target/path",
+//				VolumeId:          "vol-test",
+//			},
+//			expErrCode: codes.InvalidArgument,
+//		},
+//		{
+//			name: "fail invalid VolumeCapability",
+//			req: &csi.NodePublishVolumeRequest{
+//				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+//				StagingTargetPath: "/test/staging/path",
+//				TargetPath:        "/test/target/path",
+//				VolumeId:          "vol-test",
+//				VolumeCapability: &csi.VolumeCapability{
+//					AccessMode: &csi.VolumeCapability_AccessMode{
+//						Mode: csi.VolumeCapability_AccessMode_UNKNOWN,
+//					},
+//				},
+//			},
+//			expErrCode: codes.InvalidArgument,
+//		},
+//		{
+//			name: "fail because not implemented yet - but pass all basic verifications",
+//			req: &csi.NodePublishVolumeRequest{
+//				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+//				StagingTargetPath: "/test/staging/path",
+//				TargetPath:        "/test/target/path",
+//				VolumeCapability:  stdVolCap,
+//				VolumeId:          "vol-test",
+//			},
+//			expErrCode: codes.Unimplemented,
+//		},
+//	}
+//
+//	for _, tc := range testCases {
+//		t.Run(tc.name, func(t *testing.T) {
+//			d := newTestNodeService(nil)
+//
+//			_, err := d.NodePublishVolume(context.TODO(), tc.req)
+//			if err != nil {
+//				srvErr, ok := status.FromError(err)
+//				if !ok {
+//					t.Fatalf("Could not get error status code from error: %v", srvErr)
+//				}
+//				if srvErr.Code() != tc.expErrCode {
+//					t.Fatalf("Expected error code %d, got %d message %s", tc.expErrCode, srvErr.Code(), srvErr.Message())
+//				}
+//			} else if tc.expErrCode != codes.OK {
+//				t.Fatalf("Expected error %v and got no error", tc.expErrCode)
+//			}
+//
+//		})
+//	}
+//}
+//
+//func TestNodeUnpublishVolume(t *testing.T) {
+//	testCases := []struct {
+//		name string
+//		req  *csi.NodeUnpublishVolumeRequest
+//		// expected test error code
+//		expErrCode codes.Code
+//	}{
+//		{
+//			name: "fail no VolumeId",
+//			req: &csi.NodeUnpublishVolumeRequest{
+//				TargetPath: "/test/path",
+//			},
+//			expErrCode: codes.InvalidArgument,
+//		},
+//		{
+//			name: "fail no TargetPath",
+//			req: &csi.NodeUnpublishVolumeRequest{
+//				VolumeId: "vol-test",
+//			},
+//			expErrCode: codes.InvalidArgument,
+//		},
+//		{
+//			name: "fail because not implemented yet - but pass all basic verifications",
+//			req: &csi.NodeUnpublishVolumeRequest{
+//				VolumeId:   "vol-test",
+//				TargetPath: "/test/path",
+//			},
+//			expErrCode: codes.Unimplemented,
+//		},
+//	}
+//
+//	for _, tc := range testCases {
+//		t.Run(tc.name, func(t *testing.T) {
+//			d := newTestNodeService(nil)
+//
+//			_, err := d.NodeUnpublishVolume(context.TODO(), tc.req)
+//			if err != nil {
+//				srvErr, ok := status.FromError(err)
+//				if !ok {
+//					t.Fatalf("Could not get error status code from error: %v", srvErr)
+//				}
+//				if srvErr.Code() != tc.expErrCode {
+//					t.Fatalf("Expected error code %d, got %d message %s", tc.expErrCode, srvErr.Code(), srvErr.Message())
+//				}
+//			} else if tc.expErrCode != codes.OK {
+//				t.Fatalf("Expected error %v, got no error", tc.expErrCode)
+//			}
+//		})
+//	}
+//}
 
 func TestNodeGetVolumeStats(t *testing.T) {
 
@@ -400,7 +403,6 @@ func TestNodeGetCapabilities(t *testing.T) {
 		t.Fatalf("Expected response {%+v}, got {%+v}", expResp, resp)
 	}
 }
-
 
 func TestNodeGetInfo(t *testing.T) {
 	testCases := []struct {
@@ -455,4 +457,3 @@ func TestNodeGetInfo(t *testing.T) {
 
 	}
 }
-

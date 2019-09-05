@@ -6,10 +6,9 @@ kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
   name: gold
-provisioner: ibm-block-csi-driver
+provisioner: block.csi.ibm.com
 parameters:
-  capacity:
-    pool=gold
+  pool: gold
 
   csi.storage.k8s.io/provisioner-secret-name: a9000-array1
   csi.storage.k8s.io/provisioner-secret-namespace: kube-system

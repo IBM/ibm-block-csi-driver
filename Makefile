@@ -33,12 +33,14 @@ ibm-block-csi-driver:
 
 .PHONY: test
 test:
+	if [ -d ./node/mocks ]; then rm -rf ./node/mocks; fi
 	go generate ./...
 	go test -v -race ./node/...
 
 .PHONY: test-xunit
 test-xunit:
 	mkdir -p ./build/reports
+	if [ -d ./node/mocks ]; then rm -rf ./node/mocks; fi
 	go generate ./...
 	go test -v -race ./node/... | go2xunit -output build/reports/csi-node-unitests.xml
 	go test -v -race ./node/...	# run again so the makefile will fail in case tests failing
@@ -52,7 +54,7 @@ test-xunit-in-container:
 
 .PHONY: gofmt
 gofmt:
-	gofmt -w .
+	gofmt -w ./node
 
 .PHONY: csi-build-images-and-push-artifactory
 csi-build-images-and-push-artifactory:
