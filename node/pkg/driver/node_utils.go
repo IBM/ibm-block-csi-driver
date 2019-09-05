@@ -174,7 +174,7 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 
 func (n NodeUtils) ParseFCPorts() ([]string, error) {
 	var errs []error
-	var FCPorts []string
+	var fcPorts []string
 
 	fpaths, err := n.Executer.FilepathGlob(fcPortPath)
 	if fpaths == nil {
@@ -198,26 +198,20 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 			break
 		}
 
-		fileSplit := strings.Split(string(fileOut), "0x")
-
-		if len(fileSplit) != 2 {
-			err := fmt.Errorf(ErrorWhileTryingToReadFC, string(fileOut))
-			errs = append(errs, err)
-		} else {
-			FCPorts = append(FCPorts, strings.TrimSpace(fileSplit[1]))
-		}
+		fcPort := strings.Replace(string(fileOut),"0x","",-1)
+		fcPorts = append(fcPorts, strings.TrimSpace(fcPort))
 	}
 
 	if errs != nil {
 		logger.Errorf("errors occured while looking for FC ports: {%v}", errs)
-		if FCPorts == nil {
+		if fcPorts == nil {
 			err := errors.NewAggregate(errs)
 			return nil, err
 		}
 
 	}
 
-	return FCPorts, nil
+	return fcPorts, nil
 }
 
 func (n NodeUtils) Exists(path string) bool {
