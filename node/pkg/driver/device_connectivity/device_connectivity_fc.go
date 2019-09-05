@@ -176,16 +176,17 @@ func (o OsDeviceConnectivityHelperFc) GetFcHostIDs() ([]int, error) {
 			So the function goes over all the above hosts and return back only the host numbers as a list.
 	*/
 
-	targetNamePath := FC_HOST_SYSFS_PATH + "/host*/port_state"
+	portStatePath := filepath.Join(FC_HOST_SYSFS_PATH, "/host*/port_state")
 	var HostIDs []int
-	matches, err := o.executer.FilepathGlob(targetNamePath)
+	matches, err := o.executer.FilepathGlob(portStatePath)
 	if err != nil {
-		logger.Errorf("Error while Glob targetNamePath : {%v}. err : {%v}", targetNamePath, err)
-		return HostIDs, err
+		logger.Errorf("Error while Glob portStatePath : {%v}. err : {%v}", portStatePath, err)
+		return nil, err
 	}
 
 	logger.Debugf("targetname files matches were found : {%v}", matches)
 
+    re := regexp.MustCompile("host([0-9]+)")
 	for _, targetPath := range matches {
 		logger.Debugf("Check if targetfile (%s) value is Online.", targetPath)
 		targetName, err := o.executer.IoutilReadFile(targetPath)
@@ -195,13 +196,12 @@ func (o OsDeviceConnectivityHelperFc) GetFcHostIDs() ([]int, error) {
 		}
 
 		if strings.EqualFold(strings.TrimSpace(string(targetName)), "online") {
-			re := regexp.MustCompile("host([0-9]+)")
 			regexMatch := re.FindStringSubmatch(targetPath)
 			logger.Tracef("Found regex matches : {%v}", regexMatch)
 			hostNumber := -1
 
 			if len(regexMatch) < 2 {
-				logger.Warningf("Could not find host number for targetNamePath : {%v}", targetPath)
+				logger.Warningf("Could not find host number for portStatePath : {%v}", targetPath)
 				continue
 			} else {
 				hostNumber, err = strconv.Atoi(regexMatch[1])
@@ -212,8 +212,7 @@ func (o OsDeviceConnectivityHelperFc) GetFcHostIDs() ([]int, error) {
 			}
 
 			HostIDs = append(HostIDs, hostNumber)
-			logger.Debugf("targetname path (%s) was found. Adding host number {%v} to the session list.", targetPath, hostNumber)
-
+			logger.Debugf("portState path (%s) was found. Adding host ID {%v} to the id list.", targetPath, hostNumber)
 		}
 	}
 

@@ -63,7 +63,7 @@ func TestGetMpathDevice_Fc(t *testing.T) {
 				},
 			},
 
-			expErr:      fmt.Errorf("Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[0xX]]. Please check the host connectivity to the storage."),
+			expErr:      fmt.Errorf("Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[0xx]]. Please check the host connectivity to the storage."),
 			expDMdevice: "",
 		},
 
@@ -212,7 +212,7 @@ func TestGetMpathDevice_Fc(t *testing.T) {
 				},
 			},
 
-			expErr:      fmt.Errorf("error,Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[0xY]]. Please check the host connectivity to the storage."),
+			expErr:      fmt.Errorf("error,Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[0xy]]. Please check the host connectivity to the storage."),
 			expDMdevice: "",
 		},
 	}
@@ -230,7 +230,7 @@ func TestGetMpathDevice_Fc(t *testing.T) {
 
 			var mcalls []*gomock.Call
 			for index, r := range tc.waitForPathToExistReturns {
-				array_inititor := "0x" + tc.arrayIdentifiers[index]
+				array_inititor := "0x" + strings.ToLower(string(tc.arrayIdentifiers[index]))
 				path := strings.Join([]string{"/dev/disk/by-path/pci*", "fc", array_inititor, "lun", strconv.Itoa(lunId)}, "-")
 				call := fake_helper.EXPECT().WaitForPathToExist(path, 5, 1).Return(
 					r.devicePaths,

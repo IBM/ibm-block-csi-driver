@@ -76,8 +76,8 @@ func (n NodeUtils) ParseIscsiInitiators(path string) (string, error) {
 }
 
 func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, []string, error) {
-	// this will return :  connectivityType, lun, array_initiators, error
-	var array_initiators []string
+	// this will return :  connectivityType, lun, arrayInitiators, error
+	var arrayInitiators []string
 	str_lun := publishContext[configYaml.Controller.Publish_context_lun_parameter]
 
 	lun, err := strconv.Atoi(str_lun)
@@ -87,14 +87,14 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, c
 
 	connectivityType := publishContext[configYaml.Controller.Publish_context_connectivity_parameter]
 	if connectivityType == "iscsi" {
-		array_initiators = strings.Split(publishContext[configYaml.Controller.Publish_context_array_iqn], ",")
+		arrayInitiators = strings.Split(publishContext[configYaml.Controller.Publish_context_array_iqn], ",")
 	}
 	if connectivityType == "fc" {
-		array_initiators = strings.Split(publishContext[configYaml.Controller.Publish_context_fc_initiators], ",")
+		arrayInitiators = strings.Split(publishContext[configYaml.Controller.Publish_context_fc_initiators], ",")
 	}
 
-	logger.Debugf("PublishContext relevant info : connectivityType=%v, lun=%v, array_initiators=%v", connectivityType, lun, array_initiators)
-	return connectivityType, lun, array_initiators, nil
+	logger.Debugf("PublishContext relevant info : connectivityType=%v, lun=%v, arrayInitiators=%v", connectivityType, lun, arrayInitiators)
+	return connectivityType, lun, arrayInitiators, nil
 }
 
 func (n NodeUtils) WriteStageInfoToFile(fPath string, info map[string]string) error {
