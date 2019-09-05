@@ -7,8 +7,9 @@ from controller.array_action.array_mediator_interface import ArrayMediator
 from controller.array_action.array_action_types import Volume
 import controller.array_action.errors as controller_errors
 from controller.array_action.config import ISCSI_CONNECTIVITY_TYPE
+from controller.array_action.config import FC_CONNECTIVITY_TYPE
 from controller.array_action.utils import classproperty
-
+from controller.common.utils import string_to_array
 array_connections_dict = {}
 logger = get_stdout_logger()
 
@@ -160,19 +161,33 @@ class XIVArrayMediator(ArrayMediator):
     def get_host_by_host_identifiers(self, iscsi_iqn, fc_wwns=None):
         logger.debug("Getting host id for initiators iscsi iqn : {0} and "
                      "fc wwns : {1}".format(iscsi_iqn, fc_wwns))
+        iscsi_iqn = iscsi_iqn.strip()
+        fc_wwns_set = set(fc_wwns)
+        matching_hosts = []
+        port_types = []
+
         host_list = self.client.cmd.host_list().as_list
-        current_host = None
         for host in host_list:
-            if iscsi_iqn.strip() == host.iscsi_ports.strip():
-                logger.debug("found iscsi iqn in list : {0} for host : {1}".format(host.iscsi_ports, host.name))
-                current_host = host.name
-                break
+            host_iscsi_ports = string_to_array(host.iscsi_ports, ',')
+            host_fc_ports = string_to_array(host.fc_ports, ',')
+            host_match = False
+            if self.is_wwns_match(fc_wwns_set, host_fc_ports):
+                host_match = True
+                logger.debug("found host : {0}, by fc port : {1}".format(host.name, host_fc_ports))
+                port_types.append(FC_CONNECTIVITY_TYPE)
+            if iscsi_iqn in host_iscsi_ports:
+                host_match = True
+                if len(host_iscsi_ports) == 1:
+                    logger.debug("found host : {0}, by iscsi port : {1}".format(host.name, host_iscsi_ports))
+                    port_types.append(ISCSI_CONNECTIVITY_TYPE)
+            if host_match:
+                matching_hosts.append(host.name)
 
-        if not current_host:
-            raise controller_errors.HostNotFoundError(iscsi_iqn)
-
-        logger.debug("found host : {0}".format(current_host))
-        return current_host, [ISCSI_CONNECTIVITY_TYPE]
+        if not matching_hosts or not port_types:
+            raise controller_errors.HostNotFoundError([iscsi_iqn, fc_wwns])
+        elif len(matching_hosts) > 1:
+            raise controller_errors.MultipleHostsFoundError([iscsi_iqn, fc_wwns], matching_hosts)
+        return matching_hosts[0], port_types
 
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume id : {0}".format(volume_id))
@@ -262,6 +277,6 @@ class XIVArrayMediator(ArrayMediator):
         array_iqn = [a for a in config_get_list if a["name"] == "iscsi_name"][0]["value"]
         return [array_iqn]
 
-    def get_array_fc_wwns(self, host_name):
-        # TODO need to be implemented
-        return []
+    def get_array_fc_wwns(self, host_name=None):
+        fc_wwns_objects = self.client.cmd.fc_connectivity_list(role='Target')
+        return set([port.wwpn for port in fc_wwns_objects])

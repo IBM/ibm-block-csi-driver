@@ -248,7 +248,7 @@ class SVCArrayMediator(ArrayMediator):
                 iscsi_host = host_detail.get('name', '')
                 logger.debug("found iscsi iqn in list : {0} for host : "
                              "{1}".format(iscsi_iqn, iscsi_host))
-            if set(fc_wwns) == set(host_initiator_wwns):
+            if self.is_wwns_match(set(fc_wwns), host_initiator_wwns):
                 fc_host = host_detail.get('name', '')
                 logger.debug("found fc wwns in list : {0} for host : "
                              "{1}".format(fc_wwns, fc_host))

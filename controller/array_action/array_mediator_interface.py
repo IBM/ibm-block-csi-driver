@@ -242,3 +242,6 @@ class ArrayMediator:
             The maximum number of times a map operation will retry if lun is already in use
         """
         raise NotImplementedError
+
+    def is_wwns_match(self, node_wwns_set, host_wwns):
+        return not node_wwns_set.isdisjoint(host_wwns)
