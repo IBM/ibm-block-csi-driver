@@ -69,7 +69,10 @@ func TestParseIscsiInitiators(t *testing.T) {
 					t.Fatalf("Cannot create temporary file : %v", err)
 				}
 
-				defer os.Remove(tmpFile.Name())
+				defer func(){
+					os.Remove(tmpFile.Name())
+					driver.IscsiFullPath = "/etc/iscsi/initiatorname.iscsi"
+				}()
 
 				fmt.Println("Created File: " + tmpFile.Name())
 

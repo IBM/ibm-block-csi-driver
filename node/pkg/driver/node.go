@@ -32,7 +32,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/kubernetes/pkg/util/mount"
-	"k8s.io/apimachinery/pkg/util/errors"
 )
 
 var (
@@ -56,16 +55,15 @@ var (
 		// TODO add fc \ nvme later on
 	}
 
-	iscsiPath = "/etc/iscsi"
-	iscsiFile = "initiatorname.iscsi"
-	IscsiFullPath = path.Join(iscsiPath, iscsiFile)
-	fcPath = "/sys/class/fc_host"
+	IscsiFullPath = "/etc/iscsi/initiatorname.iscsi"
 )
 
 const (
 	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
 	// Command lines inside the container will show /host prefix.
 	PrefixChrootOfHostRoot = "/host"
+	FCPath = "/sys/class/fc_host"
+	FCPortPath = "/sys/class/fc_host/host*/port_name"
 )
 
 // nodeService represents the node service of CSI driver
@@ -483,26 +481,24 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 
 	var iscsiIQN string
 	var fcWWNs []string
-	var iscsiErr, fcErr error
+	var err error
+
+	fcExists := d.NodeUtils.Exists(FCPath)
+	if fcExists {
+		fcWWNs, err = d.NodeUtils.ParseFCPorts()
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
 
 	iscsiExists := d.NodeUtils.Exists(IscsiFullPath)
 	if iscsiExists {
-		iscsiIQN, iscsiErr = d.NodeUtils.ParseIscsiInitiators()
+		iscsiIQN, _ = d.NodeUtils.ParseIscsiInitiators()
 	}
 
-	fcExists := d.NodeUtils.Exists(fcPath)
-	if fcExists {
-		fcWWNs, fcErr = d.NodeUtils.ParseFCPorts()
-	}
-
-	if  ! fcExists && ! iscsiExists {
-		err := fmt.Errorf(ErrorUnsupportedConnectivityType, "iscsi and fc")
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	if iscsiErr != nil && fcErr != nil{
-		err := errors.NewAggregate([]error{iscsiErr, fcErr})
-		return nil, status.Error(codes.Internal, err.Error())
+	if fcWWNs == nil && iscsiIQN == "" {
+		err := fmt.Errorf("Cannot find valid fc wwns or iscsi iqn")
+		return nil,status.Error(codes.Internal, err.Error())
 	}
 
 	delimiter := ";"

@@ -30,8 +30,6 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 )
 
-var fcPortPath = "/sys/class/fc_host/host*/port_name"
-
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
 
 type NodeUtilsInterface interface {
@@ -64,14 +62,14 @@ func (n NodeUtils) ParseIscsiInitiators() (string, error) {
 
 	defer file.Close()
 
-	file_out, err := ioutil.ReadAll(file)
+	fileOut, err := ioutil.ReadAll(file)
 	if err != nil {
 		return "", err
 	}
 
-	fileSplit := strings.Split(string(file_out), "InitiatorName=")
+	fileSplit := strings.Split(string(fileOut), "InitiatorName=")
 	if len(fileSplit) != 2 {
-		return "", fmt.Errorf(ErrorWhileTryingToReadIQN, string(file_out))
+		return "", fmt.Errorf(ErrorWhileTryingToReadIQN, string(fileOut))
 	}
 
 	iscsiIqn := strings.TrimSpace(fileSplit[1])
@@ -176,7 +174,7 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 	var errs []error
 	var fcPorts []string
 
-	fpaths, err := n.Executer.FilepathGlob(fcPortPath)
+	fpaths, err := n.Executer.FilepathGlob(FCPortPath)
 	if fpaths == nil {
 		err = fmt.Errorf(ErrorUnsupportedConnectivityType, "FC")
 	}
@@ -198,17 +196,21 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 			break
 		}
 
-		fcPort := strings.Replace(string(fileOut),"0x","",-1)
-		fcPorts = append(fcPorts, strings.TrimSpace(fcPort))
+		fileSplit := strings.Split(string(fileOut), "0x")
+		if len(fileSplit) != 2 {
+			err := fmt.Errorf(ErrorWhileTryingToReadFC, string(fileOut))
+			errs = append(errs, err)
+		} else {
+			fcPorts = append(fcPorts, strings.TrimSpace(fileSplit[1]))
+		}
 	}
 
 	if errs != nil {
-		logger.Errorf("errors occured while looking for FC ports: {%v}", errs)
+		err := errors.NewAggregate(errs)
+		logger.Errorf("errors occured while looking for FC ports: {%v}", err)
 		if fcPorts == nil {
-			err := errors.NewAggregate(errs)
 			return nil, err
 		}
-
 	}
 
 	return fcPorts, nil
@@ -216,7 +218,7 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 
 func (n NodeUtils) Exists(path string) bool {
 	_, err := os.Stat(path)
-	if os.IsNotExist(err) {
+	if err != nil {
 		return false
 	}
 
