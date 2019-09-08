@@ -6,6 +6,8 @@ from controller.array_action.array_mediator_interface import ArrayMediator
 from controller.array_action.array_action_types import Volume
 import controller.array_action.errors as controller_errors
 from controller.array_action.utils import classproperty
+from controller.array_action.utils import is_wwns_match
+from controller.array_action.utils import get_all_ports
 import controller.array_action.config as config
 
 array_connections_dict = {}
@@ -229,11 +231,13 @@ class SVCArrayMediator(ArrayMediator):
 
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
-    def get_host_by_host_identifiers(self, iscsi_iqn, fc_wwns):
+    def get_host_by_host_identifiers(self, iscsi_iqn, fc_wwns=None):
         logger.debug("Getting host id for initiators iscsi iqn : {0} and "
                      "fc wwns : {1}".format(iscsi_iqn, fc_wwns))
 
-        fc_wwns = [wwn.lower() for wwn in fc_wwns]
+        fc_wwns = [wwn.lower() for wwn in fc_wwns] if fc_wwns else []
+        fc_wwns_set = set(fc_wwns)
+
         host_list = self.client.svcinfo.lshost()
         iscsi_host, fc_host = None, None
         for host in host_list:
@@ -248,7 +252,7 @@ class SVCArrayMediator(ArrayMediator):
                 iscsi_host = host_detail.get('name', '')
                 logger.debug("found iscsi iqn in list : {0} for host : "
                              "{1}".format(iscsi_iqn, iscsi_host))
-            if self.is_wwns_match(set(fc_wwns), host_initiator_wwns):
+            if is_wwns_match(fc_wwns_set, host_initiator_wwns):
                 fc_host = host_detail.get('name', '')
                 logger.debug("found fc wwns in list : {0} for host : "
                              "{1}".format(fc_wwns, fc_host))
@@ -257,7 +261,7 @@ class SVCArrayMediator(ArrayMediator):
                 return fc_host, [config.ISCSI_CONNECTIVITY_TYPE,
                                  config.FC_CONNECTIVITY_TYPE]
             else:
-                raise controller_errors.MultipleHostsFoundError(fc_wwns,
+                raise controller_errors.MultipleHostsFoundError(get_all_ports(iscsi_iqn,fc_wwns),
                                                                 fc_host)
         elif iscsi_host:
             logger.debug("found host : {0} with iqn : {1}".format(iscsi_host,
@@ -270,8 +274,7 @@ class SVCArrayMediator(ArrayMediator):
         else:
             logger.debug("can not found host by using fc wwns: {0} "
                          "and iscsi iqn : {1}".format(fc_wwns, iscsi_iqn))
-            initiators = fc_wwns if fc_wwns else iscsi_iqn
-            raise controller_errors.HostNotFoundError(initiators)
+            raise controller_errors.HostNotFoundError(get_all_ports(iscsi_iqn, fc_wwns))
 
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume id : "

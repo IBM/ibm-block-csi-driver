@@ -160,7 +160,7 @@ class ArrayMediator:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get_host_by_host_identifiers(self, iscsi_iqn, fc_wwns):
+    def get_host_by_host_identifiers(self, iscsi_iqn, fc_wwns=None):
         """
         This function will find the host name by iscsi iqn or fc wwns.
 
@@ -242,6 +242,3 @@ class ArrayMediator:
             The maximum number of times a map operation will retry if lun is already in use
         """
         raise NotImplementedError
-
-    def is_wwns_match(self, node_wwns_set, host_wwns):
-        return not node_wwns_set.isdisjoint(host_wwns)

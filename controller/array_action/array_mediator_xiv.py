@@ -9,7 +9,10 @@ import controller.array_action.errors as controller_errors
 from controller.array_action.config import ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.config import FC_CONNECTIVITY_TYPE
 from controller.array_action.utils import classproperty
+from controller.array_action.utils import is_wwns_match
+from controller.array_action.utils import get_all_ports
 from controller.common.utils import string_to_array
+
 array_connections_dict = {}
 logger = get_stdout_logger()
 
@@ -162,6 +165,7 @@ class XIVArrayMediator(ArrayMediator):
         logger.debug("Getting host id for initiators iscsi iqn : {0} and "
                      "fc wwns : {1}".format(iscsi_iqn, fc_wwns))
         iscsi_iqn = iscsi_iqn.strip()
+        fc_wwns = [wwn.lower() for wwn in fc_wwns] if fc_wwns else []
         fc_wwns_set = set(fc_wwns)
         matching_hosts = []
         port_types = []
@@ -170,23 +174,21 @@ class XIVArrayMediator(ArrayMediator):
         for host in host_list:
             host_iscsi_ports = string_to_array(host.iscsi_ports, ',')
             host_fc_ports = string_to_array(host.fc_ports, ',')
-            host_match = False
-            if self.is_wwns_match(fc_wwns_set, host_fc_ports):
-                host_match = True
+            if is_wwns_match(fc_wwns_set, host_fc_ports):
+                matching_hosts.append(host.name)
                 logger.debug("found host : {0}, by fc port : {1}".format(host.name, host_fc_ports))
                 port_types.append(FC_CONNECTIVITY_TYPE)
             if iscsi_iqn in host_iscsi_ports:
-                host_match = True
+                matching_hosts.append(host.name)
+                # iscsi port matches if host has single iscsi port
                 if len(host_iscsi_ports) == 1:
                     logger.debug("found host : {0}, by iscsi port : {1}".format(host.name, host_iscsi_ports))
                     port_types.append(ISCSI_CONNECTIVITY_TYPE)
-            if host_match:
-                matching_hosts.append(host.name)
 
         if not matching_hosts or not port_types:
-            raise controller_errors.HostNotFoundError([iscsi_iqn, fc_wwns])
+            raise controller_errors.HostNotFoundError(get_all_ports(iscsi_iqn, fc_wwns))
         elif len(matching_hosts) > 1:
-            raise controller_errors.MultipleHostsFoundError([iscsi_iqn, fc_wwns], matching_hosts)
+            raise controller_errors.MultipleHostsFoundError(get_all_ports(iscsi_iqn, fc_wwns), matching_hosts)
         return matching_hosts[0], port_types
 
     def get_volume_mappings(self, volume_id):
