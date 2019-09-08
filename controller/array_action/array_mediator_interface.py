@@ -160,7 +160,7 @@ class ArrayMediator:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get_host_by_host_identifiers(self, iscsi_iqn, fc_wwns=None):
+    def get_host_by_host_identifiers(self, iscsi_iqn, fc_wwns):
         """
         This function will find the host name by iscsi iqn or fc wwns.
 
