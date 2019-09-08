@@ -17,7 +17,7 @@ import controller.array_action.errors as controller_errors
 from controller.controller_server.errors import ValidationException
 import controller.controller_server.messages as messages
 
-logger = None #is set in main()
+logger = None #is set in ControllerServicer::__init__
 
 
 class ControllerServicer(csi_pb2_grpc.ControllerServicer):
