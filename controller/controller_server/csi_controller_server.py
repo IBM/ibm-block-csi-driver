@@ -9,6 +9,7 @@ from controller.csi_general import csi_pb2
 from controller.csi_general import csi_pb2_grpc
 from controller.array_action.array_connection_manager import ArrayConnectionManager
 from controller.common.csi_logger import get_stdout_logger
+from controller.common.csi_logger import set_log_level
 import controller.controller_server.config as config
 from controller.array_action.config import FC_CONNECTIVITY_TYPE
 import controller.controller_server.utils as utils
@@ -16,7 +17,7 @@ import controller.array_action.errors as controller_errors
 from controller.controller_server.errors import ValidationException
 import controller.controller_server.messages as messages
 
-logger = get_stdout_logger()
+logger = None #is set in main()
 
 
 class ControllerServicer(csi_pb2_grpc.ControllerServicer):
@@ -415,12 +416,18 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
 def main():
     parser = OptionParser()
-    parser.add_option("-e", "--csi-endpoint", dest="endpoint",
-                      help="grpc endpoint")
-
+    parser.add_option("-e", "--csi-endpoint", dest="endpoint",help="grpc endpoint")
+    parser.add_option("-l", "--loglevel", dest="loglevel",help="log level")
     (options, args) = parser.parse_args()
-    endpoint = options.endpoint
 
+    # set logger level and init logger
+    log_level = options.loglevel
+    set_log_level(log_level)
+    global logger
+    logger = get_stdout_logger()
+
+    # start the server
+    endpoint = options.endpoint
     curr_server = ControllerServicer(endpoint)
     curr_server.start_server()
 
