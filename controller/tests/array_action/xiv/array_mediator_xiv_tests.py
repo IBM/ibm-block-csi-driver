@@ -119,10 +119,10 @@ class TestArrayMediatorXIV(unittest.TestCase):
         host1 = utils.get_mock_xiv_host("host1", "iqn1")
         host2 = utils.get_mock_xiv_host("host2", "iqn1")
         host3 = utils.get_mock_xiv_host("host3", "iqn2")
-#        ret = Mock()
-#        ret.as_list = [host1, host2, host3]
+        ret = Mock()
+        ret.as_list = [host1, host2, host3]
 
-        self.mediator.client.cmd.host_list.return_value = [host1, host2, host3]
+        self.mediator.client.cmd.host_list.return_value = ret
         with self.assertRaises(array_errors.HostNotFoundError):
             self.mediator.get_host_by_host_identifiers(Initiators(iqn, wwns))
 
