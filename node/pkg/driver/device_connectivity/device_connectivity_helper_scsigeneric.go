@@ -17,10 +17,14 @@
 package device_connectivity
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
+	"time"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
@@ -31,21 +35,32 @@ import (
 type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	/*
 		This is helper interface for OsDeviceConnectivityHelperScsiGenericInterface.
-		Mainly for writting clean unit testing, so we can Mock this interface in order to unit test logic.
+		Mainly for writing clean unit testing, so we can Mock this interface in order to unit test logic.
 	*/
 	RescanDevices(lunId int, arrayIdentifier []string, sessionHosts []int) error
+	GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string, connectivityType string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
 	RemovePhysicalDevice(sysDevices []string) error
 }
 
 type OsDeviceConnectivityHelperScsiGeneric struct {
 	Executer        executer.ExecuterInterface
+	Helper          OsDeviceConnectivityHelperInterface
 	MutexMultipathF *sync.Mutex
 }
+
+var (
+	TimeOutMultipathFlashCmd = 4 * 1000
+)
+
+const (
+	DevPath = "/dev"
+)
 
 func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperScsiGenericInterface {
 	return &OsDeviceConnectivityHelperScsiGeneric{
 		Executer:        executer,
+		Helper:          NewOsDeviceConnectivityHelperGeneric(executer),
 		MutexMultipathF: &sync.Mutex{},
 	}
 }
@@ -77,6 +92,81 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 
 	logger.Debugf("Rescan : finish rescan lun on lun id : {%v}, with array identifier : {%v}", lunId, arrayIdentifier)
 	return nil
+}
+
+func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string, connectivityType string) (string, error) {
+
+	var devicePaths []string
+	var errStrings []string
+	var targetPath string
+	var ConnectivityType string
+	lunIdStr := strconv.Itoa(lunId)
+	//portValue := arrayIdentifiers[0]
+	/*if strings.HasPrefix(portValue, "0x") && len(portValue) == 17 {
+		targetPath = "/dev/disk/by-path/pci*"
+		ConnectivityType = "fc"
+	} else {
+		targetPath = "/dev/disk/by-path/ip*"
+		ConnectivityType = "iscsi"
+	}*/
+	if connectivityType == "fc" {
+		targetPath = "/dev/disk/by-path/pci*"
+	}
+	if connectivityType == "iscsi" {
+		targetPath = "/dev/disk/by-path/ip*"
+	}
+
+	for _, arrayIdentifier := range arrayIdentifiers {
+		dp := strings.Join([]string{targetPath, connectivityType, arrayIdentifier, "lun", lunIdStr}, "-")
+		logger.Infof("GetMpathDevice: Get the mpath devices related to connectivityType=%s initiator=%s and lunID=%s : {%v}", ConnectivityType, arrayIdentifier, lunIdStr, dp)
+		dps, exists, e := r.Helper.WaitForPathToExist(dp, 5, 1)
+		if e != nil {
+			logger.Errorf("GetMpathDevice: No device found error : %v ", e.Error())
+			errStrings = append(errStrings, e.Error())
+		} else if !exists {
+			e := &MultipleDeviceNotFoundForLunError{volumeId, lunId, []string{arrayIdentifier}}
+			logger.Errorf(e.Error())
+			errStrings = append(errStrings, e.Error())
+		}
+		devicePaths = append(devicePaths, dps...)
+	}
+
+	if len(devicePaths) == 0 && len(errStrings) != 0 {
+		err := errors.New(strings.Join(errStrings, ","))
+		return "", err
+	}
+
+	devicePathTosysfs := make(map[string]bool)
+	// Looping over the physical devices of the volume - /dev/sdX and store all the dm devices inside map.
+	for _, path := range devicePaths {
+		if path != "" { // since it may return empty items
+			mappedDevicePath, err := r.Helper.GetMultipathDisk(path)
+			if err != nil {
+				return "", err
+			}
+
+			if mappedDevicePath != "" {
+				devicePathTosysfs[mappedDevicePath] = true // map it in order to save uniq dm devices
+			}
+
+		}
+	}
+
+	var mps string
+	for key := range devicePathTosysfs {
+		mps += ", " + key
+	}
+	logger.Infof("GetMpathDevice: Found multipath devices: [%s] that relats to lunId=%d and arrayIdentifiers=%s", mps, lunId, arrayIdentifiers)
+
+	if len(devicePathTosysfs) > 1 {
+		return "", &MultipleDmDevicesError{volumeId, lunId, arrayIdentifiers, devicePathTosysfs}
+	}
+
+	var md string
+	for md = range devicePathTosysfs {
+		break // because its a single value in the map(1 mpath device, if not it should fail above), so just take the first
+	}
+	return md, nil
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice string) error {
@@ -112,7 +202,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice 
 
 func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices []string) error {
 	// sysDevices  = sdb, sda,...
-	logger.Debugf("Removing iscsi device : {%v}", sysDevices)
+	logger.Debugf("Removing scsi device : {%v}", sysDevices)
 	// NOTE: this func could be also relevant for SCSI (not only for iSCSI)
 	var (
 		f   *os.File
@@ -145,4 +235,130 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 	}
 	logger.Debugf("Finshed to remove iSCSI devices : {%v}", sysDevices)
 	return nil
+}
+
+// ============== OsDeviceConnectivityHelperInterface ==========================
+
+//go:generate mockgen -destination=../../../mocks/mock_OsDeviceConnectivityHelperInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity OsDeviceConnectivityHelperInterface
+
+type OsDeviceConnectivityHelperInterface interface {
+	/*
+		This is helper interface for OsDeviceConnectivityScsiGeneric.
+		Mainly for writting clean unit testing, so we can Mock this interface in order to unit test OsDeviceConnectivityHelperGeneric logic.
+	*/
+	WaitForPathToExist(devicePath string, maxRetries int, intervalSeconds int) ([]string, bool, error)
+	GetMultipathDisk(path string) (string, error)
+}
+
+type OsDeviceConnectivityHelperGeneric struct {
+	executer executer.ExecuterInterface
+}
+
+func NewOsDeviceConnectivityHelperGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperInterface {
+	return &OsDeviceConnectivityHelperGeneric{executer: executer}
+}
+
+func (o OsDeviceConnectivityHelperGeneric) WaitForPathToExist(devicePath string, maxRetries int, intervalSeconds int) ([]string, bool, error) {
+	/*
+				Description:
+					Try to find all the files
+					iSCSI -> /dev/disk/by-path/ip*-iscsi-<Array-WWN>-lun-<LUN-ID>
+		             FC   -> /dev/disk/by-path/pci-*-fc-<Array-WWN>-lun-<LUN-ID>
+					If not find then try again maxRetries.
+	*/
+
+	var err error
+	for i := 0; i < maxRetries; i++ {
+		err = nil
+		fpaths, err := o.executer.FilepathGlob(devicePath)
+		if err != nil {
+			return nil, false, err
+		}
+
+		logger.Debugf("fpaths : {%v}", fpaths)
+
+		if fpaths == nil {
+			err = os.ErrNotExist
+		} else {
+			return fpaths, true, nil
+		}
+
+		time.Sleep(time.Second * time.Duration(intervalSeconds))
+	}
+	return nil, false, err
+}
+
+func (o OsDeviceConnectivityHelperGeneric) GetMultipathDisk(path string) (string, error) {
+	/*
+		Description:
+			1. Get the name of the device(e.g: sdX) by check `path` as slink to the device.
+			   e.g: Where path=/dev/disk/by-path/pci-*-fc-0xwwn-lun-<LUNID> which slink to "../../sdX"
+			        /dev/disk/by-path/pci-*-fc-0xwwn-lun-<LUNID> -> ../../sdX
+			        or
+			        /dev/disk/by-path/TARGET-iscsi-iqn:<LUNID> -> ../../sdX
+			2. After having sdX, the function loop over all the files in /sys/block/dm-*\/slaves/sd<X> and return its relevant <dm-*>.
+			   The <dm-*> is actually the second directory of the path /sys/block/dm-*\/slaves/sd<X>.
+			   e.g: function will return dm-1 for this path=/dev/disk/by-path/pci-0000:13:00.0-fc-0x500507680b25c0aa-lun-0,
+					Because the /dev/disk/by-path/pci-0000:13:00.0-fc-0x500507680b25c0aa-lun-0 -> ../../sda
+					And listing all the /sys/block/dm-*\/slaves/sda  will be with dm-1. So the fucntion will return dm-1.
+
+		Return Value:
+			dm-<X>
+	*/
+
+	// Follow link to destination directory
+	logger.Debugf("Getting multipath device for given path %s", path)
+
+	// Get the sdX which is the file that path link to.
+	devicePath, err := o.executer.OsReadlink(path)
+	if err != nil {
+		logger.Errorf("Error reading link for multipath disk: %s. error: {%s}\n", path, err.Error())
+		return "", err
+	}
+
+	// Get only the physical device from /dev/disk/by-path/pci-*-fc-0xwwn-lun-<LUNID> -> ../../sdb
+	// or /dev/disk/by-path/TARGET-iscsi-iqn:<LUNID> -> ../../sdb
+	sdevice := filepath.Base(devicePath)
+
+	// If destination directory is already identified as a multipath device,
+	// just return its path
+	if strings.HasPrefix(sdevice, "dm-") {
+		logger.Debugf("Already found multipath device: %s", sdevice)
+		return sdevice, nil
+	}
+
+	// Fallback to iterating through all the entries under /sys/block/dm-* and
+	// check to see if any have an entry under /sys/block/dm-*/slaves matching
+	// the device the symlink was pointing at
+	dmPaths, err := o.executer.FilepathGlob("/sys/block/dm-*")
+	// TODO improve looping by just filepath.Glob("/sys/block/dm-*/slaves/" + sdevice) and then no loops needed below, since it will just find the device directly.
+
+	if err != nil {
+		logger.Errorf("Glob error: %s", err)
+		return "", err
+	}
+	for _, dmPath := range dmPaths {
+		sdevices, err := o.executer.FilepathGlob(filepath.Join(dmPath, "slaves", "*"))
+		if err != nil {
+			logger.Warningf("Glob error: %s", err)
+		}
+		for _, spath := range sdevices {
+			s := filepath.Base(spath)
+			if sdevice == s {
+				// We've found a matching entry, return the path for the
+				// dm-* device it was found under
+				// for Example, return /dev/dm-3
+				//   ls -l  /sys/block/dm-*/slaves/*
+				//    /sys/block/dm-3/slaves/sdb -> ../../../../pci0000:00/0000:00:17.0/0000:13:00.0/host33/rport-33:0-3/target33:0:1/33:0:1:0/block/sdb
+
+				p := filepath.Join(DevPath, filepath.Base(dmPath))
+				logger.Debugf("Found matching multipath device: %s under dm-* device path %s", sdevice, dmPath)
+				return p, nil
+			}
+		}
+	}
+
+	err = &MultipleDeviceNotFoundError{path, devicePath}
+	logger.Errorf(err.Error())
+	return "", err
 }
