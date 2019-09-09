@@ -162,7 +162,6 @@ class XIVArrayMediator(ArrayMediator):
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host id for initiators iscsi iqn : {0} and "
                      "fc wwns : {1}".format(iscsi_iqn, fc_wwns))
-        iscsi_iqn = initiators.iscsi_iqn
         matching_hosts = []
         port_types = []
 
@@ -175,7 +174,7 @@ class XIVArrayMediator(ArrayMediator):
                 host_matches = True
                 logger.debug("found host : {0}, by fc port : {1}".format(host.name, host_fc_ports))
                 port_types.append(FC_CONNECTIVITY_TYPE)
-            if iscsi_iqn in host_iscsi_ports:
+            if initiators.iscsi_iqn in host_iscsi_ports:
                 host_matches = True
                 # iscsi port matches if host has single iscsi port
                 if len(host_iscsi_ports) == 1:

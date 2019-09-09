@@ -231,7 +231,6 @@ class SVCArrayMediator(ArrayMediator):
 
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host id for initiators : {0}".format(initiators))
-        iscsi_iqn = initiators.iscsi_iqn
         host_list = self.client.svcinfo.lshost()
         iscsi_host, fc_host = None, None
         for host in host_list:
@@ -241,15 +240,14 @@ class SVCArrayMediator(ArrayMediator):
             wwns_value = host_detail.get('WWPN', [])
             if not isinstance(wwns_value, list):
                 wwns_value = [wwns_value, ]
-            host_initiator_wwns = [wwn.lower() for wwn in wwns_value]
-            if iscsi_iqn == iscsi_names:
+            if initiators.iscsi_iqn == iscsi_names:
                 iscsi_host = host_detail.get('name', '')
                 logger.debug("found iscsi iqn in list : {0} for host : "
-                             "{1}".format(iscsi_iqn, iscsi_host))
-            if initiators.is_array_wwns_match(host_initiator_wwns):
+                             "{1}".format(initiators.iscsi_iqn, iscsi_host))
+            if initiators.is_array_wwns_match(wwns_value):
                 fc_host = host_detail.get('name', '')
                 logger.debug("found fc wwns in list : {0} for host : "
-                             "{1}".format(fc_wwns, fc_host))
+                             "{1}".format(initiators.fc_wwns, fc_host))
         if iscsi_host and fc_host:
             if iscsi_host == fc_host:
                 return fc_host, [config.ISCSI_CONNECTIVITY_TYPE,
@@ -264,7 +262,7 @@ class SVCArrayMediator(ArrayMediator):
             return fc_host, [config.FC_CONNECTIVITY_TYPE]
         else:
             logger.debug("can not found host by using initiators: {0} ".format(initiators))
-            raise controller_errors.HostNotFoundError(get_all_ports(initiators))
+            raise controller_errors.HostNotFoundError(initiators)
 
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume id : "
