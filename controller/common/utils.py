@@ -10,5 +10,5 @@ def string_to_array(str_val, separator):
         return []
     str_val = str_val.strip()
     res = str_val.split(separator)
-    res[:] = [res_val.strip() for res_val in res]
-    return res
+    return [res_val.strip() for res_val in res]
+
