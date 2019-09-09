@@ -116,9 +116,9 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_get_host_by_identifiers_returns_host_not_found(self):
         iqn = "iqn"
         wwns = ['wwn1', 'wwn2']
-        host1 = utils.get_mock_xiv_host("host1", "iqn1")
-        host2 = utils.get_mock_xiv_host("host2", "iqn1")
-        host3 = utils.get_mock_xiv_host("host3", "iqn2")
+        host1 = utils.get_mock_xiv_host("host1", "iqn1,1")
+        host2 = utils.get_mock_xiv_host("host2", "iqn1,2")
+        host3 = utils.get_mock_xiv_host("host3", "iqn2,3")
         ret = Mock()
         ret.as_list = [host1, host2, host3]
 
