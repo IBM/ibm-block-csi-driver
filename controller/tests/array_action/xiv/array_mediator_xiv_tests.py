@@ -140,7 +140,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         wwns = []
         right_host = "host2"
 
-        host1 = utils.get_mock_xiv_host(right_host, "iqn1")
+        host1 = utils.get_mock_xiv_host(right_host, "iqn1", "")
         host2 = utils.get_mock_xiv_host("host2", "iqn2", "")
         host3 = utils.get_mock_xiv_host("host3", "iqn2", "")
         host4 = utils.get_mock_xiv_host("host4", "iqn3", "")
