@@ -6,8 +6,6 @@ from controller.array_action.array_mediator_interface import ArrayMediator
 from controller.array_action.array_action_types import Volume
 import controller.array_action.errors as controller_errors
 from controller.array_action.utils import classproperty
-from controller.array_action.utils import is_wwns_match
-from controller.array_action.utils import get_all_ports
 import controller.array_action.config as config
 
 array_connections_dict = {}

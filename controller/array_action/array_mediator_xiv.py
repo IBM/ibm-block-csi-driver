@@ -9,8 +9,6 @@ import controller.array_action.errors as controller_errors
 from controller.array_action.config import ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.config import FC_CONNECTIVITY_TYPE
 from controller.array_action.utils import classproperty
-from controller.array_action.utils import is_wwns_match
-from controller.array_action.utils import get_all_ports
 from controller.common.utils import string_to_array
 
 array_connections_dict = {}
