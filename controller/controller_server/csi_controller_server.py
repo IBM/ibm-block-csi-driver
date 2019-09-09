@@ -19,7 +19,7 @@ import controller.controller_server.messages as messages
 from controller.common.node_info import NodeIdInfo
 from controller.common.node_info import Initiators
 
-logger = None #is set in main()
+logger = None #is set in ControllerServicer::__init__
 
 
 class ControllerServicer(csi_pb2_grpc.ControllerServicer):
@@ -28,6 +28,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     """
 
     def __init__(self, array_endpoint):
+		# init logger
+        global logger
+        logger = get_stdout_logger()
+
         self.endpoint = array_endpoint
 
         my_path = os.path.abspath(os.path.dirname(__file__))
@@ -427,8 +431,6 @@ def main():
     # set logger level and init logger
     log_level = options.loglevel
     set_log_level(log_level)
-    global logger
-    logger = get_stdout_logger()
 
     # start the server
     endpoint = options.endpoint
