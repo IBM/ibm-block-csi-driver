@@ -16,14 +16,14 @@ FROM registry.access.redhat.com/ubi8/python-36:1
 MAINTAINER IBM Storage
 
 ###Required Labels
-LABEL name="IBM Block CSI Driver Controller" \
+LABEL name="IBM block storage CSI driver controller" \
       vendor="IBM" \
       version="1.0.0" \
       release="b1" \
-      summary="The controller component of the IBM Block CSI driver" \
-      description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and Openshift, to manage the life-cycle of persistent storage." \
-      io.k8s.display-name="IBM Block CSI Driver Controller" \
-      io.k8s.description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and Openshift, to manage the life-cycle of persistent storage." \
+      summary="The controller component of the IBM block storage CSI driver" \
+      description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage." \
+      io.k8s.display-name="IBM block storage CSI driver controller" \
+      io.k8s.description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage." \
       io.openshift.tags=ibm,csi,ibm-block-csi-driver,ibm-block-csi-node
 
 COPY controller/requirements.txt /driver/controller/
@@ -37,7 +37,7 @@ COPY ./LICENSE /licenses/
 WORKDIR /driver
 ENV PYTHONPATH=/driver
 
-# Note, UBI runs with app-user by default.
+# Note: UBI runs with app-user by default.
 
 ENTRYPOINT ["/driver/controller/scripts/entrypoint.sh"]
 
