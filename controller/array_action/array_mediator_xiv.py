@@ -280,5 +280,5 @@ class XIVArrayMediator(ArrayMediator):
         return [array_iqn]
 
     def get_array_fc_wwns(self, host_name=None):
-        fc_wwns_objects = self.client.cmd.fc_connectivity_list(role='Target')
-        return set([port.wwpn for port in fc_wwns_objects])
+        fc_wwns_objects = self.client.cmd.fc_connectivity_list(role='Target', port_state='Online')
+        return [port.wwpn for port in fc_wwns_objects]
