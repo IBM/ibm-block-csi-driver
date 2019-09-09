@@ -174,17 +174,19 @@ class XIVArrayMediator(ArrayMediator):
         for host in host_list:
             host_iscsi_ports = string_to_array(host.iscsi_ports, ',')
             host_fc_ports = string_to_array(host.fc_ports, ',')
+            host_matches = False
             if is_wwns_match(fc_wwns_set, host_fc_ports):
-                matching_hosts.append(host.name)
+                host_matches = True
                 logger.debug("found host : {0}, by fc port : {1}".format(host.name, host_fc_ports))
                 port_types.append(FC_CONNECTIVITY_TYPE)
             if iscsi_iqn in host_iscsi_ports:
-                matching_hosts.append(host.name)
+                host_matches = True
                 # iscsi port matches if host has single iscsi port
                 if len(host_iscsi_ports) == 1:
                     logger.debug("found host : {0}, by iscsi port : {1}".format(host.name, host_iscsi_ports))
                     port_types.append(ISCSI_CONNECTIVITY_TYPE)
-
+            if host_matches:
+                matching_hosts.append(host.name)
         if not matching_hosts or not port_types:
             raise controller_errors.HostNotFoundError(get_all_ports(iscsi_iqn, fc_wwns))
         elif len(matching_hosts) > 1:
