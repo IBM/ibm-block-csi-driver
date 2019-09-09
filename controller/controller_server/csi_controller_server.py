@@ -17,7 +17,6 @@ import controller.array_action.errors as controller_errors
 from controller.controller_server.errors import ValidationException
 import controller.controller_server.messages as messages
 from controller.common.node_info import NodeIdInfo
-from controller.common.node_info import Initiators
 
 logger = None #is set in ControllerServicer::__init__
 
