@@ -159,12 +159,10 @@ class XIVArrayMediator(ArrayMediator):
 
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
-    def get_host_by_host_identifiers(self, iscsi_iqn, fc_wwns):
+    def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host id for initiators iscsi iqn : {0} and "
                      "fc wwns : {1}".format(iscsi_iqn, fc_wwns))
-        iscsi_iqn = iscsi_iqn.strip()
-        fc_wwns = [wwn.lower() for wwn in fc_wwns] if fc_wwns else []
-        fc_wwns_set = set(fc_wwns)
+        iscsi_iqn = initiators.iscsi_iqn
         matching_hosts = []
         port_types = []
 
@@ -172,21 +170,23 @@ class XIVArrayMediator(ArrayMediator):
         for host in host_list:
             host_iscsi_ports = string_to_array(host.iscsi_ports, ',')
             host_fc_ports = string_to_array(host.fc_ports, ',')
-            if is_wwns_match(fc_wwns_set, host_fc_ports):
-                matching_hosts.append(host.name)
+            host_matches = False
+            if initiators.is_wwns_match(host_fc_ports):
+                host_matches = True
                 logger.debug("found host : {0}, by fc port : {1}".format(host.name, host_fc_ports))
                 port_types.append(FC_CONNECTIVITY_TYPE)
             if iscsi_iqn in host_iscsi_ports:
-                matching_hosts.append(host.name)
+                host_matches = True
                 # iscsi port matches if host has single iscsi port
                 if len(host_iscsi_ports) == 1:
                     logger.debug("found host : {0}, by iscsi port : {1}".format(host.name, host_iscsi_ports))
                     port_types.append(ISCSI_CONNECTIVITY_TYPE)
-
+            if host_matches:
+                matching_hosts.append(host.name)
         if not matching_hosts or not port_types:
-            raise controller_errors.HostNotFoundError(get_all_ports(iscsi_iqn, fc_wwns))
+            raise controller_errors.HostNotFoundError(initiators)
         elif len(matching_hosts) > 1:
-            raise controller_errors.MultipleHostsFoundError(get_all_ports(iscsi_iqn, fc_wwns), matching_hosts)
+            raise controller_errors.MultipleHostsFoundError(initiators, matching_hosts)
         return matching_hosts[0], port_types
 
     def get_volume_mappings(self, volume_id):
@@ -278,5 +278,5 @@ class XIVArrayMediator(ArrayMediator):
         return [array_iqn]
 
     def get_array_fc_wwns(self, host_name=None):
-        fc_wwns_objects = self.client.cmd.fc_connectivity_list(role='Target')
-        return set([port.wwpn for port in fc_wwns_objects])
+        fc_wwns_objects = self.client.cmd.fc_connectivity_list(role='Target', port_state='Online')
+        return [port.wwpn for port in fc_wwns_objects]

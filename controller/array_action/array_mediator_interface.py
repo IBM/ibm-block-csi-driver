@@ -160,13 +160,12 @@ class ArrayMediator:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get_host_by_host_identifiers(self, iscsi_iqn, fc_wwns):
+    def get_host_by_host_identifiers(self, initiators):
         """
         This function will find the host name by iscsi iqn or fc wwns.
 
         Args:
-           iscis_iqn : the iscsi iqn of the wanted host.
-           fc_wwns : the fc wwns of the wanted host.
+           initiators : initiators (e.g. fc wwns, iqn) of the wanted host.
 
         Returns:
            connectivity_types : list of connectivity types ([iscis, fc] or just [iscsi],..)
