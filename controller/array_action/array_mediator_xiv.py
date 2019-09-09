@@ -160,8 +160,7 @@ class XIVArrayMediator(ArrayMediator):
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
     def get_host_by_host_identifiers(self, initiators):
-        logger.debug("Getting host id for initiators iscsi iqn : {0} and "
-                     "fc wwns : {1}".format(iscsi_iqn, fc_wwns))
+        logger.debug("Getting host id for initiators : {0}".format(initiators))
         matching_hosts = []
         port_types = []
 
