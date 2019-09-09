@@ -171,7 +171,7 @@ class XIVArrayMediator(ArrayMediator):
             host_iscsi_ports = string_to_array(host.iscsi_ports, ',')
             host_fc_ports = string_to_array(host.fc_ports, ',')
             host_matches = False
-            if initiators.is_wwns_match(host_fc_ports):
+            if initiators.is_array_wwns_match(host_fc_ports):
                 host_matches = True
                 logger.debug("found host : {0}, by fc port : {1}".format(host.name, host_fc_ports))
                 port_types.append(FC_CONNECTIVITY_TYPE)
