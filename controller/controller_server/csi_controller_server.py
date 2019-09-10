@@ -407,6 +407,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         controller_server.add_insecure_port(self.endpoint)
 
         # start the server
+        logger.debug("Listening for connections on endpoint address: {}".format(self.endpoint))
+
         controller_server.start()
         logger.debug('Controller Server running ...')
 

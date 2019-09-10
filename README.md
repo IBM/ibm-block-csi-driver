@@ -22,7 +22,7 @@ DISCLAIMER: The driver is provided as is, without warranty. Any issue will be ha
 * [Prerequisites for Driver Installation](#prerequisites-for-driver-installation)
     - Install Fibre Channel and iSCSI connectivity rpms, multipath configurations, and configure storage system connectivity.
 * [Installing the Driver](#installing-the-driver)
-* [Configuring k8s secret and storage class](#configuring-k8s-secret-and-storage class)
+* [Configuring k8s secret and storage class](#configuring-k8s-secret-and-storage-class)
     - Configure the k8s storage class - to define the storage system pool name, secret reference, SpaceEfficiency (Thin, Compressed or Deduplicated) and fstype(xfs\ext4)
     - Storage system secret - to define the storage credential(user and password) and its address
 * [Driver Usage](#driver-usage)
