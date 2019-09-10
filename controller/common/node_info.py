@@ -48,7 +48,7 @@ class Initiators:
            Is current host iqns matches
         """
         host_iqns_lower = [iqn.lower() for iqn in host_iqns]
-        return not self._iscsi_iqn_lowercase in host_iqns_lower
+        return self._iscsi_iqn_lowercase in host_iqns_lower
 
     def __str__(self):
         return "iscsi_iqn: " + self.iscsi_iqn + ", fc_wwns: " + ",".join(self.fc_wwns)
