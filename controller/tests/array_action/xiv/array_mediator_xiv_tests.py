@@ -185,7 +185,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.host_list.return_value = ret
         host, connectivity_type = self.mediator.get_host_by_host_identifiers(Initiators(iqn, wwns))
         self.assertEqual(host, right_host)
-        self.assertEqual(connectivity_type, [ISCSI_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE])
+        self.assertEqual(connectivity_type, [FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE])
 
     def test_get_volume_mappings_empty_mapping_list(self):
         # host3 = utils.get_mock_xiv_mapping(2, "host1")
