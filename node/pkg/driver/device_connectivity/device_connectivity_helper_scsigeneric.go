@@ -29,6 +29,7 @@ import (
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"k8s.io/apimachinery/pkg/util/errors"
 )
 
 //go:generate mockgen -destination=../../../mocks/mock_OsDeviceConnectivityHelperScsiGenericInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity OsDeviceConnectivityHelperScsiGenericInterface
@@ -85,7 +86,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 		hostIDs = append(hostIDs, hostsId...)
 	}
 	if len(hostIDs) == 0 && len(errStrings) != 0 {
-		err := errors.New(strings.Join(errStrings, ","))
+		err := errors.NewAggregate(errStrings)
 		return err
 	}
 	for _, hostNumber := range hostIDs {
@@ -156,7 +157,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 	}
 
 	if len(devicePaths) == 0 && len(errStrings) != 0 {
-		err := errors.New(strings.Join(errStrings, ","))
+		err := errors.NewAggregate(errStrings)
 		return "", err
 	}
 
