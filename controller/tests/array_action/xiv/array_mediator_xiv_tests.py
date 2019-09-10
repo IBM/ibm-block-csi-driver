@@ -154,7 +154,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.assertEqual(connectivity_type, [ISCSI_CONNECTIVITY_TYPE])
 
     def test_get_host_by_fc_identifiers_succeeds(self):
-        iqn = "iqn1"
+        iqn = "iqn5"
         wwns = ["wwn2", "wwn4"]
         right_host = "host2"
 
@@ -172,7 +172,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
     def test_get_host_by_iscsi_and_fc_identifiers_succeeds(self):
         iqn = "iqn2"
-        wwns = ["wwn2", "wwn4"]
+        wwns = ["wwn2", "wwn5"]
         right_host = "host2"
 
         host1 = utils.get_mock_xiv_host("host1", "iqn1", "wwn1")
