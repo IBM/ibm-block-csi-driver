@@ -161,27 +161,23 @@ class XIVArrayMediator(ArrayMediator):
 
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host id for initiators : {0}".format(initiators))
-        matching_hosts = []
+        matching_hosts_set = set()
         port_types = []
 
         host_list = self.client.cmd.host_list().as_list
         for host in host_list:
             host_iscsi_ports = string_to_array(host.iscsi_ports, ',')
             host_fc_ports = string_to_array(host.fc_ports, ',')
-            host_matches = False
             if initiators.is_array_wwns_match(host_fc_ports):
-                host_matches = True
+                matching_hosts_set.add(host.name)
                 logger.debug("found host : {0}, by fc port : {1}".format(host.name, host_fc_ports))
                 port_types.append(FC_CONNECTIVITY_TYPE)
-            if initiators.iscsi_iqn in host_iscsi_ports:
-                host_matches = True
-                # iscsi port matches if host has single iscsi port
-                if len(host_iscsi_ports) == 1:
-                    logger.debug("found host : {0}, by iscsi port : {1}".format(host.name, host_iscsi_ports))
-                    port_types.append(ISCSI_CONNECTIVITY_TYPE)
-            if host_matches:
-                matching_hosts.append(host.name)
-        if not matching_hosts or not port_types:
+            if initiators.is_array_iscsi_iqns_match(host_iscsi_ports):
+                matching_hosts_set.add(host.name)
+                logger.debug("found host : {0}, by iscsi port : {1}".format(host.name, host_iscsi_ports))
+                port_types.append(ISCSI_CONNECTIVITY_TYPE)
+        matching_hosts = sorted(matching_hosts_set)
+        if not matching_hosts:
             raise controller_errors.HostNotFoundError(initiators)
         elif len(matching_hosts) > 1:
             raise controller_errors.MultipleHostsFoundError(initiators, matching_hosts)

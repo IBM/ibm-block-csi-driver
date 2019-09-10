@@ -240,7 +240,7 @@ class SVCArrayMediator(ArrayMediator):
             wwns_value = host_detail.get('WWPN', [])
             if not isinstance(wwns_value, list):
                 wwns_value = [wwns_value, ]
-            if initiators.iscsi_iqn == iscsi_names:
+            if initiators.is_array_iscsi_iqns_match([iscsi_names]):
                 iscsi_host = host_detail.get('name', '')
                 logger.debug("found iscsi iqn in list : {0} for host : "
                              "{1}".format(initiators.iscsi_iqn, iscsi_host))
