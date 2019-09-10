@@ -177,8 +177,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
         host1 = utils.get_mock_xiv_host("host1", "iqn1", "wwn1")
         host2 = utils.get_mock_xiv_host(right_host, "iqn2", "wwn2")
-        host3 = utils.get_mock_xiv_host("host3", "iqn2", "wwn3")
-        host4 = utils.get_mock_xiv_host("host4", "iqn3", "wwn4")
+        host3 = utils.get_mock_xiv_host("host3", "iqn3", "wwn3")
+        host4 = utils.get_mock_xiv_host("host4", "iqn4", "wwn4")
         ret = Mock()
         ret.as_list = [host1, host2, host3, host4]
 
