@@ -29,21 +29,13 @@ func (e *MultipleDeviceNotFoundForLunError) Error() string {
 	return fmt.Sprintf("Couldn't find multipath device for volumeID [%s] lunID [%d] from array [%s]. Please check the host connectivity to the storage.", e.VolumeId, e.LunId, e.ArrayIqns)
 }
 
-type ConnectivityIscsiStorageTargetNotFoundError struct {
+type ConnectivityIdentifierStorageTargetNotFoundError struct {
 	StorageTargetName string
 	DirectoryPath     string
 }
 
-func (e *ConnectivityIscsiStorageTargetNotFoundError) Error() string {
+func (e *ConnectivityIdentifierStorageTargetNotFoundError) Error() string {
 	return fmt.Sprintf("Connectivity Error: Storage target name [%s] was not found on the host, under directory %s. Please check the host connectivity to the storage.", e.StorageTargetName, e.DirectoryPath)
-}
-
-type ConnectivityFcHostTargetNotFoundError struct {
-	DirectoryPath string
-}
-
-func (e *ConnectivityFcHostTargetNotFoundError) Error() string {
-	return fmt.Sprintf("Connectivity Error: The target directory [%s] was not found on the hos. Please check the host FC HBA configuration.", e.DirectoryPath)
 }
 
 type MultipleDeviceNotFoundError struct {

@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -37,7 +38,7 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 		This is helper interface for OsDeviceConnectivityHelperScsiGenericInterface.
 		Mainly for writing clean unit testing, so we can Mock this interface in order to unit test logic.
 	*/
-	RescanDevices(lunId int, arrayIdentifier []string, sessionHosts []int) error
+	RescanDevices(lunId int, arrayIdentifiers []string) error
 	GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string, connectivityType string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
 	RemovePhysicalDevice(sysDevices []string) error
@@ -65,8 +66,29 @@ func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterfac
 	}
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIdentifier []string, sessionHosts []int) error {
-	for _, hostNumber := range sessionHosts {
+func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIdentifiers []string) error {
+	logger.Debugf("Rescan : Start rescan on specific lun, on lun : {%v}, with array identifiers : {%v}", lunId, arrayIdentifiers)
+	var hostIDs []int
+	var errStrings []string
+	if len(arrayIdentifiers) == 0 {
+		e := &ErrorNotFoundArrayIdentifiers{lunId}
+		logger.Errorf(e.Error())
+		return e
+	}
+
+	for _, arrayIdentifier := range arrayIdentifiers {
+		hostsId, e := r.Helper.GetHostsIdByArrayIdentifier(arrayIdentifier)
+		if e != nil {
+			logger.Errorf(e.Error())
+			errStrings = append(errStrings, e.Error())
+		}
+		hostIDs = append(hostIDs, hostsId...)
+	}
+	if len(hostIDs) == 0 && len(errStrings) != 0 {
+		err := errors.New(strings.Join(errStrings, ","))
+		return err
+	}
+	for _, hostNumber := range hostIDs {
 
 		filename := fmt.Sprintf("/sys/class/scsi_host/host%d/scan", hostNumber)
 		f, err := r.Executer.OsOpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200)
@@ -90,27 +112,29 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 
 	}
 
-	logger.Debugf("Rescan : finish rescan lun on lun id : {%v}, with array identifier : {%v}", lunId, arrayIdentifier)
+	logger.Debugf("Rescan : finish rescan lun on lun id : {%v}, with array identifiers : {%v}", lunId, arrayIdentifiers)
 	return nil
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string, connectivityType string) (string, error) {
+	logger.Infof("GetMpathDevice: Found multipath devices for volume : [%s] that relats to lunId=%d and arrayIdentifiers=%s", volumeId, lunId, arrayIdentifiers)
 
+	if len(arrayIdentifiers) == 0 {
+		e := &ErrorNotFoundArrayIdentifiers{lunId}
+		return "", e
+	}
 	var devicePaths []string
 	var errStrings []string
 	var targetPath string
-	var ConnectivityType string
 	lunIdStr := strconv.Itoa(lunId)
-	//portValue := arrayIdentifiers[0]
-	/*if strings.HasPrefix(portValue, "0x") && len(portValue) == 17 {
-		targetPath = "/dev/disk/by-path/pci*"
-		ConnectivityType = "fc"
-	} else {
-		targetPath = "/dev/disk/by-path/ip*"
-		ConnectivityType = "iscsi"
-	}*/
+
 	if connectivityType == "fc" {
 		targetPath = "/dev/disk/by-path/pci*"
+		// In host, the path like this: /dev/disk/by-path/pci-0000:13:00.0-fc-0x500507680b25c0aa-lun-0
+		// So add prefix "ox" for the arrayIdentifiers
+		for index, wwn := range arrayIdentifiers {
+			arrayIdentifiers[index] = "0x" + strings.ToLower(wwn)
+		}
 	}
 	if connectivityType == "iscsi" {
 		targetPath = "/dev/disk/by-path/ip*"
@@ -118,7 +142,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 
 	for _, arrayIdentifier := range arrayIdentifiers {
 		dp := strings.Join([]string{targetPath, connectivityType, arrayIdentifier, "lun", lunIdStr}, "-")
-		logger.Infof("GetMpathDevice: Get the mpath devices related to connectivityType=%s initiator=%s and lunID=%s : {%v}", ConnectivityType, arrayIdentifier, lunIdStr, dp)
+		logger.Infof("GetMpathDevice: Get the mpath devices related to connectivityType=%s initiator=%s and lunID=%s : {%v}", connectivityType, arrayIdentifier, lunIdStr, dp)
 		dps, exists, e := r.Helper.WaitForPathToExist(dp, 5, 1)
 		if e != nil {
 			logger.Errorf("GetMpathDevice: No device found error : %v ", e.Error())
@@ -248,6 +272,7 @@ type OsDeviceConnectivityHelperInterface interface {
 	*/
 	WaitForPathToExist(devicePath string, maxRetries int, intervalSeconds int) ([]string, bool, error)
 	GetMultipathDisk(path string) (string, error)
+	GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error)
 }
 
 type OsDeviceConnectivityHelperGeneric struct {
@@ -263,7 +288,7 @@ func (o OsDeviceConnectivityHelperGeneric) WaitForPathToExist(devicePath string,
 				Description:
 					Try to find all the files
 					iSCSI -> /dev/disk/by-path/ip*-iscsi-<Array-WWN>-lun-<LUN-ID>
-		             FC   -> /dev/disk/by-path/pci-*-fc-<Array-WWN>-lun-<LUN-ID>
+		            FC   -> /dev/disk/by-path/pci-*-fc-<Array-WWN>-lun-<LUN-ID>
 					If not find then try again maxRetries.
 	*/
 
@@ -361,4 +386,83 @@ func (o OsDeviceConnectivityHelperGeneric) GetMultipathDisk(path string) (string
 	err = &MultipleDeviceNotFoundError{path, devicePath}
 	logger.Errorf(err.Error())
 	return "", err
+}
+
+const (
+	FC_HOST_SYSFS_PATH = "/sys/class/fc_remote_ports/rport-*/port_name"
+	IscsiHostRexExPath = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
+)
+
+func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error) {
+	/*
+		Description:
+			This function find all the hosts IDs under directory /sys/class/fc_host/ or /sys/class/iscsi_host"
+			So the function goes over all the above hosts and return back only the host numbers as a list.
+	*/
+	//arrayIdentifier is wwn, value is 500507680b25c0aa
+	var targetFilePath string
+	var regexpValue string
+
+	//IQN format is iqn.yyyy-mm.naming-authority:unique name
+	//For example: iqn.1986-03.com.ibm:2145.v7k194.node2
+	iscsiMatchRex := `^iqn\.(\d{4}-\d{2})\.([^:]+)(:)([^,:\s']+)`
+	isIscsi, err := regexp.MatchString(iscsiMatchRex, arrayIdentifier)
+	if isIscsi {
+		targetFilePath = IscsiHostRexExPath
+		regexpValue = "host([0-9]+)"
+	} else {
+		targetFilePath = FC_HOST_SYSFS_PATH
+		regexpValue = "rport-([0-9]+)"
+	}
+
+	var HostIDs []int
+	matches, err := o.executer.FilepathGlob(targetFilePath)
+	if err != nil {
+		logger.Errorf("Error while Glob targetFilePath : {%v}. err : {%v}", targetFilePath, err)
+		return nil, err
+	}
+
+	logger.Debugf("targetname files matches were found : {%v}", matches)
+
+	re := regexp.MustCompile(regexpValue)
+	for _, targetPath := range matches {
+		logger.Debugf("Check if targetname path (%s) is relevant for storage target (%s).", targetPath, arrayIdentifier)
+		targetName, err := o.executer.IoutilReadFile(targetPath)
+		if err != nil {
+			logger.Warningf("Could not read target name from file : {%v}, error : {%v}", targetPath, err)
+			continue
+		}
+		identifierFromHost := strings.TrimSpace(string(targetName))
+		//For FC WWNs from the host, the value will like this: 0x500507680b26c0aa, but the arrayIdentifier doesn't has this prefix
+		if strings.HasPrefix(identifierFromHost, "0x") {
+			logger.Tracef("Remove the 0x prefix for: {%v}", identifierFromHost)
+			identifierFromHost = strings.TrimLeft(identifierFromHost, "0x")
+		}
+		if strings.EqualFold(identifierFromHost, arrayIdentifier) {
+			regexMatch := re.FindStringSubmatch(targetPath)
+			logger.Tracef("Found regex matches : {%v}", regexMatch)
+			hostNumber := -1
+
+			if len(regexMatch) < 2 {
+				logger.Warningf("Could not find host number for targetFilePath : {%v}", targetPath)
+				continue
+			} else {
+				hostNumber, err = strconv.Atoi(regexMatch[1])
+				if err != nil {
+					logger.Warningf("Host number in for target file was not valid : {%v}", regexMatch[1])
+					continue
+				}
+			}
+
+			HostIDs = append(HostIDs, hostNumber)
+			logger.Debugf("portState path (%s) was found. Adding host ID {%v} to the id list.", targetPath, hostNumber)
+		}
+	}
+
+	if len(HostIDs) == 0 {
+		return []int{}, &ConnectivityIdentifierStorageTargetNotFoundError{StorageTargetName: arrayIdentifier, DirectoryPath: targetFilePath}
+	}
+
+	return HostIDs, nil
+
 }

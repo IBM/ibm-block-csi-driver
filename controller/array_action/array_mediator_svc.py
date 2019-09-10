@@ -216,8 +216,7 @@ class SVCArrayMediator(ArrayMediator):
             self.client.svctask.rmvolume(vdisk_id=vol_name)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
-                logger.warning("Failed to delete volume {}, "
-                               "it's already deleted.".format(vol_name))
+                logger.warning("Failed to delete volume {}".format(vol_name))
                 if (OBJ_NOT_FOUND in ex.my_message
                         or VOL_NOT_FOUND in ex.my_message):
                     raise controller_errors.VolumeNotFoundError(vol_name)

@@ -289,7 +289,7 @@ func TestGetMpathDevice(t *testing.T) {
 	}{
 		{
 			name:             "Should fail when WaitForPathToExist not found any sd device",
-			arrayIdentifiers: []string{"0xx"},
+			arrayIdentifiers: []string{"x"},
 			waitForPathToExistReturns: []WaitForPathToExistReturn{
 				WaitForPathToExistReturn{
 					devicePaths: nil,
@@ -398,24 +398,24 @@ func TestGetMpathDevice(t *testing.T) {
 			arrayIdentifiers: []string{"X", "Y"},
 			waitForPathToExistReturns: []WaitForPathToExistReturn{
 				WaitForPathToExistReturn{
-					devicePaths: []string{"/dev/disk/by-path/pci-fc-X-lun1"},
+					devicePaths: []string{"/dev/disk/by-path/pci-fc-0xX-lun1"},
 					exists:      true,
 					err:         nil,
 				},
 				WaitForPathToExistReturn{
-					devicePaths: []string{"/dev/disk/by-path/pci-fc-Y-lun2"},
+					devicePaths: []string{"/dev/disk/by-path/pci-fc-0xY-lun2"},
 					exists:      true,
 					err:         nil,
 				},
 			},
 			getMultipathDiskReturns: []GetMultipathDiskReturn{
 				GetMultipathDiskReturn{
-					pathParam: "/dev/disk/by-path/pci-fc-X-lun1",
+					pathParam: "/dev/disk/by-path/pci-fc-0xX-lun1",
 					path:      "dm-1",
 					err:       nil,
 				},
 				GetMultipathDiskReturn{
-					pathParam: "/dev/disk/by-path/pci-fc-Y-lun2",
+					pathParam: "/dev/disk/by-path/pci-fc-0xY-lun2",
 					path:      "dm-1",
 					err:       nil,
 				},
@@ -427,7 +427,7 @@ func TestGetMpathDevice(t *testing.T) {
 
 		{
 			name:             "Should fail when WaitForPathToExist return error with the first array wwn, and found no sd device with the second array wwn",
-			arrayIdentifiers: []string{"0xx", "0xy"},
+			arrayIdentifiers: []string{"x", "y"},
 			waitForPathToExistReturns: []WaitForPathToExistReturn{
 				WaitForPathToExistReturn{
 					devicePaths: nil,
@@ -458,7 +458,8 @@ func TestGetMpathDevice(t *testing.T) {
 
 			var mcalls []*gomock.Call
 			for index, r := range tc.waitForPathToExistReturns {
-				path := strings.Join([]string{"/dev/disk/by-path/pci*", "fc", tc.arrayIdentifiers[index], "lun", strconv.Itoa(lunId)}, "-")
+				array_inititor := "0x" + strings.ToLower(string(tc.arrayIdentifiers[index]))
+				path := strings.Join([]string{"/dev/disk/by-path/pci*", "fc", array_inititor, "lun", strconv.Itoa(lunId)}, "-")
 				call := fake_helper.EXPECT().WaitForPathToExist(path, 5, 1).Return(
 					r.devicePaths,
 					r.exists,
@@ -683,6 +684,331 @@ func TestHelperGetMultipathDisk(t *testing.T) {
 					t.Fatalf("Expected found multipath device %s, got %s", tc.expPath, returnPath)
 				}
 			}
+		})
+	}
+}
+
+type ioutilReadFileReturn struct {
+	ReadFileParam string // The param that the IoutilReadDir recive on each call.
+	data          []byte
+	err           error
+}
+
+func TestGetHostsIdByArrayIdentifier(t *testing.T) {
+	testCasesIscsi := []struct {
+		name                  string
+		ioutilReadFileReturns []ioutilReadFileReturn
+		arrayIdentifier       string
+
+		expErrType        reflect.Type
+		expErr            error
+		expHostList       []int
+		globReturnMatches []string
+		globReturnErr     error
+	}{
+		{
+			name:              "Should fail when FilepathGlob return error",
+			arrayIdentifier:   "iqn.1986-03.com.ibm:2145.v7k194.node2",
+			globReturnMatches: nil,
+			globReturnErr:     fmt.Errorf("error"),
+			expErr:            fmt.Errorf("error"),
+			expHostList:       nil,
+		},
+		{
+			name:              "Should fail when FilepathGlob return without any hosts target files at all",
+			arrayIdentifier:   "iqn.1986-03.com.ibm:2145.v7k194.node2",
+			globReturnMatches: nil,
+			globReturnErr:     nil,
+
+			expErrType:  reflect.TypeOf(&device_connectivity.ConnectivityIdentifierStorageTargetNotFoundError{}),
+			expHostList: nil,
+		},
+		{
+			name: "Should fail when array IQN was not found in target files at all",
+			ioutilReadFileReturns: []ioutilReadFileReturn{
+				ioutilReadFileReturn{
+					ReadFileParam: "/sys/class/iscsi_host/host1/device/session1/iscsi_session/session1/targetname",
+					data:          []byte("fakeIQN_OTHER"),
+					err:           nil,
+				},
+				ioutilReadFileReturn{
+					ReadFileParam: "/sys/class/iscsi_host/host2/device/session2/iscsi_session/session2/targetname",
+					data:          []byte("fakeIQN_OTHER"),
+					err:           nil,
+				},
+			},
+			arrayIdentifier: "iqn.1986-03.com.ibm:2145.v7k194.node2",
+			globReturnMatches: []string{
+				"/sys/class/iscsi_host/host1/device/session1/iscsi_session/session1/targetname",
+				"/sys/class/iscsi_host/host2/device/session2/iscsi_session/session2/targetname",
+			},
+			globReturnErr: nil,
+
+			expErrType:  reflect.TypeOf(&device_connectivity.ConnectivityIdentifierStorageTargetNotFoundError{}),
+			expHostList: nil,
+		},
+		{
+			name: "Should fail when array IQN found but hostX where X is not int",
+			ioutilReadFileReturns: []ioutilReadFileReturn{
+				ioutilReadFileReturn{
+					ReadFileParam: "/sys/class/iscsi_host/hostX/device/session1/iscsi_session/session1/targetname",
+					data:          []byte("fakeIQN"),
+					err:           nil,
+				},
+			},
+			arrayIdentifier: "iqn.1986-03.com.ibm:2145.v7k194.node2",
+
+			globReturnMatches: []string{
+				"/sys/class/iscsi_host/hostX/device/session1/iscsi_session/session1/targetname",
+			},
+			globReturnErr: nil,
+
+			expErrType:  reflect.TypeOf(&device_connectivity.ConnectivityIdentifierStorageTargetNotFoundError{}),
+			expHostList: nil,
+		},
+
+		{
+			name: "Should succeed to find host1 and host2 for the array IQN (while host3 is not from this IQN and also host666 fail ignore)",
+			ioutilReadFileReturns: []ioutilReadFileReturn{
+				ioutilReadFileReturn{
+					ReadFileParam: "/sys/class/iscsi_host/host1/device/session1/iscsi_session/session1/targetname",
+					data:          []byte("iqn.1986-03.com.ibm:2145.v7k194.node2"),
+					err:           nil,
+				},
+				ioutilReadFileReturn{
+					ReadFileParam: "/sys/class/iscsi_host/host2/device/session1/iscsi_session/session1/targetname",
+					data:          []byte("iqn.1986-03.com.ibm:2145.v7k194.node2"),
+					err:           nil,
+				},
+				ioutilReadFileReturn{
+					ReadFileParam: "/sys/class/iscsi_host/host3/device/session1/iscsi_session/session1/targetname",
+					data:          []byte("fakeIQN_OTHER"),
+					err:           nil,
+				},
+				ioutilReadFileReturn{
+					ReadFileParam: "/sys/class/iscsi_host/host666/device/session1/iscsi_session/session1/targetname",
+					data:          nil,
+					err:           fmt.Errorf("error"),
+				},
+			},
+			arrayIdentifier: "iqn.1986-03.com.ibm:2145.v7k194.node2",
+
+			globReturnMatches: []string{
+				"/sys/class/iscsi_host/host1/device/session1/iscsi_session/session1/targetname",
+				"/sys/class/iscsi_host/host2/device/session1/iscsi_session/session1/targetname",
+				"/sys/class/iscsi_host/host3/device/session1/iscsi_session/session1/targetname",
+				"/sys/class/iscsi_host/host666/device/session1/iscsi_session/session1/targetname",
+			},
+			globReturnErr: nil,
+
+			expErrType:  nil,
+			expHostList: []int{1, 2},
+		},
+	}
+
+	for _, tc := range testCasesIscsi {
+
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
+
+			fake_executer.EXPECT().FilepathGlob(device_connectivity.IscsiHostRexExPath).Return(tc.globReturnMatches, tc.globReturnErr)
+
+			var mcalls []*gomock.Call
+			for _, r := range tc.ioutilReadFileReturns {
+				call := fake_executer.EXPECT().IoutilReadFile(r.ReadFileParam).Return(r.data, r.err)
+				mcalls = append(mcalls, call)
+			}
+			gomock.InOrder(mcalls...)
+
+			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fake_executer)
+
+			returnHostList, err := helperGeneric.GetHostsIdByArrayIdentifier(tc.arrayIdentifier)
+			if tc.expErr != nil || tc.expErrType != nil {
+				if err == nil {
+					t.Fatalf("Expected to fail with error, got success.")
+				}
+				if tc.expErrType != nil {
+					if reflect.TypeOf(err) != tc.expErrType {
+						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
+					}
+				} else {
+					if err.Error() != tc.expErr.Error() {
+						t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())
+					}
+				}
+			}
+
+			if len(tc.expHostList) == 0 && len(returnHostList) == 0 {
+				return
+			} else if !reflect.DeepEqual(returnHostList, tc.expHostList) {
+				t.Fatalf("Expected found hosts dirs %v, got %v", tc.expHostList, returnHostList)
+			}
+
+		})
+	}
+
+	testCasesFc := []struct {
+		name                  string
+		ioutilReadFileReturns []ioutilReadFileReturn
+		arrayIdentifier       string
+
+		expErrType        reflect.Type
+		expErr            error
+		expHostList       []int
+		globReturnMatches []string
+		globReturnErr     error
+	}{
+		{
+			name:              "Should fail when FilepathGlob return error",
+			arrayIdentifier:   "fakeWWN",
+			globReturnMatches: nil,
+			globReturnErr:     fmt.Errorf("error"),
+			expErr:            fmt.Errorf("error"),
+			expHostList:       nil,
+		},
+		{
+			name:              "Should fail when FilepathGlob return without any hosts target files at all",
+			arrayIdentifier:   "fakeWWN",
+			globReturnMatches: nil,
+			globReturnErr:     nil,
+
+			expErrType:  reflect.TypeOf(&device_connectivity.ConnectivityIdentifierStorageTargetNotFoundError{}),
+			expHostList: nil,
+		},
+		{
+			name: "Should fail when all values are not match",
+			ioutilReadFileReturns: []ioutilReadFileReturn{
+				ioutilReadFileReturn{
+					ReadFileParam: "/sys/class/fc_remote_ports/rport-3:0-0/port_name",
+					data:          []byte("fakeWWN_other"),
+					err:           nil,
+				},
+				ioutilReadFileReturn{
+					ReadFileParam: "/sys/class/fc_remote_ports/rport-4:0-0/port_name",
+					data:          []byte("fakeWWN_other"),
+					err:           nil,
+				},
+			},
+			arrayIdentifier: "fakeWWN",
+			globReturnMatches: []string{
+				"/sys/class/fc_remote_ports/rport-3:0-0/port_name",
+				"/sys/class/fc_remote_ports/rport-4:0-0/port_name",
+			},
+			globReturnErr: nil,
+
+			expErrType:  reflect.TypeOf(&device_connectivity.ConnectivityIdentifierStorageTargetNotFoundError{}),
+			expHostList: nil,
+		},
+
+		{
+			name: "Should succeed to find host33 and host34(host 35 offline, hott36 return error)",
+			ioutilReadFileReturns: []ioutilReadFileReturn{
+				ioutilReadFileReturn{
+					ReadFileParam: "/sys/class/fc_remote_ports/rport-33:0-0/port_name",
+					data:          []byte("fakeWWN"),
+					err:           nil,
+				},
+				ioutilReadFileReturn{
+					ReadFileParam: "/sys/class/fc_remote_ports/rport-34:0-0/port_name",
+					data:          []byte("0xfakeWWN"),
+					err:           nil,
+				},
+				ioutilReadFileReturn{
+					ReadFileParam: "/sys/class/fc_remote_ports/rport-35:0-0/port_name",
+					data:          []byte("fakeWWN_other"),
+					err:           nil,
+				},
+				ioutilReadFileReturn{
+					ReadFileParam: "/sys/class/fc_remote_ports/rport-36:0-0/port_name",
+					data:          nil,
+					err:           fmt.Errorf("error"),
+				},
+			},
+			arrayIdentifier: "fakeWWN",
+
+			globReturnMatches: []string{
+				"/sys/class/fc_remote_ports/rport-33:0-0/port_name",
+				"/sys/class/fc_remote_ports/rport-34:0-0/port_name",
+				"/sys/class/fc_remote_ports/rport-35:0-0/port_name",
+				"/sys/class/fc_remote_ports/rport-36:0-0/port_name",
+			},
+			globReturnErr: nil,
+
+			expErrType:  nil,
+			expHostList: []int{33, 34},
+		},
+
+		{
+			name: "Should succeed to find host5 and host6",
+			ioutilReadFileReturns: []ioutilReadFileReturn{
+				ioutilReadFileReturn{
+					ReadFileParam: "/sys/class/fc_remote_ports/rport-5:0-0/port_name",
+					data:          []byte("0xfakeWWN"),
+					err:           nil,
+				},
+				ioutilReadFileReturn{
+					ReadFileParam: "/sys/class/fc_remote_ports/rport-6:0-0/port_name",
+					data:          []byte("fakeWWN"),
+					err:           nil,
+				},
+			},
+			arrayIdentifier: "fakeWWN",
+
+			globReturnMatches: []string{
+				"/sys/class/fc_remote_ports/rport-5:0-0/port_name",
+				"/sys/class/fc_remote_ports/rport-6:0-0/port_name",
+			},
+			globReturnErr: nil,
+
+			expErrType:  nil,
+			expHostList: []int{5, 6},
+		},
+	}
+
+	for _, tc := range testCasesFc {
+
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
+
+			fake_executer.EXPECT().FilepathGlob(device_connectivity.FC_HOST_SYSFS_PATH).Return(tc.globReturnMatches, tc.globReturnErr)
+
+			var mcalls []*gomock.Call
+			for _, r := range tc.ioutilReadFileReturns {
+				call := fake_executer.EXPECT().IoutilReadFile(r.ReadFileParam).Return(r.data, r.err)
+				mcalls = append(mcalls, call)
+			}
+			gomock.InOrder(mcalls...)
+
+			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fake_executer)
+
+			returnHostList, err := helperGeneric.GetHostsIdByArrayIdentifier(tc.arrayIdentifier)
+			if tc.expErr != nil || tc.expErrType != nil {
+				if err == nil {
+					t.Fatalf("Expected to fail with error, got success.")
+				}
+				if tc.expErrType != nil {
+					if reflect.TypeOf(err) != tc.expErrType {
+						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
+					}
+				} else {
+					if err.Error() != tc.expErr.Error() {
+						t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())
+					}
+				}
+			}
+
+			if len(tc.expHostList) == 0 && len(returnHostList) == 0 {
+				return
+			} else if !reflect.DeepEqual(returnHostList, tc.expHostList) {
+				t.Fatalf("Expected found hosts dirs %v, got %v", tc.expHostList, returnHostList)
+			}
+
 		})
 	}
 }

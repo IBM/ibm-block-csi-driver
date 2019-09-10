@@ -17,44 +17,23 @@
 package device_connectivity
 
 import (
-	"path/filepath"
-	"regexp"
-	"strconv"
-	"strings"
-
-	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
 type OsDeviceConnectivityFc struct {
 	Executer          executer.ExecuterInterface
-	Helper            OsDeviceConnectivityHelperFcInterface
 	HelperScsiGeneric OsDeviceConnectivityHelperScsiGenericInterface
 }
 
 func NewOsDeviceConnectivityFc(executer executer.ExecuterInterface) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityFc{
 		Executer:          executer,
-		Helper:            NewOsDeviceConnectivityHelperFc(executer),
 		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer),
 	}
 }
 
 func (r OsDeviceConnectivityFc) RescanDevices(lunId int, arrayIdentifiers []string) error {
-	logger.Debugf("Rescan : Start rescan on specific lun, on lun : {%v}, with array wwn : {%v}", lunId, arrayIdentifiers)
-
-	if len(arrayIdentifiers) == 0 {
-		e := &ErrorNotFoundArrayIdentifiers{lunId}
-		logger.Errorf(e.Error())
-		return e
-	}
-
-	HostIDs, err := r.Helper.GetFcHostIDs()
-	if err != nil {
-		return err
-	}
-
-	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers, HostIDs)
+	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers)
 }
 
 func (r OsDeviceConnectivityFc) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string) (string, error) {
@@ -68,17 +47,6 @@ func (r OsDeviceConnectivityFc) GetMpathDevice(volumeId string, lunId int, array
 
 			   Return Value: "dm-X" of the volumeID by using the LunID and the array wwn.
 	*/
-
-	logger.Infof("FC: GetMpathDevice: Found multipath devices for volume : [%s] that relats to lunId=%d and arrayIdentifiers=%s", volumeId, lunId, arrayIdentifiers)
-
-	if len(arrayIdentifiers) == 0 {
-		e := &ErrorNotFoundArrayIdentifiers{lunId}
-		return "", e
-	}
-	for index, wwn := range arrayIdentifiers {
-		arrayIdentifiers[index] = "0x" + strings.ToLower(wwn)
-	}
-
 	return r.HelperScsiGeneric.GetMpathDevice(volumeId, lunId, arrayIdentifiers, "fc")
 }
 
@@ -88,82 +56,4 @@ func (r OsDeviceConnectivityFc) FlushMultipathDevice(mpathDevice string) error {
 
 func (r OsDeviceConnectivityFc) RemovePhysicalDevice(sysDevices []string) error {
 	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
-}
-
-// ============== OsDeviceConnectivityHelperFcInterface ==========================
-
-//go:generate mockgen -destination=../../../mocks/mock_OsDeviceConnectivityHelperFcInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity OsDeviceConnectivityHelperFcInterface
-
-type OsDeviceConnectivityHelperFcInterface interface {
-	/*
-		This is helper interface for OsDeviceConnectivityFc.
-		Mainly for writting clean unit testing, so we can Mock this interface in order to unit test OsDeviceConnectivityFc logic.
-	*/
-	GetFcHostIDs() ([]int, error)
-}
-
-type OsDeviceConnectivityHelperFc struct {
-	executer executer.ExecuterInterface
-}
-
-const (
-	FC_HOST_SYSFS_PATH = "/sys/class/fc_host"
-)
-
-func NewOsDeviceConnectivityHelperFc(executer executer.ExecuterInterface) OsDeviceConnectivityHelperFcInterface {
-	return &OsDeviceConnectivityHelperFc{executer: executer}
-}
-
-func (o OsDeviceConnectivityHelperFc) GetFcHostIDs() ([]int, error) {
-	/*
-		Description:
-			This function find all the hosts IDs under directory /sys/class/fc_host/"
-			So the function goes over all the above hosts and return back only the host numbers as a list.
-	*/
-
-	portStatePath := filepath.Join(FC_HOST_SYSFS_PATH, "/host*/port_state")
-	var HostIDs []int
-	matches, err := o.executer.FilepathGlob(portStatePath)
-	if err != nil {
-		logger.Errorf("Error while Glob portStatePath : {%v}. err : {%v}", portStatePath, err)
-		return nil, err
-	}
-
-	logger.Debugf("targetname files matches were found : {%v}", matches)
-
-	re := regexp.MustCompile("host([0-9]+)")
-	for _, targetPath := range matches {
-		logger.Debugf("Check if targetfile (%s) value is Online.", targetPath)
-		targetName, err := o.executer.IoutilReadFile(targetPath)
-		if err != nil {
-			logger.Warningf("Could not read target name from file : {%v}, error : {%v}", targetPath, err)
-			continue
-		}
-
-		if strings.EqualFold(strings.TrimSpace(string(targetName)), "online") {
-			regexMatch := re.FindStringSubmatch(targetPath)
-			logger.Tracef("Found regex matches : {%v}", regexMatch)
-			hostNumber := -1
-
-			if len(regexMatch) < 2 {
-				logger.Warningf("Could not find host number for portStatePath : {%v}", targetPath)
-				continue
-			} else {
-				hostNumber, err = strconv.Atoi(regexMatch[1])
-				if err != nil {
-					logger.Warningf("Host number in for target file was not valid : {%v}", regexMatch[1])
-					continue
-				}
-			}
-
-			HostIDs = append(HostIDs, hostNumber)
-			logger.Debugf("portState path (%s) was found. Adding host ID {%v} to the id list.", targetPath, hostNumber)
-		}
-	}
-
-	if len(HostIDs) == 0 {
-		return []int{}, &ConnectivityFcHostTargetNotFoundError{DirectoryPath: FC_HOST_SYSFS_PATH}
-	}
-	return HostIDs, nil
-
 }
