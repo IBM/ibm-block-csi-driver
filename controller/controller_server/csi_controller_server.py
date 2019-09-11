@@ -16,6 +16,7 @@ import controller.controller_server.utils as utils
 import controller.array_action.errors as controller_errors
 from controller.controller_server.errors import ValidationException
 import controller.controller_server.messages as messages
+from controller.common.utils import set_current_thread_name
 from controller.common.node_info import NodeIdInfo
 
 logger = None #is set in ControllerServicer::__init__
@@ -41,7 +42,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def CreateVolume(self, request, context):
         logger.info("create volume")
-
         try:
             utils.validate_create_volume_request(request)
         except ValidationException as ex:
@@ -128,6 +128,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return csi_pb2.CreateVolumeResponse()
 
     def DeleteVolume(self, request, context):
+        set_current_thread_name(request.volume_id)
         logger.info("DeleteVolume")
         secrets = request.secrets
 
@@ -176,6 +177,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         return res
 
     def ControllerPublishVolume(self, request, context):
+        set_current_thread_name(request.volume_id)
         logger.info("ControllerPublishVolume")
         try:
 
@@ -272,6 +274,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return csi_pb2.ControllerPublishVolumeResponse()
 
     def ControllerUnpublishVolume(self, request, context):
+        set_current_thread_name(request.volume_id)
         logger.info("ControllerUnpublishVolume")
         try:
             try:
