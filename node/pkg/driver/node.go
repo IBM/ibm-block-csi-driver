@@ -55,12 +55,16 @@ var (
 		"iscsi": true,
 		// TODO add fc \ nvme later on
 	}
+
+	IscsiFullPath = "/etc/iscsi/initiatorname.iscsi"
 )
 
 const (
 	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
 	// Command lines inside the container will show /host prefix.
 	PrefixChrootOfHostRoot = "/host"
+	FCPath = "/sys/class/fc_host"
+	FCPortPath = "/sys/class/fc_host/host*/port_name"
 )
 
 // nodeService represents the node service of CSI driver
@@ -488,14 +492,31 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	logger.Debugf(">>>> NodeGetInfo: called with args %+v", *req)
 	defer logger.Debugf("<<<< NodeGetInfo")
 
-	iscsiIQN, err := d.NodeUtils.ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi")
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+	var iscsiIQN string
+	var fcWWNs []string
+	var err error
+
+	fcExists := d.NodeUtils.Exists(FCPath)
+	if fcExists {
+		fcWWNs, err = d.NodeUtils.ParseFCPorts()
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
+
+	iscsiExists := d.NodeUtils.Exists(IscsiFullPath)
+	if iscsiExists {
+		iscsiIQN, _ = d.NodeUtils.ParseIscsiInitiators()
+	}
+
+	if fcWWNs == nil && iscsiIQN == "" {
+		err := fmt.Errorf("Cannot find valid fc wwns or iscsi iqn")
+		return nil,status.Error(codes.Internal, err.Error())
 	}
 
 	delimiter := ";"
-
-	nodeId := d.Hostname + delimiter + iscsiIQN
+	fcPorts := strings.Join(fcWWNs, ":")
+	nodeId := d.Hostname + delimiter + iscsiIQN + delimiter +fcPorts
 	logger.Debugf("node id is : %s", nodeId)
 
 	return &csi.NodeGetInfoResponse{

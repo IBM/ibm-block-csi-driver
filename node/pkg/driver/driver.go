@@ -61,7 +61,7 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 	return &Driver{
 		endpoint:    endpoint,
 		config:      configFile,
-		NodeService: NewNodeService(configFile, hostname, *NewNodeUtils(), osDeviceConnectivityMapping, executer, mounter, syncLock),
+		NodeService: NewNodeService(configFile, hostname, *NewNodeUtils(executer), osDeviceConnectivityMapping, executer, mounter, syncLock),
 	}, nil
 }
 
