@@ -271,6 +271,6 @@ class XIVArrayMediator(ArrayMediator):
         array_iqn = [a for a in config_get_list if a["name"] == "iscsi_name"][0]["value"]
         return [array_iqn]
 
-    def get_array_fc_wwns(self, host_name=None):
-        fc_wwns_objects = self.client.cmd.fc_connectivity_list(role='Target', port_state='Online')
-        return [port.wwpn for port in fc_wwns_objects]
+    def get_array_fc_wwns(self, host_name):
+        fc_wwns_objects = self.client.cmd.fc_port_list()
+        return [port.wwpn for port in fc_wwns_objects if port.port_state == 'Online' and port.role == 'Target']
