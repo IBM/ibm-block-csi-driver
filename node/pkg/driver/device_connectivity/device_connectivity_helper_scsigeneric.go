@@ -245,7 +245,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 		if f, err = os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200); err != nil {
 			if os.IsNotExist(err) {
 				logger.Warningf("Idempotency: Block device {%v} was not found on the system, so skip deleting it", deviceName)
-				break
+				continue
 			} else {
 				logger.Errorf("Error while opening file : {%v}. error: {%v}", filename, err.Error())
 				return err
