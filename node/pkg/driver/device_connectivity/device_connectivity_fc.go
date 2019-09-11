@@ -20,40 +20,40 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
-type OsDeviceConnectivityIscsi struct {
+type OsDeviceConnectivityFc struct {
 	Executer          executer.ExecuterInterface
 	HelperScsiGeneric OsDeviceConnectivityHelperScsiGenericInterface
 }
 
-func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface) OsDeviceConnectivityInterface {
-	return &OsDeviceConnectivityIscsi{
+func NewOsDeviceConnectivityFc(executer executer.ExecuterInterface) OsDeviceConnectivityInterface {
+	return &OsDeviceConnectivityFc{
 		Executer:          executer,
 		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer),
 	}
 }
 
-func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifiers []string) error {
+func (r OsDeviceConnectivityFc) RescanDevices(lunId int, arrayIdentifiers []string) error {
 	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers)
 }
 
-func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string) (string, error) {
+func (r OsDeviceConnectivityFc) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string) (string, error) {
 	/*
 			   Description:
-				   1. Find all the files "/dev/disk/by-path/ip-<ARRAY-IP>-iscsi-<IQN storage>-lun-<LUN-ID> -> ../../sd<X>
+				   1. Find all the files "/dev/disk/by-path/pci-*-fc-<WWN storage>-lun-<LUN-ID> -> ../../sd<X>
 		 	          Note: <ARRAY-IP> Instead of setting here the IP we just search for * on that.
 		 	       2. Get the sd<X> devices.
 		 	       3. Search '/sys/block/dm-*\/slaves/*' and get the <DM device name>. For example dm-3 below:
-		 	          /sys/block/dm-3/slaves/sdb -> ../../../../platform/host41/session9/target41:0:0/41:0:0:13/block/sdb
+		 	          /sys/block/dm-3/slaves/sdb -> ../../../../pci0000:00/0000:00:17.0/0000:13:00.0/host33/rport-33:0-3/target33:0:1/33:0:1:0/block/sdb
 
-			   Return Value: "dm-X" of the volumeID by using the LunID and the arrayIqn.
+			   Return Value: "dm-X" of the volumeID by using the LunID and the array wwn.
 	*/
-	return r.HelperScsiGeneric.GetMpathDevice(volumeId, lunId, arrayIdentifiers, "iscsi")
+	return r.HelperScsiGeneric.GetMpathDevice(volumeId, lunId, arrayIdentifiers, "fc")
 }
 
-func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(mpathDevice string) error {
+func (r OsDeviceConnectivityFc) FlushMultipathDevice(mpathDevice string) error {
 	return r.HelperScsiGeneric.FlushMultipathDevice(mpathDevice)
 }
 
-func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(sysDevices []string) error {
+func (r OsDeviceConnectivityFc) RemovePhysicalDevice(sysDevices []string) error {
 	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
 }

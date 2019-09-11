@@ -53,14 +53,19 @@ var (
 	stageInfoFilename          = ".stageInfo.json"
 	supportedConnectivityTypes = map[string]bool{
 		"iscsi": true,
-		// TODO add fc \ nvme later on
+		"fc":    true,
+		// TODO add nvme later on
 	}
+
+	IscsiFullPath = "/host/etc/iscsi/initiatorname.iscsi"
 )
 
 const (
 	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
 	// Command lines inside the container will show /host prefix.
 	PrefixChrootOfHostRoot = "/host"
+	FCPath = "/sys/class/fc_host"
+	FCPortPath = "/sys/class/fc_host/host*/port_name"
 )
 
 // nodeService represents the node service of CSI driver
@@ -113,7 +118,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volId, "NodeStageVolume")
 
-	connectivityType, lun, array_iqns, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
+	connectivityType, lun, arrayInitiators, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -125,12 +130,12 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
 	}
 
-	err = osDeviceConnectivity.RescanDevices(lun, array_iqns)
+	err = osDeviceConnectivity.RescanDevices(lun, arrayInitiators)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	device, err := osDeviceConnectivity.GetMpathDevice(volId, lun, array_iqns)
+	device, err := osDeviceConnectivity.GetMpathDevice(volId, lun, arrayInitiators)
 	logger.Debugf("Discovered device : {%v}", device)
 	if err != nil {
 		logger.Errorf("Error while discovring the device : {%v}", err.Error())
@@ -209,7 +214,7 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{"Volume Access Type Block is not supported yet"}
 	}
 
-	connectivityType, lun, array_iqns, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
+	connectivityType, lun, arrayInitiators, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
 	if err != nil {
 		return &RequestValidationError{fmt.Sprintf("Fail to parse PublishContext %v with err = %v", req.PublishContext, err)}
 	}
@@ -222,8 +227,8 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong lun id %d.", lun)}
 	}
 
-	if len(array_iqns) == 0 {
-		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong array_iqn %s.", array_iqns)}
+	if len(arrayInitiators) == 0 {
+		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong arrayInitiators %s.", arrayInitiators)}
 	}
 
 	return nil
@@ -488,14 +493,31 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	logger.Debugf(">>>> NodeGetInfo: called with args %+v", *req)
 	defer logger.Debugf("<<<< NodeGetInfo")
 
-	iscsiIQN, err := d.NodeUtils.ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi")
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+	var iscsiIQN string
+	var fcWWNs []string
+	var err error
+
+	fcExists := d.NodeUtils.Exists(FCPath)
+	if fcExists {
+		fcWWNs, err = d.NodeUtils.ParseFCPorts()
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
+
+	iscsiExists := d.NodeUtils.Exists(IscsiFullPath)
+	if iscsiExists {
+		iscsiIQN, _ = d.NodeUtils.ParseIscsiInitiators()
+	}
+
+	if fcWWNs == nil && iscsiIQN == "" {
+		err := fmt.Errorf("Cannot find valid fc wwns or iscsi iqn")
+		return nil,status.Error(codes.Internal, err.Error())
 	}
 
 	delimiter := ";"
-
-	nodeId := d.Hostname + delimiter + iscsiIQN
+	fcPorts := strings.Join(fcWWNs, ":")
+	nodeId := d.Hostname + delimiter + iscsiIQN + delimiter +fcPorts
 	logger.Debugf("node id is : %s", nodeId)
 
 	return &csi.NodeGetInfoResponse{

@@ -17,6 +17,7 @@ import controller.array_action.errors as controller_errors
 from controller.controller_server.errors import ValidationException
 import controller.controller_server.messages as messages
 from controller.common.utils import set_current_thread_name
+from controller.common.node_info import NodeIdInfo
 
 logger = None #is set in ControllerServicer::__init__
 
@@ -184,8 +185,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             array_type, vol_id = utils.get_volume_id_info(request.volume_id)
 
-            node_name, iscsi_iqn, fc_wwns_str = utils.get_node_id_info(request.node_id)
-            fc_wwns = fc_wwns_str.split(config.PARAMETERS_FC_WWN_DELIMITER)
+            node_id_info = NodeIdInfo(request.node_id)
+            node_name = node_id_info.node_name
+            initiators = node_id_info.initiators
 
             logger.debug("node name for this publish operation is : {0}".format(node_name))
 
@@ -193,7 +195,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
 
-                host_name, connectivity_types = array_mediator.get_host_by_host_identifiers(iscsi_iqn, fc_wwns)
+                host_name, connectivity_types = array_mediator.get_host_by_host_identifiers(initiators)
 
                 logger.debug("hostname : {}, connectiivity_types  : {}".format(host_name, connectivity_types))
 
@@ -285,15 +287,16 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             array_type, vol_id = utils.get_volume_id_info(request.volume_id)
 
-            node_name, iscsi_iqn, fc_wwns_str = utils.get_node_id_info(request.node_id)
-            fc_wwns = fc_wwns_str.split(config.PARAMETERS_FC_WWN_DELIMITER)
+            node_id_info = NodeIdInfo(request.node_id)
+            node_name = node_id_info.node_name
+            initiators = node_id_info.initiators
             logger.debug("node name for this unpublish operation is : {0}".format(node_name))
 
             user, password, array_addresses = utils.get_array_connection_info_from_secret(request.secrets)
 
             with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
 
-                host_name, _ = array_mediator.get_host_by_host_identifiers(iscsi_iqn, fc_wwns)
+                host_name, _ = array_mediator.get_host_by_host_identifiers(initiators)
                 try:
                     array_mediator.unmap_volume(vol_id, host_name)
 
