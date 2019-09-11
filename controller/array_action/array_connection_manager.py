@@ -38,10 +38,12 @@ def _socket_connect_test(ipaddr, port, timeout=1):
 
 class ArrayConnectionManager(object):
 
+
     def __init__(self, user, password, endpoint, array_type=None):  # TODO return the params back.
         self.array_mediator_class_dict = {
             XIVArrayMediator.array_type: XIVArrayMediator,
             SVCArrayMediator.array_type: SVCArrayMediator}
+
         self.array_type = array_type
         self.user = user
         self.password = password
@@ -108,8 +110,10 @@ class ArrayConnectionManager(object):
 
     def detect_array_type(self):
         logger.debug("detecting array connection type")
+
         for storage_type, port in [(XIVArrayMediator.array_type, XIVArrayMediator.port),
                                    (SVCArrayMediator.array_type, SVCArrayMediator.port)]:  # ds8k : 8452
+
             for endpoint in self.endpoints:
                 if _socket_connect_test(endpoint, port) == 0:
                     logger.debug("storage array type is : {0}".format(storage_type))

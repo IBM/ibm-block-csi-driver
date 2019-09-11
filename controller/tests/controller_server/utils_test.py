@@ -4,7 +4,7 @@ from controller.csi_general import csi_pb2
 from controller.controller_server.csi_controller_server import ControllerServicer
 import controller.controller_server.utils as utils
 from controller.controller_server.errors import ValidationException
-from controller.array_action.errors import VolumeNotFoundError
+from controller.array_action.errors import VolumeNotFoundError, HostNotFoundError
 
 
 class TestUtils(unittest.TestCase):
@@ -221,29 +221,57 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(vol, "vol")
 
     def test_get_node_id_info(self):
-        with self.assertRaises(VolumeNotFoundError) as ex:
-            utils.get_volume_id_info("badvolumeformat")
-            self.assertTrue("volume" in ex.message)
+        with self.assertRaises(HostNotFoundError) as ex:
+            utils.get_node_id_info("badnodeformat")
+            self.assertTrue("node" in ex.message)
 
-        arr_type, vol = utils.get_volume_id_info("xiv:vol")
-        self.assertEqual(arr_type, "xiv")
-        self.assertEqual(vol, "vol")
+        hostname, iscsi_iqn, fc_wwns = utils.get_node_id_info("hostabc;iqn.ibm;")
+        self.assertEqual(hostname, "hostabc")
+        self.assertEqual(iscsi_iqn, "iqn.ibm")
+        self.assertEqual(fc_wwns, "")
+
+        hostname, iscsi_iqn, fc_wwns = utils.get_node_id_info("hostabc;iqn.ibm;wwn1:wwn2")
+        self.assertEqual(hostname, "hostabc")
+        self.assertEqual(iscsi_iqn, "iqn.ibm")
+        self.assertEqual(fc_wwns, "wwn1:wwn2")
+
+        hostname, iscsi_iqn, fc_wwns = utils.get_node_id_info("hostabc;;wwn1:wwn2")
+        self.assertEqual(hostname, "hostabc")
+        self.assertEqual(iscsi_iqn, "")
+        self.assertEqual(fc_wwns, "wwn1:wwn2")
 
     def test_choose_connectivity_types(self):
-        res = utils.choose_connectivity_type([])
+        res = utils.choose_connectivity_type(["iscsi"])
         self.assertEqual(res, "iscsi")
 
-        res = utils.choose_connectivity_type(["something"])
-        self.assertEqual(res, "something")
+        res = utils.choose_connectivity_type(["fc"])
+        self.assertEqual(res, "fc")
 
-        res = utils.choose_connectivity_type(["something", "something else"])
-        self.assertEqual(res, "iscsi")
+        res = utils.choose_connectivity_type(["iscsi", "fc"])
+        self.assertEqual(res, "fc")
 
     def test_generate_publish_volume_response(self):
-        config = {"controller": {"publish_context_lun_parameter": "lun",
-                                 "publish_context_connectivity_parameter": "connectivity_type",
-                                 "publish_context_array_iqn": "array_iqn"}
+        config_a = {"controller": {"publish_context_lun_parameter": "lun",
+                                   "publish_context_connectivity_parameter":
+                                       "connectivity_type",
+                                   "publish_context_array_iqn": "array_iqn",
+                                   "publish_context_fc_initiators": "fc_wwns"}
                   }
-        res = utils.generate_csi_publish_volume_response(0, "iscsi", config, ["1"])
+        res = utils.generate_csi_publish_volume_response(0, "iscsi", config_a,
+                                                         ["1"])
         self.assertEqual(res.publish_context["lun"], '0')
         self.assertEqual(res.publish_context["connectivity_type"], "iscsi")
+        self.assertEqual(res.publish_context["array_iqn"], '1')
+
+        config_b = {"controller": {"publish_context_lun_parameter": "lun",
+                                   "publish_context_connectivity_parameter": "connectivity_type",
+                                   "publish_context_array_iqn": "array_iqn",
+                                   "publish_context_fc_initiators": "fc_wwns"}
+                    }
+        res = utils.generate_csi_publish_volume_response(1, "fc", config_b,
+                                                         ["wwn1", "wwn2"])
+        self.assertEqual(res.publish_context["lun"], '1')
+        self.assertEqual(res.publish_context["connectivity_type"], "fc")
+        self.assertEqual(res.publish_context["fc_wwns"], "wwn1,wwn2")
+
+

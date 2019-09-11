@@ -6,7 +6,7 @@ kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
   name: gold
-provisioner: ibm-block-csi-driver
+provisioner: block.csi.ibm.com
 parameters:
   pool: gold
 

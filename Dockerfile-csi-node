@@ -30,14 +30,14 @@ RUN make ibm-block-csi-driver
 FROM registry.access.redhat.com/ubi8/ubi-minimal:8.0
 MAINTAINER IBM Storage
 
-LABEL name="IBM Block CSI Driver Node" \
+LABEL name="IBM block storage CSI driver node" \
       vendor="IBM" \
       version="1.0.0" \
       release="b1" \
-      summary="The node component of the IBM Block CSI Driver" \
-      description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and Openshift, to manage the life-cycle of persistent storage." \
-      io.k8s.display-name="IBM Block CSI Driver Node" \
-      io.k8s.description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and Openshift, to manage the life-cycle of persistent storage." \
+      summary="The node component of the IBM block storage CSI driver" \
+      description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage." \
+      io.k8s.display-name="IBM block storage CSI driver node" \
+      io.k8s.description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage." \
       io.openshift.tags=ibm,csi,ibm-block-csi-driver,ibm-block-csi-node
 
 WORKDIR /root
