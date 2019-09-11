@@ -56,7 +56,7 @@ var (
 		// TODO add fc \ nvme later on
 	}
 
-	IscsiFullPath = "/etc/iscsi/initiatorname.iscsi"
+	IscsiFullPath = "/host/etc/iscsi/initiatorname.iscsi"
 )
 
 const (
