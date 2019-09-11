@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"path/filepath"
 	"os"
 	"path"
 	"strconv"
@@ -75,7 +76,8 @@ func (n NodeUtils) ParseIscsiInitiators(path string) (string, error) {
 }
 
 func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, []string, error) {
-	// this will return :  connectivityType, lun, array_iqn, error
+	// this will return :  connectivityType, lun, arrayInitiators, error
+	var arrayInitiators []string
 	str_lun := publishContext[configYaml.Controller.Publish_context_lun_parameter]
 
 	lun, err := strconv.Atoi(str_lun)
@@ -84,27 +86,39 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, c
 	}
 
 	connectivityType := publishContext[configYaml.Controller.Publish_context_connectivity_parameter]
-	array_iqns := strings.Split(publishContext[configYaml.Controller.Publish_context_array_iqn], ",")
+	if connectivityType == "iscsi" {
+		arrayInitiators = strings.Split(publishContext[configYaml.Controller.Publish_context_array_iqn], ",")
+	}
+	if connectivityType == "fc" {
+		arrayInitiators = strings.Split(publishContext[configYaml.Controller.Publish_context_fc_initiators], ",")
+	}
 
-	logger.Debugf("PublishContext relevant info : connectivityType=%v, lun=%v, array_iqn=%v", connectivityType, lun, array_iqns)
-	return connectivityType, lun, array_iqns, nil
+	logger.Debugf("PublishContext relevant info : connectivityType=%v, lun=%v, arrayInitiators=%v", connectivityType, lun, arrayInitiators)
+	return connectivityType, lun, arrayInitiators, nil
 }
 
-func (n NodeUtils) WriteStageInfoToFile(filePath string, info map[string]string) error {
+func (n NodeUtils) WriteStageInfoToFile(fPath string, info map[string]string) error {
 	// writes to stageTargetPath/filename
 
-	filePath = PrefixChrootOfHostRoot + filePath
-	logger.Debugf("WriteStageInfo file : path {%v}, info {%v}", filePath, info)
+	fPath = PrefixChrootOfHostRoot + fPath
+	stagePath := filepath.Dir(fPath)
+	if _, err := os.Stat(stagePath); os.IsNotExist(err) {
+        logger.Debugf("The filePath [%s] is not existed. Create it.", stagePath)
+        if err = os.MkdirAll(stagePath, os.FileMode(0755)); err != nil {
+            logger.Debugf("The filePath [%s] create fail. Error: [%v]", stagePath, err)
+        }
+    }
+	logger.Debugf("WriteStageInfo file : path {%v}, info {%v}", fPath, info)
 	stageInfo, err := json.Marshal(info)
 	if err != nil {
-		logger.Errorf("Error marshalling info file %s to json : {%v}", filePath, err.Error())
+		logger.Errorf("Error marshalling info file %s to json : {%v}", fPath, err.Error())
 		return err
 	}
 
-	err = ioutil.WriteFile(filePath, stageInfo, 0600)
+	err = ioutil.WriteFile(fPath, stageInfo, 0600)
 
 	if err != nil {
-		logger.Errorf("Error while writing to file %s: {%v}", filePath, err.Error())
+		logger.Errorf("Error while writing to file %s: {%v}", fPath, err.Error())
 		return err
 	}
 
