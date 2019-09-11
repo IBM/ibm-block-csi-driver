@@ -8,7 +8,7 @@ import controller.array_action.errors as array_errors
 from pysvc.unified.response import CLIFailureError
 from pysvc import errors as svc_errors
 import controller.array_action.config as config
-
+from controller.common.node_info import Initiators
 
 class TestArrayMediatorSVC(unittest.TestCase):
 
@@ -237,7 +237,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret2]
         with self.assertRaises(array_errors.HostNotFoundError):
-            self.svc.get_host_by_host_identifiers('Test_iqn', ['Test_wwn'])
+            self.svc.get_host_by_host_identifiers(Initiators('Test_iqn', ['Test_wwn']))
 
     def test_get_host_by_identifier_return_host_not_found_when_no_hosts_exist(
             self):
@@ -249,7 +249,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret2]
         with self.assertRaises(array_errors.HostNotFoundError):
-            self.svc.get_host_by_host_identifiers('Test_iqn', ['Test_wwn'])
+            self.svc.get_host_by_host_identifiers(Initiators('Test_iqn', ['Test_wwn']))
 
     def test_get_host_by_identifiers_raise_multiplehostsfounderror(self):
         host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
@@ -263,7 +263,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         ret3 = Munch(as_single_element=host_munch_ret_3)
         self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
         with self.assertRaises(array_errors.MultipleHostsFoundError):
-            self.svc.get_host_by_host_identifiers('iqn.test.3', ['Test_wwn'])
+            self.svc.get_host_by_host_identifiers(Initiators('iqn.test.3', ['Test_wwn']))
 
     def test_get_host_by_identifiers_return_iscsi_host(self):
         host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
@@ -278,8 +278,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         ret2 = Munch(as_single_element=host_munch_ret_2)
         ret3 = Munch(as_single_element=host_munch_ret_3)
         self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
-        host, connectivity_type = self.svc.get_host_by_host_identifiers(
-            'iqn.test.2', ['abcd3'])
+        host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
+            'iqn.test.2', ['abcd3']))
         self.assertEqual('test_host_3', host)
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_type)
 
@@ -288,7 +288,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                   'WWPN': ['abc1']})
         host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_3',
                                   'iscsi_name': 'iqn.test.2',
-                                  'WWPN': ['abc3']})
+                                  'WWPN': 'abc3'})
         host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
                                   'WWPN': ['abc1', 'abc3'],
                                   'iscsi_name': 'iqn.test.3'})
@@ -296,8 +296,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
         ret2 = Munch(as_single_element=host_munch_ret_2)
         ret3 = Munch(as_single_element=host_munch_ret_3)
         self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
-        host, connectivity_type = self.svc.get_host_by_host_identifiers(
-            'iqn.test.6', ['abc3', 'ABC1'])
+        host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
+            'iqn.test.6', ['abc3', 'ABC1']))
+        self.assertEqual('test_host_3', host)
+        self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_type)
+
+        self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
+        host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
+            'iqn.test.6', ['abc3']))
         self.assertEqual('test_host_3', host)
         self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_type)
 
@@ -315,10 +321,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
         ret3 = Munch(as_single_element=host_munch_ret_3)
         self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
         with self.assertRaises(array_errors.HostNotFoundError):
-            self.svc.get_host_by_host_identifiers('', '')
+            self.svc.get_host_by_host_identifiers(Initiators('', []))
         self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
         with self.assertRaises(array_errors.HostNotFoundError):
-            self.svc.get_host_by_host_identifiers('123', ['a', 'b'])
+            self.svc.get_host_by_host_identifiers(Initiators('123', ['a', 'b']))
 
     def test_get_host_by_identifiers_return_iscsi_and_fc_all_support(self):
         host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
@@ -333,8 +339,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         ret2 = Munch(as_single_element=host_munch_ret_2)
         ret3 = Munch(as_single_element=host_munch_ret_3)
         self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
-        host, connectivity_type = self.svc.get_host_by_host_identifiers(
-            'iqn.test.2', ['ABC3'])
+        host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
+            'iqn.test.2', ['ABC3']))
         self.assertEqual('test_host_3', host)
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE,
                           config.FC_CONNECTIVITY_TYPE], connectivity_type)
@@ -528,22 +534,24 @@ class TestArrayMediatorSVC(unittest.TestCase):
                           "iqn.1986-03.com.ibm:2145.v7k1.node2"])
 
     def test_get_array_fc_wwns_failed(self):
-        self.svc.client.svcinfo.lstargetportfc.side_effect = [
+        self.svc.client.svcinfo.lsfabric.side_effect = [
             svc_errors.CommandExecutionError('Failed')]
         with self.assertRaises(svc_errors.CommandExecutionError):
-            self.svc.get_array_fc_wwns()
+            self.svc.get_array_fc_wwns('host')
 
     def test_get_array_fc_wwns_success(self):
-        port_1 = Munch({'id': '51', 'WWPN': '500507680B26C0AA',
-                        'WWNN': '500507680B00C0AA', 'port_id': '2',
-                        'owning_node_id': '2', 'current_node_id': '2',
-                        'nportid': '000000', 'host_io_permitted': 'yes',
-                        'virtualized': 'yes', 'protocol': 'scsi'})
-        port_2 = Munch({'id': '52', 'WWPN': '500507680B28C0AA',
-                        'WWNN': '500507680B00C1AA', 'port_id': '2',
-                        'owning_node_id': '2', 'current_node_id': '2',
-                        'nportid': '000000', 'host_io_permitted': 'yes',
-                        'virtualized': 'yes', 'protocol': 'scsi'})
-        self.svc.client.svcinfo.lstargetportfc.return_value = [port_1, port_2]
-        wwns = self.svc.get_array_fc_wwns()
-        self.assertEqual(wwns, ['500507680B26C0AA', '500507680B28C0AA'])
+        port_1 = Munch({'remote_wwpn': '21000024FF3A42E5',
+                        'remote_nportid': '012F00', 'id': '1',
+                        'node_name': 'node1', 'local_wwpn': '5005076810282CD8',
+                        'local_port': '8', 'local_nportid': '010601',
+                        'state': 'active', 'name': 'csi_host',
+                        'cluster_name': '', 'type': 'host'})
+        port_2 = Munch({'remote_wwpn': '21000024FF3A42E6',
+                        'remote_nportid': '012F10', 'id': '2',
+                        'node_name': 'node2', 'local_wwpn': '5005076810262CD8',
+                        'local_port': '9', 'local_nportid': '010611',
+                        'state': 'inactive', 'name': 'csi_host',
+                        'cluster_name': '', 'type': 'host'})
+        self.svc.client.svcinfo.lsfabric.return_value = [port_1, port_2]
+        wwns = self.svc.get_array_fc_wwns('host')
+        self.assertEqual(wwns, ['5005076810282CD8', '5005076810262CD8'])

@@ -5,6 +5,8 @@ from mock import patch, Mock
 import controller.array_action.errors as array_errors
 from controller.tests.array_action.xiv import utils
 from controller.array_action.config import ISCSI_CONNECTIVITY_TYPE
+from controller.array_action.config import FC_CONNECTIVITY_TYPE
+from controller.common.node_info import Initiators
 
 
 class TestArrayMediatorXIV(unittest.TestCase):
@@ -115,15 +117,15 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_get_host_by_identifiers_returns_host_not_found(self):
         iqn = "iqn"
         wwns = ['wwn1', 'wwn2']
-        host1 = utils.get_mock_xiv_host("host1", "iqn1")
-        host2 = utils.get_mock_xiv_host("host2", "iqn1")
-        host3 = utils.get_mock_xiv_host("host3", "iqn2")
+        host1 = utils.get_mock_xiv_host("host1", "iqn1", "")
+        host2 = utils.get_mock_xiv_host("host2", "iqn1", "")
+        host3 = utils.get_mock_xiv_host("host3", "iqn2", "")
         ret = Mock()
         ret.as_list = [host1, host2, host3]
 
         self.mediator.client.cmd.host_list.return_value = ret
         with self.assertRaises(array_errors.HostNotFoundError):
-            self.mediator.get_host_by_host_identifiers(iqn, wwns)
+            self.mediator.get_host_by_host_identifiers(Initiators(iqn, wwns))
 
     def test_get_host_by_identifiers_returns_host_not_found_when_no_hosts_exist(self):
         iqn = "iqn"
@@ -132,24 +134,58 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
         self.mediator.client.cmd.host_list.return_value = ret
         with self.assertRaises(array_errors.HostNotFoundError):
-            self.mediator.get_host_by_host_identifiers(iqn)
+            self.mediator.get_host_by_host_identifiers(Initiators(iqn,[]))
 
-    def test_get_host_by_identifiers_succeeds(self):
+    def test_get_host_by_iscsi_identifiers_succeeds(self):
         iqn = "iqn1"
         wwns = []
-        right_host = "host2"
+        right_host = "host1"
 
-        host1 = utils.get_mock_xiv_host(right_host, "iqn1")
-        host2 = utils.get_mock_xiv_host("host2", "iqn2")
-        host3 = utils.get_mock_xiv_host("host3", "iqn2")
-        host4 = utils.get_mock_xiv_host("host4", "iqn3")
+        host1 = utils.get_mock_xiv_host(right_host, "iqn1,iqn4", "")
+        host2 = utils.get_mock_xiv_host("host2", "iqn2", "")
+        host3 = utils.get_mock_xiv_host("host3", "iqn2", "")
+        host4 = utils.get_mock_xiv_host("host4", "iqn3", "")
         ret = Mock()
         ret.as_list = [host1, host2, host3, host4]
 
         self.mediator.client.cmd.host_list.return_value = ret
-        host, connectivity_type = self.mediator.get_host_by_host_identifiers(iqn, wwns)
+        host, connectivity_type = self.mediator.get_host_by_host_identifiers(Initiators(iqn, wwns))
         self.assertEqual(host, right_host)
         self.assertEqual(connectivity_type, [ISCSI_CONNECTIVITY_TYPE])
+
+    def test_get_host_by_fc_identifiers_succeeds(self):
+        iqn = "iqn5"
+        wwns = ["wwn2", "wwn5"]
+        right_host = "host2"
+
+        host1 = utils.get_mock_xiv_host("host1", "iqn1", "wwn1")
+        host2 = utils.get_mock_xiv_host(right_host, "iqn2", "wwn2")
+        host3 = utils.get_mock_xiv_host("host3", "iqn2", "wwn3")
+        host4 = utils.get_mock_xiv_host("host4", "iqn3", "wwn4")
+        ret = Mock()
+        ret.as_list = [host1, host2, host3, host4]
+
+        self.mediator.client.cmd.host_list.return_value = ret
+        host, connectivity_type = self.mediator.get_host_by_host_identifiers(Initiators(iqn, wwns))
+        self.assertEqual(host, right_host)
+        self.assertEqual(connectivity_type, [FC_CONNECTIVITY_TYPE])
+
+    def test_get_host_by_iscsi_and_fc_identifiers_succeeds(self):
+        iqn = "iqn2"
+        wwns = ["wwn2", "wwn5"]
+        right_host = "host2"
+
+        host1 = utils.get_mock_xiv_host("host1", "iqn1", "wwn1")
+        host2 = utils.get_mock_xiv_host(right_host, "iqn2", "wwn2")
+        host3 = utils.get_mock_xiv_host("host3", "iqn3", "wwn3")
+        host4 = utils.get_mock_xiv_host("host4", "iqn4", "wwn4")
+        ret = Mock()
+        ret.as_list = [host1, host2, host3, host4]
+
+        self.mediator.client.cmd.host_list.return_value = ret
+        host, connectivity_type = self.mediator.get_host_by_host_identifiers(Initiators(iqn, wwns))
+        self.assertEqual(host, right_host)
+        self.assertEqual(connectivity_type, [FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE])
 
     def test_get_volume_mappings_empty_mapping_list(self):
         # host3 = utils.get_mock_xiv_mapping(2, "host1")

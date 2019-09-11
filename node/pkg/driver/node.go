@@ -25,6 +25,7 @@ import (
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/ibm/ibm-block-csi-driver/node/goid_info"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
@@ -55,12 +56,16 @@ var (
 		"fc":    true,
 		// TODO add nvme later on
 	}
+
+	IscsiFullPath = "/host/etc/iscsi/initiatorname.iscsi"
 )
 
 const (
 	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
 	// Command lines inside the container will show /host prefix.
 	PrefixChrootOfHostRoot = "/host"
+	FCPath = "/sys/class/fc_host"
+	FCPortPath = "/sys/class/fc_host/host*/port_name"
 )
 
 // nodeService represents the node service of CSI driver
@@ -89,8 +94,10 @@ func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsI
 }
 
 func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	logger.Debugf(">>>> NodeStageVolume [goid=%d]: called with args %+v", util.GetGoID(), *req)
-	defer logger.Debugf("<<<< NodeStageVolume [goid=%d]", util.GetGoID())
+	goid_info.SetAdditionalIDInfo(req.VolumeId)
+	defer goid_info.DeleteAdditionalIDInfo()
+	logger.Debugf(">>>> NodeStageVolume: called with args %+v", *req)
+	defer logger.Debugf("<<<< NodeStageVolume")
 
 	err := d.nodeStageVolumeRequestValidation(req)
 	if err != nil {
@@ -228,10 +235,12 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 }
 
 func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	logger.Debugf(">>>> NodeUnstageVolume [goid=%d]: called with args %+v", util.GetGoID(), *req)
-	defer logger.Debugf("<<<< NodeUnstageVolume [goid=%d]", util.GetGoID())
-
 	volumeID := req.GetVolumeId()
+	goid_info.SetAdditionalIDInfo(volumeID)
+	defer goid_info.DeleteAdditionalIDInfo()
+	logger.Debugf(">>>> NodeUnstageVolume: called with args %+v", *req)
+	defer logger.Debugf("<<<< NodeUnstageVolume")
+
 	if len(volumeID) == 0 {
 		logger.Errorf("Volume ID not provided")
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
@@ -294,8 +303,10 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 }
 
 func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	logger.Debugf(">>>> NodePublishVolume [goid=%d]: called with args %+v", util.GetGoID(), *req)
-	defer logger.Debugf("<<<< NodePublishVolume [goid=%d]", util.GetGoID())
+	goid_info.SetAdditionalIDInfo(req.VolumeId)
+	defer goid_info.DeleteAdditionalIDInfo()
+	logger.Debugf(">>>> NodePublishVolume: called with args %+v", *req)
+	defer logger.Debugf("<<<< NodePublishVolume")
 
 	err := d.nodePublishVolumeRequestValidation(req)
 	if err != nil {
@@ -412,10 +423,12 @@ func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVol
 }
 
 func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	logger.Debugf(">>>> NodeUnpublishVolume [goid=%d]: called with args %+v", util.GetGoID(), *req)
-	defer logger.Debugf("<<<< NodeUnpublishVolume [goid=%d]", util.GetGoID())
-
 	volumeID := req.GetVolumeId()
+	goid_info.SetAdditionalIDInfo(volumeID)
+	defer goid_info.DeleteAdditionalIDInfo()
+	logger.Debugf(">>>> NodeUnpublishVolume: called with args %+v", *req)
+	defer logger.Debugf("<<<< NodeUnpublishVolume")
+
 	if len(volumeID) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
 	}
@@ -447,16 +460,20 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 }
 
 func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+	goid_info.SetAdditionalIDInfo(req.VolumeId)
+	defer goid_info.DeleteAdditionalIDInfo()
 	return nil, status.Error(codes.Unimplemented, "NodeGetVolumeStats is not implemented yet")
 }
 
 func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
+	goid_info.SetAdditionalIDInfo(req.VolumeId)
+	defer goid_info.DeleteAdditionalIDInfo()
 	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("NodeExpandVolume is not yet implemented"))
 }
 
 func (d *NodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	logger.Debugf(">>>> NodeGetCapabilities [goid=%d]: called with args %+v", util.GetGoID(), *req)
-	defer logger.Debugf("<<<< NodeGetCapabilities [goid=%d]", util.GetGoID())
+	logger.Debugf(">>>> NodeGetCapabilities: called with args %+v", *req)
+	defer logger.Debugf("<<<< NodeGetCapabilities")
 
 	var caps []*csi.NodeServiceCapability
 	for _, cap := range nodeCaps {
@@ -476,14 +493,31 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	logger.Debugf(">>>> NodeGetInfo: called with args %+v", *req)
 	defer logger.Debugf("<<<< NodeGetInfo")
 
-	iscsiIQN, err := d.NodeUtils.ParseIscsiInitiators("/etc/iscsi/initiatorname.iscsi")
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+	var iscsiIQN string
+	var fcWWNs []string
+	var err error
+
+	fcExists := d.NodeUtils.Exists(FCPath)
+	if fcExists {
+		fcWWNs, err = d.NodeUtils.ParseFCPorts()
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
+
+	iscsiExists := d.NodeUtils.Exists(IscsiFullPath)
+	if iscsiExists {
+		iscsiIQN, _ = d.NodeUtils.ParseIscsiInitiators()
+	}
+
+	if fcWWNs == nil && iscsiIQN == "" {
+		err := fmt.Errorf("Cannot find valid fc wwns or iscsi iqn")
+		return nil,status.Error(codes.Internal, err.Error())
 	}
 
 	delimiter := ";"
-
-	nodeId := d.Hostname + delimiter + iscsiIQN
+	fcPorts := strings.Join(fcWWNs, ":")
+	nodeId := d.Hostname + delimiter + iscsiIQN + delimiter +fcPorts
 	logger.Debugf("node id is : %s", nodeId)
 
 	return &csi.NodeGetInfoResponse{

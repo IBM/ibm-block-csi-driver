@@ -1,9 +1,9 @@
 # IBM block storage CSI driver 
 
-The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and Openshift, to manage the life-cycle of persistent storage.
+The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage.
 
 Supported container platforms:
-  - Openshift v4.1
+  - OpenShift v4.1
   - Kubernetes v1.13
 
 Supported IBM storage systems:
@@ -22,7 +22,7 @@ DISCLAIMER: The driver is provided as is, without warranty. Any issue will be ha
 * [Prerequisites for Driver Installation](#prerequisites-for-driver-installation)
     - Install Fibre Channel and iSCSI connectivity rpms, multipath configurations, and configure storage system connectivity.
 * [Installing the Driver](#installing-the-driver)
-* [Configuring k8s secret and storage class](#configuring-k8s-secret-and-storage class)
+* [Configuring k8s secret and storage class](#configuring-k8s-secret-and-storage-class)
     - Configure the k8s storage class - to define the storage system pool name, secret reference, SpaceEfficiency (Thin, Compressed or Deduplicated) and fstype(xfs\ext4)
     - Storage system secret - to define the storage credential(user and password) and its address
 * [Driver Usage](#driver-usage)
@@ -146,6 +146,21 @@ daemonset.apps/ibm-block-csi-node created
 Verify the driver is running. (Make sure the csi-controller pod status is Running):
 
 ```sh
+
+$> kubectl get all -n kube-system  -l csi
+NAME                             READY   STATUS    RESTARTS   AGE
+pod/ibm-block-csi-controller-0   5/5     Running   0          9m36s
+pod/ibm-block-csi-node-jvmvh     3/3     Running   0          9m36s
+pod/ibm-block-csi-node-tsppw     3/3     Running   0          9m36s
+
+NAME                                DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
+daemonset.apps/ibm-block-csi-node   2         2         2       2            2           <none>          9m36s
+
+NAME                                        READY   AGE
+statefulset.apps/ibm-block-csi-controller   1/1     9m36s
+
+###### The following labels can also be used: app=ibm-block-csi-node, app=ibm-block-csi-controller, csi=ibm or product=ibm-block-csi-driver.
+
 $> kubectl get -n kube-system pod --selector=app=ibm-block-csi-controller
 NAME                         READY   STATUS    RESTARTS   AGE
 ibm-block-csi-controller-0   5/5     Running   0          10m
@@ -250,7 +265,7 @@ kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
   name: gold
-provisioner: ibm-block-csi-driver
+provisioner: block.csi.ibm.com
 parameters:
   SpaceEfficiency: <VALUE>   # Values applicable for Storewize are: Thin, Compressed, or Deduplicated
   pool: <VALUE_POOL_NAME>
@@ -312,7 +327,7 @@ kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
   name: gold
-provisioner: ibm-block-csi-driver
+provisioner: block.csi.ibm.com
 parameters:
   pool: gold
 

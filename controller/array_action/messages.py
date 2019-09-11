@@ -18,7 +18,7 @@ FailedToFindStorageSystemType_message = "Could not identify the type for endpoin
 
 PermissionDeniedError_message = "Permission was denied to operation : {0}"
 
-MultipleHostsFoundError_message = "Multiple hosts found for port: {0}. hosts are : {1}"
+MultipleHostsFoundError_message = "Multiple hosts found for port(s): {0}. hosts are : {1}"
 
 HostNotFoundError_message = "Host for node: {0} was not found"
 
