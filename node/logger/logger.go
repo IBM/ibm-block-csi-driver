@@ -58,7 +58,7 @@ var instance *logrus.Logger
 // Format the entry which contains log message info
 func (f *LogFormat) Format(entry *logrus.Entry) ([]byte, error) {
 	goid := entry.Data[goIDField]
-	if goid != nil {
+	if goid == nil {
 		goid = unknownValue
 	}
 	additionalGoIDInfo := entry.Data[additionalGoIDInfoField]

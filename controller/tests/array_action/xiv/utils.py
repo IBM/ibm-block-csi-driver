@@ -10,9 +10,10 @@ def get_mock_xiv_volume(size, name, wwn):
     return vol
 
 
-def get_mock_xiv_host(name, ports):
+def get_mock_xiv_host(name, iscsi_ports, fc_ports):
     host = Mock()
-    host.iscsi_ports = ports
+    host.iscsi_ports = iscsi_ports
+    host.fc_ports = fc_ports
     host.name = name
     return host
 

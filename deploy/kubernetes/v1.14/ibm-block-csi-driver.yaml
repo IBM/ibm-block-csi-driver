@@ -403,8 +403,6 @@ spec:
 
             - name: device-dir
               mountPath: /dev
-            - name: iscsi-dir
-              mountPath: /etc/iscsi
             - name: sys-dir
               mountPath: /sys
             - name: host-dir
@@ -479,12 +477,6 @@ spec:
         - name: device-dir
           hostPath:
             path: /dev
-            type: Directory
-
-        ## To retrieve the IQN for the GetNodeInfo API
-        - name: iscsi-dir
-          hostPath:
-            path: /etc/iscsi/
             type: Directory
 
         - name: sys-dir

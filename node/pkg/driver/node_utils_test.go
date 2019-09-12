@@ -71,7 +71,7 @@ func TestParseIscsiInitiators(t *testing.T) {
 
 				defer func(){
 					os.Remove(tmpFile.Name())
-					driver.IscsiFullPath = "/etc/iscsi/initiatorname.iscsi"
+					driver.IscsiFullPath = "/host/etc/iscsi/initiatorname.iscsi"
 				}()
 
 				fmt.Println("Created File: " + tmpFile.Name())
