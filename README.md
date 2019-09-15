@@ -17,7 +17,6 @@ Supported operating systems:
 
 DISCLAIMER: The driver is provided as is, without warranty. Any issue will be handled on a best-effort basis.
 
-
 ## Table of content:
 * [Prerequisites for Driver Installation](#prerequisites-for-driver-installation)
     - Install Fibre Channel and iSCSI connectivity rpms, multipath configurations, and configure storage system connectivity.
@@ -28,6 +27,7 @@ DISCLAIMER: The driver is provided as is, without warranty. Any issue will be ha
 * [Driver Usage](#driver-usage)
     - Example of how to create PVC and StatefulSet application, with full detail behind the scenes
 * [Uninstalling the Driver](#uninstalling-the-driver)
+* [More detail and troubleshooting](more-detail-and-troubleshooting)
 
 
 ## Prerequisites for Driver Installation
@@ -40,9 +40,8 @@ Skip this step if the packages are already installed.
 
 RHEL 7.x:
 ```sh
-yum -y install sg3_utils
 yum -y install iscsi-initiator-utils   # Only if iSCSI connectivity is required
-yum -y install xfsprogs                # Only if a Fibre Channel, XFS file system, is required
+yum -y install xfsprogs                # Only if XFS file system is required
 ```
 
 #### 2. Configure Linux multipath devices on the host 
@@ -126,21 +125,10 @@ This section describe how to install the CSI driver.
 ###### Download the driver yml file from github:
 $> curl https://raw.githubusercontent.com/IBM/ibm-block-csi-driver/master/deploy/kubernetes/v1.13/ibm-block-csi-driver.yaml > ibm-block-csi-driver.yaml 
 
-###### Optional: Only edit the `ibm-block-csi-driver.yaml` file if you need to change the driver IMAGE URL. By default, the URL is `ibmcom/ibm-block-csi-controller-driver:1.0.0`.
+###### Optional: Only edit the `ibm-block-csi-driver.yaml` file if you need to change the driver IMAGE URL. By default, the URL is `ibmcom/ibm-block-csi-driver-controller:1.0.0` and `ibmcom/ibm-block-csi-driver-node:1.0.0`.
 
 ###### Install the driver:
 $> kubectl apply -f ibm-block-csi-driver.yaml
-serviceaccount/ibm-block-csi-controller-sa created
-clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-provisioner-role created
-clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-external-provisioner-binding created
-clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-attacher-role created
-clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-external-attacher-binding created
-clusterrole.rbac.authorization.k8s.io/ibm-block-csi-cluster-driver-registrar-role created
-clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-cluster-driver-registrar-binding created
-clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-snapshotter-role created
-clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-external-snapshotter-binding created
-statefulset.apps/ibm-block-csi-controller created
-daemonset.apps/ibm-block-csi-node created
 ```
 
 Verify the driver is running. (Make sure the csi-controller pod status is Running):
@@ -159,70 +147,8 @@ daemonset.apps/ibm-block-csi-node   2         2         2       2            2  
 NAME                                        READY   AGE
 statefulset.apps/ibm-block-csi-controller   1/1     9m36s
 
-###### The following labels can also be used: app=ibm-block-csi-node, app=ibm-block-csi-controller, csi=ibm or product=ibm-block-csi-driver.
-
-$> kubectl get -n kube-system pod --selector=app=ibm-block-csi-controller
-NAME                         READY   STATUS    RESTARTS   AGE
-ibm-block-csi-controller-0   5/5     Running   0          10m
-
-$> kubectl get -n kube-system pod --selector=app=ibm-block-csi-node
-NAME                       READY   STATUS    RESTARTS   AGE
-ibm-block-csi-node-jvmvh   3/3     Running   0          74m
-ibm-block-csi-node-tsppw   3/3     Running   0          74m
-
-###### If pod/ibm-block-csi-controller-0 Status is not Running, troubleshoot by running the following:
-$> kubectl describe -n kube-system pod/ibm-block-csi-controller-0
-
 ```
 
-More detail on the installed driver can be viewed as below:
-
-```sh
-###### If `feature-gates=CSIDriverRegistry` was set to `true` then CSIDriver object for the driver will be automaticaly created. See this by running: 
-
-$> kubectl describe csidriver ibm-block-csi-driver
-Name:         ibm-block-csi-driver
-Namespace:    
-Labels:       <none>
-Annotations:  <none>
-API Version:  csi.storage.k8s.io/v1alpha1
-Kind:         CSIDriver
-Metadata:
-  Creation Timestamp:  2019-07-15T12:04:32Z
-  Generation:          1
-  Resource Version:    1404
-  Self Link:           /apis/csi.storage.k8s.io/v1alpha1/csidrivers/ibm-block-csi-driver
-  UID:                 b46db4ed-a6f8-11e9-b93e-005056a45d5f
-Spec:
-  Attach Required:            true
-  Pod Info On Mount Version:  
-Events:                       <none>
-
-
-$> kubectl get -n kube-system  csidriver,sa,clusterrole,clusterrolebinding,statefulset,pod,daemonset | grep ibm-block-csi
-csidriver.storage.k8s.io/ibm-block-csi-driver   2019-06-02T09:30:36Z
-serviceaccount/ibm-block-csi-controller-sa          1         2m16s
-clusterrole.rbac.authorization.k8s.io/ibm-block-csi-cluster-driver-registrar-role                            2m16s
-clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-attacher-role                                   2m16s
-clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-provisioner-role                                2m16s
-clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-snapshotter-role                                2m16s
-clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-cluster-driver-registrar-binding         2m16s
-clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-external-attacher-binding                2m16s
-clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-external-provisioner-binding             2m16s
-clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-external-snapshotter-binding             2m16s
-statefulset.apps/ibm-block-csi-controller   1/1     2m16s
-pod/ibm-block-csi-controller-0              5/5     Running   0          2m16s
-pod/ibm-block-csi-node-xnfgp                3/3     Running   0          13m
-pod/ibm-block-csi-node-zgh5h                3/3     Running   0          13m
-daemonset.extensions/ibm-block-csi-node     2       2         2          2            2           <none>                        13m
-
-###### View the CSI controller logs
-$> kubectl log -f -n kube-system ibm-block-csi-controller-0 ibm-block-csi-controller
-
-###### View the CSI daemonset node logs
-$> kubectl log -f -n kube-system ibm-block-csi-node-<PODID> ibm-block-csi-node
-
-```
 <br/>
 <br/>
 <br/>
@@ -292,6 +218,96 @@ You can now run stateful applications using IBM block storage systems.
 <br/>
 <br/>
 <br/>
+
+
+
+## Driver Usage
+Create PVC demo-pvc-gold using `demo-pvc-gold.yaml`:
+
+```sh 
+$> cat demo-pvc-gold.yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-demo
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: gold
+
+$> kubectl apply -f demo-pvc-gold.yaml
+persistentvolumeclaim/demo-pvc created
+```
+
+
+Create StatefulSet application `demo-statefulset` that uses the demo-pvc.
+
+```sh
+$> cat demo-statefulset-with-demo-pvc.yml
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: demo-statefulset
+spec:
+  selector:
+    matchLabels:
+      app: demo-statefulset
+  serviceName: demo-statefulset
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: demo-statefulset
+    spec:
+      containers:
+      - name: container1
+        image: registry.access.redhat.com/ubi8/ubi:latest
+        command: [ "/bin/sh", "-c", "--" ]
+        args: [ "while true; do sleep 30; done;" ]
+        volumeMounts:
+          - name: demo-pvc
+            mountPath: "/data"
+      volumes:
+      - name: demo-pvc
+        persistentVolumeClaim:
+          claimName: demo-pvc
+
+      #nodeSelector:
+      #  kubernetes.io/hostname: NODESELECTOR
+
+
+$> kubectl create -f demo-statefulset-with-demo-pvc.yml
+statefulset/demo-statefulset created
+
+$> kubectl get pod demo-statefulset-0
+NAME                 READY   STATUS    RESTARTS   AGE
+demo-statefulset-0   1/1     Running   0          43s
+
+###### Review the mountpoint inside the pod:
+$> kubectl exec demo-statefulset-0 -- bash -c "df -h /data"
+Filesystem          Size  Used Avail Use% Mounted on
+/dev/mapper/mpathz 1014M   33M  982M   4% /data
+```
+
+
+Delete StatefulSet and PVC
+
+```sh
+$> kubectl delete statefulset/demo-statefulset
+statefulset/demo-statefulset deleted
+
+$> kubectl get statefulset/demo-statefulset
+No resources found.
+
+$> kubectl delete pvc/demo-pvc
+persistentvolumeclaim/demo-pvc deleted
+
+$> kubectl get pv,pvc
+No resources found.
+```
 
 
 ## Driver Usage
@@ -587,6 +603,12 @@ $> kubectl delete CSIDriver ibm-block-csi-driver
 
 ```
 
+<br/>
+<br/>
+<br/>
+
+## More detail and troubleshooting
+[USAGE-DETAILS.md](USAGE-DETAILS.md)
 
 <br/>
 <br/>
