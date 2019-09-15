@@ -282,9 +282,34 @@ No resources found.
 <br/>
 
 
-## More detail on the installed driver can be viewed as below:
 
-```sh
+## Troubleshooting
+```
+###### View the CSI pods, daemonset and statefulset:
+$> kubectl get all -n kube-system  -l csi
+NAME                             READY   STATUS    RESTARTS   AGE
+pod/ibm-block-csi-controller-0   5/5     Running   0          9m36s
+pod/ibm-block-csi-node-jvmvh     3/3     Running   0          9m36s
+pod/ibm-block-csi-node-tsppw     3/3     Running   0          9m36s
+
+NAME                                DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
+daemonset.apps/ibm-block-csi-node   2         2         2       2            2           <none>          9m36s
+
+NAME                                        READY   AGE
+statefulset.apps/ibm-block-csi-controller   1/1     9m36s
+
+###### If pod/ibm-block-csi-controller-0 Status is not Running, troubleshoot by running the following:
+$> kubectl describe -n kube-system pod/ibm-block-csi-controller-0
+
+###### View the CSI controller logs
+$> kubectl log -f -n kube-system ibm-block-csi-controller-0 ibm-block-csi-controller
+
+###### View the CSI daemonset node logs
+$> kubectl log -f -n kube-system ibm-block-csi-node-<PODID> ibm-block-csi-node
+```
+
+Additional Driver details:
+```
 ###### If `feature-gates=CSIDriverRegistry` was set to `true` then CSIDriver object for the driver will be automaticaly created. See this by running: 
 
 $> kubectl describe csidriver ibm-block-csi-driver
@@ -322,34 +347,7 @@ pod/ibm-block-csi-controller-0              5/5     Running   0          2m16s
 pod/ibm-block-csi-node-xnfgp                3/3     Running   0          13m
 pod/ibm-block-csi-node-zgh5h                3/3     Running   0          13m
 daemonset.extensions/ibm-block-csi-node     2       2         2          2            2           <none>                        13m
-
 ```
-
-## Troubleshooting
-```
-###### View the CSI pods, daemonset and statefulset:
-$> kubectl get all -n kube-system  -l csi
-NAME                             READY   STATUS    RESTARTS   AGE
-pod/ibm-block-csi-controller-0   5/5     Running   0          9m36s
-pod/ibm-block-csi-node-jvmvh     3/3     Running   0          9m36s
-pod/ibm-block-csi-node-tsppw     3/3     Running   0          9m36s
-
-NAME                                DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
-daemonset.apps/ibm-block-csi-node   2         2         2       2            2           <none>          9m36s
-
-NAME                                        READY   AGE
-statefulset.apps/ibm-block-csi-controller   1/1     9m36s
-
-###### If pod/ibm-block-csi-controller-0 Status is not Running, troubleshoot by running the following:
-$> kubectl describe -n kube-system pod/ibm-block-csi-controller-0
-
-###### View the CSI controller logs
-$> kubectl log -f -n kube-system ibm-block-csi-controller-0 ibm-block-csi-controller
-
-###### View the CSI daemonset node logs
-$> kubectl log -f -n kube-system ibm-block-csi-node-<PODID> ibm-block-csi-node
-```
-
 
 <br/>
 <br/>
