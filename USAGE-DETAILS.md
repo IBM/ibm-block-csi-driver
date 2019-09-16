@@ -310,7 +310,7 @@ $> kubectl log -f -n kube-system ibm-block-csi-node-<PODID> ibm-block-csi-node
 
 Additional Driver details:
 ```
-###### If `feature-gates=CSIDriverRegistry` was set to `true` then CSIDriver object for the driver will be automaticaly created. See this by running: 
+###### If `feature-gates=CSIDriverRegistry` was set to `true` then CSIDriver object for the driver will be automatically created. See this by running: 
 
 $> kubectl describe csidriver ibm-block-csi-driver
 Name:         ibm-block-csi-driver
