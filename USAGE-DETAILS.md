@@ -4,11 +4,11 @@
 
 ## Driver Usage details
 This section shows how to:
-- Create k8s secret `a9000-array1` for the storage system. (The example below uses FlashSystem A9000R as an example but the same can be used for FlashSystem 9100).
+- Create k8s secret `a9000-array1` for the storage system. (The example below uses FlashSystem A9000R as an example but the same can be used for FlashSystem A9000 and FlashSystem 9100.)
 - Create storage class `gold`.
 - Create PVC `demo-pvc`from the storage class `gold` and show some details on the created PVC and PV.
 - Create StatefulSet application `demo-statefulset` and observe the mountpoint \ multipath device that was created by the driver. 
-- Write some data inside the `demo-statefull`, delete the `demo-statefull` and then create it again, to validate that the data remains.
+- Write some data inside the 'demo-stateful', delete the 'demo-stateful' and then create it again, to validate that the data remains.
 
 Create secret and storage class:
 
@@ -159,7 +159,7 @@ $> kubectl create -f demo-statefulset-with-demo-pvc.yml
 statefulset/demo-statefulset created
 ```
 
-Display the newly created pod (Make sure that the pod status is Running) and write data to its persistent volume. 
+Display the newly created pod (make sure that the pod status is Running) and write data to its persistent volume. 
 
 ```sh
 ###### Wait for the pod Status to be Running.
@@ -228,13 +228,13 @@ $> cat /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-711b6fef-bcf9-11e9-a1f5
 ```
 
 
-Delete StatefulSet and restart it in order to validate data (`/data/FILE`) remains in the PV.
+Delete StatefulSet and then restart, in order to validate data (/data/FILE) remains in the persistent volume.
 
 ```sh
 $> kubectl delete statefulset/demo-statefulset
 statefulset/demo-statefulset deleted
 
-### Wait until the pod no longer exists (receive return code `"demo-statefulset" not found`)
+### Wait until the pod is deleted. Once deleted the '"demo-statefulset" not found' is returned.
 $> kubectl get statefulset/demo-statefulset
 NAME                 READY   STATUS        RESTARTS   AGE
 demo-statefulset-0   0/1     Terminating   0          91m
