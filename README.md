@@ -125,7 +125,7 @@ This section describe how to install the CSI driver.
 ###### Download the driver yml file from github:
 $> curl https://raw.githubusercontent.com/IBM/ibm-block-csi-driver/master/deploy/kubernetes/v1.13/ibm-block-csi-driver.yaml > ibm-block-csi-driver.yaml 
 
-###### Optional: Only edit the `ibm-block-csi-driver.yaml` file if you need to change the driver IMAGE URL. By default, the URL is `ibmcom/ibm-block-csi-driver-controller:1.0.0` and `ibmcom/ibm-block-csi-driver-node:1.0.0`.
+###### Optional: Only edit the `ibm-block-csi-driver.yaml` file if you need to change the driver IMAGE URL. By default, the URL is `ibmcom/ibm-block-csi-driver-controller:0.9.0` and `ibmcom/ibm-block-csi-driver-node:0.9.0`.
 
 ###### Install the driver:
 $> kubectl apply -f ibm-block-csi-driver.yaml
