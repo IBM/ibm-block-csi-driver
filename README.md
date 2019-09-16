@@ -117,9 +117,7 @@ OR
 
 
 ## Installing the driver
-This section describe how to install the CSI driver.
-
-**Note:** Soon the driver installation method will be via a new CSI operator (work in progress at github.com/ibm/ibm-block-csi-driver-operator). Currently the installation method is via a basic yaml file (`ibm-block-csi-driver.yaml`) with all the driver resources. 
+This section describe how to install the CSI driver. 
 
 ```sh
 ###### Download the driver yml file from github:
