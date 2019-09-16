@@ -117,7 +117,7 @@ OR
 
 
 ## Installing the driver
-This section describe how to install the CSI driver. 
+This section describes how to install the CSI driver.
 
 ```sh
 ###### Download the driver yml file from github:
@@ -191,7 +191,7 @@ metadata:
   name: gold
 provisioner: block.csi.ibm.com
 parameters:
-  #SpaceEfficiency: <VALUE>    # Optional: Values applicable for Storewize are: Thin, Compressed, or Deduplicated
+  #SpaceEfficiency: <VALUE>    # Optional: Values applicable for Storwize are: thin, compressed, or deduplicated
   pool: <VALUE_POOL_NAME>
 
   csi.storage.k8s.io/provisioner-secret-name: <VALUE_ARRAY_SECRET>
