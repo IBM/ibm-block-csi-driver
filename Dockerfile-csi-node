@@ -33,7 +33,7 @@ MAINTAINER IBM Storage
 LABEL name="IBM block storage CSI driver node" \
       vendor="IBM" \
       version="0.9.0" \
-      release="b61" \
+      release="b62" \
       summary="The node component of the IBM block storage CSI driver" \
       description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage." \
       io.k8s.display-name="IBM block storage CSI driver node" \
