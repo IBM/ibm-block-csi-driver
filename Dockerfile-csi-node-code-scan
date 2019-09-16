@@ -12,24 +12,22 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM python:3.6.9
+FROM golang:1.11
 
-RUN pip3 install bandit
-
-COPY controller /controller
+COPY node /node
 RUN mkdir /results
 
 RUN groupadd -g 9999 appuser && \
     useradd -r -u 9999 -g appuser appuser
-
-RUN chown -R appuser:appuser /controller /results
+RUN chown -R appuser:appuser /node /results
+RUN go get github.com/securego/gosec/cmd/gosec
 
 RUN echo '#!/bin/bash \n\
-    if [ -z "$SKIPS" ]\n\
+    if [ -z "$EXCLUDE" ]\n\
     then\n\
-        /usr/local/bin/bandit -ll -f xml -o /results/bandit_result.xml -r /controller\n\
+        gosec -fmt=junit-xml -out /results/gosec_result.xml /node\n\
     else\n\
-        /usr/local/bin/bandit -ll -s ${SKIPS} -f xml -o /results/bandit_result.xml -r /controller\n\
+        gosec -exclude=${EXCLUDE} -fmt=junit-xml -out /results/gosec_result.xml /node\n\
     fi\n\
     ' > ./entrypoint.sh && \
     chmod +x ./entrypoint.sh
@@ -38,5 +36,4 @@ USER appuser
 WORKDIR .
 
 ENTRYPOINT ["./entrypoint.sh"]
-
 
