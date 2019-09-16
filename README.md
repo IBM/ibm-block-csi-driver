@@ -27,7 +27,7 @@ DISCLAIMER: The driver is provided as is, without warranty. Any issue will be ha
 * [Driver Usage](#driver-usage)
     - Example of how to create PVC and StatefulSet application, with full detail behind the scenes
 * [Uninstalling the Driver](#uninstalling-the-driver)
-* [More detail and troubleshooting](more-detail-and-troubleshooting)
+* [More details and troubleshooting](more-details-and-troubleshooting)
 
 
 ## Prerequisites for Driver Installation
@@ -329,7 +329,7 @@ $> kubectl delete CSIDriver ibm-block-csi-driver
 <br/>
 <br/>
 
-## More detail and troubleshooting
+## More details and troubleshooting
 [USAGE-DETAILS.md](USAGE-DETAILS.md)
 
 <br/>
