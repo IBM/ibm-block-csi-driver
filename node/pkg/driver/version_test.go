@@ -46,7 +46,7 @@ func TestGetVersion(t *testing.T) {
 	version, err := GetVersion(dir)
 
 	expected := VersionInfo{
-		DriverVersion: "1.0.0",
+		DriverVersion: "0.9.0",
 		GitCommit:     "",
 		BuildDate:     "",
 		GoVersion:     runtime.Version(),
@@ -76,7 +76,7 @@ func TestGetVersionJSON(t *testing.T) {
 	}
 
 	expected := fmt.Sprintf(`{
-  "driverVersion": "1.0.0",
+  "driverVersion": "0.9.0",
   "gitCommit": "",
   "buildDate": "",
   "goVersion": "%s",
