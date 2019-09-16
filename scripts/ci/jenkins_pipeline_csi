@@ -20,6 +20,12 @@ pipeline {
           
             }
         }
+        stage ('CSI-controller: security code scanning') {
+            steps {
+                sh 'mkdir -p build/reports && chmod 777 build/reports'
+                sh './scripts/run_csi_code_scan.sh'
+            }
+        }
         stage ('CSI-node: go Unit testing') {
             steps {
                 sh 'mkdir -p build/reports && chmod 777 build/reports'
