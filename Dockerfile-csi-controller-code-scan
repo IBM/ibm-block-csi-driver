@@ -24,7 +24,14 @@ RUN groupadd -g 9999 appuser && \
 
 RUN chown -R appuser:appuser /controller /results
 
-RUN echo '#!/bin/bash \n/usr/local/bin/bandit -s ${SKIPS} -f xml -o /results/bandit_result.xml -r /controller' > ./entrypoint.sh && \
+RUN echo '#!/bin/bash \n\
+    if [ -z "$SKIPS" ]\n\
+    then\n\
+        /usr/local/bin/bandit -ll -f xml -o /results/bandit_result.xml -r /controller\n\
+    else\n\
+        /usr/local/bin/bandit -ll -s ${SKIPS} -f xml -o /results/bandit_result.xml -r /controller\n\
+    fi\n\
+    ' > ./entrypoint.sh && \
     chmod +x ./entrypoint.sh
 
 USER appuser
