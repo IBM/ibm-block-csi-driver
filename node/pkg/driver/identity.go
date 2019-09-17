@@ -50,6 +50,5 @@ func (d *Driver) GetPluginCapabilities(ctx context.Context, req *csi.GetPluginCa
 }
 
 func (d *Driver) Probe(ctx context.Context, req *csi.ProbeRequest) (*csi.ProbeResponse, error) {
-	logger.Tracef("Probe: called with args %+v", *req) // Set the debug to 6 so by default it will not be printed.
 	return &csi.ProbeResponse{}, nil
 }

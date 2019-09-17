@@ -250,7 +250,7 @@ spec:
       serviceAccount: ibm-block-csi-controller-sa
       containers:
         - name: ibm-block-csi-controller
-          image: ibmcom/ibm-block-csi-controller-driver:1.0.0
+          image: ibmcom/ibm-block-csi-driver-controller:0.9.0sssssssss
           imagePullPolicy: "IfNotPresent"
           args :
             - --csi-endpoint=$(CSI_ENDPOINT)
@@ -298,7 +298,7 @@ spec:
 
 
         - name: csi-provisioner
-          image: quay.io/k8scsi/csi-provisioner:v1.1.1  #TODO v1.1.1 is for k8s1.14+(with additional RBAC), while v1.0.1 is for k8s1.13+,
+          image: quay.io/k8scsi/csi-provisioner:v1.3.0
           imagePullPolicy: "IfNotPresent"
           args:
             - --csi-address=$(ADDRESS)
@@ -313,7 +313,7 @@ spec:
 
 
         - name: csi-attacher
-          image: quay.io/k8scsi/csi-attacher:v1.0.1    # TODO v1.1.1 is for k8s 1.14+(with additional RBAC), v1.0.1 is for k8s 1.13
+          image: quay.io/k8scsi/csi-attacher:v1.2.1
           imagePullPolicy: "IfNotPresent"
           args:
             - --csi-address=$(ADDRESS)
@@ -381,7 +381,7 @@ spec:
         - name: ibm-block-csi-node
           securityContext:
             privileged: true
-          image: ibmcom/ibm-block-csi-node-driver:1.0.0
+          image: ibmcom/ibm-block-csi-driver-node:0.9.0
           imagePullPolicy: "IfNotPresent"
           args:
             - --csi-endpoint=$(CSI_ENDPOINT)
@@ -428,7 +428,7 @@ spec:
 
 
         - name: node-driver-registrar
-          image: quay.io/k8scsi/csi-node-driver-registrar:v1.0.2
+          image: quay.io/k8scsi/csi-node-driver-registrar:v1.1.0
           imagePullPolicy: "IfNotPresent"
           args:
             - --csi-address=$(ADDRESS)

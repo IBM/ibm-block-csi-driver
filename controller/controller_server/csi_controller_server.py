@@ -41,6 +41,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             self.cfg = yaml.load(yamlfile)  # TODO: add the following when possible : Loader=yaml.FullLoader)
 
     def CreateVolume(self, request, context):
+        set_current_thread_name(request.name)
         logger.info("create volume")
         try:
             utils.validate_create_volume_request(request)
