@@ -65,5 +65,20 @@ pipeline {
                     subject: 'Jenkins build is back to normal: $PROJECT_NAME - #$BUILD_NUMBER'
         }
 
+        success {
+            if ($PROJECT_NAME =~ /Production/) {
+                echo "Trigger CI Production Pipeline"
+                def images = readFile('build/reports/images_url').split("\n")
+                controller_image = images[0]
+                node_image = images[1]
+                build job: "${env.PROD_CI_JOB}", parameters: [
+                    string(name: 'CSI_CONTROLLER_IMAGE', value: ${controller_image}),
+                    string(name: 'CSI_NODE_IMAGE', value: ${node_image})
+                ]
+            } else {
+                echo "This is not a production build so not calling the CI jobs"
+            }
+        }
+
     }
 }
