@@ -31,6 +31,18 @@ import (
 	"k8s.io/apimachinery/pkg/util/errors"
 )
 
+const (
+	DevPath                 = "/dev"
+	connectivityTypeOfFc    = "fc"
+	connectivityTypeOfIscsi = "iscsi"
+	IscsiRegexpValue        = "host([0-9]+)"
+	FcRegexpValue           = "rport-([0-9]+)"
+	IscsiTargetPath         = "/dev/disk/by-path/ip*"
+	FcTargetPath            = "/dev/disk/by-path/pci*"
+	FcHostRexExPath         = "/sys/class/fc_remote_ports/rport-*/port_name"
+	IscsiHostRexExPath      = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
+)
+
 //go:generate mockgen -destination=../../../mocks/mock_OsDeviceConnectivityHelperScsiGenericInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity OsDeviceConnectivityHelperScsiGenericInterface
 
 type OsDeviceConnectivityHelperScsiGenericInterface interface {
@@ -52,18 +64,6 @@ type OsDeviceConnectivityHelperScsiGeneric struct {
 
 var (
 	TimeOutMultipathFlashCmd = 4 * 1000
-)
-
-const (
-	DevPath                 = "/dev"
-	connectivityTypeOfFc    = "fc"
-	connectivityTypeOfIscsi = "iscsi"
-	IscsiRegexpValue        = "host([0-9]+)"
-	FcRegexpValue           = "rport-([0-9]+)"
-	IscsiTargetPath         = "/dev/disk/by-path/ip*"
-	FcTargetPath            = "/dev/disk/by-path/pci*"
-	FcHostRexExPath         = "/sys/class/fc_remote_ports/rport-*/port_name"
-	IscsiHostRexExPath      = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
 )
 
 func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperScsiGenericInterface {
@@ -126,7 +126,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string, connectivityType string, targetPath string) (string, error) {
-	logger.Infof("GetMpathDevice: Found multipath devices for volume : [%s] that relats to lunId=%d, arrayIdentifiers=%s and targetPath=%s", volumeId, lunId, arrayIdentifiers, targetPath)
+	logger.Infof("GetMpathDevice: Found multipath devices for volume : [%s] that relates to lunId=%d, arrayIdentifiers=%s and targetPath=%s", volumeId, lunId, arrayIdentifiers, targetPath)
 
 	if len(arrayIdentifiers) == 0 {
 		e := &ErrorNotFoundArrayIdentifiers{lunId}
@@ -427,7 +427,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 			} else {
 				hostNumber, err = strconv.Atoi(regexMatch[1])
 				if err != nil {
-					logger.Warningf("Failed to get the host nvumber in: {%v}, try again.", regexMatch[1])
+					logger.Warningf("Failed to get the host number in: {%v}, skip it.", regexMatch[1])
 					continue
 				}
 			}
