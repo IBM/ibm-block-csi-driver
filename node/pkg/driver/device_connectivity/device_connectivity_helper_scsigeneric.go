@@ -17,7 +17,6 @@
 package device_connectivity
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -29,6 +28,7 @@ import (
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"k8s.io/apimachinery/pkg/util/errors"
 )
 
 //go:generate mockgen -destination=../../../mocks/mock_OsDeviceConnectivityHelperScsiGenericInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity OsDeviceConnectivityHelperScsiGenericInterface
@@ -38,8 +38,8 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 		This is helper interface for OsDeviceConnectivityHelperScsiGenericInterface.
 		Mainly for writing clean unit testing, so we can Mock this interface in order to unit test logic.
 	*/
-	RescanDevices(lunId int, arrayIdentifiers []string) error
-	GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string, connectivityType string) (string, error)
+	RescanDevices(lunId int, arrayIdentifiers []string, regexpValue string, targetRegexpFilePath string) error
+	GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string, connectivityType string, targetPath string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
 	RemovePhysicalDevice(sysDevices []string) error
 }
@@ -55,7 +55,15 @@ var (
 )
 
 const (
-	DevPath = "/dev"
+	DevPath                 = "/dev"
+	connectivityTypeOfFc    = "fc"
+	connectivityTypeOfIscsi = "iscsi"
+	IscsiRegexpValue        = "host([0-9]+)"
+	FcRegexpValue           = "rport-([0-9]+)"
+	IscsiTargetPath         = "/dev/disk/by-path/ip*"
+	FcTargetPath            = "/dev/disk/by-path/pci*"
+	FcHostRexExPath         = "/sys/class/fc_remote_ports/rport-*/port_name"
+	IscsiHostRexExPath      = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
 )
 
 func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperScsiGenericInterface {
@@ -66,26 +74,27 @@ func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterfac
 	}
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIdentifiers []string) error {
-	logger.Debugf("Rescan : Start rescan on specific lun, on lun : {%v}, with array identifiers : {%v}", lunId, arrayIdentifiers)
-	var hostIDs []int
-	var errStrings []string
+func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIdentifiers []string, regexpValue string, targetRegexpFilePath string) error {
+	logger.Debugf("Rescan : Start rescan on specific lun, on lun : {%v}, with array identifiers : {%v}, regexpValue : {%v}, targetRegexpFilePath : {%v}", lunId, arrayIdentifiers, regexpValue, targetRegexpFilePath)
 	if len(arrayIdentifiers) == 0 {
 		e := &ErrorNotFoundArrayIdentifiers{lunId}
 		logger.Errorf(e.Error())
 		return e
 	}
 
+	var hostIDs []int
+	var errs []error
+
 	for _, arrayIdentifier := range arrayIdentifiers {
-		hostsId, e := r.Helper.GetHostsIdByArrayIdentifier(arrayIdentifier)
+		hostsId, e := r.Helper.GetHostsIdByArrayIdentifier(arrayIdentifier, regexpValue, targetRegexpFilePath)
 		if e != nil {
 			logger.Errorf(e.Error())
-			errStrings = append(errStrings, e.Error())
+			errs = append(errs, e)
 		}
 		hostIDs = append(hostIDs, hostsId...)
 	}
-	if len(hostIDs) == 0 && len(errStrings) != 0 {
-		err := errors.New(strings.Join(errStrings, ","))
+	if len(hostIDs) == 0 && len(errs) != 0 {
+		err := errors.NewAggregate(errs)
 		return err
 	}
 	for _, hostNumber := range hostIDs {
@@ -116,29 +125,16 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 	return nil
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string, connectivityType string) (string, error) {
-	logger.Infof("GetMpathDevice: Found multipath devices for volume : [%s] that relats to lunId=%d and arrayIdentifiers=%s", volumeId, lunId, arrayIdentifiers)
+func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string, connectivityType string, targetPath string) (string, error) {
+	logger.Infof("GetMpathDevice: Found multipath devices for volume : [%s] that relats to lunId=%d, arrayIdentifiers=%s and targetPath=%s", volumeId, lunId, arrayIdentifiers, targetPath)
 
 	if len(arrayIdentifiers) == 0 {
 		e := &ErrorNotFoundArrayIdentifiers{lunId}
 		return "", e
 	}
 	var devicePaths []string
-	var errStrings []string
-	var targetPath string
+	var errs []error
 	lunIdStr := strconv.Itoa(lunId)
-
-	if connectivityType == "fc" {
-		targetPath = "/dev/disk/by-path/pci*"
-		// In host, the path like this: /dev/disk/by-path/pci-0000:13:00.0-fc-0x500507680b25c0aa-lun-0
-		// So add prefix "ox" for the arrayIdentifiers
-		for index, wwn := range arrayIdentifiers {
-			arrayIdentifiers[index] = "0x" + strings.ToLower(wwn)
-		}
-	}
-	if connectivityType == "iscsi" {
-		targetPath = "/dev/disk/by-path/ip*"
-	}
 
 	for _, arrayIdentifier := range arrayIdentifiers {
 		dp := strings.Join([]string{targetPath, connectivityType, arrayIdentifier, "lun", lunIdStr}, "-")
@@ -146,17 +142,17 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 		dps, exists, e := r.Helper.WaitForPathToExist(dp, 5, 1)
 		if e != nil {
 			logger.Errorf("GetMpathDevice: No device found error : %v ", e.Error())
-			errStrings = append(errStrings, e.Error())
+			errs = append(errs, e)
 		} else if !exists {
 			e := &MultipleDeviceNotFoundForLunError{volumeId, lunId, []string{arrayIdentifier}}
 			logger.Errorf(e.Error())
-			errStrings = append(errStrings, e.Error())
+			errs = append(errs, e)
 		}
 		devicePaths = append(devicePaths, dps...)
 	}
 
-	if len(devicePaths) == 0 && len(errStrings) != 0 {
-		err := errors.New(strings.Join(errStrings, ","))
+	if len(devicePaths) == 0 && len(errs) != 0 {
+		err := errors.NewAggregate(errs)
 		return "", err
 	}
 
@@ -273,7 +269,7 @@ type OsDeviceConnectivityHelperInterface interface {
 	*/
 	WaitForPathToExist(devicePath string, maxRetries int, intervalSeconds int) ([]string, bool, error)
 	GetMultipathDisk(path string) (string, error)
-	GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error)
+	GetHostsIdByArrayIdentifier(arrayIdentifier string, regexpValue string, targetRegexpFilePath string) ([]int, error)
 }
 
 type OsDeviceConnectivityHelperGeneric struct {
@@ -389,37 +385,18 @@ func (o OsDeviceConnectivityHelperGeneric) GetMultipathDisk(path string) (string
 	return "", err
 }
 
-const (
-	FC_HOST_SYSFS_PATH = "/sys/class/fc_remote_ports/rport-*/port_name"
-	IscsiHostRexExPath = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
-)
-
-func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error) {
+func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIdentifier string, regexpValue string, targetRegexpFilePath string) ([]int, error) {
 	/*
 		Description:
 			This function find all the hosts IDs under directory /sys/class/fc_host/ or /sys/class/iscsi_host"
 			So the function goes over all the above hosts and return back only the host numbers as a list.
 	*/
-	//arrayIdentifier is wwn, value is 500507680b25c0aa
-	var targetFilePath string
-	var regexpValue string
-
-	//IQN format is iqn.yyyy-mm.naming-authority:unique name
-	//For example: iqn.1986-03.com.ibm:2145.v7k194.node2
-	iscsiMatchRex := `^iqn\.(\d{4}-\d{2})\.([^:]+)(:)([^,:\s']+)`
-	isIscsi, err := regexp.MatchString(iscsiMatchRex, arrayIdentifier)
-	if isIscsi {
-		targetFilePath = IscsiHostRexExPath
-		regexpValue = "host([0-9]+)"
-	} else {
-		targetFilePath = FC_HOST_SYSFS_PATH
-		regexpValue = "rport-([0-9]+)"
-	}
+	logger.Infof("GetHostsIdByArrayIdentifier: Get Hosts Id By ArrayIdentifier : [%s]. The regexpValue=%s and targetRegexpFilePath=%s", arrayIdentifier, regexpValue, targetRegexpFilePath)
 
 	var HostIDs []int
-	matches, err := o.executer.FilepathGlob(targetFilePath)
+	matches, err := o.executer.FilepathGlob(targetRegexpFilePath)
 	if err != nil {
-		logger.Errorf("Error while Glob targetFilePath : {%v}. err : {%v}", targetFilePath, err)
+		logger.Errorf("Error while Glob targetRegexpFilePath : {%v}. err : {%v}", targetRegexpFilePath, err)
 		return nil, err
 	}
 
@@ -445,12 +422,12 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 			hostNumber := -1
 
 			if len(regexMatch) < 2 {
-				logger.Warningf("Could not find host number for targetFilePath : {%v}", targetPath)
+				logger.Warningf("Could not find host number for targetRegexpFilePath : {%v}", targetRegexpFilePath)
 				continue
 			} else {
 				hostNumber, err = strconv.Atoi(regexMatch[1])
 				if err != nil {
-					logger.Warningf("Host number in for target file was not valid : {%v}", regexMatch[1])
+					logger.Warningf("Failed to get the host nvumber in: {%v}, try again.", regexMatch[1])
 					continue
 				}
 			}
@@ -461,7 +438,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 	}
 
 	if len(HostIDs) == 0 {
-		return []int{}, &ConnectivityIdentifierStorageTargetNotFoundError{StorageTargetName: arrayIdentifier, DirectoryPath: targetFilePath}
+		return []int{}, &ConnectivityIdentifierStorageTargetNotFoundError{StorageTargetName: arrayIdentifier, DirectoryPath: targetRegexpFilePath}
 	}
 
 	return HostIDs, nil

@@ -17,6 +17,8 @@
 package device_connectivity
 
 import (
+	"strings"
+
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
@@ -33,7 +35,7 @@ func NewOsDeviceConnectivityFc(executer executer.ExecuterInterface) OsDeviceConn
 }
 
 func (r OsDeviceConnectivityFc) RescanDevices(lunId int, arrayIdentifiers []string) error {
-	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers)
+	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers, FcRegexpValue, FcHostRexExPath)
 }
 
 func (r OsDeviceConnectivityFc) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string) (string, error) {
@@ -47,7 +49,13 @@ func (r OsDeviceConnectivityFc) GetMpathDevice(volumeId string, lunId int, array
 
 			   Return Value: "dm-X" of the volumeID by using the LunID and the array wwn.
 	*/
-	return r.HelperScsiGeneric.GetMpathDevice(volumeId, lunId, arrayIdentifiers, "fc")
+
+	// In host, the fc path like this: /dev/disk/by-path/pci-0000:13:00.0-fc-0x500507680b25c0aa-lun-0
+	// So add prefix "ox" for the arrayIdentifiers
+	for index, wwn := range arrayIdentifiers {
+		arrayIdentifiers[index] = "0x" + strings.ToLower(wwn)
+	}
+	return r.HelperScsiGeneric.GetMpathDevice(volumeId, lunId, arrayIdentifiers, connectivityTypeOfFc, FcTargetPath)
 }
 
 func (r OsDeviceConnectivityFc) FlushMultipathDevice(mpathDevice string) error {

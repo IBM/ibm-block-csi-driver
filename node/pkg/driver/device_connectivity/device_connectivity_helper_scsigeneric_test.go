@@ -221,7 +221,7 @@ func TestGetMpathDevice(t *testing.T) {
 				},
 			},
 
-			expErr:      fmt.Errorf("error,Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[Y]]. Please check the host connectivity to the storage."),
+			expErr:      fmt.Errorf("[error, Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[Y]]. Please check the host connectivity to the storage.]"),
 			expDMdevice: "",
 		},
 	}
@@ -254,7 +254,7 @@ func TestGetMpathDevice(t *testing.T) {
 			gomock.InOrder(mcalls...)
 
 			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fake_executer, fake_helper, fake_mutex)
-			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, tc.arrayIdentifiers, "iscsi")
+			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, tc.arrayIdentifiers, "iscsi", device_connectivity.IscsiTargetPath)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")
@@ -289,7 +289,7 @@ func TestGetMpathDevice(t *testing.T) {
 	}{
 		{
 			name:             "Should fail when WaitForPathToExist not found any sd device",
-			arrayIdentifiers: []string{"x"},
+			arrayIdentifiers: []string{"0xx"},
 			waitForPathToExistReturns: []WaitForPathToExistReturn{
 				WaitForPathToExistReturn{
 					devicePaths: nil,
@@ -395,27 +395,27 @@ func TestGetMpathDevice(t *testing.T) {
 
 		{
 			name:             "Should succeed to GetMpathDevice with one more iqns",
-			arrayIdentifiers: []string{"X", "Y"},
+			arrayIdentifiers: []string{"0xX", "0xY"},
 			waitForPathToExistReturns: []WaitForPathToExistReturn{
 				WaitForPathToExistReturn{
-					devicePaths: []string{"/dev/disk/by-path/pci-fc-0xX-lun1"},
+					devicePaths: []string{"/dev/disk/by-path/pci-fc-0xx-lun1"},
 					exists:      true,
 					err:         nil,
 				},
 				WaitForPathToExistReturn{
-					devicePaths: []string{"/dev/disk/by-path/pci-fc-0xY-lun2"},
+					devicePaths: []string{"/dev/disk/by-path/pci-fc-0xy-lun2"},
 					exists:      true,
 					err:         nil,
 				},
 			},
 			getMultipathDiskReturns: []GetMultipathDiskReturn{
 				GetMultipathDiskReturn{
-					pathParam: "/dev/disk/by-path/pci-fc-0xX-lun1",
+					pathParam: "/dev/disk/by-path/pci-fc-0xx-lun1",
 					path:      "dm-1",
 					err:       nil,
 				},
 				GetMultipathDiskReturn{
-					pathParam: "/dev/disk/by-path/pci-fc-0xY-lun2",
+					pathParam: "/dev/disk/by-path/pci-fc-0xy-lun2",
 					path:      "dm-1",
 					err:       nil,
 				},
@@ -427,7 +427,7 @@ func TestGetMpathDevice(t *testing.T) {
 
 		{
 			name:             "Should fail when WaitForPathToExist return error with the first array wwn, and found no sd device with the second array wwn",
-			arrayIdentifiers: []string{"x", "y"},
+			arrayIdentifiers: []string{"0xx", "0xy"},
 			waitForPathToExistReturns: []WaitForPathToExistReturn{
 				WaitForPathToExistReturn{
 					devicePaths: nil,
@@ -441,7 +441,7 @@ func TestGetMpathDevice(t *testing.T) {
 				},
 			},
 
-			expErr:      fmt.Errorf("error,Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[0xy]]. Please check the host connectivity to the storage."),
+			expErr:      fmt.Errorf("[error, Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[0xy]]. Please check the host connectivity to the storage.]"),
 			expDMdevice: "",
 		},
 	}
@@ -458,8 +458,8 @@ func TestGetMpathDevice(t *testing.T) {
 
 			var mcalls []*gomock.Call
 			for index, r := range tc.waitForPathToExistReturns {
-				array_inititor := "0x" + strings.ToLower(string(tc.arrayIdentifiers[index]))
-				path := strings.Join([]string{"/dev/disk/by-path/pci*", "fc", array_inititor, "lun", strconv.Itoa(lunId)}, "-")
+				//array_inititor := "0x" + strings.ToLower(string(tc.arrayIdentifiers[index]))
+				path := strings.Join([]string{"/dev/disk/by-path/pci*", "fc", tc.arrayIdentifiers[index], "lun", strconv.Itoa(lunId)}, "-")
 				call := fake_helper.EXPECT().WaitForPathToExist(path, 5, 1).Return(
 					r.devicePaths,
 					r.exists,
@@ -474,7 +474,7 @@ func TestGetMpathDevice(t *testing.T) {
 			gomock.InOrder(mcalls...)
 
 			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fake_executer, fake_helper, fake_mutex)
-			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, tc.arrayIdentifiers, "fc")
+			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, tc.arrayIdentifiers, "fc", device_connectivity.FcTargetPath)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")
@@ -825,7 +825,7 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 
 			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fake_executer)
 
-			returnHostList, err := helperGeneric.GetHostsIdByArrayIdentifier(tc.arrayIdentifier)
+			returnHostList, err := helperGeneric.GetHostsIdByArrayIdentifier(tc.arrayIdentifier, "host([0-9]+)", device_connectivity.IscsiHostRexExPath)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")
@@ -976,7 +976,7 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 
 			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
 
-			fake_executer.EXPECT().FilepathGlob(device_connectivity.FC_HOST_SYSFS_PATH).Return(tc.globReturnMatches, tc.globReturnErr)
+			fake_executer.EXPECT().FilepathGlob(device_connectivity.FcHostRexExPath).Return(tc.globReturnMatches, tc.globReturnErr)
 
 			var mcalls []*gomock.Call
 			for _, r := range tc.ioutilReadFileReturns {
@@ -987,7 +987,7 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 
 			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fake_executer)
 
-			returnHostList, err := helperGeneric.GetHostsIdByArrayIdentifier(tc.arrayIdentifier)
+			returnHostList, err := helperGeneric.GetHostsIdByArrayIdentifier(tc.arrayIdentifier, "rport-([0-9]+)", device_connectivity.FcHostRexExPath)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")

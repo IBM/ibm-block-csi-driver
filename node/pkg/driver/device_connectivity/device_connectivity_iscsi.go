@@ -33,7 +33,7 @@ func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface) OsDeviceC
 }
 
 func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifiers []string) error {
-	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers)
+	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers, IscsiRegexpValue, IscsiHostRexExPath)
 }
 
 func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string) (string, error) {
@@ -47,7 +47,7 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 
 			   Return Value: "dm-X" of the volumeID by using the LunID and the arrayIqn.
 	*/
-	return r.HelperScsiGeneric.GetMpathDevice(volumeId, lunId, arrayIdentifiers, "iscsi")
+	return r.HelperScsiGeneric.GetMpathDevice(volumeId, lunId, arrayIdentifiers, connectivityTypeOfIscsi, IscsiTargetPath)
 }
 
 func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(mpathDevice string) error {
