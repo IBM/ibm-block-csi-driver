@@ -71,10 +71,14 @@ pipeline {
                     def images = readFile('build/reports/images_url').split("\n")
                     def controller_image = images[0]
                     def node_image = images[1]
-                    build job: "${env.PROD_CI_JOB}", parameters: [
-                        string(name: 'CSI_CONTROLLER_IMAGE', value: "${controller_image}"),
-                        string(name: 'CSI_NODE_IMAGE', value: "${node_image}")
-                    ]
+                    build(
+                        job: "${env.PROD_CI_JOB}", 
+                        wait: false,
+                        parameters: [
+                            string(name: 'CSI_CONTROLLER_IMAGE', value: "${controller_image}"),
+                            string(name: 'CSI_NODE_IMAGE', value: "${node_image}")
+                        ]
+                    )
                 } else {
                     echo "Will not trigger CI Production pipeline as this is not a production job"
                 }
