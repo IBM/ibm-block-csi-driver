@@ -28,12 +28,12 @@ type OsDeviceConnectivityIscsi struct {
 func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityIscsi{
 		Executer:          executer,
-		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer),
+		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, IscsiRegexpValue, IscsiHostRexExPath),
 	}
 }
 
 func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifiers []string) error {
-	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers, IscsiRegexpValue, IscsiHostRexExPath)
+	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers)
 }
 
 func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string) (string, error) {

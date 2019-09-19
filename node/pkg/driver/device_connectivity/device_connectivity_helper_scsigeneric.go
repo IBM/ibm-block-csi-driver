@@ -50,7 +50,7 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 		This is helper interface for OsDeviceConnectivityHelperScsiGenericInterface.
 		Mainly for writing clean unit testing, so we can Mock this interface in order to unit test logic.
 	*/
-	RescanDevices(lunId int, arrayIdentifiers []string, regexpValue string, targetRegexpFilePath string) error
+	RescanDevices(lunId int, arrayIdentifiers []string) error
 	GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string, connectivityType string, targetPath string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
 	RemovePhysicalDevice(sysDevices []string) error
@@ -66,16 +66,16 @@ var (
 	TimeOutMultipathFlashCmd = 4 * 1000
 )
 
-func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperScsiGenericInterface {
+func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface, regexpValue string, targetRegexpFilePath string) OsDeviceConnectivityHelperScsiGenericInterface {
 	return &OsDeviceConnectivityHelperScsiGeneric{
 		Executer:        executer,
-		Helper:          NewOsDeviceConnectivityHelperGeneric(executer),
+		Helper:          NewOsDeviceConnectivityHelperGeneric(executer, regexpValue, targetRegexpFilePath),
 		MutexMultipathF: &sync.Mutex{},
 	}
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIdentifiers []string, regexpValue string, targetRegexpFilePath string) error {
-	logger.Debugf("Rescan : Start rescan on specific lun, on lun : {%v}, with array identifiers : {%v}, regexpValue : {%v}, targetRegexpFilePath : {%v}", lunId, arrayIdentifiers, regexpValue, targetRegexpFilePath)
+func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIdentifiers []string) error {
+	logger.Debugf("Rescan : Start rescan on specific lun, on lun : {%v}, with array identifiers : {%v}", lunId, arrayIdentifiers)
 	if len(arrayIdentifiers) == 0 {
 		e := &ErrorNotFoundArrayIdentifiers{lunId}
 		logger.Errorf(e.Error())
@@ -86,7 +86,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 	var errs []error
 
 	for _, arrayIdentifier := range arrayIdentifiers {
-		hostsId, e := r.Helper.GetHostsIdByArrayIdentifier(arrayIdentifier, regexpValue, targetRegexpFilePath)
+		hostsId, e := r.Helper.GetHostsIdByArrayIdentifier(arrayIdentifier)
 		if e != nil {
 			logger.Errorf(e.Error())
 			errs = append(errs, e)
@@ -269,15 +269,17 @@ type OsDeviceConnectivityHelperInterface interface {
 	*/
 	WaitForPathToExist(devicePath string, maxRetries int, intervalSeconds int) ([]string, bool, error)
 	GetMultipathDisk(path string) (string, error)
-	GetHostsIdByArrayIdentifier(arrayIdentifier string, regexpValue string, targetRegexpFilePath string) ([]int, error)
+	GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error)
 }
 
 type OsDeviceConnectivityHelperGeneric struct {
-	executer executer.ExecuterInterface
+	executer             executer.ExecuterInterface
+	regexpValue          string
+	targetRegexpFilePath string
 }
 
-func NewOsDeviceConnectivityHelperGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperInterface {
-	return &OsDeviceConnectivityHelperGeneric{executer: executer}
+func NewOsDeviceConnectivityHelperGeneric(executer executer.ExecuterInterface, regexpValue string, targetRegexpFilePath string) OsDeviceConnectivityHelperInterface {
+	return &OsDeviceConnectivityHelperGeneric{executer: executer, regexpValue: regexpValue, targetRegexpFilePath: targetRegexpFilePath}
 }
 
 func (o OsDeviceConnectivityHelperGeneric) WaitForPathToExist(devicePath string, maxRetries int, intervalSeconds int) ([]string, bool, error) {
@@ -385,12 +387,14 @@ func (o OsDeviceConnectivityHelperGeneric) GetMultipathDisk(path string) (string
 	return "", err
 }
 
-func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIdentifier string, regexpValue string, targetRegexpFilePath string) ([]int, error) {
+func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error) {
 	/*
 		Description:
 			This function find all the hosts IDs under directory /sys/class/fc_host/ or /sys/class/iscsi_host"
 			So the function goes over all the above hosts and return back only the host numbers as a list.
 	*/
+	regexpValue := o.regexpValue
+	targetRegexpFilePath := o.targetRegexpFilePath
 	logger.Infof("GetHostsIdByArrayIdentifier: Get Hosts Id By ArrayIdentifier : [%s]. The regexpValue=%s and targetRegexpFilePath=%s", arrayIdentifier, regexpValue, targetRegexpFilePath)
 
 	var HostIDs []int

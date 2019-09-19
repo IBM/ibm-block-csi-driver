@@ -30,12 +30,12 @@ type OsDeviceConnectivityFc struct {
 func NewOsDeviceConnectivityFc(executer executer.ExecuterInterface) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityFc{
 		Executer:          executer,
-		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer),
+		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, FcRegexpValue, FcHostRexExPath),
 	}
 }
 
 func (r OsDeviceConnectivityFc) RescanDevices(lunId int, arrayIdentifiers []string) error {
-	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers, FcRegexpValue, FcHostRexExPath)
+	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers)
 }
 
 func (r OsDeviceConnectivityFc) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string) (string, error) {
