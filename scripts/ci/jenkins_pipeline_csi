@@ -67,7 +67,7 @@ pipeline {
 
         success {
             script {
-                if (env.JOB_NAME =~ /Production/) {
+                if (env.JOB_NAME =~ /STAGING/) {
                     echo "Trigger CI Production Pipeline"
                     def images = readFile('build/reports/images_url').split("\n")
                     controller_image = images[0]
