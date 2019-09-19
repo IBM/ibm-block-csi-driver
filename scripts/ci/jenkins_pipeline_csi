@@ -67,7 +67,7 @@ pipeline {
 
         success {
             script {
-                if ($PROJECT_NAME =~ /Production/) {
+                if (env.JOB_NAME =~ /Production/) {
                     echo "Trigger CI Production Pipeline"
                     def images = readFile('build/reports/images_url').split("\n")
                     controller_image = images[0]
@@ -77,7 +77,7 @@ pipeline {
                         string(name: 'CSI_NODE_IMAGE', value: ${node_image})
                     ]
                 } else {
-                    echo "This is not a production build so not calling the CI jobs"
+                    echo "Will not trigger CI Production pipeline as this is not a production job"
                 }
             }
         }
