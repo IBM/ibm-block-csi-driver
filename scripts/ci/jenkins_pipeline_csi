@@ -43,7 +43,6 @@ pipeline {
             junit 'build/reports/*.xml'
             // cobertura coberturaReportFile: 'build/reports/*.xml'   ## TODO need to run cobertura but it has an issue "No such DSL method"
             archiveArtifacts 'build/reports/images_url'
-            sh '[ -d build/reports ] && rm -rf build/reports'
             script {
                 manager.addShortText("${env.GIT_BRANCH}")
             }
@@ -79,6 +78,12 @@ pipeline {
                 } else {
                     echo "Will not trigger CI Production pipeline as this is not a production job"
                 }
+            }
+        }
+
+        cleanup {
+            script {
+                sh '[ -d build/reports ] && rm -rf build/reports'
             }
         }
 
