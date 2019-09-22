@@ -22,8 +22,8 @@ DISCLAIMER: The driver is provided as is, without warranty. Any issue will be ha
     - Install Fibre Channel and iSCSI connectivity rpms, multipath configurations, and configure storage system connectivity.
 * [Installing the Driver](#installing-the-driver)
 * [Configuring k8s secret and storage class](#configuring-k8s-secret-and-storage-class)
-    - Configure the k8s storage class - to define the storage system pool name, secret reference, SpaceEfficiency (Thin, Compressed or Deduplicated) and fstype(xfs\ext4)
-    - Storage system secret - to define the storage credential(user and password) and its address
+    - Configure the k8s storage class - to define the storage system pool name, secret reference, SpaceEfficiency (Thin, Compressed or Deduplicated) and fstype (xfs\ext4)
+    - Storage system secret - to define the storage credential (user and password) and its address
 * [Driver Usage](#driver-usage)
     - Example of how to create PVC and StatefulSet application, with full detail behind the scenes
 * [Uninstalling the Driver](#uninstalling-the-driver)
@@ -67,7 +67,7 @@ multipath -ll
 
 3.3. For iSCSI, perform the following steps:
 
-3.3.1. Make sure that the login to the iSCSI targets is permanent and remains available after a reboot of the worker node. To do this, verify that the node.startup in the /etc/iscsi/iscsid.conf file is set to automatic. If not, set it as required and then restart the iscsid service `$> service iscsid restart`.
+3.3.1. Make sure that the login to the iSCSI targets is permanent and remains available after a reboot of the worker node. To do this, verify that the node.startup in the `/etc/iscsi/iscsid.conf` file is set to automatic. If not, set it as required and then restart the iscsid service `$> service iscsid restart`.
 
 3.3.2. Discover and log into at least two iSCSI targets on the relevant storage
 systems.
@@ -96,7 +96,7 @@ In Kubernetes v1.13, this feature was disabled by default (the feature was alpha
 
 **Note:** If the feature gate was not enabled, CSIDriver for the ibm-block-csi-driver will not be created automatically.
 
-1. Ensure the feature gate is enabled via the following Kubernetes feature flag: --feature-gates=CSIDriverRegistry=true
+1. Ensure the feature gate is enabled via the following Kubernetes feature flag: `--feature-gates=CSIDriverRegistry=true`
    For example, on kubeadm installation, add the flag inside `/etc/kubernetes/manifests/kube-apiserver.yaml`.
 2. Perform one of the following:
 -Ensure the CSIDriver CRD is automatically installed via the Kubernetes Storage CRD addon 
@@ -129,7 +129,7 @@ $> curl https://raw.githubusercontent.com/IBM/ibm-block-csi-driver/master/deploy
 $> kubectl apply -f ibm-block-csi-driver.yaml
 ```
 
-Verify the driver is running. (Make sure the csi-controller pod status is Running):
+Verify the driver is running. (Make sure the csi-controller pod status is running):
 
 ```sh
 
@@ -156,7 +156,7 @@ In order to use the driver, create the relevant storage classes and secrets, as 
 
 This section describes how to:
  1. Create a storage system secret - to define the storage credential (user and password) and its address.
- 2. Configure the k8s storage class - to define the storage system pool name, secret reference, SpaceEfficiency (thin, compressed, or deduplicated) and fstype(xfs\ext4).
+ 2. Configure the k8s storage class - to define the storage system pool name, secret reference, SpaceEfficiency (thin, compressed, or deduplicated) and fstype (xfs\ext4).
 
 #### 1. Create an array secret 
 Create a secret file as follows and update the relevant credentials:
