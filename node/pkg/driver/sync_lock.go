@@ -48,9 +48,8 @@ func (s SyncLock) GetSyncMap() *sync.Map {
 
 func (s SyncLock) AddVolumeLock(id string, msg string) error {
 	logger.Debugf("Lock for action %s, Try to acquire lock for volume", msg)
-	_, exists := s.SyncMap.Load(id)
+	_, exists := s.SyncMap.LoadOrStore(id, 0)
 	if !exists {
-		s.SyncMap.Store(id, 0)
 		logger.Debugf("Lock for action %s, Succeed to acquire lock for volume", msg)
 		return nil
 	} else {
@@ -62,10 +61,7 @@ func (s SyncLock) AddVolumeLock(id string, msg string) error {
 func (s SyncLock) RemoveVolumeLock(id string, msg string) {
 	logger.Debugf("Lock for action %s, release lock for volume", msg)
 
-	_, exists := s.SyncMap.Load(id)
-	if exists {
-		s.SyncMap.Delete(id)
-	}
+	s.SyncMap.Delete(id)
 }
 
 /*func (s SyncLock) RemoveVolumeLock(id string, msg string) func() {
