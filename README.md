@@ -27,7 +27,7 @@ DISCLAIMER: The driver is provided as is, without warranty. Version 0.9.0 of the
 * [Driver usage](#driver-usage)
     - Example of how to create PVC and StatefulSet application, with full detail behind the scenes
 * [Uninstalling the driver](#uninstalling-the-driver)
-* [More details and troubleshooting](more-details-and-troubleshooting)
+* [More details and troubleshooting](#more-details-and-troubleshooting)
 
 
 ## Prerequisites for driver installation
