@@ -15,22 +15,22 @@ Supported IBM storage systems:
 Supported operating systems:
   - RHEL 7.x (x86 architecture)
 
-DISCLAIMER: The driver is provided as is, without warranty. Any issue will be handled on a best-effort basis.
+DISCLAIMER: The driver is provided as is, without warranty. Version 0.9.0 of the IBM block storage CSI driver is a beta software version. Do not use this driver for production purposes and do not contact IBM for support. Any issue will be handled on a best-effort basis. 
 
 ## Table of content:
-* [Prerequisites for Driver Installation](#prerequisites-for-driver-installation)
+* [Prerequisites for driver installation](#prerequisites-for-driver-installation)
     - Install Fibre Channel and iSCSI connectivity rpms, multipath configurations, and configure storage system connectivity.
-* [Installing the Driver](#installing-the-driver)
+* [Installing the driver](#installing-the-driver)
 * [Configuring k8s secret and storage class](#configuring-k8s-secret-and-storage-class)
     - Configure the k8s storage class - to define the storage system pool name, secret reference, SpaceEfficiency (Thin, Compressed or Deduplicated) and fstype(xfs\ext4)
     - Storage system secret - to define the storage credential(user and password) and its address
-* [Driver Usage](#driver-usage)
+* [Driver usage](#driver-usage)
     - Example of how to create PVC and StatefulSet application, with full detail behind the scenes
-* [Uninstalling the Driver](#uninstalling-the-driver)
-* [More details and troubleshooting](more-details-and-troubleshooting)
+* [Uninstalling the driver](#uninstalling-the-driver)
+* [More details and troubleshooting](#more-details-and-troubleshooting)
 
 
-## Prerequisites for Driver Installation
+## Prerequisites for driver installation
 
 ### Preparing worker nodes
 Perform these steps for each worker node in Kubernetes cluster:
@@ -94,7 +94,7 @@ Enable the CSIDriver on Kubernetes. For more details see https://kubernetes-csi.
 .
 In Kubernetes v1.13, this feature was disabled by default (the feature was alpha). To enable the use of CSIDriver on this Kubernetes version, perform the the following steps:
 
-**Note:** If the feature gate was not enabled, CSIDriver for the ibm-block-csi-driver will not be created automatically.
+**Note:** If the feature gate was not enabled, CSIDriver for the block.csi.ibm.com will not be created automatically.
 
 1. Ensure the feature gate is enabled via the following Kubernetes feature flag: --feature-gates=CSIDriverRegistry=true
    For example, on kubeadm installation, add the flag inside `/etc/kubernetes/manifests/kube-apiserver.yaml`.
@@ -219,7 +219,7 @@ You can now run stateful applications using IBM block storage systems.
 
 
 
-## Driver Usage
+## Driver usage
 Create PVC demo-pvc-gold using `demo-pvc-gold.yaml`:
 
 ```sh 
@@ -320,8 +320,8 @@ $> kubectl delete storageclass/gold
 $> kubectl delete -n kube-system secret/a9000-array1
 $> kubectl delete -f ibm-block-csi-driver.yaml
 
-##### Kubernetes version 1.13 automatically creates the CSIDriver `ibm-block-csi-driver`, but it does not delete it automatically when removing the driver manifest. In order to clean up the CSIDriver object, run the following command:
-$> kubectl delete CSIDriver ibm-block-csi-driver
+##### Kubernetes version 1.13 automatically creates the CSIDriver `block.csi.ibm.com`, but it does not delete it automatically when removing the driver manifest. In order to clean up the CSIDriver object, run the following command:
+$> kubectl delete CSIDriver block.csi.ibm.com
 
 ```
 

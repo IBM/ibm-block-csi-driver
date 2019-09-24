@@ -33,6 +33,7 @@ RUN pip3 install -r /driver/controller/requirements.txt
 COPY ./common /driver/common
 COPY ./controller /driver/controller
 COPY ./LICENSE /licenses/
+COPY ./NOTICES /licenses/
 
 WORKDIR /driver
 ENV PYTHONPATH=/driver

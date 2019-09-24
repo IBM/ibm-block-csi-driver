@@ -44,6 +44,7 @@ WORKDIR /root
 COPY --from=builder /go/src/github.com/ibm/ibm-block-csi-driver/common/config.yaml .
 COPY --from=builder /go/src/github.com/ibm/ibm-block-csi-driver/bin/ibm-block-csi-node-driver .
 COPY ./LICENSE /licenses/
+COPY ./NOTICES /licenses/
 
 RUN mkdir /chroot
 ADD chroot-host-wrapper.sh /chroot
