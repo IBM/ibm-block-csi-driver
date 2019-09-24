@@ -1,0 +1,495 @@
+# ==============================================================
+# IBM Block CSI driver - Kubernetes manifest.
+# The manifest contains:
+#    CSI controller (StatefulSet)
+#    CSI node (DaemonSet)
+#  And all the relevant RBAC elements the CSI side car containers:
+#    CSI controller service account
+#        ibm-block-csi-external-provisioner-role
+#        ibm-block-csi-external-provisioner-binding
+#        ibm-block-csi-external-attacher-role
+#        ibm-block-csi-external-attacher-binding
+#        ibm-block-csi-cluster-driver-registrar-role
+#        ibm-block-csi-cluster-driver-registrar-binding
+#        ibm-block-csi-external-snapshotter-role
+#        ibm-block-csi-snapshotter-binding
+#    CSI node service account
+# ==============================================================
+
+
+# CSI Controller Service Account
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ibm-block-csi-controller-sa
+  namespace: kube-system
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
+
+---
+
+# RBAC for CSI Controller Service Account for all the CSI sidecar containers.
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ibm-block-csi-external-provisioner-role
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
+  
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list", "watch", "create", "update", "patch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots"]
+    verbs: ["get", "list"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotcontents"]
+    verbs: ["get", "list"]
+  - apiGroups: ["storage.k8s.io"]
+    ## Needed only from k8s 1.14+
+    resources: ["csinodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    ## Needed only from k8s 1.14+
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+
+---
+
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ibm-block-csi-external-provisioner-binding
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
+
+subjects:
+  - kind: ServiceAccount
+    name: ibm-block-csi-controller-sa
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: ibm-block-csi-external-provisioner-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ibm-block-csi-external-attacher-role
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["csi.storage.k8s.io"]
+    resources: ["csinodeinfos"] # For k8s 1.14+
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments"]
+    verbs: ["get", "list", "watch", "update"]
+
+---
+
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ibm-block-csi-external-attacher-binding
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
+subjects:
+  - kind: ServiceAccount
+    name: ibm-block-csi-controller-sa
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: ibm-block-csi-external-attacher-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ibm-block-csi-cluster-driver-registrar-role
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
+rules:
+  ## Only needed for k8s 1.13 since it was automatic install the CSIDriver. But for 1.14+ its not available.
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["create", "list", "watch", "delete"]
+
+  - apiGroups: ["csi.storage.k8s.io"]
+    resources: ["csidrivers"]
+    verbs: ["create", "delete"]
+
+---
+
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ibm-block-csi-cluster-driver-registrar-binding
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
+subjects:
+  - kind: ServiceAccount
+    name: ibm-block-csi-controller-sa
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: ibm-block-csi-cluster-driver-registrar-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ibm-block-csi-external-snapshotter-role
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
+rules:
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list", "watch", "create", "update", "patch"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotclasses"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshotcontents"]
+    verbs: ["create", "get", "list", "watch", "update", "delete"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots"]
+    verbs: ["get", "list", "watch", "update"]
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    verbs: ["create", "list", "watch", "delete"]
+
+---
+
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: ibm-block-csi-external-snapshotter-binding
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
+subjects:
+  - kind: ServiceAccount
+    name: ibm-block-csi-controller-sa
+    namespace: kube-system
+roleRef:
+  kind: ClusterRole
+  name: ibm-block-csi-external-snapshotter-role
+  apiGroup: rbac.authorization.k8s.io
+
+---
+
+## CSI Controller Service statefulset
+kind: StatefulSet
+apiVersion: apps/v1
+metadata:
+  name: ibm-block-csi-controller
+  namespace: kube-system
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
+spec:
+  selector:
+    matchLabels:
+      app: ibm-block-csi-controller
+  serviceName: ibm-block-csi-controller
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: ibm-block-csi-controller
+        product: ibm-block-csi-driver
+        csi: ibm
+    spec:
+      serviceAccount: ibm-block-csi-controller-sa
+      containers:
+        - name: ibm-block-csi-controller
+          image: ibmcom/ibm-block-csi-driver-controller:0.9.0
+          imagePullPolicy: "IfNotPresent"
+          args :
+            - --csi-endpoint=$(CSI_ENDPOINT)
+            - --loglevel=$(CSI_LOGLEVEL)
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///var/lib/csi/sockets/pluginproxy/csi.sock
+            - name: CSI_LOGLEVEL
+              value: DEBUG
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+
+          ## Defining port which will be used to GET plugin health status
+          ## 9808 is default, but can be changed.
+          ports:
+          - containerPort: 9808
+            name: healthz
+            protocol: TCP
+          ## The probe actually used by the liveness-probe. TODO Not sure if ports\livenessProbe needed.
+          livenessProbe:
+            failureThreshold: 5
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 10
+            timeoutSeconds: 3
+            periodSeconds: 2
+
+
+        - name: cluster-driver-registrar
+          ## Note: Requires CRD CSIDriver
+          image: quay.io/k8scsi/csi-cluster-driver-registrar:v1.0.1
+          imagePullPolicy: "IfNotPresent"
+          args:
+            - --csi-address=$(ADDRESS)
+            - --v=5
+            #- --pod-info-mount=true  ## TODO to enable pod info feature.
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+
+
+        - name: csi-provisioner
+          image: quay.io/k8scsi/csi-provisioner:v1.3.0
+          imagePullPolicy: "IfNotPresent"
+          args:
+            - --csi-address=$(ADDRESS)
+            - --v=5
+            #- --feature-gates=Topology=true   ## TODO add Topology feature
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+
+
+        - name: csi-attacher
+          image: quay.io/k8scsi/csi-attacher:v1.2.1
+          imagePullPolicy: "IfNotPresent"
+          args:
+            - --csi-address=$(ADDRESS)
+            - --v=5
+          env:
+            - name: ADDRESS
+              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /var/lib/csi/sockets/pluginproxy/
+
+
+## TODO add snapshotter when plugin will support ControllerCreateSnapshot capability.
+#        - name: csi-snapshotter
+#          image: quay.io/k8scsi/csi-snapshotter:v1.1.0   # TODO v1.1.0 for k8s1.13+(github release different then k8s CSI docs), but there is v1.0.1 for k8s 1.13
+#          imagePullPolicy: "IfNotPresent"
+#          args:
+#            - --csi-address=$(ADDRESS)
+#            - --connection-timeout=15s
+#          env:
+#            - name: ADDRESS
+#              value: /var/lib/csi/sockets/pluginproxy/csi.sock
+#          volumeMounts:
+#            - name: socket-dir
+#              mountPath: /var/lib/csi/sockets/pluginproxy/
+
+
+        - name: liveness-probe
+          image: quay.io/k8scsi/livenessprobe:v1.1.0  # TODO v1.1.0 is for k8s 1.13+, but v1.0.2 was the first k8s 1.13 version.
+          args:
+            - --csi-address=/csi/csi.sock
+            - --connection-timeout=3s   # TODO this line is deprecated from v1.1.0. So if exist its ignore it.
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+
+      volumes:
+        - name: socket-dir
+          emptyDir: {}
+
+---
+
+# CSI Node Service Deamonset
+kind: DaemonSet
+apiVersion: apps/v1
+metadata:
+  name: ibm-block-csi-node
+  namespace: kube-system
+  labels:
+    product: ibm-block-csi-driver
+    csi: ibm
+spec:
+  selector:
+    matchLabels:
+      app: ibm-block-csi-node
+  template:
+    metadata:
+      labels:
+        app: ibm-block-csi-node
+        product: ibm-block-csi-driver
+        csi: ibm
+    spec:
+      hostNetwork: true
+      containers:
+        - name: ibm-block-csi-node
+          securityContext:
+            privileged: true
+          image: ibmcom/ibm-block-csi-driver-node:0.9.0
+          imagePullPolicy: "IfNotPresent"
+          args:
+            - --csi-endpoint=$(CSI_ENDPOINT)
+            - --hostname=$(KUBE_NODE_NAME)
+            - --config-file-path=./config.yaml
+            - --loglevel=$(CSI_LOGLEVEL)
+          env:
+            - name: CSI_ENDPOINT
+              value: unix:///csi/csi.sock
+            - name: CSI_LOGLEVEL
+              value: "trace"
+            ## KUBE_NODE_NAME needed for the GetNodeInfo API
+            - name: KUBE_NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          volumeMounts:
+            - name: mountpoint-dir
+              mountPath: /var/lib/kubelet/pods
+              mountPropagation: "Bidirectional"
+            - name: socket-dir
+              mountPath: /csi
+
+            - name: device-dir
+              mountPath: /dev
+            - name: sys-dir
+              mountPath: /sys
+            - name: host-dir
+              mountPath: /host  # Maps the host root into "/host", inside the container.
+              mountPropagation: "Bidirectional"
+
+          ports:
+            - name: healthz
+              containerPort: 9808
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 10
+            timeoutSeconds: 3
+            periodSeconds: 10
+            failureThreshold: 5
+
+
+        - name: node-driver-registrar
+          image: quay.io/k8scsi/csi-node-driver-registrar:v1.1.0
+          imagePullPolicy: "IfNotPresent"
+          args:
+            - --csi-address=$(ADDRESS)
+            - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
+            - --v=5
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "rm -rf /registration/block.csi.ibm.com-reg.sock /csi/csi.sock"]
+          env:
+            - name: ADDRESS
+              value: /csi/csi.sock
+            - name: DRIVER_REG_SOCK_PATH
+              value: /var/lib/kubelet/plugins/block.csi.ibm.com/csi.sock
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+            - name: registration-dir
+              mountPath: /registration
+
+        - name: liveness-probe
+          image: quay.io/k8scsi/livenessprobe:v1.1.0  # TODO v1.1.0 is for k8s 1.13+, but v1.0.2 was the first k8s 1.13 version.
+          args:
+            - --csi-address=/csi/csi.sock
+            - --connection-timeout=3s   # NOTE: this line is deprecated from v1.1.0. So if exist its ignore it.
+          volumeMounts:
+            - name: socket-dir
+              mountPath: /csi
+
+      volumes:
+        ## This volume is where the driver mounts volumes
+        - name: mountpoint-dir
+          hostPath:
+            path: /var/lib/kubelet/pods
+            type: Directory
+
+        ## This volume is where the socket for kubelet->driver communication is done
+        - name: socket-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/block.csi.ibm.com/
+            type: DirectoryOrCreate
+
+        ## This volume is where the node-driver-registrar registers the plugin with kubelet
+        - name: registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry/
+            type: Directory
+
+        ## To discover the new devices
+        - name: device-dir
+          hostPath:
+            path: /dev
+            type: Directory
+
+        - name: sys-dir
+          hostPath:
+            path: /sys
+            type: Directory
+
+        - name: host-dir
+          hostPath:
+            path: /
+            type: Directory
+

@@ -1,0 +1,45 @@
+# Copyright IBM Corporation 2019.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+FROM registry.access.redhat.com/ubi8/python-36:1
+MAINTAINER IBM Storage
+
+###Required Labels
+LABEL name="IBM block storage CSI driver controller" \
+      vendor="IBM" \
+      version="0.9.0" \
+      release="b62" \
+      summary="The controller component of the IBM block storage CSI driver" \
+      description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage." \
+      io.k8s.display-name="IBM block storage CSI driver controller" \
+      io.k8s.description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage." \
+      io.openshift.tags=ibm,csi,ibm-block-csi-driver,ibm-block-csi-node
+
+COPY controller/requirements.txt /driver/controller/
+RUN pip3 install --upgrade pip==19.1.1
+RUN pip3 install -r /driver/controller/requirements.txt
+
+COPY ./common /driver/common
+COPY ./controller /driver/controller
+COPY ./LICENSE /licenses/
+COPY ./NOTICES /licenses/
+
+WORKDIR /driver
+ENV PYTHONPATH=/driver
+
+# Note: UBI runs with app-user by default.
+
+ENTRYPOINT ["/driver/controller/scripts/entrypoint.sh"]
+
+

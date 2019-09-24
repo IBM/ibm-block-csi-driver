@@ -1,0 +1,8 @@
+*.pyc
+.idea
+.coverage
+.project
+.pydevproject
+/.metadata/
+/bin/
+node/mocks

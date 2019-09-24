@@ -1,0 +1,95 @@
+pipeline {
+    agent {
+        label 'docker-engine'
+    }
+    stages {
+        stage ('CSI-controller: Unit testing + coverage') {
+            steps {
+                sh 'mkdir -p build/reports && chmod 777 build/reports'
+                sh './scripts/run_unitests.sh `pwd`/build/reports'
+            }
+        }
+        stage ('CSI-controller: pep8') {
+            steps {
+                sh 'true'
+            }
+        }
+        stage ('CSI-controller: pylint') {
+            steps {
+                sh 'true'
+          
+            }
+        }
+        stage ('CSI-node: go Unit testing') {
+            steps {
+                sh 'mkdir -p build/reports && chmod 777 build/reports'
+                sh 'make test-xunit-in-container'
+            }
+        }
+        stage ('CSI-deployment: k8s yamls validation') {
+            steps {
+                sh './scripts/run_yamlcheck.sh'
+            }
+        }
+        stage ('CSI-controller & node: Build and push images') {
+            steps {
+                sh './scripts/ci/build_push_images.sh build/reports/images_url'
+            }
+        }
+    }
+    post {
+        always {
+            sh 'ls -la build/reports/'
+            junit 'build/reports/*.xml'
+            // cobertura coberturaReportFile: 'build/reports/*.xml'   ## TODO need to run cobertura but it has an issue "No such DSL method"
+            archiveArtifacts 'build/reports/images_url'
+            script {
+                manager.addShortText("${env.GIT_BRANCH}")
+            }
+        }
+
+        failure {
+            emailext body: 'Check console output at $BUILD_URL to view the results. \n\n ${CHANGES} \n\n -------------------------------------------------- \n${BUILD_LOG, maxLines=100, escapeHtml=false}',
+                    to: "${env.EMAIL_TO}",
+                    subject: 'Build failed in Jenkins: $PROJECT_NAME - #$BUILD_NUMBER'
+        }
+        unstable {
+            emailext body: 'Check console output at $BUILD_URL to view the results. \n\n ${CHANGES} \n\n -------------------------------------------------- \n${BUILD_LOG, maxLines=100, escapeHtml=false}',
+                    to: "${env.EMAIL_TO}",
+                    subject: 'Unstable build in Jenkins: $PROJECT_NAME - #$BUILD_NUMBER'
+        }
+        changed {
+            emailext body: 'Check console output at $BUILD_URL to view the results.',
+                    to: "${env.EMAIL_TO}",
+                    subject: 'Jenkins build is back to normal: $PROJECT_NAME - #$BUILD_NUMBER'
+        }
+
+        success {
+            script {
+                if (env.JOB_NAME =~ /PRODUCTION/) {
+                    echo "Trigger CI Production Pipeline"
+                    def images = readFile('build/reports/images_url').split("\n")
+                    def controller_image = images[0]
+                    def node_image = images[1]
+                    build(
+                        job: "${env.PROD_CI_JOB}", 
+                        wait: false,
+                        parameters: [
+                            string(name: 'CSI_CONTROLLER_IMAGE', value: "${controller_image}"),
+                            string(name: 'CSI_NODE_IMAGE', value: "${node_image}")
+                        ]
+                    )
+                } else {
+                    echo "Will not trigger CI Production pipeline as this is not a production job"
+                }
+            }
+        }
+
+        cleanup {
+            script {
+                sh '[ -d build/reports ] && rm -rf build/reports'
+            }
+        }
+
+    }
+}
