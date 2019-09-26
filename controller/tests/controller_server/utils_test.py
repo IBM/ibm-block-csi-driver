@@ -150,6 +150,22 @@ class TestUtils(unittest.TestCase):
         with self.assertRaises(Exception):
             utils.generate_csi_create_volume_response(new_vol)
 
+    @patch("controller.controller_server.utils.get_vol_id")
+    def test_get_create_volume_response_with_single_IP(self, get_vol_id):
+        new_vol = Mock()
+        new_vol.volume_name = "name"
+        new_vol.array_address = "9.1.1.1"
+
+        new_vol.pool_name = "pool"
+        new_vol.array_type = "svc"
+        new_vol.capacity_bytes = 10
+
+        get_vol_id.return_value = "svc:name"
+        res = utils.generate_csi_create_volume_response(new_vol)
+
+        self.assertEqual(10, res.volume.capacity_bytes)
+        self.assertEqual("9.1.1.1", res.volume.volume_context['array_address'])
+
     @patch('controller.controller_server.utils.validate_secret')
     @patch('controller.controller_server.utils.validate_csi_volume_capability')
     def test_validate_publish_volume_request(self, validate_capabilities, validate_secrets):
