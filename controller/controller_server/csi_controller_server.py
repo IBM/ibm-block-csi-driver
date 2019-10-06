@@ -38,7 +38,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         path = os.path.join(my_path, "../../common/config.yaml")
 
         with open(path, 'r') as yamlfile:
-            self.cfg = yaml.load(yamlfile)  # TODO: add the following when possible : Loader=yaml.FullLoader)
+            self.cfg = yaml.safe_load(yamlfile)  # TODO: add the following when possible : Loader=yaml.FullLoader)
 
     def CreateVolume(self, request, context):
         set_current_thread_name(request.name)
