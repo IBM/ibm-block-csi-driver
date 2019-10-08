@@ -269,7 +269,43 @@ class TestArrayMediatorSVC(unittest.TestCase):
         host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
                                   'WWPN': ['abc1']})
         host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_3',
+                                  'iscsi_name': ['iqn.test.2'],
+                                  'WWPN': ['abc3']})
+        host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
+                                  'WWPN': ['abc3'],
+                                  'iscsi_name': 'iqn.test.3'})
+        ret1 = [host_munch_ret_1, host_munch_ret_2]
+        ret2 = Munch(as_single_element=host_munch_ret_2)
+        ret3 = Munch(as_single_element=host_munch_ret_3)
+        self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
+        host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
+            'iqn.test.2', ['abcd3']))
+        self.assertEqual('test_host_3', host)
+        self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_type)
+
+    def test_get_host_by_identifiers_return_iscsi_host_with_string_iqn(self):
+        host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
+                                  'WWPN': ['abc1']})
+        host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_3',
                                   'iscsi_name': 'iqn.test.2',
+                                  'WWPN': ['abc3']})
+        host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
+                                  'WWPN': ['abc3'],
+                                  'iscsi_name': 'iqn.test.3'})
+        ret1 = [host_munch_ret_1, host_munch_ret_2]
+        ret2 = Munch(as_single_element=host_munch_ret_2)
+        ret3 = Munch(as_single_element=host_munch_ret_3)
+        self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
+        host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
+            'iqn.test.2', ['abcd3']))
+        self.assertEqual('test_host_3', host)
+        self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_type)
+
+    def test_get_host_by_identifiers_return_iscsi_host_with_list_iqn(self):
+        host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
+                                  'WWPN': ['abc1']})
+        host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_3',
+                                  'iscsi_name': ['iqn.test.2', 'iqn.test.22'],
                                   'WWPN': ['abc3']})
         host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
                                   'WWPN': ['abc3'],
@@ -287,7 +323,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
                                   'WWPN': ['abc1']})
         host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_3',
-                                  'iscsi_name': 'iqn.test.2',
+                                  'iscsi_name': '',
                                   'WWPN': 'abc3'})
         host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
                                   'WWPN': ['abc1', 'abc3'],
