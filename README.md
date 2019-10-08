@@ -53,6 +53,7 @@ RHEL 7.x:
 ```sh
 yum install device-mapper-multipath
 modprobe dm-multipath
+systemctl enable multipathd
 systemctl start multipathd
 systemctl status multipathd
 multipath -ll
