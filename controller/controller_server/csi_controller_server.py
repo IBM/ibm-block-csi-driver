@@ -180,99 +180,114 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def ControllerPublishVolume(self, request, context):
         set_current_thread_name(request.volume_id)
         logger.info("ControllerPublishVolume")
-        try:
+        attempts = 0
+        while attempts <100:
+            try:
+                utils.validate_publish_volume_request(request)
 
-            utils.validate_publish_volume_request(request)
+                array_type, vol_id = utils.get_volume_id_info(request.volume_id)
 
-            array_type, vol_id = utils.get_volume_id_info(request.volume_id)
+                node_id_info = NodeIdInfo(request.node_id)
+                node_name = node_id_info.node_name
+                initiators = node_id_info.initiators
 
-            node_id_info = NodeIdInfo(request.node_id)
-            node_name = node_id_info.node_name
-            initiators = node_id_info.initiators
+                logger.debug("node name for this publish operation is : {0}".format(node_name))
 
-            logger.debug("node name for this publish operation is : {0}".format(node_name))
+                user, password, array_addresses = utils.get_array_connection_info_from_secret(request.secrets)
 
-            user, password, array_addresses = utils.get_array_connection_info_from_secret(request.secrets)
+                with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
 
-            with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
+                    host_name, connectivity_types = array_mediator.get_host_by_host_identifiers(initiators)
 
-                host_name, connectivity_types = array_mediator.get_host_by_host_identifiers(initiators)
+                    logger.debug("hostname : {}, connectiivity_types  : {}".format(host_name, connectivity_types))
 
-                logger.debug("hostname : {}, connectiivity_types  : {}".format(host_name, connectivity_types))
+                    connectivity_type = utils.choose_connectivity_type(connectivity_types)
 
-                connectivity_type = utils.choose_connectivity_type(connectivity_types)
+                    if FC_CONNECTIVITY_TYPE == connectivity_type:
+                        array_initiators = array_mediator.get_array_fc_wwns(host_name)
+                    else:
+                        array_initiators = array_mediator.get_array_iqns()
+                    mappings = array_mediator.get_volume_mappings(vol_id)
+                    if len(mappings) >= 1:
+                        logger.debug(
+                            "{0} mappings have been found for volume. the mappings are: {1}".format(
+                                len(mappings), mappings))
+                        if len(mappings) == 1:
+                            mapping = list(mappings)[0]
+                            if mapping == host_name:
+                                logger.debug("idempotent case - volume is already mapped to host.")
+                                return utils.generate_csi_publish_volume_response(mappings[mapping], connectivity_type,
+                                                                                  self.cfg, array_initiators)
 
-                if FC_CONNECTIVITY_TYPE == connectivity_type:
-                    array_initiators = array_mediator.get_array_fc_wwns(host_name)
-                else:
-                    array_initiators = array_mediator.get_array_iqns()
-                mappings = array_mediator.get_volume_mappings(vol_id)
-                if len(mappings) >= 1:
-                    logger.debug(
-                        "{0} mappings have been found for volume. the mappings are: {1}".format(
-                            len(mappings), mappings))
-                    if len(mappings) == 1:
-                        mapping = list(mappings)[0]
-                        if mapping == host_name:
-                            logger.debug("idempotent case - volume is already mapped to host.")
-                            return utils.generate_csi_publish_volume_response(mappings[mapping], connectivity_type,
-                                                                              self.cfg, array_initiators)
+                        logger.error(messages.more_then_one_mapping_message.format(mappings))
+                        context.set_details(messages.more_then_one_mapping_message.format(mappings))
+                        context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+                        return csi_pb2.ControllerPublishVolumeResponse()
 
-                    logger.error(messages.more_then_one_mapping_message.format(mappings))
-                    context.set_details(messages.more_then_one_mapping_message.format(mappings))
-                    context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+                    logger.debug("no mappings were found for volume. mapping vol : {0} to host : {1}".format(
+                        vol_id, host_name))
+
+                    try:
+                        lun = array_mediator.map_volume(vol_id, host_name)
+                        logger.debug("lun : {}".format(lun))
+                    except controller_errors.LunAlreadyInUseError as ex:
+                        logger.warning("Lun was already in use. re-trying the operation. {0}".format(ex))
+                        for i in range(array_mediator.max_lun_retries - 1):
+                            try:
+                                lun = array_mediator.map_volume(vol_id, host_name)
+                                break
+                            except controller_errors.LunAlreadyInUseError as inner_ex:
+                                logger.warning("re-trying map volume. try #{0}. {1}".format(i, inner_ex))
+                        else:    # will get here only if the for statement is false.
+                            raise ex
+                    except controller_errors.PermissionDeniedError as ex:
+                        context.set_code(grpc.StatusCode.PERMISSION_DENIED)
+                        context.set_details(ex)
+                        return csi_pb2.ControllerPublishVolumeResponse()
+
+                    logger.info("finished ControllerPublishVolume")
+                    res = utils.generate_csi_publish_volume_response(lun, connectivity_type, self.cfg, array_initiators)
+                    logger.debug("after res")
+                    return res
+
+            except (controller_errors.LunAlreadyInUseError, controller_errors.NoAvailableLunError) as ex:
+                logger.exception(ex)
+                context.set_details(ex.message)
+                context.set_code(grpc.StatusCode.RESOURCE_EXHAUSTED)
+                return csi_pb2.ControllerPublishVolumeResponse()
+
+            except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError, controller_errors.BadNodeIdError) as ex:
+                logger.exception(ex)
+                context.set_details(ex.message)
+                context.set_code(grpc.StatusCode.NOT_FOUND)
+                return csi_pb2.ControllerPublishVolumeResponse()
+
+            except ValidationException as ex:
+                logger.exception(ex)
+                context.set_details(ex.message)
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                return csi_pb2.ControllerPublishVolumeResponse()
+
+            #if exception is NoConnectionAvailableException, sleep 3s and have a retry, if it's still failed after 100 times retry, return the error response
+            except controller_errors.NoConnectionAvailableException as ex:
+                logger.debug("no avaliable connections for the request vol {}".format(vol_id))
+                logger.exception(ex)
+                logger.debug("sleep 3s when encounter NoConnectionAvailableException for vol {}".format(vol_id))
+                time.sleep(3)
+                attempts += 1
+                if attempts == 100:
+                    logger.debug("After 100 times retry, no avaliable connection for the request vol {}".format(vol_id))
+                    context.set_code(grpc.StatusCode.INTERNAL)
+                    context.set_details('an internal exception occurred : {}'.format(ex))
                     return csi_pb2.ControllerPublishVolumeResponse()
+                continue
 
-                logger.debug("no mappings were found for volume. mapping vol : {0} to host : {1}".format(
-                    vol_id, host_name))
-
-                try:
-                    lun = array_mediator.map_volume(vol_id, host_name)
-                    logger.debug("lun : {}".format(lun))
-                except controller_errors.LunAlreadyInUseError as ex:
-                    logger.warning("Lun was already in use. re-trying the operation. {0}".format(ex))
-                    for i in range(array_mediator.max_lun_retries - 1):
-                        try:
-                            lun = array_mediator.map_volume(vol_id, host_name)
-                            break
-                        except controller_errors.LunAlreadyInUseError as inner_ex:
-                            logger.warning("re-trying map volume. try #{0}. {1}".format(i, inner_ex))
-                    else:    # will get here only if the for statement is false.
-                        raise ex
-                except controller_errors.PermissionDeniedError as ex:
-                    context.set_code(grpc.StatusCode.PERMISSION_DENIED)
-                    context.set_details(ex)
-                    return csi_pb2.ControllerPublishVolumeResponse()
-
-                logger.info("finished ControllerPublishVolume")
-                res = utils.generate_csi_publish_volume_response(lun, connectivity_type, self.cfg, array_initiators)
-                logger.debug("after res")
-                return res
-
-        except (controller_errors.LunAlreadyInUseError, controller_errors.NoAvailableLunError) as ex:
-            logger.exception(ex)
-            context.set_details(ex.message)
-            context.set_code(grpc.StatusCode.RESOURCE_EXHAUSTED)
-            return csi_pb2.ControllerPublishVolumeResponse()
-
-        except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError, controller_errors.BadNodeIdError) as ex:
-            logger.exception(ex)
-            context.set_details(ex.message)
-            context.set_code(grpc.StatusCode.NOT_FOUND)
-            return csi_pb2.ControllerPublishVolumeResponse()
-
-        except ValidationException as ex:
-            logger.exception(ex)
-            context.set_details(ex.message)
-            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-            return csi_pb2.ControllerPublishVolumeResponse()
-
-        except Exception as ex:
-            logger.debug("an internal exception occurred")
-            logger.exception(ex)
-            context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details('an internal exception occurred : {}'.format(ex))
-            return csi_pb2.ControllerPublishVolumeResponse()
+            except Exception as ex:
+                logger.debug("an internal exception occurred")
+                logger.exception(ex)
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details('an internal exception occurred : {}'.format(ex))
+                return csi_pb2.ControllerPublishVolumeResponse()
 
     def ControllerUnpublishVolume(self, request, context):
         set_current_thread_name(request.volume_id)
