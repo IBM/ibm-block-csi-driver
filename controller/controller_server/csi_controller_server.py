@@ -181,7 +181,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         set_current_thread_name(request.volume_id)
         logger.info("ControllerPublishVolume")
         attempts = 0
-        while attempts <100:
+        while attempts <4:
             try:
                 utils.validate_publish_volume_request(request)
 
@@ -275,7 +275,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.debug("sleep 3s when encounter NoConnectionAvailableException for vol {}".format(vol_id))
                 time.sleep(3)
                 attempts += 1
-                if attempts == 100:
+                if attempts == 4:
                     logger.debug("After 100 times retry, no avaliable connection for the request vol {}".format(vol_id))
                     context.set_code(grpc.StatusCode.INTERNAL)
                     context.set_details('an internal exception occurred : {}'.format(ex))
