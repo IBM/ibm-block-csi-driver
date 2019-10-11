@@ -180,8 +180,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def ControllerPublishVolume(self, request, context):
         set_current_thread_name(request.volume_id)
         logger.info("ControllerPublishVolume")
-        attempts = 0
-        while attempts <4:
+        retry = 0
+        while retry <11:
             try:
                 utils.validate_publish_volume_request(request)
 
@@ -268,15 +268,15 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
                 return csi_pb2.ControllerPublishVolumeResponse()
 
-            #if exception is NoConnectionAvailableException, sleep 3s and have a retry, if it's still failed after 100 times retry, return the error response
             except controller_errors.NoConnectionAvailableException as ex:
                 logger.debug("no avaliable connections for the request vol {}".format(vol_id))
                 logger.exception(ex)
-                logger.debug("sleep 3s when encounter NoConnectionAvailableException for vol {}".format(vol_id))
-                time.sleep(3)
-                attempts += 1
-                if attempts == 4:
-                    logger.debug("After 100 times retry, no avaliable connection for the request vol {}".format(vol_id))
+                logger.debug("sleep 1s when encounter NoConnectionAvailableException for vol {}".format(vol_id))
+                time.sleep(1)
+                retry += 1
+                #csiTimeout for kubelet is 15 second, it should give a response before it
+                if retry == 11:
+                    logger.debug("After 11 times retry, no avaliable connection for the request vol {}".format(vol_id))
                     context.set_code(grpc.StatusCode.INTERNAL)
                     context.set_details('an internal exception occurred : {}'.format(ex))
                     return csi_pb2.ControllerPublishVolumeResponse()
@@ -292,54 +292,70 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def ControllerUnpublishVolume(self, request, context):
         set_current_thread_name(request.volume_id)
         logger.info("ControllerUnpublishVolume")
-        try:
+        retry = 0
+        while retry < 11:
             try:
-                utils.validate_unpublish_volume_request(request)
-            except ValidationException as ex:
-                logger.exception(ex)
-                context.set_details(ex.message)
-                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                return csi_pb2.ControllerUnpublishVolumeResponse()
-
-            array_type, vol_id = utils.get_volume_id_info(request.volume_id)
-
-            node_id_info = NodeIdInfo(request.node_id)
-            node_name = node_id_info.node_name
-            initiators = node_id_info.initiators
-            logger.debug("node name for this unpublish operation is : {0}".format(node_name))
-
-            user, password, array_addresses = utils.get_array_connection_info_from_secret(request.secrets)
-
-            with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
-
-                host_name, _ = array_mediator.get_host_by_host_identifiers(initiators)
                 try:
-                    array_mediator.unmap_volume(vol_id, host_name)
-
-                except controller_errors.VolumeAlreadyUnmappedError as ex:
-                    logger.debug("Idempotent case. volume is already unmapped.")
+                    utils.validate_unpublish_volume_request(request)
+                except ValidationException as ex:
+                    logger.exception(ex)
+                    context.set_details(ex.message)
+                    context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
                     return csi_pb2.ControllerUnpublishVolumeResponse()
 
-                except controller_errors.PermissionDeniedError as ex:
-                    context.set_code(grpc.StatusCode.PERMISSION_DENIED)
-                    context.set_details(ex)
+                array_type, vol_id = utils.get_volume_id_info(request.volume_id)
+
+                node_id_info = NodeIdInfo(request.node_id)
+                node_name = node_id_info.node_name
+                initiators = node_id_info.initiators
+                logger.debug("node name for this unpublish operation is : {0}".format(node_name))
+
+                user, password, array_addresses = utils.get_array_connection_info_from_secret(request.secrets)
+
+                with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
+
+                    host_name, _ = array_mediator.get_host_by_host_identifiers(initiators)
+                    try:
+                        array_mediator.unmap_volume(vol_id, host_name)
+
+                    except controller_errors.VolumeAlreadyUnmappedError as ex:
+                        logger.debug("Idempotent case. volume is already unmapped.")
+                        return csi_pb2.ControllerUnpublishVolumeResponse()
+
+                    except controller_errors.PermissionDeniedError as ex:
+                        context.set_code(grpc.StatusCode.PERMISSION_DENIED)
+                        context.set_details(ex)
+                        return csi_pb2.ControllerPublishVolumeResponse()
+
+                logger.info("finished ControllerUnpublishVolume")
+                return csi_pb2.ControllerUnpublishVolumeResponse()
+
+            except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError) as ex:
+                logger.exception(ex)
+                context.set_details(ex.message)
+                context.set_code(grpc.StatusCode.NOT_FOUND)
+                return csi_pb2.ControllerUnpublishVolumeResponse()
+
+            except controller_errors.NoConnectionAvailableException as ex:
+                logger.debug("no avaliable connections for the request vol {}".format(vol_id))
+                logger.exception(ex)
+                logger.debug("sleep 1s when encounter NoConnectionAvailableException for vol {}".format(vol_id))
+                time.sleep(1)
+                retry += 1
+                #csiTimeout for kubelet is 15 second, it should give a response before it
+                if retry == 11:
+                    logger.debug("After 11 times retry, no avaliable connection for the request vol {}".format(vol_id))
+                    context.set_code(grpc.StatusCode.INTERNAL)
+                    context.set_details('an internal exception occurred : {}'.format(ex))
                     return csi_pb2.ControllerPublishVolumeResponse()
+                continue
 
-            logger.info("finished ControllerUnpublishVolume")
-            return csi_pb2.ControllerUnpublishVolumeResponse()
-
-        except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError) as ex:
-            logger.exception(ex)
-            context.set_details(ex.message)
-            context.set_code(grpc.StatusCode.NOT_FOUND)
-            return csi_pb2.ControllerUnpublishVolumeResponse()
-
-        except Exception as ex:
-            logger.debug("an internal exception occurred")
-            logger.exception(ex)
-            context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details('an internal exception occurred : {}'.format(ex))
-            return csi_pb2.ControllerUnpublishVolumeResponse()
+            except Exception as ex:
+                logger.debug("an internal exception occurred")
+                logger.exception(ex)
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details('an internal exception occurred : {}'.format(ex))
+                return csi_pb2.ControllerUnpublishVolumeResponse()
 
     def ValidateVolumeCapabilities(self, request, context):
         logger.info("ValidateVolumeCapabilities")
