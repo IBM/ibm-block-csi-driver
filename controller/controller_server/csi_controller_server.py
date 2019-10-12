@@ -269,14 +269,14 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 return csi_pb2.ControllerPublishVolumeResponse()
 
             except controller_errors.NoConnectionAvailableException as ex:
-                logger.debug("no avaliable connections for the request vol {}".format(vol_id))
+                logger.debug("no avaliable connections for vol {}".format(vol_id))
                 logger.exception(ex)
                 logger.debug("sleep 1s when encounter NoConnectionAvailableException for vol {}".format(vol_id))
                 time.sleep(1)
                 retry += 1
                 #csiTimeout for kubelet is 15 second, it should give a response before it
                 if retry == 11:
-                    logger.debug("After 11 times retry, no avaliable connection for the request vol {}".format(vol_id))
+                    logger.debug("no avaliable connection for vol {} after 11 times retry".format(vol_id))
                     context.set_code(grpc.StatusCode.INTERNAL)
                     context.set_details('an internal exception occurred : {}'.format(ex))
                     return csi_pb2.ControllerPublishVolumeResponse()
@@ -337,14 +337,14 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 return csi_pb2.ControllerUnpublishVolumeResponse()
 
             except controller_errors.NoConnectionAvailableException as ex:
-                logger.debug("no avaliable connections for the request vol {}".format(vol_id))
+                logger.debug("no avaliable connections for vol {}".format(vol_id))
                 logger.exception(ex)
                 logger.debug("sleep 1s when encounter NoConnectionAvailableException for vol {}".format(vol_id))
                 time.sleep(1)
                 retry += 1
                 #csiTimeout for kubelet is 15 second, it should give a response before it
                 if retry == 11:
-                    logger.debug("After 11 times retry, no avaliable connection for the request vol {}".format(vol_id))
+                    logger.debug("no avaliable connection for vol {} after 11 times retry".format(vol_id))
                     context.set_code(grpc.StatusCode.INTERNAL)
                     context.set_details('an internal exception occurred : {}'.format(ex))
                     return csi_pb2.ControllerPublishVolumeResponse()
