@@ -18,8 +18,8 @@ MAINTAINER IBM Storage
 ###Required Labels
 LABEL name="IBM block storage CSI driver controller" \
       vendor="IBM" \
-      version="0.9.0" \
-      release="b62" \
+      version="1.0.0" \
+      release="b78" \
       summary="The controller component of the IBM block storage CSI driver" \
       description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage." \
       io.k8s.display-name="IBM block storage CSI driver controller" \

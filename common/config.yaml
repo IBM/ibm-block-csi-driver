@@ -1,6 +1,6 @@
 identity:
    name: block.csi.ibm.com
-   version: 0.9.0
+   version: 1.0.0
    capabilities: 
       - CONTROLLER_SERVICE
 
