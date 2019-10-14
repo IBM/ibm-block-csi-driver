@@ -20,6 +20,12 @@ pipeline {
           
             }
         }
+        stage ('CSI controller and node: security code scanning') {
+            steps {
+                sh 'mkdir -p build/reports && chmod 777 build/reports'
+                sh './scripts/run_csi_code_scan.sh'
+            }
+        }
         stage ('CSI-node: go Unit testing') {
             steps {
                 sh 'mkdir -p build/reports && chmod 777 build/reports'
@@ -43,7 +49,6 @@ pipeline {
             junit 'build/reports/*.xml'
             // cobertura coberturaReportFile: 'build/reports/*.xml'   ## TODO need to run cobertura but it has an issue "No such DSL method"
             archiveArtifacts 'build/reports/images_url'
-            sh '[ -d build/reports ] && rm -rf build/reports'
             script {
                 manager.addShortText("${env.GIT_BRANCH}")
             }
@@ -63,6 +68,33 @@ pipeline {
             emailext body: 'Check console output at $BUILD_URL to view the results.',
                     to: "${env.EMAIL_TO}",
                     subject: 'Jenkins build is back to normal: $PROJECT_NAME - #$BUILD_NUMBER'
+        }
+
+        success {
+            script {
+                if (env.JOB_NAME =~ /PRODUCTION/) {
+                    echo "Trigger CI Production Pipeline"
+                    def images = readFile('build/reports/images_url').split("\n")
+                    def controller_image = images[0]
+                    def node_image = images[1]
+                    build(
+                        job: "${env.PROD_CI_JOB}", 
+                        wait: false,
+                        parameters: [
+                            string(name: 'CSI_CONTROLLER_IMAGE', value: "${controller_image}"),
+                            string(name: 'CSI_NODE_IMAGE', value: "${node_image}")
+                        ]
+                    )
+                } else {
+                    echo "Will not trigger CI Production pipeline as this is not a production job"
+                }
+            }
+        }
+
+        cleanup {
+            script {
+                sh '[ -d build/reports ] && rm -rf build/reports'
+            }
         }
 
     }

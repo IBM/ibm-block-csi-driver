@@ -44,7 +44,7 @@ type MultipleDeviceNotFoundError struct {
 }
 
 func (e *MultipleDeviceNotFoundError) Error() string {
-	return fmt.Sprintf("Couldn't find dm-* of the physical device path [%s -> %s]. Please check the host connectivity to the storage.", e.DiskByPathDevice, e.LinkToPhysicalDevice)
+	return fmt.Sprintf("Multipath device(dm) is not found for this physical device [%s -> %s], this can happen when there is only one path to the storage system. Please verify that you have more than one path connected to the storage system.", e.DiskByPathDevice, e.LinkToPhysicalDevice)
 }
 
 type ErrorNothingWasWrittenToScanFileError struct {

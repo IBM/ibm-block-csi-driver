@@ -1,8 +1,8 @@
-# IBM block storage CSI driver - Usage details
+# IBM block storage CSI driver - Usage Details
 
 
 
-## Driver Usage details
+## Driver Usage Details
 This section shows how to:
 - Create k8s secret `a9000-array1` for the storage system. (The example below uses FlashSystem A9000R as an example but the same can be used for FlashSystem A9000 and FlashSystem 9100.)
 - Create storage class `gold`.
@@ -86,7 +86,7 @@ persistentvolumeclaim/demo-pvc   Bound    pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d
 $> kubectl describe persistentvolume/pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d5f
 Name:            pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d5f
 Labels:          <none>
-Annotations:     pv.kubernetes.io/provisioned-by: ibm-block-csi-driver
+Annotations:     pv.kubernetes.io/provisioned-by: block.csi.ibm.com
 Finalizers:      [kubernetes.io/pv-protection]
 StorageClass:    gold
 Status:          Bound
@@ -99,12 +99,12 @@ Node Affinity:   <none>
 Message:         
 Source:
     Type:              CSI (a Container Storage Interface (CSI) volume source)
-    Driver:            ibm-block-csi-driver
+    Driver:            block.csi.ibm.com
     VolumeHandle:      A9000:6001738CFC9035EB0000000000D1F68F
     ReadOnly:          false
     VolumeAttributes:      array_address=<IP>
                            pool_name=gold
-                           storage.kubernetes.io/csiProvisionerIdentity=1565550204603-8081-ibm-block-csi-driver
+                           storage.kubernetes.io/csiProvisionerIdentity=1565550204603-8081-block.csi.ibm.com
                            storage_type=A9000
                            volume_name=demo1_pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d5f
 Events:                <none>
@@ -302,18 +302,18 @@ statefulset.apps/ibm-block-csi-controller   1/1     9m36s
 $> kubectl describe -n kube-system pod/ibm-block-csi-controller-0
 
 ###### View the CSI controller logs
-$> kubectl log -f -n kube-system ibm-block-csi-controller-0 ibm-block-csi-controller
+$> kubectl log -f -n kube-system ibm-block-csi-controller-0 -c ibm-block-csi-controller
 
 ###### View the CSI daemonset node logs
-$> kubectl log -f -n kube-system ibm-block-csi-node-<PODID> ibm-block-csi-node
+$> kubectl log -f -n kube-system ibm-block-csi-node-<PODID> -c ibm-block-csi-node
 ```
 
-Additional Driver details:
+Additional driver details:
 ```
 ###### If `feature-gates=CSIDriverRegistry` was set to `true` then CSIDriver object for the driver will be automatically created. See this by running: 
 
-$> kubectl describe csidriver ibm-block-csi-driver
-Name:         ibm-block-csi-driver
+$> kubectl describe csidriver block.csi.ibm.com
+Name:         block.csi.ibm.com
 Namespace:    
 Labels:       <none>
 Annotations:  <none>
@@ -323,7 +323,7 @@ Metadata:
   Creation Timestamp:  2019-07-15T12:04:32Z
   Generation:          1
   Resource Version:    1404
-  Self Link:           /apis/csi.storage.k8s.io/v1alpha1/csidrivers/ibm-block-csi-driver
+  Self Link:           /apis/csi.storage.k8s.io/v1alpha1/csidrivers/block.csi.ibm.com
   UID:                 b46db4ed-a6f8-11e9-b93e-005056a45d5f
 Spec:
   Attach Required:            true
@@ -332,7 +332,7 @@ Events:                       <none>
 
 
 $> kubectl get -n kube-system  csidriver,sa,clusterrole,clusterrolebinding,statefulset,pod,daemonset | grep ibm-block-csi
-csidriver.storage.k8s.io/ibm-block-csi-driver   2019-06-02T09:30:36Z
+csidriver.storage.k8s.io/block.csi.ibm.com   2019-06-02T09:30:36Z
 serviceaccount/ibm-block-csi-controller-sa          1         2m16s
 clusterrole.rbac.authorization.k8s.io/ibm-block-csi-cluster-driver-registrar-role                            2m16s
 clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-attacher-role                                   2m16s
