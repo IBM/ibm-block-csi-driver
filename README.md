@@ -15,7 +15,7 @@ Supported IBM storage systems:
 Supported operating systems:
   - RHEL 7.x (x86 architecture)
 
-DISCLAIMER: The driver is provided as is, without warranty. Version 0.9.0 of the IBM block storage CSI driver is a beta software version. Do not use this driver for production purposes and do not contact IBM for support. Any issue will be handled on a best-effort basis. 
+DISCLAIMER: The driver is provided as is, without warranty. Version 1.0.0 of the IBM block storage CSI driver is a beta software version. Do not use this driver for production purposes and do not contact IBM for support. Any issue will be handled on a best-effort basis. 
 
 ## Table of content:
 * [Prerequisites for driver installation](#prerequisites-for-driver-installation)
@@ -124,7 +124,7 @@ This section describes how to install the CSI driver.
 ###### Download the driver yml file from github:
 $> curl https://raw.githubusercontent.com/IBM/ibm-block-csi-driver/master/deploy/kubernetes/v1.13/ibm-block-csi-driver.yaml > ibm-block-csi-driver.yaml 
 
-###### Optional: Only edit the `ibm-block-csi-driver.yaml` file if you need to change the driver IMAGE URL. By default, the URL is `ibmcom/ibm-block-csi-driver-controller:0.9.0` and `ibmcom/ibm-block-csi-driver-node:0.9.0`.
+###### Optional: Only edit the `ibm-block-csi-driver.yaml` file if you need to change the driver IMAGE URL. By default, the URL is `ibmcom/ibm-block-csi-driver-controller:1.0.0` and `ibmcom/ibm-block-csi-driver-node:0.9.0`.
 
 ###### Install the driver:
 $> kubectl apply -f ibm-block-csi-driver.yaml
