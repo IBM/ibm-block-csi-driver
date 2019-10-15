@@ -269,6 +269,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.ControllerPublishVolumeResponse()
 
+        except controller_errors.NoConnectionAvailableException as ex:
+            logger.exception(ex)
+            raise ex
+
         except Exception as ex:
             logger.debug("an internal exception occurred")
             logger.exception(ex)
@@ -321,6 +325,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)
             return csi_pb2.ControllerUnpublishVolumeResponse()
+
+        except controller_errors.NoConnectionAvailableException as ex:
+            logger.exception(ex)
+            raise ex
 
         except Exception as ex:
             logger.debug("an internal exception occurred")
