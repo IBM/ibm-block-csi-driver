@@ -493,6 +493,7 @@ spec:
             path: /
             type: Directory
 
+---
 
 ## The below CSIDriver object is required to define (k8s 1.14 its still needed to be added due to redesign -> https://kubernetes-csi.github.io/docs/cluster-driver-registrar.html)
 apiVersion: storage.k8s.io/v1beta1   ## for k8s 1.13 it should be csi.storage.k8s.io/v1alpha1 and requires to set feature gate --feature-gates=CSIDriverRegistry=true
