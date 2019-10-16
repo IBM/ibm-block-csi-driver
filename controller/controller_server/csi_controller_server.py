@@ -11,11 +11,9 @@ from controller.array_action.array_connection_manager import ArrayConnectionMana
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.csi_logger import set_log_level
 import controller.controller_server.config as config
-from controller.array_action.config import FC_CONNECTIVITY_TYPE
 import controller.controller_server.utils as utils
 import controller.array_action.errors as controller_errors
 from controller.controller_server.errors import ValidationException
-import controller.controller_server.messages as messages
 from controller.common.utils import set_current_thread_name
 from controller.common.node_info import NodeIdInfo
 from controller.array_action.array_mediator_action import map_volume, unmap_volume
@@ -202,7 +200,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                          array_initiators)
             return res
 
-        except controller_errors.MappingError as ex:
+        except controller_errors.VolumeMappedToMultipleHostsError as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.FAILED_PRECONDITION)

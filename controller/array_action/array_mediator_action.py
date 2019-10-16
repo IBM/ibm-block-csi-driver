@@ -2,7 +2,6 @@ from controller.array_action.array_connection_manager import ArrayConnectionMana
 from controller.common.csi_logger import get_stdout_logger
 from controller.array_action.errors import NoConnectionAvailableException
 from controller.controller_server import utils
-from controller.controller_server import messages
 import controller.array_action.errors as controller_errors
 from controller.array_action.config import FC_CONNECTIVITY_TYPE
 
@@ -34,8 +33,7 @@ def map_volume(user, password, array_addresses, array_type, vol_id, initiators):
                 if mapping == host_name:
                     logger.debug("idempotent case - volume is already mapped to host.")
                     return mappings[mapping], connectivity_type, array_initiators
-            err = messages.more_then_one_mapping_message.format(mappings)
-            raise controller_errors.MappingError(vol_id, host_name, err)
+            raise controller_errors.VolumeMappedToMultipleHostsError(mappings, vol_id)
 
         logger.debug(
             "no mappings were found for volume. mapping vol : {0} to host : {1}".format(
