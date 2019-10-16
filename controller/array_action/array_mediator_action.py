@@ -33,7 +33,7 @@ def map_volume(user, password, array_addresses, array_type, vol_id, initiators):
                 if mapping == host_name:
                     logger.debug("idempotent case - volume is already mapped to host.")
                     return mappings[mapping], connectivity_type, array_initiators
-            raise controller_errors.VolumeMappedToMultipleHostsError(mappings, vol_id)
+            raise controller_errors.VolumeMappedToMultipleHostsError(mappings)
 
         logger.debug(
             "no mappings were found for volume. mapping vol : {0} to host : {1}".format(

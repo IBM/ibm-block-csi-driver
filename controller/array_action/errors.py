@@ -122,5 +122,5 @@ class BadNodeIdError(BaseArrayActionException):
 
 class VolumeMappedToMultipleHostsError(BaseArrayActionException):
 
-    def __init__(self, hosts, vol):
-        self.message = messages.VolumeMappedToMultipleHostsError_message.format(hosts, vol)
+    def __init__(self, hosts):
+        self.message = messages.VolumeMappedToMultipleHostsError_message.format(hosts)
