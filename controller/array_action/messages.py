@@ -33,3 +33,5 @@ VolumeAlreadyUnmapped_message = "Volume: {0} is already unmapped."
 UnMappingError_message = "Unmapping error has occurred for vol : {0} and host : {1}. error : {2}"
 
 BadNodeIdError_message = "Bad node id format for node id : {0}"
+
+VolumeMappedToMultipleHostsError_message = "Volume is already mapped to different hosts {0}"
