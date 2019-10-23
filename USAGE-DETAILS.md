@@ -44,7 +44,7 @@ parameters:
   csi.storage.k8s.io/controller-publish-secret-name: a9000-array1
   csi.storage.k8s.io/controller-publish-secret-namespace: kube-system
 
-  csi.storage.k8s.io/fstype: xfs   # Optional. values ext4/xfs. The default is ext4.
+  csi.storage.k8s.io/fstype: xfs   # Optional. values ext4/xfs. The default is xfs.
   volume_name_prefix: demo1        # Optional.
 
 $> kubectl create -f demo-storageclass-gold-A9000R.yaml

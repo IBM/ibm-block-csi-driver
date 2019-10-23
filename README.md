@@ -200,7 +200,7 @@ parameters:
   csi.storage.k8s.io/controller-publish-secret-name: <VALUE_ARRAY_SECRET>
   csi.storage.k8s.io/controller-publish-secret-namespace: <VALUE_ARRAY_SECRET_NAMESPACE>
 
-  csi.storage.k8s.io/fstype: xfs   # Optional: Values ext4/xfs. The default is ext4.
+  csi.storage.k8s.io/fstype: xfs   # Optional: Values ext4/xfs. The default is xfs.
 ```
 
 Apply the storage class:
