@@ -206,7 +206,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice 
 	r.MutexMultipathF.Unlock()
 
 	if err != nil {
-		if _, errOpen := os.Open(fullDevice); errOpen != nil {
+		if file, errOpen := os.Open(fullDevice); errOpen != nil {
 			if os.IsNotExist(errOpen) {
 				logger.Debugf("Mpath device {%v} was deleted", fullDevice)
 			} else {
@@ -215,6 +215,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice 
 			}
 		} else {
 			logger.Errorf("multipath -f {%v} did not succeed to delete the device. err={%v}", fullDevice, err.Error())
+			defer file.Close()
 			return err
 		}
 	}
