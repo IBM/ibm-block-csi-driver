@@ -49,7 +49,7 @@ var (
 		},
 	}
 
-	defaultFSType              = "ext4"
+	defaultFSType              = "xfs"
 	stageInfoFilename          = ".stageInfo.json"
 	supportedConnectivityTypes = map[string]bool{
 		"iscsi": true,
