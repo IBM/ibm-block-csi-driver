@@ -117,7 +117,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string, connectivityType string) (string, error) {
-	logger.Infof("GetMpathDevice: Found multipath devices for volume : [%s] that relats to lunId=%d and arrayIdentifiers=%s", volumeId, lunId, arrayIdentifiers)
+	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] that relats to lunId=%d and arrayIdentifiers=%s", volumeId, lunId, arrayIdentifiers)
 
 	if len(arrayIdentifiers) == 0 {
 		e := &ErrorNotFoundArrayIdentifiers{lunId}
