@@ -387,6 +387,7 @@ spec:
             - --hostname=$(KUBE_NODE_NAME)
             - --config-file-path=./config.yaml
             - --loglevel=$(CSI_LOGLEVEL)
+          hostIPC: true
           env:
             - name: CSI_ENDPOINT
               value: unix:///csi/csi.sock
