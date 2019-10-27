@@ -376,6 +376,7 @@ spec:
         product: ibm-block-csi-driver
         csi: ibm
     spec:
+      hostIPC: true
       containers:
         - name: ibm-block-csi-node
           securityContext:
