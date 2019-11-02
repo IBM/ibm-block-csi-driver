@@ -17,7 +17,7 @@ Supported operating systems:
 
 DISCLAIMER: The driver is provided as is, without warranty.
 
-Full documentation can be found in the IBM knowlage center -> HERE
+Full documentation can be found in the [IBM knowlage center](https://www.ibm.com/support/knowledgecenter/SSRQ8T).
 
 ## Table of content:
 * [Prerequisites for driver installation](#prerequisites-for-driver-installation)
