@@ -109,6 +109,73 @@ From this version(1.0.0) the deployment method of the driver is done via `Operat
 Note: This `deploy/kubernetes` yaml files are deprecated from version v1.0.0.
 
 
+## Configuring k8s secret and storage class
+In order to use the driver, create the relevant storage classes and secrets, as needed.
+
+This section describes how to:
+ 1. Create a storage system secret - to define the storage credential (user and password) and its address.
+ 2. Configure the k8s storage class - to define the storage system pool name, secret reference, SpaceEfficiency (thin, compressed, or deduplicated) and fstype(xfs\ext4).
+
+#### 1. Create an array secret 
+Create a secret file as follows and update the relevant credentials:
+
+```
+kind: Secret
+apiVersion: v1
+metadata:
+  name: <VALUE-1>
+  namespace: kube-system
+type: Opaque
+stringData:
+  management_address: <VALUE-2,VALUE-3> # Array managment addresses
+  username: <VALUE-4>                   # Array username.  
+data:
+  password: <VALUE-5 base64>            # Array password.
+```
+
+Apply the secret:
+
+```
+$> kubectl apply -f array-secret.yaml
+```
+
+#### 2. Create storage classes
+
+Create a storage class yaml file `storageclass-gold.yaml` as follows, with the relevant capabilities, pool and, array secret:
+
+```sh
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: gold
+provisioner: block.csi.ibm.com
+parameters:
+  #SpaceEfficiency: <VALUE>    # Optional: Values applicable for Storwize are: thin, compressed, or deduplicated
+  pool: <VALUE_POOL_NAME>
+
+  csi.storage.k8s.io/provisioner-secret-name: <VALUE_ARRAY_SECRET>
+  csi.storage.k8s.io/provisioner-secret-namespace: <VALUE_ARRAY_SECRET_NAMESPACE>
+  csi.storage.k8s.io/controller-publish-secret-name: <VALUE_ARRAY_SECRET>
+  csi.storage.k8s.io/controller-publish-secret-namespace: <VALUE_ARRAY_SECRET_NAMESPACE>
+
+  csi.storage.k8s.io/fstype: xfs   # Optional: Values ext4/xfs. The default is ext4.
+```
+
+Apply the storage class:
+
+```sh
+$> kubectl apply -f storageclass-gold.yaml
+storageclass.storage.k8s.io/gold created
+```
+You can now run stateful applications using IBM block storage systems.
+
+
+
+
+<br/>
+<br/>
+<br/>
+
 
 ## Driver usage
 Create PVC demo-pvc-gold using `demo-pvc-gold.yaml`:
