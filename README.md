@@ -128,9 +128,9 @@ metadata:
 type: Opaque
 stringData:
   management_address: <VALUE-2,VALUE-3> # Array managment addresses
-  username: <VALUE-4>                   # Array username.  
+  username: <VALUE-4>                   # Array username  
 data:
-  password: <VALUE-5 base64>            # Array password.
+  password: <VALUE-5 base64>            # Array password
 ```
 
 Apply the secret:
