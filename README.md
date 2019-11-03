@@ -72,13 +72,14 @@ multipath -ll
 
 3.3.1. Make sure that the login to the iSCSI targets is permanent and remains available after a reboot of the worker node. To do this, verify that the node.startup in the /etc/iscsi/iscsid.conf file is set to automatic. If not, set it as required and then restart the iscsid service `$> service iscsid restart`.
 
-3.3.2. Discover and log into at least two iSCSI targets on the relevant storage
-systems.
+3.3.2. Discover and log into at least two iSCSI targets on the relevant storage systems. (NOTE: Without at least two ports, multipath device will not be created.)
 
 ```sh
-$> iscsiadm -m discoverydb -t st -p ${storage system iSCSI port IP}:3260
---discover
-$> iscsiadm -m node -p ${storage system iSCSI port IP/hostname} --login
+$> iscsiadm -m discoverydb -t st -p ${STORAGE-SYSTEM-iSCSI-PORT-IP1}:3260 --discover
+$> iscsiadm -m node -p ${STORAGE-SYSTEM-iSCSI-PORT-IP1} --login
+
+$> iscsiadm -m discoverydb -t st -p ${STORAGE-SYSTEM-iSCSI-PORT-IP2}:3260 --discover
+$> iscsiadm -m node -p ${STORAGE-SYSTEM-iSCSI-PORT-IP2} --login
 ```
 
 3.3.3. Verify that the login was successful and display all targets that you logged into. The portal value must be the iSCSI target IP address.
@@ -86,7 +87,8 @@ $> iscsiadm -m node -p ${storage system iSCSI port IP/hostname} --login
 ```sh
 $> iscsiadm -m session --rescan
 Rescanning session [sid: 1, target: {storage system IQN},
-portal: {storage system iSCSI port IP},{port number}
+portal: {STORAGE-SYSTEM-iSCSI-PORT-IP1},{port number}
+portal: {STORAGE-SYSTEM-iSCSI-PORT-IP2},{port number}
 ```
 
 End of worker node setup.
