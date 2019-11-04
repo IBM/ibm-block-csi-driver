@@ -64,7 +64,7 @@ multipath -ll
 **Important:** When configuring Linux multipath devices, verify that the `find_multipaths` parameter in the `multipath.conf` file is disabled. In RHEL 7.x, remove the`find_multipaths yes` string from the `multipath.conf` file.
 
 #### 3. Configure storage system connectivity
-3.1. Define the hostname of each Kubernetes node on the relevant storage systems with the valid WWPN(for Fibre Channel) or IQN(for iSCSI) of the node. 
+3.1. Define the hostname of each Kubernetes node on the relevant storage systems with the valid WWPN (for Fibre Channel) or IQN (for iSCSI) of the node. 
 
 3.2. For Fibre Channel, configure the relevant zoning from the storage to the host.
 
@@ -72,7 +72,7 @@ multipath -ll
 
 3.3.1. Make sure that the login to the iSCSI targets is permanent and remains available after a reboot of the worker node. To do this, verify that the node.startup in the /etc/iscsi/iscsid.conf file is set to automatic. If not, set it as required and then restart the iscsid service `$> service iscsid restart`.
 
-3.3.2. Discover and log into at least two iSCSI targets on the relevant storage systems. (NOTE: Without at least two ports, multipath device will not be created.)
+3.3.2. Discover and log into at least two iSCSI targets on the relevant storage systems. (NOTE: Without at least two ports, a multipath device will not be created.)
 
 ```sh
 $> iscsiadm -m discoverydb -t st -p ${STORAGE-SYSTEM-iSCSI-PORT-IP1}:3260 --discover
@@ -107,8 +107,6 @@ End of worker node setup.
 This section describes how to install the CSI driver.
 
 From this version(1.0.0) the deployment method of the driver is done via `Operator for IBM Block CSI Driver` -> https://github.com/ibm/ibm-block-csi-operator.
-
-Note: This `deploy/kubernetes` yaml files are deprecated from version v1.0.0.
 
 
 ## Configuring k8s secret and storage class
