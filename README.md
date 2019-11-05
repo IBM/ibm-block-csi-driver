@@ -24,7 +24,7 @@ Full documentation can be found on the [IBM knowledge center](www.ibm.com/suppor
     - Install Fibre Channel and iSCSI connectivity rpms, multipath configurations, and configure storage system connectivity.
 * [Installing the driver](#installing-the-driver)
 * [Configuring k8s secret and storage class](#configuring-k8s-secret-and-storage-class)
-    - Configure the k8s storage class - to define the storage system pool name, secret reference, SpaceEfficiency (Thin, Compressed or Deduplicated) and fstype(xfs\ext4)
+    - Configure the k8s storage class - to define the storage system pool name, secret reference, SpaceEfficiency (Thin, Compressed or Deduplicated) and fstype (xfs\ext4)
     - Storage system secret - to define the storage credential(user and password) and its address
 * [Driver usage](#driver-usage)
     - Example of how to create PVC and StatefulSet application, with full detail behind the scenes
@@ -113,11 +113,11 @@ From this version(1.0.0) the deployment method of the driver is done via `Operat
 In order to use the driver, create the relevant storage classes and secrets, as needed.
 
 This section describes how to:
- 1. Create a storage system secret - to define the storage credential (user and password) and its address.
- 2. Configure the k8s storage class - to define the storage system pool name, secret reference, SpaceEfficiency (thin, compressed, or deduplicated) and fstype(xfs\ext4).
+ 1. Create a storage system secret - to define the storage system credentials (user and password) and its address.
+ 2. Configure the k8s storage class - to define the storage system pool name, secret reference, SpaceEfficiency (thin, compressed, or deduplicated) and fstype (xfs\ext4).
 
 #### 1. Create an array secret 
-Create a secret file as follows and update the relevant credentials:
+Create a secret file as follows `array-secret.yaml` and update the relevant credentials:
 
 ```
 kind: Secret
@@ -167,7 +167,6 @@ Apply the storage class:
 $> kubectl apply -f storageclass-gold.yaml
 storageclass.storage.k8s.io/gold created
 ```
-You can now run stateful applications using IBM block storage systems.
 
 
 
