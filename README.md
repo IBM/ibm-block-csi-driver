@@ -3,8 +3,8 @@
 The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage.
 
 Supported container platforms:
-  - OpenShift v4.1
-  - Kubernetes v1.13
+  - OpenShift v4.2
+  - Kubernetes v1.14
 
 Supported IBM storage systems:
   - IBM FlashSystem 9100
@@ -15,14 +15,16 @@ Supported IBM storage systems:
 Supported operating systems:
   - RHEL 7.x (x86 architecture)
 
-DISCLAIMER: The driver is provided as is, without warranty. Version 1.0.0 of the IBM block storage CSI driver is a beta software version. Do not use this driver for production purposes and do not contact IBM for support. Any issue will be handled on a best-effort basis. 
+DISCLAIMER: The driver is provided as is, without warranty.
+
+Full documentation can be found on the [IBM knowledge center](www.ibm.com/support/knowledgecenter/SSRQ8T).
 
 ## Table of content:
 * [Prerequisites for driver installation](#prerequisites-for-driver-installation)
     - Install Fibre Channel and iSCSI connectivity rpms, multipath configurations, and configure storage system connectivity.
 * [Installing the driver](#installing-the-driver)
 * [Configuring k8s secret and storage class](#configuring-k8s-secret-and-storage-class)
-    - Configure the k8s storage class - to define the storage system pool name, secret reference, SpaceEfficiency (Thin, Compressed or Deduplicated) and fstype(xfs\ext4)
+    - Configure the k8s storage class - to define the storage system pool name, secret reference, SpaceEfficiency (Thin, Compressed or Deduplicated) and fstype (xfs\ext4)
     - Storage system secret - to define the storage credential(user and password) and its address
 * [Driver usage](#driver-usage)
     - Example of how to create PVC and StatefulSet application, with full detail behind the scenes
@@ -62,7 +64,7 @@ multipath -ll
 **Important:** When configuring Linux multipath devices, verify that the `find_multipaths` parameter in the `multipath.conf` file is disabled. In RHEL 7.x, remove the`find_multipaths yes` string from the `multipath.conf` file.
 
 #### 3. Configure storage system connectivity
-3.1. Define the hostname of each Kubernetes node on the relevant storage systems with the valid WWPN or IQN of the node. 
+3.1. Define the hostname of each Kubernetes node on the relevant storage systems with the valid WWPN (for Fibre Channel) or IQN (for iSCSI) of the node. 
 
 3.2. For Fibre Channel, configure the relevant zoning from the storage to the host.
 
@@ -70,13 +72,14 @@ multipath -ll
 
 3.3.1. Make sure that the login to the iSCSI targets is permanent and remains available after a reboot of the worker node. To do this, verify that the node.startup in the /etc/iscsi/iscsid.conf file is set to automatic. If not, set it as required and then restart the iscsid service `$> service iscsid restart`.
 
-3.3.2. Discover and log into at least two iSCSI targets on the relevant storage
-systems.
+3.3.2. Discover and log into at least two iSCSI targets on the relevant storage systems. (NOTE: Without at least two ports, a multipath device will not be created.)
 
 ```sh
-$> iscsiadm -m discoverydb -t st -p ${storage system iSCSI port IP}:3260
---discover
-$> iscsiadm -m node -p ${storage system iSCSI port IP/hostname} --login
+$> iscsiadm -m discoverydb -t st -p ${STORAGE-SYSTEM-iSCSI-PORT-IP1}:3260 --discover
+$> iscsiadm -m node -p ${STORAGE-SYSTEM-iSCSI-PORT-IP1} --login
+
+$> iscsiadm -m discoverydb -t st -p ${STORAGE-SYSTEM-iSCSI-PORT-IP2}:3260 --discover
+$> iscsiadm -m node -p ${STORAGE-SYSTEM-iSCSI-PORT-IP2} --login
 ```
 
 3.3.3. Verify that the login was successful and display all targets that you logged into. The portal value must be the iSCSI target IP address.
@@ -84,28 +87,11 @@ $> iscsiadm -m node -p ${storage system iSCSI port IP/hostname} --login
 ```sh
 $> iscsiadm -m session --rescan
 Rescanning session [sid: 1, target: {storage system IQN},
-portal: {storage system iSCSI port IP},{port number}
+portal: {STORAGE-SYSTEM-iSCSI-PORT-IP1},{port number}
+portal: {STORAGE-SYSTEM-iSCSI-PORT-IP2},{port number}
 ```
 
 End of worker node setup.
-
-
-### Installing the CSIDriver CRD (optional)
-Enable the CSIDriver on Kubernetes. For more details see https://kubernetes-csi.github.io/docs/csi-driver-object.html#enabling-csidriver-on-kubernetes
-.
-In Kubernetes v1.13, this feature was disabled by default (the feature was alpha). To enable the use of CSIDriver on this Kubernetes version, perform the the following steps:
-
-**Note:** If the feature gate was not enabled, CSIDriver for the block.csi.ibm.com will not be created automatically.
-
-1. Ensure the feature gate is enabled via the following Kubernetes feature flag: --feature-gates=CSIDriverRegistry=true
-   For example, on kubeadm installation, add the flag inside `/etc/kubernetes/manifests/kube-apiserver.yaml`.
-2. Perform one of the following:
--Ensure the CSIDriver CRD is automatically installed via the Kubernetes Storage CRD addon 
-OR
--Manually install the CSIDriver CRD on the Kubernetes cluster with the following command:
-   ```sh
-   $> kubectl create -f https://raw.githubusercontent.com/kubernetes/csi-api/master/pkg/crd/manifests/csidriver.yaml
-   ```
 
 
 
@@ -120,47 +106,18 @@ OR
 ## Installing the driver
 This section describes how to install the CSI driver.
 
-```sh
-###### Download the driver yml file from github:
-$> curl https://raw.githubusercontent.com/IBM/ibm-block-csi-driver/master/deploy/kubernetes/v1.13/ibm-block-csi-driver.yaml > ibm-block-csi-driver.yaml 
+From this version(1.0.0) the deployment method of the driver is done via `Operator for IBM Block CSI Driver` -> https://github.com/ibm/ibm-block-csi-operator.
 
-###### Optional: Only edit the `ibm-block-csi-driver.yaml` file if you need to change the driver IMAGE URL. By default, the URL is `ibmcom/ibm-block-csi-driver-controller:1.0.0` and `ibmcom/ibm-block-csi-driver-node:0.9.0`.
-
-###### Install the driver:
-$> kubectl apply -f ibm-block-csi-driver.yaml
-```
-
-Verify the driver is running. (Make sure the csi-controller pod status is Running):
-
-```sh
-
-$> kubectl get all -n kube-system  -l csi
-NAME                             READY   STATUS    RESTARTS   AGE
-pod/ibm-block-csi-controller-0   5/5     Running   0          9m36s
-pod/ibm-block-csi-node-jvmvh     3/3     Running   0          9m36s
-pod/ibm-block-csi-node-tsppw     3/3     Running   0          9m36s
-
-NAME                                DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
-daemonset.apps/ibm-block-csi-node   2         2         2       2            2           <none>          9m36s
-
-NAME                                        READY   AGE
-statefulset.apps/ibm-block-csi-controller   1/1     9m36s
-
-```
-
-<br/>
-<br/>
-<br/>
 
 ## Configuring k8s secret and storage class
 In order to use the driver, create the relevant storage classes and secrets, as needed.
 
 This section describes how to:
- 1. Create a storage system secret - to define the storage credential (user and password) and its address.
- 2. Configure the k8s storage class - to define the storage system pool name, secret reference, SpaceEfficiency (thin, compressed, or deduplicated) and fstype(xfs\ext4).
+ 1. Create a storage system secret - to define the storage system credentials (user and password) and its address.
+ 2. Configure the k8s storage class - to define the storage system pool name, secret reference, SpaceEfficiency (thin, compressed, or deduplicated) and fstype (xfs\ext4).
 
 #### 1. Create an array secret 
-Create a secret file as follows and update the relevant credentials:
+Create a secret file as follows `array-secret.yaml` and update the relevant credentials:
 
 ```
 kind: Secret
@@ -171,9 +128,9 @@ metadata:
 type: Opaque
 stringData:
   management_address: <VALUE-2,VALUE-3> # Array managment addresses
-  username: <VALUE-4>                   # Array username.  
+  username: <VALUE-4>                   # Array username  
 data:
-  password: <VALUE-5 base64>            # Array password.
+  password: <VALUE-5 base64>            # Array password
 ```
 
 Apply the secret:
@@ -210,7 +167,6 @@ Apply the storage class:
 $> kubectl apply -f storageclass-gold.yaml
 storageclass.storage.k8s.io/gold created
 ```
-You can now run stateful applications using IBM block storage systems.
 
 
 
@@ -218,7 +174,6 @@ You can now run stateful applications using IBM block storage systems.
 <br/>
 <br/>
 <br/>
-
 
 
 ## Driver usage
@@ -268,12 +223,12 @@ spec:
         command: [ "/bin/sh", "-c", "--" ]
         args: [ "while true; do sleep 30; done;" ]
         volumeMounts:
-          - name: demo-pvc
+          - name: pvc-demo
             mountPath: "/data"
       volumes:
-      - name: demo-pvc
+      - name: pvc-demo
         persistentVolumeClaim:
-          claimName: demo-pvc
+          claimName: pvc-demo
 
       #nodeSelector:
       #  kubernetes.io/hostname: NODESELECTOR
@@ -315,21 +270,8 @@ No resources found.
 
 ## Uninstalling the driver
 
-### Delete the storage class, secret, and driver
+From this version(1.0.0) the deployment method of the driver is done via `Operator for IBM Block CSI Driver` -> https://github.com/ibm/ibm-block-csi-operator.
 
-```sh
-$> kubectl delete storageclass/gold
-$> kubectl delete -n kube-system secret/a9000-array1
-$> kubectl delete -f ibm-block-csi-driver.yaml
-
-##### Kubernetes version 1.13 automatically creates the CSIDriver `block.csi.ibm.com`, but it does not delete it automatically when removing the driver manifest. In order to clean up the CSIDriver object, run the following command:
-$> kubectl delete CSIDriver block.csi.ibm.com
-
-```
-
-<br/>
-<br/>
-<br/>
 
 ## More details and troubleshooting
 [USAGE-DETAILS.md](USAGE-DETAILS.md)
