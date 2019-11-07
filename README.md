@@ -223,12 +223,12 @@ spec:
         command: [ "/bin/sh", "-c", "--" ]
         args: [ "while true; do sleep 30; done;" ]
         volumeMounts:
-          - name: demo-pvc
+          - name: pvc-demo
             mountPath: "/data"
       volumes:
-      - name: demo-pvc
+      - name: pvc-demo
         persistentVolumeClaim:
-          claimName: demo-pvc
+          claimName: pvc-demo
 
       #nodeSelector:
       #  kubernetes.io/hostname: NODESELECTOR
