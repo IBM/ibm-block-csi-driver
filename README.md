@@ -15,8 +15,6 @@ Supported IBM storage systems:
 Supported operating systems:
   - RHEL 7.x (x86 architecture)
 
-DISCLAIMER: The driver is provided as is, without warranty.
-
 Full documentation can be found on the [IBM knowledge center](www.ibm.com/support/knowledgecenter/SSRQ8T).
 
 ## Table of content:
