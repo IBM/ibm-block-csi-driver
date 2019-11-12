@@ -64,8 +64,8 @@ const (
 	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
 	// Command lines inside the container will show /host prefix.
 	PrefixChrootOfHostRoot = "/host"
-	FCPath = "/sys/class/fc_host"
-	FCPortPath = "/sys/class/fc_host/host*/port_name"
+	FCPath                 = "/sys/class/fc_host"
+	FCPortPath             = "/sys/class/fc_host/host*/port_name"
 )
 
 // nodeService represents the node service of CSI driver
@@ -446,12 +446,8 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	}
 
 	logger.Debugf("NodeUnpublishVolume: unmounting %s", target)
-	err = d.mounter.Unmount(target)
+	err = mount.CleanupMountPoint(target, d.mounter, true)
 	if err != nil {
-		if strings.Contains(err.Error(), "not mounted") {
-			logger.Warningf("Idempotent case - target was already unmounted %s", target)
-			return &csi.NodeUnpublishVolumeResponse{}, nil
-		}
 		return nil, status.Errorf(codes.Internal, "Could not unmount %q: %v", target, err)
 	}
 
@@ -512,12 +508,12 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 
 	if fcWWNs == nil && iscsiIQN == "" {
 		err := fmt.Errorf("Cannot find valid fc wwns or iscsi iqn")
-		return nil,status.Error(codes.Internal, err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	delimiter := ";"
 	fcPorts := strings.Join(fcWWNs, ":")
-	nodeId := d.Hostname + delimiter + iscsiIQN + delimiter +fcPorts
+	nodeId := d.Hostname + delimiter + iscsiIQN + delimiter + fcPorts
 	logger.Debugf("node id is : %s", nodeId)
 
 	return &csi.NodeGetInfoResponse{

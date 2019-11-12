@@ -1,4 +1,8 @@
 # ==============================================================
+#
+# Note: This yaml is deprecated.
+#       From version 1.0.0 the deployment method is via Operator -> https://github.com/ibm/ibm-block-csi-operator.
+#
 # IBM Block CSI driver - Kubernetes manifest.
 # The manifest contains:
 #    CSI controller (StatefulSet)
@@ -245,7 +249,7 @@ spec:
       serviceAccount: ibm-block-csi-controller-sa
       containers:
         - name: ibm-block-csi-controller
-          image: ibmcom/ibm-block-csi-driver-controller:0.9.0
+          image: ibmcom/ibm-block-csi-driver-controller:1.0.0
           imagePullPolicy: "IfNotPresent"
           args :
             - --csi-endpoint=$(CSI_ENDPOINT)
@@ -372,12 +376,12 @@ spec:
         product: ibm-block-csi-driver
         csi: ibm
     spec:
-      hostNetwork: true
+      hostIPC: true
       containers:
         - name: ibm-block-csi-node
           securityContext:
             privileged: true
-          image: ibmcom/ibm-block-csi-driver-node:0.9.0
+          image: ibmcom/ibm-block-csi-driver-node:1.0.0
           imagePullPolicy: "IfNotPresent"
           args:
             - --csi-endpoint=$(CSI_ENDPOINT)
@@ -489,6 +493,7 @@ spec:
             path: /
             type: Directory
 
+---
 
 ## The below CSIDriver object is required to define (k8s 1.14 its still needed to be added due to redesign -> https://kubernetes-csi.github.io/docs/cluster-driver-registrar.html)
 apiVersion: storage.k8s.io/v1beta1   ## for k8s 1.13 it should be csi.storage.k8s.io/v1alpha1 and requires to set feature gate --feature-gates=CSIDriverRegistry=true

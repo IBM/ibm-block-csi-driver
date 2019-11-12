@@ -117,7 +117,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string, connectivityType string) (string, error) {
-	logger.Infof("GetMpathDevice: Found multipath devices for volume : [%s] that relats to lunId=%d and arrayIdentifiers=%s", volumeId, lunId, arrayIdentifiers)
+	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] that relats to lunId=%d and arrayIdentifiers=%s", volumeId, lunId, arrayIdentifiers)
 
 	if len(arrayIdentifiers) == 0 {
 		e := &ErrorNotFoundArrayIdentifiers{lunId}
@@ -206,13 +206,8 @@ func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice 
 	r.MutexMultipathF.Unlock()
 
 	if err != nil {
-		if _, errOpen := os.Open(fullDevice); errOpen != nil {
-			if os.IsNotExist(errOpen) {
-				logger.Debugf("Mpath device {%v} was deleted", fullDevice)
-			} else {
-				logger.Errorf("Error while opening file : {%v}. error: {%v}. Means the multipath -f {%v} did not succeed to delete the device.", fullDevice, errOpen.Error(), fullDevice)
-				return errOpen
-			}
+		if _, e := os.Stat(fullDevice); os.IsNotExist(e) {
+			logger.Debugf("Mpath device {%v} was deleted", fullDevice)
 		} else {
 			logger.Errorf("multipath -f {%v} did not succeed to delete the device. err={%v}", fullDevice, err.Error())
 			return err

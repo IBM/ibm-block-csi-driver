@@ -21,10 +21,11 @@ metadata:
   name: a9000-array1
   namespace: kube-system
 type: Opaque
+stringData:
+  management_address: <VALUE-2>     # Replace with valid FlashSystem A9000 management address
+  username: <VALUE-3>               # Replace with valid username
 data:
-  username: <VALUE-2 base64>   # Replace with valid username
-  password: <VALUE-3 base64>   # Replace with valid password
-  management_address: <VALUE-4 base64>   # Replace with valid FlashSystem A9000 management address
+  password: <VALUE-4 base64>        # Replace with valid password
   
 $> kubectl create -f demo-secret-a9000-array1.yaml
 secret/a9000-array1 created
