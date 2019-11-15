@@ -385,7 +385,7 @@ spec:
         - name: ibm-block-csi-node
           securityContext:
             privileged: true
-          image: ibmcom/ibm-block-csi-driver-node:9.0.0
+          image: ibmcom/ibm-block-csi-driver-node:1.0.0
           imagePullPolicy: "IfNotPresent"
           args:
             - --csi-endpoint=$(CSI_ENDPOINT)
