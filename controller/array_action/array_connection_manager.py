@@ -13,24 +13,26 @@ array_connections_dict = {}
 logger = get_stdout_logger()
 
 
-def _socket_connect_test(ipaddr, port, timeout=1):
-    '''
-    function to test socket connection to ip:port.
+def _socket_connect_test(host, port, timeout=1):
+    """
+    function to test socket connection to host:port.
 
-    :param ipaddr: ip address
+    :param host: ip address or host name
     :param port: port
     :param timeout: connection timeout
 
     :return:  0 - on successful connection
-             -1 for exception + other return codes for connection errors.
-
-    '''
+             -1 - on any exception, or specific connection errors with that error number
+             other values - on other connection errors
+    """
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(timeout)
-        ret = sock.connect_ex((ipaddr, port))
+        ret = sock.connect_ex((host, port))
         sock.close()
         return ret
+    except socket.gaierror as e:
+        logger.debug('hostname {HOST} could not be resolved: {ERROR}'.format(HOST=host, ERROR=e))
     except Exception as e:
         logger.debug('socket_connect {}'.format(e))
         return -1
