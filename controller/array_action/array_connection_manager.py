@@ -33,6 +33,7 @@ def _socket_connect_test(host, port, timeout=1):
         return ret
     except socket.gaierror as e:
         logger.debug('hostname {HOST} could not be resolved: {ERROR}'.format(HOST=host, ERROR=e))
+        return -1
     except Exception as e:
         logger.debug('socket_connect {}'.format(e))
         return -1
