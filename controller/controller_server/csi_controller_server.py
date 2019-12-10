@@ -302,7 +302,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.info("Create snapshot : {}".format(snapshot_name))
         return csi_pb2.CreateSnapshotResponse()
 
-    def DeleteVolume(self, request, context):
+    def DeleteSnapshot(self, request, context):
         # TODO
         logger.info("Delete snapshot")
         return csi_pb2.DeleteSnapshotResponse()
