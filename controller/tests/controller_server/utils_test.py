@@ -288,7 +288,7 @@ class TestUtils(unittest.TestCase):
                                        "connectivity_type",
                                    "publish_context_array_iqn": "array_iqn",
                                    "publish_context_fc_initiators": "fc_wwns"}
-                  }
+                    }
         res = utils.generate_csi_publish_volume_response(0, "iscsi", config_a,
                                                          ["1"])
         self.assertEqual(res.publish_context["lun"], '0')

@@ -10,6 +10,7 @@ from pysvc import errors as svc_errors
 import controller.array_action.config as config
 from controller.common.node_info import Initiators
 
+
 class TestArrayMediatorSVC(unittest.TestCase):
 
     @patch(
@@ -533,7 +534,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_unmap_volume_success(self):
         self.svc.client.svctask.rmvdiskhostmap.return_value = None
-        lun = self.svc.unmap_volume("vol", "host")
+        self.svc.unmap_volume("vol", "host")
 
     def test_get_array_iqns_with_exception(self):
         self.svc.client.svcinfo.lsnode.side_effect = [Exception]

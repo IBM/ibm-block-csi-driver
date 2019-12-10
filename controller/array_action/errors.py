@@ -120,6 +120,7 @@ class BadNodeIdError(BaseArrayActionException):
     def __init__(self, name):
         self.message = messages.BadNodeIdError_message.format(name)
 
+
 class VolumeMappedToMultipleHostsError(BaseArrayActionException):
 
     def __init__(self, hosts):

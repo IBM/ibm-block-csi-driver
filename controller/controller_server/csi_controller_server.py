@@ -18,7 +18,7 @@ from controller.common.utils import set_current_thread_name
 from controller.common.node_info import NodeIdInfo
 from controller.array_action.array_mediator_action import map_volume, unmap_volume
 
-logger = None #is set in ControllerServicer::__init__
+logger = None  # is set in ControllerServicer::__init__
 
 
 class ControllerServicer(csi_pb2_grpc.ControllerServicer):
@@ -27,7 +27,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     """
 
     def __init__(self, array_endpoint):
-		# init logger
+        # init logger
         global logger
         logger = get_stdout_logger()
 
@@ -191,13 +191,14 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.debug("node name for this publish operation is : {0}".format(node_name))
 
             user, password, array_addresses = utils.get_array_connection_info_from_secret(request.secrets)
-            lun, connectivity_type, array_initiators = map_volume(user, password, array_addresses, array_type, vol_id, initiators)
+            lun, connectivity_type, array_initiators = map_volume(user, password, array_addresses, array_type, vol_id,
+                                                                  initiators)
 
             logger.info("finished ControllerPublishVolume")
             res = utils.generate_csi_publish_volume_response(lun,
-                                                         connectivity_type,
-                                                         self.cfg,
-                                                         array_initiators)
+                                                             connectivity_type,
+                                                             self.cfg,
+                                                             array_initiators)
             return res
 
         except controller_errors.VolumeMappedToMultipleHostsError as ex:
@@ -217,7 +218,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.RESOURCE_EXHAUSTED)
             return csi_pb2.ControllerPublishVolumeResponse()
 
-        except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError, controller_errors.BadNodeIdError) as ex:
+        except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError,
+                controller_errors.BadNodeIdError) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)
@@ -387,8 +389,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
 def main():
     parser = OptionParser()
-    parser.add_option("-e", "--csi-endpoint", dest="endpoint",help="grpc endpoint")
-    parser.add_option("-l", "--loglevel", dest="loglevel",help="log level")
+    parser.add_option("-e", "--csi-endpoint", dest="endpoint", help="grpc endpoint")
+    parser.add_option("-l", "--loglevel", dest="loglevel", help="log level")
     (options, args) = parser.parse_args()
 
     # set logger level and init logger
