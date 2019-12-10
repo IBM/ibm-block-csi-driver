@@ -299,7 +299,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def CreateSnapshot(self, request, context):
         # TODO
         set_current_thread_name(request.name)
-        logger.info("Create snapshot : {}".format(snapshot_name))
+        logger.info("Create snapshot : {}".format(request.name))
         return csi_pb2.CreateSnapshotResponse()
 
     def DeleteSnapshot(self, request, context):
@@ -325,7 +325,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 csi_pb2.ControllerServiceCapability(
                     rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("PUBLISH_UNPUBLISH_VOLUME")))])
 
-        logger.info("finished ControllerGetCapabilities")
+        logger.info("finished ControllerGetCapabilities - TODO")
         return res
 
     def __get_identity_config(self, attribute_name):
