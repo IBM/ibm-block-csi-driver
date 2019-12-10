@@ -134,7 +134,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
         self.mediator.client.cmd.host_list.return_value = ret
         with self.assertRaises(array_errors.HostNotFoundError):
-            self.mediator.get_host_by_host_identifiers(Initiators(iqn,[]))
+            self.mediator.get_host_by_host_identifiers(Initiators(iqn, []))
 
     def test_get_host_by_iscsi_identifiers_succeeds(self):
         iqn = "iqn1"

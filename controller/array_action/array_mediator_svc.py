@@ -80,7 +80,7 @@ class SVCArrayMediator(ArrayMediator):
 
     @classproperty
     def minimal_volume_size_in_bytes(self):
-        return 512   # 512 Bytes
+        return 512  # 512 Bytes
 
     @classproperty
     def max_lun_retries(self):
@@ -378,7 +378,7 @@ class SVCArrayMediator(ArrayMediator):
         except Exception as ex:
             logger.exception(ex)
             raise ex
-    
+
     def get_array_iqns(self):
         logger.debug("Getting array nodes iscsi name")
         try:

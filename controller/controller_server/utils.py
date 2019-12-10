@@ -104,7 +104,8 @@ def generate_csi_create_volume_response(new_vol):
     logger.debug("creating volume response for vol : {0}".format(new_vol))
 
     vol_context = {"volume_name": new_vol.volume_name,
-                   "array_address": ",".join(new_vol.array_address if isinstance(new_vol.array_address, list) else [new_vol.array_address]),
+                   "array_address": ",".join(
+                       new_vol.array_address if isinstance(new_vol.array_address, list) else [new_vol.array_address]),
                    "pool_name": new_vol.pool_name,
                    "storage_type": new_vol.array_type
                    }
@@ -183,6 +184,7 @@ def choose_connectivity_type(connecitvity_types):
     if ISCSI_CONNECTIVITY_TYPE in connecitvity_types:
         logger.debug("connectivity type is : {0}".format(ISCSI_CONNECTIVITY_TYPE))
         return ISCSI_CONNECTIVITY_TYPE
+
 
 def generate_csi_publish_volume_response(lun, connectivity_type, config, array_initiators):
     logger.debug("generating publish volume response for lun :{0}, connectivity : {1}".format(lun, connectivity_type))

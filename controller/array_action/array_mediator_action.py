@@ -9,6 +9,7 @@ from retry import retry
 
 logger = get_stdout_logger()
 
+
 @retry(NoConnectionAvailableException, tries=11, delay=1)
 def map_volume(user, password, array_addresses, array_type, vol_id, initiators):
     with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
@@ -16,7 +17,7 @@ def map_volume(user, password, array_addresses, array_type, vol_id, initiators):
 
         logger.debug(
             "hostname : {}, connectivity_types  : {}".format(host_name,
-                                                              connectivity_types))
+                                                             connectivity_types))
 
         connectivity_type = utils.choose_connectivity_type(connectivity_types)
 
@@ -58,6 +59,7 @@ def map_volume(user, password, array_addresses, array_type, vol_id, initiators):
                 raise ex
 
         return lun, connectivity_type, array_initiators
+
 
 @retry(NoConnectionAvailableException, tries=11, delay=1)
 def unmap_volume(user, password, array_addresses, array_type, vol_id, initiators):
