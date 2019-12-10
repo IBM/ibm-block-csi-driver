@@ -296,6 +296,17 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.info("finished ListVolumes")
         return csi_pb2.ListVolumesResponse()
 
+    def CreateSnapshot(self, request, context):
+        # TODO
+        set_current_thread_name(request.name)
+        logger.info("Create snapshot : {}".format(snapshot_name))
+        return csi_pb2.CreateSnapshotResponse()
+
+    def DeleteVolume(self, request, context):
+        # TODO
+        logger.info("Delete snapshot")
+        return csi_pb2.DeleteSnapshotResponse()
+
     def GetCapacity(self, request, context):
         logger.info("GetCapacity")
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -309,6 +320,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         res = csi_pb2.ControllerGetCapabilitiesResponse(
             capabilities=[csi_pb2.ControllerServiceCapability(
                 rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_VOLUME"))),
+                csi_pb2.ControllerServiceCapability(
+                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_SNAPSHOT"))),
                 csi_pb2.ControllerServiceCapability(
                     rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("PUBLISH_UNPUBLISH_VOLUME")))])
 
