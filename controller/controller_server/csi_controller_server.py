@@ -307,6 +307,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.info("Delete snapshot")
         return csi_pb2.DeleteSnapshotResponse()
 
+    def ListSnapshots(self, request, context):
+        logger.info("ListSnapshots")
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        logger.info("finished ListSnapshots")
+        return csi_pb2.ListSnapshotsResponse()
+
     def GetCapacity(self, request, context):
         logger.info("GetCapacity")
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -323,9 +329,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 csi_pb2.ControllerServiceCapability(
                     rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_SNAPSHOT"))),
                 csi_pb2.ControllerServiceCapability(
+                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("LIST_SNAPSHOTS"))),
+                csi_pb2.ControllerServiceCapability(
                     rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("PUBLISH_UNPUBLISH_VOLUME")))])
 
-        logger.info("finished ControllerGetCapabilities - TODO")
+        logger.info("finished ControllerGetCapabilities - TODO 2")
         return res
 
     def __get_identity_config(self, attribute_name):
