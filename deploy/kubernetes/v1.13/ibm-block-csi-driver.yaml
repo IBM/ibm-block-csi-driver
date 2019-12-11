@@ -229,36 +229,6 @@ roleRef:
 
 ---
 
-kind: ClusterRole
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: ibm-block-csi-external-snapshotter-role
-  labels:
-    product: ibm-block-csi-driver
-    csi: ibm
-rules:
-  - apiGroups: ["apiextensions.k8s.io"]
-    resources: ["customresourcedefinitions"]
-    verbs: ["*"]
----
-
-kind: ClusterRoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: ibm-block-csi-external-snapshotter-binding
-  labels:
-    product: ibm-block-csi-driver
-    csi: ibm
-subjects:
-  - kind: ServiceAccount
-    name: ibm-block-csi-controller-sa
-    namespace: kube-system
-roleRef:
-  kind: ClusterRole
-  name: ibm-block-csi-external-snapshotter-role
-  apiGroup: rbac.authorization.k8s.io
----
-
 ## CSI Controller Service statefulset
 kind: StatefulSet
 apiVersion: apps/v1
