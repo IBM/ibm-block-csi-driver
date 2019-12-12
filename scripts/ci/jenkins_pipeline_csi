@@ -3,21 +3,15 @@ pipeline {
         label 'docker-engine'
     }
     stages {
+        stage ('CSI-controller: static code analysis') {
+            steps {
+                sh './scripts/run_static_code_analysis.sh'
+            }
+        }
         stage ('CSI-controller: Unit testing + coverage') {
             steps {
                 sh 'mkdir -p build/reports && chmod 777 build/reports'
                 sh './scripts/run_unitests.sh `pwd`/build/reports'
-            }
-        }
-        stage ('CSI-controller: pep8') {
-            steps {
-                sh 'true'
-            }
-        }
-        stage ('CSI-controller: pylint') {
-            steps {
-                sh 'true'
-          
             }
         }
         stage ('CSI controller and node: security code scanning') {

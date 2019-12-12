@@ -1,6 +1,7 @@
 import controller.controller_server.utils as utils
 import controller.controller_server.config as config
 
+
 class NodeIdInfo:
     def __init__(self, node_id):
         """
@@ -17,6 +18,7 @@ class Initiators:
     """
     Object containing node initiators (e.g. iqn, fc_wwns)
     """
+
     def __init__(self, iscsi_iqn, fc_wwns):
         """
         Args:
