@@ -14,19 +14,12 @@
 
 FROM python:3.6.9
 
-RUN pip3 install bandit
+RUN pip3 install safety
 
-COPY controller /controller
-COPY scripts/csi_controller_code_scan_entrypoint.sh entrypoint.sh
+COPY controller ./controller
 RUN mkdir /results
 
-RUN groupadd -g 9999 appuser && \
-    useradd -r -u 9999 -g appuser appuser
-
-RUN chown -R appuser:appuser /controller /results entrypoint.sh
-
-USER appuser
 WORKDIR .
 
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["safety", "check", "-o", "/results/code_scan_controller_dep", "-r", "/controller/requirements.txt"]
 

@@ -1,0 +1,72 @@
+pipeline {
+    agent {
+        label 'docker-engine'
+    }
+    stages {
+        stage ('Environment Setup')  {
+            steps {
+                sh 'mkdir -p build/reports && chmod 777 build/reports'
+            }
+        }
+        stage ('CSI Controller: security code scanning') {
+            steps {
+                script {
+                    try {
+                        sh './scripts/ci/code_scanning/run_csi_code_scan.sh csi-controller-code-scan'
+                   } catch (exc) {
+                        echo "${exc}"
+                    }
+                }
+            }
+        }
+        stage ('CSI Controller Dependencies: security code scanning') {
+            steps {
+                script {
+                    try {
+                        sh './scripts/ci/code_scanning/run_csi_code_scan.sh csi-controller-dep-code-scan'
+                   } catch (exc) {
+                        echo "${exc}"
+                    }
+                }
+            }
+        }
+        stage ('CSI Node: security code scanning') {
+            steps {
+                script {
+                    try {
+                        sh './scripts/ci/code_scanning/run_csi_code_scan.sh csi-node-code-scan'
+                   } catch (exc) {
+                        echo "${exc}"
+                    }
+                }
+            }
+        }
+        stage ('CSI Node Dependencies: security code scanning') {
+            steps {
+                script {
+                    try {
+                        sh './scripts/ci/code_scanning/run_csi_code_scan.sh csi-node-dep-code-scan'
+                   } catch (exc) {
+                        echo "${exc}"
+                    }
+                }
+            }
+        }
+    }
+    post {
+        always {
+            sh 'ls -la build/reports/'
+            archiveArtifacts artifacts: 'build/reports/*', fingerprint: true
+            script {
+                manager.addShortText("${env.GIT_BRANCH}")
+            }
+        }
+
+        cleanup {
+            script {
+                 sh '[ -d build/reports ] && rm -rf build/reports'
+            }
+        }
+
+    }
+}
