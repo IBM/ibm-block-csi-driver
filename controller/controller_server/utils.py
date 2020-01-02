@@ -131,7 +131,7 @@ def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
 
     snapshot_context = {"snapshot_name": new_snapshot.snapshot_name,
                    "array_address": ",".join(new_snapshot.array_address if isinstance(new_snapshot.array_address, list) else [new_snapshot.array_address]),
-                   "volume_name": new_snapshot.vol_name,
+                   "volume_name": new_snapshot.volume_name,
                    "storage_type": new_snapshot.array_type
                    }
 
