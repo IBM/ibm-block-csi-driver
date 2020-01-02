@@ -5,6 +5,7 @@ from controller.controller_server.errors import ValidationException
 import controller.controller_server.messages as messages
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.errors import HostNotFoundError, VolumeNotFoundError
+from google.protobuf.timestamp_pb2 import Timestamp
 
 logger = get_stdout_logger()
 
@@ -21,6 +22,13 @@ def get_vol_id(new_vol):
     vol_id = "{0}{1}{2}".format(new_vol.array_type, config.PARAMETERS_VOLUME_ID_DELIMITER, new_vol.id)
     logger.debug("vol id is : {0}".format(vol_id))
     return vol_id
+
+
+def get_snapshot_id(new_snapshot):
+    logger.debug('getting snapshot id for snapshot : {0}'.format(new_snapshot))
+    snapshot_id = "{0}{1}{2}".format(new_snapshot.array_type, config.PARAMETERS_VOLUME_ID_DELIMITER, new_snapshot.id)
+    logger.debug("snapshot id is : {0}".format(snapshot_id))
+    return snapshot_id
 
 
 def validate_secret(secret):
@@ -115,6 +123,27 @@ def generate_csi_create_volume_response(new_vol):
         volume_context=vol_context))
 
     logger.debug("finished creating volume response : {0}".format(res))
+    return res
+
+
+def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
+    logger.debug("creating snapshot response for snapshot : {0}".format(new_snapshot))
+
+    snapshot_context = {"snapshot_name": new_snapshot.snapshot_name,
+                   "array_address": ",".join(new_snapshot.array_address if isinstance(new_snapshot.array_address, list) else [new_snapshot.array_address]),
+                   "volume_name": new_snapshot.vol_name,
+                   "storage_type": new_snapshot.array_type
+                   }
+
+    res = csi_pb2.CreateSnapshotResponse(snapshot=csi_pb2.Snapshot(
+        size_bytes=new_snapshot.capacity_bytes,
+        snapshot_id=get_snapshot_id(new_snapshot),
+        source_volume_id=0,
+        creation_time=timestamp.GetCurrentTime(),
+        ready_to_use=True, #TODO
+        snapshot_context=snapshot_context))
+
+    logger.debug("finished creating snapshot response : {0}".format(res))
     return res
 
 

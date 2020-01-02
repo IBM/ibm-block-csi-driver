@@ -5,6 +5,7 @@ from pyxcli import errors as xcli_errors
 from controller.common.csi_logger import get_stdout_logger
 from controller.array_action.array_mediator_interface import ArrayMediator
 from controller.array_action.array_action_types import Volume
+from controller.array_action.array_action_types import Snapshot
 import controller.array_action.errors as controller_errors
 from controller.array_action.config import ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.config import FC_CONNECTIVITY_TYPE
@@ -83,6 +84,15 @@ class XIVArrayMediator(ArrayMediator):
                       cli_volume.pool_name,
                       self.array_type)
 
+    def _generate_snapshot_response(self, cli_snapshot):
+        return Snapshot(0,
+                        cli_snapshot.wwn,
+                        cli_snapshot.name,
+                        self.endpoint,
+                        cli_snapshot.master_name,
+                        cli_snapshot.pool_name,
+                        self.array_type)
+
     def get_volume(self, vol_name):
         logger.debug("Get volume : {}".format(vol_name))
         try:
@@ -134,6 +144,26 @@ class XIVArrayMediator(ArrayMediator):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
+    def create_snapshot(self, name, volume_name):
+        logger.info("creating snapshot {0} from volume {1}".format(name, volume_name))
+
+        try:
+            cli_snapshot = self.client.cmd.snapshot_create(name=name, vol=volume_name).as_single_element
+            logger.info("finished creating cli snapshot {0} from volume {1}".format(name, volume_name))
+            return self._generate_snapshot_response(cli_snapshot)
+        except xcli_errors.IllegalNameForObjectError as ex:
+            logger.exception(ex)
+            raise controller_errors.IllegalObjectName(ex.status)
+        except xcli_errors.VolumeExistsError as ex:
+            logger.exception(ex)
+            raise controller_errors.VolumeAlreadyExists(name, self.endpoint)
+        except xcli_errors.PoolDoesNotExistError as ex:
+            logger.exception(ex)
+            raise controller_errors.VolumeDoesNotExist(volume_name, self.endpoint)
+        except xcli_errors.OperationForbiddenForUserCategoryError as ex:
+            logger.exception(ex)
+            raise controller_errors.PermissionDeniedError("create snapshot {0} from volume {1}".format(volume_name))
+
     def _get_vol_by_wwn(self, volume_id):
         vol_by_wwn = self.client.cmd.vol_list(wwn=volume_id).as_single_element
         if not vol_by_wwn:
@@ -182,6 +212,9 @@ class XIVArrayMediator(ArrayMediator):
         elif len(matching_hosts) > 1:
             raise controller_errors.MultipleHostsFoundError(initiators, matching_hosts)
         return matching_hosts[0], port_types
+
+    def get_volume_name(self, volume_id):
+        return self._get_vol_by_wwn(volume_id)
 
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume id : {0}".format(volume_id))

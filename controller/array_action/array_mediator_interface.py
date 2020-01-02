@@ -54,6 +54,28 @@ class ArrayMediator:
         raise NotImplementedError
 
     @abc.abstractmethod
+    def create_snapshot(self, name, volume_name):
+        """
+        This function should create a snapshot from volume in the storage system.
+
+        Args:
+            name           : name of the snapshot to be created in the storage system
+            volume_name    : name of the volume to be created from
+
+        Returns:
+            Snapshot object
+
+        Raises:
+            VolumeAlreadyExists
+            VolumeDoesNotExist
+            PoolDoesNotMatchCapabilities
+            IllegalObjectName
+            VolumeNameIsNotSupported
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def delete_volume(self, volume_id):
         """
         This function should delete a volume in the storage system.
@@ -85,6 +107,22 @@ class ArrayMediator:
             volumeNotFound
             IllegalObjectName
             PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def get_volume_name(self, volume_id):
+        """
+        This function return volume mappings.
+
+        Args:
+           volume_id : volume id
+
+        Returns:
+           volume name
+
+        Raises:
+            volumeNotFound
         """
         raise NotImplementedError
 

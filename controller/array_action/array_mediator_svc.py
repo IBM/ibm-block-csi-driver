@@ -209,6 +209,10 @@ class SVCArrayMediator(ArrayMediator):
             logger.exception(ex)
             raise ex
 
+    def create_snapshot(self, name, volume_name):
+        # TODO: will need to implement
+        raise NotImplementedError
+
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
         vol_name = self._get_vol_by_wwn(volume_id)
@@ -264,6 +268,9 @@ class SVCArrayMediator(ArrayMediator):
         else:
             logger.debug("can not found host by using initiators: {0} ".format(initiators))
             raise controller_errors.HostNotFoundError(initiators)
+
+    def get_volume_name(self, volume_id):
+        return self._get_vol_by_wwn(volume_id)
 
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume id : "

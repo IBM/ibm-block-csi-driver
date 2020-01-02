@@ -55,6 +55,12 @@ class VolumeAlreadyExists(BaseArrayActionException):
         self.message = messages.VolumeAlreadyExists_message.format(volume, array)
 
 
+class VolumeDoesNotExist(BaseArrayActionException):
+
+    def __init__(self, volume, array):
+        self.message = messages.VolumeDoesNotExist_message.format(volume, array)
+
+
 class PoolDoesNotExist(BaseArrayActionException):
 
     def __init__(self, pool, array):

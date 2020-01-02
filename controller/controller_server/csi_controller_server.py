@@ -299,8 +299,31 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def CreateSnapshot(self, request, context):
         # TODO
         set_current_thread_name(request.name)
-        logger.info("Create snapshot : {}".format(request.name))
-        return csi_pb2.CreateSnapshotResponse()
+
+        snapshot_name = request.name
+        source_volume_id = request.source_volume_id
+
+        logger.info("Create snapshot : {}. Source volume id : {}".format(snapshot_name, source_volume_id))
+
+        _, vol_id = utils.get_volume_id_info(source_volume_id)
+        secrets = request.secrets
+        user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
+        try:
+            with ArrayConnectionManager(user, password, array_addresses) as array_mediator:
+                logger.debug(array_mediator)
+                volume_name = array_mediator.get_volume_name(vol_id)
+                logger.info("Create snapshot {} from volume {}".format(snapshot_name, volume_name))
+                snapshot = array_mediator.create_snapshot(snapshot_name, volume_name)
+        except Exception as ex:
+            logger.error("an internal exception occurred")
+            logger.exception(ex)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details('an internal exception occurred : {}'.format(ex))
+            return csi_pb2.CreateSnapshotResponse()
+
+        logger.debug("generating create volume response")
+        return utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
+
 
     def DeleteSnapshot(self, request, context):
         # TODO
