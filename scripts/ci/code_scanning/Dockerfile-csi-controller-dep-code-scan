@@ -21,5 +21,5 @@ RUN mkdir /results
 
 WORKDIR .
 
-ENTRYPOINT ["safety", "check", "-o", "/results/code_scan_controller_dep", "-r", "/controller/requirements.txt"]
+ENTRYPOINT ["/bin/sh", "-c", "safety check -o /results/code_scan_controller_dep -r /controller/requirements.txt > /results/code_scan_controller_dep.log 2>&1"]
 
