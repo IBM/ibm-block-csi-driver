@@ -312,8 +312,15 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             with ArrayConnectionManager(user, password, array_addresses) as array_mediator:
                 logger.debug(array_mediator)
                 volume_name = array_mediator.get_volume_name(vol_id)
-                logger.info("Create snapshot {} from volume {}".format(snapshot_name, volume_name))
-                snapshot = array_mediator.create_snapshot(snapshot_name, volume_name)
+                try:
+                    snapshot = array_mediator.get_snapshot(snapshot_name)
+                except controller_errors.SnapshotNotFoundError:
+                    logger.debug(
+                        "Snapshot was not found. creating a new snapshot {0} from volume {1}".format(snapshot_name, volume_name))
+                    snapshot = array_mediator.create_snapshot(snapshot_name, volume_name)
+                else:
+                    logger.debug("Snapshot found : {}".format(snapshot))
+                    #TODO: add validations
         except Exception as ex:
             logger.error("an internal exception occurred")
             logger.exception(ex)
@@ -321,7 +328,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateSnapshotResponse()
 
-        logger.debug("generating create volume response")
+        logger.debug("generating create snapshot response")
         return utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
 
 

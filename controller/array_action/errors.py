@@ -31,6 +31,12 @@ class VolumeNotFoundError(BaseArrayActionException):
         self.message = messages.VolumeNotFoundError_message.format(name)
 
 
+class SnapshotNotFoundError(BaseArrayActionException):
+
+    def __init__(self, name):
+        self.message = messages.SnapshotNotFoundError_message.format(name)
+
+
 class IllegalObjectName(BaseArrayActionException):
 
     def __init__(self, msg):

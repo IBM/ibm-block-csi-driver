@@ -108,6 +108,21 @@ class XIVArrayMediator(ArrayMediator):
         array_vol = self._generate_volume_response(cli_volume)
         return array_vol
 
+    def get_snapshot(self, snapshot_name):
+        logger.debug("Get snapshot : {}".format(snapshot_name))
+        try:
+            cli_snapshot = self.client.cmd.vol_list(vol=snapshot_name).as_single_element
+        except xcli_errors.IllegalNameForObjectError as ex:
+            logger.exception(ex)
+            raise controller_errors.IllegalObjectName(ex.status)
+
+        logger.debug("cli snapshot returned : {}".format(cli_snapshot))
+        if not cli_snapshot:
+            raise controller_errors.SnapshotNotFoundError(snapshot_name)
+
+        array_snapshot = self._generate_snapshot_response(cli_snapshot)
+        return array_snapshot
+
     def validate_supported_capabilities(self, capabilities):
         logger.info("validate_supported_capabilities for capabilities : {0}".format(capabilities))
         # for a9k there should be no capabilities
