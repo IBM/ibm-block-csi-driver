@@ -10,7 +10,7 @@ class Volume:
 
 class Snapshot:
     def __init__(self, size_bytes, snapshot_id, snapshot_name, array_address, volume_name, pool_name, array_type):
-        self.snapshot_size_bytes = size_bytes
+        self.size_bytes = size_bytes
         self.id = snapshot_id
         self.snapshot_name = snapshot_name
         self.array_address = array_address
