@@ -129,19 +129,12 @@ def generate_csi_create_volume_response(new_vol):
 def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
     logger.debug("creating snapshot response for snapshot : {0}".format(new_snapshot))
 
-    snapshot_context = {"snapshot_name": new_snapshot.snapshot_name,
-                   "array_address": ",".join(new_snapshot.array_address if isinstance(new_snapshot.array_address, list) else [new_snapshot.array_address]),
-                   "volume_name": new_snapshot.volume_name,
-                   "storage_type": new_snapshot.array_type
-                   }
-
     res = csi_pb2.CreateSnapshotResponse(snapshot=csi_pb2.Snapshot(
-        size_bytes=new_snapshot.capacity_bytes,
+        size_bytes=new_snapshot.size_bytes,
         snapshot_id=get_snapshot_id(new_snapshot),
         source_volume_id=source_volume_id,
         creation_time=Timestamp().GetCurrentTime(),
-        ready_to_use=True, #TODO
-        snapshot_context=snapshot_context))
+        ready_to_use=True))
 
     logger.debug("finished creating snapshot response : {0}".format(res))
     return res
