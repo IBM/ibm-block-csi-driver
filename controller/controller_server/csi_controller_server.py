@@ -17,6 +17,7 @@ from controller.controller_server.errors import ValidationException
 from controller.common.utils import set_current_thread_name
 from controller.common.node_info import NodeIdInfo
 from controller.array_action.array_mediator_action import map_volume, unmap_volume
+from controller.array_action import messages
 
 logger = None #is set in ControllerServicer::__init__
 
@@ -297,12 +298,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         return csi_pb2.ListVolumesResponse()
 
     def CreateSnapshot(self, request, context):
-        # TODO
         set_current_thread_name(request.name)
-
         snapshot_name = request.name
         source_volume_id = request.source_volume_id
-
         logger.info("Create snapshot : {}. Source volume id : {}".format(snapshot_name, source_volume_id))
 
         _, vol_id = utils.get_volume_id_info(source_volume_id)
@@ -320,17 +318,27 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     snapshot = array_mediator.create_snapshot(snapshot_name, volume_name)
                 else:
                     logger.debug("Snapshot found : {}".format(snapshot))
-                    #TODO: add validations
+                    if snapshot.volume_name != volume_name:
+                        context.set_details(messages.SnapshotWrongVolume_message)
+                        context.set_code(grpc.StatusCode.ALREADY_EXISTS)
+                        return csi_pb2.CreateSnapshotResponse()
+        except (controller_errors.IllegalObjectName, controller_errors.VolumeDoesNotExist) as ex:
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            return csi_pb2.CreateVolumeResponse()
+        except controller_errors.PermissionDeniedError as ex:
+            context.set_code(grpc.StatusCode.PERMISSION_DENIED)
+            context.set_details(ex)
+            return csi_pb2.CreateVolumeResponse()
         except Exception as ex:
             logger.error("an internal exception occurred")
             logger.exception(ex)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details('an internal exception occurred : {}'.format(ex))
-            return csi_pb2.CreateSnapshotResponse()
+            return csi_pb2.CreateVolumeResponse()
 
         logger.debug("generating create snapshot response")
         return utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
-
 
     def DeleteSnapshot(self, request, context):
         # TODO
@@ -363,7 +371,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 csi_pb2.ControllerServiceCapability(
                     rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("PUBLISH_UNPUBLISH_VOLUME")))])
 
-        logger.info("finished ControllerGetCapabilities - TODO 2")
+        logger.info("finished ControllerGetCapabilities")
         return res
 
     def __get_identity_config(self, attribute_name):
