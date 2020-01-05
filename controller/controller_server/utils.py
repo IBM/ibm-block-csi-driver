@@ -129,6 +129,8 @@ def generate_csi_create_volume_response(new_vol):
 def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
     logger.debug("creating snapshot response for snapshot : {0}".format(new_snapshot))
 
+    logger.debug("creating snapshot response for snapshot : Time {1} Size={2}".format(Timestamp().GetCurrentTime(), new_snapshot.size_bytes))
+
     res = csi_pb2.CreateSnapshotResponse(snapshot=csi_pb2.Snapshot(
         size_bytes=new_snapshot.size_bytes,
         snapshot_id=get_snapshot_id(new_snapshot),
