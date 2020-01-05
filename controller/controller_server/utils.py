@@ -139,7 +139,6 @@ def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
         size_bytes=new_snapshot.capacity_bytes,
         snapshot_id=get_snapshot_id(new_snapshot),
         source_volume_id=source_volume_id,
-        vol_name=new_snapshot.vol_name,
         creation_time=timestamp.GetCurrentTime(),
         ready_to_use=True, #TODO
         snapshot_context=snapshot_context))
