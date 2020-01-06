@@ -312,7 +312,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     snapshot = array_mediator.get_snapshot(snapshot_name)
                 except controller_errors.SnapshotNotFoundError:
                     logger.debug(
-                        "Snapshot was not found. creating a new snapshot {0} from volume {1}".format(snapshot_name, volume_name))
+                        "Snapshot was not found. creating a new snapshot {0} from volume {1}".format(snapshot_name,
+                                                                                                     volume_name))
                     snapshot = array_mediator.create_snapshot(snapshot_name, volume_name)
                 else:
                     logger.debug("Snapshot found : {}".format(snapshot))
