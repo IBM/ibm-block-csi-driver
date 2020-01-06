@@ -12,20 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM golang:1.11
+# Build stage
+FROM golang:1.12.6 as builder
 
-COPY node /node
-COPY scripts/csi_node_code_scan_entrypoint.sh entrypoint.sh
+WORKDIR /go/src/github.com/ibm/ibm-block-csi-driver
+ENV GO111MODULE=on
+
+COPY node ./node
 RUN mkdir /results
-
-RUN groupadd -g 9999 appuser && \
-    useradd -r -u 9999 -g appuser appuser
-RUN chown -R appuser:appuser /node /results entrypoint.sh
 RUN go get github.com/securego/gosec/cmd/gosec
 
+VOLUME /results
 
-USER appuser
-WORKDIR .
-
-ENTRYPOINT ["./entrypoint.sh"]
-
+ENTRYPOINT ["gosec", "-log", "/results/code_scan_node.log", "-out", "/results/code_scan_node", "-no-fail", "./..."]
