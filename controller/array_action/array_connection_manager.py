@@ -9,7 +9,6 @@ from controller.array_action.array_mediator_svc import SVCArrayMediator
 connection_lock_dict = {}
 array_connections_dict = {}
 
-
 logger = get_stdout_logger()
 
 
@@ -40,7 +39,6 @@ def _socket_connect_test(host, port, timeout=1):
 
 
 class ArrayConnectionManager(object):
-
 
     def __init__(self, user, password, endpoint, array_type=None):  # TODO return the params back.
         self.array_mediator_class_dict = {

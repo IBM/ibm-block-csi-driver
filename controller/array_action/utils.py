@@ -1,4 +1,3 @@
-
 class classproperty(object):
 
     def __init__(self, function):
