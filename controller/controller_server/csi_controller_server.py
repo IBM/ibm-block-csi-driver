@@ -52,7 +52,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateVolumeResponse()
 
-        volume_name = request.name
+        volume_name = self._get_volume_snapshot_create_name(request, config.PARAMETERS_VOLUME_NAME_PREFIX)
         logger.debug("volume name : {}".format(volume_name))
 
         secrets = request.secrets
@@ -64,10 +64,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 config.PARAMETERS_CAPABILITIES_SPACEEFFICIENCY,
             ]
         }
-
-        if config.PARAMETERS_PREFIX in request.parameters:
-            volume_prefix = request.parameters[config.PARAMETERS_PREFIX]
-            volume_name = volume_prefix + "_" + volume_name
 
         try:
             # TODO : pass multiple array addresses
@@ -299,7 +295,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def CreateSnapshot(self, request, context):
         set_current_thread_name(request.name)
-        snapshot_name = request.name
+        snapshot_name = self._get_volume_snapshot_create_name(request, config.PARAMETERS_SNAPSHOT_NAME_PREFIX)
         source_volume_id = request.source_volume_id
         logger.info("Create snapshot : {}. Source volume id : {}".format(snapshot_name, source_volume_id))
 
@@ -442,6 +438,19 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         except KeyboardInterrupt:
             controller_server.stop(0)
             logger.debug('Controller Server Stopped ...')
+
+    def _get_volume_snapshot_create_name(self, request, name_prefix_param):
+        """
+        :param request: API request object
+        :param name_prefix_param: prefix user specifies in yaml file (e.g. storage class)
+        :return: if prefix specified <prefix>_<request.name> else <request.name>
+        """
+        base_name = request.name
+        if name_prefix_param in request.parameters:
+            name_prefix = request.parameters[name_prefix_param]
+            return name_prefix + "_" + base_name
+        else:
+            return base_name
 
 
 def main():
