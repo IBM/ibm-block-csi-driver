@@ -90,7 +90,7 @@ class XIVArrayMediator(ArrayMediator):
                         cli_snapshot.name,
                         self.endpoint,
                         cli_snapshot.master_name,
-                        False, #TODO
+                        True,
                         self.array_type)
 
     def get_volume(self, vol_name):
