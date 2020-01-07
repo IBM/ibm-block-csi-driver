@@ -311,6 +311,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         context.set_details(messages.SnapshotWrongVolume_message)
                         context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                         return csi_pb2.CreateSnapshotResponse()
+
+                logger.debug("generating create snapshot response")
+                res = utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
+                logger.info("finished create volume")
+                return res
         except (controller_errors.IllegalObjectName, controller_errors.VolumeDoesNotExist) as ex:
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
@@ -325,9 +330,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateVolumeResponse()
-
-        logger.debug("generating create snapshot response")
-        return utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
 
     def DeleteSnapshot(self, request, context):
         # TODO
@@ -439,7 +441,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         :return:
                 Volume name according to request and storage type
         """
-        return self._get_object_name(request, config.PARAMETERS_VOLUME_NAME_PREFIX, array_mediator.max_vol_name_length, "volume")
+        return self._get_object_name(request,
+                                     config.PARAMETERS_VOLUME_NAME_PREFIX,
+                                     array_mediator.max_vol_name_length,
+                                     "volume")
 
     def _get_snapshot_name(self, request, array_mediator):
         """
@@ -448,7 +453,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         :return:
                 Snapshot name according to request and storage type
         """
-        return self._get_object_name(request, config.PARAMETERS_SNAPSHOT_NAME_PREFIX, array_mediator.max_snapshot_name_length, "snapshot")
+        return self._get_object_name(request,
+                                     config.PARAMETERS_SNAPSHOT_NAME_PREFIX,
+                                     array_mediator.max_snapshot_name_length,
+                                     "snapshot")
 
     def _get_object_name(self, request, name_prefix_param, max_name_length, object_type):
         """
@@ -459,15 +467,16 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         :return: if prefix specified <prefix>_<request.name> else <request.name>. Also if the name is too ong - cut it
         """
         res = request.name
-        #consider prefix
+        # consider prefix
         if name_prefix_param in request.parameters:
             name_prefix = request.parameters[name_prefix_param]
             res = name_prefix + "_" + res
-        #cut if too long
+        # cut if too long
         if len(res) > max_name_length:
             res = res[:max_name_length]
-            logger.warning("The {0} storage object name is too long - cutting it to be of size : {1}. new name : {2}".format(
-                object_type, max_name_length, res))
+            logger.warning(
+                "The {0} storage object name is too long - cutting it to be of size : {1}. new name : {2}".format(
+                    object_type, max_name_length, res))
         return res
 
     def _get_volume_size(self, request, array_mediator):
