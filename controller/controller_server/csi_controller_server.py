@@ -286,6 +286,16 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def CreateSnapshot(self, request, context):
         set_current_thread_name(request.name)
+
+        try:
+            utils.validate_create_snapshot_request(request)
+        except ValidationException as ex:
+            logger.error("failed request validation")
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            return csi_pb2.CreateSnapshotResponse()
+
         source_volume_id = request.source_volume_id
         logger.info("Snapshot base name : {}. Source volume id : {}".format(request.name, source_volume_id))
 
@@ -314,22 +324,22 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 logger.debug("generating create snapshot response")
                 res = utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
-                logger.info("finished create volume")
+                logger.info("finished create snapshot")
                 return res
         except (controller_errors.IllegalObjectName, controller_errors.VolumeDoesNotExist) as ex:
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-            return csi_pb2.CreateVolumeResponse()
+            return csi_pb2.CreateSnapshotResponse()
         except controller_errors.PermissionDeniedError as ex:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
             context.set_details(ex)
-            return csi_pb2.CreateVolumeResponse()
+            return csi_pb2.CreateSnapshotResponse()
         except Exception as ex:
             logger.error("an internal exception occurred")
             logger.exception(ex)
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details('an internal exception occurred : {}'.format(ex))
-            return csi_pb2.CreateVolumeResponse()
+            return csi_pb2.CreateSnapshotResponse()
 
     def DeleteSnapshot(self, request, context):
         # TODO
