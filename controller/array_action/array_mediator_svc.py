@@ -75,6 +75,10 @@ class SVCArrayMediator(ArrayMediator):
         return 63
 
     @classproperty
+    def max_snapshot_name_length(self):
+        return 63
+
+    @classproperty
     def max_connections(self):
         return 2
 

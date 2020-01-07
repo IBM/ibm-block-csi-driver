@@ -276,6 +276,14 @@ class ArrayMediator:
 
     @property
     @abc.abstractmethod
+    def max_snapshot_name_length(self):
+        """
+        The max number of concurrent connections to the storage system.
+        """
+        raise NotImplementedError
+
+    @property
+    @abc.abstractmethod
     def max_connections(self):
         """
         The max number of concurrent connections to the storage system.

@@ -52,9 +52,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateVolumeResponse()
 
-        volume_name = self._get_volume_snapshot_create_name(request, config.PARAMETERS_VOLUME_NAME_PREFIX)
-        logger.debug("volume name : {}".format(volume_name))
-
+        logger.debug("Volume base name : {}".format(request.name))
         secrets = request.secrets
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
 
@@ -69,18 +67,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             # TODO : pass multiple array addresses
             with ArrayConnectionManager(user, password, array_addresses) as array_mediator:
                 logger.debug(array_mediator)
-
-                if len(volume_name) > array_mediator.max_vol_name_length:
-                    volume_name = volume_name[:array_mediator.max_vol_name_length]
-                    logger.warning("volume name is too long - cutting it to be of size : {0}. new name : {1}".format(
-                        array_mediator.max_vol_name_length, volume_name))
-
-                size = request.capacity_range.required_bytes
-
-                if size == 0:
-                    size = array_mediator.minimal_volume_size_in_bytes
-                    logger.debug("requested size is 0 so the default size will be used : {0} ".format(
-                        size))
+                volume_name = self._get_volume_name(request, array_mediator)
+                logger.debug("Volume name : {}".format(volume_name))
+                size = self._get_volume_size(request, array_mediator)
                 try:
                     vol = array_mediator.get_volume(volume_name)
 
@@ -297,9 +286,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def CreateSnapshot(self, request, context):
         set_current_thread_name(request.name)
-        snapshot_name = self._get_volume_snapshot_create_name(request, config.PARAMETERS_SNAPSHOT_NAME_PREFIX)
         source_volume_id = request.source_volume_id
-        logger.info("Create snapshot : {}. Source volume id : {}".format(snapshot_name, source_volume_id))
+        logger.info("Snapshot base name : {}. Source volume id : {}".format(request.name, source_volume_id))
 
         _, vol_id = utils.get_volume_id_info(source_volume_id)
         secrets = request.secrets
@@ -307,7 +295,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         try:
             with ArrayConnectionManager(user, password, array_addresses) as array_mediator:
                 logger.debug(array_mediator)
+                snapshot_name = self._get_snapshot_name(request, array_mediator)
                 volume_name = array_mediator.get_volume_name(vol_id)
+                logger.info("Snapshot name : {}. Volume name : {}".format(snapshot_name, volume_name))
                 try:
                     snapshot = array_mediator.get_snapshot(snapshot_name)
                 except controller_errors.SnapshotNotFoundError:
@@ -316,7 +306,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                                                                      volume_name))
                     snapshot = array_mediator.create_snapshot(snapshot_name, volume_name)
                 else:
-                    logger.debug("Snapshot found : {}".format(snapshot))
+                    logger.debug("Snapshot exists : {}".format(snapshot_name))
                     if snapshot.volume_name != volume_name:
                         context.set_details(messages.SnapshotWrongVolume_message)
                         context.set_code(grpc.StatusCode.ALREADY_EXISTS)
@@ -442,18 +432,56 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             controller_server.stop(0)
             logger.debug('Controller Server Stopped ...')
 
-    def _get_volume_snapshot_create_name(self, request, name_prefix_param):
+    def _get_volume_name(self, request, array_mediator):
         """
         :param request: API request object
-        :param name_prefix_param: prefix user specifies in yaml file (e.g. storage class)
-        :return: if prefix specified <prefix>_<request.name> else <request.name>
+        :param array_mediator:
+        :return:
+                Volume name according to request and storage type
         """
-        base_name = request.name
+        return self._get_object_name(request, config.PARAMETERS_VOLUME_NAME_PREFIX, array_mediator.max_vol_name_length, "volume")
+
+    def _get_snapshot_name(self, request, array_mediator):
+        """
+        :param request: API request object
+        :param array_mediator:
+        :return:
+                Snapshot name according to request and storage type
+        """
+        return self._get_object_name(request, config.PARAMETERS_SNAPSHOT_NAME_PREFIX, array_mediator.max_snapshot_name_length, "snapshot")
+
+    def _get_object_name(self, request, name_prefix_param, max_name_length, object_type):
+        """
+        :param request: :param request: API request object
+        :param name_prefix_param: prefix user specifies in yaml file (e.g. storage class)
+        :param max_name_length: maximum allowed object name length
+        :param object_type: Volume or Snapshot
+        :return: if prefix specified <prefix>_<request.name> else <request.name>. Also if the name is too ong - cut it
+        """
+        res = request.name
+        #consider prefix
         if name_prefix_param in request.parameters:
             name_prefix = request.parameters[name_prefix_param]
-            return name_prefix + "_" + base_name
-        else:
-            return base_name
+            res = name_prefix + "_" + res
+        #cut if too long
+        if len(res) > max_name_length:
+            res = res[:max_name_length]
+            logger.warning("The {0} storage object name is too long - cutting it to be of size : {1}. new name : {2}".format(
+                object_type, max_name_length, res))
+        return res
+
+    def _get_volume_size(self, request, array_mediator):
+        """
+        :param request: API request object
+        :param array_mediator:
+        :return:
+                Volume size
+        """
+        res = request.capacity_range.required_bytes
+        if res == 0:
+            res = array_mediator.minimal_volume_size_in_bytes
+            logger.debug("requested size is 0 so the default size will be used : {0} ".format(res))
+        return res
 
 
 def main():

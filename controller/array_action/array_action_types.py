@@ -17,3 +17,5 @@ class Snapshot:
         self.volume_name = volume_name
         self.is_ready = is_ready
         self.array_type = array_type
+
+
