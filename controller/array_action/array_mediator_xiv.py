@@ -85,12 +85,12 @@ class XIVArrayMediator(ArrayMediator):
                       self.array_type)
 
     def _generate_snapshot_response(self, cli_snapshot):
-        return Snapshot(0,
+        return Snapshot(self._convert_size_blocks_to_bytes(int(cli_snapshot.capacity)),
                         cli_snapshot.wwn,
                         cli_snapshot.name,
                         self.endpoint,
                         cli_snapshot.master_name,
-                        cli_snapshot.pool_name,
+                        False, #TODO
                         self.array_type)
 
     def get_volume(self, vol_name):

@@ -131,11 +131,11 @@ def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
     logger.debug("creating snapshot response for snapshot : {0}".format(new_snapshot))
 
     res = csi_pb2.CreateSnapshotResponse(snapshot=csi_pb2.Snapshot(
-        size_bytes=new_snapshot.size_bytes,
+        size_bytes=new_snapshot.capacity_bytes,
         snapshot_id=get_snapshot_id(new_snapshot),
         source_volume_id=source_volume_id,
         creation_time=get_current_timestamp(),
-        ready_to_use=True))
+        ready_to_use=new_snapshot.is_ready))
 
     logger.debug("finished creating snapshot response : {0}".format(res))
     return res
