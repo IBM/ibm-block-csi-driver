@@ -8,11 +8,43 @@ from controller.tests import utils
 from controller.csi_general import csi_pb2
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.controller_server.csi_controller_server import ControllerServicer
-from controller.controller_server.test_settings import vol_name
+from controller.controller_server.test_settings import vol_name, snap_name, snap_vol_name
 import controller.array_action.errors as array_errors
 import controller.controller_server.errors as controller_errors
 
 from controller.controller_server.config import PARAMETERS_VOLUME_NAME_PREFIX
+
+class TestControllerServerCreateSnapshot(unittest.TestCase):
+
+    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
+    def setUp(self, connect):
+        self.fqdn = "fqdn"
+        self.mediator = XIVArrayMediator("user", "password", self.fqdn)
+        self.mediator.client = Mock()
+        self.mediator.get_snapshot = Mock()
+        self.mediator.get_snapshot.side_effect = [array_errors.VolumeNotFoundError("snap")]
+
+        self.servicer = ControllerServicer(self.fqdn)
+
+        self.request = Mock()
+        self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
+        self.request.name = vol_name
+        self.request.source_volume_id = "A9000:12345678"
+
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_create_snapshot_succeeds(self, a_exit, a_enter, array_type):
+        a_enter.return_value = self.mediator
+        context = utils.FakeContext()
+
+        self.mediator.create_snapshot = Mock()
+        self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, "snap", "wwn", "snap_vol", "xiv")
+        array_type.return_value = "a9k"
+        res = self.servicer.CreateSnapshot(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.OK)
+        self.mediator.get_snapshot.assert_called_once_with(snap_name)
+        self.mediator.create_snapshot.assert_called_once_with(snap_name, snap_vol_name)
 
 
 class TestControllerServerCreateVolume(unittest.TestCase):
