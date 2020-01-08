@@ -28,6 +28,7 @@ class TestControllerServerCreateSnapshot(unittest.TestCase):
 
         self.request = Mock()
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
+        self.request.parameters = {}
         self.request.name = snap_name
         self.request.source_volume_id = "A9000:12345678"
 
