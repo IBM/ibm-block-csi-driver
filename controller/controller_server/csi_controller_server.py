@@ -476,13 +476,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.info("++++ get object name {0}".format(request))
         logger.info("++++ get object name {0} {1}".format(request, request.name))
         res = request.name
+        logger.info("++++ get object name {0} {1}".format(res, max_name_length))
         # consider prefix
         if request.parameters and name_prefix_param in request.parameters:
             logger.info("++++ get name prefix")
             name_prefix = request.parameters[name_prefix_param]
             res = name_prefix + "_" + res
         # cut if too long
-        logger.info("++++ get object name {0} {1}".format(res, max_name_length))
         if len(res) > max_name_length:
             res = res[:max_name_length]
             logger.warning(
