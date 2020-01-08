@@ -37,11 +37,12 @@ class TestControllerServerCreateSnapshot(unittest.TestCase):
     def test_create_snapshot_succeeds(self, a_exit, a_enter, array_type):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
-
         self.mediator.create_snapshot = Mock()
         self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, "snap", "wwn", "snap_vol", "xiv")
+        self.mediator.get_volume_name = Mock()
+        self.mediator.get_volume_name.return_value = snap_vol_name
         array_type.return_value = "a9k"
-        res = self.servicer.CreateSnapshot(self.request, context)
+        self.servicer.CreateSnapshot(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.mediator.get_snapshot.assert_called_once_with(snap_name)
         self.mediator.create_snapshot.assert_called_once_with(snap_name, snap_vol_name)
