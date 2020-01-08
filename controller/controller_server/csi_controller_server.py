@@ -472,17 +472,21 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         :param object_type: Volume or Snapshot
         :return: if prefix specified <prefix>_<request.name> else <request.name>. Also if the name is too ong - cut it
         """
+        logger.info("++++ get object name")
         res = request.name
         # consider prefix
         if request.parameters and name_prefix_param in request.parameters:
+            logger.info("++++ get name prefix")
             name_prefix = request.parameters[name_prefix_param]
             res = name_prefix + "_" + res
         # cut if too long
+        logger.info("++++ get object name {0} {1}".format(res, max_name_length))
         if len(res) > max_name_length:
             res = res[:max_name_length]
             logger.warning(
                 "The {0} storage object name is too long - cutting it to be of size : {1}. new name : {2}".format(
                     object_type, max_name_length, res))
+        logger.info("+++++++++ return {0}".format(res))
         return res
 
     def _get_volume_size(self, request, array_mediator):
