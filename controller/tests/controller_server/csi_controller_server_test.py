@@ -2,7 +2,7 @@ import unittest
 # from unittest import mock as umock
 import grpc
 
-from mock import patch, Mock, call
+from mock import patch, Mock, PropertyMock, call
 from controller.tests import utils
 
 from controller.csi_general import csi_pb2
@@ -41,8 +41,7 @@ class TestControllerServerCreateSnapshot(unittest.TestCase):
         self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, "snap", "wwn", "snap_vol", "xiv")
         self.mediator.get_volume_name = Mock()
         self.mediator.get_volume_name.return_value = snap_vol_name
-        self.mediator.max_snapshot_name_length = Mock()
-        self.mediator.max_snapshot_name_length.return_value = 10
+        self.mediator.max_snapshot_name_length = PropertyMock(return_value=10)
         
         array_type.return_value = "a9k"
         self.servicer.CreateSnapshot(self.request, context)
