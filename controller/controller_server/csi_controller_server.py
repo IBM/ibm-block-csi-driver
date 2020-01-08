@@ -309,6 +309,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 print("+++++++++++++ inside with")
                 logger.debug(array_mediator)
                 snapshot_name = self._get_snapshot_name(request, array_mediator)
+                print("+++++++++++++ get snapshot name")
                 volume_name = array_mediator.get_volume_name(vol_id)
                 logger.info("Snapshot name : {}. Volume name : {}".format(snapshot_name, volume_name))
                 print("+++++++++++++ Before call get snapshot")

@@ -22,7 +22,7 @@ class TestControllerServerCreateSnapshot(unittest.TestCase):
         self.mediator = XIVArrayMediator("user", "password", self.fqdn)
         self.mediator.client = Mock()
         self.mediator.get_snapshot = Mock()
-        self.mediator.get_snapshot.return_value=None
+        self.mediator.get_snapshot.return_value = None
 
         self.servicer = ControllerServicer(self.fqdn)
 
@@ -41,6 +41,8 @@ class TestControllerServerCreateSnapshot(unittest.TestCase):
         self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, "snap", "wwn", "snap_vol", "xiv")
         self.mediator.get_volume_name = Mock()
         self.mediator.get_volume_name.return_value = snap_vol_name
+        self.mediator.max_snapshot_name_length = 10
+
         array_type.return_value = "a9k"
         self.servicer.CreateSnapshot(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
