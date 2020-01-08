@@ -183,7 +183,8 @@ class XIVArrayMediator(ArrayMediator):
             raise controller_errors.VolumeDoesNotExist(volume_name, self.endpoint)
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
-            raise controller_errors.PermissionDeniedError("create snapshot {0} from volume {1}".format(name, volume_name))
+            raise controller_errors.PermissionDeniedError(
+                "create snapshot {0} from volume {1}".format(name, volume_name))
 
     def _get_vol_by_wwn(self, volume_id):
         vol_by_wwn = self.client.cmd.vol_list(wwn=volume_id).as_single_element

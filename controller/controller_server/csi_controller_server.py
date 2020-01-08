@@ -315,7 +315,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return csi_pb2.CreateSnapshotResponse()
                 else:
                     logger.debug(
-                        "Snapshot doesn't exist. Creating a new snapshot {0} from volume {1}".format(snapshot_name,                                                                                                     volume_name))
+                        "Snapshot doesn't exist. Creating a new snapshot {0} from volume {1}".format(snapshot_name,
+                                                                                                     volume_name))
                     snapshot = array_mediator.create_snapshot(snapshot_name, volume_name)
 
                 logger.debug("generating create snapshot response")
@@ -472,26 +473,17 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         :param object_type: Volume or Snapshot
         :return: if prefix specified <prefix>_<request.name> else <request.name>. Also if the name is too ong - cut it
         """
-        logger.info("++++ get object name")
-        logger.info("++++ get object name {0}".format(request))
-        logger.info("++++ get object name {0} {1}".format(request, request.name))
         res = request.name
-        logger.info("++++ get object name {0} {1}".format(res, max_name_length))
         # consider prefix
-        logger.info("+++++++++ name_prefix_param {0}".format(name_prefix_param))
-        logger.info("+++++++++ request.parameters {0}".format(request.parameters))
         if request.parameters and (name_prefix_param in request.parameters):
-            logger.info("++++ get name prefix")
             name_prefix = request.parameters[name_prefix_param]
             res = name_prefix + "_" + res
         # cut if too long
-        logger.info("+++++++++ len {0}".format(len(res)))
         if len(res) > max_name_length:
             res = res[:max_name_length]
             logger.warning(
                 "The {0} storage object name is too long - cutting it to be of size : {1}. new name : {2}".format(
                     object_type, max_name_length, res))
-        logger.info("+++++++++ return {0}".format(res))
         return res
 
     def _get_volume_size(self, request, array_mediator):

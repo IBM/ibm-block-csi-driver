@@ -107,6 +107,7 @@ def validate_create_volume_request(request):
 
     logger.debug("request validation finished.")
 
+
 def validate_create_snapshot_request(request):
     logger.debug("validating create snapshot request")
     logger.debug("validating snapshot name")
@@ -116,6 +117,7 @@ def validate_create_snapshot_request(request):
     if request.secrets:
         validate_secret(request.secrets)
     logger.debug("request validation finished.")
+
 
 def generate_csi_create_volume_response(new_vol):
     logger.debug("creating volume response for vol : {0}".format(new_vol))

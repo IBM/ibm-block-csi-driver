@@ -14,6 +14,7 @@ import controller.controller_server.errors as controller_errors
 
 from controller.controller_server.config import PARAMETERS_VOLUME_NAME_PREFIX
 
+
 class TestControllerServerCreateSnapshot(unittest.TestCase):
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
@@ -39,7 +40,8 @@ class TestControllerServerCreateSnapshot(unittest.TestCase):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
         self.mediator.create_snapshot = Mock()
-        self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, "snap", "wwn", "snap_vol", "xiv")
+        self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, "snap", "wwn",
+                                                                                               "snap_vol", "xiv")
         self.mediator.get_volume_name = Mock()
         self.mediator.get_volume_name.return_value = snap_vol_name
 
@@ -670,7 +672,7 @@ class TestControllerServerPublishVolume(unittest.TestCase):
 
         self.mediator.map_volume.side_effect = [
                                                    array_errors.LunAlreadyInUseError("", "")] * (
-                                                           self.mediator.max_lun_retries + 1)
+                                                       self.mediator.max_lun_retries + 1)
         enter.return_value = self.mediator
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.RESOURCE_EXHAUSTED)
