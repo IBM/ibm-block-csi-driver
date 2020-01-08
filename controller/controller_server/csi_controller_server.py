@@ -474,7 +474,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         """
         logger.info("++++ get object name")
         logger.info("++++ get object name {0}".format(request))
-        logger.info("++++ get object name {0}".format(request, request.name))
+        logger.info("++++ get object name {0} {1}".format(request, request.name))
         res = request.name
         # consider prefix
         if request.parameters and name_prefix_param in request.parameters:
