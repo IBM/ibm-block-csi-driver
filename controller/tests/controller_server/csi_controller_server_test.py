@@ -28,7 +28,7 @@ class TestControllerServerCreateSnapshot(unittest.TestCase):
 
         self.request = Mock()
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
-        self.request.name = vol_name
+        self.request.name = snap_name
         self.request.source_volume_id = "A9000:12345678"
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
