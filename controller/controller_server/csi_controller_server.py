@@ -286,7 +286,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def CreateSnapshot(self, request, context):
         set_current_thread_name(request.name)
-        print("+++++++++++++ Start")
         try:
             utils.validate_create_snapshot_request(request)
         except ValidationException as ex:
@@ -298,21 +297,15 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         source_volume_id = request.source_volume_id
         logger.info("Snapshot base name : {}. Source volume id : {}".format(request.name, source_volume_id))
-
-        print("+++++++++++++ before get6 vol id")
-
         _, vol_id = utils.get_volume_id_info(source_volume_id)
         secrets = request.secrets
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
         try:
             with ArrayConnectionManager(user, password, array_addresses) as array_mediator:
-                print("+++++++++++++ inside with")
                 logger.debug(array_mediator)
                 snapshot_name = self._get_snapshot_name(request, array_mediator)
-                print("+++++++++++++ get snapshot name")
                 volume_name = array_mediator.get_volume_name(vol_id)
                 logger.info("Snapshot name : {}. Volume name : {}".format(snapshot_name, volume_name))
-                print("+++++++++++++ Before call get snapshot")
                 snapshot = array_mediator.get_snapshot(snapshot_name)
                 if snapshot:
                     logger.debug("Snapshot exists : {}".format(snapshot_name))
@@ -481,7 +474,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         """
         res = request.name
         # consider prefix
-        if name_prefix_param in request.parameters:
+        if request.parameters && name_prefix_param in request.parameters:
             name_prefix = request.parameters[name_prefix_param]
             res = name_prefix + "_" + res
         # cut if too long
