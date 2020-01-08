@@ -308,19 +308,18 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 snapshot_name = self._get_snapshot_name(request, array_mediator)
                 volume_name = array_mediator.get_volume_name(vol_id)
                 logger.info("Snapshot name : {}. Volume name : {}".format(snapshot_name, volume_name))
-                try:
-                    snapshot = array_mediator.get_snapshot(snapshot_name)
-                except controller_errors.SnapshotNotFoundError:
-                    logger.debug(
-                        "Snapshot was not found. creating a new snapshot {0} from volume {1}".format(snapshot_name,
-                                                                                                     volume_name))
-                    snapshot = array_mediator.create_snapshot(snapshot_name, volume_name)
-                else:
+
+                snapshot = array_mediator.get_snapshot(snapshot_name)
+                if snapshot:
                     logger.debug("Snapshot exists : {}".format(snapshot_name))
                     if snapshot.volume_name != volume_name:
                         context.set_details(messages.SnapshotWrongVolume_message)
                         context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                         return csi_pb2.CreateSnapshotResponse()
+                else:
+                    logger.debug(
+                        "Snapshot doesn't exist. Creating a new snapshot {0} from volume {1}".format(snapshot_name,                                                                                                     volume_name))
+                    snapshot = array_mediator.create_snapshot(snapshot_name, volume_name)
 
                 logger.debug("generating create snapshot response")
                 res = utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)

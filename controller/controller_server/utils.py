@@ -77,13 +77,13 @@ def validate_create_volume_request(request):
     logger.debug("validating create volume request")
 
     logger.debug("validating volume name")
-    if request.name == '':
-        raise ValidationException(messages.name_should_be_empty_message)
+    if not request.name:
+        raise ValidationException(messages.name_should_not_be_empty_message)
 
     logger.debug("validating volume capacity")
     if request.capacity_range:
         if request.capacity_range.required_bytes < 0:
-            raise ValidationException(messages.size_bigget_then_0_message)
+            raise ValidationException(messages.size_bigger_then_0_message)
 
     else:
         raise ValidationException(messages.no_capacity_range_message)
@@ -110,8 +110,8 @@ def validate_create_volume_request(request):
 def validate_create_snapshot_request(request):
     logger.debug("validating create snapshot request")
     logger.debug("validating snapshot name")
-    if request.name == '':
-        raise ValidationException(messages.name_should_be_empty_message)
+    if not request.name:
+        raise ValidationException(messages.name_should_not_be_empty_message)
     logger.debug("validating secrets")
     if request.secrets:
         validate_secret(request.secrets)
@@ -168,7 +168,7 @@ def validate_publish_volume_request(request):
 
     logger.debug("validating readonly")
     if request.readonly:
-        raise ValidationException(messages.readoly_not_supported_message)
+        raise ValidationException(messages.readonly_not_supported_message)
 
     logger.debug("validating volume capabilities")
     validate_csi_volume_capability(request.volume_capability)

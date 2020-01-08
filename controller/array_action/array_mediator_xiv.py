@@ -119,11 +119,13 @@ class XIVArrayMediator(ArrayMediator):
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectName(ex.status)
-
-        logger.debug("cli snapshot returned : {}".format(cli_snapshot))
         if not cli_snapshot:
-            raise controller_errors.SnapshotNotFoundError(snapshot_name)
-
+            logger.debug("Snapshot {} doesn't exist".format(snapshot_name))
+            return None
+        if not cli_snapshot.master_name:
+            logger.debug("Snapshot {} doesn't exist. But volume with the same name exists".format(snapshot_name))
+            return None
+        logger.debug("Cli snapshot returned : {}".format(cli_snapshot))
         array_snapshot = self._generate_snapshot_response(cli_snapshot)
         return array_snapshot
 
