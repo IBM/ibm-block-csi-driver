@@ -473,6 +473,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         :return: if prefix specified <prefix>_<request.name> else <request.name>. Also if the name is too ong - cut it
         """
         logger.info("++++ get object name")
+        logger.info("++++ get object name {0}".format(request))
+        logger.info("++++ get object name {0}".format(request, request.name))
         res = request.name
         # consider prefix
         if request.parameters and name_prefix_param in request.parameters:
