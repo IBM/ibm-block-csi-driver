@@ -474,7 +474,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         """
         res = request.name
         # consider prefix
-        if request.parameters && name_prefix_param in request.parameters:
+        if request.parameters and name_prefix_param in request.parameters:
             name_prefix = request.parameters[name_prefix_param]
             res = name_prefix + "_" + res
         # cut if too long
