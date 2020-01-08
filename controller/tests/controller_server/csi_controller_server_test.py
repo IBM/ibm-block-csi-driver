@@ -22,7 +22,7 @@ class TestControllerServerCreateSnapshot(unittest.TestCase):
         self.mediator = XIVArrayMediator("user", "password", self.fqdn)
         self.mediator.client = Mock()
         self.mediator.get_snapshot = Mock()
-        self.mediator.get_snapshot.side_effect = [array_errors.VolumeNotFoundError("snap")]
+        self.mediator.get_snapshot.return_value=None
 
         self.servicer = ControllerServicer(self.fqdn)
 
