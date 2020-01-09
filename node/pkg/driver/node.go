@@ -362,10 +362,20 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	// if the device is not mounted then we are mounting it.
 
 	volumeCap := req.GetVolumeCapability()
-	fsType := volumeCap.GetMount().FsType
-
-	if fsType == "" {
-		fsType = defaultFSType
+	volMount := volumeCap.GetMount()
+	isFormat := false
+	fsType := ""
+	if volMount != nil {
+		isFormat = true
+		fsType = volumeCap.GetMount().FsType
+		if fsType == "" {
+			fsType = defaultFSType
+		}
+		logger.Debugf("Volume will be formatted. FS type : {%v}", fsType)
+	} else if volumeCap.GetBlock() != nil { //not moun t and not block
+		logger.Debugf("Volume will not be formatted. File system type : {%v}", fsType)
+	} else {
+		return nil, status.Errorf(codes.InvalidArgument, "Illegal access type (%v)", volumeCap.GetAccessType())
 	}
 
 	if _, err := os.Stat(targetPathWithHostPrefix); os.IsNotExist(err) {
@@ -374,9 +384,13 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 
 	logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
-
-	logger.Debugf("FormatAndMount start [goid=%d]", util.GetGoID())
-	err = d.mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
+	if isFormat {
+		logger.Debugf("FormatAndMount start fsType: %s", fsType)
+		err = d.mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
+	} else {
+		logger.Debugf("Mount start")
+		err = d.mounter.Mount(mpathDevice, targetPath, "", nil)
+	}
 	// TODO: pass mount options
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
