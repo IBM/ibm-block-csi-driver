@@ -19,7 +19,7 @@ class AbstractControllerTest(unittest.TestCase):
     def get_create_object_method(self):
         raise NotImplementedError
 
-    def test_create_object_with_wrong_secrets(self, a_enter, a_exit, array_type):
+    def _test_create_object_with_wrong_secrets(self, a_enter, a_exit, array_type):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
 
@@ -84,7 +84,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     def test_create_volume_with_wrong_secrets(self, a_enter, a_exit, array_type):
-        self.test_create_object_with_wrong_secrets(a_enter, a_exit, array_type)
+        self._test_create_object_with_wrong_secrets(a_enter, a_exit, array_type)
 
 
 class TestControllerServerCreateVolume(unittest.TestCase):
