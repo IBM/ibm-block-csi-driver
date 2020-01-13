@@ -207,6 +207,24 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.mediator.get_snapshot.assert_called_once_with("a" * self.mediator.max_snapshot_name_length)
 
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_create_snapshot_with_name_prefix(self, a_exit, a_enter, array_type):
+        a_enter.return_value = self.mediator
+        context = utils.FakeContext()
+        self.mediator.get_volume_name = Mock()
+        self.mediator.get_volume_name.return_value = "snap_vol"
+
+        self.request.name = "some_name"
+        self.request.parameters[PARAMETERS_SNAPSHOT_NAME_PREFIX] = "prefix"
+        self.mediator.create_snapshot = Mock()
+        self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_volume(10, "snap", "wwn", "snap_vol", "xiv")
+        array_type.return_value = "a9k"
+        res = self.servicer.CreateSnapshot(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.OK)
+        self.mediator.create_snapshot.assert_called_once_with("prefix_some_name", "snap_vol")
+
 
 class TestControllerServerCreateVolume(AbstractControllerTest):
 
