@@ -44,7 +44,7 @@ class AbstractControllerTest(unittest.TestCase):
 class TestControllerServerCreateSnapshot(unittest.AbstractControllerTest):
 
     def get_create_object_method(self):
-        raise self.servicer.CreateSnapshot
+        return self.servicer.CreateSnapshot
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
     def setUp(self, connect):
