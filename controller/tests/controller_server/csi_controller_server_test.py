@@ -84,7 +84,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     def test_create_volume_with_wrong_secrets(self, a_enter, a_exit, array_type):
-        super().test_create_volume_with_wrong_secrets(a_enter, a_exit, array_type)
+        test_create_object_with_wrong_secrets(a_enter, a_exit, array_type)
 
 
 class TestControllerServerCreateVolume(unittest.TestCase):
