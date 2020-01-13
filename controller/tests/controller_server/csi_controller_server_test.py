@@ -24,17 +24,17 @@ class AbstractControllerTest(unittest.TestCase):
         context = utils.FakeContext()
 
         self.request.secrets = {"password": "pass", "management_address": "mg"}
-        self.servicer.CreateVolume(self.request, context)
+        self.get_create_object_method()(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "username is missing in secrets")
         self.assertTrue("secret" in context.details)
 
         self.request.secrets = {"username": "user", "management_address": "mg"}
-        self.servicer.CreateVolume(self.request, context)
+        self.get_create_object_method()(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "password is missing in secrets")
         self.assertTrue("secret" in context.details)
 
         self.request.secrets = {"username": "user", "password": "pass"}
-        self.servicer.CreateVolume(self.request, context)
+        self.get_create_object_method()(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "mgmt address is missing in secrets")
         self.assertTrue("secret" in context.details)
 
