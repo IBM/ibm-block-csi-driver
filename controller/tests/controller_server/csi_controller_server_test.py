@@ -138,7 +138,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self._test_create_object_with_get_array_type_exception(a_enter, array_type)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
-    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.get_volume")
+    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.get_snapshot")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_create_snapshot_get_snapshot_exception(self, a_enter, get_volume, array_type):
         a_enter.return_value = self.mediator
@@ -150,7 +150,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.mediator.get_snapshot.assert_called_once_with(snap_name)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
-    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.get_volume")
+    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.get_snapshot")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_create_snapshot_with_get_snapshot_illegal_object_name_exception(self, a_enter, get_volume, array_type):
         a_enter.return_value = self.mediator
@@ -164,10 +164,11 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.mediator.get_snapshot.assert_called_once_with(snap_name)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
-    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.create_volume")
+    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.create_snapshot")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def create_snapshot_returns_error(self, a_enter, create_snapshot, array_type, return_code, err):
         a_enter.return_value = self.mediator
+
         create_snapshot.side_effect = [err]
         context = utils.FakeContext()
         self.servicer.CreateSnapshot(self.request, context)
