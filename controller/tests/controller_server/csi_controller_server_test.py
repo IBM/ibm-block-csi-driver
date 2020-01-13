@@ -28,10 +28,10 @@ class AbstractControllerTest(unittest.TestCase):
         a_enter.return_value = self.mediator
         self.request.name = ""
         context = utils.FakeContext()
-        res = self.get_create_object_method(self.request, context)
+        res = self.get_create_object_method()(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertTrue("name" in context.details)
-        self.assertEqual(res, self.get_create_object_method_response())
+        self.assertEqual(res, self.get_create_object_method_response()())
 
     def _test_create_object_with_wrong_secrets(self, a_enter):
         a_enter.return_value = self.mediator
@@ -82,7 +82,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     def test_create_snapshot_with_empty_name(self, a_enter, a_exit):
-        self._test_create_object_with_empty_name(self, a_enter)
+        self._test_create_object_with_empty_name(a_enter)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
@@ -147,7 +147,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     def test_create_volume_with_empty_name(self, a_enter, a_exit):
-        self._test_create_object_with_empty_name(self, a_enter)
+        self._test_create_object_with_empty_name(a_enter)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
