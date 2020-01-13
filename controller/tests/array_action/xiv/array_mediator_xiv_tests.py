@@ -121,7 +121,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_delete_snapshot_return_bad_name_error(self):
         self.mediator.client.cmd.snapshot_delete.side_effect = [xcli_errors.VolumeBadNameError("", "snap", "")]
         with self.assertRaises(array_errors.SnapshotNotFoundError):
-            self.mediator.delete_snapshot("vol-wwn")
+            self.mediator.delete_snapshot("snap-wwn")
 
     def test_delete_snapshot_fails_on_permissions(self):
         self.mediator.client.cmd.snapshot_delete.side_effect = [

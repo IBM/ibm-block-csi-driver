@@ -111,6 +111,23 @@ class ArrayMediator:
         raise NotImplementedError
 
     @abc.abstractmethod
+    def delete_snapshot(self, snapshot_id):
+        """
+        This function should delete a snapshot in the storage system.
+
+        Args:
+            snapshot_id : wwn of the snapshot to delete
+
+        Returns:
+            None
+
+        Raises:
+            SnapshotNotFound
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abc.abstractmethod
     def get_volume(self, volume_name):
         """
         This function return volume info about the volume.
