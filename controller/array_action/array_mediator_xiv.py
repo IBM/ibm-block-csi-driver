@@ -213,7 +213,10 @@ class XIVArrayMediator(ArrayMediator):
 
     def delete_snapshot(self, snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
-        snapshot_name = self._get_vol_by_wwn(snapshot_id)
+        try:
+            snapshot_name = self._get_vol_by_wwn(snapshot_id)
+        except controller_errors.VolumeNotFoundError as ex:
+            raise controller_errors.SnapshotNotFoundError(snapshot_id)
 
         try:
             self.client.cmd.snapshot_delete(snapshot=snapshot_name)

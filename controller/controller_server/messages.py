@@ -12,6 +12,7 @@ unsupported_fs_type_message = "unsupported fs_type : {}"
 only_mount_supported_message = "only mount volume capability is supported"
 unsupported_access_mode_message = "unsupported access mode : {}"
 name_should_not_be_empty_message = 'name should not be empty'
+snapshot_id_cannot_not_be_empty_message = 'snapshot id cannot be empty'
 size_bigger_then_0_message = 'size should be bigger then 0'
 no_capacity_range_message = 'no capacity range set'
 pool_is_missing_message = 'pool parameter is missing.'

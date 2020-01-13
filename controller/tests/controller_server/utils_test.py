@@ -130,6 +130,15 @@ class TestUtils(unittest.TestCase):
         request.capacity_range.required_bytes = 0
         utils.validate_create_volume_request(request)
 
+    @patch('controller.controller_server.utils.validate_secret')
+    def test_validate_delete_snapshot_request(self, _):
+        request = Mock()
+        request.snapshot_id = ""
+
+        with self.assertRaises(ValidationException):
+            utils.validate_delete_snapshot_request(request)
+
+
     @patch("controller.controller_server.utils.get_vol_id")
     def test_get_create_volume_response(self, get_vol_id):
         new_vol = Mock()
