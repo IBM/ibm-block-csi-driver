@@ -113,7 +113,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.mediator.get_volume_name.return_value = snap_vol_name
 
         array_type.return_value = "a9k"
-        self.get_create_object_method()(self.request, context)
+        self.servicer.CreateSnapshot(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.mediator.get_snapshot.assert_called_once_with(snap_name)
         self.mediator.create_snapshot.assert_called_once_with(snap_name, snap_vol_name)
@@ -135,6 +135,32 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     def test_create_snapshot_with_get_array_type_exception(self, a_enter, a_exit, array_type):
         self._test_create_object_with_get_array_type_exception(a_enter, array_type)
+
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.get_volume")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_create_snapshot_get_snapshot_exception(self, a_enter, get_volume, array_type):
+        a_enter.return_value = self.mediator
+        self.mediator.get_volume.side_effect = [Exception("error")]
+        context = utils.FakeContext()
+        self.servicer.CreateSnapshot(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
+        self.assertTrue("error" in context.details)
+        self.mediator.get_volume.assert_called_once_with(snap_name)
+
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.get_volume")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_create_snapshot_with_get_snapshot_illegal_object_name_exception(self, a_enter, get_volume, array_type):
+        a_enter.return_value = self.mediator
+        self.mediator.get_volume.side_effect = [array_errors.IllegalObjectName("snap")]
+        context = utils.FakeContext()
+        self.servicer.CreateSnapshot(self.request, context)
+        msg = array_errors.IllegalObjectName("snap").message
+
+        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
+        self.assertTrue(msg in context.details)
+        self.mediator.get_snapshot.assert_called_once_with(snap_name)
 
 
 class TestControllerServerCreateVolume(AbstractControllerTest):
