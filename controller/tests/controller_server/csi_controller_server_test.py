@@ -54,6 +54,22 @@ class AbstractControllerTest(unittest.TestCase):
 
         self.request.secrets = []
 
+    def _test_create_object_with_array_connection_exception(self, a_enter):
+        a_enter.side_effect = [Exception("error")]
+        context = utils.FakeContext()
+        self.get_create_object_method()(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.INTERNAL, "connection error occured in array_connection")
+        self.assertTrue("error" in context.details)
+
+    def _test_create_object_with_get_array_type_exception(self, a_enter, array_type):
+        a_enter.return_value = self.mediator
+        context = utils.FakeContext()
+        array_type.side_effect = [array_errors.FailedToFindStorageSystemType("endpoint")]
+        self.self.get_create_object_method()(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.INTERNAL, "failed to find storage system")
+        msg = array_errors.FailedToFindStorageSystemType("endpoint").message
+        self.assertTrue(msg in context.details)
+
 
 class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
@@ -107,6 +123,18 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     def test_create_snapshot_with_wrong_secrets(self, a_enter, a_exit, array_type):
         self._test_create_object_with_wrong_secrets(a_enter)
+
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_create_snapshot_with_array_connection_exception(self, a_enter, a_exit, array_type):
+        self._test_create_object_with_array_connection_exception(a_enter)
+
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_create_snapshot_with_get_array_type_exception(self, a_enter, a_exit, array_type):
+        self._test_create_object_with_get_array_type_exception(a_enter, array_type)
 
 
 class TestControllerServerCreateVolume(AbstractControllerTest):
@@ -217,23 +245,13 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     def test_create_volume_with_array_connection_exception(self, a_enter, a_exit, array_type):
-        a_enter.side_effect = [Exception("error")]
-        context = utils.FakeContext()
-        res = self.servicer.CreateVolume(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INTERNAL, "connection error occured in array_connection")
-        self.assertTrue("error" in context.details)
+        self._test_create_object_with_array_connection_exception(a_enter)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     def test_create_volume_with_get_array_type_exception(self, a_enter, a_exit, array_type):
-        a_enter.return_value = self.mediator
-        context = utils.FakeContext()
-        array_type.side_effect = [array_errors.FailedToFindStorageSystemType("endpoint")]
-        res = self.servicer.CreateVolume(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INTERNAL, "failed to find storage system")
-        msg = array_errors.FailedToFindStorageSystemType("endpoint").message
-        self.assertTrue(msg in context.details)
+        self._test_create_object_with_get_array_type_exception(a_enter, array_type)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.get_volume")
