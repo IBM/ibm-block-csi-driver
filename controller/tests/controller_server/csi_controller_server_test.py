@@ -147,7 +147,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.servicer.CreateSnapshot(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
         self.assertTrue("error" in context.details)
-        self.mediator.get_volume.assert_called_once_with(snap_name)
+        self.mediator.get_snapshot.assert_called_once_with(snap_name)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.get_volume")
