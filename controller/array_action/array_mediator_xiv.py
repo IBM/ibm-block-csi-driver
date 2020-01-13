@@ -215,7 +215,7 @@ class XIVArrayMediator(ArrayMediator):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
         try:
             snapshot_name = self._get_vol_by_wwn(snapshot_id)
-        except controller_errors.VolumeNotFoundError as ex:
+        except controller_errors.VolumeNotFoundError:
             raise controller_errors.SnapshotNotFoundError(snapshot_id)
 
         try:

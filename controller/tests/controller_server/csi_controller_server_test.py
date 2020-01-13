@@ -310,8 +310,8 @@ class TestControllerServerCreateVolume(unittest.TestCase):
 
 
 class TestControllerServerDeleteSnapshot(unittest.TestCase):
-    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
-    def setUp(self, connect):
+    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect", Mock())
+    def setUp(self):
         self.fqdn = "fqdn"
         self.mediator = XIVArrayMediator("user", "password", self.fqdn)
         self.mediator.client = Mock()
@@ -323,9 +323,9 @@ class TestControllerServerDeleteSnapshot(unittest.TestCase):
         self.request.parameters = {}
         self.request.snapshot_id = "A9000:BADC0FFEE0DDF00D00000000DEADBABE"
 
-    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.delete_snapshot")
+    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.delete_snapshot", Mock())
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_delete_snapshot_succeeds(self, a_enter, _):
+    def test_delete_snapshot_succeeds(self, a_enter):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
 
@@ -334,8 +334,8 @@ class TestControllerServerDeleteSnapshot(unittest.TestCase):
         self.assertEqual(context.code, grpc.StatusCode.OK)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_delete_snapshot_with_wrong_secrets(self, a_enter, _):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__", Mock())
+    def test_delete_snapshot_with_wrong_secrets(self, a_enter):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
 
@@ -355,8 +355,8 @@ class TestControllerServerDeleteSnapshot(unittest.TestCase):
         self.assertTrue("secret" in context.details)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_delete_snapshot_with_array_connection_exception(self, a_enter, _):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__", Mock())
+    def test_delete_snapshot_with_array_connection_exception(self, a_enter):
         a_enter.side_effect = [Exception("a_enter error")]
         context = utils.FakeContext()
 
