@@ -1,7 +1,7 @@
 import unittest
 # from unittest import mock as umock
 import grpc
-
+import abc
 from mock import patch, Mock, PropertyMock, call
 from controller.tests import utils
 
@@ -14,8 +14,37 @@ import controller.controller_server.errors as controller_errors
 
 from controller.controller_server.config import PARAMETERS_VOLUME_NAME_PREFIX
 
+class AbstractControllerTest(unittest.TestCase):
+    @abc.abstractmethod
+    def get_create_object_method(self):
+        raise NotImplementedError
 
-class TestControllerServerCreateSnapshot(unittest.TestCase):
+    def test_create_object_with_wrong_secrets(self, a_enter, a_exit, array_type):
+        a_enter.return_value = self.mediator
+        context = utils.FakeContext()
+
+        self.request.secrets = {"password": "pass", "management_address": "mg"}
+        self.servicer.CreateVolume(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "username is missing in secrets")
+        self.assertTrue("secret" in context.details)
+
+        self.request.secrets = {"username": "user", "management_address": "mg"}
+        self.servicer.CreateVolume(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "password is missing in secrets")
+        self.assertTrue("secret" in context.details)
+
+        self.request.secrets = {"username": "user", "password": "pass"}
+        self.servicer.CreateVolume(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "mgmt address is missing in secrets")
+        self.assertTrue("secret" in context.details)
+
+        self.request.secrets = []
+
+
+class TestControllerServerCreateSnapshot(unittest.AbstractControllerTest):
+
+    def get_create_object_method(self):
+        raise self.servicer.CreateSnapshot
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
     def setUp(self, connect):
@@ -46,10 +75,16 @@ class TestControllerServerCreateSnapshot(unittest.TestCase):
         self.mediator.get_volume_name.return_value = snap_vol_name
 
         array_type.return_value = "a9k"
-        self.servicer.CreateSnapshot(self.request, context)
+        self.get_create_object_method()(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.mediator.get_snapshot.assert_called_once_with(snap_name)
         self.mediator.create_snapshot.assert_called_once_with(snap_name, snap_vol_name)
+
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_create_volume_with_wrong_secrets(self, a_enter, a_exit, array_type):
+        super().test_create_volume_with_wrong_secrets(a_enter, a_exit, array_type)
 
 
 class TestControllerServerCreateVolume(unittest.TestCase):
