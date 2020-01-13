@@ -65,7 +65,7 @@ class AbstractControllerTest(unittest.TestCase):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
         array_type.side_effect = [array_errors.FailedToFindStorageSystemType("endpoint")]
-        self.self.get_create_object_method()(self.request, context)
+        self.get_create_object_method()(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL, "failed to find storage system")
         msg = array_errors.FailedToFindStorageSystemType("endpoint").message
         self.assertTrue(msg in context.details)
