@@ -61,7 +61,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         return self.servicer.CreateSnapshot
 
     def get_create_object_method_response(self):
-        raise csi_pb2.CreateSnapshotResponse
+        return csi_pb2.CreateSnapshotResponse
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
     def setUp(self, connect):
@@ -115,7 +115,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         return self.servicer.CreateVolume
 
     def get_create_object_method_response(self):
-        raise csi_pb2.CreateVolumeRequest
+        return csi_pb2.CreateVolumeRequest
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
     def setUp(self, connect):
