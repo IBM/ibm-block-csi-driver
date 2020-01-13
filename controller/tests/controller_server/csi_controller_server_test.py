@@ -178,6 +178,21 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.mediator.get_snapshot.assert_called_once_with(snap_name)
         self.mediator.create_snapshot.assert_called_once_with(snap_name, vol_name)
 
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_create_volume_cuts_name_if_its_too_long(self, a_exit, a_enter, array_type):
+        a_enter.return_value = self.mediator
+        context = utils.FakeContext()
+
+        self.request.name = "a" * 128
+        self.mediator.create_snapshot = Mock()
+        self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, "snap", "wwn", "snap_vol", ""xiv")
+        array_type.return_value = "a9k"
+        self.servicer.CreateSnapshot(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.OK)
+        self.mediator.get_snapshot.assert_called_once_with("a" * self.mediator.max_snapshot_name_length)
+
 
 class TestControllerServerCreateVolume(AbstractControllerTest):
 
