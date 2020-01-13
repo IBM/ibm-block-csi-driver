@@ -142,7 +142,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_create_snapshot_get_snapshot_exception(self, a_enter, get_volume, array_type):
         a_enter.return_value = self.mediator
-        self.mediator.get_volume.side_effect = [Exception("error")]
+        self.mediator.get_snapshot.side_effect = [Exception("error")]
         context = utils.FakeContext()
         self.servicer.CreateSnapshot(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
