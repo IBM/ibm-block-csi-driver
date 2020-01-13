@@ -41,7 +41,7 @@ class AbstractControllerTest(unittest.TestCase):
         self.request.secrets = []
 
 
-class TestControllerServerCreateSnapshot(unittest.AbstractControllerTest):
+class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
     def get_create_object_method(self):
         return self.servicer.CreateSnapshot
