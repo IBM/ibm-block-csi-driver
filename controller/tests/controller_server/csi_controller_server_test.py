@@ -14,6 +14,7 @@ import controller.controller_server.errors as controller_errors
 
 from controller.controller_server.config import PARAMETERS_VOLUME_NAME_PREFIX, PARAMETERS_SNAPSHOT_NAME_PREFIX
 
+
 class AbstractControllerTest(unittest.TestCase):
 
     @abc.abstractmethod
@@ -183,11 +184,11 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
     def test_create_volume_with_illegal_object_name_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
-                                         err=array_errors.IllegalObjectName("snap"))
+                                           err=array_errors.IllegalObjectName("snap"))
 
     def test_create_snapshot_with_snapshot_exists_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.ALREADY_EXISTS,
-                                         err=array_errors.VolumeAlreadyExists("snap", "endpoint"))
+                                           err=array_errors.VolumeAlreadyExists("snap", "endpoint"))
 
     def test_create_snapshot_with_other_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INTERNAL, err=Exception("error"))
@@ -201,7 +202,8 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
         self.request.name = "a" * 128
         self.mediator.create_snapshot = Mock()
-        self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, "snap", "wwn", "snap_vol", "xiv")
+        self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, "snap", "wwn",
+                                                                                               "snap_vol", "xiv")
         array_type.return_value = "a9k"
         self.servicer.CreateSnapshot(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -219,7 +221,8 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.request.name = "some_name"
         self.request.parameters[PARAMETERS_SNAPSHOT_NAME_PREFIX] = "prefix"
         self.mediator.create_snapshot = Mock()
-        self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_volume(10, "snap", "wwn", "snap_vol", "xiv")
+        self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_volume(10, "snap", "wwn",
+                                                                                             "snap_vol", "xiv")
         array_type.return_value = "a9k"
         res = self.servicer.CreateSnapshot(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
