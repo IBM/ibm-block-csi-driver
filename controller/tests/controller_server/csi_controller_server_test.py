@@ -169,6 +169,8 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     def create_snapshot_returns_error(self, a_enter, create_snapshot, array_type, return_code, err):
         a_enter.return_value = self.mediator
 
+        self.mediator.get_volume_name = Mock()
+        self.mediator.get_volume_name.return_value = snap_vol_name
         create_snapshot.side_effect = [err]
         context = utils.FakeContext()
         self.servicer.CreateSnapshot(self.request, context)
