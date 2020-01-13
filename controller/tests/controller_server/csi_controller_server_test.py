@@ -177,7 +177,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.assertEqual(context.code, return_code)
         self.assertTrue(msg in context.details)
         self.mediator.get_snapshot.assert_called_once_with(snap_name)
-        self.mediator.create_snapshot.assert_called_once_with(snap_name, vol_name)
+        self.mediator.create_snapshot.assert_called_once_with(snap_name, snap_vol_name)
 
     def test_create_volume_with_illegal_object_name_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
