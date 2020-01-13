@@ -221,7 +221,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.request.name = "some_name"
         self.request.parameters[PARAMETERS_SNAPSHOT_NAME_PREFIX] = "prefix"
         self.mediator.create_snapshot = Mock()
-        self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_volume(10, "snap", "wwn",
+        self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, "snap", "wwn",
                                                                                              "snap_vol", "xiv")
         array_type.return_value = "a9k"
         res = self.servicer.CreateSnapshot(self.request, context)
