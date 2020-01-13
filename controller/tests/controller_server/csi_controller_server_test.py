@@ -12,7 +12,7 @@ from controller.controller_server.test_settings import vol_name, snap_name, snap
 import controller.array_action.errors as array_errors
 import controller.controller_server.errors as controller_errors
 
-from controller.controller_server.config import PARAMETERS_VOLUME_NAME_PREFIX
+from controller.controller_server.config import PARAMETERS_VOLUME_NAME_PREFIX, PARAMETERS_SNAPSHOT_NAME_PREFIX
 
 class AbstractControllerTest(unittest.TestCase):
 
