@@ -166,7 +166,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.create_volume")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def create_volume_returns_error(self, a_enter, create_snapshot, array_type, return_code, err):
+    def create_snapshot_returns_error(self, a_enter, create_snapshot, array_type, return_code, err):
         a_enter.return_value = self.mediator
         create_snapshot.side_effect = [err]
         context = utils.FakeContext()
@@ -178,10 +178,21 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.mediator.get_snapshot.assert_called_once_with(snap_name)
         self.mediator.create_snapshot.assert_called_once_with(snap_name, vol_name)
 
+    def test_create_volume_with_illegal_object_name_exception(self):
+        self.create_snapshot_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
+                                         err=array_errors.IllegalObjectName("snap"))
+
+    def test_create_snapshot_with_snapshot_exists_exception(self):
+        self.create_snapshot_returns_error(return_code=grpc.StatusCode.ALREADY_EXISTS,
+                                         err=array_errors.VolumeAlreadyExists("snap", "endpoint"))
+
+    def test_create_snapshot_with_other_exception(self):
+        self.create_volume_returns_error(return_code=grpc.StatusCode.INTERNAL, err=Exception("error"))
+
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_create_volume_cuts_name_if_its_too_long(self, a_exit, a_enter, array_type):
+    def test_create_snapshot_cuts_name_if_its_too_long(self, a_exit, a_enter, array_type):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
 
