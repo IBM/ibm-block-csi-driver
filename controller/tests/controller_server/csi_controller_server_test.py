@@ -115,7 +115,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         return self.servicer.CreateVolume
 
     def get_create_object_method_response(self):
-        return csi_pb2.CreateVolumeRequest
+        return csi_pb2.CreateVolumeResponse
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
     def setUp(self, connect):
