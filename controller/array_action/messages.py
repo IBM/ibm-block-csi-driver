@@ -32,7 +32,7 @@ NoAvailableLunError_message = "No available lun was found for host : {0}"
 
 LunAlreadyInUse_message = "Lun : {0} is already mapped for host : {1}"
 
-MappingError_message = "Mapping error has occured while mapping vol : {0} to host : {1}. error : {2}"
+MappingError_message = "Mapping error has occurred while mapping vol : {0} to host : {1}. error : {2}"
 
 VolumeAlreadyUnmapped_message = "Volume: {0} is already unmapped."
 
