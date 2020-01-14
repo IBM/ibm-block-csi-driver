@@ -1,0 +1,9 @@
+apiVersion: snapshot.storage.k8s.io/v1alpha1
+kind: VolumeSnapshotClass
+metadata:
+  name: <VALUE_NAME>
+snapshotter: block.csi.ibm.com
+parameters:
+  csi.storage.k8s.io/snapshotter-secret-name: <VALUE_ARRAY_SECRET>
+  csi.storage.k8s.io/snapshotter-secret-namespace: <VALUE_ARRAY_SECRET_NAMESPACE>
+  snapshot_name_prefix: <VALUE_PREFIX>     # Optional.

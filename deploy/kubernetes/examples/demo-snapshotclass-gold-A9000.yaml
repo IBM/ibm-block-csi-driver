@@ -1,0 +1,9 @@
+apiVersion: snapshot.storage.k8s.io/v1alpha1
+kind: VolumeSnapshotClass
+metadata:
+  name: gold
+snapshotter: block.csi.ibm.com
+parameters:
+  csi.storage.k8s.io/snapshotter-secret-name: a9000-array1
+  csi.storage.k8s.io/snapshotter-secret-namespace: kube-system
+  snapshot_name_prefix: demo1     # Optional.
