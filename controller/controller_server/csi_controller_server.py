@@ -323,7 +323,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 res = utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
                 logger.info("finished create snapshot")
                 return res
-        except (controller_errors.IllegalObjectName, controller_errors.VolumeDoesNotExist) as ex:
+        except (controller_errors.IllegalObjectName, controller_errors.VolumeNotFoundError) as ex:
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateSnapshotResponse()

@@ -84,11 +84,9 @@ class ArrayMediator:
             Snapshot object
 
         Raises:
-            VolumeAlreadyExists
-            VolumeDoesNotExist
-            PoolDoesNotMatchCapabilities
+            SnapshotAlreadyExists
+            VolumeNotFound
             IllegalObjectName
-            VolumeNameIsNotSupported
             PermissionDenied
         """
         raise NotImplementedError
