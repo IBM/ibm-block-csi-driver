@@ -472,17 +472,17 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def _get_object_name(self, request, name_prefix_param, max_name_length, object_type):
         """
-        :param request: :param request: API request object
+        :param request: API request object
         :param name_prefix_param: prefix user specifies in yaml file (e.g. storage class)
         :param max_name_length: maximum allowed object name length
-        :param object_type: Volume or Snapshot
+        :param object_type: String value "volume" or "snapshot"
         :return: if prefix specified <prefix>_<request.name> else <request.name>. Also if the name is too ong - cut it
         """
         res = request.name
         # consider prefix
         if request.parameters and (name_prefix_param in request.parameters):
             name_prefix = request.parameters[name_prefix_param]
-            res = name_prefix + "_" + res
+            res = "{0}_{1}".format(name_prefix, res)
         # cut if too long
         if len(res) > max_name_length:
             res = res[:max_name_length]
