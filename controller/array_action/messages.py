@@ -8,6 +8,8 @@ VolumeNotFoundError_message = "Volume was not found : {0} "
 
 SnapshotNotFoundError_message = "Snapshot was not found : {0} "
 
+SnapshotAlreadyExistsError_message  = "Snapshot already exists : {0} , array : {1}"
+
 SnapshotWrongVolume_message = "Snapshot {0} exists but it is of Volume {1} and not {2}"
 
 PoolDoesNotMatchCapabilities_message = "Pool : {0} does not match the following capabilities : {1} . error : {2}"
@@ -15,8 +17,6 @@ PoolDoesNotMatchCapabilities_message = "Pool : {0} does not match the following 
 StorageClassCapabilityNotSupported_message = "Storage class capability is not supported : {0} "
 
 VolumeAlreadyExists_message = "Volume already exists : {0} , array : {1}"
-
-VolumeDoesNotExist_message = "Volume does not exist: {0} , array : {1}"
 
 PoolDoesNotExist_message = "Pool does not exist: {0} , array : {1}"
 
@@ -32,7 +32,7 @@ NoAvailableLunError_message = "No available lun was found for host : {0}"
 
 LunAlreadyInUse_message = "Lun : {0} is already mapped for host : {1}"
 
-MappingError_message = "Mapping error has occured while mapping vol : {0} to host : {1}. error : {2}"
+MappingError_message = "Mapping error has occurred while mapping vol : {0} to host : {1}. error : {2}"
 
 VolumeAlreadyUnmapped_message = "Volume: {0} is already unmapped."
 

@@ -36,7 +36,7 @@ class XIVArrayMediator(ArrayMediator):
 
     @classproperty
     def max_snapshot_name_length(self):
-        return 63
+        return self.max_vol_name_length
 
     @classproperty
     def max_connections(self):
@@ -94,8 +94,8 @@ class XIVArrayMediator(ArrayMediator):
                         cli_snapshot.name,
                         self.endpoint,
                         cli_snapshot.master_name,
-                        True,
-                        self.array_type)
+                        is_ready=True,
+                        array_type=self.array_type)
 
     def get_volume(self, vol_name):
         logger.debug("Get volume : {}".format(vol_name))
@@ -177,10 +177,10 @@ class XIVArrayMediator(ArrayMediator):
             raise controller_errors.IllegalObjectName(ex.status)
         except xcli_errors.VolumeExistsError as ex:
             logger.exception(ex)
-            raise controller_errors.VolumeAlreadyExists(name, self.endpoint)
-        except xcli_errors.PoolDoesNotExistError as ex:
+            raise controller_errors.SnapshotAlreadyExists(name, self.endpoint)
+        except xcli_errors.VolumeBadNameError as ex:
             logger.exception(ex)
-            raise controller_errors.VolumeDoesNotExist(volume_name, self.endpoint)
+            raise controller_errors.VolumeNotFoundError(volume_name)
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError(

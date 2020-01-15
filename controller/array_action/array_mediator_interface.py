@@ -84,11 +84,9 @@ class ArrayMediator:
             Snapshot object
 
         Raises:
-            VolumeAlreadyExists
-            VolumeDoesNotExist
-            PoolDoesNotMatchCapabilities
+            SnapshotAlreadyExists
+            VolumeNotFound
             IllegalObjectName
-            VolumeNameIsNotSupported
             PermissionDenied
         """
         raise NotImplementedError
@@ -105,7 +103,7 @@ class ArrayMediator:
             None
 
         Raises:
-            volumeNotFound
+            VolumeNotFound
             PermissionDenied
         """
         raise NotImplementedError
@@ -139,7 +137,7 @@ class ArrayMediator:
            Volume
 
         Raises:
-            volumeNotFound
+            VolumeNotFound
             IllegalObjectName
             PermissionDenied
         """
@@ -157,7 +155,7 @@ class ArrayMediator:
            volume name
 
         Raises:
-            volumeNotFound
+            VolumeNotFound
         """
         raise NotImplementedError
 
@@ -173,7 +171,7 @@ class ArrayMediator:
            mapped_host_luns : a dict like this: {<host name>:<lun id>,...}
 
         Raises:
-            volumeNotFound
+            VolumeNotFound
         """
         raise NotImplementedError
 
@@ -192,7 +190,7 @@ class ArrayMediator:
         Raises:
             NoAvailableLun
             LunAlreadyInUse
-            volumeNotFound
+            VolumeNotFound
             hostNotFound
             PermissionDenied
             MappingError

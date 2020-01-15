@@ -18,6 +18,7 @@ from controller.common.utils import set_current_thread_name
 from controller.common.node_info import NodeIdInfo
 from controller.array_action.array_mediator_action import map_volume, unmap_volume
 from controller.array_action import messages
+from controller.controller_server.config import OBJECT_TYPE_NAME_VOLUME, OBJECT_TYPE_NAME_SNAPSHOT
 
 logger = None  # is set in ControllerServicer::__init__
 
@@ -323,7 +324,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 res = utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
                 logger.info("finished create snapshot")
                 return res
-        except (controller_errors.IllegalObjectName, controller_errors.VolumeDoesNotExist) as ex:
+        except (controller_errors.IllegalObjectName, controller_errors.VolumeNotFoundError) as ex:
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateSnapshotResponse()
@@ -499,7 +500,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         return self._get_object_name(request,
                                      config.PARAMETERS_VOLUME_NAME_PREFIX,
                                      array_mediator.max_vol_name_length,
-                                     "volume")
+                                     OBJECT_TYPE_NAME_VOLUME)
 
     def _get_snapshot_name(self, request, array_mediator):
         """
@@ -511,21 +512,21 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         return self._get_object_name(request,
                                      config.PARAMETERS_SNAPSHOT_NAME_PREFIX,
                                      array_mediator.max_snapshot_name_length,
-                                     "snapshot")
+                                     OBJECT_TYPE_NAME_SNAPSHOT)
 
     def _get_object_name(self, request, name_prefix_param, max_name_length, object_type):
         """
-        :param request: :param request: API request object
+        :param request: API request object
         :param name_prefix_param: prefix user specifies in yaml file (e.g. storage class)
         :param max_name_length: maximum allowed object name length
-        :param object_type: Volume or Snapshot
+        :param object_type: String value "volume" or "snapshot"
         :return: if prefix specified <prefix>_<request.name> else <request.name>. Also if the name is too ong - cut it
         """
         res = request.name
         # consider prefix
         if request.parameters and (name_prefix_param in request.parameters):
             name_prefix = request.parameters[name_prefix_param]
-            res = name_prefix + "_" + res
+            res = "{0}_{1}".format(name_prefix, res)
         # cut if too long
         if len(res) > max_name_length:
             res = res[:max_name_length]

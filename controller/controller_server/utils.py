@@ -19,14 +19,14 @@ def get_array_connection_info_from_secret(secrets):
 
 def get_vol_id(new_vol):
     logger.debug('getting vol id for vol : {0}'.format(new_vol))
-    vol_id = "{0}{1}{2}".format(new_vol.array_type, config.PARAMETERS_VOLUME_ID_DELIMITER, new_vol.id)
+    vol_id = "{0}{1}{2}".format(new_vol.array_type, config.PARAMETERS_OBJECT_ID_DELIMITER, new_vol.id)
     logger.debug("vol id is : {0}".format(vol_id))
     return vol_id
 
 
 def get_snapshot_id(new_snapshot):
     logger.debug('getting snapshot id for snapshot : {0}'.format(new_snapshot))
-    snapshot_id = "{0}{1}{2}".format(new_snapshot.array_type, config.PARAMETERS_VOLUME_ID_DELIMITER, new_snapshot.id)
+    snapshot_id = "{0}{1}{2}".format(new_snapshot.array_type, config.PARAMETERS_OBJECT_ID_DELIMITER, new_snapshot.id)
     logger.debug("snapshot id is : {0}".format(snapshot_id))
     return snapshot_id
 
@@ -196,7 +196,7 @@ def validate_publish_volume_request(request):
 
 def get_volume_id_info(volume_id):
     logger.debug("getting volume info for vol id : {0}".format(volume_id))
-    split_vol = volume_id.split(config.PARAMETERS_VOLUME_ID_DELIMITER)
+    split_vol = volume_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)
     if len(split_vol) != 2:
         raise VolumeNotFoundError(volume_id)
 
@@ -252,7 +252,7 @@ def validate_unpublish_volume_request(request):
     logger.debug("validating unpublish volume request")
 
     logger.debug("validating volume id")
-    if len(request.volume_id.split(config.PARAMETERS_VOLUME_ID_DELIMITER)) != 2:
+    if len(request.volume_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)) != 2:
         raise ValidationException(messages.volume_id_wrong_format_message)
 
     logger.debug("validating secrets")

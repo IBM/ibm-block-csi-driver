@@ -37,6 +37,12 @@ class SnapshotNotFoundError(BaseArrayActionException):
         self.message = messages.SnapshotNotFoundError_message.format(name)
 
 
+class SnapshotAlreadyExists(BaseArrayActionException):
+
+    def __init__(self, snapshot, array):
+        self.message = messages.SnapshotAlreadyExistsError_message.format(snapshot, array)
+
+
 class IllegalObjectName(BaseArrayActionException):
 
     def __init__(self, msg):
@@ -59,12 +65,6 @@ class VolumeAlreadyExists(BaseArrayActionException):
 
     def __init__(self, volume, array):
         self.message = messages.VolumeAlreadyExists_message.format(volume, array)
-
-
-class VolumeDoesNotExist(BaseArrayActionException):
-
-    def __init__(self, volume, array):
-        self.message = messages.VolumeDoesNotExist_message.format(volume, array)
 
 
 class PoolDoesNotExist(BaseArrayActionException):
