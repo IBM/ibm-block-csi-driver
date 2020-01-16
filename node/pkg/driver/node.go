@@ -208,12 +208,6 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{"Volume capability AccessMode not supported"}
 	}
 
-	// If the access type is block, do nothing for stage
-	switch volCap.GetAccessType().(type) {
-	case *csi.VolumeCapability_Block:
-		return &RequestValidationError{"Volume Access Type Block is not supported yet"}
-	}
-
 	connectivityType, lun, arrayInitiators, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
 	if err != nil {
 		return &RequestValidationError{fmt.Sprintf("Fail to parse PublishContext %v with err = %v", req.PublishContext, err)}
