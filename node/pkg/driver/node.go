@@ -367,7 +367,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		}
 		logger.Debugf("Volume will be formatted. FS type : {%v}", fsType)
 	} else if volumeCap.GetBlock() != nil { //not moun t and not block
-		logger.Debugf("Volume will not be formatted. File system type : {%v}", fsType)
+		logger.Debugf("Volume will not be formatted. Raw disc is specified.")
 	} else {
 		return nil, status.Errorf(codes.InvalidArgument, "Illegal access type (%v)", volumeCap.GetAccessType())
 	}
@@ -377,12 +377,16 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		d.mounter.MakeDir(targetPathWithHostPrefix)
 	}
 
-	logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
 	if isFormat {
-		logger.Debugf("FormatAndMount start fsType: %s", fsType)
+		logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
 		err = d.mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 	} else {
-		logger.Debugf("Mount start")
+		logger.Debugf("Create file %q", targetPath)
+		err = d.mounter.MakeFile(targetPath)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Could not create file %q: %v", targetPath, err)
+		}
+		logger.Debugf("Mount the device with raw disk")
 		err = d.mounter.Mount(mpathDevice, targetPath, "", nil)
 	}
 	// TODO: pass mount options
