@@ -421,12 +421,6 @@ func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVol
 		return &RequestValidationError{"Volume capability AccessMode not supported"}
 	}
 
-	// If the access type is block, do nothing for stage
-	switch volCap.GetAccessType().(type) {
-	case *csi.VolumeCapability_Block:
-		return &RequestValidationError{"Volume Access Type Block is not supported yet"}
-	}
-
 	return nil
 }
 
