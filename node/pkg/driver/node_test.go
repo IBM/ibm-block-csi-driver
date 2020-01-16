@@ -77,23 +77,6 @@ func TestNodeStageVolume(t *testing.T) {
 			expErrCode: codes.InvalidArgument,
 		},
 		{
-			name: "fail invalid VolumeCapability Block instead of Mount",
-			req: &csi.NodeStageVolumeRequest{
-				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-				StagingTargetPath: "/test/path",
-				VolumeCapability: &csi.VolumeCapability{
-					AccessMode: &csi.VolumeCapability_AccessMode{
-						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-					},
-					AccessType: &csi.VolumeCapability_Block{
-						Block: &csi.VolumeCapability_BlockVolume{},
-					},
-				},
-				VolumeId: "vol-test",
-			},
-			expErrCode: codes.InvalidArgument,
-		},
-		{
 			name: "fail invalid VolumeCapability ",
 			req: &csi.NodeStageVolumeRequest{
 				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
