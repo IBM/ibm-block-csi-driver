@@ -19,14 +19,14 @@ def get_array_connection_info_from_secret(secrets):
 
 def get_vol_id(new_vol):
     logger.debug('getting vol id for vol : {0}'.format(new_vol))
-    vol_id = "{0}{1}{2}".format(new_vol.array_type, config.PARAMETERS_OBJECT_ID_DELIMITER, new_vol.id)
+    vol_id = config.PARAMETERS_OBJECT_ID_DELIMITER.join(new_vol.array_type, new_vol.id)
     logger.debug("vol id is : {0}".format(vol_id))
     return vol_id
 
 
 def get_snapshot_id(new_snapshot):
     logger.debug('getting snapshot id for snapshot : {0}'.format(new_snapshot))
-    snapshot_id = "{0}{1}{2}".format(new_snapshot.array_type, config.PARAMETERS_OBJECT_ID_DELIMITER, new_snapshot.id)
+    snapshot_id = config.PARAMETERS_OBJECT_ID_DELIMITER.join(new_snapshot.array_type, new_snapshot.id)
     logger.debug("snapshot id is : {0}".format(snapshot_id))
     return snapshot_id
 
