@@ -381,6 +381,11 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
 		err = d.mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 	} else {
+		globalMountPath := filepath.Dir(targetPath)
+		if _, err := os.Stat(globalMountPath); os.IsNotExist(err) {
+			logger.Debugf("Target path directory does not exist. creating : {%v}", globalMountPath)
+			d.mounter.MakeDir(globalMountPath)
+		}
 		logger.Debugf("Create file %q", targetPath)
 		err = d.mounter.MakeFile(targetPath)
 		if err != nil {
