@@ -29,7 +29,6 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
-	"github.com/ibm/ibm-block-csi-driver/node/util"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/kubernetes/pkg/util/mount"
@@ -372,34 +371,34 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		return nil, status.Errorf(codes.InvalidArgument, "Illegal access type (%v)", volumeCap.GetAccessType())
 	}
 
-	if _, err := os.Stat(targetPathWithHostPrefix); os.IsNotExist(err) {
-		logger.Debugf("Target path directory does not exist. creating : {%v}", targetPathWithHostPrefix)
-		d.mounter.MakeDir(targetPathWithHostPrefix)
-	}
-
 	if isFormat {
+		if _, err := os.Stat(targetPathWithHostPrefix); os.IsNotExist(err) {
+			logger.Debugf("Target path directory does not exist. creating : {%v}", targetPathWithHostPrefix)
+			d.mounter.MakeDir(targetPathWithHostPrefix)
+		}
 		logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
 		err = d.mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 	} else {
-		globalMountPath := filepath.Dir(targetPath)
-		if _, err := os.Stat(globalMountPath); os.IsNotExist(err) {
-			logger.Debugf("Target path directory does not exist. creating : {%v}", globalMountPath)
-			d.mounter.MakeDir(globalMountPath)
+		if _, err := os.Stat(targetPathWithHostPrefix); os.IsNotExist(err) {
+			targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
+			if _, err := os.Stat(targetPathParentDirWithHostPrefix); os.IsNotExist(err) {
+				logger.Debugf("Target path parent directory does not exist. creating : {%v}", targetPathParentDirWithHostPrefix)
+				d.mounter.MakeDir(targetPathParentDirWithHostPrefix)
+			}
+			logger.Debugf("Target path file does not exist. creating : {%v}", targetPathWithHostPrefix)
+			err = d.mounter.MakeFile(targetPathWithHostPrefix)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "Could not create file %q: %v", targetPath, err)
+			}
 		}
-		logger.Debugf("Create file %q", targetPath)
-		err = d.mounter.MakeFile(targetPath)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Could not create file %q: %v", targetPath, err)
-		}
+		options := []string{"bind"}
 		logger.Debugf("Mount the device with raw disk")
-		err = d.mounter.Mount(mpathDevice, targetPath, "", nil)
+		err = d.mounter.Mount(mpathDevice, targetPath, "", options)
 	}
 	// TODO: pass mount options
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	logger.Debugf("FormatAndMount end [goid=%d]", util.GetGoID())
-
 	logger.Debugf("NodePublishVolume Finished: multipath device is now mounted to targetPath.")
 
 	return &csi.NodePublishVolumeResponse{}, nil
