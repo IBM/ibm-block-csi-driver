@@ -476,19 +476,26 @@ func CleanupMountPoint(mountPath string, mounter mount.Interface, extensiveMount
 }
 
 func PathExists(path string) (bool, error) {
+	logger.Errorf("++++++++++ PathExists err: %v")
 	_, err := os.Stat(path)
+	logger.Errorf("++++++++++ PathExists err: %v", err)
 	if err == nil {
+		logger.Errorf("++++++++++ PathExists no error")
 		return true, nil
 	} else if os.IsNotExist(err) {
+		logger.Errorf("++++++++++ PathExists not exists")
 		return false, nil
 	} else if IsCorruptedMnt(err) {
+		logger.Errorf("++++++++++ PathExists corrupted mnt")
 		return true, err
 	} else {
+		logger.Errorf("++++++++++ PathExists other error")
 		return false, err
 	}
 }
 
 func IsCorruptedMnt(err error) bool {
+	logger.Errorf("+++++++ Is corrupted mount %v", err)
 	if err == nil {
 		return false
 	}
@@ -496,17 +503,22 @@ func IsCorruptedMnt(err error) bool {
 	var underlyingError error
 	switch pe := err.(type) {
 	case nil:
+		logger.Errorf("+++++++ Is corrupted mount nil")
 		return false
 	case *os.PathError:
+		logger.Errorf("+++++++ Is corrupted mount PathError")
 		underlyingError = pe.Err
 	case *os.LinkError:
+		logger.Errorf("+++++++ Is corrupted mount LinkError")
 		underlyingError = pe.Err
 	case *os.SyscallError:
+		logger.Errorf("+++++++ Is corrupted mount SyscallError")
 		underlyingError = pe.Err
 	}
 
 	if ee, ok := underlyingError.(syscall.Errno); ok {
 		for _, errno := range errorNoList {
+			logger.Warningf("+++++++++++++ IsCorruptedMnt failed? with error: %v, error code: %v", err, errno)
 			if int(ee) == errno {
 				logger.Warningf("IsCorruptedMnt failed with error: %v, error code: %v", err, errno)
 				return true
@@ -514,6 +526,7 @@ func IsCorruptedMnt(err error) bool {
 		}
 	}
 
+	logger.Errorf("+++++++++++++++ IsCorruptedMnt - NO error")
 	return false
 }
 
