@@ -23,6 +23,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/ibm/ibm-block-csi-driver/node/goid_info"
@@ -57,6 +58,8 @@ var (
 	}
 
 	IscsiFullPath = "/host/etc/iscsi/initiatorname.iscsi"
+
+	errorNoList = [...]int{53, 54, 59, 64, 65, 66, 67, 1219, 1326}
 )
 
 const (
@@ -353,32 +356,21 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 
 	// if the device is not mounted then we are mounting it.
-
 	volumeCap := req.GetVolumeCapability()
-	volMount := volumeCap.GetMount()
-	isFormat := false
-	fsType := ""
-	if volMount != nil {
-		isFormat = true
+	switch volumeCap.GetAccessType().(type) {
+	case *csi.VolumeCapability_Mount:
 		fsType = volumeCap.GetMount().FsType
 		if fsType == "" {
 			fsType = defaultFSType
 		}
-		logger.Debugf("Volume will be formatted. FS type : {%v}", fsType)
-	} else if volumeCap.GetBlock() != nil { //not moun t and not block
-		logger.Debugf("Volume will not be formatted. Raw disc is specified.")
-	} else {
-		return nil, status.Errorf(codes.InvalidArgument, "Illegal access type (%v)", volumeCap.GetAccessType())
-	}
-
-	if isFormat {
+		logger.Debugf("Volume will be formatted to FS type : {%v}", fsType)
 		if _, err := os.Stat(targetPathWithHostPrefix); os.IsNotExist(err) {
 			logger.Debugf("Target path directory does not exist. creating : {%v}", targetPathWithHostPrefix)
 			d.mounter.MakeDir(targetPathWithHostPrefix)
 		}
 		logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
 		err = d.mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
-	} else {
+	case *csi.VolumeCapability_Block:
 		if _, err := os.Stat(targetPathWithHostPrefix); os.IsNotExist(err) {
 			targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
 			if _, err := os.Stat(targetPathParentDirWithHostPrefix); os.IsNotExist(err) {
@@ -456,13 +448,153 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	}
 
 	logger.Debugf("NodeUnpublishVolume: unmounting %s", target)
-	err = mount.CleanupMountPoint(target, d.mounter, true)
+	//err = mount.CleanupMountPoint(target, d.mounter, true)
+	err = CleanupMountPoint(target, d.mounter, true)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Could not unmount %q: %v", target, err)
 	}
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 
+}
+
+func CleanupMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool) error {
+	// mounter.ExistsPath cannot be used because for containerized kubelet, we need to check
+	// the path in the kubelet container, not on the host.
+	pathExists, pathErr := PathExists(mountPath)
+	if !pathExists {
+		logger.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
+		return nil
+	}
+	logger.Errorf("+++++++++++++++++ Path exists %v", pathExists)
+	corruptedMnt := IsCorruptedMnt(pathErr)
+	if pathErr != nil && !corruptedMnt {
+		return fmt.Errorf("Error checking path: %v", pathErr)
+	}
+	logger.Errorf("+++++++++++++++++ pathErr %v, corruptedMnt %v", pathErr, corruptedMnt)
+	return doCleanupMountPoint(mountPath, mounter, extensiveMountPointCheck, corruptedMnt)
+}
+
+func PathExists(path string) (bool, error) {
+	_, err := os.Stat(path)
+	if err == nil {
+		return true, nil
+	} else if os.IsNotExist(err) {
+		return false, nil
+	} else if IsCorruptedMnt(err) {
+		return true, err
+	} else {
+		return false, err
+	}
+}
+
+func IsCorruptedMnt(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	var underlyingError error
+	switch pe := err.(type) {
+	case nil:
+		return false
+	case *os.PathError:
+		underlyingError = pe.Err
+	case *os.LinkError:
+		underlyingError = pe.Err
+	case *os.SyscallError:
+		underlyingError = pe.Err
+	}
+
+	if ee, ok := underlyingError.(syscall.Errno); ok {
+		for _, errno := range errorNoList {
+			if int(ee) == errno {
+				logger.Warningf("IsCorruptedMnt failed with error: %v, error code: %v", err, errno)
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func doCleanupMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool, corruptedMnt bool) error {
+	logger.Errorf("+++++++++++++++++ doCleanupMountPoint, corruptedMnt %v", corruptedMnt)
+	if !corruptedMnt {
+		var notMnt bool
+		var err error
+		if extensiveMountPointCheck {
+			notMnt, err = IsNotMountPoint(mounter, mountPath)
+			logger.Errorf("+++++++++++++++++ is not mount point %v, err  %v", notMnt, err)
+		} else {
+			notMnt, err = mounter.IsLikelyNotMountPoint(mountPath)
+			logger.Errorf("+++++++++++++++++ is LIKELY not mount point %v, err  %v", notMnt, err)
+		}
+
+		if err != nil {
+			return err
+		}
+
+		if notMnt {
+			logger.Warningf("Warning: %q is not a mountpoint, deleting", mountPath)
+			return os.Remove(mountPath)
+		}
+	}
+
+	// Unmount the mount path
+	logger.Infof("%q is a mountpoint, unmounting", mountPath)
+	logger.Errorf("+++++++++++++++++ Call mount  %v", mountPath)
+	if err := mounter.Unmount(mountPath); err != nil {
+		return err
+	}
+	logger.Errorf("+++++++++++++++++ Call mount finished without error %v", mountPath)
+	notMnt, mntErr := mounter.IsLikelyNotMountPoint(mountPath)
+	if mntErr != nil {
+		return mntErr
+	}
+	if notMnt {
+		logger.Infof("%q is unmounted, deleting the directory", mountPath)
+		return os.Remove(mountPath)
+	}
+	return fmt.Errorf("Failed to unmount path %v", mountPath)
+}
+
+func IsNotMountPoint(mounter mount.Interface, file string) (bool, error) {
+	// IsLikelyNotMountPoint provides a quick check
+	// to determine whether file IS A mountpoint
+	notMnt, notMntErr := mounter.IsLikelyNotMountPoint(file)
+	if notMntErr != nil && os.IsPermission(notMntErr) {
+		// We were not allowed to do the simple stat() check, e.g. on NFS with
+		// root_squash. Fall back to /proc/mounts check below.
+		notMnt = true
+		notMntErr = nil
+	}
+	if notMntErr != nil {
+		return notMnt, notMntErr
+	}
+	// identified as mountpoint, so return this fact
+	if notMnt == false {
+		return notMnt, nil
+	}
+
+	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts
+	resolvedFile, err := mounter.EvalHostSymlinks(file)
+	if err != nil {
+		return true, err
+	}
+
+	// check all mountpoints since IsLikelyNotMountPoint
+	// is not reliable for some mountpoint types
+	mountPoints, mountPointsErr := mounter.List()
+	if mountPointsErr != nil {
+		return notMnt, mountPointsErr
+	}
+	for _, mp := range mountPoints {
+		if mounter.IsMountPointMatch(mp, resolvedFile) {
+			notMnt = false
+			break
+		}
+	}
+	return notMnt, nil
 }
 
 func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
