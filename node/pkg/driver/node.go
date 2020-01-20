@@ -359,7 +359,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	volumeCap := req.GetVolumeCapability()
 	switch volumeCap.GetAccessType().(type) {
 	case *csi.VolumeCapability_Mount:
-		fsType = volumeCap.GetMount().FsType
+		fsType := volumeCap.GetMount().FsType
 		if fsType == "" {
 			fsType = defaultFSType
 		}
