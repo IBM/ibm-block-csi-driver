@@ -452,9 +452,21 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	}
 
 	logger.Debugf("NodeUnpublishVolume: unmounting %s", target)
-	//err = mount.CleanupMountPoint(target, d.mounter, true)
-	err = CleanupMountPoint(target, d.mounter, true)
+	err = d.mounter.Unmount(target)
 	if err != nil {
+		logger.Errorf("Unmount failed. Target : %s, err : %v", target, err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	logger.Debugf("Unmount finished. Target : {%s}", target)
+	if err = os.RemoveAll(target); err != nil {
+		logger.Errorf("Unmount failed to remove mount path file. Target %s: %v", target, err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	logger.Debugf("Mount point deleted. Target : %s", target)
+
+	//err = mount.CleanupMountPoint(target, d.mounter, true)
+	err1 := CleanupMountPoint(target, d.mounter, true)
+	if err1 != nil {
 		return nil, status.Errorf(codes.Internal, "Could not unmount %q: %v", target, err)
 	}
 
@@ -463,6 +475,10 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 }
 
 func CleanupMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool) error {
+	if 1 == 1 {
+		return nil
+	}
+
 	// mounter.ExistsPath cannot be used because for containerized kubelet, we need to check
 	// the path in the kubelet container, not on the host.
 	pathExists, pathErr := PathExists(mountPath)
