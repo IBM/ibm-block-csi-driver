@@ -13,7 +13,7 @@ from controller.common.csi_logger import set_log_level
 import controller.controller_server.config as config
 import controller.controller_server.utils as utils
 import controller.array_action.errors as controller_errors
-from controller.controller_server.errors import ValidationException
+from controller.controller_server.errors import ObjectIdError, ValidationException
 from controller.common.utils import set_current_thread_name
 from controller.common.node_info import NodeIdInfo
 from controller.array_action.array_mediator_action import map_volume, unmap_volume
@@ -125,7 +125,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             try:
                 array_type, vol_id = utils.get_volume_id_info(request.volume_id)
-            except controller_errors.VolumeNotFoundError as ex:
+            except ObjectIdError as ex:
                 logger.warning("volume id is invalid. error : {}".format(ex))
                 return csi_pb2.DeleteVolumeResponse()
 
@@ -205,7 +205,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return csi_pb2.ControllerPublishVolumeResponse()
 
         except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError,
-                controller_errors.BadNodeIdError) as ex:
+                controller_errors.BadNodeIdError, ObjectIdError) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)
@@ -259,7 +259,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details(ex)
             return csi_pb2.ControllerPublishVolumeResponse()
 
-        except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError) as ex:
+        except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError,
+                ObjectIdError) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)
@@ -323,7 +324,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 res = utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
                 logger.info("finished create snapshot")
                 return res
-        except (controller_errors.IllegalObjectName, controller_errors.VolumeNotFoundError) as ex:
+        except (controller_errors.IllegalObjectName, controller_errors.VolumeNotFoundError,
+                ObjectIdError) as ex:
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateSnapshotResponse()
@@ -353,8 +355,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
 
             try:
-                array_type, snapshot_id = utils.get_volume_id_info(request.snapshot_id)
-            except controller_errors.SnapshotNotFoundError as ex:
+                array_type, snapshot_id = utils.get_snapshot_id_info(request.snapshot_id)
+            except ObjectIdError as ex:
                 logger.warning("snapshot id is invalid. error : {}".format(ex))
                 return csi_pb2.DeleteSnapshotResponse()
 

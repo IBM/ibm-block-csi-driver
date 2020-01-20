@@ -3,8 +3,8 @@ from mock import patch, Mock
 from controller.csi_general import csi_pb2
 from controller.controller_server.csi_controller_server import ControllerServicer
 import controller.controller_server.utils as utils
-from controller.controller_server.errors import ValidationException
-from controller.array_action.errors import VolumeNotFoundError, HostNotFoundError
+from controller.controller_server.errors import ObjectIdError, ValidationException
+from controller.array_action.errors import HostNotFoundError
 
 
 class TestUtils(unittest.TestCase):
@@ -138,7 +138,6 @@ class TestUtils(unittest.TestCase):
         with self.assertRaises(ValidationException):
             utils.validate_delete_snapshot_request(request)
 
-
     @patch("controller.controller_server.utils.get_vol_id")
     def test_get_create_volume_response(self, get_vol_id):
         new_vol = Mock()
@@ -253,7 +252,7 @@ class TestUtils(unittest.TestCase):
         utils.validate_unpublish_volume_request(request)
 
     def test_get_volume_id_info(self):
-        with self.assertRaises(VolumeNotFoundError) as ex:
+        with self.assertRaises(ObjectIdError) as ex:
             utils.get_volume_id_info("badvolumeformat")
             self.assertTrue("volume" in ex.message)
 

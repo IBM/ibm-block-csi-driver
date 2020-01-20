@@ -1,10 +1,10 @@
 from controller.common.csi_logger import get_stdout_logger
 import controller.controller_server.config as config
 from controller.csi_general import csi_pb2
-from controller.controller_server.errors import ValidationException
+from controller.controller_server.errors import ObjectIdError, ValidationException
 import controller.controller_server.messages as messages
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
-from controller.array_action.errors import HostNotFoundError, VolumeNotFoundError
+from controller.array_action.errors import HostNotFoundError
 from google.protobuf.timestamp_pb2 import Timestamp
 
 logger = get_stdout_logger()
@@ -194,15 +194,23 @@ def validate_publish_volume_request(request):
     logger.debug("publish volume request validation finished.")
 
 
-def get_volume_id_info(volume_id):
-    logger.debug("getting volume info for vol id : {0}".format(volume_id))
-    split_vol = volume_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)
-    if len(split_vol) != 2:
-        raise VolumeNotFoundError(volume_id)
+def get_object_id_info(object_id, object_type):
+    logger.debug("getting {0} info for {0} id : {1}".format(object_type, object_id))
+    split_obj = object_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)
+    if len(split_obj) != 2:
+        raise ObjectIdError(object_type, object_id)
 
-    array_type, vol_id = split_vol
-    logger.debug("volume id : {0}, array type :{1}".format(vol_id, array_type))
-    return array_type, vol_id
+    array_type, obj_id = split_obj
+    logger.debug("{0} id : {1}, array type :{2}".format(object_type, obj_id, array_type))
+    return array_type, obj_id
+
+
+def get_volume_id_info(volume_id):
+    return get_object_id_info(volume_id, config.OBJECT_TYPE_NAME_VOLUME)
+
+
+def get_snapshot_id_info(snapshot_id):
+    return get_object_id_info(snapshot_id, config.OBJECT_TYPE_NAME_SNAPSHOT)
 
 
 def get_node_id_info(node_id):

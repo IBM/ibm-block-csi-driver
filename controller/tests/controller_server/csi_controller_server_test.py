@@ -514,6 +514,15 @@ class TestControllerServerDeleteSnapshot(unittest.TestCase):
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL, "array connection internal error")
         self.assertTrue("a_enter error" in context.details)
 
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__", Mock())
+    def test_delete_snapshot_invalid_snapshot_id(self, a_enter):
+        a_enter.return_value = self.mediator
+        context = utils.FakeContext()
+        self.request.snapshot_id = "wrong_id"
+        self.servicer.DeleteSnapshot(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.OK)
+
 
 class TestControllerServerDeleteVolume(unittest.TestCase):
 
