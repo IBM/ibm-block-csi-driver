@@ -476,7 +476,7 @@ func CleanupMountPoint(mountPath string, mounter mount.Interface, extensiveMount
 }
 
 func PathExists(path string) (bool, error) {
-	logger.Errorf("++++++++++ PathExists err: %v")
+	logger.Errorf("++++++++++ PathExists err: %v", path)
 	_, err := os.Stat(path)
 	logger.Errorf("++++++++++ PathExists err: %v", err)
 	if err == nil {
