@@ -18,7 +18,6 @@ from controller.common.utils import set_current_thread_name
 from controller.common.node_info import NodeIdInfo
 from controller.array_action.array_mediator_action import map_volume, unmap_volume
 from controller.array_action import messages
-from controller.controller_server.config import OBJECT_TYPE_NAME_VOLUME, OBJECT_TYPE_NAME_SNAPSHOT
 
 logger = None  # is set in ControllerServicer::__init__
 
@@ -500,7 +499,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         return self._get_object_name(request,
                                      config.PARAMETERS_VOLUME_NAME_PREFIX,
                                      array_mediator.max_vol_name_length,
-                                     OBJECT_TYPE_NAME_VOLUME)
+                                     config.OBJECT_TYPE_NAME_VOLUME)
 
     def _get_snapshot_name(self, request, array_mediator):
         """
@@ -512,7 +511,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         return self._get_object_name(request,
                                      config.PARAMETERS_SNAPSHOT_NAME_PREFIX,
                                      array_mediator.max_snapshot_name_length,
-                                     OBJECT_TYPE_NAME_SNAPSHOT)
+                                     config.OBJECT_TYPE_NAME_SNAPSHOT)
 
     def _get_object_name(self, request, name_prefix_param, max_name_length, object_type):
         """
