@@ -297,10 +297,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         source_volume_id = request.source_volume_id
         logger.info("Snapshot base name : {}. Source volume id : {}".format(request.name, source_volume_id))
-        _, vol_id = utils.get_volume_id_info(source_volume_id)
         secrets = request.secrets
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
         try:
+            _, vol_id = utils.get_volume_id_info(source_volume_id)
             with ArrayConnectionManager(user, password, array_addresses) as array_mediator:
                 logger.debug(array_mediator)
                 snapshot_name = self._get_snapshot_name(request, array_mediator)
