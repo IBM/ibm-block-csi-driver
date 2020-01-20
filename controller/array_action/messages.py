@@ -8,7 +8,7 @@ VolumeNotFoundError_message = "Volume was not found : {0} "
 
 SnapshotNotFoundError_message = "Snapshot was not found : {0} "
 
-SnapshotAlreadyExistsError_message  = "Snapshot already exists : {0} , array : {1}"
+SnapshotAlreadyExistsError_message = "Snapshot already exists : {0} , array : {1}"
 
 SnapshotWrongVolume_message = "Snapshot {0} exists but it is of Volume {1} and not {2}"
 
