@@ -19,6 +19,7 @@ package driver
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path"
 	"path/filepath"
@@ -381,6 +382,10 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 			err = d.mounter.MakeFile(targetPathWithHostPrefix)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "Could not create file %q: %v", targetPath, err)
+			}
+			err = os.Chmod(targetPathWithHostPrefix, 0750)
+			if err != nil {
+				return nil, status.Errorf(codes.Internal, "Could not create file permissions%q: %v", targetPath, err)
 			}
 		}
 		options := []string{"bind"}
