@@ -382,7 +382,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "Could not create file %q: %v", targetPath, err)
 			}
-			err = os.Chmod(targetPathWithHostPrefix, 0750)
+			//TODO: err = os.Chmod(targetPathWithHostPrefix, 0750)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "Could not create file permissions %q: %v", targetPath, err)
 			}
@@ -450,6 +450,13 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	if len(target) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path not provided")
 	}
+	targetPathWithHostPrefix := path.Join(PrefixChrootOfHostRoot, target)
+
+	logger.Debugf("Check if 5target file exists %s", target)
+	if _, err := os.Stat(targetPathWithHostPrefix); os.IsNotExist(err) {
+		logger.Warningf("Idempotent case: target file %s doesn't exist", target)
+		return &csi.NodeUnpublishVolumeResponse{}, nil
+	}
 
 	logger.Debugf("NodeUnpublishVolume: unmounting %s", target)
 	err = d.mounter.Unmount(target)
@@ -458,8 +465,8 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	logger.Debugf("Unmount finished. Target : {%s}", target)
-	if err = os.RemoveAll(target); err != nil {
-		logger.Errorf("Unmount failed to remove mount path file. Target %s: %v", target, err)
+	if err = os.RemoveAll(targetPathWithHostPrefix); err != nil {
+		logger.Errorf("Failed to remove mount path file. Target %s: %v", target, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	logger.Debugf("Mount point deleted. Target : %s", target)
