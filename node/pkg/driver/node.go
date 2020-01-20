@@ -452,13 +452,13 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	}
 	targetPathWithHostPrefix := path.Join(PrefixChrootOfHostRoot, target)
 
-	logger.Debugf("Check if 5target file exists %s", target)
+	logger.Debugf("Check if target file exists %s", target)
 	if _, err := os.Stat(targetPathWithHostPrefix); os.IsNotExist(err) {
 		logger.Warningf("Idempotent case: target file %s doesn't exist", target)
 		return &csi.NodeUnpublishVolumeResponse{}, nil
 	}
 
-	logger.Debugf("NodeUnpublishVolume: unmounting %s", target)
+	logger.Debugf("NodeUnpublishVolume: Unmounting %s", target)
 	err = d.mounter.Unmount(target)
 	if err != nil {
 		logger.Errorf("Unmount failed. Target : %s, err : %v", target, err)
