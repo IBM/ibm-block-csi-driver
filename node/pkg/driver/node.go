@@ -382,7 +382,6 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "Could not create file %q: %v", targetPath, err)
 			}
-			//TODO: err = os.Chmod(targetPathWithHostPrefix, 0750)
 			if err != nil {
 				return nil, status.Errorf(codes.Internal, "Could not create file permissions %q: %v", targetPath, err)
 			}
@@ -472,17 +471,17 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	logger.Debugf("Mount point deleted. Target : %s", target)
 
 	//err = mount.CleanupMountPoint(target, d.mounter, true)
-	//err1 := CleanupMountPoint(target, d.mounter, true)
-	//if err1 != nil {
-	//	return nil, status.Errorf(codes.Internal, "Could not unmount %q: %v", target, err)
-	//}
+	err1 := CleanupMountPoint(target, d.mounter, true)
+	if err1 != nil {
+		return nil, status.Errorf(codes.Internal, "Could not unmount %q: %v", target, err)
+	}
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 
 }
 
 func CleanupMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool) error {
-	if 1 == 1 {
+	if 0 == 1 {
 		return nil
 	}
 
