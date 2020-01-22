@@ -398,7 +398,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 			}
 		}
 		options := []string{"bind"}
-		logger.Debugf("Mount the device with raw disk")
+		logger.Debugf("Mount the device to raw block volume. Target : {%s}, device : {%s}", targetPath, mpathDevice)
 		err = d.mounter.Mount(mpathDevice, targetPath, "", options)
 	}
 	// TODO: pass mount options
@@ -419,7 +419,7 @@ func (d *NodeService) checkMountExists(targetPathWithHostPrefix string, mpathDev
 		return false, err
 	}
 	for _, mount := range mountList {
-		logger.Tracef("Check if mount path({%v}) [with device({%v})] is equel to targetPath {%s}", mount.Path, mount.Device, targetPathWithHostPrefix)
+		//logger.Tracef("Check if mount path({%v}) [with device({%v})] is equel to targetPath {%s}", mount.Path, mount.Device, targetPathWithHostPrefix)
 		if mount.Path == targetPathWithHostPrefix {
 			if mount.Device == mpathDevice {
 				targetFile, err := os.Stat(targetPathWithHostPrefix)
