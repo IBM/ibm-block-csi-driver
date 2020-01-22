@@ -59,11 +59,11 @@ pipeline {
     }
     post {
         always {
-            sh 'ls -la build/reports/'
-            archiveArtifacts artifacts: 'build/reports/csi-*/*', fingerprint: true
             script {
                 manager.addShortText("${env.GIT_BRANCH}")
             }
+            sh 'ls -la build/reports/'
+            archiveArtifacts artifacts: 'build/reports/csi-*/*', fingerprint: true
         }
 
         cleanup {
