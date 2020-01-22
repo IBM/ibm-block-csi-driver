@@ -415,11 +415,11 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 func (d *NodeService) checkMountExists(targetPathWithHostPrefix string, mpathDevice string, isFSVolume bool) (bool, error) {
 	logger.Debugf("Check if targetPath {%s} exist in mount list", targetPathWithHostPrefix)
 	mountList, err := d.mounter.List()
-	if err != null {
+	if err != nil {
 		return false, err
 	}
 	for _, mount := range mountList {
-		logger.Tracef("Check if mount path({%v}) [with device({%v})] is equel to targetPath {%s}", mount.Path, mount.Device, targetPath)
+		logger.Tracef("Check if mount path({%v}) [with device({%v})] is equel to targetPath {%s}", mount.Path, mount.Device, targetPathWithHostPrefix)
 		if mount.Path == targetPathWithHostPrefix {
 			if mount.Device == mpathDevice {
 				targetFile, err := os.Stat(targetPathWithHostPrefix)
