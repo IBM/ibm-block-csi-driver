@@ -408,8 +408,8 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	logger.Debugf("NodePublishVolume Finished: multipath device is now mounted to targetPath.")
 
 	//TODO
-	return &csi.NodePublishVolumeResponse{}, nil
-	//return nil, status.Errorf(codes.Internal, "TODO forse fail")
+	//return &csi.NodePublishVolumeResponse{}, nil
+	return nil, status.Errorf(codes.Internal, "TODO forse fail")
 }
 
 func (d *NodeService) checkMountExists(targetPathWithHostPrefix string, mpathDevice string, isFSVolume bool) (bool, error) {
