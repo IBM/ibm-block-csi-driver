@@ -339,20 +339,6 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	mpathDevice := filepath.Join(device_connectivity.DevPath, infoMap["mpathDevice"])
 	logger.Debugf("Got info from stageInfo file. device : {%v}", mpathDevice)
 
-	//logger.Debugf("Check if targetPath {%s} exist in mount list", targetPath)
-	//mountList, err := d.mounter.List()
-	//for _, mount := range mountList {
-	//	logger.Tracef("Check if mount path({%v}) [with device({%v})] is equel to targetPath {%s}", mount.Path, mount.Device, targetPath)
-	//	if mount.Path == targetPathWithHostPrefix {
-	//		if mount.Device == mpathDevice {
-	//			logger.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume.", targetPath)
-	//			return &csi.NodePublishVolumeResponse{}, nil
-	//		} else {
-	//			return nil, status.Errorf(codes.AlreadyExists, "Mount point is already mounted to but with different multipath device (%s), while the expected device is %s ", mount.Device, mpathDevice)
-	//		}
-	//	}
-	//}
-
 	// if the device is not mounted then we are mounting it.
 	volumeCap := req.GetVolumeCapability()
 	isFSVolume := true
@@ -361,7 +347,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		isFSVolume = false
 	}
 	// check if already mounted
-	isMounted, err := d.checkMountExists(targetPathWithHostPrefix, mpathDevice, isFSVolume)
+	isMounted, err := d.checkMountExists(targetPathWithHostPrefix, isFSVolume)
 	if err != nil {
 		logger.Debugf("Existing mount check failed {%v}", err.Error())
 		return nil, err
@@ -382,21 +368,26 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
 		err = d.mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 	} else {
+		logger.Debugf("Raw block Volume will be created")
+
+		// Create mount file and its folder if they don't exist
+		targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
+		if _, err := os.Stat(targetPathParentDirWithHostPrefix); os.IsNotExist(err) {
+			logger.Debugf("Target path parent directory does not exist. creating : {%v}", targetPathParentDirWithHostPrefix)
+			err = d.mounter.MakeDir(targetPathParentDirWithHostPrefix)
+		}
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Could not create directory %q: %v", targetPathParentDirWithHostPrefix, err)
+		}
 		if _, err := os.Stat(targetPathWithHostPrefix); os.IsNotExist(err) {
-			targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
-			if _, err := os.Stat(targetPathParentDirWithHostPrefix); os.IsNotExist(err) {
-				logger.Debugf("Target path parent directory does not exist. creating : {%v}", targetPathParentDirWithHostPrefix)
-				d.mounter.MakeDir(targetPathParentDirWithHostPrefix)
-			}
 			logger.Debugf("Target path file does not exist. creating : {%v}", targetPathWithHostPrefix)
 			err = d.mounter.MakeFile(targetPathWithHostPrefix)
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "Could not create file %q: %v", targetPath, err)
-			}
-			if err != nil {
-				return nil, status.Errorf(codes.Internal, "Could not create file permissions %q: %v", targetPath, err)
-			}
 		}
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Could not create file %q: %v", targetPathWithHostPrefix, err)
+		}
+
+		// Mount
 		options := []string{"bind"}
 		logger.Debugf("Mount the device to raw block volume. Target : {%s}, device : {%s}", targetPath, mpathDevice)
 		err = d.mounter.Mount(mpathDevice, targetPath, "", options)
@@ -407,42 +398,33 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 	logger.Debugf("NodePublishVolume Finished: multipath device is now mounted to targetPath.")
 
-	//TODO
-	isMounted, err = d.checkMountExists(targetPathWithHostPrefix, mpathDevice, isFSVolume)
-	if err != nil {
-		logger.Debugf("NodePublishVolume +++++ {%v}.", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
 	return &csi.NodePublishVolumeResponse{}, nil
-	//return nil, status.Errorf(codes.Internal, "TODO forse fail")
 }
 
-func (d *NodeService) checkMountExists(targetPathWithHostPrefix string, mpathDevice string, isFSVolume bool) (bool, error) {
+// targetPathWithHostPrefix: path of target as seen from pod
+// isFSVolume: if we check volume with file system - true, otherwise for raw block false
+// Returns: is target mounted, error if occured
+func (d *NodeService) checkMountExists(targetPathWithHostPrefix string, isFSVolume bool) (bool, error) {
 	logger.Debugf("Check if targetPath {%s} exist in mount list", targetPathWithHostPrefix)
 	mountList, err := d.mounter.List()
 	if err != nil {
 		return false, err
 	}
 	for _, mount := range mountList {
-		//logger.Tracef("Check if mount path({%v}) [with device({%v})] is equel to targetPath {%s}", mount.Path, mount.Device, targetPathWithHostPrefix)
 		if mount.Path == targetPathWithHostPrefix {
-			if mount.Device == mpathDevice {
-				targetFile, err := os.Stat(targetPathWithHostPrefix)
-				if err != nil {
-					return true, status.Errorf(codes.AlreadyExists, "Failed to open target file {%s} ", targetPathWithHostPrefix)
-				}
-				isTargetDirectory := targetFile.Mode().IsDir()
-				if isFSVolume && !isTargetDirectory {
-					return true, status.Errorf(codes.AlreadyExists, "Required volume with file system but target {%s} is mounted and it is not a directory.", targetPathWithHostPrefix)
-				} else if !isFSVolume && isTargetDirectory {
-					return true, status.Errorf(codes.AlreadyExists, "Required raw block volume but target {%s} is mounted and it is a directory.", targetPathWithHostPrefix)
-				}
-				logger.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume.", targetPathWithHostPrefix)
-				return true, nil
-			} else {
-				return true, status.Errorf(codes.AlreadyExists, "Mount point is already mounted to but with different multipath device (%s), while the expected device is %s ", mount.Device, mpathDevice)
+			//TODO: PUI-16179 - check if device is correct
+			targetFile, err := os.Stat(targetPathWithHostPrefix)
+			if err != nil {
+				return true, status.Errorf(codes.AlreadyExists, "Failed to open target file {%s} ", targetPathWithHostPrefix)
 			}
+			isTargetDirectory := targetFile.Mode().IsDir()
+			if isFSVolume && !isTargetDirectory {
+				return true, status.Errorf(codes.AlreadyExists, "Required volume with file system but target {%s} is mounted and it is not a directory.", targetPathWithHostPrefix)
+			} else if !isFSVolume && isTargetDirectory {
+				return true, status.Errorf(codes.AlreadyExists, "Required raw block volume but target {%s} is mounted and it is a directory.", targetPathWithHostPrefix)
+			}
+			logger.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume.", targetPathWithHostPrefix)
+			return true, nil
 		}
 	}
 	return false, nil
