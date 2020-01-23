@@ -347,7 +347,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		isFSVolume = false
 	}
 	// check if already mounted
-	isMounted, err := d.checkMountExists(targetPathWithHostPrefix, isFSVolume)
+	isMounted, err := d.isTargetMounted(targetPathWithHostPrefix, isFSVolume)
 	if err != nil {
 		logger.Debugf("Existing mount check failed {%v}", err.Error())
 		return nil, err
@@ -404,7 +404,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 // targetPathWithHostPrefix: path of target as seen from pod
 // isFSVolume: if we check volume with file system - true, otherwise for raw block false
 // Returns: is target mounted, error if occured
-func (d *NodeService) checkMountExists(targetPathWithHostPrefix string, isFSVolume bool) (bool, error) {
+func (d *NodeService) isTargetMounted(targetPathWithHostPrefix string, isFSVolume bool) (bool, error) {
 	logger.Debugf("Check if targetPath {%s} exist in mount list", targetPathWithHostPrefix)
 	mountList, err := d.mounter.List()
 	if err != nil {
