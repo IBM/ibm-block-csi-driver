@@ -488,6 +488,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return &csi.NodeUnpublishVolumeResponse{}, nil
 	}
 
+	// Numount and delete mount point file/folder
 	logger.Debugf("NodeUnpublishVolume: Unmounting %s", target)
 	err = d.mounter.Unmount(target)
 	if err != nil {
