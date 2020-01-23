@@ -368,7 +368,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
 		err = d.mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 	} else {
-		logger.Debugf("Raw block Volume will be created")
+		logger.Debugf("Raw block volume will be created")
 
 		// Create mount file and its folder if they don't exist
 		targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
@@ -392,7 +392,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		logger.Debugf("Mount the device to raw block volume. Target : {%s}, device : {%s}", targetPath, mpathDevice)
 		err = d.mounter.Mount(mpathDevice, targetPath, "", options)
 	}
-	// TODO: pass mount options
+
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
