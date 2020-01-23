@@ -21,7 +21,10 @@ pipeline {
     stages {
         stage ('Environment Setup') {
             steps {
-                sh 'mkdir -p build/reports && chmod 777 build/reports'
+                sh '''
+                    mkdir -p build/reports && chmod 777 build/reports
+                    mkdir -p build/code_scan && chmod 777 build/code_scan
+                '''
             }
         }
         stage ('Running code scanning in parallel') {
@@ -64,11 +67,15 @@ pipeline {
             }
             sh 'ls -la build/reports/'
             archiveArtifacts artifacts: 'build/reports/csi-*/*', fingerprint: true
+            archiveArtifacts artifacts: 'build/code_scan/csi-*/*', fingerprint: true
         }
 
         cleanup {
             script {
-                 sh '[ -d build/reports ] && rm -rf build/reports'
+                 sh '''
+                    [ -d build/reports ] && rm -rf build/reports
+                    [ -d build/code_scan ] && rm -rf build/code_scan
+                 '''
             }
         }
 

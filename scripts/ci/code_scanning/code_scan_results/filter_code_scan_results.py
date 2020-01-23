@@ -51,7 +51,7 @@ def _remove_inner_fields_dict(inner_dicts, keys_to_remove):
 
 def _remove_line_numbers_bandit(inner_dicts):
     for inner_dict in inner_dicts:
-        inner_dict["code"] = sub(r"(^\d+)|(\n\d+)|(\n$)", " ", inner_dict["code"])
+        inner_dict["code"] = sub(r"(^\d+)|(\n\d+)|(\n$)", "", inner_dict["code"])
 
 
 if __name__ == "__main__":
