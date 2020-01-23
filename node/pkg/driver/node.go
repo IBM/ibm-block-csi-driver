@@ -492,7 +492,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	logger.Debugf("NodeUnpublishVolume: Unmounting %s", target)
 	err = d.mounter.Unmount(target)
 	if err != nil {
-		logger.Errorf("Unmount failed. Target : %s, err : %v", target, err)
+		logger.Errorf("Unmount failed. Target : %s, err : %v", target, err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	logger.Debugf("Unmount finished. Target : {%s}", target)
