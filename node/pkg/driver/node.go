@@ -410,6 +410,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	//TODO
 	isMounted, err = d.checkMountExists(targetPathWithHostPrefix, mpathDevice, isFSVolume)
 	if err != nil {
+		logger.Debugf("NodePublishVolume +++++ {%v}.", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
