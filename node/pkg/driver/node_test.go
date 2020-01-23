@@ -269,7 +269,7 @@ func TestNodePublishVolume(t *testing.T) {
 				VolumeCapability:  stdVolCap,
 				VolumeId:          "vol-test",
 			},
-			expErrCode: nil,
+			//expErrCode: nil,
 		},
 		{
 			name: "pass raw block volume",
@@ -280,7 +280,7 @@ func TestNodePublishVolume(t *testing.T) {
 				VolumeCapability:  rawBlockVolumeCapability,
 				VolumeId:          "vol-test",
 			},
-			expErrCode: nil,
+			//expErrCode: nil,
 		},
 	}
 
