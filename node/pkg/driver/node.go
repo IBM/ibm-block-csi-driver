@@ -427,7 +427,7 @@ func (d *NodeService) checkMountExists(targetPathWithHostPrefix string, mpathDev
 	for _, mount := range mountList {
 		//logger.Tracef("Check if mount path({%v}) [with device({%v})] is equel to targetPath {%s}", mount.Path, mount.Device, targetPathWithHostPrefix)
 		if mount.Path == targetPathWithHostPrefix {
-			if true || (mount.Device == mpathDevice) {
+			if mount.Device == mpathDevice {
 				targetFile, err := os.Stat(targetPathWithHostPrefix)
 				if err != nil {
 					return true, status.Errorf(codes.AlreadyExists, "Failed to open target file {%s} ", targetPathWithHostPrefix)
