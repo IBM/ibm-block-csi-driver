@@ -19,7 +19,6 @@ package driver_test
 import (
 	"context"
 	"fmt"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"reflect"
 	"testing"
 
@@ -107,7 +106,7 @@ func TestNodeStageVolume(t *testing.T) {
 
 		t.Run(tc.name, func(t *testing.T) {
 
-			d := newTestNodeService(nil, nil)
+			d := newTestNodeService(nil)
 
 			_, err := d.NodeStageVolume(context.TODO(), tc.req)
 			if err != nil {
@@ -125,13 +124,11 @@ func TestNodeStageVolume(t *testing.T) {
 	}
 }
 
-
-func newTestNodeService(nodeUtils driver.NodeUtilsInterface, mounterInterface mount.Interface) driver.NodeService {
+func newTestNodeService(nodeUtils driver.NodeUtilsInterface) driver.NodeService {
 	return driver.NodeService{
 		Hostname:   "test-host",
 		ConfigYaml: driver.ConfigFile{},
 		NodeUtils:  nodeUtils,
-		mounter:	mounterInterface
 	}
 }
 
@@ -186,184 +183,127 @@ func newTestNodeService(nodeUtils driver.NodeUtilsInterface, mounterInterface mo
 //	}
 //}
 
+func TestNodePublishVolume(t *testing.T) {
+	stdVolCap := &csi.VolumeCapability{
+		AccessType: &csi.VolumeCapability_Mount{
+			Mount: &csi.VolumeCapability_MountVolume{},
+		},
+		AccessMode: &csi.VolumeCapability_AccessMode{
+			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+		},
+	}
+	rawBlockVolumeCapability := &csi.VolumeCapability{
+		AccessMode: &csi.VolumeCapability_AccessMode{
+			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+		},
+		AccessType: &csi.VolumeCapability_Block{
+			Block: &csi.VolumeCapability_BlockVolume{},
+		},
+	}
+	testCases := []struct {
+		name       string
+		req        *csi.NodePublishVolumeRequest
+		expErrCode codes.Code
+	}{
+		{
+			name: "fail no VolumeId",
+			req: &csi.NodePublishVolumeRequest{
+				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+				StagingTargetPath: "/test/staging/path",
+				TargetPath:        "/test/target/path",
+				VolumeCapability:  stdVolCap,
+			},
+			expErrCode: codes.InvalidArgument,
+		},
+		{
+			name: "fail no StagingTargetPath",
+			req: &csi.NodePublishVolumeRequest{
+				PublishContext:   map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+				TargetPath:       "/test/target/path",
+				VolumeCapability: stdVolCap,
+				VolumeId:         "vol-test",
+			},
+			expErrCode: codes.InvalidArgument,
+		},
+		{
+			name: "fail no TargetPath",
+			req: &csi.NodePublishVolumeRequest{
+				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+				StagingTargetPath: "/test/staging/path",
+				VolumeCapability:  stdVolCap,
+				VolumeId:          "vol-test",
+			},
+			expErrCode: codes.InvalidArgument,
+		},
+		{
+			name: "fail no VolumeCapability",
+			req: &csi.NodePublishVolumeRequest{
+				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+				StagingTargetPath: "/test/staging/path",
+				TargetPath:        "/test/target/path",
+				VolumeId:          "vol-test",
+			},
+			expErrCode: codes.InvalidArgument,
+		},
+		{
+			name: "fail invalid VolumeCapability",
+			req: &csi.NodePublishVolumeRequest{
+				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+				StagingTargetPath: "/test/staging/path",
+				TargetPath:        "/test/target/path",
+				VolumeId:          "vol-test",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_UNKNOWN,
+					},
+				},
+			},
+			expErrCode: codes.InvalidArgument,
+		},
+		{
+			name: "pass volume with file system",
+			req: &csi.NodePublishVolumeRequest{
+				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+				StagingTargetPath: "/test/staging/path",
+				TargetPath:        "/test/target/path",
+				VolumeCapability:  stdVolCap,
+				VolumeId:          "vol-test",
+			},
+			//expErrCode: nil,
+		},
+		{
+			name: "pass raw block volume",
+			req: &csi.NodePublishVolumeRequest{
+				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+				StagingTargetPath: "/test/staging/path",
+				TargetPath:        "/test/target/path",
+				VolumeCapability:  rawBlockVolumeCapability,
+				VolumeId:          "vol-test",
+			},
+			//expErrCode: nil,
+		},
+	}
 
-//func TestNodePublishVolume(t *testing.T) {
-//	testCases := []struct {
-//		name     string
-//		testFunc func(t *testing.T)
-//	}{
-//		{
-//			name: "success normal",
-//			testFunc: func(t *testing.T) {
-//				mockCtl := gomock.NewController(t)
-//				defer mockCtl.Finish()
-//
-//				mockMounter := mocks.NewMockInterface(mockCtl)
-//
-//				fam := &mount.SafeFormatAndMount{
-//					Interface: mockMounter,
-//					Exec:      mount.NewOsExec(),
-//				}
-//
-//				req := &mount.SafeFormatAndMount{
-//					Interface:    mockMounter,
-//					Exec: nil
-//				}
-//
-//				mnt := mount.SafeFormatAndMount{mockMounter, nil}
-//				driver := newTestNodeService{nil, mockMounter)
-//
-//				mockMounter.EXPECT().MakeDir(gomock.Eq(targetPath)).Return(nil)
-//				mockMounter.EXPECT().Mount(gomock.Eq(stagingTargetPath), gomock.Eq(targetPath), gomock.Eq(defaultFsType), gomock.Eq([]string{"bind"})).Return(nil)
-//
-//				req := &csi.NodePublishVolumeRequest{
-//					PublishContext:    map[string]string{DevicePathKey: devicePath},
-//					StagingTargetPath: stagingTargetPath,
-//					TargetPath:        targetPath,
-//					VolumeCapability:  stdVolCap,
-//					VolumeId:          "vol-test",
-//				}
-//
-//				_, err := awsDriver.NodePublishVolume(context.TODO(), req)
-//				if err != nil {
-//					t.Fatalf("Expect no error but got: %v", err)
-//				}
-//			},
-//		}
-//	for _, tc := range testCases {
-//		t.Run(tc.name, func(t *testing.T) {
-//			req := &csi.NodeGetInfoRequest{}
-//
-//			mockCtrl := gomock.NewController(t)
-//			defer mockCtrl.Finish()
-//
-//			fakeMounter := mocks.NewMockInterface(mockCtrl)
-//		}
-//	}
-//}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			d := newTestNodeService(nil)
 
-//func TestNodePublishVolume(t *testing.T) {
-//	stdVolCap := &csi.VolumeCapability{
-//		AccessType: &csi.VolumeCapability_Mount{
-//			Mount: &csi.VolumeCapability_MountVolume{},
-//		},
-//		AccessMode: &csi.VolumeCapability_AccessMode{
-//			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-//		},
-//	}
-//	rawBlockVolumeCapability := &csi.VolumeCapability{
-//		AccessMode: &csi.VolumeCapability_AccessMode{
-//			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-//		},
-//		AccessType: &csi.VolumeCapability_Block{
-//			Block: &csi.VolumeCapability_BlockVolume{},
-//		},
-//	}
-//	testCases := []struct {
-//		name       string
-//		req        *csi.NodePublishVolumeRequest
-//		expErrCode codes.Code
-//	}{
-//		{
-//			name: "fail no VolumeId",
-//			req: &csi.NodePublishVolumeRequest{
-//				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-//				StagingTargetPath: "/test/staging/path",
-//				TargetPath:        "/test/target/path",
-//				VolumeCapability:  stdVolCap,
-//			},
-//			expErrCode: codes.InvalidArgument,
-//		},
-//		{
-//			name: "fail no StagingTargetPath",
-//			req: &csi.NodePublishVolumeRequest{
-//				PublishContext:   map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-//				TargetPath:       "/test/target/path",
-//				VolumeCapability: stdVolCap,
-//				VolumeId:         "vol-test",
-//			},
-//			expErrCode: codes.InvalidArgument,
-//		},
-//		{
-//			name: "fail no TargetPath",
-//			req: &csi.NodePublishVolumeRequest{
-//				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-//				StagingTargetPath: "/test/staging/path",
-//				VolumeCapability:  stdVolCap,
-//				VolumeId:          "vol-test",
-//			},
-//			expErrCode: codes.InvalidArgument,
-//		},
-//		{
-//			name: "fail no VolumeCapability",
-//			req: &csi.NodePublishVolumeRequest{
-//				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-//				StagingTargetPath: "/test/staging/path",
-//				TargetPath:        "/test/target/path",
-//				VolumeId:          "vol-test",
-//			},
-//			expErrCode: codes.InvalidArgument,
-//		},
-//		{
-//			name: "fail invalid VolumeCapability",
-//			req: &csi.NodePublishVolumeRequest{
-//				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-//				StagingTargetPath: "/test/staging/path",
-//				TargetPath:        "/test/target/path",
-//				VolumeId:          "vol-test",
-//				VolumeCapability: &csi.VolumeCapability{
-//					AccessMode: &csi.VolumeCapability_AccessMode{
-//						Mode: csi.VolumeCapability_AccessMode_UNKNOWN,
-//					},
-//				},
-//			},
-//			expErrCode: codes.InvalidArgument,
-//		},
-//		//{
-//		//	name: "pass volume with file system",
-//		//	req: &csi.NodePublishVolumeRequest{
-//		//		PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-//		//		StagingTargetPath: "/test/staging/path",
-//		//		TargetPath:        "/test/target/path",
-//		//		VolumeCapability:  stdVolCap,
-//		//		VolumeId:          "vol-test",
-//		//	},
-//		//	//expErrCode: nil,
-//		//},
-//		//{
-//		//	name: "pass raw block volume",
-//		//	req: &csi.NodePublishVolumeRequest{
-//		//		PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-//		//		StagingTargetPath: "/test/staging/path",
-//		//		TargetPath:        "/test/target/path",
-//		//		VolumeCapability:  rawBlockVolumeCapability,
-//		//		VolumeId:          "vol-test",
-//		//	},
-//		//	//expErrCode: nil,
-//		//},
-//	}
-//
-//	for _, tc := range testCases {
-//		t.Run(tc.name, func(t *testing.T) {
-//			d := newTestNodeService(nil)
-//
-//			_, err := d.NodePublishVolume(context.TODO(), tc.req)
-//			if err != nil {
-//				srvErr, ok := status.FromError(err)
-//				if !ok {
-//					t.Fatalf("Could not get error status code from error: %v", srvErr)
-//				}
-//				if srvErr.Code() != tc.expErrCode {
-//					t.Fatalf("Expected error code %d, got %d message %s", tc.expErrCode, srvErr.Code(), srvErr.Message())
-//				}
-//			} else if tc.expErrCode != codes.OK {
-//				t.Fatalf("Expected error %v and got no error", tc.expErrCode)
-//			}
-//
-//		})
-//	}
-//}
+			_, err := d.NodePublishVolume(context.TODO(), tc.req)
+			if err != nil {
+				srvErr, ok := status.FromError(err)
+				if !ok {
+					t.Fatalf("Could not get error status code from error: %v", srvErr)
+				}
+				if srvErr.Code() != tc.expErrCode {
+					t.Fatalf("Expected error code %d, got %d message %s", tc.expErrCode, srvErr.Code(), srvErr.Message())
+				}
+			} else if tc.expErrCode != codes.OK {
+				t.Fatalf("Expected error %v and got no error", tc.expErrCode)
+			}
 
+		})
+	}
+}
 //
 //func TestNodeUnpublishVolume(t *testing.T) {
 //	testCases := []struct {
@@ -420,7 +360,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 
 	req := &csi.NodeGetVolumeStatsRequest{}
 
-	d := newTestNodeService(nil, nil)
+	d := newTestNodeService(nil)
 
 	expErrCode := codes.Unimplemented
 
@@ -440,7 +380,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 func TestNodeGetCapabilities(t *testing.T) {
 	req := &csi.NodeGetCapabilitiesRequest{}
 
-	d := newTestNodeService(nil, nil)
+	d := newTestNodeService(nil)
 
 	caps := []*csi.NodeServiceCapability{
 		{
@@ -548,7 +488,7 @@ func TestNodeGetInfo(t *testing.T) {
 				}
 			}
 
-			d:= newTestNodeService(fake_nodeutils, nil)
+			d:= newTestNodeService(fake_nodeutils)
 
 			expResponse := &csi.NodeGetInfoResponse{NodeId: tc.expNodeId}
 
