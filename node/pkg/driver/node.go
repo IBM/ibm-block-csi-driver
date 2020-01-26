@@ -68,9 +68,16 @@ const (
 	FCPortPath             = "/sys/class/fc_host/host*/port_name"
 )
 
+//go:generate mockgen -destination=../../mocks/mock_mount.go -package=mocks k8s.io/kubernetes/pkg/util/mount Interface
+
+type NodeServiceMounter interface {
+	mount.Interface
+	FormatAndMount(source string, target string, fstype string, options []string) error
+}
+
 // nodeService represents the node service of CSI driver
 type NodeService struct {
-	mounter                     *mount.SafeFormatAndMount
+	mounter                     NodeServiceMounter
 	ConfigYaml                  ConfigFile
 	Hostname                    string
 	NodeUtils                   NodeUtilsInterface
@@ -81,7 +88,7 @@ type NodeService struct {
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
-func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface, executer executer.ExecuterInterface, mounter *mount.SafeFormatAndMount, syncLock SyncLockInterface) NodeService {
+func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils *mount.SafeFormatAndMount, OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface, executer executer.ExecuterInterface, mounter *NodeServiceMounter, syncLock SyncLockInterface) NodeService {
 	return NodeService{
 		ConfigYaml:                  configYaml,
 		Hostname:                    hostname,
