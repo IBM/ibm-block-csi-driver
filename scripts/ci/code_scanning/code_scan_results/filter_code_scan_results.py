@@ -9,15 +9,15 @@ def main():
     tools = {"csi-controller-code-scan": "bandit", "csi-controller-dep-code-scan": "safety",
              "csi-node-code-scan": "gosec", "csi-node-dep-code-scan": "gosec"}
 
-    code_scan_res = _get_code_scan_res(output_path, target_name)
+    code_scan_res = get_code_scan_res(output_path, target_name)
     if not code_scan_res: 
         print("No results were found.")
     else:
         _filter_code_scan_res(tools[target_name], code_scan_res)
-    _serialize_filtered_res(output_path, target_name, code_scan_res)
+    serialize_filtered_res(output_path, target_name, code_scan_res)
 
 
-def _get_code_scan_res(output_path, target_name):
+def get_code_scan_res(output_path, target_name):
     code_scan_file_path = path.join(output_path, "{}.json".format(target_name))
     return utils.get_deserialized_json_data(code_scan_file_path)
 
@@ -28,7 +28,7 @@ def _filter_code_scan_res(tool, code_scan_res):
     elif tool == "bandit":
         _filter_code_scan_res_bandit(code_scan_res)
     else:
-        _filter_code_scan_res_gosec(code_scan_res)
+        filter_code_scan_res_gosec(code_scan_res)
 
 
 def _filter_code_scan_res_safety(code_scan_res):
@@ -41,7 +41,7 @@ def _filter_code_scan_res_bandit(code_scan_res):
     _remove_line_numbers_bandit(code_scan_res["results"])
 
 
-def _filter_code_scan_res_gosec(code_scan_res):
+def filter_code_scan_res_gosec(code_scan_res):
     _remove_fields_dict(code_scan_res, keys_to_remove=("Golang errors", "Stats"))
     _remove_inner_fields_dict(code_scan_res["Issues"], keys_to_remove=("cwe", "line"))
 
@@ -66,7 +66,7 @@ def _remove_line_numbers_bandit(inner_dicts):
         inner_dict["code"] = sub(r"(^\d+)|(\n\d+)|(\n$)", "", inner_dict["code"])
 
 
-def _serialize_filtered_res(output_path, target_name, code_scan_res):
+def serialize_filtered_res(output_path, target_name, code_scan_res):
     filtered_code_scan_file_path = path.join(output_path, "filtered-{}.json".format(target_name))
     utils.serialize_json_data(filtered_code_scan_file_path, code_scan_res)
 
