@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
+	"io/ioutil"
+	"os"
 	"path"
 	"path/filepath"
 	"reflect"
@@ -266,6 +268,90 @@ func TestNodePublishVolume(t *testing.T) {
 				}
 
 				_, err := driver.NodePublishVolume(context.TODO(), req)
+				if err != nil {
+					t.Fatalf("Expect no error but got: %v", err)
+				}
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
+
+func TestNodeUnpublishVolume(t *testing.T) {
+	existingTargetPath := "/tmp/TestNodeUnpublishVolume.txt"
+	nonExistingTargetPath := "/test/path"
+	os.MkdirAll("/host/tmp", 0755)
+	err := ioutil.WriteFile("/host/tmp/TestNodeUnpublishVolume.txt", []byte("Hello"), 0755)
+	if err != nil {
+		fmt.Printf("Unable to write file: %v", err)
+	}
+	defer os.RemoveAll(existingTargetPath)
+
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "fail no VolumeId",
+			testFunc: func(t *testing.T) {
+				driver := newTestNodeService(nil, nil)
+
+				req := &csi.NodeUnpublishVolumeRequest{
+					TargetPath: existingTargetPath,
+				}
+				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
+				assertError(t, err, codes.InvalidArgument)
+			},
+		},
+		{
+			name: "fail no TargetPath",
+			testFunc: func(t *testing.T) {
+				driver := newTestNodeService(nil, nil)
+
+				req := &csi.NodeUnpublishVolumeRequest{
+					VolumeId: "vol-test",
+				}
+				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
+				assertError(t, err, codes.InvalidArgument)
+			},
+		},
+		{
+			name: "success normal",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				driver := newTestNodeService(mockNodeUtils, mockMounter)
+
+				req := &csi.NodeUnpublishVolumeRequest{
+					TargetPath: existingTargetPath,
+					VolumeId:   "vol-test",
+				}
+				mockMounter.EXPECT().Unmount(gomock.Eq(existingTargetPath)).Return(nil)
+				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
+				if err != nil {
+					t.Fatalf("Expect no error but got: %v", err)
+				}
+			},
+		},
+		{
+			name: "success idempotent",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				driver := newTestNodeService(mockNodeUtils, mockMounter)
+
+				req := &csi.NodeUnpublishVolumeRequest{
+					TargetPath: nonExistingTargetPath,
+					VolumeId:   "vol-test",
+				}
+				//mockMounter.EXPECT().Unmount(gomock.Eq(nonExistingTargetPath)).Return(nil)
+				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
 				}
@@ -602,5 +688,17 @@ func TestNodeGetInfo(t *testing.T) {
 			}
 		})
 	}
+}
 
+func assertError(t *testing.T, err error, expectedErrorCode codes.Code) {
+	if err == nil {
+		t.Fatalf("Expected error code %d, got success", expectedErrorCode)
+	}
+	grpcError, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("Failed getting error code from error: %v", grpcError)
+	}
+	if grpcError.Code() != expectedErrorCode {
+		t.Fatalf("Expected error code %d, got %d. Error: %s", expectedErrorCode, grpcError.Code(), grpcError.Message())
+	}
 }
