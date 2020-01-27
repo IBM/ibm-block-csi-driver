@@ -68,9 +68,16 @@ const (
 	FCPortPath             = "/sys/class/fc_host/host*/port_name"
 )
 
+//go:generate mockgen -destination=../../mocks/mock_NodeMounter.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeMounter
+
+type NodeMounter interface {
+	mount.Interface
+	FormatAndMount(source string, target string, fstype string, options []string) error
+}
+
 // nodeService represents the node service of CSI driver
 type NodeService struct {
-	mounter                     *mount.SafeFormatAndMount
+	mounter                     NodeMounter
 	ConfigYaml                  ConfigFile
 	Hostname                    string
 	NodeUtils                   NodeUtilsInterface
@@ -81,7 +88,7 @@ type NodeService struct {
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
-func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface, executer executer.ExecuterInterface, mounter *mount.SafeFormatAndMount, syncLock SyncLockInterface) NodeService {
+func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface, executer executer.ExecuterInterface, mounter NodeMounter, syncLock SyncLockInterface) NodeService {
 	return NodeService{
 		ConfigYaml:                  configYaml,
 		Hostname:                    hostname,
