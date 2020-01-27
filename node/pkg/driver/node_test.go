@@ -186,12 +186,14 @@ func TestNodePublishVolume(t *testing.T) {
 	fsTypeXfs := "ext4"
 	targetPath := "/test/path"
 	targetPathWithHostPrefix := path.Join(driver.PrefixChrootOfHostRoot, targetPath)
+	targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
 	stagingTargetPath := "/test/staging/path/.stageInfo.json"
 	stagingTargetFile := path.Join(stagingTargetPath, ".stageInfo.json")
 	deviceName := "fakedev"
 	stagingInfo := map[string]string{"mpathDevice": deviceName}
-	devicePath := "/dev/fake"
-	stdVolCap := &csi.VolumeCapability{
+	mpathDevice := filepath.Join(device_connectivity.DevPath, deviceName)
+
+	fsVolCap := &csi.VolumeCapability{
 		AccessType: &csi.VolumeCapability_Mount{
 			Mount: &csi.VolumeCapability_MountVolume{FsType: fsTypeXfs},
 		},
@@ -199,21 +201,21 @@ func TestNodePublishVolume(t *testing.T) {
 			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 		},
 	}
-	//rawBlockVolumeCapability := &csi.VolumeCapability{
-	//	AccessMode: &csi.VolumeCapability_AccessMode{
-	//		Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-	//	},
-	//	AccessType: &csi.VolumeCapability_Block{
-	//		Block: &csi.VolumeCapability_BlockVolume{},
-	//	},
-	//}
+	rawBlockVolumeCap := &csi.VolumeCapability{
+		AccessMode: &csi.VolumeCapability_AccessMode{
+			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+		},
+		AccessType: &csi.VolumeCapability_Block{
+			Block: &csi.VolumeCapability_BlockVolume{},
+		},
+	}
 
 	testCases := []struct {
 		name     string
 		testFunc func(t *testing.T)
 	}{
 		{
-			name: "success with filesystem",
+			name: "success with filesystem volume",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				defer mockCtl.Finish()
@@ -224,14 +226,42 @@ func TestNodePublishVolume(t *testing.T) {
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(gomock.Eq(stagingTargetFile)).Return(stagingInfo, nil)
 				mockMounter.EXPECT().List().Return(nil, nil)
 				mockMounter.EXPECT().MakeDir(gomock.Eq(targetPathWithHostPrefix)).Return(nil)
-				mpathDevice := filepath.Join(device_connectivity.DevPath, deviceName)
 				mockMounter.EXPECT().FormatAndMount(mpathDevice, targetPath, fsTypeXfs, nil)
 
 				req := &csi.NodePublishVolumeRequest{
-					PublishContext:    map[string]string{"DevicePath": devicePath},
+					PublishContext:    map[string]string{},
 					StagingTargetPath: stagingTargetPath,
 					TargetPath:        targetPath,
-					VolumeCapability:  stdVolCap,
+					VolumeCapability:  fsVolCap,
+					VolumeId:          "vol-test",
+				}
+
+				_, err := driver.NodePublishVolume(context.TODO(), req)
+				if err != nil {
+					t.Fatalf("Expect no error but got: %v", err)
+				}
+			},
+		},
+		{
+			name: "success with raw block volume",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				driver := newTestNodeService(mockNodeUtils, mockMounter)
+
+				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(gomock.Eq(stagingTargetFile)).Return(stagingInfo, nil)
+				mockMounter.EXPECT().List().Return(nil, nil)
+				mockMounter.EXPECT().MakeDir(gomock.Eq(targetPathParentDirWithHostPrefix)).Return(nil)
+				mockMounter.EXPECT().MakeFile(gomock.Eq(targetPathWithHostPrefix)).Return(nil)
+				mockMounter.EXPECT().Mount(mpathDevice, targetPath, "", []string{"bind"})
+
+				req := &csi.NodePublishVolumeRequest{
+					PublishContext:    map[string]string{},
+					StagingTargetPath: stagingTargetPath,
+					TargetPath:        targetPath,
+					VolumeCapability:  rawBlockVolumeCap,
 					VolumeId:          "vol-test",
 				}
 
