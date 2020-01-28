@@ -353,14 +353,17 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	case *csi.VolumeCapability_Block:
 		isFSVolume = false
 	}
-	// check if already mounted
-	isMounted, err := d.isTargetMounted(targetPathWithHostPrefix, isFSVolume)
-	if err != nil {
-		logger.Debugf("Existing mount check failed {%v}", err.Error())
-		return nil, err
-	}
-	if isMounted { // idempotent case
-		return &csi.NodePublishVolumeResponse{}, nil
+	isTargetFileExists := d.NodeUtils.IsFileExists(targetPathWithHostPrefix)
+	if isTargetFileExists {
+		// check if already mounted
+		isMounted, err := d.isTargetMounted(targetPathWithHostPrefix, isFSVolume)
+		if err != nil {
+			logger.Debugf("Existing mount check failed {%v}", err.Error())
+			return nil, err
+		}
+		if isMounted { // idempotent case
+			return &csi.NodePublishVolumeResponse{}, nil
+		}
 	}
 	if isFSVolume {
 		fsType := volumeCap.GetMount().FsType
@@ -368,7 +371,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 			fsType = defaultFSType
 		}
 		logger.Debugf("Volume will be formatted to FS type : {%v}", fsType)
-		if _, err := os.Stat(targetPathWithHostPrefix); os.IsNotExist(err) {
+		if !isTargetFileExists {
 			logger.Debugf("Target path directory does not exist. creating : {%v}", targetPathWithHostPrefix)
 			d.mounter.MakeDir(targetPathWithHostPrefix)
 		}
@@ -379,14 +382,14 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 		// Create mount file and its folder if they don't exist
 		targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
-		if _, err := os.Stat(targetPathParentDirWithHostPrefix); os.IsNotExist(err) {
+		if !d.NodeUtils.IsFileExists(targetPathParentDirWithHostPrefix) {
 			logger.Debugf("Target path parent directory does not exist. creating : {%v}", targetPathParentDirWithHostPrefix)
 			err = d.mounter.MakeDir(targetPathParentDirWithHostPrefix)
 		}
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Could not create directory %q: %v", targetPathParentDirWithHostPrefix, err)
 		}
-		if _, err := os.Stat(targetPathWithHostPrefix); os.IsNotExist(err) {
+		if !isTargetFileExists {
 			logger.Debugf("Target path file does not exist. creating : {%v}", targetPathWithHostPrefix)
 			err = d.mounter.MakeFile(targetPathWithHostPrefix)
 		}
@@ -420,11 +423,7 @@ func (d *NodeService) isTargetMounted(targetPathWithHostPrefix string, isFSVolum
 	for _, mount := range mountList {
 		if mount.Path == targetPathWithHostPrefix {
 			//TODO: PUI-16179 - check if device is correct
-			targetFile, err := os.Stat(targetPathWithHostPrefix)
-			if err != nil {
-				return true, status.Errorf(codes.AlreadyExists, "Failed to open target file {%s} ", targetPathWithHostPrefix)
-			}
-			isTargetDirectory := targetFile.Mode().IsDir()
+			isTargetDirectory := d.NodeUtils.IsDirectory(targetPathWithHostPrefix)
 			if isFSVolume && !isTargetDirectory {
 				return true, status.Errorf(codes.AlreadyExists, "Required volume with file system but target {%s} is mounted and it is not a directory.", targetPathWithHostPrefix)
 			} else if !isFSVolume && isTargetDirectory {
@@ -490,7 +489,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	targetPathWithHostPrefix := path.Join(PrefixChrootOfHostRoot, target)
 
 	logger.Debugf("Check if target file exists %s", target)
-	if _, err := os.Stat(targetPathWithHostPrefix); os.IsNotExist(err) {
+	if !d.NodeUtils.IsFileExists(targetPathWithHostPrefix) {
 		logger.Warningf("Idempotent case: target file %s doesn't exist", target)
 		return &csi.NodeUnpublishVolumeResponse{}, nil
 	}
@@ -503,7 +502,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	logger.Debugf("Unmount finished. Target : {%s}", target)
-	if err = os.RemoveAll(targetPathWithHostPrefix); err != nil {
+	if err = d.NodeUtils.RemoveFileOrDirectory(targetPathWithHostPrefix); err != nil {
 		logger.Errorf("Failed to remove mount path file. Target %s: %v", target, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -551,7 +550,7 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	var fcWWNs []string
 	var err error
 
-	fcExists := d.NodeUtils.Exists(FCPath)
+	fcExists := d.NodeUtils.IsFileExists(FCPath)
 	if fcExists {
 		fcWWNs, err = d.NodeUtils.ParseFCPorts()
 		if err != nil {
@@ -559,7 +558,7 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 		}
 	}
 
-	iscsiExists := d.NodeUtils.Exists(IscsiFullPath)
+	iscsiExists := d.NodeUtils.IsFileExists(IscsiFullPath)
 	if iscsiExists {
 		iscsiIQN, _ = d.NodeUtils.ParseIscsiInitiators()
 	}

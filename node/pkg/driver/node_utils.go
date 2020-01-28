@@ -20,15 +20,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
-	"k8s.io/apimachinery/pkg/util/errors"
 
-	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
@@ -44,7 +44,9 @@ type NodeUtilsInterface interface {
 	ReadFromStagingInfoFile(filePath string) (map[string]string, error)
 	ClearStageInfoFile(filePath string) error
 	StageInfoFileIsExist(filePath string) bool
-	Exists(filePath string) bool
+	IsFileExists(filePath string) bool
+	IsDirectory(filePath string) bool
+	RemoveFileOrDirectory(filePath string) error
 }
 
 type NodeUtils struct {
@@ -230,11 +232,31 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 	return fcPorts, nil
 }
 
-func (n NodeUtils) Exists(path string) bool {
+func (n NodeUtils) IsFileExists(path string) bool {
 	_, err := os.Stat(path)
 	if err != nil {
+		if !os.IsNotExist(err) {
+			return false
+			logger.Warningf("Check is file %s exists returned error %s", path, err.Error())
+		}
 		return false
 	}
 
 	return true
+}
+
+func (n NodeUtils) IsDirectory(path string) bool {
+	targetFile, err := os.Stat(path)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			logger.Warningf("Check is directory %s returned error %s", path, err.Error())
+		}
+		return false
+	}
+	return targetFile.Mode().IsDir()
+}
+
+// Xeletes file or directory with all subdirectory and files
+func (n NodeUtils) RemoveFileOrDirectory(path string) error {
+	return os.RemoveAll(path)
 }

@@ -20,8 +20,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
-	"io/ioutil"
-	"os"
+	"k8s.io/kubernetes/pkg/util/mount"
 	"path"
 	"path/filepath"
 	"reflect"
@@ -194,7 +193,14 @@ func TestNodePublishVolume(t *testing.T) {
 	deviceName := "fakedev"
 	stagingInfo := map[string]string{"mpathDevice": deviceName}
 	mpathDevice := filepath.Join(device_connectivity.DevPath, deviceName)
-
+	targetMountPoint := &mount.MountPoint {
+		Path: targetPathWithHostPrefix,
+	}
+	fakeMountPoint := &mount.MountPoint {
+		Path: "/fake_mountpoint",
+	}
+	// mount point for which node will say that mount already exists
+	positiveMountPoint := []mount.MountPoint{*targetMountPoint, *fakeMountPoint}
 	fsVolCap := &csi.VolumeCapability{
 		AccessType: &csi.VolumeCapability_Mount{
 			Mount: &csi.VolumeCapability_MountVolume{FsType: fsTypeXfs},
@@ -217,6 +223,112 @@ func TestNodePublishVolume(t *testing.T) {
 		testFunc func(t *testing.T)
 	}{
 		{
+			name: "fail no VolumeId",
+			testFunc: func(t *testing.T) {
+				driver := newTestNodeService(nil, nil)
+				req := &csi.NodePublishVolumeRequest{
+					PublishContext:    map[string]string{},
+					StagingTargetPath: stagingTargetPath,
+					TargetPath:        targetPath,
+					VolumeCapability:  fsVolCap,
+				}
+
+				_, err := driver.NodePublishVolume(context.TODO(), req)
+				assertError(t, err, codes.InvalidArgument)
+			},
+		},
+		{
+			name: "fail no StagingTargetPath",
+			testFunc: func(t *testing.T) {
+				driver := newTestNodeService(nil, nil)
+				req := &csi.NodePublishVolumeRequest{
+					PublishContext:    map[string]string{},
+					TargetPath:        targetPath,
+					VolumeCapability:  fsVolCap,
+					VolumeId:          "vol-test",
+				}
+
+				_, err := driver.NodePublishVolume(context.TODO(), req)
+				assertError(t, err, codes.InvalidArgument)
+			},
+		},
+		{
+			name: "fail no TargetPath",
+			testFunc: func(t *testing.T) {
+				driver := newTestNodeService(nil, nil)
+				req := &csi.NodePublishVolumeRequest{
+					PublishContext:    map[string]string{},
+					StagingTargetPath: stagingTargetPath,
+					VolumeCapability:  fsVolCap,
+					VolumeId:          "vol-test",
+				}
+
+				_, err := driver.NodePublishVolume(context.TODO(), req)
+				assertError(t, err, codes.InvalidArgument)
+			},
+		},
+		{
+			name: "fail no VolumeCapability",
+			testFunc: func(t *testing.T) {
+				driver := newTestNodeService(nil, nil)
+				req := &csi.NodePublishVolumeRequest{
+					PublishContext:    map[string]string{},
+					StagingTargetPath: stagingTargetPath,
+					TargetPath:        targetPath,
+					VolumeId:          "vol-test",
+				}
+
+				_, err := driver.NodePublishVolume(context.TODO(), req)
+				assertError(t, err, codes.InvalidArgument)
+			},
+		},
+		{
+			name: "fail invalid VolumeCapability",
+			testFunc: func(t *testing.T) {
+				driver := newTestNodeService(nil, nil)
+				req := &csi.NodePublishVolumeRequest{
+					PublishContext:    map[string]string{},
+					StagingTargetPath: stagingTargetPath,
+					TargetPath:        targetPath,
+					VolumeCapability: &csi.VolumeCapability{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_UNKNOWN,
+						},
+					},
+					VolumeId:          "vol-test",
+				}
+
+				_, err := driver.NodePublishVolume(context.TODO(), req)
+				assertError(t, err, codes.InvalidArgument)
+			},
+		},
+		{
+			name: "fail AlreadyExists",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				driver := newTestNodeService(mockNodeUtils, mockMounter)
+
+				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
+				mockNodeUtils.EXPECT().IsFileExists(targetPathWithHostPrefix).Return(true)
+				mockMounter.EXPECT().List().Return(positiveMountPoint, nil)
+				mockNodeUtils.EXPECT().IsDirectory(targetPathWithHostPrefix).Return(false)
+
+				req := &csi.NodePublishVolumeRequest{
+					PublishContext:    map[string]string{},
+					StagingTargetPath: stagingTargetPath,
+					TargetPath:        targetPath,
+					VolumeCapability:  fsVolCap,
+					VolumeId:          "vol-test",
+				}
+
+				_, err := driver.NodePublishVolume(context.TODO(), req)
+				assertError(t, err, codes.AlreadyExists)
+			},
+		},
+		{
 			name: "success with filesystem volume",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
@@ -225,10 +337,38 @@ func TestNodePublishVolume(t *testing.T) {
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
 				driver := newTestNodeService(mockNodeUtils, mockMounter)
 
-				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(gomock.Eq(stagingTargetFile)).Return(stagingInfo, nil)
-				mockMounter.EXPECT().List().Return(nil, nil)
-				mockMounter.EXPECT().MakeDir(gomock.Eq(targetPathWithHostPrefix)).Return(nil)
+				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
+				mockNodeUtils.EXPECT().IsFileExists(targetPathWithHostPrefix).Return(false)
+				mockMounter.EXPECT().MakeDir(targetPathWithHostPrefix).Return(nil)
 				mockMounter.EXPECT().FormatAndMount(mpathDevice, targetPath, fsTypeXfs, nil)
+
+				req := &csi.NodePublishVolumeRequest{
+					PublishContext:    map[string]string{},
+					StagingTargetPath: stagingTargetPath,
+					TargetPath:        targetPath,
+					VolumeCapability:  fsVolCap,
+					VolumeId:          "vol-test",
+				}
+
+				_, err := driver.NodePublishVolume(context.TODO(), req)
+				if err != nil {
+					t.Fatalf("Expect no error but got: %v", err)
+				}
+			},
+		},
+		{
+			name: "success idempotent with filesystem volume",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				driver := newTestNodeService(mockNodeUtils, mockMounter)
+
+				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
+				mockNodeUtils.EXPECT().IsFileExists(targetPathWithHostPrefix).Return(true)
+				mockMounter.EXPECT().List().Return(positiveMountPoint, nil)
+				mockNodeUtils.EXPECT().IsDirectory(targetPathWithHostPrefix).Return(true)
 
 				req := &csi.NodePublishVolumeRequest{
 					PublishContext:    map[string]string{},
@@ -253,9 +393,12 @@ func TestNodePublishVolume(t *testing.T) {
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
 				driver := newTestNodeService(mockNodeUtils, mockMounter)
 
-				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(gomock.Eq(stagingTargetFile)).Return(stagingInfo, nil)
-				mockMounter.EXPECT().List().Return(nil, nil)
-				mockMounter.EXPECT().MakeDir(gomock.Eq(targetPathParentDirWithHostPrefix)).Return(nil)
+				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
+				gomock.InOrder(
+					mockNodeUtils.EXPECT().IsFileExists(targetPathWithHostPrefix).Return(false),
+					mockNodeUtils.EXPECT().IsFileExists(targetPathParentDirWithHostPrefix).Return(false),
+				)
+				mockMounter.EXPECT().MakeDir(targetPathParentDirWithHostPrefix).Return(nil)
 				mockMounter.EXPECT().MakeFile(gomock.Eq(targetPathWithHostPrefix)).Return(nil)
 				mockMounter.EXPECT().Mount(mpathDevice, targetPath, "", []string{"bind"})
 
@@ -280,14 +423,8 @@ func TestNodePublishVolume(t *testing.T) {
 }
 
 func TestNodeUnpublishVolume(t *testing.T) {
-	existingTargetPath := "/tmp/TestNodeUnpublishVolume.txt"
-	nonExistingTargetPath := "/test/path"
-	os.MkdirAll("/host/tmp", 0755)
-	err := ioutil.WriteFile("/host/tmp/TestNodeUnpublishVolume.txt", []byte("Hello"), 0755)
-	if err != nil {
-		fmt.Printf("Unable to write file: %v", err)
-	}
-	defer os.RemoveAll(existingTargetPath)
+	targetPath := "/test/path"
+	targetPathWithHostPrefix := path.Join(driver.PrefixChrootOfHostRoot, targetPath)
 
 	testCases := []struct {
 		name     string
@@ -299,7 +436,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 				driver := newTestNodeService(nil, nil)
 
 				req := &csi.NodeUnpublishVolumeRequest{
-					TargetPath: existingTargetPath,
+					TargetPath: targetPath,
 				}
 				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
@@ -327,10 +464,12 @@ func TestNodeUnpublishVolume(t *testing.T) {
 				driver := newTestNodeService(mockNodeUtils, mockMounter)
 
 				req := &csi.NodeUnpublishVolumeRequest{
-					TargetPath: existingTargetPath,
+					TargetPath: targetPath,
 					VolumeId:   "vol-test",
 				}
-				mockMounter.EXPECT().Unmount(gomock.Eq(existingTargetPath)).Return(nil)
+				mockNodeUtils.EXPECT().IsFileExists(targetPathWithHostPrefix).Return(true)
+				mockMounter.EXPECT().Unmount(targetPath).Return(nil)
+				mockNodeUtils.EXPECT().RemoveFileOrDirectory(targetPathWithHostPrefix)
 				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
@@ -347,10 +486,10 @@ func TestNodeUnpublishVolume(t *testing.T) {
 				driver := newTestNodeService(mockNodeUtils, mockMounter)
 
 				req := &csi.NodeUnpublishVolumeRequest{
-					TargetPath: nonExistingTargetPath,
+					TargetPath: targetPath,
 					VolumeId:   "vol-test",
 				}
-				//mockMounter.EXPECT().Unmount(gomock.Eq(nonExistingTargetPath)).Return(nil)
+				mockNodeUtils.EXPECT().IsFileExists(targetPathWithHostPrefix).Return(false)
 				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
@@ -657,12 +796,12 @@ func TestNodeGetInfo(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fake_nodeutils := mocks.NewMockNodeUtilsInterface(mockCtrl)
-			fake_nodeutils.EXPECT().Exists(driver.FCPath).Return(tc.fcExists)
+			fake_nodeutils.EXPECT().IsFileExists(driver.FCPath).Return(tc.fcExists)
 			if tc.fcExists {
 				fake_nodeutils.EXPECT().ParseFCPorts().Return(tc.return_fcs, tc.return_fc_err)
 			}
 			if tc.return_fc_err == nil {
-				fake_nodeutils.EXPECT().Exists(driver.IscsiFullPath).Return(tc.iscsiExists)
+				fake_nodeutils.EXPECT().IsFileExists(driver.IscsiFullPath).Return(tc.iscsiExists)
 				if tc.iscsiExists {
 					fake_nodeutils.EXPECT().ParseIscsiInitiators().Return(tc.return_iqn, tc.return_iqn_err)
 				}
