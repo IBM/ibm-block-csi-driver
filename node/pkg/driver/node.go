@@ -356,7 +356,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	isTargetFileExists := d.NodeUtils.IsFileExists(targetPathWithHostPrefix)
 	if isTargetFileExists {
 		// check if already mounted
-		isMounted, err := d.isTargetMounted(targetPathWithHostPrefix, isFSVolume)
+		isMounted, err := d.isTargetMounted(targetPath, isFSVolume)
 		if err != nil {
 			logger.Debugf("Existing mount check failed {%v}", err.Error())
 			return nil, err
