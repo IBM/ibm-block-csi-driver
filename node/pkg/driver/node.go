@@ -372,7 +372,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		}
 		logger.Debugf("Volume will be formatted to FS type : {%v}", fsType)
 		if !isTargetFileExists {
-			logger.Debugf("Target path directory does not exist. creating : {%v}", targetPathWithHostPrefix)
+			logger.Debugf("Target path directory does not exist. creating : {%v}", targetPath)
 			d.Mounter.MakeDir(targetPathWithHostPrefix)
 		}
 		logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
@@ -383,18 +383,18 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		// Create mount file and its folder if they don't exist
 		targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
 		if !d.NodeUtils.IsFileExists(targetPathParentDirWithHostPrefix) {
-			logger.Debugf("Target path parent directory does not exist. creating : {%v}", targetPathParentDirWithHostPrefix)
+			logger.Debugf("Target path parent directory does not exist. creating : {%v}", targetPath)
 			err = d.Mounter.MakeDir(targetPathParentDirWithHostPrefix)
 		}
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Could not create directory %q: %v", targetPathParentDirWithHostPrefix, err)
+			return nil, status.Errorf(codes.Internal, "Could not create directory %q: %v", targetPath, err)
 		}
 		if !isTargetFileExists {
-			logger.Debugf("Target path file does not exist. creating : {%v}", targetPathWithHostPrefix)
+			logger.Debugf("Target path file does not exist. creating : {%v}", targetPath)
 			err = d.Mounter.MakeFile(targetPathWithHostPrefix)
 		}
 		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Could not create file %q: %v", targetPathWithHostPrefix, err)
+			return nil, status.Errorf(codes.Internal, "Could not create file %q: %v", targetPath, err)
 		}
 
 		// Mount
@@ -414,8 +414,9 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 // targetPathWithHostPrefix: path of target as seen from pod
 // isFSVolume: if we check volume with file system - true, otherwise for raw block false
 // Returns: is target mounted, error if occured
-func (d *NodeService) isTargetMounted(targetPathWithHostPrefix string, isFSVolume bool) (bool, error) {
-	logger.Debugf("Check if targetPath {%s} exist in mount list", targetPathWithHostPrefix)
+func (d *NodeService) isTargetMounted(target string, isFSVolume bool) (bool, error) {
+	logger.Debugf("Check if targetPath {%s} exist in mount list", target)
+	targetPathWithHostPrefix := path.Join(PrefixChrootOfHostRoot, target)
 	mountList, err := d.Mounter.List()
 	if err != nil {
 		return false, err
@@ -425,11 +426,11 @@ func (d *NodeService) isTargetMounted(targetPathWithHostPrefix string, isFSVolum
 			//TODO: PUI-16179 - check if device is correct
 			isTargetDirectory := d.NodeUtils.IsDirectory(targetPathWithHostPrefix)
 			if isFSVolume && !isTargetDirectory {
-				return true, status.Errorf(codes.AlreadyExists, "Required volume with file system but target {%s} is mounted and it is not a directory.", targetPathWithHostPrefix)
+				return true, status.Errorf(codes.AlreadyExists, "Required volume with file system but target {%s} is mounted and it is not a directory.", target)
 			} else if !isFSVolume && isTargetDirectory {
-				return true, status.Errorf(codes.AlreadyExists, "Required raw block volume but target {%s} is mounted and it is a directory.", targetPathWithHostPrefix)
+				return true, status.Errorf(codes.AlreadyExists, "Required raw block volume but target {%s} is mounted and it is a directory.", target)
 			}
-			logger.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume.", targetPathWithHostPrefix)
+			logger.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume.", target)
 			return true, nil
 		}
 	}
