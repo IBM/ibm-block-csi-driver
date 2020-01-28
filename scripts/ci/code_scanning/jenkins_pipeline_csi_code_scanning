@@ -1,7 +1,7 @@
 def run_csi_code_scan(target_name) {
     EXIT_STATUS = sh(
         returnStatus: true,
-        script: "./scripts/ci/code_scanning/run_csi_code_scan.sh ${target_name}"
+        script: "./scripts/ci/code_scanning/run_csi_code_scan.sh ${target_name} scripts/ci/code_scanning"
     )
     if (EXIT_STATUS == 1) {
         currentBuild.result = 'FAILURE'
