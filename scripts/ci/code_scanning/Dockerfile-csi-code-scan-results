@@ -14,11 +14,18 @@
 
 FROM python:3.6.9
 
-RUN pip3 install safety
+RUN pip3 install deepdiff
 
-COPY controller ./controller
-RUN mkdir /results
+COPY scripts/ci/code_scanning/code_scan_results_entrypoint.sh ./entrypoint.sh
+COPY scripts/ci/code_scanning/code_scan_results/* ./code_scan_results/
+RUN chmod u+x entrypoint.sh code_scan_results/*
+
+ENV CONTAINER_OUTPUT_PATH="/results"
+RUN mkdir ${CONTAINER_OUTPUT_PATH}
+
+ENV CONTAINER_BASELINE_PATH="/baseline_results"
+RUN mkdir ${CONTAINER_BASELINE_PATH}
 
 WORKDIR .
 
-ENTRYPOINT ["/bin/sh", "-c", "/usr/local/bin/safety check --json -r /controller/requirements.txt > /results/${TARGET_NAME}.json 2> /results/${TARGET_NAME}.log"]
+ENTRYPOINT ["/bin/sh", "-c", "./entrypoint.sh"]
