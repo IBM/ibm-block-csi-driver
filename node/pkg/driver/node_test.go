@@ -146,6 +146,8 @@ func TestNodePublishVolume(t *testing.T) {
 	}
 	// mount point for which node will say that mount already exists
 	positiveMountPoint := []mount.MountPoint{*targetMountPoint, *fakeMountPoint}
+	// mount point for which node will say that mount does not exists
+	negativeMountPoint := []mount.MountPoint{*fakeMountPoint}
 	fsVolCap := &csi.VolumeCapability{
 		AccessType: &csi.VolumeCapability_Mount{
 			Mount: &csi.VolumeCapability_MountVolume{FsType: fsTypeXfs},
@@ -345,6 +347,37 @@ func TestNodePublishVolume(t *testing.T) {
 				)
 				mockMounter.EXPECT().MakeDir(targetPathParentDirWithHostPrefix).Return(nil)
 				mockMounter.EXPECT().MakeFile(gomock.Eq(targetPathWithHostPrefix)).Return(nil)
+				mockMounter.EXPECT().Mount(mpathDevice, targetPath, "", []string{"bind"})
+
+				req := &csi.NodePublishVolumeRequest{
+					PublishContext:    map[string]string{},
+					StagingTargetPath: stagingTargetPath,
+					TargetPath:        targetPath,
+					VolumeCapability:  rawBlockVolumeCap,
+					VolumeId:          "vol-test",
+				}
+
+				_, err := driver.NodePublishVolume(context.TODO(), req)
+				if err != nil {
+					t.Fatalf("Expect no error but got: %v", err)
+				}
+			},
+		},
+		{
+			name: "success with raw block volume with mount file exits",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				driver := newTestNodeService(mockNodeUtils, mockMounter)
+
+				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
+				gomock.InOrder(
+					mockNodeUtils.EXPECT().IsFileExists(targetPathWithHostPrefix).Return(true),
+					mockNodeUtils.EXPECT().IsFileExists(targetPathParentDirWithHostPrefix).Return(true),
+				)
+				mockMounter.EXPECT().List().Return(negativeMountPoint, nil)
 				mockMounter.EXPECT().Mount(mpathDevice, targetPath, "", []string{"bind"})
 
 				req := &csi.NodePublishVolumeRequest{
