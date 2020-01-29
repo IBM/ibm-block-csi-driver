@@ -131,9 +131,9 @@ func TestNodeStageVolume(t *testing.T) {
 func TestNodePublishVolume(t *testing.T) {
 	fsTypeXfs := "ext4"
 	targetPath := "/test/path"
-	targetPathWithHostPrefix := path.Join(driver.PrefixChrootOfHostRoot, targetPath)
+	targetPathWithHostPrefix := driver.GetPodFilePath(targetPath)
 	targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
-	stagingTargetPath := "/test/staging/path/.stageInfo.json"
+	stagingTargetPath := path.Join("/test/staging", driver.StageInfoFilename)
 	stagingTargetFile := path.Join(stagingTargetPath, ".stageInfo.json")
 	deviceName := "fakedev"
 	stagingInfo := map[string]string{"mpathDevice": deviceName}
@@ -369,7 +369,7 @@ func TestNodePublishVolume(t *testing.T) {
 
 func TestNodeUnpublishVolume(t *testing.T) {
 	targetPath := "/test/path"
-	targetPathWithHostPrefix := path.Join(driver.PrefixChrootOfHostRoot, targetPath)
+	targetPathWithHostPrefix := driver.GetPodFilePath(targetPath)
 
 	testCases := []struct {
 		name     string

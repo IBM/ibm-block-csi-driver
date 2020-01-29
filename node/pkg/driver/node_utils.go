@@ -31,6 +31,12 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
+const (
+	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
+	// Command lines inside the container will show /host prefix.
+	PrefixChrootOfHostRoot = "/host"
+)
+
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
 
 type NodeUtilsInterface interface {
@@ -105,7 +111,7 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, c
 func (n NodeUtils) WriteStageInfoToFile(fPath string, info map[string]string) error {
 	// writes to stageTargetPath/filename
 
-	fPath = PrefixChrootOfHostRoot + fPath
+	fPath = GetPodFilePath(fPath)
 	stagePath := filepath.Dir(fPath)
 	if _, err := os.Stat(stagePath); os.IsNotExist(err) {
         logger.Debugf("The filePath [%s] is not existed. Create it.", stagePath)
@@ -132,7 +138,7 @@ func (n NodeUtils) WriteStageInfoToFile(fPath string, info map[string]string) er
 
 func (n NodeUtils) ReadFromStagingInfoFile(filePath string) (map[string]string, error) {
 	// reads from stageTargetPath/filename
-	filePath = PrefixChrootOfHostRoot + filePath
+	filePath = GetPodFilePath(filePath)
 
 	logger.Debugf("Read StagingInfoFile : path {%v},", filePath)
 	stageInfo, err := ioutil.ReadFile(filePath)
@@ -153,7 +159,7 @@ func (n NodeUtils) ReadFromStagingInfoFile(filePath string) (map[string]string, 
 }
 
 func (n NodeUtils) ClearStageInfoFile(filePath string) error {
-	filePath = PrefixChrootOfHostRoot + filePath
+	filePath = GetPodFilePath(filePath)
 	logger.Debugf("Delete StagingInfoFile : path {%v},", filePath)
 
 	return os.Remove(filePath)
@@ -259,4 +265,10 @@ func (n NodeUtils) IsDirectory(path string) bool {
 // Xeletes file or directory with all subdirectory and files
 func (n NodeUtils) RemoveFileOrDirectory(path string) error {
 	return os.RemoveAll(path)
+}
+
+// path: file/folder path
+// return: path to the file/folder if accessed from pod
+func GetPodFilePath(path string) string {
+	return path.Join(PrefixChrootOfHostRoot, path)
 }

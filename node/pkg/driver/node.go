@@ -48,7 +48,7 @@ var (
 	}
 
 	defaultFSType              = "ext4"
-	stageInfoFilename          = ".stageInfo.json"
+	StageInfoFilename          = ".stageInfo.json"
 	supportedConnectivityTypes = map[string]bool{
 		"iscsi": true,
 		"fc":    true,
@@ -61,9 +61,6 @@ var (
 )
 
 const (
-	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
-	// Command lines inside the container will show /host prefix.
-	PrefixChrootOfHostRoot = "/host"
 	FCPath                 = "/sys/class/fc_host"
 	FCPortPath             = "/sys/class/fc_host/host*/port_name"
 )
@@ -151,7 +148,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	// TODO move stageInfo into the node_until API
 	// Generate the stageInfo detail
-	stageInfoPath := path.Join(stagingPath, stageInfoFilename)
+	stageInfoPath := path.Join(stagingPath, StageInfoFilename)
 	stageInfo := make(map[string]string)
 	baseDevice := path.Base(device)
 	stageInfo["mpathDevice"] = baseDevice //this should return the mathhh for example
@@ -261,7 +258,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	}
 
 	logger.Debugf("Reading stage info file")
-	stageInfoPath := path.Join(stagingTargetPath, stageInfoFilename)
+	stageInfoPath := path.Join(stagingTargetPath, StageInfoFilename)
 	infoMap, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -330,12 +327,12 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	// checking if the node staging path was mpounted into
 	stagingPath := req.GetStagingTargetPath()
 	targetPath := req.GetTargetPath()
-	targetPathWithHostPrefix := path.Join(PrefixChrootOfHostRoot, targetPath)
+	targetPathWithHostPrefix := GetPodFilePath(targetPath)
 
 	logger.Debugf("stagingPath : {%v}, targetPath : {%v}", stagingPath, targetPath)
 
 	// Read staging info file in order to find the mpath device for mounting.
-	stageInfoPath := path.Join(stagingPath, stageInfoFilename)
+	stageInfoPath := path.Join(stagingPath, StageInfoFilename)
 	infoMap, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
 	if err != nil {
 		// Note: after validation it looks like k8s create the directory in advance. So we don't try to remove it at the Unpublish
@@ -416,7 +413,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 // Returns: is target mounted, error if occured
 func (d *NodeService) isTargetMounted(target string, isFSVolume bool) (bool, error) {
 	logger.Debugf("Check if targetPath {%s} exist in mount list", target)
-	targetPathWithHostPrefix := path.Join(PrefixChrootOfHostRoot, target)
+	targetPathWithHostPrefix := GetPodFilePath(target)
 	mountList, err := d.Mounter.List()
 	if err != nil {
 		return false, err
@@ -487,7 +484,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	if len(target) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path not provided")
 	}
-	targetPathWithHostPrefix := path.Join(PrefixChrootOfHostRoot, target)
+	targetPathWithHostPrefix := GetPodFilePath(target)
 
 	logger.Debugf("Check if target file exists %s", target)
 	if !d.NodeUtils.IsFileExists(targetPathWithHostPrefix) {
