@@ -104,7 +104,7 @@ End of worker node setup.
 ## Installing the driver
 This section describes how to install the CSI driver.
 
-From this version(1.0.0) the deployment method of the driver is done via `Operator for IBM Block CSI Driver` -> https://github.com/ibm/ibm-block-csi-operator.
+From version 1.0.0, the deployment method of the driver is done via `Operator for IBM Block CSI Driver` -> https://github.com/ibm/ibm-block-csi-operator.
 
 
 ## Configuring k8s secret and storage class
@@ -268,7 +268,7 @@ No resources found.
 
 ## Uninstalling the driver
 
-From this version(1.0.0) the deployment method of the driver is done via `Operator for IBM Block CSI Driver` -> https://github.com/ibm/ibm-block-csi-operator.
+From version 1.0.0, the deployment method of the driver is done via `Operator for IBM Block CSI Driver` -> https://github.com/ibm/ibm-block-csi-operator.
 
 
 ## More details and troubleshooting
