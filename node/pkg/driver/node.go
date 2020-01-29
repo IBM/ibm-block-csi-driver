@@ -421,10 +421,10 @@ func (d *NodeService) isTargetMounted(target string, isFSVolume bool) (bool, err
 	for _, mount := range mountList {
 		if mount.Path == targetPathWithHostPrefix {
 			//TODO: PUI-16179 - check if device is correct
-			isTargetDirectory := d.NodeUtils.IsDirectory(targetPathWithHostPrefix)
-			if isFSVolume && !isTargetDirectory {
+			targetIsDir := d.NodeUtils.IsDirectory(targetPathWithHostPrefix)
+			if isFSVolume && !targetIsDir {
 				return true, status.Errorf(codes.AlreadyExists, "Required volume with file system but target {%s} is mounted and it is not a directory.", target)
-			} else if !isFSVolume && isTargetDirectory {
+			} else if !isFSVolume && targetIsDir {
 				return true, status.Errorf(codes.AlreadyExists, "Required raw block volume but target {%s} is mounted and it is a directory.", target)
 			}
 			logger.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume.", target)
