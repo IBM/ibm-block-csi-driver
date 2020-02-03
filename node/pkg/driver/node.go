@@ -418,7 +418,7 @@ func (d *NodeService) mountRawBlockVolume(mpathDevice string, targetPath string,
 	return d.Mounter.Mount(mpathDevice, targetPath, "", options)
 }
 
-// targetPathWithHostPrefix: path of target as seen from pod
+// target: path of target
 // isFSVolume: if we check volume with file system - true, otherwise for raw block false
 // Returns: is target mounted, error if occured
 func (d *NodeService) isTargetMounted(target string, isFSVolume bool) (bool, error) {
@@ -506,7 +506,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	logger.Debugf("NodeUnpublishVolume: Unmounting %s", targetPathWithHostPrefix)
 	err = d.Mounter.Unmount(target)
 	if err != nil {
-		logger.Errorf("Unmount failed. Target : %s, err : %v", target, err.Error())
+		logger.Errorf("Unmount failed. Target : %q, err : %v", target, err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	logger.Debugf("Unmount finished. Target : {%s}", target)
