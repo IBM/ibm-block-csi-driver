@@ -428,8 +428,8 @@ func (d *NodeService) isTargetMounted(target string, isFSVolume bool) (bool, err
 	if err != nil {
 		return false, err
 	}
-	for _, mount := range mountList {
-		if mount.Path == targetPathWithHostPrefix {
+	for _, currentMount := range mountList {
+		if currentMount.Path == targetPathWithHostPrefix {
 			//TODO: PUI-16179 - check if device is correct
 			targetIsDir := d.NodeUtils.IsDirectory(targetPathWithHostPrefix)
 			if isFSVolume && !targetIsDir {
