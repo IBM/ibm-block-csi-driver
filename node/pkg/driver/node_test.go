@@ -131,7 +131,7 @@ func TestNodeStageVolume(t *testing.T) {
 func TestNodePublishVolume(t *testing.T) {
 	fsTypeXfs := "ext4"
 	targetPath := "/test/path"
-	targetPathWithHostPrefix := driver.GetPodFilePath(targetPath)
+	targetPathWithHostPrefix := driver.GetPodPath(targetPath)
 	targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
 	stagingTargetPath := path.Join("/test/staging", driver.StageInfoFilename)
 	stagingTargetFile := path.Join(stagingTargetPath, ".stageInfo.json")
@@ -402,7 +402,7 @@ func TestNodePublishVolume(t *testing.T) {
 
 func TestNodeUnpublishVolume(t *testing.T) {
 	targetPath := "/test/path"
-	targetPathWithHostPrefix := driver.GetPodFilePath(targetPath)
+	targetPathWithHostPrefix := driver.GetPodPath(targetPath)
 
 	testCases := []struct {
 		name     string

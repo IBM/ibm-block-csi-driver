@@ -50,7 +50,7 @@ type NodeUtilsInterface interface {
 	ReadFromStagingInfoFile(filePath string) (map[string]string, error)
 	ClearStageInfoFile(filePath string) error
 	StageInfoFileIsExist(filePath string) bool
-	IsFileExists(filePath string) bool
+	IsPathExists(filePath string) bool
 	IsDirectory(filePath string) bool
 	RemoveFileOrDirectory(filePath string) error
 }
@@ -111,7 +111,7 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, c
 func (n NodeUtils) WriteStageInfoToFile(fPath string, info map[string]string) error {
 	// writes to stageTargetPath/filename
 
-	fPath = GetPodFilePath(fPath)
+	fPath = GetPodPath(fPath)
 	stagePath := filepath.Dir(fPath)
 	if _, err := os.Stat(stagePath); os.IsNotExist(err) {
         logger.Debugf("The filePath [%s] is not existed. Create it.", stagePath)
@@ -138,7 +138,7 @@ func (n NodeUtils) WriteStageInfoToFile(fPath string, info map[string]string) er
 
 func (n NodeUtils) ReadFromStagingInfoFile(filePath string) (map[string]string, error) {
 	// reads from stageTargetPath/filename
-	filePath = GetPodFilePath(filePath)
+	filePath = GetPodPath(filePath)
 
 	logger.Debugf("Read StagingInfoFile : path {%v},", filePath)
 	stageInfo, err := ioutil.ReadFile(filePath)
@@ -159,7 +159,7 @@ func (n NodeUtils) ReadFromStagingInfoFile(filePath string) (map[string]string, 
 }
 
 func (n NodeUtils) ClearStageInfoFile(filePath string) error {
-	filePath = GetPodFilePath(filePath)
+	filePath = GetPodPath(filePath)
 	logger.Debugf("Delete StagingInfoFile : path {%v},", filePath)
 
 	return os.Remove(filePath)
@@ -238,7 +238,7 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 	return fcPorts, nil
 }
 
-func (n NodeUtils) IsFileExists(path string) bool {
+func (n NodeUtils) IsPathExists(path string) bool {
 	_, err := os.Stat(path)
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -267,8 +267,8 @@ func (n NodeUtils) RemoveFileOrDirectory(path string) error {
 	return os.RemoveAll(path)
 }
 
-// path: file/folder path
-// return: path to the file/folder if accessed from pod
-func GetPodFilePath(filepath string) string {
+// path: file/dir path
+// return: path to the file/dir if accessed from pod
+func GetPodPath(filepath string) string {
 	return path.Join(PrefixChrootOfHostRoot, filepath)
 }
