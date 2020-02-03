@@ -348,8 +348,8 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	case *csi.VolumeCapability_Block:
 		isFSVolume = false
 	}
-	isTargetFileExists := d.NodeUtils.IsPathExists(targetPathWithHostPrefix)
-	if isTargetFileExists {
+	isTargetPathExists := d.NodeUtils.IsPathExists(targetPathWithHostPrefix)
+	if isTargetPathExists {
 		// check if already mounted
 		isMounted, err := d.isTargetMounted(targetPath, isFSVolume)
 		if err != nil {
@@ -362,40 +362,9 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 	if isFSVolume {
 		fsType := volumeCap.GetMount().FsType
-		if fsType == "" {
-			fsType = defaultFSType
-		}
-		logger.Debugf("Volume will be have FS type : {%v}", fsType)
-		if !isTargetFileExists {
-			logger.Debugf("Target path directory does not exist. Creating : {%v}", targetPathWithHostPrefix)
-			d.Mounter.MakeDir(targetPathWithHostPrefix)
-		}
-		logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
-		err = d.Mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
+		err = d.mountFileSystemVolume(mpathDevice, targetPath, fsType, isTargetPathExists)
 	} else {
-		logger.Debugf("Raw block volume will be created")
-
-		// Create mount file and its folder if they don't exist
-		targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
-		if !d.NodeUtils.IsPathExists(targetPathParentDirWithHostPrefix) {
-			logger.Debugf("Target path parent directory does not exist. creating : {%v}", targetPath)
-			err = d.Mounter.MakeDir(targetPathParentDirWithHostPrefix)
-		}
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Could not create directory %q: %v", targetPathWithHostPrefix, err)
-		}
-		if !isTargetFileExists {
-			logger.Debugf("Target path file does not exist. creating : {%v}", targetPathWithHostPrefix)
-			err = d.Mounter.MakeFile(targetPathWithHostPrefix)
-		}
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Could not create file %q: %v", targetPathWithHostPrefix, err)
-		}
-
-		// Mount
-		options := []string{"bind"}
-		logger.Debugf("Mount the device to raw block volume. Target : {%s}, device : {%s}", targetPath, mpathDevice)
-		err = d.Mounter.Mount(mpathDevice, targetPath, "", options)
+		err = d.mountRawBlockVolume(mpathDevice, targetPath, isTargetPathExists)
 	}
 
 	if err != nil {
@@ -404,6 +373,49 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	logger.Debugf("NodePublishVolume Finished: multipath device is now mounted to targetPath.")
 
 	return &csi.NodePublishVolumeResponse{}, nil
+}
+
+func (d *NodeService) mountFileSystemVolume(mpathDevice string, targetPath string, fsType string, isTargetPathExists bool) error {
+	if fsType == "" {
+		fsType = defaultFSType
+	}
+	logger.Debugf("Volume will be have FS type : {%v}", fsType)
+	targetPathWithHostPrefix := GetPodPath(targetPath)
+	if !isTargetPathExists {
+		logger.Debugf("Target path directory does not exist. Creating : {%v}", targetPathWithHostPrefix)
+		err := d.Mounter.MakeDir(targetPathWithHostPrefix)
+		if err != nil {
+			return status.Errorf(codes.Internal, "Could not create file %q: %v", targetPathWithHostPrefix, err)
+		}
+	}
+	logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
+	return d.Mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
+}
+
+func (d *NodeService) mountRawBlockVolume(mpathDevice string, targetPath string, isTargetPathExists bool) error {
+	logger.Debugf("Raw block volume will be created")
+	targetPathWithHostPrefix := GetPodPath(targetPath)
+	// Create mount file and its parent directory if they don't exist
+	targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
+	if !d.NodeUtils.IsPathExists(targetPathParentDirWithHostPrefix) {
+		logger.Debugf("Target path parent directory does not exist. creating : {%v}", targetPathWithHostPrefix)
+		err := d.Mounter.MakeDir(targetPathParentDirWithHostPrefix)
+		if err != nil {
+			return status.Errorf(codes.Internal, "Could not create directory %q: %v", targetPathWithHostPrefix, err)
+		}
+	}
+	if !isTargetPathExists {
+		logger.Debugf("Target path file does not exist. creating : {%v}", targetPathWithHostPrefix)
+		err := d.Mounter.MakeFile(targetPathWithHostPrefix)
+		if err != nil {
+			return status.Errorf(codes.Internal, "Could not create file %q: %v", targetPathWithHostPrefix, err)
+		}
+	}
+
+	// Mount
+	options := []string{"bind"}
+	logger.Debugf("Mount the device to raw block volume. Target : {%s}, device : {%s}", targetPath, mpathDevice)
+	return d.Mounter.Mount(mpathDevice, targetPath, "", options)
 }
 
 // targetPathWithHostPrefix: path of target as seen from pod
