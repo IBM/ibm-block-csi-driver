@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package driver_test
+package driver
 
 import (
 	"fmt"
@@ -25,13 +25,12 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	"errors"
 	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
-	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"reflect"
 )
 
 var (
-	nodeUtils = driver.NewNodeUtils(&executer.Executer{})
+	nodeUtils = NewNodeUtils(&executer.Executer{})
 )
 
 func TestParseIscsiInitiators(t *testing.T) {
@@ -44,7 +43,7 @@ func TestParseIscsiInitiators(t *testing.T) {
 		{
 			name:         "wrong iqn file",
 			file_content: "wrong-content",
-			expErr:       fmt.Errorf(driver.ErrorWhileTryingToReadIQN, "wrong-content"),
+			expErr:       fmt.Errorf(ErrorWhileTryingToReadIQN, "wrong-content"),
 		},
 		{
 			name:   "non existing file",
@@ -89,7 +88,7 @@ func TestParseIscsiInitiators(t *testing.T) {
 				filePath = "/non/existent/path"
 			}
 
-			driver.IscsiFullPath = filePath
+			IscsiFullPath = filePath
 			isci, err := nodeUtils.ParseIscsiInitiators()
 
 			if tc.expErr != nil {
@@ -123,11 +122,11 @@ func TestParseFCPortsName(t *testing.T) {
 		{
 			name: "fc port file with wrong content",
 			file_contents: []string{"wrong content"},
-			expErr: fmt.Errorf(driver.ErrorWhileTryingToReadFC, "wrong content"),
+			expErr: fmt.Errorf(ErrorWhileTryingToReadFC, "wrong content"),
 		},
 		{
 			name: "fc unsupported",
-			expErr: fmt.Errorf(driver.ErrorUnsupportedConnectivityType, "FC"),
+			expErr: fmt.Errorf(ErrorUnsupportedConnectivityType, "FC"),
 		},
 		{
 			name: "one FC port",
@@ -188,7 +187,7 @@ func TestParseFCPortsName(t *testing.T) {
 			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
 			devicePath := "/sys/class/fc_host/host*/port_name"
 			fake_executer.EXPECT().FilepathGlob(devicePath).Return(fpaths, tc.err)
-			nodeUtils := driver.NewNodeUtils(fake_executer)
+			nodeUtils := NewNodeUtils(fake_executer)
 
 			fcs, err := nodeUtils.ParseFCPorts()
 

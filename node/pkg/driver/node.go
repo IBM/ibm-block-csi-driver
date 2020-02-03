@@ -56,8 +56,6 @@ var (
 	}
 
 	IscsiFullPath = "/host/etc/iscsi/initiatorname.iscsi"
-
-	errorNoList = [...]int{53, 54, 59, 64, 65, 66, 67, 1219, 1326}
 )
 
 const (
@@ -74,7 +72,7 @@ type NodeMounter interface {
 
 // nodeService represents the node service of CSI driver
 type NodeService struct {
-	Mounter                     NodeMounter
+	mounter                     NodeMounter
 	ConfigYaml                  ConfigFile
 	Hostname                    string
 	NodeUtils                   NodeUtilsInterface
@@ -92,7 +90,7 @@ func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsI
 		NodeUtils:                   nodeUtils,
 		executer:                    executer,
 		OsDeviceConnectivityMapping: OsDeviceConnectivityMapping,
-		Mounter:                     mounter,
+		mounter:                     mounter,
 		VolumeIdLocksMap:            syncLock,
 	}
 }
@@ -370,10 +368,10 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		logger.Debugf("Volume will be formatted to FS type : {%v}", fsType)
 		if !isTargetFileExists {
 			logger.Debugf("Target path directory does not exist. creating : {%v}", targetPath)
-			d.Mounter.MakeDir(targetPathWithHostPrefix)
+			d.mounter.MakeDir(targetPathWithHostPrefix)
 		}
 		logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
-		err = d.Mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
+		err = d.mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 	} else {
 		logger.Debugf("Raw block volume will be created")
 
@@ -381,14 +379,14 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
 		if !d.NodeUtils.IsFileExists(targetPathParentDirWithHostPrefix) {
 			logger.Debugf("Target path parent directory does not exist. creating : {%v}", targetPath)
-			err = d.Mounter.MakeDir(targetPathParentDirWithHostPrefix)
+			err = d.mounter.MakeDir(targetPathParentDirWithHostPrefix)
 		}
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Could not create directory %q: %v", targetPath, err)
 		}
 		if !isTargetFileExists {
 			logger.Debugf("Target path file does not exist. creating : {%v}", targetPath)
-			err = d.Mounter.MakeFile(targetPathWithHostPrefix)
+			err = d.mounter.MakeFile(targetPathWithHostPrefix)
 		}
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Could not create file %q: %v", targetPath, err)
@@ -397,7 +395,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		// Mount
 		options := []string{"bind"}
 		logger.Debugf("Mount the device to raw block volume. Target : {%s}, device : {%s}", targetPath, mpathDevice)
-		err = d.Mounter.Mount(mpathDevice, targetPath, "", options)
+		err = d.mounter.Mount(mpathDevice, targetPath, "", options)
 	}
 
 	if err != nil {
@@ -414,7 +412,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 func (d *NodeService) isTargetMounted(target string, isFSVolume bool) (bool, error) {
 	logger.Debugf("Check if targetPath {%s} exist in mount list", target)
 	targetPathWithHostPrefix := GetPodFilePath(target)
-	mountList, err := d.Mounter.List()
+	mountList, err := d.mounter.List()
 	if err != nil {
 		return false, err
 	}
@@ -494,7 +492,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 
 	// Numount and delete mount point file/folder
 	logger.Debugf("NodeUnpublishVolume: Unmounting %s", target)
-	err = d.Mounter.Unmount(target)
+	err = d.mounter.Unmount(target)
 	if err != nil {
 		logger.Errorf("Unmount failed. Target : %s, err : %v", target, err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
