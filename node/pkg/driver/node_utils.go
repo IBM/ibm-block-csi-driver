@@ -262,7 +262,7 @@ func (n NodeUtils) IsDirectory(path string) bool {
 	return targetFile.Mode().IsDir()
 }
 
-// Xeletes file or directory with all subdirectory and files
+// Deletes file or directory with all subdirectory and files
 func (n NodeUtils) RemoveFileOrDirectory(path string) error {
 	return os.RemoveAll(path)
 }

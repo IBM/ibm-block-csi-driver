@@ -365,12 +365,12 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		if fsType == "" {
 			fsType = defaultFSType
 		}
-		logger.Debugf("Volume will be formatted to FS type : {%v}", fsType)
+		logger.Debugf("Volume will be have FS type : {%v}", fsType)
 		if !isTargetFileExists {
 			logger.Debugf("Target path directory does not exist. Creating : {%v}", targetPathWithHostPrefix)
 			d.Mounter.MakeDir(targetPathWithHostPrefix)
 		}
-		logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if mount succeeds and not read-only)", fsType)
+		logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
 		err = d.Mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 	} else {
 		logger.Debugf("Raw block volume will be created")
