@@ -385,7 +385,7 @@ func (d *NodeService) mountFileSystemVolume(mpathDevice string, targetPath strin
 		logger.Debugf("Target path directory does not exist. Creating : {%v}", targetPathWithHostPrefix)
 		err := d.Mounter.MakeDir(targetPathWithHostPrefix)
 		if err != nil {
-			return status.Errorf(codes.Internal, "Could not create file %q: %v", targetPathWithHostPrefix, err)
+			return status.Errorf(codes.Internal, "Could not create directory %q: %v", targetPathWithHostPrefix, err)
 		}
 	}
 	logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
