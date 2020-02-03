@@ -262,13 +262,13 @@ func (n NodeUtils) IsDirectory(path string) bool {
 	return targetFile.Mode().IsDir()
 }
 
-// Deletes file or directory with all subdirectory and files
+// Deletes file or directory with all sub-directories and files
 func (n NodeUtils) RemoveFileOrDirectory(path string) error {
 	return os.RemoveAll(path)
 }
 
 // path: file/dir path
 // return: path to the file/dir if accessed from pod
-func GetPodPath(filepath string) string {
-	return path.Join(PrefixChrootOfHostRoot, filepath)
+func GetPodPath(path string) string {
+	return path.Join(PrefixChrootOfHostRoot, path)
 }

@@ -379,7 +379,7 @@ func (d *NodeService) mountFileSystemVolume(mpathDevice string, targetPath strin
 	if fsType == "" {
 		fsType = defaultFSType
 	}
-	logger.Debugf("Volume will be have FS type : {%v}", fsType)
+	logger.Debugf("Volume will have FS type : {%v}", fsType)
 	targetPathWithHostPrefix := GetPodPath(targetPath)
 	if !isTargetPathExists {
 		logger.Debugf("Target path directory does not exist. Creating : {%v}", targetPathWithHostPrefix)
@@ -511,7 +511,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	}
 	logger.Debugf("Unmount finished. Target : {%s}", target)
 	if err = d.NodeUtils.RemoveFileOrDirectory(targetPathWithHostPrefix); err != nil {
-		logger.Errorf("Failed to remove mount path filoe/directory. Target %s: %v", targetPathWithHostPrefix, err)
+		logger.Errorf("Failed to remove mount path file/directory. Target %s: %v", targetPathWithHostPrefix, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	logger.Debugf("Mount point deleted. Target : %s", targetPathWithHostPrefix)
