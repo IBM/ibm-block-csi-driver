@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package driver
+package driver_test
 
 import (
 	"context"
@@ -29,6 +29,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/mock/gomock"
 	"github.com/ibm/ibm-block-csi-driver/node/mocks"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -38,13 +39,13 @@ const (
 	PublishContextParamConnectivity string = "PUBLISH_CONTEXT_CONNECTIVITY"
 )
 
-func newTestNodeService(nodeUtils NodeUtilsInterface, nodeMounter NodeMounter) NodeService {
-	return NodeService{
+func newTestNodeService(nodeUtils driver.NodeUtilsInterface, nodeMounter driver.NodeMounter) driver.NodeService {
+	return driver.NodeService{
 		Hostname:   "test-host",
-		ConfigYaml: ConfigFile{},
-		VolumeIdLocksMap: NewSyncLock(),
+		ConfigYaml: driver.ConfigFile{},
+		VolumeIdLocksMap: driver.NewSyncLock(),
 		NodeUtils:  nodeUtils,
-		mounter: nodeMounter,
+		Mounter: nodeMounter,
 	}
 }
 
@@ -130,9 +131,9 @@ func TestNodeStageVolume(t *testing.T) {
 func TestNodePublishVolume(t *testing.T) {
 	fsTypeXfs := "ext4"
 	targetPath := "/test/path"
-	targetPathWithHostPrefix := GetPodFilePath(targetPath)
+	targetPathWithHostPrefix := driver.GetPodFilePath(targetPath)
 	targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
-	stagingTargetPath := path.Join("/test/staging", StageInfoFilename)
+	stagingTargetPath := path.Join("/test/staging", driver.StageInfoFilename)
 	stagingTargetFile := path.Join(stagingTargetPath, ".stageInfo.json")
 	deviceName := "fakedev"
 	stagingInfo := map[string]string{"mpathDevice": deviceName}
@@ -401,7 +402,7 @@ func TestNodePublishVolume(t *testing.T) {
 
 func TestNodeUnpublishVolume(t *testing.T) {
 	targetPath := "/test/path"
-	targetPathWithHostPrefix := GetPodFilePath(targetPath)
+	targetPathWithHostPrefix := driver.GetPodFilePath(targetPath)
 
 	testCases := []struct {
 		name     string
@@ -600,12 +601,12 @@ func TestNodeGetInfo(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fake_nodeutils := mocks.NewMockNodeUtilsInterface(mockCtrl)
-			fake_nodeutils.EXPECT().IsFileExists(FCPath).Return(tc.fcExists)
+			fake_nodeutils.EXPECT().IsFileExists(driver.FCPath).Return(tc.fcExists)
 			if tc.fcExists {
 				fake_nodeutils.EXPECT().ParseFCPorts().Return(tc.return_fcs, tc.return_fc_err)
 			}
 			if tc.return_fc_err == nil {
-				fake_nodeutils.EXPECT().IsFileExists(IscsiFullPath).Return(tc.iscsiExists)
+				fake_nodeutils.EXPECT().IsFileExists(driver.IscsiFullPath).Return(tc.iscsiExists)
 				if tc.iscsiExists {
 					fake_nodeutils.EXPECT().ParseIscsiInitiators().Return(tc.return_iqn, tc.return_iqn_err)
 				}

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package driver
+package driver_test
 
 import (
 	"fmt"
@@ -25,12 +25,13 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	"errors"
 	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
+	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"reflect"
 )
 
 var (
-	nodeUtils = NewNodeUtils(&executer.Executer{})
+	nodeUtils = driver.NewNodeUtils(&executer.Executer{})
 )
 
 func TestParseIscsiInitiators(t *testing.T) {
@@ -43,7 +44,7 @@ func TestParseIscsiInitiators(t *testing.T) {
 		{
 			name:         "wrong iqn file",
 			file_content: "wrong-content",
-			expErr:       fmt.Errorf(ErrorWhileTryingToReadIQN, "wrong-content"),
+			expErr:       fmt.Errorf(driver.ErrorWhileTryingToReadIQN, "wrong-content"),
 		},
 		{
 			name:   "non existing file",
@@ -70,7 +71,7 @@ func TestParseIscsiInitiators(t *testing.T) {
 
 				defer func(){
 					os.Remove(tmpFile.Name())
-					IscsiFullPath = "/host/etc/iscsi/initiatorname.iscsi"
+					driver.IscsiFullPath = "/host/etc/iscsi/initiatorname.iscsi"
 				}()
 
 				fmt.Println("Created File: " + tmpFile.Name())
@@ -88,7 +89,7 @@ func TestParseIscsiInitiators(t *testing.T) {
 				filePath = "/non/existent/path"
 			}
 
-			IscsiFullPath = filePath
+			driver.IscsiFullPath = filePath
 			isci, err := nodeUtils.ParseIscsiInitiators()
 
 			if tc.expErr != nil {
@@ -122,11 +123,11 @@ func TestParseFCPortsName(t *testing.T) {
 		{
 			name: "fc port file with wrong content",
 			file_contents: []string{"wrong content"},
-			expErr: fmt.Errorf(ErrorWhileTryingToReadFC, "wrong content"),
+			expErr: fmt.Errorf(driver.ErrorWhileTryingToReadFC, "wrong content"),
 		},
 		{
 			name: "fc unsupported",
-			expErr: fmt.Errorf(ErrorUnsupportedConnectivityType, "FC"),
+			expErr: fmt.Errorf(driver.ErrorUnsupportedConnectivityType, "FC"),
 		},
 		{
 			name: "one FC port",
@@ -187,7 +188,7 @@ func TestParseFCPortsName(t *testing.T) {
 			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
 			devicePath := "/sys/class/fc_host/host*/port_name"
 			fake_executer.EXPECT().FilepathGlob(devicePath).Return(fpaths, tc.err)
-			nodeUtils := NewNodeUtils(fake_executer)
+			nodeUtils := driver.NewNodeUtils(fake_executer)
 
 			fcs, err := nodeUtils.ParseFCPorts()
 
