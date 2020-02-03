@@ -259,7 +259,7 @@ func TestNodePublishVolume(t *testing.T) {
 				driver := newTestNodeService(mockNodeUtils, mockMounter)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
-				mockNodeUtils.EXPECT().IsFileExists(targetPathWithHostPrefix).Return(true)
+				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(true)
 				mockMounter.EXPECT().List().Return(positiveMountPoint, nil)
 				mockNodeUtils.EXPECT().IsDirectory(targetPathWithHostPrefix).Return(false)
 
@@ -285,7 +285,7 @@ func TestNodePublishVolume(t *testing.T) {
 				driver := newTestNodeService(mockNodeUtils, mockMounter)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
-				mockNodeUtils.EXPECT().IsFileExists(targetPathWithHostPrefix).Return(false)
+				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(false)
 				mockMounter.EXPECT().MakeDir(targetPathWithHostPrefix).Return(nil)
 				mockMounter.EXPECT().FormatAndMount(mpathDevice, targetPath, fsTypeXfs, nil)
 
@@ -313,7 +313,7 @@ func TestNodePublishVolume(t *testing.T) {
 				driver := newTestNodeService(mockNodeUtils, mockMounter)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
-				mockNodeUtils.EXPECT().IsFileExists(targetPathWithHostPrefix).Return(true)
+				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(true)
 				mockMounter.EXPECT().List().Return(positiveMountPoint, nil)
 				mockNodeUtils.EXPECT().IsDirectory(targetPathWithHostPrefix).Return(true)
 
@@ -342,8 +342,8 @@ func TestNodePublishVolume(t *testing.T) {
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
 				gomock.InOrder(
-					mockNodeUtils.EXPECT().IsFileExists(targetPathWithHostPrefix).Return(false),
-					mockNodeUtils.EXPECT().IsFileExists(targetPathParentDirWithHostPrefix).Return(false),
+					mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(false),
+					mockNodeUtils.EXPECT().IsPathExists(targetPathParentDirWithHostPrefix).Return(false),
 				)
 				mockMounter.EXPECT().MakeDir(targetPathParentDirWithHostPrefix).Return(nil)
 				mockMounter.EXPECT().MakeFile(gomock.Eq(targetPathWithHostPrefix)).Return(nil)
@@ -374,8 +374,8 @@ func TestNodePublishVolume(t *testing.T) {
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
 				gomock.InOrder(
-					mockNodeUtils.EXPECT().IsFileExists(targetPathWithHostPrefix).Return(true),
-					mockNodeUtils.EXPECT().IsFileExists(targetPathParentDirWithHostPrefix).Return(true),
+					mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(true),
+					mockNodeUtils.EXPECT().IsPathExists(targetPathParentDirWithHostPrefix).Return(true),
 				)
 				mockMounter.EXPECT().List().Return(negativeMountPoint, nil)
 				mockMounter.EXPECT().Mount(mpathDevice, targetPath, "", []string{"bind"})
@@ -445,7 +445,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 					TargetPath: targetPath,
 					VolumeId:   "vol-test",
 				}
-				mockNodeUtils.EXPECT().IsFileExists(targetPathWithHostPrefix).Return(true)
+				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(true)
 				mockMounter.EXPECT().Unmount(targetPath).Return(nil)
 				mockNodeUtils.EXPECT().RemoveFileOrDirectory(targetPathWithHostPrefix)
 				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
@@ -467,7 +467,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 					TargetPath: targetPath,
 					VolumeId:   "vol-test",
 				}
-				mockNodeUtils.EXPECT().IsFileExists(targetPathWithHostPrefix).Return(false)
+				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(false)
 				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
@@ -601,12 +601,12 @@ func TestNodeGetInfo(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fake_nodeutils := mocks.NewMockNodeUtilsInterface(mockCtrl)
-			fake_nodeutils.EXPECT().IsFileExists(driver.FCPath).Return(tc.fcExists)
+			fake_nodeutils.EXPECT().IsPathExists(driver.FCPath).Return(tc.fcExists)
 			if tc.fcExists {
 				fake_nodeutils.EXPECT().ParseFCPorts().Return(tc.return_fcs, tc.return_fc_err)
 			}
 			if tc.return_fc_err == nil {
-				fake_nodeutils.EXPECT().IsFileExists(driver.IscsiFullPath).Return(tc.iscsiExists)
+				fake_nodeutils.EXPECT().IsPathExists(driver.IscsiFullPath).Return(tc.iscsiExists)
 				if tc.iscsiExists {
 					fake_nodeutils.EXPECT().ParseIscsiInitiators().Return(tc.return_iqn, tc.return_iqn_err)
 				}
