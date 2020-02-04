@@ -46,6 +46,8 @@ class TestUtils(unittest.TestCase):
         caps.mount.fs_type = "ext4"
         access_types = csi_pb2.VolumeCapability.AccessMode
         caps.access_mode.mode = access_types.SINGLE_NODE_WRITER
+        caps.FieldExists.return_value = True
+        caps.FieldExists.assert_called_with('mount')
 
         utils.validate_csi_volume_capabilties([caps])
 
