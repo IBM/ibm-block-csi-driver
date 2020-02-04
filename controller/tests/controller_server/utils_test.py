@@ -47,7 +47,6 @@ class TestUtils(unittest.TestCase):
         access_types = csi_pb2.VolumeCapability.AccessMode
         caps.access_mode.mode = access_types.SINGLE_NODE_WRITER
         caps.HasField.return_value = True
-        caps.HasField.assert_called_with('mount')
 
         utils.validate_csi_volume_capabilties([caps])
 
