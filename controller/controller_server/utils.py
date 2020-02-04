@@ -38,7 +38,7 @@ def validate_secret(secret):
 
 
 def validate_csi_volume_capability(cap):
-    logger.debug("validating csi volume capability : {0}".format(cap))
+    logger.debug("+++++++++++++++ validating csi volume capability : {0}".format(cap))
     # TODO
     logger.debug("validating csi volume capability DICT : {0}".format(cap.__dict__))
     logger.debug("validating csi volume capability MOUNT : {0}".format(cap.mount))
