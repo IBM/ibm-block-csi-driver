@@ -50,7 +50,9 @@ def validate_csi_volume_capability(cap):
     logger.debug("+++++++++++ MOUNT VAR TYPE {0}".format(type(cap.mount)))
     logger.debug("+++++++++++ MOUNT VAR DIR {0}".format(dir(cap.mount)))
     # logger.debug("+++++++++++ MOUNT VAR IsInitialized {0}".format(cap.mount.IsInitialized()))
-    logger.debug("+++++++++++ MOUNT VAR WhichOneOf {0}".format(cap.WhichOneOf('access_type')))
+    logger.debug("+++++++++++ MOUNT HAS FIELD MOUNT {0}".format(cap.HasField('mount')))
+    logger.debug("+++++++++++ MOUNT HAS FIELD BLOCK {0}".format(cap.HasField('block')))
+    # logger.debug("+++++++++++ MOUNT VAR WhichOneOf {0}".format(cap.WhichOneOf('access_type')))
 
     logger.debug("validating csi volume capability BLOCK+")
     logger.debug("validating csi volume capability BLOCK : 1{0}1".format(cap.block))
