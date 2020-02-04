@@ -38,42 +38,12 @@ def validate_secret(secret):
 
 
 def validate_csi_volume_capability(cap):
-    logger.debug("+++++++++++++++ validating csi volume capability : {0}".format(cap))
-    # TODO
-    logger.debug("validating csi volume capability MOUNT+")
-    logger.debug("validating csi volume capability MOUNT : 1{0}1".format(cap.mount))
-    # logger.debug("validating csi volume capability DICT+")
-    # logger.debug("validating csi volume capability DICT : {0}".format(cap.__dict__))
-    logger.debug("validating csi volume capability ACCESS MODE")
-    logger.debug("+++++++++++ access mode {0}".format(cap.access_mode))
-    logger.debug("validating csi volume capability MOUNT VAR TYPE")
-    logger.debug("+++++++++++ MOUNT VAR TYPE {0}".format(type(cap.mount)))
-    logger.debug("+++++++++++ MOUNT VAR DIR {0}".format(dir(cap.mount)))
-    # logger.debug("+++++++++++ MOUNT VAR IsInitialized {0}".format(cap.mount.IsInitialized()))
-    logger.debug("+++++++++++ MOUNT HAS FIELD MOUNT {0}".format(cap.HasField('mount')))
-    logger.debug("+++++++++++ MOUNT HAS FIELD BLOCK {0}".format(cap.HasField('block')))
-    # logger.debug("+++++++++++ MOUNT VAR WhichOneOf {0}".format(cap.WhichOneOf('access_type')))
-
-    logger.debug("validating csi volume capability BLOCK+")
-    logger.debug("validating csi volume capability BLOCK : 1{0}1".format(cap.block))
-    logger.debug("validating csi volume capability BLOCK VAR TYPE")
-    logger.debug("+++++++++++ BLOCK VAR TYPE {0}".format(type(cap.block)))
-    logger.debug("+++++++++++ BLOCK VAR TYPE {0}".format(dir(cap.block)))
-
-    # logger.debug("validating csi volume capability ACCESS TYPE")
-    # logger.debug("+++++++++++ access type {0}".format(cap.access_type))
-    logger.debug("validating csi volume capability AFTER")
+    logger.debug("validating csi volume capability : {0}".format(cap))
     if cap.mount:
-        # TODO
-        logger.debug("validating csi volume capability ++++++++++++  mount")
-        logger.debug("validating csi volume capability FS-TYPE : {0}".format(cap.mount.fs_type))
         if cap.mount.fs_type and (cap.mount.fs_type not in config.SUPPORTED_FS_TYPES):
-            logger.debug("validating csi volume capability ++++++++++++ ERROR no fs")
             raise ValidationException(messages.unsupported_fs_type_message.format(cap.mount.fs_type))
 
     else:
-        # TODO
-        logger.debug("validating csi volume capability ++++++++++++ ERROR no mount")
         logger.error(messages.only_mount_supported_message)
         raise ValidationException(messages.only_mount_supported_message)
 

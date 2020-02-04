@@ -242,7 +242,6 @@ func (n NodeUtils) IsPathExists(path string) bool {
 	_, err := os.Stat(path)
 	if err != nil {
 		if !os.IsNotExist(err) {
-			return false
 			logger.Warningf("Check is file %s exists returned error %s", path, err.Error())
 		}
 		return false
