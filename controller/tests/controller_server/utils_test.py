@@ -46,6 +46,7 @@ class TestUtils(unittest.TestCase):
         caps.mount.fs_type = "ext4"
         access_types = csi_pb2.VolumeCapability.AccessMode
         caps.access_mode.mode = access_types.SINGLE_NODE_WRITER
+        caps.HasField.return_value = True
 
         utils.validate_csi_volume_capabilties([caps])
 
@@ -57,12 +58,6 @@ class TestUtils(unittest.TestCase):
             utils.validate_csi_volume_capabilties([caps])
 
         caps.mount.fs_type = "ext4"
-        caps.access_mode.mode = access_types.SINGLE_NODE_READER_ONLY
-        with self.assertRaises(ValidationException):
-            utils.validate_csi_volume_capabilties([caps])
-
-        caps = Mock()
-        caps.mount = None
         caps.access_mode.mode = access_types.SINGLE_NODE_READER_ONLY
         with self.assertRaises(ValidationException):
             utils.validate_csi_volume_capabilties([caps])

@@ -25,7 +25,6 @@ RUN go mod vendor
 RUN mkdir /results
 RUN go get github.com/securego/gosec/cmd/gosec
 
-VOLUME /results
 WORKDIR vendor
 
-ENTRYPOINT ["gosec", "-log", "/results/code_scan_node_dep.log", "-out", "/results/code_scan_node_dep", "-no-fail", "./..."]
+ENTRYPOINT ["/bin/sh", "-c", "/go/bin/gosec -fmt=json -no-fail ./... > /results/${TARGET_NAME}.json 2> /results/${TARGET_NAME}.log"]
