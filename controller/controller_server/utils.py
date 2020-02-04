@@ -3,7 +3,8 @@ import controller.controller_server.config as config
 from controller.csi_general import csi_pb2
 from controller.controller_server.errors import ValidationException
 import controller.controller_server.messages as messages
-from controller.controller_server.config import VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_MOUNT, VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_BLOCK
+from controller.controller_server.config import VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_MOUNT,\
+    VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_BLOCK
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.errors import HostNotFoundError, VolumeNotFoundError
 
