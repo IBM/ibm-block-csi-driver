@@ -62,12 +62,6 @@ class TestUtils(unittest.TestCase):
         with self.assertRaises(ValidationException):
             utils.validate_csi_volume_capabilties([caps])
 
-        caps = Mock()
-        caps.mount = None
-        caps.access_mode.mode = access_types.SINGLE_NODE_READER_ONLY
-        with self.assertRaises(ValidationException):
-            utils.validate_csi_volume_capabilties([caps])
-
     @patch('controller.controller_server.utils.validate_secret')
     @patch('controller.controller_server.utils.validate_csi_volume_capabilties')
     def test_validate_create_volume_request(self, valiate_capabilities, validate_secret):
