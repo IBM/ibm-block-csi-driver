@@ -45,6 +45,7 @@ def validate_csi_volume_capability(cap):
     # logger.debug("validating csi volume capability DICT+")
     # logger.debug("validating csi volume capability DICT : {0}".format(cap.__dict__))
     logger.debug("validating csi volume capability AFTER")
+    logger.debug("+++++++++++ access type {0}".format(cap.access_type))
     if cap.mount:
         # TODO
         logger.debug("validating csi volume capability ++++++++++++  mount")
