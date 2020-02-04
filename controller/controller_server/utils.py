@@ -41,17 +41,21 @@ def validate_csi_volume_capability(cap):
     logger.debug("+++++++++++++++ validating csi volume capability : {0}".format(cap))
     # TODO
     logger.debug("validating csi volume capability MOUNT+")
-    logger.debug("validating csi volume capability MOUNT : {0}".format(cap.mount))
-    logger.debug("validating csi volume capability DICT+")
-    logger.debug("validating csi volume capability DICT : {0}".format(cap.__dict__))
+    logger.debug("validating csi volume capability MOUNT : 1{0}1".format(cap.mount))
+    #logger.debug("validating csi volume capability DICT+")
+    #logger.debug("validating csi volume capability DICT : {0}".format(cap.__dict__))
     logger.debug("validating csi volume capability AFTER")
     if cap.mount:
         # TODO
+        logger.debug("validating csi volume capability ++++++++++++  mount")
         logger.debug("validating csi volume capability FS-TYPE : {0}".format(cap.mount.fs_type))
         if cap.mount.fs_type and (cap.mount.fs_type not in config.SUPPORTED_FS_TYPES):
+            logger.debug("validating csi volume capability ++++++++++++ ERROR no fs")
             raise ValidationException(messages.unsupported_fs_type_message.format(cap.mount.fs_type))
 
     else:
+        # TODO
+        logger.debug("validating csi volume capability ++++++++++++ ERROR no mount")
         logger.error(messages.only_mount_supported_message)
         raise ValidationException(messages.only_mount_supported_message)
 
