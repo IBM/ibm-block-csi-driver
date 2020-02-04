@@ -269,6 +269,6 @@ func (n NodeUtils) RemoveFileOrDirectory(path string) error {
 
 // path: file/dir path
 // return: path to the file/dir if accessed from pod
-func GetPodPath(path string) string {
-	return path.Join(PrefixChrootOfHostRoot, path)
+func GetPodPath(filepath string) string {
+	return path.Join(PrefixChrootOfHostRoot, filepath)
 }
