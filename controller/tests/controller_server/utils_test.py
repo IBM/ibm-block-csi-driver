@@ -40,7 +40,7 @@ class TestUtils(unittest.TestCase):
         with self.assertRaises(ValidationException):
             utils.validate_secret(secrets)
 
-    def test_validate_volume_capabilities(self):
+    def test_validate_file_system_volume_capabilities(self):
         caps = Mock()
         caps.mount = Mock()
         caps.mount.fs_type = "ext4"
@@ -61,6 +61,16 @@ class TestUtils(unittest.TestCase):
         caps.access_mode.mode = access_types.SINGLE_NODE_READER_ONLY
         with self.assertRaises(ValidationException):
             utils.validate_csi_volume_capabilties([caps])
+
+    def test_validate_raw_block_volume_capabilities(self):
+        caps = Mock()
+        caps.block = Mock()
+        access_types = csi_pb2.VolumeCapability.AccessMode
+        caps.access_mode.mode = access_types.SINGLE_NODE_WRITER
+        # First call of HasField returns True and second - False
+        caps.HasField.side_effect = [False, True]
+
+        utils.validate_csi_volume_capabilties([caps])
 
     @patch('controller.controller_server.utils.validate_secret')
     @patch('controller.controller_server.utils.validate_csi_volume_capabilties')
