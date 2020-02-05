@@ -8,11 +8,11 @@ spec:
     image: registry.access.redhat.com/ubi8/ubi:latest
     command: [ "/bin/sh", "-c", "--" ]
     args: [ "while true; do date; sleep 5; date >&2; sleep 5; done;" ]
-    volumeMounts:
-       - name: sanity-pvc
-         mountPath: "/data"
+    volumeDevices:
+       - name: sanity-volume
+         mountPath: "/dev"
   volumes:
-  - name: sanity-pvc
+  - name: sanity-volume
     persistentVolumeClaim:
-      claimName: sanity-pvc
+      claimName: sanity-pvc-row-block
   
