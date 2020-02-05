@@ -53,7 +53,7 @@ class TestUtils(unittest.TestCase):
         with self.assertRaises(ValidationException):
             utils.validate_csi_volume_capabilties([])
 
-        caps.mount.fs_type = "ext41"
+        caps.mount.fs_type = "ext4dummy"
         with self.assertRaises(ValidationException):
             utils.validate_csi_volume_capabilties([caps])
 
