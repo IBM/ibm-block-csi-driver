@@ -41,26 +41,26 @@ class TestUtils(unittest.TestCase):
             utils.validate_secret(secrets)
 
     def test_validate_volume_capabilities(self):
-        caps = Mock()
-        caps.mount = Mock()
-        caps.mount.fs_type = "ext4"
+        cap = Mock()
+        cap.mount = Mock()
+        cap.mount.fs_type = "ext4"
         access_types = csi_pb2.VolumeCapability.AccessMode
-        caps.access_mode.mode = access_types.SINGLE_NODE_WRITER
-        caps.HasField.return_value = True
+        cap.access_mode.mode = access_types.SINGLE_NODE_WRITER
+        cap.HasField.return_value = True
 
-        utils.validate_csi_volume_capabilties([caps])
+        utils.validate_csi_volume_capabilties([cap])
 
         with self.assertRaises(ValidationException):
             utils.validate_csi_volume_capabilties([])
 
-        caps.mount.fs_type = "ext41"
+        cap.mount.fs_type = "ext41"
         with self.assertRaises(ValidationException):
-            utils.validate_csi_volume_capabilties([caps])
+            utils.validate_csi_volume_capabilties([cap])
 
-        caps.mount.fs_type = "ext4"
-        caps.access_mode.mode = access_types.SINGLE_NODE_READER_ONLY
+        cap.mount.fs_type = "ext4"
+        cap.access_mode.mode = access_types.SINGLE_NODE_READER_ONLY
         with self.assertRaises(ValidationException):
-            utils.validate_csi_volume_capabilties([caps])
+            utils.validate_csi_volume_capabilties([cap])
 
     @patch('controller.controller_server.utils.validate_secret')
     @patch('controller.controller_server.utils.validate_csi_volume_capabilties')
