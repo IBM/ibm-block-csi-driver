@@ -210,6 +210,14 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{"Volume capability AccessMode not supported"}
 	}
 
+	// If the access type is not mount and not block, should never happen
+	switch volCap.GetAccessType().(type) {
+	case *csi.VolumeCapability_Mount:
+	case *csi.VolumeCapability_Block:
+	default:
+		return &RequestValidationError{"Volume Access Type is not supported"}
+	}
+
 	connectivityType, lun, arrayInitiators, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
 	if err != nil {
 		return &RequestValidationError{fmt.Sprintf("Fail to parse PublishContext %v with err = %v", req.PublishContext, err)}
@@ -467,6 +475,14 @@ func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVol
 
 	if !isValidVolumeCapabilitiesAccessMode([]*csi.VolumeCapability{volCap}) {
 		return &RequestValidationError{"Volume capability AccessMode not supported"}
+	}
+
+	// If the access type is not mount and not block, should never happen
+	switch volCap.GetAccessType().(type) {
+	case *csi.VolumeCapability_Mount:
+	case *csi.VolumeCapability_Block:
+	default:
+		return &RequestValidationError{"Volume Access Type is not supported"}
 	}
 
 	return nil
