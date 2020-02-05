@@ -266,8 +266,8 @@ func (n NodeUtils) RemoveFileOrDirectory(path string) error {
 	return os.RemoveAll(path)
 }
 
-// path: file/dir path
-// return: path to the file/dir when accessed from pod
+// To some files/dirs pod cannot access using its real path. It has to use a different path which is <prefix>/<path>.
+// E.g. in order to access /etc/test.txt pod has to use /host/etc/test.txt
 func GetPodPath(filepath string) string {
 	return path.Join(PrefixChrootOfHostRoot, filepath)
 }
