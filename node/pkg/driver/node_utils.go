@@ -118,7 +118,7 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, c
 func (n NodeUtils) WriteStageInfoToFile(fPath string, info map[string]string) error {
 	// writes to stageTargetPath/filename
 
-	fPath = GetPodPath(fPath)
+	fPath = n.GetPodPath(fPath)
 	stagePath := filepath.Dir(fPath)
 	if _, err := os.Stat(stagePath); os.IsNotExist(err) {
         logger.Debugf("The filePath [%s] is not existed. Create it.", stagePath)
@@ -145,7 +145,7 @@ func (n NodeUtils) WriteStageInfoToFile(fPath string, info map[string]string) er
 
 func (n NodeUtils) ReadFromStagingInfoFile(filePath string) (map[string]string, error) {
 	// reads from stageTargetPath/filename
-	filePath = GetPodPath(filePath)
+	filePath = n.GetPodPath(filePath)
 
 	logger.Debugf("Read StagingInfoFile : path {%v},", filePath)
 	stageInfo, err := ioutil.ReadFile(filePath)
@@ -166,7 +166,7 @@ func (n NodeUtils) ReadFromStagingInfoFile(filePath string) (map[string]string, 
 }
 
 func (n NodeUtils) ClearStageInfoFile(filePath string) error {
-	filePath = GetPodPath(filePath)
+	filePath = n.GetPodPath(filePath)
 	logger.Debugf("Delete StagingInfoFile : path {%v},", filePath)
 
 	return os.Remove(filePath)
