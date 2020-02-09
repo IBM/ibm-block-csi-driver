@@ -31,7 +31,7 @@ import (
 )
 
 var (
-	nodeUtils = driver.NewNodeUtils(&executer.Executer{})
+	nodeUtils = driver.NewNodeUtils(&executer.Executer{}, nil)
 )
 
 func TestParseIscsiInitiators(t *testing.T) {

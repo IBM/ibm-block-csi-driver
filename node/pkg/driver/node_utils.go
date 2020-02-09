@@ -29,6 +29,7 @@ import (
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"k8s.io/kubernetes/pkg/util/mount"
 )
 
 const (
@@ -53,14 +54,20 @@ type NodeUtilsInterface interface {
 	IsPathExists(filePath string) bool
 	IsDirectory(filePath string) bool
 	RemoveFileOrDirectory(filePath string) error
+	GetPodPath(filepath string) string
+	IsNotMountPoint(file string) (bool, error)
 }
 
 type NodeUtils struct {
 	Executer executer.ExecuterInterface
+	mounter mount.Interface
 }
 
-func NewNodeUtils(executer executer.ExecuterInterface) *NodeUtils {
-	return &NodeUtils{Executer: executer}
+func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface) *NodeUtils {
+	return &NodeUtils{
+		Executer: executer,
+		mounter: mounter,
+	}
 }
 
 func (n NodeUtils) ParseIscsiInitiators() (string, error) {
@@ -268,6 +275,10 @@ func (n NodeUtils) RemoveFileOrDirectory(path string) error {
 
 // To some files/dirs pod cannot access using its real path. It has to use a different path which is <prefix>/<path>.
 // E.g. in order to access /etc/test.txt pod has to use /host/etc/test.txt
-func GetPodPath(filepath string) string {
+func (n NodeUtils) GetPodPath(filepath string) string {
 	return path.Join(PrefixChrootOfHostRoot, filepath)
+}
+
+func (n NodeUtils) IsNotMountPoint(file string) (bool, error) {
+	return mount.IsNotMountPoint(n.mounter, file)
 }

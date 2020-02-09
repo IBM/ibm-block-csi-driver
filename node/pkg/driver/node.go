@@ -335,7 +335,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	// checking if the node staging path was mpounted into
 	stagingPath := req.GetStagingTargetPath()
 	targetPath := req.GetTargetPath()
-	targetPathWithHostPrefix := GetPodPath(targetPath)
+	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
 
 	logger.Debugf("stagingPath : {%v}, targetPath : {%v}", stagingPath, targetPath)
 
@@ -390,7 +390,7 @@ func (d *NodeService) mountFileSystemVolume(mpathDevice string, targetPath strin
 		fsType = defaultFSType
 	}
 	logger.Debugf("Volume will have FS type : {%v}", fsType)
-	targetPathWithHostPrefix := GetPodPath(targetPath)
+	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
 	if !isTargetPathExists {
 		logger.Debugf("Target path directory does not exist. Creating : {%v}", targetPathWithHostPrefix)
 		err := d.Mounter.MakeDir(targetPathWithHostPrefix)
@@ -404,7 +404,7 @@ func (d *NodeService) mountFileSystemVolume(mpathDevice string, targetPath strin
 
 func (d *NodeService) mountRawBlockVolume(mpathDevice string, targetPath string, isTargetPathExists bool) error {
 	logger.Debugf("Raw block volume will be created")
-	targetPathWithHostPrefix := GetPodPath(targetPath)
+	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
 	// Create mount file and its parent directory if they don't exist
 	targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
 	if !d.NodeUtils.IsPathExists(targetPathParentDirWithHostPrefix) {
@@ -433,7 +433,7 @@ func (d *NodeService) mountRawBlockVolume(mpathDevice string, targetPath string,
 // Returns: is target mounted, error if occured
 func (d *NodeService) isTargetMounted(target string, isFSVolume bool) (bool, error) {
 	logger.Debugf("Check if targetPath {%s} exist in mount list", target)
-	targetPathWithHostPrefix := GetPodPath(target)
+	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(target)
 	mountList, err := d.Mounter.List()
 	if err != nil {
 		return false, err
@@ -512,7 +512,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	if len(target) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path not provided")
 	}
-	targetPathWithHostPrefix := GetPodPath(target)
+	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(target)
 
 	logger.Debugf("Check if target file exists %s", targetPathWithHostPrefix)
 	if !d.NodeUtils.IsPathExists(targetPathWithHostPrefix) {
@@ -617,7 +617,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 // This method uses the List() of all mountpoints
 // It is more extensive than IsLikelyNotMountPoint
 // and it detects bind mounts in linux
-func IsNotMountPoint(mounter mount.Interface, file string) (bool, error) {
+func IsNotMountPoint1(mounter mount.Interface, file string) (bool, error) {
 	// IsLikelyNotMountPoint provides a quick check
 	// to determine whether file IS A mountpoint
 	logger.Errorf("++++++++++ IsLikelyNotMountPoint %s", file)
