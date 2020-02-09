@@ -660,6 +660,7 @@ func IsNotMountPoint(mounter mount.Interface, file string) (bool, error) {
 		return notMnt, mountPointsErr
 	}
 	for _, mp := range mountPoints {
+		logger.Errorf("++++++++++ IsLikelyNotMountPoint check mount %s", mp.Path)
 		if mounter.IsMountPointMatch(mp, resolvedFile) {
 			logger.Errorf("++++++++++ IsLikelyNotMountPoint found mount")
 			notMnt = false
