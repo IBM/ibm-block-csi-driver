@@ -433,7 +433,7 @@ func (d *NodeService) mountRawBlockVolume(mpathDevice string, targetPath string,
 // Returns: is target mounted, error if occured
 func (d *NodeService) isTargetMounted(target string, isFSVolume bool) (bool, error) {
 	logger.Debugf("Check if targetPath {%s} exist in mount list", target)
-	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(target)
+	targetPathWithHostPrefix := GetPodPath(target)
 	mountList, err := d.Mounter.List()
 	if err != nil {
 		return false, err
@@ -512,7 +512,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	if len(target) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path not provided")
 	}
-	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(target)
+	targetPathWithHostPrefix := GetPodPath(target)
 
 	logger.Debugf("Check if target file exists %s", targetPathWithHostPrefix)
 	if !d.NodeUtils.IsPathExists(targetPathWithHostPrefix) {
