@@ -26,7 +26,7 @@ import (
 )
 
 // default mount/unmount timeout interval, 30s
-var timeout time.Duration = 30 * time.Second
+var timeout time.Duration = 60 * time.Second
 
 // Mounter is a warpper of mount.Mounter which has the ability to cancel
 // a comand when timeout.
