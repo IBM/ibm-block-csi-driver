@@ -535,9 +535,9 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 		//TODO
-		logger.Debugf("Check if target %s is mounted 222 - after unmount", targetPathWithHostPrefix)
-		isNotMounted, err = mount.IsNotMountPoint(d.Mounter, targetPathWithHostPrefix)
-		logger.Errorf("Check is target mounted 222 - after unmount res. Target : %q, err : %v", targetPathWithHostPrefix, err.Error())
+		// logger.Debugf("Check if target %s is mounted 222 - after unmount", targetPathWithHostPrefix)
+		//isNotMounted, err = mount.IsNotMountPoint(d.Mounter, targetPathWithHostPrefix)
+		//logger.Errorf("Check is target mounted 222 - after unmount res. Target : %q, err : %v", targetPathWithHostPrefix, err.Error())
 		//ODOT
 	}
 	logger.Debugf("Unmount finished. Target : {%s}", target)
