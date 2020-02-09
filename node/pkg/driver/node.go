@@ -522,7 +522,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 
 	// Unmount and delete mount point file/folder
 	logger.Debugf("Check if target %s is mounted", targetPathWithHostPrefix)
-	isNotMounted, err := mount.IsNotMountPoint(d.Mounter, targetPathWithHostPrefix)
+	isNotMounted, err := IsNotMountPoint(d.Mounter, targetPathWithHostPrefix)
 	if err != nil {
 		logger.Errorf("Check is target mounted failed. Target : %q, err : %v", targetPathWithHostPrefix, err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
@@ -536,7 +536,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		}
 		//TODO
 		logger.Debugf("Check if target %s is mounted 222 - after unmount", targetPathWithHostPrefix)
-		isNotMounted, err = mount.IsNotMountPoint(d.Mounter, targetPathWithHostPrefix)
+		isNotMounted, err = IsNotMountPoint(d.Mounter, targetPathWithHostPrefix)
 		logger.Errorf("Check is target mounted 222 - after unmount res. Target : %q, err : %v", targetPathWithHostPrefix, err.Error())
 		//ODOT
 	}
@@ -612,50 +612,64 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 //}
 //
 //
-//// IsNotMountPoint determines if a directory is a mountpoint.
-//// It should return ErrNotExist when the directory does not exist.
-//// This method uses the List() of all mountpoints
-//// It is more extensive than IsLikelyNotMountPoint
-//// and it detects bind mounts in linux
-//func IsNotMountPoint(mounter mount.Interface, file string) (bool, error) {
-//	// IsLikelyNotMountPoint provides a quick check
-//	// to determine whether file IS A mountpoint
-//	notMnt, notMntErr := mounter.IsLikelyNotMountPoint(file)
-//	if notMntErr != nil && os.IsPermission(notMntErr) {
-//		// We were not allowed to do the simple stat() check, e.g. on NFS with
-//		// root_squash. Fall back to /proc/mounts check below.
-//		notMnt = true
-//		notMntErr = nil
-//	}
-//	if notMntErr != nil {
-//		return notMnt, notMntErr
-//	}
-//	// identified as mountpoint, so return this fact
-//	if notMnt == false {
-//		return notMnt, nil
-//	}
-//
-//	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts
-//	resolvedFile, err := mounter.EvalHostSymlinks(file)
-//	if err != nil {
-//		return true, err
-//	}
-//
-//	// check all mountpoints since IsLikelyNotMountPoint
-//	// is not reliable for some mountpoint types
-//	mountPoints, mountPointsErr := mounter.List()
-//	if mountPointsErr != nil {
-//		return notMnt, mountPointsErr
-//	}
-//	for _, mp := range mountPoints {
-//		if mounter.IsMountPointMatch(mp, resolvedFile) {
-//			notMnt = false
-//			break
-//		}
-//	}
-//	return notMnt, nil
-//}
-//
+// IsNotMountPoint determines if a directory is a mountpoint.
+// It should return ErrNotExist when the directory does not exist.
+// This method uses the List() of all mountpoints
+// It is more extensive than IsLikelyNotMountPoint
+// and it detects bind mounts in linux
+func IsNotMountPoint(mounter mount.Interface, file string) (bool, error) {
+	// IsLikelyNotMountPoint provides a quick check
+	// to determine whether file IS A mountpoint
+	logger.Errorf("++++++++++ IsLikelyNotMountPoint %s", file)
+	notMnt, notMntErr := mounter.IsLikelyNotMountPoint(file)
+	logger.Errorf("++++++++++ IsLikelyNotMountPoint notMnt: %s iserror %s", notMnt, notMntErr == nil)
+	if notMntErr != nil {
+		logger.Errorf("++++++++++ IsLikelyNotMountPoint notMntError %s", notMntErr.Error())
+	}
+	if notMntErr != nil && os.IsPermission(notMntErr) {
+		// We were not allowed to do the simple stat() check, e.g. on NFS with
+		// root_squash. Fall back to /proc/mounts check below.
+		notMnt = true
+		notMntErr = nil
+		logger.Errorf("++++++++++ IsLikelyNotMountPoint os.IsPermission")
+	}
+	if notMntErr != nil {
+		logger.Errorf("++++++++++ IsLikelyNotMountPoint RETURN isMnt: %s ERROR %s", notMnt, notMntErr.Error())
+		return notMnt, notMntErr
+	}
+	// identified as mountpoint, so return this fact
+	if notMnt == false {
+		logger.Errorf("++++++++++ IsLikelyNotMountPoint RETURN false, nil")
+		return notMnt, nil
+	}
+
+	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts
+	logger.Errorf("++++++++++ IsLikelyNotMountPoint EvalHostSymlinks file: %s", file)
+	resolvedFile, err := mounter.EvalHostSymlinks(file)
+	if err != nil {
+		logger.Errorf("++++++++++ IsLikelyNotMountPoint EvalHostSymlinks error: %s", err.Error())
+		return true, err
+	}
+	logger.Errorf("++++++++++ IsLikelyNotMountPoint EvalHostSymlinks resolved file: %s", resolvedFile)
+
+	// check all mountpoints since IsLikelyNotMountPoint
+	// is not reliable for some mountpoint types
+	mountPoints, mountPointsErr := mounter.List()
+	if mountPointsErr != nil {
+		logger.Errorf("++++++++++ IsLikelyNotMountPoint Mountp[ointerror: %s", mountPointsErr.Error())
+		return notMnt, mountPointsErr
+	}
+	for _, mp := range mountPoints {
+		if mounter.IsMountPointMatch(mp, resolvedFile) {
+			logger.Errorf("++++++++++ IsLikelyNotMountPoint found mount")
+			notMnt = false
+			break
+		}
+	}
+	logger.Errorf("++++++++++ IsLikelyNotMountPoint return not|Mnt %s, nil", notMnt)
+	return notMnt, nil
+}
+
 //// TODO: clean this up to use pkg/util/file/FileExists
 //// PathExists returns true if the specified path exists.
 //func PathExists(path string) (bool, error) {
