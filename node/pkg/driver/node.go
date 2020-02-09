@@ -335,7 +335,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	// checking if the node staging path was mpounted into
 	stagingPath := req.GetStagingTargetPath()
 	targetPath := req.GetTargetPath()
-	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
+	targetPathWithHostPrefix := GetPodPath(targetPath)
 
 	logger.Debugf("stagingPath : {%v}, targetPath : {%v}", stagingPath, targetPath)
 
@@ -390,7 +390,7 @@ func (d *NodeService) mountFileSystemVolume(mpathDevice string, targetPath strin
 		fsType = defaultFSType
 	}
 	logger.Debugf("Volume will have FS type : {%v}", fsType)
-	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
+	targetPathWithHostPrefix := GetPodPath(targetPath)
 	if !isTargetPathExists {
 		logger.Debugf("Target path directory does not exist. Creating : {%v}", targetPathWithHostPrefix)
 		err := d.Mounter.MakeDir(targetPathWithHostPrefix)
@@ -404,7 +404,7 @@ func (d *NodeService) mountFileSystemVolume(mpathDevice string, targetPath strin
 
 func (d *NodeService) mountRawBlockVolume(mpathDevice string, targetPath string, isTargetPathExists bool) error {
 	logger.Debugf("Raw block volume will be created")
-	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
+	targetPathWithHostPrefix := GetPodPath(targetPath)
 	// Create mount file and its parent directory if they don't exist
 	targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
 	if !d.NodeUtils.IsPathExists(targetPathParentDirWithHostPrefix) {
