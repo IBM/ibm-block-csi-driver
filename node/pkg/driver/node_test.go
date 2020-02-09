@@ -401,6 +401,7 @@ func TestNodePublishVolume(t *testing.T) {
 
 func TestNodeUnpublishVolume(t *testing.T) {
 	targetPath := "/test/path"
+	targetPathWithHostPrefix := driver.GetPodPath(targetPath)
 
 	testCases := []struct {
 		name     string
