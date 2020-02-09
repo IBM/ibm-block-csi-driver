@@ -31,6 +31,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+//	"syscall"
 )
 
 var (
@@ -56,6 +57,7 @@ var (
 	}
 
 	IscsiFullPath = "/host/etc/iscsi/initiatorname.iscsi"
+//	var errorNoList = [...]int{53, 54, 59, 64, 65, 66, 67, 1219, 1326}
 )
 
 const (
@@ -519,11 +521,19 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	}
 
 	// Unmount and delete mount point file/folder
-	logger.Debugf("NodeUnpublishVolume: Unmounting %s", target)
-	err = d.Mounter.Unmount(target)
+	logger.Debugf("Check if target %s is mounted", target)
+	isNotMounted, err := mount.IsNotMountPoint(d.Mounter, target)
 	if err != nil {
-		logger.Errorf("Unmount failed. Target : %q, err : %v", target, err.Error())
+		logger.Errorf("Check is target mounted failed. Target : %q, err : %v", target, err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if !isNotMounted {
+		logger.Debugf("Unmounting %s", target)
+		err = d.Mounter.Unmount(target)
+		if err != nil {
+			logger.Errorf("Unmount failed. Target : %q, err : %v", target, err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
 	}
 	logger.Debugf("Unmount finished. Target : {%s}", target)
 	if err = d.NodeUtils.RemoveFileOrDirectory(targetPathWithHostPrefix); err != nil {
@@ -535,6 +545,158 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 
 }
+
+//=========================================================================
+//func CleanupMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool) error {
+//	// mounter.ExistsPath cannot be used because for containerized kubelet, we need to check
+//	// the path in the kubelet container, not on the host.
+//	pathExists, pathErr := PathExists(mountPath)
+//	if !pathExists {
+//		logger.Warningf("Warning: Unmount skipped because path does not exist: %v", mountPath)
+//		return nil
+//	}
+//	corruptedMnt := IsCorruptedMnt(pathErr)
+//	if pathErr != nil && !corruptedMnt {
+//		return fmt.Errorf("Error checking path: %v", pathErr)
+//	}
+//	return doCleanupMountPoint(mountPath, mounter, extensiveMountPointCheck, corruptedMnt)
+//}
+//
+//// doCleanupMountPoint unmounts the given path and
+//// deletes the remaining directory if successful.
+//// if extensiveMountPointCheck is true
+//// IsNotMountPoint will be called instead of IsLikelyNotMountPoint.
+//// IsNotMountPoint is more expensive but properly handles bind mounts within the same fs.
+//// if corruptedMnt is true, it means that the mountPath is a corrupted mountpoint, and the mount point check
+//// will be skipped
+//func doCleanupMountPoint(mountPath string, mounter mount.Interface, extensiveMountPointCheck bool, corruptedMnt bool) error {
+//	if !corruptedMnt {
+//		var notMnt bool
+//		var err error
+//		if extensiveMountPointCheck {
+//			notMnt, err = IsNotMountPoint(mounter, mountPath)
+//		} else {
+//			notMnt, err = mounter.IsLikelyNotMountPoint(mountPath)
+//		}
+//
+//		if err != nil {
+//			return err
+//		}
+//
+//		if notMnt {
+//			logger.Warningf("Warning: %q is not a mountpoint, deleting", mountPath)
+//			return os.Remove(mountPath)
+//		}
+//	}
+//
+//	// Unmount the mount path
+//	logger.Infof("%q is a mountpoint, unmounting", mountPath)
+//	if err := mounter.Unmount(mountPath); err != nil {
+//		return err
+//	}
+//
+//	notMnt, mntErr := mounter.IsLikelyNotMountPoint(mountPath)
+//	if mntErr != nil {
+//		return mntErr
+//	}
+//	if notMnt {
+//		logger.Infof("%q is unmounted, deleting the directory", mountPath)
+//		return os.Remove(mountPath)
+//	}
+//	return fmt.Errorf("Failed to unmount path %v", mountPath)
+//}
+//
+//
+//// IsNotMountPoint determines if a directory is a mountpoint.
+//// It should return ErrNotExist when the directory does not exist.
+//// This method uses the List() of all mountpoints
+//// It is more extensive than IsLikelyNotMountPoint
+//// and it detects bind mounts in linux
+//func IsNotMountPoint(mounter mount.Interface, file string) (bool, error) {
+//	// IsLikelyNotMountPoint provides a quick check
+//	// to determine whether file IS A mountpoint
+//	notMnt, notMntErr := mounter.IsLikelyNotMountPoint(file)
+//	if notMntErr != nil && os.IsPermission(notMntErr) {
+//		// We were not allowed to do the simple stat() check, e.g. on NFS with
+//		// root_squash. Fall back to /proc/mounts check below.
+//		notMnt = true
+//		notMntErr = nil
+//	}
+//	if notMntErr != nil {
+//		return notMnt, notMntErr
+//	}
+//	// identified as mountpoint, so return this fact
+//	if notMnt == false {
+//		return notMnt, nil
+//	}
+//
+//	// Resolve any symlinks in file, kernel would do the same and use the resolved path in /proc/mounts
+//	resolvedFile, err := mounter.EvalHostSymlinks(file)
+//	if err != nil {
+//		return true, err
+//	}
+//
+//	// check all mountpoints since IsLikelyNotMountPoint
+//	// is not reliable for some mountpoint types
+//	mountPoints, mountPointsErr := mounter.List()
+//	if mountPointsErr != nil {
+//		return notMnt, mountPointsErr
+//	}
+//	for _, mp := range mountPoints {
+//		if mounter.IsMountPointMatch(mp, resolvedFile) {
+//			notMnt = false
+//			break
+//		}
+//	}
+//	return notMnt, nil
+//}
+//
+//// TODO: clean this up to use pkg/util/file/FileExists
+//// PathExists returns true if the specified path exists.
+//func PathExists(path string) (bool, error) {
+//	_, err := os.Stat(path)
+//	if err == nil {
+//		return true, nil
+//	} else if os.IsNotExist(err) {
+//		return false, nil
+//	} else if IsCorruptedMnt(err) {
+//		return true, err
+//	} else {
+//		return false, err
+//	}
+//}
+//
+//
+//// IsCorruptedMnt return true if err is about corrupted mount point
+//func IsCorruptedMnt(err error) bool {
+//	if err == nil {
+//		return false
+//	}
+//
+//	var underlyingError error
+//	switch pe := err.(type) {
+//	case nil:
+//		return false
+//	case *os.PathError:
+//		underlyingError = pe.Err
+//	case *os.LinkError:
+//		underlyingError = pe.Err
+//	case *os.SyscallError:
+//		underlyingError = pe.Err
+//	}
+//
+//	if ee, ok := underlyingError.(syscall.Errno); ok {
+//		for _, errno := range errorNoList {
+//			if int(ee) == errno {
+//				logger.Warningf("IsCorruptedMnt failed with error: %v, error code: %v", err, errno)
+//				return true
+//			}
+//		}
+//	}
+//
+//	return false
+//}
+//=========================================================================
 
 func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 	goid_info.SetAdditionalIDInfo(req.VolumeId)
