@@ -512,14 +512,14 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	}
 	targetPathWithHostPrefix := GetPodPath(target)
 
-	logger.Debugf("Check if target file exists %s", target)
+	logger.Debugf("Check if target file exists %s", targetPathWithHostPrefix)
 	if !d.NodeUtils.IsPathExists(targetPathWithHostPrefix) {
 		logger.Warningf("Idempotent case: target file %s doesn't exist", targetPathWithHostPrefix)
 		return &csi.NodeUnpublishVolumeResponse{}, nil
 	}
 
 	// Unmount and delete mount point file/folder
-	logger.Debugf("NodeUnpublishVolume: Unmounting %s", targetPathWithHostPrefix)
+	logger.Debugf("NodeUnpublishVolume: Unmounting %s", target)
 	err = d.Mounter.Unmount(target)
 	if err != nil {
 		logger.Errorf("Unmount failed. Target : %q, err : %v", target, err.Error())
