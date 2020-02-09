@@ -400,85 +400,85 @@ func TestNodePublishVolume(t *testing.T) {
 	}
 }
 
-func TestNodeUnpublishVolume(t *testing.T) {
-	targetPath := "/test/path"
-	targetPathWithHostPrefix := driver.GetPodPath(targetPath)
-
-	testCases := []struct {
-		name     string
-		testFunc func(t *testing.T)
-	}{
-		{
-			name: "fail no VolumeId",
-			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
-
-				req := &csi.NodeUnpublishVolumeRequest{
-					TargetPath: targetPath,
-				}
-				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
-				assertError(t, err, codes.InvalidArgument)
-			},
-		},
-		{
-			name: "fail no TargetPath",
-			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
-
-				req := &csi.NodeUnpublishVolumeRequest{
-					VolumeId: "vol-test",
-				}
-				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
-				assertError(t, err, codes.InvalidArgument)
-			},
-		},
-		{
-			name: "success normal",
-			testFunc: func(t *testing.T) {
-				mockCtl := gomock.NewController(t)
-				defer mockCtl.Finish()
-				mockMounter := mocks.NewMockNodeMounter(mockCtl)
-				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				driver := newTestNodeService(mockNodeUtils, mockMounter)
-
-				req := &csi.NodeUnpublishVolumeRequest{
-					TargetPath: targetPath,
-					VolumeId:   "vol-test",
-				}
-				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(true)
-				mockMounter.EXPECT().Unmount(targetPath).Return(nil)
-				mockNodeUtils.EXPECT().RemoveFileOrDirectory(targetPathWithHostPrefix)
-				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
-				if err != nil {
-					t.Fatalf("Expect no error but got: %v", err)
-				}
-			},
-		},
-		{
-			name: "success idempotent",
-			testFunc: func(t *testing.T) {
-				mockCtl := gomock.NewController(t)
-				defer mockCtl.Finish()
-				mockMounter := mocks.NewMockNodeMounter(mockCtl)
-				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				driver := newTestNodeService(mockNodeUtils, mockMounter)
-
-				req := &csi.NodeUnpublishVolumeRequest{
-					TargetPath: targetPath,
-					VolumeId:   "vol-test",
-				}
-				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(false)
-				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
-				if err != nil {
-					t.Fatalf("Expect no error but got: %v", err)
-				}
-			},
-		},
-	}
-	for _, tc := range testCases {
-		t.Run(tc.name, tc.testFunc)
-	}
-}
+//func TestNodeUnpublishVolume(t *testing.T) {
+//	targetPath := "/test/path"
+//	targetPathWithHostPrefix := driver.GetPodPath(targetPath)
+//
+//	testCases := []struct {
+//		name     string
+//		testFunc func(t *testing.T)
+//	}{
+//		{
+//			name: "fail no VolumeId",
+//			testFunc: func(t *testing.T) {
+//				driver := newTestNodeService(nil, nil)
+//
+//				req := &csi.NodeUnpublishVolumeRequest{
+//					TargetPath: targetPath,
+//				}
+//				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
+//				assertError(t, err, codes.InvalidArgument)
+//			},
+//		},
+//		{
+//			name: "fail no TargetPath",
+//			testFunc: func(t *testing.T) {
+//				driver := newTestNodeService(nil, nil)
+//
+//				req := &csi.NodeUnpublishVolumeRequest{
+//					VolumeId: "vol-test",
+//				}
+//				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
+//				assertError(t, err, codes.InvalidArgument)
+//			},
+//		},
+//		{
+//			name: "success normal",
+//			testFunc: func(t *testing.T) {
+//				mockCtl := gomock.NewController(t)
+//				defer mockCtl.Finish()
+//				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+//				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+//				driver := newTestNodeService(mockNodeUtils, mockMounter)
+//
+//				req := &csi.NodeUnpublishVolumeRequest{
+//					TargetPath: targetPath,
+//					VolumeId:   "vol-test",
+//				}
+//				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(true)
+//				mockMounter.EXPECT().Unmount(targetPath).Return(nil)
+//				mockNodeUtils.EXPECT().RemoveFileOrDirectory(targetPathWithHostPrefix)
+//				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
+//				if err != nil {
+//					t.Fatalf("Expect no error but got: %v", err)
+//				}
+//			},
+//		},
+//		{
+//			name: "success idempotent",
+//			testFunc: func(t *testing.T) {
+//				mockCtl := gomock.NewController(t)
+//				defer mockCtl.Finish()
+//				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+//				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+//				driver := newTestNodeService(mockNodeUtils, mockMounter)
+//
+//				req := &csi.NodeUnpublishVolumeRequest{
+//					TargetPath: targetPath,
+//					VolumeId:   "vol-test",
+//				}
+//				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(false)
+//				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
+//				if err != nil {
+//					t.Fatalf("Expect no error but got: %v", err)
+//				}
+//			},
+//		},
+//	}
+//	for _, tc := range testCases {
+//		t.Run(tc.name, tc.testFunc)
+//	}
+//}
 
 func TestNodeGetVolumeStats(t *testing.T) {
 
