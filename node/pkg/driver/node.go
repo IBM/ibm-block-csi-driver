@@ -534,6 +534,11 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 			logger.Errorf("Unmount failed. Target : %q, err : %v", target, err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
 		}
+		//TODO
+		logger.Debugf("Check if target %s is mounted 222 - after unmount", target)
+		isNotMounted, err = mount.IsNotMountPoint(d.Mounter, target)
+		logger.Errorf("Check is target mounted 222 - after unmount res. Target : %q, err : %v", target, err.Error())
+		//ODOT
 	}
 	logger.Debugf("Unmount finished. Target : {%s}", target)
 	if err = d.NodeUtils.RemoveFileOrDirectory(targetPathWithHostPrefix); err != nil {
