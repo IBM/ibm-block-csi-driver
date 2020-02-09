@@ -148,21 +148,20 @@ func TestNodePublishVolume(t *testing.T) {
 	positiveMountPoint := []mount.MountPoint{*targetMountPoint, *fakeMountPoint}
 	// mount point for which node will say that mount does not exists
 	negativeMountPoint := []mount.MountPoint{*fakeMountPoint}
+	accessMode := &csi.VolumeCapability_AccessMode{
+		Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+	}
 	fsVolCap := &csi.VolumeCapability{
 		AccessType: &csi.VolumeCapability_Mount{
 			Mount: &csi.VolumeCapability_MountVolume{FsType: fsTypeXfs},
 		},
-		AccessMode: &csi.VolumeCapability_AccessMode{
-			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-		},
+		AccessMode: accessMode,
 	}
 	rawBlockVolumeCap := &csi.VolumeCapability{
-		AccessMode: &csi.VolumeCapability_AccessMode{
-			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
-		},
 		AccessType: &csi.VolumeCapability_Block{
 			Block: &csi.VolumeCapability_BlockVolume{},
 		},
+		AccessMode: accessMode,
 	}
 
 	testCases := []struct {

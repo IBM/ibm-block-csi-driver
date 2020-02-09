@@ -3,7 +3,7 @@ apiVersion: v1
 metadata:
   name: <VALUE_MANE>
 spec:
-  # volumeMode: <VALUE_VOLUME_MODE> # Optional. values FileSystem\Block. The default is FileSystem.
+  # volumeMode: <VALUE_VOLUME_MODE> # Optional. values Filesystem\Block. The default is Filesystem.
   storageClassName: <VALUE_STORAGE_CLASS_NAME>
   accessModes:
     - ReadWriteOnce

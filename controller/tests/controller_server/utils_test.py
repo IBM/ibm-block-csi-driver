@@ -44,8 +44,8 @@ class TestUtils(unittest.TestCase):
         cap = Mock()
         cap.mount = Mock()
         cap.mount.fs_type = "ext4"
-        access_types = csi_pb2.VolumeCapability.AccessMode
-        cap.access_mode.mode = access_types.SINGLE_NODE_WRITER
+        access_mode = csi_pb2.VolumeCapability.AccessMode
+        cap.access_mode.mode = access_mode.SINGLE_NODE_WRITER
         cap.HasField.return_value = True
 
         utils.validate_csi_volume_capabilties([cap])
@@ -58,15 +58,15 @@ class TestUtils(unittest.TestCase):
             utils.validate_csi_volume_capabilties([cap])
 
         cap.mount.fs_type = "ext4"
-        cap.access_mode.mode = access_types.SINGLE_NODE_READER_ONLY
+        cap.access_mode.mode = access_mode.SINGLE_NODE_READER_ONLY
         with self.assertRaises(ValidationException):
             utils.validate_csi_volume_capabilties([cap])
 
     def test_validate_raw_block_volume_capabilities(self):
         caps = Mock()
         caps.block = Mock()
-        access_types = csi_pb2.VolumeCapability.AccessMode
-        caps.access_mode.mode = access_types.SINGLE_NODE_WRITER
+        access_mode = csi_pb2.VolumeCapability.AccessMode
+        caps.access_mode.mode = access_mode.SINGLE_NODE_WRITER
         # First call of HasField returns True and second - False
         caps.HasField.side_effect = [False, True]
 

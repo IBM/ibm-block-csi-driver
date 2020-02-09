@@ -1,7 +1,7 @@
 kind: Pod
 apiVersion: v1
 metadata:
-  name: pod1
+  name: pod-file-system
 spec:
   containers:
   - name: container1 

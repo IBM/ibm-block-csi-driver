@@ -408,7 +408,7 @@ func (d *NodeService) mountRawBlockVolume(mpathDevice string, targetPath string,
 	// Create mount file and its parent directory if they don't exist
 	targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
 	if !d.NodeUtils.IsPathExists(targetPathParentDirWithHostPrefix) {
-		logger.Debugf("Target path parent directory does not exist. creating : {%v}", targetPathWithHostPrefix)
+		logger.Debugf("Target path parent directory does not exist. creating : {%v}", targetPathParentDirWithHostPrefix)
 		err := d.Mounter.MakeDir(targetPathParentDirWithHostPrefix)
 		if err != nil {
 			return status.Errorf(codes.Internal, "Could not create directory %q: %v", targetPathParentDirWithHostPrefix, err)

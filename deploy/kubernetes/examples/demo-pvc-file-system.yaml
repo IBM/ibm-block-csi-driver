@@ -3,7 +3,7 @@ apiVersion: v1
 metadata:
   name: demo-pvc
 spec:
-  volumeMode: FileSystem
+  volumeMode: Filesystem
   accessModes:
   - ReadWriteOnce
   resources:
