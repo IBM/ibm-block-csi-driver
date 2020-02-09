@@ -31,7 +31,6 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
-//	"syscall"
 )
 
 var (
@@ -57,7 +56,6 @@ var (
 	}
 
 	IscsiFullPath = "/host/etc/iscsi/initiatorname.iscsi"
-//	var errorNoList = [...]int{53, 54, 59, 64, 65, 66, 67, 1219, 1326}
 )
 
 const (
