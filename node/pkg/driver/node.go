@@ -622,7 +622,7 @@ func IsNotMountPoint(mounter mount.Interface, file string) (bool, error) {
 	// to determine whether file IS A mountpoint
 	logger.Errorf("++++++++++ IsLikelyNotMountPoint %s", file)
 	notMnt, notMntErr := mounter.IsLikelyNotMountPoint(file)
-	logger.Errorf("++++++++++ IsLikelyNotMountPoint notMnt: %s iserror %s", notMnt, notMntErr == nil)
+	logger.Errorf("++++++++++ IsLikelyNotMountPoint notMnt: %v iserror %v", notMnt, notMntErr == nil)
 	if notMntErr != nil {
 		logger.Errorf("++++++++++ IsLikelyNotMountPoint notMntError %s", notMntErr.Error())
 	}
@@ -634,7 +634,7 @@ func IsNotMountPoint(mounter mount.Interface, file string) (bool, error) {
 		logger.Errorf("++++++++++ IsLikelyNotMountPoint os.IsPermission")
 	}
 	if notMntErr != nil {
-		logger.Errorf("++++++++++ IsLikelyNotMountPoint RETURN isMnt: %s ERROR %s", notMnt, notMntErr.Error())
+		logger.Errorf("++++++++++ IsLikelyNotMountPoint RETURN isMnt: %v ERROR %s", notMnt, notMntErr.Error())
 		return notMnt, notMntErr
 	}
 	// identified as mountpoint, so return this fact
@@ -666,7 +666,7 @@ func IsNotMountPoint(mounter mount.Interface, file string) (bool, error) {
 			break
 		}
 	}
-	logger.Errorf("++++++++++ IsLikelyNotMountPoint return not|Mnt %s, nil", notMnt)
+	logger.Errorf("++++++++++ IsLikelyNotMountPoint return not|Mnt %v, nil", notMnt)
 	return notMnt, nil
 }
 
