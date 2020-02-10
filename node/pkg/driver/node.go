@@ -426,12 +426,11 @@ func (d *NodeService) mountRawBlockVolume(mpathDevice string, targetPath string,
 	return d.Mounter.Mount(mpathDevice, targetPath, "", options)
 }
 
-// target: path of target
+// targetPathWithHostPrefix: path of target
 // isFSVolume: if we check volume with file system - true, otherwise for raw block false
 // Returns: is target mounted, error if occured
-func (d *NodeService) isTargetMounted(target string, isFSVolume bool) (bool, error) {
-	logger.Debugf("Check if targetPath {%s} exist in mount list", target)
-	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(target)
+func (d *NodeService) isTargetMounted(targetPathWithHostPrefix string, isFSVolume bool) (bool, error) {
+	logger.Debugf("Check if targetPath {%s} exist in mount list", targetPathWithHostPrefix)
 	mountList, err := d.Mounter.List()
 	if err != nil {
 		return false, err
