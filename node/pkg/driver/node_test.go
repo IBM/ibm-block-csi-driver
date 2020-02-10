@@ -131,7 +131,7 @@ func TestNodeStageVolume(t *testing.T) {
 func TestNodePublishVolume(t *testing.T) {
 	fsTypeXfs := "ext4"
 	targetPath := "/test/path"
-	targetPathWithHostPrefix := driver.GetPodPath(targetPath)
+	targetPathWithHostPrefix := GetPodPath(targetPath)
 	targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
 	stagingTargetPath := path.Join("/test/staging", driver.StageInfoFilename)
 	stagingTargetFile := path.Join(stagingTargetPath, ".stageInfo.json")
@@ -401,7 +401,7 @@ func TestNodePublishVolume(t *testing.T) {
 
 func TestNodeUnpublishVolume(t *testing.T) {
 	targetPath := "/test/path"
-	targetPathWithHostPrefix := driver.GetPodPath(targetPath)
+	targetPathWithHostPrefix := GetPodPath(targetPath)
 
 	testCases := []struct {
 		name     string
@@ -645,4 +645,10 @@ func assertError(t *testing.T, err error, expectedErrorCode codes.Code) {
 	if grpcError.Code() != expectedErrorCode {
 		t.Fatalf("Expected error code %d, got %d. Error: %s", expectedErrorCode, grpcError.Code(), grpcError.Message())
 	}
+}
+
+// To some files/dirs pod cannot access using its real path. It has to use a different path which is <prefix>/<path>.
+// E.g. in order to access /etc/test.txt pod has to use /host/etc/test.txt
+func GetPodPath(filepath string) string {
+	return path.Join(driver.PrefixChrootOfHostRoot, filepath)
 }
