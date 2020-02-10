@@ -347,7 +347,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 
 	logger.Debugf("Check if targetPath {%s} exist in mount list", targetPathWithHostPrefix)
 	isNotMounted, err := mount.IsNotMountPoint(d.mounter, targetPathWithHostPrefix)
-	if err != null {
+	if err != nil {
 		logger.Warningf("Failed to check if (%s), is mounted.", targetPathWithHostPrefix)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
