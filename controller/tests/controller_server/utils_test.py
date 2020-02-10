@@ -67,7 +67,7 @@ class TestUtils(unittest.TestCase):
         caps.block = Mock()
         access_mode = csi_pb2.VolumeCapability.AccessMode
         caps.access_mode.mode = access_mode.SINGLE_NODE_WRITER
-        # First call of HasField returns True and second - False
+        # First call of HasField returns False and second - True
         caps.HasField.side_effect = [False, True]
 
         utils.validate_csi_volume_capabilties([caps])
