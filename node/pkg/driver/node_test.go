@@ -444,8 +444,8 @@ func TestNodeUnpublishVolume(t *testing.T) {
 					TargetPath: targetPath,
 					VolumeId:   "vol-test",
 				}
-				mockNodeUtils.EXPECT().IsNotMountPoint(targetPathWithHostPrefix).Return(false, nil)
 				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(true)
+				mockNodeUtils.EXPECT().IsNotMountPoint(targetPathWithHostPrefix).Return(True, nil)
 				mockMounter.EXPECT().Unmount(targetPath).Return(nil)
 				mockNodeUtils.EXPECT().RemoveFileOrDirectory(targetPathWithHostPrefix)
 				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
