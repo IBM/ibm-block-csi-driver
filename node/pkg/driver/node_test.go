@@ -258,6 +258,7 @@ func TestNodePublishVolume(t *testing.T) {
 				driver := newTestNodeService(mockNodeUtils, mockMounter)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
+				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(true)
 				mockMounter.EXPECT().List().Return(positiveMountPoint, nil)
 				mockNodeUtils.EXPECT().IsDirectory(targetPathWithHostPrefix).Return(false)
@@ -284,6 +285,7 @@ func TestNodePublishVolume(t *testing.T) {
 				driver := newTestNodeService(mockNodeUtils, mockMounter)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
+				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(false)
 				mockMounter.EXPECT().MakeDir(targetPathWithHostPrefix).Return(nil)
 				mockMounter.EXPECT().FormatAndMount(mpathDevice, targetPath, fsTypeXfs, nil)
@@ -312,6 +314,7 @@ func TestNodePublishVolume(t *testing.T) {
 				driver := newTestNodeService(mockNodeUtils, mockMounter)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
+				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(true)
 				mockMounter.EXPECT().List().Return(positiveMountPoint, nil)
 				mockNodeUtils.EXPECT().IsDirectory(targetPathWithHostPrefix).Return(true)
@@ -340,6 +343,7 @@ func TestNodePublishVolume(t *testing.T) {
 				driver := newTestNodeService(mockNodeUtils, mockMounter)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
+				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix)
 				gomock.InOrder(
 					mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(false),
 					mockNodeUtils.EXPECT().IsPathExists(targetPathParentDirWithHostPrefix).Return(false),
@@ -372,6 +376,7 @@ func TestNodePublishVolume(t *testing.T) {
 				driver := newTestNodeService(mockNodeUtils, mockMounter)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
+				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix)
 				gomock.InOrder(
 					mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(true),
 					mockNodeUtils.EXPECT().IsPathExists(targetPathParentDirWithHostPrefix).Return(true),
