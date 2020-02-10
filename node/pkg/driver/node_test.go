@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
-	"k8s.io/kubernetes/pkg/util/mount"
 	"path"
 	"path/filepath"
 	"reflect"
@@ -138,16 +137,6 @@ func TestNodePublishVolume(t *testing.T) {
 	deviceName := "fakedev"
 	stagingInfo := map[string]string{"mpathDevice": deviceName}
 	mpathDevice := filepath.Join(device_connectivity.DevPath, deviceName)
-	targetMountPoint := &mount.MountPoint {
-		Path: targetPathWithHostPrefix,
-	}
-	fakeMountPoint := &mount.MountPoint {
-		Path: "/fake_mountpoint",
-	}
-	// mount point for which node will say that mount already exists
-	positiveMountPoint := []mount.MountPoint{*targetMountPoint, *fakeMountPoint}
-	// mount point for which node will say that mount does not exists
-	negativeMountPoint := []mount.MountPoint{*fakeMountPoint}
 	accessMode := &csi.VolumeCapability_AccessMode{
 		Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 	}
@@ -260,7 +249,7 @@ func TestNodePublishVolume(t *testing.T) {
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
 				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix).AnyTimes()
 				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(true)
-				mockMounter.EXPECT().List().Return(positiveMountPoint, nil)
+				mockNodeUtils.EXPECT().IsNotMountPoint(targetPathWithHostPrefix).Return(false, nil)
 				mockNodeUtils.EXPECT().IsDirectory(targetPathWithHostPrefix).Return(false)
 
 				req := &csi.NodePublishVolumeRequest{
@@ -316,7 +305,7 @@ func TestNodePublishVolume(t *testing.T) {
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
 				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix).AnyTimes()
 				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(true)
-				mockMounter.EXPECT().List().Return(positiveMountPoint, nil)
+				mockNodeUtils.EXPECT().IsNotMountPoint(targetPathWithHostPrefix).Return(false, nil)
 				mockNodeUtils.EXPECT().IsDirectory(targetPathWithHostPrefix).Return(true)
 
 				req := &csi.NodePublishVolumeRequest{
@@ -376,12 +365,12 @@ func TestNodePublishVolume(t *testing.T) {
 				driver := newTestNodeService(mockNodeUtils, mockMounter)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
-				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix)
+				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix).AnyTimes()
 				gomock.InOrder(
 					mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(true),
 					mockNodeUtils.EXPECT().IsPathExists(targetPathParentDirWithHostPrefix).Return(true),
 				)
-				mockMounter.EXPECT().List().Return(negativeMountPoint, nil)
+				mockNodeUtils.EXPECT().IsNotMountPoint(targetPathWithHostPrefix).Return(true, nil)
 				mockMounter.EXPECT().Mount(mpathDevice, targetPath, "", []string{"bind"})
 
 				req := &csi.NodePublishVolumeRequest{

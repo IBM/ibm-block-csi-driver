@@ -359,7 +359,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	isTargetPathExists := d.NodeUtils.IsPathExists(targetPathWithHostPrefix)
 	if isTargetPathExists {
 		// check if already mounted
-		isMounted, err := d.isTargetMounted(targetPath, isFSVolume)
+		isMounted, err := d.isTargetMounted(targetPathWithHostPrefix, isFSVolume)
 		if err != nil {
 			logger.Debugf("Existing mount check failed {%v}", err.Error())
 			return nil, err
@@ -428,27 +428,26 @@ func (d *NodeService) mountRawBlockVolume(mpathDevice string, targetPath string,
 
 // targetPathWithHostPrefix: path of target
 // isFSVolume: if we check volume with file system - true, otherwise for raw block false
-// Returns: is target mounted, error if occured
+// Returns: is <target mounted, error if occured>
 func (d *NodeService) isTargetMounted(targetPathWithHostPrefix string, isFSVolume bool) (bool, error) {
-	logger.Debugf("Check if targetPath {%s} exist in mount list", targetPathWithHostPrefix)
-	mountList, err := d.Mounter.List()
+	logger.Debugf("Check if target {%s} is mounted", targetPathWithHostPrefix)
+	isNotMounted, err := d.NodeUtils.IsNotMountPoint(targetPathWithHostPrefix)
 	if err != nil {
-		return false, err
+		logger.Warningf("Failed to check if (%s), is mounted.", targetPathWithHostPrefix)
+		return false, status.Error(codes.Internal, err.Error())
 	}
-	for _, currentMount := range mountList {
-		if currentMount.Path == targetPathWithHostPrefix {
-			//TODO: PUI-16179 - check if device is correct
-			targetIsDir := d.NodeUtils.IsDirectory(targetPathWithHostPrefix)
-			if isFSVolume && !targetIsDir {
-				return true, status.Errorf(codes.AlreadyExists, "Required volume with file system but target {%s} is mounted and it is not a directory.", targetPathWithHostPrefix)
-			} else if !isFSVolume && targetIsDir {
-				return true, status.Errorf(codes.AlreadyExists, "Required raw block volume but target {%s} is mounted and it is a directory.", targetPathWithHostPrefix)
-			}
-			logger.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume.", targetPathWithHostPrefix)
-			return true, nil
+	if isNotMounted {
+		return false, nil
+	} else {
+		targetIsDir := d.NodeUtils.IsDirectory(targetPathWithHostPrefix)
+		if isFSVolume && !targetIsDir {
+			return true, status.Errorf(codes.AlreadyExists, "Required volume with file system but target {%s} is mounted and it is not a directory.", targetPathWithHostPrefix)
+		} else if !isFSVolume && targetIsDir {
+			return true, status.Errorf(codes.AlreadyExists, "Required raw block volume but target {%s} is mounted and it is a directory.", targetPathWithHostPrefix)
 		}
+		logger.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume.", targetPathWithHostPrefix)
+		return true, nil
 	}
-	return false, nil
 }
 
 func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVolumeRequest) error {
