@@ -345,18 +345,15 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	mpathDevice := filepath.Join(device_connectivity.DevPath, infoMap["mpathDevice"])
 	logger.Debugf("Got info from stageInfo file. device : {%v}", mpathDevice)
 
-	logger.Debugf("Check if targetPath {%s} exist in mount list", targetPath)
-	mountList, err := d.mounter.List()
-	for _, mount := range mountList {
-		logger.Tracef("Check if mount path({%v}) [with device({%v})] is equel to targetPath {%s}", mount.Path, mount.Device, targetPath)
-		if mount.Path == targetPathWithHostPrefix {
-			if mount.Device == mpathDevice {
-				logger.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume.", targetPath)
-				return &csi.NodePublishVolumeResponse{}, nil
-			} else {
-				return nil, status.Errorf(codes.AlreadyExists, "Mount point is already mounted to but with different multipath device (%s), while the expected device is %s ", mount.Device, mpathDevice)
-			}
-		}
+	logger.Debugf("Check if targetPath {%s} exist in mount list", targetPathWithHostPrefix)
+	isNotMounted, err := mount.IsNotMountPoint(d.mounter, targetPathWithHostPrefix)
+	if err != nil {
+		logger.Warningf("Failed to check if (%s), is mounted.", targetPathWithHostPrefix)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if !isNotMounted {
+		logger.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume.", targetPath)
+		return &csi.NodePublishVolumeResponse{}, nil
 	}
 
 	// if the device is not mounted then we are mounting it.
