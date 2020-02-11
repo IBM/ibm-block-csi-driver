@@ -279,6 +279,6 @@ func (n NodeUtils) IsNotMountPoint(file string) (bool, error) {
 
 // To some files/dirs pod cannot access using its real path. It has to use a different path which is <prefix>/<path>.
 // E.g. in order to access /etc/test.txt pod has to use /host/etc/test.txt
-func (n NodeUtils) GetPodPath(filepath string) string {
-	return path.Join(PrefixChrootOfHostRoot, filepath)
+func (n NodeUtils) GetPodPath(origPath string) string {
+	return path.Join(PrefixChrootOfHostRoot, origPath)
 }
