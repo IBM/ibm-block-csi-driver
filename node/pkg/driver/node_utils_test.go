@@ -31,7 +31,7 @@ import (
 )
 
 var (
-	nodeUtils = driver.NewNodeUtils(&executer.Executer{})
+	nodeUtils = driver.NewNodeUtils(&executer.Executer{}, nil)
 )
 
 func TestParseIscsiInitiators(t *testing.T) {
@@ -188,7 +188,7 @@ func TestParseFCPortsName(t *testing.T) {
 			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
 			devicePath := "/sys/class/fc_host/host*/port_name"
 			fake_executer.EXPECT().FilepathGlob(devicePath).Return(fpaths, tc.err)
-			nodeUtils := driver.NewNodeUtils(fake_executer)
+			nodeUtils := driver.NewNodeUtils(fake_executer, nil)
 
 			fcs, err := nodeUtils.ParseFCPorts()
 

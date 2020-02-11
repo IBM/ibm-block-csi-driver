@@ -1,0 +1,18 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: pod-file-system
+spec:
+  containers:
+  - name: container1 
+    image: registry.access.redhat.com/ubi8/ubi:latest
+    command: [ "/bin/sh", "-c", "--" ]
+    args: [ "while true; do date; sleep 5; date >&2; sleep 5; done;" ]
+    volumeMounts:
+       - name: sanity-volume
+         mountPath: "/data"
+  volumes:
+  - name: sanity-volume
+    persistentVolumeClaim:
+      claimName: sanity-pvc
+  

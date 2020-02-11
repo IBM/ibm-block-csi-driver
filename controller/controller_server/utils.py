@@ -3,7 +3,6 @@ import controller.controller_server.config as config
 from controller.csi_general import csi_pb2
 from controller.controller_server.errors import ValidationException
 import controller.controller_server.messages as messages
-from controller.controller_server.config import VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_MOUNT
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.errors import HostNotFoundError, VolumeNotFoundError
 
@@ -40,13 +39,14 @@ def validate_secret(secret):
 
 def validate_csi_volume_capability(cap):
     logger.debug("validating csi volume capability : {0}".format(cap))
-    if cap.HasField(VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_MOUNT):
+    if cap.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_MOUNT):
         if cap.mount.fs_type and (cap.mount.fs_type not in config.SUPPORTED_FS_TYPES):
             raise ValidationException(messages.unsupported_fs_type_message.format(cap.mount.fs_type))
 
-    else:
-        logger.error(messages.only_mount_supported_message)
-        raise ValidationException(messages.only_mount_supported_message)
+    elif not cap.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_BLOCK):
+        # should never get here since the value can be only mount (for fs volume) or block (for raw block)
+        logger.error(messages.unsupported_volume_access_type_message)
+        raise ValidationException(messages.unsupported_volume_access_type_message)
 
     if cap.access_mode.mode not in config.SUPPORTED_ACCESS_MODE:
         logger.error("unsupported access mode : {}".format(cap.access_mode))

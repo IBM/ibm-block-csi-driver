@@ -4,7 +4,10 @@ SUPPORTED_FS_TYPES = ["ext4", "xfs"]
 
 access_mode = csi_pb2.VolumeCapability.AccessMode
 SUPPORTED_ACCESS_MODE = [access_mode.SINGLE_NODE_WRITER]
+
+# VolumeCapabilities fields which specify if it is volume with fs or raw block volume
 VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_MOUNT = 'mount'
+VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_BLOCK = 'block'
 
 SECRET_USERNAME_PARAMETER = "username"
 SECRET_PASSWORD_PARAMETER = "password"

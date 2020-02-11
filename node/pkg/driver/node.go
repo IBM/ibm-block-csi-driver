@@ -19,20 +19,18 @@ package driver
 import (
 	"context"
 	"fmt"
-	"os"
-	"path"
-	"path/filepath"
-	"strings"
-
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/ibm/ibm-block-csi-driver/node/goid_info"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
-	"github.com/ibm/ibm-block-csi-driver/node/util"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/kubernetes/pkg/util/mount"
+	"os"
+	"path"
+	"path/filepath"
+	"strings"
 )
 
 var (
@@ -50,7 +48,7 @@ var (
 	}
 
 	defaultFSType              = "ext4"
-	stageInfoFilename          = ".stageInfo.json"
+	StageInfoFilename          = ".stageInfo.json"
 	supportedConnectivityTypes = map[string]bool{
 		"iscsi": true,
 		"fc":    true,
@@ -61,16 +59,20 @@ var (
 )
 
 const (
-	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
-	// Command lines inside the container will show /host prefix.
-	PrefixChrootOfHostRoot = "/host"
 	FCPath                 = "/sys/class/fc_host"
 	FCPortPath             = "/sys/class/fc_host/host*/port_name"
 )
 
+//go:generate mockgen -destination=../../mocks/mock_NodeMounter.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeMounter
+
+type NodeMounter interface {
+	mount.Interface
+	FormatAndMount(source string, target string, fstype string, options []string) error
+}
+
 // nodeService represents the node service of CSI driver
 type NodeService struct {
-	mounter                     *mount.SafeFormatAndMount
+	Mounter                     NodeMounter
 	ConfigYaml                  ConfigFile
 	Hostname                    string
 	NodeUtils                   NodeUtilsInterface
@@ -81,14 +83,14 @@ type NodeService struct {
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
-func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface, executer executer.ExecuterInterface, mounter *mount.SafeFormatAndMount, syncLock SyncLockInterface) NodeService {
+func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface, executer executer.ExecuterInterface, mounter NodeMounter, syncLock SyncLockInterface) NodeService {
 	return NodeService{
 		ConfigYaml:                  configYaml,
 		Hostname:                    hostname,
 		NodeUtils:                   nodeUtils,
 		executer:                    executer,
 		OsDeviceConnectivityMapping: OsDeviceConnectivityMapping,
-		mounter:                     mounter,
+		Mounter:                     mounter,
 		VolumeIdLocksMap:            syncLock,
 	}
 }
@@ -144,7 +146,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	// TODO move stageInfo into the node_until API
 	// Generate the stageInfo detail
-	stageInfoPath := path.Join(stagingPath, stageInfoFilename)
+	stageInfoPath := path.Join(stagingPath, StageInfoFilename)
 	stageInfo := make(map[string]string)
 	baseDevice := path.Base(device)
 	stageInfo["mpathDevice"] = baseDevice //this should return the mathhh for example
@@ -208,10 +210,12 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{"Volume capability AccessMode not supported"}
 	}
 
-	// If the access type is block, do nothing for stage
+	// If the access type is not mount and not block, should never happen
 	switch volCap.GetAccessType().(type) {
+	case *csi.VolumeCapability_Mount:
 	case *csi.VolumeCapability_Block:
-		return &RequestValidationError{"Volume Access Type Block is not supported yet"}
+	default:
+		return &RequestValidationError{"Volume Access Type is not supported"}
 	}
 
 	connectivityType, lun, arrayInitiators, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
@@ -260,7 +264,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	}
 
 	logger.Debugf("Reading stage info file")
-	stageInfoPath := path.Join(stagingTargetPath, stageInfoFilename)
+	stageInfoPath := path.Join(stagingTargetPath, StageInfoFilename)
 	infoMap, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -329,12 +333,12 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	// checking if the node staging path was mpounted into
 	stagingPath := req.GetStagingTargetPath()
 	targetPath := req.GetTargetPath()
-	targetPathWithHostPrefix := path.Join(PrefixChrootOfHostRoot, targetPath)
+	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
 
 	logger.Debugf("stagingPath : {%v}, targetPath : {%v}", stagingPath, targetPath)
 
 	// Read staging info file in order to find the mpath device for mounting.
-	stageInfoPath := path.Join(stagingPath, stageInfoFilename)
+	stageInfoPath := path.Join(stagingPath, StageInfoFilename)
 	infoMap, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
 	if err != nil {
 		// Note: after validation it looks like k8s create the directory in advance. So we don't try to remove it at the Unpublish
@@ -345,44 +349,105 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	mpathDevice := filepath.Join(device_connectivity.DevPath, infoMap["mpathDevice"])
 	logger.Debugf("Got info from stageInfo file. device : {%v}", mpathDevice)
 
-	logger.Debugf("Check if targetPath {%s} exist in mount list", targetPathWithHostPrefix)
-	isNotMounted, err := mount.IsNotMountPoint(d.mounter, targetPathWithHostPrefix)
-	if err != nil {
-		logger.Warningf("Failed to check if (%s), is mounted.", targetPathWithHostPrefix)
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	if !isNotMounted {
-		logger.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume.", targetPath)
-		return &csi.NodePublishVolumeResponse{}, nil
-	}
-
 	// if the device is not mounted then we are mounting it.
-
 	volumeCap := req.GetVolumeCapability()
-	fsType := volumeCap.GetMount().FsType
-
-	if fsType == "" {
-		fsType = defaultFSType
+	isFSVolume := true
+	switch volumeCap.GetAccessType().(type) {
+	case *csi.VolumeCapability_Block:
+		isFSVolume = false
+	}
+	isTargetPathExists := d.NodeUtils.IsPathExists(targetPathWithHostPrefix)
+	if isTargetPathExists {
+		// check if already mounted
+		isMounted, err := d.isTargetMounted(targetPathWithHostPrefix, isFSVolume)
+		if err != nil {
+			logger.Debugf("Existing mount check failed {%v}", err.Error())
+			return nil, err
+		}
+		if isMounted { // idempotent case
+			return &csi.NodePublishVolumeResponse{}, nil
+		}
+	}
+	if isFSVolume {
+		fsType := volumeCap.GetMount().FsType
+		err = d.mountFileSystemVolume(mpathDevice, targetPath, fsType, isTargetPathExists)
+	} else {
+		err = d.mountRawBlockVolume(mpathDevice, targetPath, isTargetPathExists)
 	}
 
-	if _, err := os.Stat(targetPathWithHostPrefix); os.IsNotExist(err) {
-		logger.Debugf("Target path directory does not exist. creating : {%v}", targetPathWithHostPrefix)
-		d.mounter.MakeDir(targetPathWithHostPrefix)
-	}
-
-	logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
-
-	logger.Debugf("FormatAndMount start [goid=%d]", util.GetGoID())
-	err = d.mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
-	// TODO: pass mount options
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	logger.Debugf("FormatAndMount end [goid=%d]", util.GetGoID())
-
 	logger.Debugf("NodePublishVolume Finished: multipath device is now mounted to targetPath.")
 
 	return &csi.NodePublishVolumeResponse{}, nil
+}
+
+func (d *NodeService) mountFileSystemVolume(mpathDevice string, targetPath string, fsType string, isTargetPathExists bool) error {
+	if fsType == "" {
+		fsType = defaultFSType
+	}
+	logger.Debugf("Volume will have FS type : {%v}", fsType)
+	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
+	if !isTargetPathExists {
+		logger.Debugf("Target path directory does not exist. Creating : {%v}", targetPathWithHostPrefix)
+		err := d.Mounter.MakeDir(targetPathWithHostPrefix)
+		if err != nil {
+			return status.Errorf(codes.Internal, "Could not create directory %q: %v", targetPathWithHostPrefix, err)
+		}
+	}
+	logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
+	return d.Mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
+}
+
+func (d *NodeService) mountRawBlockVolume(mpathDevice string, targetPath string, isTargetPathExists bool) error {
+	logger.Debugf("Raw block volume will be created")
+	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
+	// Create mount file and its parent directory if they don't exist
+	targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
+	if !d.NodeUtils.IsPathExists(targetPathParentDirWithHostPrefix) {
+		logger.Debugf("Target path parent directory does not exist. creating : {%v}", targetPathParentDirWithHostPrefix)
+		err := d.Mounter.MakeDir(targetPathParentDirWithHostPrefix)
+		if err != nil {
+			return status.Errorf(codes.Internal, "Could not create directory %q: %v", targetPathParentDirWithHostPrefix, err)
+		}
+	}
+	if !isTargetPathExists {
+		logger.Debugf("Target path file does not exist. creating : {%v}", targetPathWithHostPrefix)
+		err := d.Mounter.MakeFile(targetPathWithHostPrefix)
+		if err != nil {
+			return status.Errorf(codes.Internal, "Could not create file %q: %v", targetPathWithHostPrefix, err)
+		}
+	}
+
+	// Mount
+	options := []string{"bind"}
+	logger.Debugf("Mount the device to raw block volume. Target : {%s}, device : {%s}", targetPath, mpathDevice)
+	return d.Mounter.Mount(mpathDevice, targetPath, "", options)
+}
+
+// targetPathWithHostPrefix: path of target
+// isFSVolume: if we check volume with file system - true, otherwise for raw block false
+// Returns: is <target mounted, error if occured>
+func (d *NodeService) isTargetMounted(targetPathWithHostPrefix string, isFSVolume bool) (bool, error) {
+	logger.Debugf("Check if target {%s} is mounted", targetPathWithHostPrefix)
+	isNotMounted, err := d.NodeUtils.IsNotMountPoint(targetPathWithHostPrefix)
+	if err != nil {
+		logger.Warningf("Failed to check if (%s), is mounted.", targetPathWithHostPrefix)
+		return false, status.Error(codes.Internal, err.Error())
+	}
+	if isNotMounted {
+		return false, nil
+	} else {
+		targetIsDir := d.NodeUtils.IsDirectory(targetPathWithHostPrefix)
+		if isFSVolume && !targetIsDir {
+			return true, status.Errorf(codes.AlreadyExists, "Required volume with file system but target {%s} is mounted and it is not a directory.", targetPathWithHostPrefix)
+		} else if !isFSVolume && targetIsDir {
+			return true, status.Errorf(codes.AlreadyExists, "Required raw block volume but target {%s} is mounted and it is a directory.", targetPathWithHostPrefix)
+		}
+		logger.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume.", targetPathWithHostPrefix)
+		return true, nil
+	}
 }
 
 func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVolumeRequest) error {
@@ -410,10 +475,12 @@ func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVol
 		return &RequestValidationError{"Volume capability AccessMode not supported"}
 	}
 
-	// If the access type is block, do nothing for stage
+	// If the access type is not mount and not block, should never happen
 	switch volCap.GetAccessType().(type) {
+	case *csi.VolumeCapability_Mount:
 	case *csi.VolumeCapability_Block:
-		return &RequestValidationError{"Volume Access Type Block is not supported yet"}
+	default:
+		return &RequestValidationError{"Volume Access Type is not supported"}
 	}
 
 	return nil
@@ -441,12 +508,35 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	if len(target) == 0 {
 		return nil, status.Error(codes.InvalidArgument, "Target path not provided")
 	}
+	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(target)
 
-	logger.Debugf("NodeUnpublishVolume: unmounting %s", target)
-	err = mount.CleanupMountPoint(target, d.mounter, true)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Could not unmount %q: %v", target, err)
+	logger.Debugf("Check if target file exists %s", targetPathWithHostPrefix)
+	if !d.NodeUtils.IsPathExists(targetPathWithHostPrefix) {
+		logger.Warningf("Idempotent case: target file %s doesn't exist", targetPathWithHostPrefix)
+		return &csi.NodeUnpublishVolumeResponse{}, nil
 	}
+
+	// Unmount and delete mount point file/folder
+	logger.Debugf("Check if target %s is mounted", targetPathWithHostPrefix)
+	isNotMounted, err := d.NodeUtils.IsNotMountPoint(targetPathWithHostPrefix)
+	if err != nil {
+		logger.Errorf("Check is target mounted failed. Target : %q, err : %v", targetPathWithHostPrefix, err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if !isNotMounted {
+		logger.Debugf("Unmounting %s", target)
+		err = d.Mounter.Unmount(target)
+		if err != nil {
+			logger.Errorf("Unmount failed. Target : %q, err : %v", target, err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
+	logger.Debugf("Unmount finished. Target : {%s}", target)
+	if err = d.NodeUtils.RemoveFileOrDirectory(targetPathWithHostPrefix); err != nil {
+		logger.Errorf("Failed to remove mount path file/directory. Target %s: %v", targetPathWithHostPrefix, err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	logger.Debugf("Mount point deleted. Target : %s", targetPathWithHostPrefix)
 
 	return &csi.NodeUnpublishVolumeResponse{}, nil
 
@@ -490,7 +580,7 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	var fcWWNs []string
 	var err error
 
-	fcExists := d.NodeUtils.Exists(FCPath)
+	fcExists := d.NodeUtils.IsPathExists(FCPath)
 	if fcExists {
 		fcWWNs, err = d.NodeUtils.ParseFCPorts()
 		if err != nil {
@@ -498,7 +588,7 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 		}
 	}
 
-	iscsiExists := d.NodeUtils.Exists(IscsiFullPath)
+	iscsiExists := d.NodeUtils.IsPathExists(IscsiFullPath)
 	if iscsiExists {
 		iscsiIQN, _ = d.NodeUtils.ParseIscsiInitiators()
 	}

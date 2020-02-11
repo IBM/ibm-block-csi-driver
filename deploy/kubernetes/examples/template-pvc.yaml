@@ -1,11 +1,12 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: <VALUE1>
+  name: <VALUE_MANE>
 spec:
-  storageClassName: <VALUE2>
+  # volumeMode: <VALUE_VOLUME_MODE> # Optional. values Filesystem\Block. The default is Filesystem.
+  storageClassName: <VALUE_STORAGE_CLASS_NAME>
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: <VALUE3>
+      storage: <STORAGE_SIZE_VALUE>
