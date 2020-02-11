@@ -767,7 +767,7 @@ class TestIdentityServer(unittest.TestCase):
     @patch.object(ControllerServicer, "_ControllerServicer__get_identity_config")
     def test_identity_plugin_get_info_succeeds(self, identity_config):
         plugin_name = "plugin-name"
-        version = "1.0.0"
+        version = "1.1.0"
         identity_config.side_effect = [plugin_name, version]
         request = Mock()
         context = Mock()
@@ -780,7 +780,7 @@ class TestIdentityServer(unittest.TestCase):
         request = Mock()
         context = Mock()
 
-        identity_config.side_effect = ["name", Exception(), Exception(), "1.0.0"]
+        identity_config.side_effect = ["name", Exception(), Exception(), "1.1.0"]
 
         res = self.servicer.GetPluginInfo(request, context)
         context.set_code.assert_called_once_with(grpc.StatusCode.INTERNAL)
@@ -795,7 +795,7 @@ class TestIdentityServer(unittest.TestCase):
         request = Mock()
         context = Mock()
 
-        identity_config.side_effect = ["", "1.0.0", "name", ""]
+        identity_config.side_effect = ["", "1.1.0", "name", ""]
 
         res = self.servicer.GetPluginInfo(request, context)
         context.set_code.assert_called_once_with(grpc.StatusCode.INTERNAL)
