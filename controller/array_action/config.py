@@ -5,3 +5,7 @@ CAPABILITY_THIN = 'thin'
 CAPABILITY_COMPRESSED = 'compressed'
 CAPABILITY_DEDUPLICATED = 'deduplicated'
 CAPABILITY_THICK = 'thick'
+
+# volume context
+CONTEXT_POOL = "pool"
+CONTEXT_LSS = "lss"

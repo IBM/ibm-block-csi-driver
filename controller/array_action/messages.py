@@ -35,3 +35,7 @@ UnMappingError_message = "Unmapping error has occurred for vol : {0} and host : 
 BadNodeIdError_message = "Bad node id format for node id : {0}"
 
 VolumeMappedToMultipleHostsError_message = "Volume is already mapped to different hosts {0}"
+
+NotSupportStorageVersionError_message = 'Unsupported storage system microcode version {}, the version should not lower than {}'  # noqa
+
+VolumeCreationError_message = 'Failed to create volume {}'

@@ -71,12 +71,13 @@ class ArrayMediator:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get_volume(self, volume_name):
+    def get_volume(self, volume_name, volume_context=None):
         """
         This function return volume info about the volume.
 
         Args:
-            vol_name : name of the volume to be created in the storage system
+            volume_name: name of the volume on storage system.
+            volume_context: context of the volume to find the volume more efficiently.
 
         Returns:
            Volume

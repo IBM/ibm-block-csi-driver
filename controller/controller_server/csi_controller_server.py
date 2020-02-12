@@ -85,7 +85,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug("requested size is 0 so the default size will be used : {0} ".format(
                         size))
                 try:
-                    vol = array_mediator.get_volume(volume_name)
+                    vol = array_mediator.get_volume(
+                        volume_name, volume_context=request.parameters
+                    )
 
                 except controller_errors.VolumeNotFoundError as ex:
                     logger.debug(

@@ -122,7 +122,7 @@ class SVCArrayMediator(ArrayMediator):
             cli_volume.mdisk_grp_name,
             self.array_type)
 
-    def get_volume(self, vol_name):
+    def get_volume(self, vol_name, volume_context=None):
         logger.debug("Get volume : {}".format(vol_name))
         cli_volume = None
         try:

@@ -83,7 +83,7 @@ class XIVArrayMediator(ArrayMediator):
                       cli_volume.pool_name,
                       self.array_type)
 
-    def get_volume(self, vol_name):
+    def get_volume(self, vol_name, volume_context=None):
         logger.debug("Get volume : {}".format(vol_name))
         try:
             cli_volume = self.client.cmd.vol_list(vol=vol_name).as_single_element
