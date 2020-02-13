@@ -213,7 +213,9 @@ class TestControllerServerCreateVolume(unittest.TestCase):
     #     array_type.return_value = "a9k"
     #     res = self.servicer.CreateVolume(self.request, context)
     #     self.assertEqual(context.code, grpc.StatusCode.OK)
-    #     self.mediator.get_volume.assert_called_once_with("a" * self.mediator.max_vol_name_length, volume_context={'pool': 'pool1'})
+    #     self.mediator.get_volume.assert_called_once_with("a" * self.mediator.max_vol_name_length,
+    #                                                      volume_context={'pool': 'pool1'}
+    #     )
 
     def test_create_volume_with_illegal_object_name_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,

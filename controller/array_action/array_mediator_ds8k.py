@@ -274,7 +274,7 @@ class DS8KArrayMediator(ArrayMediator):
             vol_size_bytes=int(res[VOLUME_LOGICAL_CAP]),
             vol_id=self._generate_volume_scsi_identifier(res[VOLUME_ID]),
             vol_name=res[VOLUME_NAME],
-            array_address= self.service_address,
+            array_address=self.service_address,
             pool_name=res[VOLUME_POOL_ID],
             array_type=self.array_type
         )

@@ -57,11 +57,10 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             DS8KArrayMediator("user", "password", self.endpoint)
 
     def test_validate_capabilities_passed(self):
-        return_value = self.array.validate_supported_capabilities(
+        self.array.validate_supported_capabilities(
             {config.CAPABILITIES_SPACEEFFICIENCY: config.CAPABILITY_THIN}
         )
-        # return None and no error is raised
-        self.assertIsNone(return_value)
+        # nothing is raised
 
     def test_validate_capabilities_failed(self):
         with self.assertRaises(array_errors.StorageClassCapabilityNotSupported):
