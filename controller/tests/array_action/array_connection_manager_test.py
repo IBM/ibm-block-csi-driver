@@ -5,6 +5,7 @@ from mock import patch
 from controller.array_action.errors import FailedToFindStorageSystemType
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.array_action.array_mediator_svc import SVCArrayMediator
+from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
 
 
 class TestWithFunctionality(unittest.TestCase):
@@ -93,12 +94,17 @@ class TestGetconnection(unittest.TestCase):
         res = self.array_connection.detect_array_type()
         self.assertEqual(res, XIVArrayMediator.array_type)
 
-        socket_connet.side_effect = [1, 1, 0, 0]
+        socket_connet.side_effect = [1, 1, 0]
+
+        res = self.array_connection.detect_array_type()
+        self.assertEqual(res, DS8KArrayMediator.array_type)
+
+        socket_connet.side_effect = [1, 1, 1, 1, 0]
 
         res = self.array_connection.detect_array_type()
         self.assertEqual(res, SVCArrayMediator.array_type)
 
-        socket_connet.side_effect = [1, 1, 1, 1]
+        socket_connet.side_effect = [1, 1, 1, 1, 1, 1]
         with self.assertRaises(FailedToFindStorageSystemType):
             self.array_connection.detect_array_type()
 
