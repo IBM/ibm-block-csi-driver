@@ -1,4 +1,5 @@
 from hashlib import sha1
+import math
 from packaging.version import parse
 from pyds8k.exceptions import ClientError, ClientException
 from controller.common.csi_logger import get_stdout_logger
@@ -148,9 +149,10 @@ def parse_version(bundle):
 
 def build_kwargs_from_capabilities(capabilities, pool_id, name, size):
     cli_kwargs = {}
+    size_in_gib = int(math.ceil(convert_size_bytes_to_gib(size)))
     cli_kwargs.update({
         'pool_id': pool_id,
-        'capacity_in_gib': size,
+        'capacity_in_gib': size_in_gib,
         'tp': 'none',
         'volume_names_list': [shorten_volume_name(name), ],
     })
@@ -281,16 +283,18 @@ class DS8KArrayMediator(ArrayMediator):
 
     def create_volume(self, name, size_in_bytes, capabilities, pool_id):
         logger.info(
-            "creating volume with name: {}, size: {}, in pool: {}, "
+            "Creating volume with name: {}, size: {}, in pool: {}, "
             "with capabilities: {}".format(
                 name, size_in_bytes, pool_id,
                 capabilities
             )
         )
         try:
-            size = convert_size_bytes_to_gib(size_in_bytes)
             cli_kwargs = build_kwargs_from_capabilities(capabilities, pool_id,
-                                                        name, size)
+                                                        name, size_in_bytes)
+            logger.debug(
+                "Start to create volume with parameters: {}".format(cli_kwargs)
+            )
             res = self.client.create_volumes(**cli_kwargs)[0]
             if 'id' in res:
                 logger.info("finished creating volume {}".format(name))
