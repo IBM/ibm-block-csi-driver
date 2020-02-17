@@ -49,6 +49,12 @@ class VolumeCreationError(BaseArrayActionException):
         self.message = messages.VolumeCreationError_message.format(name)
 
 
+class VolumeDeletionError(BaseArrayActionException):
+
+    def __init__(self, volume_id):
+        self.message = messages.VolumeDeletionError_message.format(volume_id)
+
+
 class IllegalObjectName(BaseArrayActionException):
 
     def __init__(self, msg):

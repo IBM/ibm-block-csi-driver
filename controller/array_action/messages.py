@@ -39,3 +39,5 @@ VolumeMappedToMultipleHostsError_message = "Volume is already mapped to differen
 NotSupportStorageVersionError_message = 'Unsupported storage system microcode version {}, the version should not lower than {}'  # noqa
 
 VolumeCreationError_message = 'Failed to create volume {}'
+
+VolumeDeletionError_message = 'Failed to delete volume {}'

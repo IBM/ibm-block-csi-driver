@@ -1,7 +1,7 @@
 from hashlib import sha1
 import math
 from packaging.version import parse
-from pyds8k.exceptions import ClientError, ClientException
+from pyds8k.exceptions import ClientError, ServerError, ClientException, NotFound
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.size_converter import convert_size_bytes_to_gib
 from controller.common.size_converter import convert_size_gib_to_bytes
@@ -77,6 +77,7 @@ IOPORT_WWPN = 'wwpn'
 # IOPORT_WWNN = ''
 IOPORT_PORT_SPEED = 'speed'
 IOPORT_STATUS = 'state'
+IOPORT_STATUS_ONLINE = 'online'
 IOPORT_LOCATION = 'loc'
 IOPORT_ENCLOSURE_NUMBER = 'io_enclosure'
 
@@ -85,6 +86,10 @@ HOST_ID = 'name'
 HOST_NAME = 'name'
 HOST_STATE = 'state'
 HOST_TYPE = 'hosttype'  # VMWare
+HOST_VOLUME_MAPPINGS = 'mappings_briefs'
+HOST_VOLUME_MAPPING_VOLUME_ID = 'volume_id'
+HOST_VOLUME_MAPPING_LUN_ID = 'lunid'
+HOST_PORTS = 'host_ports_briefs'
 HOST_ADDRESS_DISCOVERY = 'addrdiscovery'
 
 # host port
@@ -96,7 +101,7 @@ HOST_PORT_TYPE = 'hosttype'
 
 # host mapping
 HOST_MAPPING_LUN_ID = 'lunid'
-HOST_MAPPING_VOLUME_NAME = 'volume'
+HOST_MAPPING_VOLUME_ID = 'volume'
 
 # user
 USER_NAME = 'name'
@@ -145,6 +150,10 @@ def parse_version(bundle):
     v2 = '{0:0{1}}'.format(int(v2), 2)
 
     return '.'.join([v1[-1], v2[0], v2[1]])
+
+
+def get_volume_id_from_scsi_identifier(scsi_id):
+    return scsi_id[-4:]
 
 
 def build_kwargs_from_capabilities(capabilities, pool_id, name, size):
@@ -325,10 +334,26 @@ class DS8KArrayMediator(ArrayMediator):
             raise controller_errors.VolumeCreationError(name)
 
     def delete_volume(self, volume_id):
-        pass
+        logger.info("Deleting volume {}".format(volume_id))
+        try:
+            self.client.delete_volume(
+                volume_id=get_volume_id_from_scsi_identifier(volume_id)
+            )
+            logger.info("Finished deleting volume {}".format(volume_id))
+        except NotFound:
+            raise controller_errors.VolumeNotFoundError(volume_id)
+        except ClientException as ex:
+            logger.error(
+                "Failed to delete volume {} in DS8K {}, reason is: {}".format(
+                    volume_id,
+                    self.identifier,
+                    ex.detail
+                )
+            )
+            raise controller_errors.VolumeDeletionError(volume_id)
 
     def get_volume(self, name, volume_context=None):
-        logger.debug("Getting volume : {}".format(name))
+        logger.debug("Getting volume {}".format(name))
         if not volume_context:
             logger.error(
                 "volume_context is not specified, "
@@ -357,6 +382,9 @@ class DS8KArrayMediator(ArrayMediator):
         pass
 
     def map_volume(self, volume_id, host_name):
+        pass
+
+    def unmap_volume(self, volume_id, host_name):
         pass
 
     def get_array_iqns(self):

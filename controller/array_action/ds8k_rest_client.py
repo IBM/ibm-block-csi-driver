@@ -182,6 +182,10 @@ class RESTClient(object):
         return self.client.get_mappings_by_host(host_name)
 
     @dictionarize
+    def list_host_ioports(self, host_name):
+        return self.client.get_ioports_by_host(host_name)
+
+    @dictionarize
     def list_ioenclosures(self):
         return self.client.get_io_enclosures()
 
