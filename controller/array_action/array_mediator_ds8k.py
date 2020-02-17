@@ -325,12 +325,13 @@ class DS8KArrayMediator(ArrayMediator):
                 )
                 raise controller_errors.VolumeCreationError(name)
         except ClientException as ex:
-            msg = "Failed to create volume {} on array {}. Reason: {}".format(
-                name,
-                self.identifier,
-                ex.detail
+            logger.error(
+                "Failed to create volume {} on array {}, reason is: {}".format(
+                    name,
+                    self.identifier,
+                    ex.details
+                )
             )
-            logger.error(msg)
             raise controller_errors.VolumeCreationError(name)
 
     def delete_volume(self, volume_id):
@@ -344,10 +345,10 @@ class DS8KArrayMediator(ArrayMediator):
             raise controller_errors.VolumeNotFoundError(volume_id)
         except ClientException as ex:
             logger.error(
-                "Failed to delete volume {} in DS8K {}, reason is: {}".format(
+                "Failed to delete volume {} on array {}, reason is: {}".format(
                     volume_id,
                     self.identifier,
-                    ex.detail
+                    ex.details
                 )
             )
             raise controller_errors.VolumeDeletionError(volume_id)

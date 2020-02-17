@@ -4,7 +4,7 @@ from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
 from controller.array_action.array_mediator_ds8k import shorten_volume_name
 from controller.array_action.array_mediator_ds8k import SYSTEM_CODE_LEVEL, \
     VOLUME_LOGICAL_CAP, VOLUME_ID, VOLUME_NAME, VOLUME_POOL_ID
-from pyds8k.exceptions import ClientError, ClientException
+from pyds8k.exceptions import ClientError, ClientException, NotFound
 import controller.array_action.errors as array_errors
 from controller.array_action import config
 
@@ -166,15 +166,26 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_create_volume_failed_with_ClientException(self):
         self.client_mock.create_volumes.side_effect = ClientException("500")
         with self.assertRaises(array_errors.VolumeCreationError):
-            self.array.create_volume(
-                "fake_name", 1, {}, "fake_pool",
-            )
+            self.array.create_volume("fake_name", 1, {}, "fake_pool")
 
     def test_create_volume_failed_with_error_status(self):
         self.client_mock.create_volumes.return_value = [
             {"status": "failed"},
         ]
         with self.assertRaises(array_errors.VolumeCreationError):
-            self.array.create_volume(
-                "fake_name", 1, {}, "fake_pool",
-            )
+            self.array.create_volume("fake_name", 1, {}, "fake_pool")
+
+    def test_delete_volume(self):
+        scsi_id = "6005076306FFD3010000000000000001"
+        self.array.delete_volume(scsi_id)
+        self.client_mock.delete_volume.assert_called_once_with(volume_id=scsi_id[-4:])
+
+    def test_delete_volume_failed_with_ClientException(self):
+        self.client_mock.delete_volume.side_effect = ClientException("500")
+        with self.assertRaises(array_errors.VolumeDeletionError):
+            self.array.delete_volume("fake_name")
+
+    def test_delete_volume_failed_with_NotFound(self):
+        self.client_mock.delete_volume.side_effect = NotFound("404")
+        with self.assertRaises(array_errors.VolumeNotFoundError):
+            self.array.delete_volume("fake_name")
