@@ -28,10 +28,10 @@ class CredentialsError(BaseArrayActionException):
         self.message = messages.CredentialsError_message.format(endpoint)
 
 
-class NotSupportStorageVersionError(BaseArrayActionException):
+class UnsupportedStorageVersionError(BaseArrayActionException):
 
     def __init__(self, version, supported_version):
-        self.message = messages.NotSupportStorageVersionError_message.format(version, supported_version)  # noqa
+        self.message = messages.UnsupportedStorageVersionError_message.format(version, supported_version)  # noqa
 
 
 # =============================================================================

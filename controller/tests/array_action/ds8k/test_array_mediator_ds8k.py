@@ -1,5 +1,5 @@
 import unittest
-from mock import Mock, patch, NonCallableMagicMock
+from mock import patch, NonCallableMagicMock
 from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
 from controller.array_action.array_mediator_ds8k import shorten_volume_name
 from controller.array_action.array_mediator_ds8k import SYSTEM_CODE_LEVEL, \
@@ -53,7 +53,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_connect_to_unsupported_system(self):
         self.client_mock.get_system.return_value = \
             [{SYSTEM_CODE_LEVEL: "87.50.34.0"}]
-        with self.assertRaises(array_errors.NotSupportStorageVersionError):
+        with self.assertRaises(array_errors.UnsupportedStorageVersionError):
             DS8KArrayMediator("user", "password", self.endpoint)
 
     def test_validate_capabilities_passed(self):

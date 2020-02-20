@@ -5,19 +5,20 @@ from controller.common.csi_logger import get_stdout_logger
 logger = get_stdout_logger()
 
 
-def dictionarize(func):
+def normalize_response(func):
     def inner(self, *args, **kwargs):
         res_obj = func(self, *args, **kwargs)
         if not isinstance(res_obj, list):
             res_obj = [res_obj, ]
-        coverted = []
-        for res in res_obj:
-            try:
-                coverted.append(res.representation)
-            except AttributeError:
-                coverted.append(res)
-        return coverted
+        return list(map(_normalize_item, res_obj))
     return inner
+
+
+def _normalize_item(res):
+    try:
+        return res.representation
+    except AttributeError:
+        return res
 
 
 def _int_lunid_to_hex(lunid):
@@ -26,9 +27,9 @@ def _int_lunid_to_hex(lunid):
 
 def int_to_scsilun(lun):
     # There are two style lun number, one's decimal value is <256 and the other
-    # is full as 16 hex digit. According to T10 SAN, when decimal value value
-    # is more then 256 and it is converted to the full 16 hex digit, it should
-    # be swapped and hex.
+    # is full as 16 hex digit. According to T10 SAN, when decimal value is more
+    # then 256 and it is converted to the full 16 hex digit, it should be
+    # swapped and converted into hex.
     # For example, zlinux lun number stored in SC DB is 1075331113. It should
     # be hex to '40184029' and swapped to '40294018'. When the lun number is 12
     # and it is <256, it should be hex to '0c' directly.
@@ -79,29 +80,29 @@ class RESTClient(object):
 
         self.client = Client(**client_kwargs)
 
-    @dictionarize
+    @normalize_response
     def get_system(self):
         return self.client.get_system()
 
-    @dictionarize
+    @normalize_response
     def get_volume(self, volume_id):
         return self.client.get_volumes(volume_id)
 
-    @dictionarize
+    @normalize_response
     def get_host(self, host_name):
         return self.client.get_hosts(host_name)
 
-    @dictionarize
+    @normalize_response
     def get_host_mapping(self, host_name, lunid):
         return self.client.get_mapping_by_host(host_name=host_name,
                                                lunid=int_to_scsilun(lunid)
                                                )
 
-    @dictionarize
+    @normalize_response
     def get_host_port(self, port_id):
         return self.client.get_host_ports(port_id)
 
-    @dictionarize
+    @normalize_response
     def get_extentpool(self, pool_id):
         pool = self.client.get_pools(pool_id)
         try:
@@ -112,103 +113,58 @@ class RESTClient(object):
             pass
         return pool
 
-    @dictionarize
+    @normalize_response
     def list_extentpools(self):
         """
         return extent pool list without ese capacity info.
         """
         return self.client.get_pools()
 
-    @dictionarize
+    @normalize_response
     def list_hosts(self):
         return self.client.get_hosts()
 
-    @dictionarize
+    @normalize_response
     def list_host_ports(self):
         return self.client.get_host_ports()
 
-    @dictionarize
+    @normalize_response
     def list_extentpool_volumes(self, pool_id):
-        # two requests
-        # pool = self.client.get_pools(pool_id)
-        # return pool.volumes
-
-        # one request
         return self.client.get_volumes_by_pool(pool_id)
 
-    @dictionarize
+    @normalize_response
     def list_extentpool_virtualpool(self, pool_id):
         return self.client.get_eserep_by_pool(pool_id)
 
-    @dictionarize
+    @normalize_response
     def list_flashcopies(self):
         return self.client.get_flashcopies()
 
-    @dictionarize
+    @normalize_response
     def list_volume_flashcopies(self, volume_id):
-        # two requests
-        # volume = self.client.get_volumes(volume_id)
-        # return volume.flashcopy
-
-        # one request
         return self.client.get_flashcopies_by_volume(volume_id)
 
-    @dictionarize
-    def list_remotecopies(self):
-        return self.client.get_cs_pprcs()
-
-    @dictionarize
-    def list_volume_remotecopies(self, volume_id):
-        return self.client.get_pprc_by_volume(volume_id)
-
-    @dictionarize
-    def get_remotecopy(self, rc_id):
-        return self.client.get_cs_pprcs(rc_id)
-
-    @dictionarize
+    @normalize_response
     def list_logical_subsystems(self):
         return self.client.get_lss()
 
-    @dictionarize
+    @normalize_response
     def list_lss_volumes(self, lss_number):
         return self.client.get_volumes_by_lss(lss_number)
 
-    @dictionarize
+    @normalize_response
     def list_fcports(self):
         return self.client.get_ioports()
 
-    @dictionarize
+    @normalize_response
     def list_host_mappings(self, host_name):
         return self.client.get_mappings_by_host(host_name)
 
-    @dictionarize
+    @normalize_response
     def list_host_ioports(self, host_name):
         return self.client.get_ioports_by_host(host_name)
 
-    @dictionarize
-    def list_ioenclosures(self):
-        return self.client.get_io_enclosures()
-
-    @dictionarize
-    def list_nodes(self):
-        return self.client.get_nodes()
-
-    @dictionarize
-    def list_marrays(self):
-        return self.client.get_marrays()
-
-    @dictionarize
-    def list_encryption_groups(self):
-        return self.client.get_encryption_groups()
-
-    @dictionarize
-    def list_events(self, before=None, after=None):
-        # before&after are datetime instances.
-        return self.client.get_events_by_filter(before=before,
-                                                after=after
-                                                )
-
-    @dictionarize
+    @normalize_response
     def get_user(self):
         return self.client.get_users(user_name=self.client.client.user)
 
@@ -216,7 +172,7 @@ class RESTClient(object):
         mappings = self.client.get_mappings_by_host(host_name)
         return [mapping.id for mapping in mappings]
 
-    @dictionarize
+    @normalize_response
     def create_volumes(self, pool_id, capacity_in_gib, tp,
                        volume_names_list):
         """
@@ -249,23 +205,23 @@ class RESTClient(object):
         return self.client.update_volume_move(volume_id=volume_id,
                                               new_pool=new_pool_id)
 
-    def crate_host(self, host_name, wwpn, host_type='VMWare'):
+    def create_host(self, host_name, wwpn, host_type='VMWare'):
         hosts = self.client.create_host(host_name=host_name,
                                         hosttype=host_type
                                         )
-        self.attach_hostport_to_host(host_name=hosts[0].id, wwpn=wwpn)
+        self.attach_port_to_host(host_name=hosts[0].id, wwpn=wwpn)
         return hosts[0].id
 
     def delete_host(self, host_name):
         # delete a host will delete all the attached host ports.
         return self.client.delete_host(host_name=host_name)
 
-    def attach_hostport_to_host(self, host_name, wwpn):
+    def attach_port_to_host(self, host_name, wwpn):
         return self._get_attach_or_create_host_port(host_name=host_name,
                                                     wwpn=wwpn
                                                     )
 
-    def detach_hostport_from_host(self, wwpn):
+    def detach_port_from_host(self, wwpn):
         return self.client.delete_host_port(port_id=wwpn)
 
     def map_volume_to_host(self, host_name, volume_id, lunid=''):

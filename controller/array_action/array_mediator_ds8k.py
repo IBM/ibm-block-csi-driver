@@ -1,14 +1,13 @@
 from hashlib import sha1
-import math
 from packaging.version import parse
-from pyds8k.exceptions import ClientError, ServerError, ClientException, NotFound
+from pyds8k import exceptions
 from controller.common.csi_logger import get_stdout_logger
-from controller.common.size_converter import convert_size_bytes_to_gib
 from controller.common.size_converter import convert_size_gib_to_bytes
+from controller.common.size_converter import convert_and_ceil_size_bytes_to_gib
 from controller.array_action.array_mediator_interface import ArrayMediator
 from controller.array_action.utils import classproperty
 from controller.array_action.ds8k_rest_client import RESTClient
-import controller.array_action.errors as controller_errors
+import controller.array_action.errors as array_errors
 from controller.array_action import config
 from controller.array_action.array_action_types import Volume
 
@@ -135,10 +134,13 @@ RES_MSG = 'message'
 # response values
 RES_SUCCESS_STAUTS = ('ok', 'successful', )
 
+# response error codes
+INVALID_CREDENTIALS = 'BE7A002D'
+
 
 def parse_version(bundle):
     """
-    Parse ds8k version number form bundle.
+    Parse ds8k version number from bundle.
 
     rule is:
     87.51.34.0 => 7.5.1
@@ -154,24 +156,6 @@ def parse_version(bundle):
 
 def get_volume_id_from_scsi_identifier(scsi_id):
     return scsi_id[-4:]
-
-
-def build_kwargs_from_capabilities(capabilities, pool_id, name, size):
-    cli_kwargs = {}
-    size_in_gib = int(math.ceil(convert_size_bytes_to_gib(size)))
-    cli_kwargs.update({
-        'pool_id': pool_id,
-        'capacity_in_gib': size_in_gib,
-        'tp': 'none',
-        'volume_names_list': [shorten_volume_name(name), ],
-    })
-    capability = capabilities.get(config.CAPABILITIES_SPACEEFFICIENCY)
-    if capability:
-        capability = capability.lower()
-        if capability == config.CAPABILITY_THIN:
-            cli_kwargs.update({'tp': 'ese'})
-
-    return cli_kwargs
 
 
 # shorten volume name to 16 characters if it is too long.
@@ -225,21 +209,21 @@ class DS8KArrayMediator(ArrayMediator):
                                      password=self.password,
                                      )
             if parse(self.version) < parse(self.SUPPORTED_FROM_VERSION):
-                raise controller_errors.NotSupportStorageVersionError(
+                raise array_errors.UnsupportedStorageVersionError(
                     self.version, self.SUPPORTED_FROM_VERSION
                 )
-        except ClientError as e:
+        except exceptions.ClientError as e:
             # BE7A002D=Authentication has failed because the user name and
             # password combination that you have entered is not valid.
-            if str(e.message).upper() == 'BE7A002D':
-                raise controller_errors.CredentialsError(self.service_address)
+            if INVALID_CREDENTIALS in str(e.message).upper():
+                raise array_errors.CredentialsError(self.service_address)
             else:
                 raise ConnectionError()
-        except ClientException as e:
+        except exceptions.ClientException as e:
             logger.error(
                 'Failed to connect to DS8K array {}, reason is {}'.format(
-                    self.service_address,
-                    e
+                    self.identifier,
+                    e.details
                     )
                 )
             raise ConnectionError()
@@ -249,33 +233,26 @@ class DS8KArrayMediator(ArrayMediator):
 
     def get_system_info(self):
         """Get the system result"""
-        system_info = self.client.get_system()[0]
-        return system_info
+        if self._system_info is None:
+            self._system_info = self.client.get_system()[0]
+        return self._system_info
 
     @property
     def identifier(self):
-        if self._system_info is None:
-            self._system_info = self.get_system_info()
-        return self._system_info[SYSTEM_ID]
+        return self.get_system_info()[SYSTEM_ID]
 
     @property
     def name(self):
-        if self._system_info is None:
-            self._system_info = self.get_system_info()
-        return self._system_info.get(SYSTEM_NAME, None) \
+        return self.get_system_info().get(SYSTEM_NAME, None) \
             or self.identifier
 
     @property
     def version(self):
-        if self._system_info is None:
-            self._system_info = self.get_system_info()
-        return parse_version(self._system_info[SYSTEM_CODE_LEVEL])
+        return parse_version(self.get_system_info()[SYSTEM_CODE_LEVEL])
 
     @property
     def wwnn(self):
-        if self._system_info is None:
-            self._system_info = self.get_system_info()
-        return self._system_info[SYSTEM_WWNN]
+        return self.get_system_info()[SYSTEM_WWNN]
 
     def _generate_volume_scsi_identifier(self, volume_id):
         return '6{}000000000000{}'.format(self.wwnn[1:], volume_id)
@@ -290,6 +267,14 @@ class DS8KArrayMediator(ArrayMediator):
             array_type=self.array_type
         )
 
+    def get_se_capability_value(self, capabilities):
+        capability = capabilities.get(config.CAPABILITIES_SPACEEFFICIENCY)
+        if capability:
+            capability = capability.lower()
+            if capability == config.CAPABILITY_THIN:
+                return "ese"
+        return "none"
+
     def create_volume(self, name, size_in_bytes, capabilities, pool_id):
         logger.info(
             "Creating volume with name: {}, size: {}, in pool: {}, "
@@ -299,8 +284,14 @@ class DS8KArrayMediator(ArrayMediator):
             )
         )
         try:
-            cli_kwargs = build_kwargs_from_capabilities(capabilities, pool_id,
-                                                        name, size_in_bytes)
+            cli_kwargs = {}
+            size_in_gib = convert_and_ceil_size_bytes_to_gib(size_in_bytes)
+            cli_kwargs.update({
+                'pool_id': pool_id,
+                'capacity_in_gib': size_in_gib,
+                'tp': self.get_se_capability_value(capabilities),
+                'volume_names_list': [shorten_volume_name(name), ],
+            })
             logger.debug(
                 "Start to create volume with parameters: {}".format(cli_kwargs)
             )
@@ -314,17 +305,17 @@ class DS8KArrayMediator(ArrayMediator):
                     name,
                     self.identifier,
                     res.get(RES_MSG, '')
-                )
+                    )
                 logger.error(msg)
-                raise controller_errors.VolumeCreationError(name)
+                raise array_errors.VolumeCreationError(name)
             else:
                 logger.error('Failed to create volume {} on array {}.'.format(
                     name,
                     self.identifier,
+                    )
                 )
-                )
-                raise controller_errors.VolumeCreationError(name)
-        except ClientException as ex:
+                raise array_errors.VolumeCreationError(name)
+        except exceptions.ClientException as ex:
             logger.error(
                 "Failed to create volume {} on array {}, reason is: {}".format(
                     name,
@@ -332,7 +323,7 @@ class DS8KArrayMediator(ArrayMediator):
                     ex.details
                 )
             )
-            raise controller_errors.VolumeCreationError(name)
+            raise array_errors.VolumeCreationError(name)
 
     def delete_volume(self, volume_id):
         logger.info("Deleting volume {}".format(volume_id))
@@ -341,9 +332,9 @@ class DS8KArrayMediator(ArrayMediator):
                 volume_id=get_volume_id_from_scsi_identifier(volume_id)
             )
             logger.info("Finished deleting volume {}".format(volume_id))
-        except NotFound:
-            raise controller_errors.VolumeNotFoundError(volume_id)
-        except ClientException as ex:
+        except exceptions.NotFound:
+            raise array_errors.VolumeNotFoundError(volume_id)
+        except exceptions.ClientException as ex:
             logger.error(
                 "Failed to delete volume {} on array {}, reason is: {}".format(
                     volume_id,
@@ -351,50 +342,49 @@ class DS8KArrayMediator(ArrayMediator):
                     ex.details
                 )
             )
-            raise controller_errors.VolumeDeletionError(volume_id)
+            raise array_errors.VolumeDeletionError(volume_id)
 
     def get_volume(self, name, volume_context=None):
         logger.debug("Getting volume {}".format(name))
         if not volume_context:
             logger.error(
-                "volume_context is not specified, "
-                "can not get volumes from storage."
+                "volume_context is not specified, can not get volumes from storage."
             )
-            raise controller_errors.VolumeNotFoundError(name)
+            raise array_errors.VolumeNotFoundError(name)
 
         volume_candidates = []
         if config.CONTEXT_POOL in volume_context:
             volume_candidates = self.client.list_extentpool_volumes(
                 volume_context[config.CONTEXT_POOL]
             )
-        # elif config.CONTEXT_LSS in volume_context:
-        #     volume_candidates = self.client.list_lss_volumes(
-        #         volume_context[config.CONTEXT_LSS]
-        #     )
-
         for vol in volume_candidates:
             if vol[VOLUME_NAME] == shorten_volume_name(name):
                 logger.debug("Found volume: {}".format(vol))
                 return self._generate_volume_response(vol)
 
-        raise controller_errors.VolumeNotFoundError(name)
+        raise array_errors.VolumeNotFoundError(name)
 
     def get_volume_mappings(self, volume_id):
+        # TODO: CSI-1197
         pass
 
     def map_volume(self, volume_id, host_name):
+        # TODO: CSI-1198
         pass
 
     def unmap_volume(self, volume_id, host_name):
+        # TODO: CSI-1199
         pass
 
     def get_array_iqns(self):
-        pass
+        return []
 
     def get_array_fc_wwns(self, host_name=None):
+        # TODO: CSI-1200
         pass
 
     def get_host_by_host_identifiers(self, initiators):
+        # TODO: CSI-1201
         pass
 
     def validate_supported_capabilities(self, capabilities):
@@ -406,7 +396,7 @@ class DS8KArrayMediator(ArrayMediator):
                 config.CAPABILITIES_SPACEEFFICIENCY).lower() not in
                 [config.CAPABILITY_THIN, ]):
             logger.error("capabilities is not supported.")
-            raise controller_errors.StorageClassCapabilityNotSupported(
+            raise array_errors.StorageClassCapabilityNotSupported(
                 capabilities)
 
         logger.debug("Finished validating capabilities.")

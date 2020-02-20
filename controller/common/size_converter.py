@@ -1,3 +1,6 @@
+import math
+
+
 # =============================================================================
 # Definitions
 # =============================================================================
@@ -11,16 +14,6 @@ KiB = 2**10     # Kibibyte = kiB = 2^10 B = 1,024 bytes
 GB = 10**9      # Gigabyte = GB = 10^9 B = 1,000,000,000 bytes
 MB = 10**6      # Megabyte = MB = 10^6 B = 1,000,000 bytes
 KB = 10**3      # Kilobyte = kB = 10^3 B = 1,000 bytes
-
-
-class SizeUnit(object):
-    BYTE = 'byte'
-    KB = 'kb'
-    MB = 'mb'
-    GB = 'gb'
-    KiB = 'kib'
-    MiB = 'mib'
-    GiB = 'gib'
 
 
 # =============================================================================
@@ -37,3 +30,7 @@ def convert_size_gib_to_bytes(size_in_gib):
 
 def convert_size_bytes_to_gib(size_in_bytes):
     return float(size_in_bytes) / GiB
+
+
+def convert_and_ceil_size_bytes_to_gib(size_in_bytes):
+    return int(math.ceil(convert_size_bytes_to_gib(size_in_bytes)))
