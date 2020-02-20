@@ -2,8 +2,6 @@ from hashlib import sha1
 from packaging.version import parse
 from pyds8k import exceptions
 from controller.common.csi_logger import get_stdout_logger
-from controller.common.size_converter import convert_size_gib_to_bytes
-from controller.common.size_converter import convert_and_ceil_size_bytes_to_gib
 from controller.array_action.array_mediator_interface import ArrayMediator
 from controller.array_action.utils import classproperty
 from controller.array_action.ds8k_rest_client import RESTClient
@@ -186,7 +184,7 @@ class DS8KArrayMediator(ArrayMediator):
 
     @classproperty
     def minimal_volume_size_in_bytes(self):
-        return convert_size_gib_to_bytes(1)
+        return 512  # 1 block, 512 bytes
 
     @classproperty
     def max_lun_retries(self):
@@ -285,17 +283,17 @@ class DS8KArrayMediator(ArrayMediator):
         )
         try:
             cli_kwargs = {}
-            size_in_gib = convert_and_ceil_size_bytes_to_gib(size_in_bytes)
             cli_kwargs.update({
+                'name': shorten_volume_name(name),
+                'capacity_in_bytes': size_in_bytes,
                 'pool_id': pool_id,
-                'capacity_in_gib': size_in_gib,
                 'tp': self.get_se_capability_value(capabilities),
-                'volume_names_list': [shorten_volume_name(name), ],
+
             })
             logger.debug(
                 "Start to create volume with parameters: {}".format(cli_kwargs)
             )
-            res = self.client.create_volumes(**cli_kwargs)[0]
+            res = self.client.create_volume(**cli_kwargs)[0]
             if 'id' in res:
                 logger.info("finished creating volume {}".format(name))
                 return self._generate_volume_response(res)

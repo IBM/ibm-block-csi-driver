@@ -173,29 +173,21 @@ class RESTClient(object):
         return [mapping.id for mapping in mappings]
 
     @normalize_response
-    def create_volumes(self, pool_id, capacity_in_gib, tp,
-                       volume_names_list):
-        """
-        :returns: The representation of created volumes.
-        :rtype: list of volume dict, if all volumes are created successfully.
-                If some failed, an error dict will be returned.
-
-                So it may look like:
-                [volume1_dict, volume2_dict, volume3_error_msg_dict]
-        """
-        return self.client.create_volumes(name_col=volume_names_list,
-                                          cap=capacity_in_gib,
-                                          pool=pool_id,
-                                          tp=tp)
+    def create_volume(self, name, capacity_in_bytes, pool_id, tp):
+        return self.client.create_volume_fb(name=name,
+                                            cap=capacity_in_bytes,
+                                            captype='bytes',
+                                            pool=pool_id,
+                                            tp=tp)
 
     def rename_volume(self, volume_id, new_name):
         return self.client.update_volume_rename(volume_id=volume_id,
                                                 new_name=new_name)
 
-    def extend_volume(self, volume_id, new_size_in_GiB):
+    def extend_volume(self, volume_id, new_size_in_bytes):
         return self.client.update_volume_extend(volume_id=volume_id,
-                                                new_size=new_size_in_GiB,
-                                                captype='gib')
+                                                new_size=new_size_in_bytes,
+                                                captype='bytes')
 
     def delete_volume(self, volume_id):
         # remember to unmap all hosts before delete.

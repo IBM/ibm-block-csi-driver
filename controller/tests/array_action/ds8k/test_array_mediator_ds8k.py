@@ -117,7 +117,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self._test_create_volume_with_capabilities_succeeded(True)
 
     def _test_create_volume_with_capabilities_succeeded(self, is_thin):
-        self.client_mock.create_volumes.return_value = [
+        self.client_mock.create_volume.return_value = [
             self.volume_response,
         ]
         name = self.volume_response[VOLUME_NAME]
@@ -134,11 +134,11 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         vol = self.array.create_volume(
             name, size_in_bytes, capabilities, pool_id,
         )
-        self.client_mock.create_volumes.assert_called_once_with(
+        self.client_mock.create_volume.assert_called_once_with(
             pool_id=pool_id,
-            capacity_in_gib=1,
+            capacity_in_bytes='1073741824',
             tp=tp,
-            volume_names_list=[name, ]
+            name='test_name',
         )
         self.assertEqual(vol.volume_name, self.volume_response[VOLUME_NAME])
 
@@ -147,7 +147,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         short_name = shorten_volume_name(volume_name)
         volume_res = self.volume_response
         volume_res[VOLUME_NAME] = short_name
-        self.client_mock.create_volumes.return_value = [volume_res, ]
+        self.client_mock.create_volume.return_value = [volume_res, ]
         size_in_bytes = volume_res[VOLUME_LOGICAL_CAP]
         capabilities = {}
         tp = 'none'
@@ -155,21 +155,21 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         vol = self.array.create_volume(
             volume_name, size_in_bytes, capabilities, pool_id,
         )
-        self.client_mock.create_volumes.assert_called_once_with(
+        self.client_mock.create_volume.assert_called_once_with(
             pool_id=pool_id,
-            capacity_in_gib=1,
+            capacity_in_bytes='1073741824',
             tp=tp,
-            volume_names_list=[short_name, ]
+            name=short_name,
         )
         self.assertEqual(vol.volume_name, short_name)
 
     def test_create_volume_failed_with_ClientException(self):
-        self.client_mock.create_volumes.side_effect = ClientException("500")
+        self.client_mock.create_volume.side_effect = ClientException("500")
         with self.assertRaises(array_errors.VolumeCreationError):
             self.array.create_volume("fake_name", 1, {}, "fake_pool")
 
     def test_create_volume_failed_with_error_status(self):
-        self.client_mock.create_volumes.return_value = [
+        self.client_mock.create_volume.return_value = [
             {"status": "failed"},
         ]
         with self.assertRaises(array_errors.VolumeCreationError):
