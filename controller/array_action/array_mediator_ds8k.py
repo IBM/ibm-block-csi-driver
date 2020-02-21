@@ -180,7 +180,8 @@ class DS8KArrayMediator(ArrayMediator):
 
     @classproperty
     def max_connections(self):
-        return 20
+        # max for rest api is 128.
+        return 50
 
     @classproperty
     def minimal_volume_size_in_bytes(self):
