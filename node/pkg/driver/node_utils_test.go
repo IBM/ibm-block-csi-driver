@@ -48,7 +48,7 @@ func TestParseIscsiInitiators(t *testing.T) {
 		},
 		{
 			name:   "non existing file",
-			expErr: &os.PathError{"open", "/non/existent/path", syscall.ENOENT},
+			expErr: &os.PathError{Op: "open", Path: "/non/existent/path", Err: syscall.ENOENT},
 		},
 		{
 			name:         "right_iqn",
