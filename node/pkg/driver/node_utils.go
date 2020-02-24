@@ -20,15 +20,22 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"path/filepath"
+	"k8s.io/apimachinery/pkg/util/errors"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
-	"k8s.io/apimachinery/pkg/util/errors"
 
-	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"k8s.io/kubernetes/pkg/util/mount"
+)
+
+const (
+	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
+	// Command lines inside the container will show /host prefix.
+	PrefixChrootOfHostRoot = "/host"
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
@@ -44,15 +51,23 @@ type NodeUtilsInterface interface {
 	ReadFromStagingInfoFile(filePath string) (map[string]string, error)
 	ClearStageInfoFile(filePath string) error
 	StageInfoFileIsExist(filePath string) bool
-	Exists(filePath string) bool
+	IsPathExists(filePath string) bool
+	IsDirectory(filePath string) bool
+	RemoveFileOrDirectory(filePath string) error
+	IsNotMountPoint(file string) (bool, error)
+	GetPodPath(filepath string) string
 }
 
 type NodeUtils struct {
 	Executer executer.ExecuterInterface
+	mounter mount.Interface
 }
 
-func NewNodeUtils(executer executer.ExecuterInterface) *NodeUtils {
-	return &NodeUtils{Executer: executer}
+func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface) *NodeUtils {
+	return &NodeUtils{
+		Executer: executer,
+		mounter: mounter,
+	}
 }
 
 func (n NodeUtils) ParseIscsiInitiators() (string, error) {
@@ -103,7 +118,7 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, c
 func (n NodeUtils) WriteStageInfoToFile(fPath string, info map[string]string) error {
 	// writes to stageTargetPath/filename
 
-	fPath = PrefixChrootOfHostRoot + fPath
+	fPath = n.GetPodPath(fPath)
 	stagePath := filepath.Dir(fPath)
 	if _, err := os.Stat(stagePath); os.IsNotExist(err) {
         logger.Debugf("The filePath [%s] is not existed. Create it.", stagePath)
@@ -130,7 +145,7 @@ func (n NodeUtils) WriteStageInfoToFile(fPath string, info map[string]string) er
 
 func (n NodeUtils) ReadFromStagingInfoFile(filePath string) (map[string]string, error) {
 	// reads from stageTargetPath/filename
-	filePath = PrefixChrootOfHostRoot + filePath
+	filePath = n.GetPodPath(filePath)
 
 	logger.Debugf("Read StagingInfoFile : path {%v},", filePath)
 	stageInfo, err := ioutil.ReadFile(filePath)
@@ -151,7 +166,7 @@ func (n NodeUtils) ReadFromStagingInfoFile(filePath string) (map[string]string, 
 }
 
 func (n NodeUtils) ClearStageInfoFile(filePath string) error {
-	filePath = PrefixChrootOfHostRoot + filePath
+	filePath = n.GetPodPath(filePath)
 	logger.Debugf("Delete StagingInfoFile : path {%v},", filePath)
 
 	return os.Remove(filePath)
@@ -230,11 +245,40 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 	return fcPorts, nil
 }
 
-func (n NodeUtils) Exists(path string) bool {
+func (n NodeUtils) IsPathExists(path string) bool {
 	_, err := os.Stat(path)
 	if err != nil {
+		if !os.IsNotExist(err) {
+			logger.Warningf("Check is file %s exists returned error %s", path, err.Error())
+		}
 		return false
 	}
 
 	return true
+}
+
+func (n NodeUtils) IsDirectory(path string) bool {
+	targetFile, err := os.Stat(path)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			logger.Warningf("Check is directory %s returned error %s", path, err.Error())
+		}
+		return false
+	}
+	return targetFile.Mode().IsDir()
+}
+
+// Deletes file or directory with all sub-directories and files
+func (n NodeUtils) RemoveFileOrDirectory(path string) error {
+	return os.RemoveAll(path)
+}
+
+func (n NodeUtils) IsNotMountPoint(file string) (bool, error) {
+	return mount.IsNotMountPoint(n.mounter, file)
+}
+
+// To some files/dirs pod cannot access using its real path. It has to use a different path which is <prefix>/<path>.
+// E.g. in order to access /etc/test.txt pod has to use /host/etc/test.txt
+func (n NodeUtils) GetPodPath(origPath string) string {
+	return path.Join(PrefixChrootOfHostRoot, origPath)
 }
