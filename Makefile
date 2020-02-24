@@ -26,6 +26,17 @@ DRIVER_CONFIG_YML=$(shell pwd)/common/config.yaml
 
 .EXPORT_ALL_VARIABLES:
 
+define gofmt-test =
+@echo ">> checking code style"
+@fmtRes=$$(gofmt -d $$(find ./node/ -name '*.go')); \
+if [ -n "$${fmtRes}" ]; then \
+	echo "gofmt checking failed!"; echo "$${fmtRes}"; echo; \
+	exit 1; \
+fi
+@echo ">> code style passed!"
+endef
+
+
 .PHONY: ibm-block-csi-driver
 ibm-block-csi-driver:
 	mkdir -p bin
@@ -35,6 +46,7 @@ ibm-block-csi-driver:
 test:
 	if [ -d ./node/mocks ]; then rm -rf ./node/mocks; fi
 	go generate ./...
+	$(gofmt-test)
 	go vet -c=1 ./node/...
 	go test -v -race ./node/...
 
@@ -43,6 +55,7 @@ test-xunit:
 	mkdir -p ./build/reports
 	if [ -d ./node/mocks ]; then rm -rf ./node/mocks; fi
 	go generate ./...
+	$(gofmt-test)
 	go vet -c=1 ./node/...
 	go test -v -race ./node/... | go2xunit -output build/reports/csi-node-unitests.xml
 	go test -v -race ./node/...	# run again so the makefile will fail in case tests failing

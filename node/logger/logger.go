@@ -74,8 +74,8 @@ func (f *LogFormat) Format(entry *logrus.Entry) ([]byte, error) {
 	}
 	b.WriteString(entry.Time.Format(f.TimestampFormat) + " ")
 	b.WriteString(strings.ToUpper(entry.Level.String()) + "\t")
-	b.WriteString(fmt.Sprintf("%v", "[" + goid.(string)) + "] ")
-	b.WriteString(fmt.Sprintf("%v", "[" + additionalGoIDInfo.(string)) + "] ")
+	b.WriteString(fmt.Sprintf("%v", "["+goid.(string)) + "] ")
+	b.WriteString(fmt.Sprintf("%v", "["+additionalGoIDInfo.(string)) + "] ")
 	b.WriteString("(" + caller.(string) + ") - ")
 	b.WriteString(entry.Message)
 	b.WriteString("\n")
@@ -115,8 +115,8 @@ func logEntry() *logrus.Entry {
 		caller = filepath.Base(file) + ":" + strconv.Itoa(no)
 	}
 	logEntry := getInstance().WithFields(logrus.Fields{goIDField: strconv.FormatUint(goid, 10),
-													   additionalGoIDInfoField: additionalId,
-													   callerField:             caller})
+		additionalGoIDInfoField: additionalId,
+		callerField:             caller})
 	return logEntry
 }
 

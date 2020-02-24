@@ -40,11 +40,11 @@ const (
 
 func newTestNodeService(nodeUtils driver.NodeUtilsInterface, nodeMounter driver.NodeMounter) driver.NodeService {
 	return driver.NodeService{
-		Hostname:   "test-host",
-		ConfigYaml: driver.ConfigFile{},
+		Hostname:         "test-host",
+		ConfigYaml:       driver.ConfigFile{},
 		VolumeIdLocksMap: driver.NewSyncLock(),
-		NodeUtils:  nodeUtils,
-		Mounter: nodeMounter,
+		NodeUtils:        nodeUtils,
+		Mounter:          nodeMounter,
 	}
 }
 
@@ -177,10 +177,10 @@ func TestNodePublishVolume(t *testing.T) {
 			testFunc: func(t *testing.T) {
 				driver := newTestNodeService(nil, nil)
 				req := &csi.NodePublishVolumeRequest{
-					PublishContext:    map[string]string{},
-					TargetPath:        targetPath,
-					VolumeCapability:  fsVolCap,
-					VolumeId:          "vol-test",
+					PublishContext:   map[string]string{},
+					TargetPath:       targetPath,
+					VolumeCapability: fsVolCap,
+					VolumeId:         "vol-test",
 				}
 
 				_, err := driver.NodePublishVolume(context.TODO(), req)
@@ -230,7 +230,7 @@ func TestNodePublishVolume(t *testing.T) {
 							Mode: csi.VolumeCapability_AccessMode_UNKNOWN,
 						},
 					},
-					VolumeId:          "vol-test",
+					VolumeId: "vol-test",
 				}
 
 				_, err := driver.NodePublishVolume(context.TODO(), req)
@@ -535,58 +535,58 @@ func TestNodeGetInfo(t *testing.T) {
 		return_fc_err  error
 		expErr         error
 		expNodeId      string
-		iscsiExists      bool
+		iscsiExists    bool
 		fcExists       bool
 	}{
 		{
-			name: "good iqn, empty fc with error from node_utils",
+			name:          "good iqn, empty fc with error from node_utils",
 			return_fc_err: fmt.Errorf("some error"),
-			expErr: status.Error(codes.Internal, fmt.Errorf("some error").Error()),
-			iscsiExists: true,
-			fcExists: true,
+			expErr:        status.Error(codes.Internal, fmt.Errorf("some error").Error()),
+			iscsiExists:   true,
+			fcExists:      true,
 		},
 		{
-			name: "empty iqn with error, one fc port",
-			return_fcs: []string{"10000000c9934d9f"},
-			expNodeId: "test-host;;10000000c9934d9f",
+			name:        "empty iqn with error, one fc port",
+			return_fcs:  []string{"10000000c9934d9f"},
+			expNodeId:   "test-host;;10000000c9934d9f",
 			iscsiExists: true,
-			fcExists: true,
+			fcExists:    true,
 		},
 		{
-			name: "empty iqn with error from node_utils, one more fc ports",
-			return_iqn: "",
-			return_fcs: []string{"10000000c9934d9f","10000000c9934d9h"},
-			expNodeId: "test-host;;10000000c9934d9f:10000000c9934d9h",
+			name:        "empty iqn with error from node_utils, one more fc ports",
+			return_iqn:  "",
+			return_fcs:  []string{"10000000c9934d9f", "10000000c9934d9h"},
+			expNodeId:   "test-host;;10000000c9934d9f:10000000c9934d9h",
 			iscsiExists: true,
-			fcExists: true,
+			fcExists:    true,
 		},
 		{
-			name: "good iqn and good fcs",
-			return_iqn: "iqn.1994-07.com.redhat:e123456789",
-			return_fcs: []string{"10000000c9934d9f","10000000c9934d9h"},
-			expNodeId: "test-host;iqn.1994-07.com.redhat:e123456789;10000000c9934d9f:10000000c9934d9h",
+			name:        "good iqn and good fcs",
+			return_iqn:  "iqn.1994-07.com.redhat:e123456789",
+			return_fcs:  []string{"10000000c9934d9f", "10000000c9934d9h"},
+			expNodeId:   "test-host;iqn.1994-07.com.redhat:e123456789;10000000c9934d9f:10000000c9934d9h",
 			iscsiExists: true,
-			fcExists: true,
+			fcExists:    true,
 		},
 		{
-			name: "iqn and fc path are inexistent",
+			name:        "iqn and fc path are inexistent",
 			iscsiExists: false,
-			fcExists: false,
-			expErr: status.Error(codes.Internal, fmt.Errorf("Cannot find valid fc wwns or iscsi iqn").Error()),
+			fcExists:    false,
+			expErr:      status.Error(codes.Internal, fmt.Errorf("Cannot find valid fc wwns or iscsi iqn").Error()),
 		},
 		{
-			name: "iqn path is inexistsent",
+			name:        "iqn path is inexistsent",
 			iscsiExists: false,
-			fcExists: true,
-			return_fcs: []string{"10000000c9934d9f"},
-			expNodeId: "test-host;;10000000c9934d9f",
+			fcExists:    true,
+			return_fcs:  []string{"10000000c9934d9f"},
+			expNodeId:   "test-host;;10000000c9934d9f",
 		},
 		{
-			name: "fc path is inexistent",
+			name:        "fc path is inexistent",
 			iscsiExists: true,
-			fcExists: false,
-			return_iqn: "iqn.1994-07.com.redhat:e123456789",
-			expNodeId: "test-host;iqn.1994-07.com.redhat:e123456789;",
+			fcExists:    false,
+			return_iqn:  "iqn.1994-07.com.redhat:e123456789",
+			expNodeId:   "test-host;iqn.1994-07.com.redhat:e123456789;",
 		},
 	}
 	for _, tc := range testCases {
@@ -608,7 +608,7 @@ func TestNodeGetInfo(t *testing.T) {
 				}
 			}
 
-			d:= newTestNodeService(fake_nodeutils, nil)
+			d := newTestNodeService(fake_nodeutils, nil)
 
 			expResponse := &csi.NodeGetInfoResponse{NodeId: tc.expNodeId}
 
