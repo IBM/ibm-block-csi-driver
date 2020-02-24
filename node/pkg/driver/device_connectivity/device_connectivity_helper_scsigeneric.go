@@ -129,7 +129,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 	lunIdStr := strconv.Itoa(lunId)
 
 	if connectivityType == "fc" {
-		targetPath = fmt.Sprintf("/dev/disk/by-path/%s*", FcSubsystem)
+		targetPath = fmt.Sprintf("/dev/disk/by-path/%s*", fcSubsystem)
 		// In host, the path like this: /dev/disk/by-path/pci-0000:13:00.0-fc-0x500507680b25c0aa-lun-0
 		// So add prefix "0x" for the arrayIdentifiers
 		for index, wwn := range arrayIdentifiers {
