@@ -115,6 +115,7 @@ class ArrayConnectionManager(object):
     def detect_array_type(self):
         logger.debug("detecting array connection type")
 
+        # Don't change the order here since svc port (22) is also opened in ds8k.
         for storage_type, port in [(XIVArrayMediator.array_type, XIVArrayMediator.port),
                                    (DS8KArrayMediator.array_type, DS8KArrayMediator.port),
                                    (SVCArrayMediator.array_type, SVCArrayMediator.port),

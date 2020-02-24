@@ -88,25 +88,40 @@ class TestGetconnection(unittest.TestCase):
         self.assertTrue(error_msg in str(ex.exception))
 
     @patch("controller.array_action.array_connection_manager._socket_connect_test")
-    def test_detect_array_type(self, socket_connet):
-        socket_connet.side_effect = [0, 1]
+    def test_detect_array_type(self, socket_connect_test_mock):
 
-        res = self.array_connection.detect_array_type()
-        self.assertEqual(res, XIVArrayMediator.array_type)
+        # arrays is a [host, open_ports] dict, note that both port 22 and 8452 are opened in ds8k
+        arrays = {
+            "svc_host": [SVCArrayMediator.port, ],
+            "ds8k_host": [DS8KArrayMediator.port, 22],
+            "xiv_host": [XIVArrayMediator.port, ],
 
-        socket_connet.side_effect = [1, 1, 0]
+        }
 
-        res = self.array_connection.detect_array_type()
-        self.assertEqual(res, DS8KArrayMediator.array_type)
+        def side_effect(host, port):
+            if host in arrays and port in arrays[host]:
+                return 0
+            return 1
 
-        socket_connet.side_effect = [1, 1, 1, 1, 0]
+        socket_connect_test_mock.side_effect = side_effect
 
-        res = self.array_connection.detect_array_type()
-        self.assertEqual(res, SVCArrayMediator.array_type)
+        self.assertEqual(
+            ArrayConnectionManager("", "", ["svc_host", ]).detect_array_type(),
+            SVCArrayMediator.array_type
+        )
 
-        socket_connet.side_effect = [1, 1, 1, 1, 1, 1]
+        self.assertEqual(
+            ArrayConnectionManager("", "", ["ds8k_host", ]).detect_array_type(),
+            DS8KArrayMediator.array_type
+        )
+
+        self.assertEqual(
+            ArrayConnectionManager("", "", ["xiv_host", ]).detect_array_type(),
+            XIVArrayMediator.array_type
+        )
+
         with self.assertRaises(FailedToFindStorageSystemType):
-            self.array_connection.detect_array_type()
+            ArrayConnectionManager("", "", ["unkonwn_host", ]).detect_array_type()
 
     @patch("controller.array_action.array_connection_manager.XIVArrayMediator._connect")
     def test_exit_reduces_connection_to_zero(self, connect):

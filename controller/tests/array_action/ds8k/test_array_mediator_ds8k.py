@@ -136,7 +136,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         )
         self.client_mock.create_volume.assert_called_once_with(
             pool_id=pool_id,
-            capacity_in_bytes='1073741824',
+            capacity_in_bytes=self.volume_response[VOLUME_LOGICAL_CAP],
             tp=tp,
             name='test_name',
         )
@@ -157,7 +157,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         )
         self.client_mock.create_volume.assert_called_once_with(
             pool_id=pool_id,
-            capacity_in_bytes='1073741824',
+            capacity_in_bytes=self.volume_response[VOLUME_LOGICAL_CAP],
             tp=tp,
             name=short_name,
         )

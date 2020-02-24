@@ -26,13 +26,17 @@ def _int_lunid_to_hex(lunid):
 
 
 def int_to_scsilun(lun):
-    # There are two style lun number, one's decimal value is <256 and the other
-    # is full as 16 hex digit. According to T10 SAN, when decimal value is more
-    # then 256 and it is converted to the full 16 hex digit, it should be
-    # swapped and converted into hex.
-    # For example, zlinux lun number stored in SC DB is 1075331113. It should
-    # be hex to '40184029' and swapped to '40294018'. When the lun number is 12
-    # and it is <256, it should be hex to '0c' directly.
+    """
+    There are two style lun number, one's decimal value is <256 and the other
+    is full as 16 hex digit. According to T10 SAN, when decimal value is more
+    than 256 and it is converted to the full 16 hex digit, it should be
+    swapped and converted into hex.
+    For example, zlinux lun number stored in SC DB is 1075331113. It should
+    be hex to '40184029' and swapped to '40294018'. When the lun number is 12
+    and it is <256, it should be hex to '0c' directly.
+
+    https://github.com/kubernetes/kubernetes/issues/45024
+    """
     pretreated_lun = int(lun)
     if pretreated_lun < 256:
         return _int_lunid_to_hex(pretreated_lun)
@@ -43,13 +47,17 @@ def int_to_scsilun(lun):
 
 
 def scsilun_to_int(lun):
-    # There are two style lun number, one's decimal value is <256 and the other
-    # is full as 16 hex digit. According to T10 SAN, the full 16 hex digit
-    # should be swapped and converted into decimal.
-    # For example, SC got zlinux lun number from DS8K API, '40294018'. And it
-    # should be swapped to '40184029' and converted into decimal, 1075331113.
-    # When the lun number is '0c' and its decimal value is <256, it should be
-    # converted directly into decimal, 12.
+    """
+    There are two style lun number, one's decimal value is <256 and the other
+    is full as 16 hex digit. According to T10 SAN, the full 16 hex digit
+    should be swapped and converted into decimal.
+    For example, SC got zlinux lun number from DS8K API, '40294018'. And it
+    should be swapped to '40184029' and converted into decimal, 1075331113.
+    When the lun number is '0c' and its decimal value is <256, it should be
+    converted directly into decimal, 12.
+
+    https://github.com/kubernetes/kubernetes/issues/45024
+    """
     pretreated_scsilun = int(lun, 16)
     if pretreated_scsilun < 256:
         return pretreated_scsilun
