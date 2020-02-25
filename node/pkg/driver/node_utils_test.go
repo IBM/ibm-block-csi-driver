@@ -17,17 +17,17 @@
 package driver_test
 
 import (
-	"fmt"
-	"io/ioutil"
-	"os"
-	"syscall"
-	"testing"
-	gomock "github.com/golang/mock/gomock"
 	"errors"
+	"fmt"
+	gomock "github.com/golang/mock/gomock"
 	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
 	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"io/ioutil"
+	"os"
 	"reflect"
+	"syscall"
+	"testing"
 )
 
 var (
@@ -48,7 +48,7 @@ func TestParseIscsiInitiators(t *testing.T) {
 		},
 		{
 			name:   "non existing file",
-			expErr: &os.PathError{"open", "/non/existent/path", syscall.ENOENT},
+			expErr: &os.PathError{Op: "open", Path: "/non/existent/path", Err: syscall.ENOENT},
 		},
 		{
 			name:         "right_iqn",
@@ -69,7 +69,7 @@ func TestParseIscsiInitiators(t *testing.T) {
 					t.Fatalf("Cannot create temporary file : %v", err)
 				}
 
-				defer func(){
+				defer func() {
 					os.Remove(tmpFile.Name())
 					driver.IscsiFullPath = "/host/etc/iscsi/initiatorname.iscsi"
 				}()
@@ -116,38 +116,38 @@ func TestParseFCPortsName(t *testing.T) {
 	testCases := []struct {
 		name          string
 		file_contents []string
-		err	      error
+		err           error
 		expErr        error
 		expFCPorts    []string
 	}{
 		{
-			name: "fc port file with wrong content",
+			name:          "fc port file with wrong content",
 			file_contents: []string{"wrong content"},
-			expErr: fmt.Errorf(driver.ErrorWhileTryingToReadFC, "wrong content"),
+			expErr:        fmt.Errorf(driver.ErrorWhileTryingToReadFC, "wrong content"),
 		},
 		{
-			name: "fc unsupported",
+			name:   "fc unsupported",
 			expErr: fmt.Errorf(driver.ErrorUnsupportedConnectivityType, "FC"),
 		},
 		{
-			name: "one FC port",
+			name:          "one FC port",
 			file_contents: []string{"0x10000000c9934d9f"},
-			expFCPorts: []string{"10000000c9934d9f"},
+			expFCPorts:    []string{"10000000c9934d9f"},
 		},
 		{
-			name: "one FC port file with wrong content, another is good",
+			name:          "one FC port file with wrong content, another is good",
 			file_contents: []string{"wrong content", "0x10000000c9934dab"},
-			expFCPorts: []string{"10000000c9934dab"},
+			expFCPorts:    []string{"10000000c9934dab"},
 		},
 		{
-			name: "one fc port file with wrong content, aonther file path is inexistent",
+			name:          "one fc port file with wrong content, aonther file path is inexistent",
 			file_contents: []string{"wrong content", ""},
-			expErr: errors.New("[Error while tring to get FC port from string: wrong content., open /non/existent/path: no such file or directory]"),
+			expErr:        errors.New("[Error while tring to get FC port from string: wrong content., open /non/existent/path: no such file or directory]"),
 		},
 		{
-			name: "two FC ports",
+			name:          "two FC ports",
 			file_contents: []string{"0x10000000c9934d9f", "0x10000000c9934dab"},
-			expFCPorts: []string{"10000000c9934d9f", "10000000c9934dab"},
+			expFCPorts:    []string{"10000000c9934d9f", "10000000c9934dab"},
 		},
 	}
 

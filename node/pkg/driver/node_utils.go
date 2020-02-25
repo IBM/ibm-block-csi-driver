@@ -60,13 +60,13 @@ type NodeUtilsInterface interface {
 
 type NodeUtils struct {
 	Executer executer.ExecuterInterface
-	mounter mount.Interface
+	mounter  mount.Interface
 }
 
 func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface) *NodeUtils {
 	return &NodeUtils{
 		Executer: executer,
-		mounter: mounter,
+		mounter:  mounter,
 	}
 }
 
@@ -121,11 +121,11 @@ func (n NodeUtils) WriteStageInfoToFile(fPath string, info map[string]string) er
 	fPath = n.GetPodPath(fPath)
 	stagePath := filepath.Dir(fPath)
 	if _, err := os.Stat(stagePath); os.IsNotExist(err) {
-        logger.Debugf("The filePath [%s] is not existed. Create it.", stagePath)
-        if err = os.MkdirAll(stagePath, os.FileMode(0755)); err != nil {
-            logger.Debugf("The filePath [%s] create fail. Error: [%v]", stagePath, err)
-        }
-    }
+		logger.Debugf("The filePath [%s] is not existed. Create it.", stagePath)
+		if err = os.MkdirAll(stagePath, os.FileMode(0755)); err != nil {
+			logger.Debugf("The filePath [%s] create fail. Error: [%v]", stagePath, err)
+		}
+	}
 	logger.Debugf("WriteStageInfo file : path {%v}, info {%v}", fPath, info)
 	stageInfo, err := json.Marshal(info)
 	if err != nil {
