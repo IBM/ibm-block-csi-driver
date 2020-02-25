@@ -24,7 +24,7 @@ LDFLAGS?="-X ${PKG}/node/pkg/driver.gitCommit=${GIT_COMMIT} -X ${PKG}/node/pkg/d
 GO111MODULE=on
 DRIVER_CONFIG_YML=$(shell pwd)/common/config.yaml
 # -race is not supported on Z
-GO_TEST_FLAGS=$(shell if [ "$(uname -m)" = "s390x" ]; then echo "-v"; else echo "-v -race"; fi)
+GO_TEST_FLAGS=$(shell if [ "$$(uname -m)" = "s390x" ]; then echo "-v"; else echo "-v -race"; fi)
 
 .EXPORT_ALL_VARIABLES:
 
