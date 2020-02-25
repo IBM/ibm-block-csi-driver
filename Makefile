@@ -29,12 +29,12 @@ GO_TEST_FLAGS=$(shell if [ "$$(uname -m)" = "s390x" ]; then echo "-v"; else echo
 .EXPORT_ALL_VARIABLES:
 
 define gofmt-test =
-@echo ">> checking code style"
-@fmtRes=$$(gofmt -d $$(find ./node/ -name '*.go')); \
-if [ -n "$${fmtRes}" ]; then \
-	echo "gofmt checking failed!"; echo "$${fmtRes}"; echo; \
-	exit 1; \
-fi
+	@echo ">> checking code style"
+	@fmtRes=$$(gofmt -d $$(find ./node/ -name '*.go')); \
+	if [ -n "$${fmtRes}" ]; then \
+		echo "gofmt checking failed!"; echo "$${fmtRes}"; echo; \
+		exit 1; \
+	fi
 @echo ">> code style passed!"
 endef
 
