@@ -23,6 +23,8 @@ BUILD_DATE?=$(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
 LDFLAGS?="-X ${PKG}/node/pkg/driver.gitCommit=${GIT_COMMIT} -X ${PKG}/node/pkg/driver.buildDate=${BUILD_DATE} -s -w"
 GO111MODULE=on
 DRIVER_CONFIG_YML=$(shell pwd)/common/config.yaml
+# -race is not supported on Z
+GO_TEST_FLAGS=$(shell if [ "$$(uname -m)" = "s390x" ]; then echo "-v"; else echo "-v -race"; fi)
 
 .EXPORT_ALL_VARIABLES:
 
@@ -35,15 +37,15 @@ ibm-block-csi-driver:
 test:
 	if [ -d ./node/mocks ]; then rm -rf ./node/mocks; fi
 	go generate ./...
-	go test -v -race ./node/...
+	go test ${GO_TEST_FLAGS} ./node/...
 
 .PHONY: test-xunit
 test-xunit:
 	mkdir -p ./build/reports
 	if [ -d ./node/mocks ]; then rm -rf ./node/mocks; fi
 	go generate ./...
-	go test -v -race ./node/... | go2xunit -output build/reports/csi-node-unitests.xml
-	go test -v -race ./node/...	# run again so the makefile will fail in case tests failing
+	go test ${GO_TEST_FLAGS} ./node/... | go2xunit -output build/reports/csi-node-unitests.xml
+	go test ${GO_TEST_FLAGS} ./node/...	# run again so the makefile will fail in case tests failing
 
 .PHONY: test-xunit-in-container
 test-xunit-in-container:
