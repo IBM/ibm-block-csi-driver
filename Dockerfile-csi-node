@@ -27,8 +27,8 @@ COPY . .
 RUN make ibm-block-csi-driver
 
 # Final stage
-#FROM registry.access.redhat.com/ubi7/ubi-minimal:7.7-138
-FROM registry.access.redhat.com/ubi7/ubi:7.6-177
+FROM registry.access.redhat.com/ubi7/ubi-minimal:7.7-138
+#FROM registry.access.redhat.com/ubi7/ubi:7.6-177
 MAINTAINER IBM Storage
 
 LABEL name="IBM block storage CSI driver node" \
@@ -48,7 +48,7 @@ COPY ./LICENSE /licenses/
 COPY ./NOTICES /licenses/
 COPY ./node/scripts/entrypoint.sh .
 RUN chmod 755 ./entrypoint.sh
-RUN yum install -y iscsi-initiator-utils && yum clean all
+#RUN yum install -y iscsi-initiator-utils && yum clean all
 
 RUN mkdir /chroot
 ADD chroot-host-wrapper.sh /chroot
@@ -68,6 +68,7 @@ RUN    ln -s /chroot/chroot-host-wrapper.sh /chroot/blkid \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/multipath \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/multipathd \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/service \
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/ps \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/umount
 
 ENV PATH="/chroot:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
