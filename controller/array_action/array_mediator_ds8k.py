@@ -1,4 +1,5 @@
 from hashlib import sha1
+import base58
 from packaging.version import parse
 from pyds8k import exceptions
 from controller.common.csi_logger import get_stdout_logger
@@ -160,7 +161,7 @@ def get_volume_id_from_scsi_identifier(scsi_id):
 def shorten_volume_name(name):
     if len(name) <= 16:
         return name
-    return sha1(name.encode()).hexdigest()[-16:]
+    return base58.b58encode(sha1(name.encode()).digest()).decode()[-16:]
 
 
 class DS8KArrayMediator(ArrayMediator):
@@ -176,7 +177,7 @@ class DS8KArrayMediator(ArrayMediator):
 
     @classproperty
     def max_vol_name_length(self):
-        return 16
+        return 63
 
     @classproperty
     def max_connections(self):

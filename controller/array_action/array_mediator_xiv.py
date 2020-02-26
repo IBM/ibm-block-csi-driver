@@ -83,17 +83,17 @@ class XIVArrayMediator(ArrayMediator):
                       cli_volume.pool_name,
                       self.array_type)
 
-    def get_volume(self, vol_name, volume_context=None):
-        logger.debug("Get volume : {}".format(vol_name))
+    def get_volume(self, volume_name, volume_context=None):
+        logger.debug("Get volume : {}".format(volume_name))
         try:
-            cli_volume = self.client.cmd.vol_list(vol=vol_name).as_single_element
+            cli_volume = self.client.cmd.vol_list(vol=volume_name).as_single_element
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectName(ex.status)
 
         logger.debug("cli volume returned : {}".format(cli_volume))
         if not cli_volume:
-            raise controller_errors.VolumeNotFoundError(vol_name)
+            raise controller_errors.VolumeNotFoundError(volume_name)
 
         array_vol = self._generate_volume_response(cli_volume)
         return array_vol

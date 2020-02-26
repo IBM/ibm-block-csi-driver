@@ -73,6 +73,14 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             with ArrayConnectionManager(user, password, array_addresses) as array_mediator:
                 logger.debug(array_mediator)
 
+                if len(volume_name) > array_mediator.max_vol_name_length:
+                    raise controller_errors.IllegalObjectName(
+                        "The volume name {} is too long, max allowed length is {}".format(
+                            volume_name,
+                            array_mediator.max_vol_name_length,
+                        )
+                    )
+
                 size = request.capacity_range.required_bytes
 
                 if size == 0:

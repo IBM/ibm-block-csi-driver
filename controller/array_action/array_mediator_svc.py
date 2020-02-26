@@ -122,24 +122,24 @@ class SVCArrayMediator(ArrayMediator):
             cli_volume.mdisk_grp_name,
             self.array_type)
 
-    def get_volume(self, vol_name, volume_context=None):
-        logger.debug("Get volume : {}".format(vol_name))
+    def get_volume(self, volume_name, volume_context=None):
+        logger.debug("Get volume : {}".format(volume_name))
         cli_volume = None
         try:
             cli_volume = self.client.svcinfo.lsvdisk(
-                bytes=True, object_id=vol_name).as_single_element
+                bytes=True, object_id=volume_name).as_single_element
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 if (OBJ_NOT_FOUND in ex.my_message or
                         NAME_NOT_MEET in ex.my_message):
                     logger.error("Volume not found")
-                    raise controller_errors.VolumeNotFoundError(vol_name)
+                    raise controller_errors.VolumeNotFoundError(volume_name)
         except Exception as ex:
             logger.exception(ex)
             raise ex
 
         if not cli_volume:
-            raise controller_errors.VolumeNotFoundError(vol_name)
+            raise controller_errors.VolumeNotFoundError(volume_name)
         logger.debug("cli volume returned : {}".format(cli_volume))
         return self._generate_volume_response(cli_volume)
 
