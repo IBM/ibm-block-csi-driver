@@ -47,6 +47,7 @@ COPY ./LICENSE /licenses/
 COPY ./NOTICES /licenses/
 COPY ./node/scripts/entrypoint.sh .
 RUN chmod 755 ./entrypoint.sh
+RUN yum install -y iscsi-initiator-utils && yum clean all
 
 RUN mkdir /chroot
 ADD chroot-host-wrapper.sh /chroot
