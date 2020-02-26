@@ -1,3 +1,3 @@
-#! /bin/bash -x
+#!/bin/bash
 
 /root/ibm-block-csi-node-driver $@
