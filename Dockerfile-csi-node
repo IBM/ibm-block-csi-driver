@@ -68,4 +68,4 @@ RUN    ln -s /chroot/chroot-host-wrapper.sh /chroot/blkid \
 
 ENV PATH="/chroot:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-ENTRYPOINT ["./entrypoint.sh"]
+ENTRYPOINT ["/root/entrypoint.sh"]
