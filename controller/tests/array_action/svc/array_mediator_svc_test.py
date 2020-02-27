@@ -537,13 +537,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.unmap_volume("vol", "host")
 
     def test_get_iscsi_targets_cmd_error_raise_no_targets_error(self):
-        self.svc.client.svctask.lsportip.side_effect = [
+        self.svc.client.svcinfo.lsportip.side_effect = [
             svc_errors.CommandExecutionError('Failed')]
         with self.assertRaises(array_errors.NoIscsiTargetsFoundError):
             self.svc.get_iscsi_targets()
 
     def test_get_iscsi_targets_cli_error_raise_no_targets_error(self):
-        self.svc.client.svctask.lsportip.side_effect = [
+        self.svc.client.svcinfo.lsportip.side_effect = [
             CLIFailureError("Failed")]
         with self.assertRaises(array_errors.NoIscsiTargetsFoundError):
             self.svc.get_iscsi_targets()
@@ -554,15 +554,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.get_iscsi_targets()
 
     def test_get_iscsi_targets_no_port_with_ip_raise_no_targets_error(self):
-        port_1 = Munch({'Not_an_IP_address': '1.1.1.1'})
-        port_2 = Munch({'Not_an_IP_address_6': '1::1'})
+        port_1 = Munch({'IP_address': None, 'IP_address_6': ''})
+        port_2 = Munch({'IP_address': '', 'IP_address_6': None})
         self.svc.client.svcinfo.lsportip.return_value = [port_1, port_2]
         with self.assertRaises(array_errors.NoIscsiTargetsFoundError):
             self.svc.get_iscsi_targets()
 
     def test_get_iscsi_targets_success(self):
-        port_1 = Munch({'IP_address': '1.1.1.1'})
-        port_2 = Munch({'IP_address_6': '1::1'})
+        port_1 = Munch({'IP_address': '1.1.1.1', 'IP_address_6': None})
+        port_2 = Munch({'IP_address': '', 'IP_address_6': '1::1'})
         self.svc.client.svcinfo.lsportip.return_value = [port_1, port_2]
         ips = self.svc.get_iscsi_targets()
         self.assertEqual(ips, ['1.1.1.1', '1::1'])
