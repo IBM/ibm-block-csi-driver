@@ -1,18 +1,17 @@
 import unittest
+
 # from unittest import mock as umock
 import grpc
-
 from mock import patch, Mock, call
-from controller.tests import utils
 
-from controller.csi_general import csi_pb2
-from controller.array_action.array_mediator_xiv import XIVArrayMediator
-from controller.controller_server.csi_controller_server import ControllerServicer
-from controller.controller_server.test_settings import vol_name
 import controller.array_action.errors as array_errors
 import controller.controller_server.errors as controller_errors
-
+from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.controller_server.config import PARAMETERS_PREFIX
+from controller.controller_server.csi_controller_server import ControllerServicer
+from controller.controller_server.test_settings import vol_name
+from controller.csi_general import csi_pb2
+from controller.tests import utils
 
 
 class TestControllerServerCreateVolume(unittest.TestCase):
@@ -378,6 +377,9 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.mediator.get_array_iqns = Mock()
         self.mediator.get_array_iqns.return_value = "array-iqn"
 
+        self.mediator.get_iscsi_targets = Mock()
+        self.mediator.get_iscsi_targets.return_value = ['1.1.1.1', '2.2.2.2']
+
         self.servicer = ControllerServicer(self.fqdn)
 
         self.request = Mock()
@@ -494,6 +496,8 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.assertEqual(
             res.publish_context["PUBLISH_CONTEXT_ARRAY_IQN"],
             "iqn.1994-05.com.redhat:686358c930fe")
+        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_ISCSI_TARGETS"],
+                         '1.1.1.1,2.2.2.2')
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_publish_volume_with_node_id_only_has_iqns(self, enter):
@@ -635,10 +639,29 @@ class TestControllerServerPublishVolume(unittest.TestCase):
 
         self.mediator.map_volume.side_effect = [
                                                    array_errors.LunAlreadyInUseError("", "")] * (
-                                                           self.mediator.max_lun_retries + 1)
+                                                       self.mediator.max_lun_retries + 1)
         enter.return_value = self.mediator
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.RESOURCE_EXHAUSTED)
+
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_publish_volume_get_iscsi_targets_excpetions(self, enter):
+        context = utils.FakeContext()
+
+        self.mediator.get_iscsi_targets.side_effect = [array_errors.NoIscsiTargetsSpecifiedError()]
+        enter.return_value = self.mediator
+        self.servicer.ControllerPublishVolume(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
+
+        self.mediator.get_iscsi_targets.side_effect = [array_errors.UnsupportedConnectivityTypeError("usb")]
+        enter.return_value = self.mediator
+        self.servicer.ControllerPublishVolume(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
+
+        self.mediator.get_iscsi_targets.side_effect = [array_errors.NoIscsiTargetsFoundError("some_endpoint")]
+        enter.return_value = self.mediator
+        self.servicer.ControllerPublishVolume(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
 
 class TestControllerServerUnPublishVolume(unittest.TestCase):

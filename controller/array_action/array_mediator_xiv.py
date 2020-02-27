@@ -1,21 +1,22 @@
 from random import randint
 
-from pyxcli.client import XCLIClient
 from pyxcli import errors as xcli_errors
-from controller.common.csi_logger import get_stdout_logger
-from controller.array_action.array_mediator_interface import ArrayMediator
-from controller.array_action.array_action_types import Volume
+from pyxcli.client import XCLIClient
+
 import controller.array_action.errors as controller_errors
-from controller.array_action.config import ISCSI_CONNECTIVITY_TYPE
+from controller.array_action.array_action_types import Volume
+from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.config import FC_CONNECTIVITY_TYPE
+from controller.array_action.config import ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.utils import classproperty
+from controller.common.csi_logger import get_stdout_logger
 from controller.common.utils import string_to_array
 
 array_connections_dict = {}
 logger = get_stdout_logger()
 
 
-class XIVArrayMediator(ArrayMediator):
+class XIVArrayMediator(ArrayMediatorAbstract):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
     MAX_LUN_NUMBER = 250
@@ -265,6 +266,9 @@ class XIVArrayMediator(ArrayMediator):
                 raise controller_errors.VolumeAlreadyUnmappedError(vol_name)
             else:
                 raise controller_errors.UnMappingError(vol_name, host_name, ex)
+
+    def get_iscsi_targets(self):
+        raise NotImplementedError  # TODO: CSI-1166
 
     def get_array_iqns(self):
         config_get_list = self.client.cmd.config_get().as_list

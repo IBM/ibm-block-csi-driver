@@ -35,3 +35,9 @@ UnMappingError_message = "Unmapping error has occurred for vol : {0} and host : 
 BadNodeIdError_message = "Bad node id format for node id : {0}"
 
 VolumeMappedToMultipleHostsError_message = "Volume is already mapped to different hosts {0}"
+
+NoIscsiTargetsFoundError_message = "Could not find iSCSI targets for endpoint: {0}"
+
+NoIscsiTargetsSpecifiedError_message = "No iSCSI targets specified"
+
+UnsupportedConnectivityTypeError_message = "Unsupported connectivity type: {0}"

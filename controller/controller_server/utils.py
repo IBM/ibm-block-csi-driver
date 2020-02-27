@@ -4,7 +4,8 @@ from controller.csi_general import csi_pb2
 from controller.controller_server.errors import ValidationException
 import controller.controller_server.messages as messages
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
-from controller.array_action.errors import HostNotFoundError, VolumeNotFoundError
+from controller.array_action.errors import HostNotFoundError, VolumeNotFoundError, UnsupportedConnectivityTypeError, \
+    NoIscsiTargetsSpecifiedError
 
 logger = get_stdout_logger()
 
@@ -187,20 +188,32 @@ def choose_connectivity_type(connecitvity_types):
         return ISCSI_CONNECTIVITY_TYPE
 
 
-def generate_csi_publish_volume_response(lun, connectivity_type, config, array_initiators):
+def generate_csi_publish_volume_response(lun, connectivity_type, config, array_initiators, iscsi_targets=None):
     logger.debug("generating publish volume response for lun :{0}, connectivity : {1}".format(lun, connectivity_type))
 
     lun_param = config["controller"]["publish_context_lun_parameter"]
     connectivity_param = config["controller"]["publish_context_connectivity_parameter"]
-    hash_by_connectivity = {
-        'iscsi': config["controller"]["publish_context_array_iqn"],
-        'fc': config["controller"]["publish_context_fc_initiators"]}
 
-    array_initiators = ",".join(array_initiators)
-    res = csi_pb2.ControllerPublishVolumeResponse(
-        publish_context={lun_param: str(lun),
-                         connectivity_param: connectivity_type,
-                         hash_by_connectivity[connectivity_type]: array_initiators})
+    publish_context = {
+        lun_param: str(lun),
+        connectivity_param: connectivity_type
+    }
+
+    if connectivity_type == ISCSI_CONNECTIVITY_TYPE:
+        if not iscsi_targets:
+            raise NoIscsiTargetsSpecifiedError()
+        iscsi_targets_param = config["controller"]["publish_context_iscsi_targets"]
+        publish_context[iscsi_targets_param] = ",".join(iscsi_targets)
+
+        array_initiators_param = config["controller"]["publish_context_array_iqn"]
+    elif connectivity_type == FC_CONNECTIVITY_TYPE:
+        array_initiators_param = config["controller"]["publish_context_fc_initiators"]
+    else:
+        raise UnsupportedConnectivityTypeError(connectivity_type)
+
+    publish_context[array_initiators_param] = ",".join(array_initiators)
+
+    res = csi_pb2.ControllerPublishVolumeResponse(publish_context=publish_context)
 
     logger.debug("publish volume response is :{0}".format(res))
     return res

@@ -1,12 +1,13 @@
-from pysvc.unified.client import connect
 from pysvc import errors as svc_errors
+from pysvc.unified.client import connect
 from pysvc.unified.response import CLIFailureError
-from controller.common.csi_logger import get_stdout_logger
-from controller.array_action.array_mediator_interface import ArrayMediator
-from controller.array_action.array_action_types import Volume
-import controller.array_action.errors as controller_errors
-from controller.array_action.utils import classproperty
+
 import controller.array_action.config as config
+import controller.array_action.errors as controller_errors
+from controller.array_action.array_action_types import Volume
+from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
+from controller.array_action.utils import classproperty
+from controller.common.csi_logger import get_stdout_logger
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -56,7 +57,7 @@ def build_kwargs_from_capabilities(capabilities, pool_name, volume_name,
     return cli_kwargs
 
 
-class SVCArrayMediator(ArrayMediator):
+class SVCArrayMediator(ArrayMediatorAbstract):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
     MAX_LUN_NUMBER = 511
@@ -378,6 +379,33 @@ class SVCArrayMediator(ArrayMediator):
         except Exception as ex:
             logger.exception(ex)
             raise ex
+
+    def _list_ip_ports(self):
+        try:
+            return self.client.svcinfo.lsportip(filtervalue='state=configured:failover=no')
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            logger.error("Get iscsi targets failed. Reason is: {}".format(ex))
+            raise controller_errors.NoIscsiTargetsFoundError(self.endpoint)
+
+    @staticmethod
+    def _extract_ip_addresses(ports):
+        ips = []
+        for port in ports:
+            if port.IP_address:
+                ips.append(port.IP_address)
+            if port.IP_address_6:
+                ips.append(port.IP_address_6)
+        return ips
+
+    def get_iscsi_targets(self):
+        logger.debug("Getting iscsi targets")
+        ports = self._list_ip_ports()
+        ips = self._extract_ip_addresses(ports)
+        if ips:
+            logger.debug("Found iscsi targets: {}".format(ips))
+            return ips
+        else:
+            raise controller_errors.NoIscsiTargetsFoundError(self.endpoint)
 
     def get_array_iqns(self):
         logger.debug("Getting array nodes iscsi name")
