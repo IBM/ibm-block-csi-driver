@@ -8,4 +8,3 @@ CAPABILITY_THICK = 'thick'
 
 # volume context
 CONTEXT_POOL = "pool"
-CONTEXT_LSS = "lss"

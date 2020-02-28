@@ -20,110 +20,15 @@ SYSTEM_WWNN = 'wwnn'
 SYSTEM_CODE_LEVEL = 'bundle'
 SYSTEM_NAME = 'name'
 SYSTEM_MODEL = 'MTM'  # 2421-961, Machine type and Model
-SYSTEM_STATE = 'state'
-SYSTEM_CAPACITY = 'cap'
-SYSTEM_CAPACITY_FREE = 'capavail'
-SYSTEM_CAPACITY_USED = 'capalloc'
 
 # volume
 VOLUME_ID = 'id'
 VOLUME_NAME = 'name'
 VOLUME_POOL_ID = 'pool'
-VOLUME_DATA_TYPE = 'datatype'
-VOLUME_TYPE = 'stgtype'
-# VOLUME_SCSI_ID = 'scsi_id'
 VOLUME_LOGICAL_CAP = 'cap'
 VOLUME_PHYSICAL_CAP = 'real_cap'
 VOLUME_USED_CAP = 'capalloc'
-VOLUME_STATE = 'state'
-VOLUME_EXTENT_ALLOCATION_METHOD = 'allocmethod'
 VOLUME_STORAGE_ALLOCATION_METHOD = 'tp'  # none|tse|ese
-
-# pool
-POOL_ID = 'id'
-POOL_NAME = 'name'
-POOL_PHYSICAL_SIZE = 'cap'
-POOL_LOGICAL_SIZE = 'cap'
-POOL_PHYSICAL_FREE = 'capavail'
-POOL_LOGICAL_FREE = 'capavail'
-POOL_RANK_GROUP = 'node'
-POOL_EXTENT_TYPE = 'stgtype'
-POOL_CAP_ALLOCATED_REAL_EXTS_ON_ESE = 'real_capacity_allocated_on_ese'
-POOL_CAP_ALLOCATED_VIRT_EXTS_ON_ESE = 'virtual_capacity_allocated_on_ese'
-
-# flashCopy
-FC_SOURCE_VOLUME_ID = 'sourcevolume'
-FC_TARGET_VOLUME_ID = 'targetvolume'
-FC_STATUS = 'state'
-FC_IS_PERSISTENT = 'persistent'  # enabled|disabled
-FC_IS_RECORDING = 'recording'  # enabled|multinc|disabled|None
-FC_IS_BGCOPY = 'backgroundcopy'  # enabled|disabled
-FC_ID = 'id'
-
-# pprc
-PPRC_SOURCE_VOLUME_ID = 'source_volume'
-PPRC_TARGET_VOLUME_ID = 'target_volume'
-# PPRC_SOURCE_ESS_NAME = 'system'
-PPRC_SOURCE_SYSTEM_ID = 'source_system'
-PPRC_TARGET_SYSTEM_ID = 'target_system'
-PPRC_STATUS = 'state'
-PPRC_REMOTE_COPY_TYPE = 'type'  # metromirror|globalcopy|unknown
-
-# ioport
-IOPORT_NAME = 'id'
-IOPORT_WWPN = 'wwpn'
-# IOPORT_WWNN = ''
-IOPORT_PORT_SPEED = 'speed'
-IOPORT_STATUS = 'state'
-IOPORT_STATUS_ONLINE = 'online'
-IOPORT_LOCATION = 'loc'
-IOPORT_ENCLOSURE_NUMBER = 'io_enclosure'
-
-# host
-HOST_ID = 'name'
-HOST_NAME = 'name'
-HOST_STATE = 'state'
-HOST_TYPE = 'hosttype'  # VMWare
-HOST_VOLUME_MAPPINGS = 'mappings_briefs'
-HOST_VOLUME_MAPPING_VOLUME_ID = 'volume_id'
-HOST_VOLUME_MAPPING_LUN_ID = 'lunid'
-HOST_PORTS = 'host_ports_briefs'
-HOST_ADDRESS_DISCOVERY = 'addrdiscovery'
-
-# host port
-HOST_PORT_WWPN = 'wwpn'
-HOST_PORT_HOST_ID = 'host'
-HOST_PORT_IOPORTS = 'login_ports'
-HOST_PORT_STATE = 'state'
-HOST_PORT_TYPE = 'hosttype'
-
-# host mapping
-HOST_MAPPING_LUN_ID = 'lunid'
-HOST_MAPPING_VOLUME_ID = 'volume'
-
-# user
-USER_NAME = 'name'
-USER_STATE = 'state'
-USER_GROUP = 'group'
-
-# lss
-LSS_ID = 'id'
-LSS_TYPE = 'type'
-LSS_GROUP = 'group'
-
-# io enclosure
-IOENCLOSURE_ID = 'id'
-IOENCLOSURE_NAME = 'name'
-IOENCLOSURE_STATE = 'state'
-
-# node
-NODE_ID = 'id'
-NODE_STATUS = 'state'
-
-# marray
-MARRAY_ID = 'id'
-MARRAY_DISK_CLASS = 'disk_class'
-MARRAY_POOL_ID = 'pool'
 
 # response keys
 RES_STATUS = 'status'
@@ -197,8 +102,6 @@ class DS8KArrayMediator(ArrayMediator):
         self.service_address = \
             endpoint[0] if isinstance(endpoint, list) else endpoint
         self.password = password
-        self.client = None
-        self._system_info = None
 
         self._connect()
 
@@ -208,6 +111,9 @@ class DS8KArrayMediator(ArrayMediator):
                                      user=self.user,
                                      password=self.password,
                                      )
+
+            self.system_info = self.get_system_info()
+
             if parse(self.version) < parse(self.SUPPORTED_FROM_VERSION):
                 raise array_errors.UnsupportedStorageVersionError(
                     self.version, self.SUPPORTED_FROM_VERSION
@@ -232,27 +138,24 @@ class DS8KArrayMediator(ArrayMediator):
         pass
 
     def get_system_info(self):
-        """Get the system result"""
-        if self._system_info is None:
-            self._system_info = self.client.get_system()[0]
-        return self._system_info
+        return self.client.get_system()[0]
 
     @property
     def identifier(self):
-        return self.get_system_info()[SYSTEM_ID]
+        return self.system_info[SYSTEM_ID]
 
     @property
     def name(self):
-        return self.get_system_info().get(SYSTEM_NAME, None) \
+        return self.system_info.get(SYSTEM_NAME, None) \
             or self.identifier
 
     @property
     def version(self):
-        return parse_version(self.get_system_info()[SYSTEM_CODE_LEVEL])
+        return parse_version(self.system_info[SYSTEM_CODE_LEVEL])
 
     @property
     def wwnn(self):
-        return self.get_system_info()[SYSTEM_WWNN]
+        return self.system_info[SYSTEM_WWNN]
 
     def _generate_volume_scsi_identifier(self, volume_id):
         return '6{}000000000000{}'.format(self.wwnn[1:], volume_id)
