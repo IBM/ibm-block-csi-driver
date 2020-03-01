@@ -82,6 +82,8 @@ class DS8KArrayMediator(ArrayMediator):
 
     @classproperty
     def max_vol_name_length(self):
+        # the max length is 16 on storage side, it is too short, use shorten_volume_name to workaround it.
+        # so 63 here is just a soft limit, to make sure the volume name won't be very long.
         return 63
 
     @classproperty
