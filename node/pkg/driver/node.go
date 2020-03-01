@@ -120,10 +120,11 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volId, "NodeStageVolume")
 
-	connectivityType, lun, arrayInitiators, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
+	connectivityType, lun, arrayInitiators, iscsiTargets, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	logger.Debugf("NodeStageVolume: Got iscsiTargets: {%s}.", iscsiTargets)
 
 	stagingPath := req.GetStagingTargetPath() // e.g in k8s /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-21967c74-b456-11e9-b93e-005056a45d5f/globalmount
 
@@ -218,7 +219,7 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{"Volume Access Type is not supported"}
 	}
 
-	connectivityType, lun, arrayInitiators, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
+	connectivityType, lun, arrayInitiators, iscsiTargets, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
 	if err != nil {
 		return &RequestValidationError{fmt.Sprintf("Fail to parse PublishContext %v with err = %v", req.PublishContext, err)}
 	}
@@ -233,6 +234,10 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 
 	if len(arrayInitiators) == 0 {
 		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong arrayInitiators %s.", arrayInitiators)}
+	}
+
+	if connectivityType == "iscsi" && len(iscsiTargets) == 0 {
+		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong iscsiTargets %s.", iscsiTargets)}
 	}
 
 	return nil

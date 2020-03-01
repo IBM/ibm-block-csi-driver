@@ -36,6 +36,7 @@ import (
 const (
 	PublishContextParamLun          string = "PUBLISH_CONTEXT_LUN" // TODO for some reason I coun't take it from config.yaml
 	PublishContextParamConnectivity string = "PUBLISH_CONTEXT_CONNECTIVITY"
+	PublishContextIscsiTargets      string = "PUBLISH_CONTEXT_ISCSI_TARGETS"
 )
 
 func newTestNodeService(nodeUtils driver.NodeUtilsInterface, nodeMounter driver.NodeMounter) driver.NodeService {

@@ -110,6 +110,7 @@ type ConfigFile struct {
 	Controller struct {
 		Publish_context_lun_parameter          string
 		Publish_context_connectivity_parameter string
+		Publish_context_iscsi_targets          string
 		Publish_context_array_iqn              string
 		Publish_context_fc_initiators          string
 	}

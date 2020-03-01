@@ -43,7 +43,7 @@ const (
 type NodeUtilsInterface interface {
 	ParseIscsiInitiators() (string, error)
 	ParseFCPorts() ([]string, error)
-	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, []string, error)
+	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, []string, []string, error)
 	GetSysDevicesFromMpath(baseDevice string) (string, error)
 
 	// TODO refactor and move all staging methods to dedicate interface.
@@ -93,26 +93,28 @@ func (n NodeUtils) ParseIscsiInitiators() (string, error) {
 	return iscsiIqn, nil
 }
 
-func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, []string, error) {
-	// this will return :  connectivityType, lun, arrayInitiators, error
+func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, []string, []string, error) {
+	// this will return :  connectivityType, lun, arrayInitiators, iscsiTargets error
 	var arrayInitiators []string
+	var iscsiTargets []string
 	str_lun := publishContext[configYaml.Controller.Publish_context_lun_parameter]
 
 	lun, err := strconv.Atoi(str_lun)
 	if err != nil {
-		return "", -1, nil, err
+		return "", -1, nil, nil, err
 	}
 
 	connectivityType := publishContext[configYaml.Controller.Publish_context_connectivity_parameter]
 	if connectivityType == "iscsi" {
 		arrayInitiators = strings.Split(publishContext[configYaml.Controller.Publish_context_array_iqn], ",")
+		iscsiTargets = strings.Split(publishContext[configYaml.Controller.Publish_context_iscsi_targets], ",")
 	}
 	if connectivityType == "fc" {
 		arrayInitiators = strings.Split(publishContext[configYaml.Controller.Publish_context_fc_initiators], ",")
 	}
 
 	logger.Debugf("PublishContext relevant info : connectivityType=%v, lun=%v, arrayInitiators=%v", connectivityType, lun, arrayInitiators)
-	return connectivityType, lun, arrayInitiators, nil
+	return connectivityType, lun, arrayInitiators, iscsiTargets, nil
 }
 
 func (n NodeUtils) WriteStageInfoToFile(fPath string, info map[string]string) error {
