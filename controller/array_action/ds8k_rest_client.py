@@ -28,7 +28,7 @@ def _int_lunid_to_hex(lunid):
 def int_to_scsilun(lun):
     """
     There are two style lun number, one's decimal value is <256 and the other
-    is full as 16 hex digit. According to T10 SAN, when decimal value is more
+    is full as 16 hex digit. According to T10 SAM, when decimal value is more
     than 256 and it is converted to the full 16 hex digit, it should be
     swapped and converted into hex.
     For example, zlinux lun number stored in SC DB is 1075331113. It should
@@ -49,7 +49,7 @@ def int_to_scsilun(lun):
 def scsilun_to_int(lun):
     """
     There are two style lun number, one's decimal value is <256 and the other
-    is full as 16 hex digit. According to T10 SAN, the full 16 hex digit
+    is full as 16 hex digit. According to T10 SAM, the full 16 hex digit
     should be swapped and converted into decimal.
     For example, SC got zlinux lun number from DS8K API, '40294018'. And it
     should be swapped to '40184029' and converted into decimal, 1075331113.
