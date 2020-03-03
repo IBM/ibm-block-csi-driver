@@ -14,30 +14,6 @@ from controller.array_action.array_action_types import Volume
 logger = get_stdout_logger()
 
 
-# system
-SYSTEM_ID = 'id'   # 2107-{sn}
-SYSTEM_WWNN = 'wwnn'
-SYSTEM_CODE_LEVEL = 'bundle'
-SYSTEM_NAME = 'name'
-SYSTEM_MODEL = 'MTM'  # 2421-961, Machine type and Model
-
-# volume
-VOLUME_ID = 'id'
-VOLUME_NAME = 'name'
-VOLUME_POOL_ID = 'pool'
-VOLUME_LOGICAL_CAP = 'cap'
-VOLUME_PHYSICAL_CAP = 'real_cap'
-VOLUME_USED_CAP = 'capalloc'
-VOLUME_STORAGE_ALLOCATION_METHOD = 'tp'  # none|tse|ese
-
-# response keys
-RES_STATUS = 'status'
-RES_CODE = 'code'
-RES_MSG = 'message'
-
-# response values
-RES_SUCCESS_STAUTS = ('ok', 'successful', )
-
 # response error codes
 INVALID_CREDENTIALS = 'BE7A002D'
 
@@ -140,39 +116,39 @@ class DS8KArrayMediator(ArrayMediator):
         pass
 
     def get_system_info(self):
-        return self.client.get_system()[0]
+        return self.client.get_system()
 
     @property
     def identifier(self):
-        return self.system_info[SYSTEM_ID]
+        return self.system_info.id
 
     @property
     def name(self):
-        return self.system_info.get(SYSTEM_NAME, None) \
-            or self.identifier
+        return self.system_info.name or self.identifier
 
     @property
     def version(self):
-        return parse_version(self.system_info[SYSTEM_CODE_LEVEL])
+        return parse_version(self.system_info.bundle)
 
     @property
     def wwnn(self):
-        return self.system_info[SYSTEM_WWNN]
+        return self.system_info.wwnn
 
     def _generate_volume_scsi_identifier(self, volume_id):
         return '6{}000000000000{}'.format(self.wwnn[1:], volume_id)
 
     def _generate_volume_response(self, res):
         return Volume(
-            vol_size_bytes=int(res[VOLUME_LOGICAL_CAP]),
-            vol_id=self._generate_volume_scsi_identifier(res[VOLUME_ID]),
-            vol_name=res[VOLUME_NAME],
+            vol_size_bytes=int(res.cap),
+            vol_id=self._generate_volume_scsi_identifier(res.id),
+            vol_name=res.name,
             array_address=self.service_address,
-            pool_name=res[VOLUME_POOL_ID],
+            pool_name=res.pool,
             array_type=self.array_type
         )
 
-    def get_se_capability_value(self, capabilities):
+    @staticmethod
+    def get_se_capability_value(capabilities):
         capability = capabilities.get(config.CAPABILITIES_SPACEEFFICIENCY)
         if capability:
             capability = capability.lower()
@@ -200,26 +176,10 @@ class DS8KArrayMediator(ArrayMediator):
             logger.debug(
                 "Start to create volume with parameters: {}".format(cli_kwargs)
             )
-            res = self.client.create_volume(**cli_kwargs)[0]
-            if 'id' in res:
-                logger.info("finished creating volume {}".format(name))
-                return self._generate_volume_response(res)
-            elif RES_STATUS in res and \
-                    res[RES_STATUS].lower() not in RES_SUCCESS_STAUTS:
-                msg = 'Failed to create volume {} on array {}. {}'.format(
-                    name,
-                    self.identifier,
-                    res.get(RES_MSG, '')
-                    )
-                logger.error(msg)
-                raise array_errors.VolumeCreationError(name)
-            else:
-                logger.error('Failed to create volume {} on array {}.'.format(
-                    name,
-                    self.identifier,
-                    )
-                )
-                raise array_errors.VolumeCreationError(name)
+            res = self.client.create_volume(**cli_kwargs)
+
+            logger.info("finished creating volume {}".format(name))
+            return self._generate_volume_response(res)
         except exceptions.ClientException as ex:
             logger.error(
                 "Failed to create volume {} on array {}, reason is: {}".format(
@@ -259,11 +219,11 @@ class DS8KArrayMediator(ArrayMediator):
 
         volume_candidates = []
         if config.CONTEXT_POOL in volume_context:
-            volume_candidates = self.client.list_extentpool_volumes(
+            volume_candidates = self.client.get_volumes_by_pool(
                 volume_context[config.CONTEXT_POOL]
             )
         for vol in volume_candidates:
-            if vol[VOLUME_NAME] == shorten_volume_name(name):
+            if vol.name == shorten_volume_name(name):
                 logger.debug("Found volume: {}".format(vol))
                 return self._generate_volume_response(vol)
 

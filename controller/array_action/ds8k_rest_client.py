@@ -5,22 +5,6 @@ from controller.common.csi_logger import get_stdout_logger
 logger = get_stdout_logger()
 
 
-def normalize_response(func):
-    def inner(self, *args, **kwargs):
-        res_obj = func(self, *args, **kwargs)
-        if not isinstance(res_obj, list):
-            res_obj = [res_obj, ]
-        return list(map(_normalize_item, res_obj))
-    return inner
-
-
-def _normalize_item(res):
-    try:
-        return res.representation
-    except AttributeError:
-        return res
-
-
 def _int_lunid_to_hex(lunid):
     return '{0:0{1}x}'.format(int(lunid), 2)
 
@@ -77,6 +61,8 @@ class RESTClient(object):
                  port=None,
                  hostname='',
                  ):
+        self.user = user
+
         client_kwargs = {'service_address': service_address,
                          'user': user,
                          'password': password,
@@ -86,33 +72,28 @@ class RESTClient(object):
         if hostname:
             client_kwargs.update({'hostname': hostname})
 
-        self.client = Client(**client_kwargs)
+        self._client = Client(**client_kwargs)
 
-    @normalize_response
     def get_system(self):
-        return self.client.get_system()
+        return self._client.get_systems()[0]
 
-    @normalize_response
     def get_volume(self, volume_id):
-        return self.client.get_volumes(volume_id)
+        return self._client.get_volumes(volume_id)
 
-    @normalize_response
     def get_host(self, host_name):
-        return self.client.get_hosts(host_name)
+        return self._client.get_hosts(host_name)
 
-    @normalize_response
     def get_host_mapping(self, host_name, lunid):
-        return self.client.get_mapping_by_host(host_name=host_name,
-                                               lunid=int_to_scsilun(lunid)
-                                               )
+        return self._client.get_mapping_by_host(
+            host_name=host_name,
+            lunid=int_to_scsilun(lunid)
+        )
 
-    @normalize_response
     def get_host_port(self, port_id):
-        return self.client.get_host_ports(port_id)
+        return self._client.get_host_ports(port_id)
 
-    @normalize_response
-    def get_extentpool(self, pool_id):
-        pool = self.client.get_pools(pool_id)
+    def get_pool(self, pool_id):
+        pool = self._client.get_pools(pool_id)
         try:
             # lazy-loading
             eserep = pool.eserep[0]
@@ -121,126 +102,119 @@ class RESTClient(object):
             pass
         return pool
 
-    @normalize_response
-    def list_extentpools(self):
+    def get_pools(self):
         """
         return extent pool list without ese capacity info.
         """
-        return self.client.get_pools()
+        return self._client.get_pools()
 
-    @normalize_response
-    def list_hosts(self):
-        return self.client.get_hosts()
+    def get_hosts(self):
+        return self._client.get_hosts()
 
-    @normalize_response
-    def list_host_ports(self):
-        return self.client.get_host_ports()
+    def get_host_ports(self):
+        return self._client.get_host_ports()
 
-    @normalize_response
-    def list_extentpool_volumes(self, pool_id):
-        return self.client.get_volumes_by_pool(pool_id)
+    def get_volumes_by_pool(self, pool_id):
+        return self._client.get_volumes_by_pool(pool_id)
 
-    @normalize_response
-    def list_extentpool_virtualpool(self, pool_id):
-        return self.client.get_eserep_by_pool(pool_id)
+    def get_flashcopies(self):
+        return self._client.get_flashcopies()
 
-    @normalize_response
-    def list_flashcopies(self):
-        return self.client.get_flashcopies()
+    def get_flashcopies_by_volume(self, volume_id):
+        return self._client.get_flashcopies_by_volume(volume_id)
 
-    @normalize_response
-    def list_volume_flashcopies(self, volume_id):
-        return self.client.get_flashcopies_by_volume(volume_id)
+    def get_lss(self):
+        return self._client.get_lss()
 
-    @normalize_response
-    def list_logical_subsystems(self):
-        return self.client.get_lss()
+    def get_volumes_by_lss(self, lss_number):
+        return self._client.get_volumes_by_lss(lss_number)
 
-    @normalize_response
-    def list_lss_volumes(self, lss_number):
-        return self.client.get_volumes_by_lss(lss_number)
+    def get_fcports(self):
+        return self._client.get_ioports()
 
-    @normalize_response
-    def list_fcports(self):
-        return self.client.get_ioports()
+    def get_host_mappings(self, host_name):
+        return self._client.get_mappings_by_host(host_name)
 
-    @normalize_response
-    def list_host_mappings(self, host_name):
-        return self.client.get_mappings_by_host(host_name)
+    def get_ioports_by_host(self, host_name):
+        return self._client.get_ioports_by_host(host_name)
 
-    @normalize_response
-    def list_host_ioports(self, host_name):
-        return self.client.get_ioports_by_host(host_name)
-
-    @normalize_response
     def get_user(self):
-        return self.client.get_users(user_name=self.client.client.user)
+        return self._client.get_users(user_name=self.user)
 
     def get_used_lun_numbers_by_host(self, host_name):
-        mappings = self.client.get_mappings_by_host(host_name)
+        mappings = self._client.get_mappings_by_host(host_name)
         return [mapping.id for mapping in mappings]
 
-    @normalize_response
     def create_volume(self, name, capacity_in_bytes, pool_id, tp):
-        return self.client.create_volume_fb(name=name,
-                                            cap=capacity_in_bytes,
-                                            captype='bytes',
-                                            pool=pool_id,
-                                            tp=tp)
+        return self._client.create_volume_fb(
+            name=name,
+            cap=capacity_in_bytes,
+            captype='bytes',
+            pool=pool_id,
+            tp=tp
+        )[0]
 
     def rename_volume(self, volume_id, new_name):
-        return self.client.update_volume_rename(volume_id=volume_id,
-                                                new_name=new_name)
+        return self._client.update_volume_rename(
+            volume_id=volume_id,
+            new_name=new_name
+        )
 
     def extend_volume(self, volume_id, new_size_in_bytes):
-        return self.client.update_volume_extend(volume_id=volume_id,
-                                                new_size=new_size_in_bytes,
-                                                captype='bytes')
+        return self._client.update_volume_extend(
+            volume_id=volume_id,
+            new_size=new_size_in_bytes,
+            captype='bytes'
+        )
 
     def delete_volume(self, volume_id):
         # remember to unmap all hosts before delete.
-        return self.client.delete_volume(volume_id=volume_id)
+        return self._client.delete_volume(volume_id=volume_id)
 
-    def relocate_volume(self, volume_id, new_pool_id):
-        return self.client.update_volume_move(volume_id=volume_id,
-                                              new_pool=new_pool_id)
+    def move_volume(self, volume_id, new_pool_id):
+        return self._client.update_volume_move(
+            volume_id=volume_id,
+            new_pool=new_pool_id
+        )
 
     def create_host(self, host_name, wwpn, host_type='VMWare'):
-        hosts = self.client.create_host(host_name=host_name,
-                                        hosttype=host_type
-                                        )
+        hosts = self._client.create_host(
+            host_name=host_name,
+            hosttype=host_type
+        )
         self.attach_port_to_host(host_name=hosts[0].id, wwpn=wwpn)
         return hosts[0].id
 
     def delete_host(self, host_name):
         # delete a host will delete all the attached host ports.
-        return self.client.delete_host(host_name=host_name)
+        return self._client.delete_host(host_name=host_name)
 
     def attach_port_to_host(self, host_name, wwpn):
-        return self._get_attach_or_create_host_port(host_name=host_name,
-                                                    wwpn=wwpn
-                                                    )
+        return self._get_attach_or_create_host_port(
+            host_name=host_name,
+            wwpn=wwpn,
+        )
 
     def detach_port_from_host(self, wwpn):
-        return self.client.delete_host_port(port_id=wwpn)
+        return self._client.delete_host_port(port_id=wwpn)
 
     def map_volume_to_host(self, host_name, volume_id, lunid=''):
-        return self.client.map_volume_to_host(
+        return self._client.map_volume_to_host(
             host_name=host_name,
             volume_id=volume_id,
             lunid=int_to_scsilun(lunid) if lunid else ''
-            )
+        )
 
     def unmap_volume_from_host(self, host_name, lunid):
-        return self.client.unmap_volume_from_host(
+        return self._client.unmap_volume_from_host(
             host_name=host_name,
             lunid=int_to_scsilun(lunid)
-            )
+        )
 
     def _get_attach_or_create_host_port(self, host_name, wwpn):
         try:
-            host_port = self.client.get_host_port(port_id=wwpn)
-            return self.client.update_host_port_change_host(
+            host_port = self._client.get_host_port(port_id=wwpn)
+            return self._client.update_host_port_change_host(
                 port_id=host_port.id,
                 host_name=host_name
             )
@@ -248,6 +222,7 @@ class RESTClient(object):
             logger.debug(
                 'host port {} is not found, creating new...'.format(wwpn)
             )
-            return self.client.create_host_port(port_id=wwpn,
-                                                host_name=host_name
-                                                )
+            return self._client.create_host_port(
+                port_id=wwpn,
+                host_name=host_name
+            )
