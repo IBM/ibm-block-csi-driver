@@ -223,7 +223,7 @@ class DS8KArrayMediator(ArrayMediator):
             raise array_errors.VolumeDeletionError(volume_id)
 
     def get_volume(self, name, volume_context=None):
-        logger.debug("Getting volume {} under context ".format(name, volume_context))
+        logger.debug("Getting volume {} under context {}".format(name, volume_context))
         if not volume_context:
             logger.error(
                 "volume_context is not specified, can not get volumes from storage."
