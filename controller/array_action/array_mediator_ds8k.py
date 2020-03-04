@@ -16,6 +16,7 @@ logger = get_stdout_logger()
 
 # response error codes
 INVALID_CREDENTIALS = 'BE7A002D'
+POOL_NOT_FOUND = 'BE7A0001'
 
 
 def parse_version(bundle):
@@ -176,10 +177,22 @@ class DS8KArrayMediator(ArrayMediator):
             logger.debug(
                 "Start to create volume with parameters: {}".format(cli_kwargs)
             )
-            res = self.client.create_volume(**cli_kwargs)
+            vol = self.client.create_volume(**cli_kwargs)
 
             logger.info("finished creating volume {}".format(name))
-            return self._generate_volume_response(res)
+            return self._generate_volume_response(self.client.get_volume(vol.id))
+        except exceptions.NotFound as ex:
+            if POOL_NOT_FOUND in str(ex.message).upper():
+                raise array_errors.PoolDoesNotExist(pool_id, self.identifier)
+            else:
+                logger.error(
+                    "Failed to create volume {} on array {}, reason is: {}".format(
+                        name,
+                        self.identifier,
+                        ex.details
+                    )
+                )
+                raise array_errors.VolumeCreationError(name)
         except exceptions.ClientException as ex:
             logger.error(
                 "Failed to create volume {} on array {}, reason is: {}".format(
@@ -210,7 +223,7 @@ class DS8KArrayMediator(ArrayMediator):
             raise array_errors.VolumeDeletionError(volume_id)
 
     def get_volume(self, name, volume_context=None):
-        logger.debug("Getting volume {}".format(name))
+        logger.debug("Getting volume {} under context ".format(name, volume_context))
         if not volume_context:
             logger.error(
                 "volume_context is not specified, can not get volumes from storage."

@@ -118,6 +118,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def _test_create_volume_with_capabilities_succeeded(self, is_thin):
         self.client_mock.create_volume.return_value = self.volume_response
+        self.client_mock.get_volume.return_value = self.volume_response
         name = self.volume_response.name
         size_in_bytes = self.volume_response.cap
         if is_thin:
@@ -146,6 +147,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         volume_res = self.volume_response
         volume_res.name = short_name
         self.client_mock.create_volume.return_value = volume_res
+        self.client_mock.get_volume.return_value = volume_res
         size_in_bytes = volume_res.cap
         capabilities = {}
         tp = 'none'
