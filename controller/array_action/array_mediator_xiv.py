@@ -34,6 +34,10 @@ class XIVArrayMediator(ArrayMediator):
         return 63
 
     @classproperty
+    def max_volume_prefix_length(self):
+        return 20
+
+    @classproperty
     def max_connections(self):
         return 2
 
@@ -83,7 +87,7 @@ class XIVArrayMediator(ArrayMediator):
                       cli_volume.pool_name,
                       self.array_type)
 
-    def get_volume(self, volume_name, volume_context=None):
+    def get_volume(self, volume_name, volume_context=None, volume_prefix=""):
         logger.debug("Get volume : {}".format(volume_name))
         try:
             cli_volume = self.client.cmd.vol_list(vol=volume_name).as_single_element
@@ -110,7 +114,7 @@ class XIVArrayMediator(ArrayMediator):
         """:rtype: float"""
         return float(size_in_bytes) / self.BLOCK_SIZE_IN_BYTES
 
-    def create_volume(self, name, size_in_bytes, capabilities, pool):
+    def create_volume(self, name, size_in_bytes, capabilities, pool, volume_prefix=""):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with capabilities : {}".format(
             name, size_in_bytes, pool, capabilities))
 

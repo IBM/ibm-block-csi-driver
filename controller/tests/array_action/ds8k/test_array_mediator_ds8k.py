@@ -4,6 +4,7 @@ from mock import patch, NonCallableMagicMock
 from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
 from controller.array_action.array_mediator_ds8k import shorten_volume_name
 from pyds8k.exceptions import ClientError, ClientException, NotFound
+from controller.common import settings
 import controller.array_action.errors as array_errors
 from controller.array_action import config
 
@@ -43,6 +44,18 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         )
 
         self.array = DS8KArrayMediator("user", "password", self.endpoint)
+
+    def test_shorten_volume_name(self):
+        test_prefix = "test"
+        test_name = "it is a very very long volume name"
+        full_name = test_prefix + settings.NAME_PREFIX_SEPARATOR + test_name
+        new_name = shorten_volume_name(full_name, test_prefix)
+
+        # new name length should be 16
+        self.assertEqual(len(new_name), 16)
+
+        # the volume prefix should not be changed.
+        self.assertTrue(new_name.startswith(test_prefix + settings.NAME_PREFIX_SEPARATOR))
 
     def test_connect_with_incorrect_credentials(self):
         self.client_mock.get_system.side_effect = \
@@ -86,7 +99,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_get_volume_with_long_name(self):
         volume_name = "it is a very long name, more than 16 characters"
-        short_name = shorten_volume_name(volume_name)
+        short_name = shorten_volume_name(volume_name, "")
         volume_res = self.volume_response
         volume_res.name = short_name
         self.client_mock.get_volumes_by_pool.return_value = [volume_res, ]
@@ -143,7 +156,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_create_volume_with_long_name_succeeded(self):
         volume_name = "it is a very long name, more than 16 characters"
-        short_name = shorten_volume_name(volume_name)
+        short_name = shorten_volume_name(volume_name, "")
         volume_res = self.volume_response
         volume_res.name = short_name
         self.client_mock.create_volume.return_value = volume_res
@@ -166,6 +179,11 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_create_volume_failed_with_ClientException(self):
         self.client_mock.create_volume.side_effect = ClientException("500")
         with self.assertRaises(array_errors.VolumeCreationError):
+            self.array.create_volume("fake_name", 1, {}, "fake_pool")
+
+    def test_create_volume_failed_with_pool_not_found(self):
+        self.client_mock.create_volume.side_effect = NotFound("404", message="BE7A0001")
+        with self.assertRaises(array_errors.PoolDoesNotExist):
             self.array.create_volume("fake_name", 1, {}, "fake_pool")
 
     def test_delete_volume(self):

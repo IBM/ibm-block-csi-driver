@@ -75,6 +75,10 @@ class SVCArrayMediator(ArrayMediator):
         return 63
 
     @classproperty
+    def max_volume_prefix_length(self):
+        return 20
+
+    @classproperty
     def max_connections(self):
         return 2
 
@@ -122,7 +126,7 @@ class SVCArrayMediator(ArrayMediator):
             cli_volume.mdisk_grp_name,
             self.array_type)
 
-    def get_volume(self, volume_name, volume_context=None):
+    def get_volume(self, volume_name, volume_context=None, volume_prefix=""):
         logger.debug("Get volume : {}".format(volume_name))
         cli_volume = None
         try:
@@ -178,7 +182,7 @@ class SVCArrayMediator(ArrayMediator):
         logger.debug("found volume name : {0}".format(vol_name))
         return vol_name
 
-    def create_volume(self, name, size_in_bytes, capabilities, pool):
+    def create_volume(self, name, size_in_bytes, capabilities, pool, volume_prefix=""):
         logger.info("creating volume with name : {}. size : {} . in pool : {} "
                     "with capabilities : {}".format(name, size_in_bytes, pool,
                                                     capabilities))

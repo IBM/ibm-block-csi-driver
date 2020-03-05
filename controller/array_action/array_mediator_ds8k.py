@@ -3,6 +3,7 @@ import base58
 from packaging.version import parse
 from pyds8k import exceptions
 from controller.common.csi_logger import get_stdout_logger
+from controller.common import settings
 from controller.array_action.array_mediator_interface import ArrayMediator
 from controller.array_action.utils import classproperty
 from controller.array_action.ds8k_rest_client import RESTClient
@@ -16,7 +17,7 @@ logger = get_stdout_logger()
 
 # response error codes
 INVALID_CREDENTIALS = 'BE7A002D'
-POOL_NOT_FOUND = 'BE7A0001'
+RESOURCE_NOT_EXISTS = 'BE7A0001'
 
 
 def parse_version(bundle):
@@ -40,10 +41,16 @@ def get_volume_id_from_scsi_identifier(scsi_id):
 
 
 # shorten volume name to 16 characters if it is too long.
-def shorten_volume_name(name):
+def shorten_volume_name(name, prefix):
     if len(name) <= 16:
         return name
-    return base58.b58encode(sha1(name.encode()).digest()).decode()[-16:]
+
+    if not prefix:
+        return base58.b58encode(sha1(name.encode()).digest()).decode()[:16]
+    else:
+        name_without_prefix = str(name).split(prefix+settings.NAME_PREFIX_SEPARATOR, 2)[1]
+        hashed = base58.b58encode(sha1(name_without_prefix.encode()).digest()).decode()
+        return (prefix + settings.NAME_PREFIX_SEPARATOR + hashed)[:16]
 
 
 class DS8KArrayMediator(ArrayMediator):
@@ -62,6 +69,10 @@ class DS8KArrayMediator(ArrayMediator):
         # the max length is 16 on storage side, it is too short, use shorten_volume_name to workaround it.
         # so 63 here is just a soft limit, to make sure the volume name won't be very long.
         return 63
+
+    @classproperty
+    def max_volume_prefix_length(self):
+        return 5
 
     @classproperty
     def max_connections(self):
@@ -157,7 +168,7 @@ class DS8KArrayMediator(ArrayMediator):
                 return "ese"
         return "none"
 
-    def create_volume(self, name, size_in_bytes, capabilities, pool_id):
+    def create_volume(self, name, size_in_bytes, capabilities, pool_id, volume_prefix=""):
         logger.info(
             "Creating volume with name: {}, size: {}, in pool: {}, "
             "with capabilities: {}".format(
@@ -168,7 +179,7 @@ class DS8KArrayMediator(ArrayMediator):
         try:
             cli_kwargs = {}
             cli_kwargs.update({
-                'name': shorten_volume_name(name),
+                'name': shorten_volume_name(name, volume_prefix),
                 'capacity_in_bytes': size_in_bytes,
                 'pool_id': pool_id,
                 'tp': self.get_se_capability_value(capabilities),
@@ -182,7 +193,7 @@ class DS8KArrayMediator(ArrayMediator):
             logger.info("finished creating volume {}".format(name))
             return self._generate_volume_response(self.client.get_volume(vol.id))
         except exceptions.NotFound as ex:
-            if POOL_NOT_FOUND in str(ex.message).upper():
+            if RESOURCE_NOT_EXISTS in str(ex.message).upper():
                 raise array_errors.PoolDoesNotExist(pool_id, self.identifier)
             else:
                 logger.error(
@@ -222,7 +233,7 @@ class DS8KArrayMediator(ArrayMediator):
             )
             raise array_errors.VolumeDeletionError(volume_id)
 
-    def get_volume(self, name, volume_context=None):
+    def get_volume(self, name, volume_context=None, volume_prefix=""):
         logger.debug("Getting volume {} under context {}".format(name, volume_context))
         if not volume_context:
             logger.error(
@@ -236,7 +247,7 @@ class DS8KArrayMediator(ArrayMediator):
                 volume_context[config.CONTEXT_POOL]
             )
         for vol in volume_candidates:
-            if vol.name == shorten_volume_name(name):
+            if vol.name == shorten_volume_name(name, volume_prefix):
                 logger.debug("Found volume: {}".format(vol))
                 return self._generate_volume_response(vol)
 
