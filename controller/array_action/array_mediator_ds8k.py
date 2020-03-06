@@ -18,6 +18,7 @@ logger = get_stdout_logger()
 # response error codes
 INVALID_CREDENTIALS = 'BE7A002D'
 RESOURCE_NOT_EXISTS = 'BE7A0001'
+MAX_VOLUME_LENGTH = 16
 
 
 def parse_version(bundle):
@@ -40,17 +41,29 @@ def get_volume_id_from_scsi_identifier(scsi_id):
     return scsi_id[-4:]
 
 
-# shorten volume name to 16 characters if it is too long.
+def hash_string(string):
+    return base58.b58encode(sha1(string.encode()).digest()).decode()
+
+
+#
 def shorten_volume_name(name, prefix):
-    if len(name) <= 16:
+    """
+    shorten volume name to 16 characters if it is too long.
+
+    :param name: the origin name with prefix
+    :param prefix: the prefix of the name
+    :return: a short name with the origin prefix
+    """
+
+    if len(name) <= MAX_VOLUME_LENGTH:
         return name
 
     if not prefix:
-        return base58.b58encode(sha1(name.encode()).digest()).decode()[:16]
+        return hash_string(name)[:MAX_VOLUME_LENGTH]
     else:
         name_without_prefix = str(name).split(prefix+settings.NAME_PREFIX_SEPARATOR, 2)[1]
-        hashed = base58.b58encode(sha1(name_without_prefix.encode()).digest()).decode()
-        return (prefix + settings.NAME_PREFIX_SEPARATOR + hashed)[:16]
+        hashed = hash_string(name_without_prefix)
+        return (prefix + settings.NAME_PREFIX_SEPARATOR + hashed)[:MAX_VOLUME_LENGTH]
 
 
 class DS8KArrayMediator(ArrayMediator):
@@ -188,10 +201,22 @@ class DS8KArrayMediator(ArrayMediator):
             logger.debug(
                 "Start to create volume with parameters: {}".format(cli_kwargs)
             )
-            vol = self.client.create_volume(**cli_kwargs)
 
-            logger.info("finished creating volume {}".format(name))
-            return self._generate_volume_response(self.client.get_volume(vol.id))
+            try:
+                # get the volume before creating again, to make sure it is not existing,
+                # because volume name is not unique in ds8k.
+                vol = self.get_volume(
+                    name,
+                    volume_context={config.CONTEXT_POOL: pool_id},
+                    volume_prefix=volume_prefix
+                )
+                logger.info("Found volume {}".format(name))
+                return vol
+            except array_errors.VolumeNotFoundError:
+                vol = self.client.create_volume(**cli_kwargs)
+
+                logger.info("finished creating volume {}".format(name))
+                return self._generate_volume_response(self.client.get_volume(vol.id))
         except exceptions.NotFound as ex:
             if RESOURCE_NOT_EXISTS in str(ex.message).upper():
                 raise array_errors.PoolDoesNotExist(pool_id, self.identifier)

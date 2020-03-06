@@ -154,6 +154,16 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         )
         self.assertEqual(vol.volume_name, self.volume_response.name)
 
+    def test_create_volume_return_existing(self):
+        self.client_mock.get_volumes_by_pool.return_value = [
+            self.volume_response,
+        ]
+        pool_id = self.volume_response.pool
+        vol = self.array.create_volume(
+            self.volume_response.name, "1", {}, pool_id,
+        )
+        self.assertEqual(vol.volume_name, self.volume_response.name)
+
     def test_create_volume_with_long_name_succeeded(self):
         volume_name = "it is a very long name, more than 16 characters"
         short_name = shorten_volume_name(volume_name, "")
