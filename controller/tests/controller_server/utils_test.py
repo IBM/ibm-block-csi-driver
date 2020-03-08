@@ -15,7 +15,6 @@ class TestUtils(unittest.TestCase):
         self.config = {"controller": {"publish_context_lun_parameter": "lun",
                                       "publish_context_connectivity_parameter": "connectivity_type",
                                       "publish_context_array_iqn": "array_iqn",
-                                      "publish_context_iscsi_targets": "iscsi_targets",
                                       "publish_context_fc_initiators": "fc_wwns"}
                        }
 
@@ -297,15 +296,17 @@ class TestUtils(unittest.TestCase):
     def test_generate_publish_volume_response_error(self):
         with self.assertRaises(NoIscsiTargetsSpecifiedError):
             utils.generate_csi_publish_volume_response(0, "iscsi", self.config,
-                                                       ["1"])
+                                                       {"1": []})
 
     def test_generate_publish_volume_response_success(self):
         res = utils.generate_csi_publish_volume_response(0, "iscsi", self.config,
-                                                         ["1"], ['1.1.1.1'])
+                                                         {"iqn": ["1.1.1.1", "2.2.2.2"],
+                                                          "iqn2": ["3.3.3.3", "::1"]})
         self.assertEqual(res.publish_context["lun"], '0')
         self.assertEqual(res.publish_context["connectivity_type"], "iscsi")
-        self.assertEqual(res.publish_context["array_iqn"], '1')
-        self.assertEqual(res.publish_context["iscsi_targets"], '1.1.1.1')
+        self.assertEqual(res.publish_context["array_iqn"], "iqn,iqn2")
+        self.assertEqual(res.publish_context["iqn"], "1.1.1.1,2.2.2.2")
+        self.assertEqual(res.publish_context["iqn2"], "3.3.3.3,::1")
 
         res = utils.generate_csi_publish_volume_response(1, "fc", self.config,
                                                          ["wwn1", "wwn2"])

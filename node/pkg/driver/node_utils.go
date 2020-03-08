@@ -43,7 +43,8 @@ const (
 type NodeUtilsInterface interface {
 	ParseIscsiInitiators() (string, error)
 	ParseFCPorts() ([]string, error)
-	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, []string, []string, error)
+	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, map[string][]string, error)
+	GetArrayInitiators(ipsByArrayInitiator map[string][]string) []string
 	GetSysDevicesFromMpath(baseDevice string) (string, error)
 
 	// TODO refactor and move all staging methods to dedicate interface.
@@ -93,28 +94,45 @@ func (n NodeUtils) ParseIscsiInitiators() (string, error) {
 	return iscsiIqn, nil
 }
 
-func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, []string, []string, error) {
-	// this will return :  connectivityType, lun, arrayInitiators, iscsiTargets error
-	var arrayInitiators []string
-	var iscsiTargets []string
-	str_lun := publishContext[configYaml.Controller.Publish_context_lun_parameter]
+func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, map[string][]string, error) {
+	// this will return :  connectivityType, lun, ipsByArrayInitiator, error
+	ipsByArrayInitiator := make(map[string][]string)
+	strLun := publishContext[configYaml.Controller.Publish_context_lun_parameter]
 
-	lun, err := strconv.Atoi(str_lun)
+	lun, err := strconv.Atoi(strLun)
 	if err != nil {
-		return "", -1, nil, nil, err
+		return "", -1, nil, err
 	}
 
 	connectivityType := publishContext[configYaml.Controller.Publish_context_connectivity_parameter]
 	if connectivityType == "iscsi" {
-		arrayInitiators = strings.Split(publishContext[configYaml.Controller.Publish_context_array_iqn], ",")
-		iscsiTargets = strings.Split(publishContext[configYaml.Controller.Publish_context_iscsi_targets], ",")
+		iqns := strings.Split(publishContext[configYaml.Controller.Publish_context_array_iqn], ",")
+		for _, iqn := range iqns {
+			if ips, iqnExists := publishContext[iqn]; iqnExists {
+				ipsByArrayInitiator[iqn] = strings.Split(ips, ",")
+			} else {
+				logger.Errorf("Publish context does not contain any iscsi target IP for {%v}", iqn)
+			}
+		}
 	}
 	if connectivityType == "fc" {
-		arrayInitiators = strings.Split(publishContext[configYaml.Controller.Publish_context_fc_initiators], ",")
+		wwns := strings.Split(publishContext[configYaml.Controller.Publish_context_fc_initiators], ",")
+		for _, wwn := range wwns {
+			ipsByArrayInitiator[wwn] = nil
+		}
 	}
 
-	logger.Debugf("PublishContext relevant info : connectivityType=%v, lun=%v, arrayInitiators=%v", connectivityType, lun, arrayInitiators)
-	return connectivityType, lun, arrayInitiators, iscsiTargets, nil
+	logger.Debugf("PublishContext relevant info : connectivityType=%v, lun=%v, arrayInitiators=%v",
+		connectivityType, lun, ipsByArrayInitiator)
+	return connectivityType, lun, ipsByArrayInitiator, nil
+}
+
+func (n NodeUtils) GetArrayInitiators(ipsByArrayInitiator map[string][]string) []string {
+	arrayInitiators := make([]string, 0, len(ipsByArrayInitiator))
+	for arrayInitiator := range ipsByArrayInitiator {
+		arrayInitiators = append(arrayInitiators, arrayInitiator)
+	}
+	return arrayInitiators
 }
 
 func (n NodeUtils) WriteStageInfoToFile(fPath string, info map[string]string) error {

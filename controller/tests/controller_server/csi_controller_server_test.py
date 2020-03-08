@@ -374,11 +374,8 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.mediator.map_volume = Mock()
         self.mediator.map_volume.return_value = 1
 
-        self.mediator.get_array_iqns = Mock()
-        self.mediator.get_array_iqns.return_value = "array-iqn"
-
-        self.mediator.get_iscsi_targets = Mock()
-        self.mediator.get_iscsi_targets.return_value = ['1.1.1.1', '2.2.2.2']
+        self.mediator.get_iscsi_targets_by_iqn = Mock()
+        self.mediator.get_iscsi_targets_by_iqn.return_value = {"iqn1": ["1.1.1.1", "2.2.2.2"], "iqn2": ["::1"]}
 
         self.servicer = ControllerServicer(self.fqdn)
 
@@ -465,9 +462,6 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi", "fc"]
         self.mediator.get_array_fc_wwns = Mock()
         self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
-        self.mediator.get_array_iqns = Mock()
-        self.mediator.get_array_iqns.return_value = [
-            "iqn.1994-05.com.redhat:686358c930fe"]
         enter.return_value = self.mediator
 
         res = self.servicer.ControllerPublishVolume(self.request, context)
@@ -481,8 +475,6 @@ class TestControllerServerPublishVolume(unittest.TestCase):
     def test_publish_volume_with_connectivity_type_iscsi(self, enter):
         context = utils.FakeContext()
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi"]
-        self.mediator.get_array_iqns = Mock()
-        self.mediator.get_array_iqns.return_value = ["iqn.1994-05.com.redhat:686358c930fe"]
         self.mediator.get_array_fc_wwns = Mock()
         self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
         enter.return_value = self.mediator
@@ -493,20 +485,18 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '1')
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
                          "iscsi")
-        self.assertEqual(
-            res.publish_context["PUBLISH_CONTEXT_ARRAY_IQN"],
-            "iqn.1994-05.com.redhat:686358c930fe")
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_ISCSI_TARGETS"],
-                         '1.1.1.1,2.2.2.2')
+        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_ARRAY_IQN"],
+                         "iqn1,iqn2")
+        self.assertEqual(res.publish_context["iqn1"],
+                         "1.1.1.1,2.2.2.2")
+        self.assertEqual(res.publish_context["iqn2"],
+                         "::1")
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_publish_volume_with_node_id_only_has_iqns(self, enter):
         context = utils.FakeContext()
         self.request.node_id = "hostname;iqn.1994-05.com.redhat:686358c930fe;"
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi"]
-        self.mediator.get_array_iqns = Mock()
-        self.mediator.get_array_iqns.return_value = [
-            "iqn.1994-05.com.redhat:686358c930fe"]
         enter.return_value = self.mediator
 
         res = self.servicer.ControllerPublishVolume(self.request, context)
@@ -515,9 +505,12 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '1')
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
                          "iscsi")
-        self.assertEqual(
-            res.publish_context["PUBLISH_CONTEXT_ARRAY_IQN"],
-            "iqn.1994-05.com.redhat:686358c930fe")
+        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_ARRAY_IQN"],
+                         "iqn1,iqn2")
+        self.assertEqual(res.publish_context["iqn1"],
+                         "1.1.1.1,2.2.2.2")
+        self.assertEqual(res.publish_context["iqn2"],
+                         "::1")
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_publish_volume_with_node_id_only_has_wwns(self, enter):
@@ -526,6 +519,7 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["fc"]
         self.mediator.get_array_fc_wwns = Mock()
         self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
+        self.mediator.get_iscsi_targets_by_iqn.return_value = {}
         enter.return_value = self.mediator
 
         res = self.servicer.ControllerPublishVolume(self.request, context)
@@ -609,7 +603,6 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         context = utils.FakeContext()
 
         self.mediator.map_volume.side_effect = [array_errors.LunAlreadyInUseError("", ""), 2]
-        self.mediator.map_volume.get_array_iqns.return_value = "array-iqn"
         enter.return_value = self.mediator
         res = self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -645,23 +638,28 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.assertEqual(context.code, grpc.StatusCode.RESOURCE_EXHAUSTED)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_publish_volume_get_iscsi_targets_excpetions(self, enter):
+    def test_publish_volume_get_iscsi_targets_by_iqn_excpetions(self, enter):
         context = utils.FakeContext()
 
-        self.mediator.get_iscsi_targets.side_effect = [array_errors.NoIscsiTargetsSpecifiedError()]
+        self.mediator.get_iscsi_targets_by_iqn.side_effect = [array_errors.NoIscsiTargetsSpecifiedError()]
         enter.return_value = self.mediator
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
 
-        self.mediator.get_iscsi_targets.side_effect = [array_errors.UnsupportedConnectivityTypeError("usb")]
-        enter.return_value = self.mediator
-        self.servicer.ControllerPublishVolume(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
-
-        self.mediator.get_iscsi_targets.side_effect = [array_errors.NoIscsiTargetsFoundError("some_endpoint")]
+        self.mediator.get_iscsi_targets_by_iqn.side_effect = [array_errors.NoIscsiTargetsFoundError("some_endpoint")]
         enter.return_value = self.mediator
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
+
+    @patch("controller.controller_server.utils.generate_csi_publish_volume_response")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_generate_csi_publish_volume_response_exceptions(self, enter, generate_csi_publish_volume_response):
+        context = utils.FakeContext()
+        generate_csi_publish_volume_response.side_effect = [
+            array_errors.UnsupportedConnectivityTypeError("usb")]
+        enter.return_value = self.mediator
+        self.servicer.ControllerPublishVolume(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
 
 
 class TestControllerServerUnPublishVolume(unittest.TestCase):

@@ -1,3 +1,4 @@
+from collections import defaultdict
 from pysvc import errors as svc_errors
 from pysvc.unified.client import connect
 from pysvc.unified.response import CLIFailureError
@@ -380,6 +381,18 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise ex
 
+    def _get_array_iqns_by_node_id(self):
+        logger.debug("Getting array nodes id and iscsi name")
+        try:
+            nodes_list = self.client.svcinfo.lsnode()
+            array_iqns_by_id = {node.id: node.iscsi_name for node in nodes_list
+                                if node.status.lower() == "online"}
+        except Exception as ex:
+            logger.exception(ex)
+            raise ex
+        logger.debug("Found iqns by node id: {}".format(array_iqns_by_id))
+        return array_iqns_by_id
+
     def _list_ip_ports(self):
         try:
             return self.client.svcinfo.lsportip(filtervalue='state=configured:failover=no')
@@ -388,35 +401,35 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.NoIscsiTargetsFoundError(self.endpoint)
 
     @staticmethod
-    def _extract_ip_addresses(ports):
-        ips = []
+    def _extract_ips_by_node_id(ports):
+        ips_by_node_id = defaultdict(list)
         for port in ports:
             if port.IP_address:
-                ips.append(port.IP_address)
+                ips_by_node_id[port.node_id].append(port.IP_address)
             if port.IP_address_6:
-                ips.append(port.IP_address_6)
-        return ips
+                ips_by_node_id[port.node_id].append(port.IP_address_6)
+        return dict(ips_by_node_id)
 
-    def get_iscsi_targets(self):
-        logger.debug("Getting iscsi targets")
+    @staticmethod
+    def _unify_ips_by_iqn(iqns_by_node_id, ips_by_node_id):
+        ips_by_iqn = defaultdict(list)
+        for node_id, iqn in iqns_by_node_id.items():
+            ips = ips_by_node_id.get(node_id, [])
+            ips_by_iqn[iqn].extend(ips)
+        return dict(ips_by_iqn)
+
+    def get_iscsi_targets_by_iqn(self):
+        logger.debug("Getting iscsi targets by iqn")
+        iqns_by_node_id = self._get_array_iqns_by_node_id()
         ports = self._list_ip_ports()
-        ips = self._extract_ip_addresses(ports)
-        if ips:
-            logger.debug("Found iscsi targets: {}".format(ips))
-            return ips
+        ips_by_node_id = self._extract_ips_by_node_id(ports)
+        ips_by_iqn = self._unify_ips_by_iqn(iqns_by_node_id, ips_by_node_id)
+
+        if ips_by_iqn and any(ips_by_iqn.values()):
+            logger.debug("Found iscsi target IPs by iqn: {}".format(ips_by_iqn))
+            return ips_by_iqn
         else:
             raise controller_errors.NoIscsiTargetsFoundError(self.endpoint)
-
-    def get_array_iqns(self):
-        logger.debug("Getting array nodes iscsi name")
-        try:
-            nodes_list = self.client.svcinfo.lsnode()
-            array_iqns = [node.iscsi_name for node in nodes_list
-                          if node.status.lower() == "online"]
-        except Exception as ex:
-            logger.exception(ex)
-            raise ex
-        return array_iqns
 
     def get_array_fc_wwns(self, host_name):
         logger.debug("Getting the connected fc port wwn value from array "

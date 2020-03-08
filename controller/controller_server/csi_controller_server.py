@@ -10,7 +10,6 @@ import controller.array_action.errors as controller_errors
 import controller.controller_server.config as config
 import controller.controller_server.utils as utils
 from controller.array_action.array_connection_manager import ArrayConnectionManager
-from controller.array_action.config import ISCSI_CONNECTIVITY_TYPE
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.csi_logger import set_log_level
 from controller.common.node_info import NodeIdInfo
@@ -180,7 +179,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def ControllerPublishVolume(self, request, context):
         set_current_thread_name(request.volume_id)
         logger.info("ControllerPublishVolume")
-        iscsi_targets = None
         try:
             utils.validate_publish_volume_request(request)
 
@@ -196,14 +194,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
                 lun, connectivity_type, array_initiators = array_mediator.map_volume_by_initiators(vol_id,
                                                                                                    initiators)
-                if connectivity_type == ISCSI_CONNECTIVITY_TYPE:
-                    iscsi_targets = array_mediator.get_iscsi_targets()
             logger.info("finished ControllerPublishVolume")
             res = utils.generate_csi_publish_volume_response(lun,
                                                              connectivity_type,
                                                              self.cfg,
-                                                             array_initiators,
-                                                             iscsi_targets)
+                                                             array_initiators)
             return res
 
         except controller_errors.VolumeMappedToMultipleHostsError as ex:

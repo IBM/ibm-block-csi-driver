@@ -267,13 +267,10 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             else:
                 raise controller_errors.UnMappingError(vol_name, host_name, ex)
 
-    def get_iscsi_targets(self):
-        raise NotImplementedError  # TODO: CSI-1166
-
-    def get_array_iqns(self):
+    def get_iscsi_targets_by_iqn(self):
         config_get_list = self.client.cmd.config_get().as_list
         array_iqn = [a for a in config_get_list if a["name"] == "iscsi_name"][0]["value"]
-        return [array_iqn]
+        return {array_iqn: None}  # TODO: CSI-1166 replace None with list of iscsi target IPs (ipinterface_list)
 
     def get_array_fc_wwns(self, host_name):
         fc_wwns_objects = self.client.cmd.fc_port_list()

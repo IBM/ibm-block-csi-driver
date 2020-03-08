@@ -17,7 +17,9 @@
 package device_connectivity
 
 import (
+	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"os/exec"
 )
 
 type OsDeviceConnectivityIscsi struct {
@@ -30,6 +32,39 @@ func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface) OsDeviceC
 		Executer:          executer,
 		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer),
 	}
+}
+
+func (r OsDeviceConnectivityIscsi) iscsiDiscoverAndLogin(iqn, ip string) error {
+	logger.Debugf("iscsiDiscoverAndLogin: iqn {%s}, ip {%s}", iqn, ip)
+	_, err := exec.Command("iscsiadm", "-m", "discovery", "-t", "sendtargets", "-p", ip).CombinedOutput()
+	if err != nil {
+		logger.Error(err)
+		return err
+	}
+
+	_, err = exec.Command("iscsiadm", "-m", "node", "-p", ip+":3260", "-T", iqn, "--login").CombinedOutput()
+	if err != nil {
+		logger.Error(err)
+		return err
+	}
+	return nil
+}
+
+func (r OsDeviceConnectivityIscsi) EnsureLogin(ipsByArrayIdentifier map[string][]string) error {
+	isAnyLoginSucceeded := false
+	var err error
+	for arrayIdentifier, ips := range ipsByArrayIdentifier {
+		for _, ip := range ips {
+			err = r.iscsiDiscoverAndLogin(arrayIdentifier, ip)
+			if err == nil {
+				isAnyLoginSucceeded = true
+			}
+		}
+	}
+	if !isAnyLoginSucceeded {
+		return err
+	}
+	return nil
 }
 
 func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifiers []string) error {

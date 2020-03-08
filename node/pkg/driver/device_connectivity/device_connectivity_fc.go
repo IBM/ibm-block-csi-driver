@@ -32,6 +32,10 @@ func NewOsDeviceConnectivityFc(executer executer.ExecuterInterface) OsDeviceConn
 	}
 }
 
+func (r OsDeviceConnectivityFc) EnsureLogin(_ map[string][]string) error {
+	return nil
+}
+
 func (r OsDeviceConnectivityFc) RescanDevices(lunId int, arrayIdentifiers []string) error {
 	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers)
 }

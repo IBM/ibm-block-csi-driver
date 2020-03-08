@@ -120,17 +120,21 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volId, "NodeStageVolume")
 
-	connectivityType, lun, arrayInitiators, iscsiTargets, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
+	connectivityType, lun, ipsByArrayInitiator, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	logger.Debugf("NodeStageVolume: Got iscsiTargets: {%s}.", iscsiTargets)
+	arrayInitiators := d.NodeUtils.GetArrayInitiators(ipsByArrayInitiator)
 
 	stagingPath := req.GetStagingTargetPath() // e.g in k8s /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-21967c74-b456-11e9-b93e-005056a45d5f/globalmount
 
 	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
 	if !ok {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
+	}
+
+	if err := osDeviceConnectivity.EnsureLogin(ipsByArrayInitiator); err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	err = osDeviceConnectivity.RescanDevices(lun, arrayInitiators)
@@ -219,7 +223,7 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{"Volume Access Type is not supported"}
 	}
 
-	connectivityType, lun, arrayInitiators, iscsiTargets, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
+	connectivityType, lun, ipsByArrayInitiator, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
 	if err != nil {
 		return &RequestValidationError{fmt.Sprintf("Fail to parse PublishContext %v with err = %v", req.PublishContext, err)}
 	}
@@ -232,12 +236,23 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong lun id %d.", lun)}
 	}
 
-	if len(arrayInitiators) == 0 {
-		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong arrayInitiators %s.", arrayInitiators)}
+	if len(ipsByArrayInitiator) == 0 {
+		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong arrayInitiators %v.",
+			ipsByArrayInitiator)}
 	}
 
-	if connectivityType == "iscsi" && len(iscsiTargets) == 0 {
-		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong iscsiTargets %s.", iscsiTargets)}
+	if connectivityType == "iscsi" {
+		isAnyIpFound := false
+		for arrayInitiator := range ipsByArrayInitiator {
+			if _, ok := req.PublishContext[arrayInitiator]; ok {
+				isAnyIpFound = true
+				break
+			}
+		}
+		if !isAnyIpFound {
+			return &RequestValidationError{fmt.Sprintf("PublishContext with no iscsi target IP %v.",
+				req.PublishContext)}
+		}
 	}
 
 	return nil

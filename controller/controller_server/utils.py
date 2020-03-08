@@ -188,7 +188,7 @@ def choose_connectivity_type(connecitvity_types):
         return ISCSI_CONNECTIVITY_TYPE
 
 
-def generate_csi_publish_volume_response(lun, connectivity_type, config, array_initiators, iscsi_targets=None):
+def generate_csi_publish_volume_response(lun, connectivity_type, config, array_initiators):
     logger.debug("generating publish volume response for lun :{0}, connectivity : {1}".format(lun, connectivity_type))
 
     lun_param = config["controller"]["publish_context_lun_parameter"]
@@ -200,18 +200,18 @@ def generate_csi_publish_volume_response(lun, connectivity_type, config, array_i
     }
 
     if connectivity_type == ISCSI_CONNECTIVITY_TYPE:
-        if not iscsi_targets:
+        if not array_initiators or not any(array_initiators.values()):
             raise NoIscsiTargetsSpecifiedError()
-        iscsi_targets_param = config["controller"]["publish_context_iscsi_targets"]
-        publish_context[iscsi_targets_param] = ",".join(iscsi_targets)
+        for iqn, ips in array_initiators.items():
+            publish_context[iqn] = ",".join(ips)
 
         array_initiators_param = config["controller"]["publish_context_array_iqn"]
+        publish_context[array_initiators_param] = ",".join(array_initiators.keys())
     elif connectivity_type == FC_CONNECTIVITY_TYPE:
         array_initiators_param = config["controller"]["publish_context_fc_initiators"]
+        publish_context[array_initiators_param] = ",".join(array_initiators)
     else:
         raise UnsupportedConnectivityTypeError(connectivity_type)
-
-    publish_context[array_initiators_param] = ",".join(array_initiators)
 
     res = csi_pb2.ControllerPublishVolumeResponse(publish_context=publish_context)
 

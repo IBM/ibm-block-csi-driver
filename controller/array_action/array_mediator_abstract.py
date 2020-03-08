@@ -26,7 +26,7 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
         if FC_CONNECTIVITY_TYPE == connectivity_type:
             array_initiators = self.get_array_fc_wwns(host_name)
         else:
-            array_initiators = self.get_array_iqns()
+            array_initiators = self.get_iscsi_targets_by_iqn()
         mappings = self.get_volume_mappings(vol_id)
         if len(mappings) >= 1:
             logger.debug(
