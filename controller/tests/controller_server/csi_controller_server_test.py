@@ -375,7 +375,7 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.mediator.map_volume.return_value = 1
 
         self.mediator.get_iscsi_targets_by_iqn = Mock()
-        self.mediator.get_iscsi_targets_by_iqn.return_value = {"iqn1": ["1.1.1.1", "2.2.2.2"], "iqn2": ["::1"]}
+        self.mediator.get_iscsi_targets_by_iqn.return_value = {"iqn1": ["1.1.1.1", "2.2.2.2"], "iqn2": ["[::1]"]}
 
         self.servicer = ControllerServicer(self.fqdn)
 
@@ -490,7 +490,7 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.assertEqual(res.publish_context["iqn1"],
                          "1.1.1.1,2.2.2.2")
         self.assertEqual(res.publish_context["iqn2"],
-                         "::1")
+                         "[::1]")
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_publish_volume_with_node_id_only_has_iqns(self, enter):
@@ -510,7 +510,7 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.assertEqual(res.publish_context["iqn1"],
                          "1.1.1.1,2.2.2.2")
         self.assertEqual(res.publish_context["iqn2"],
-                         "::1")
+                         "[::1]")
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_publish_volume_with_node_id_only_has_wwns(self, enter):

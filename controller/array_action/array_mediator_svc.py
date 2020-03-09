@@ -407,7 +407,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             if port.IP_address:
                 ips_by_node_id[port.node_id].append(port.IP_address)
             if port.IP_address_6:
-                ips_by_node_id[port.node_id].append(port.IP_address_6)
+                ipv6 = port.IP_address_6.join('[]')
+                ips_by_node_id[port.node_id].append(ipv6)
         return dict(ips_by_node_id)
 
     @staticmethod

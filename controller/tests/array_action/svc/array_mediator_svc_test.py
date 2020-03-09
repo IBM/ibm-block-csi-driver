@@ -607,7 +607,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         ips_by_iqn = self.svc.get_iscsi_targets_by_iqn()
 
         self.assertEqual(ips_by_iqn, {'iqn.1986-03.com.ibm:2145.v7k1.node1': ['1.1.1.1', '2.2.2.2'],
-                                      'iqn.1986-03.com.ibm:2145.v7k1.node2': ['1::1']})
+                                      'iqn.1986-03.com.ibm:2145.v7k1.node2': ['[1::1]']})
 
     def test_get_array_fc_wwns_failed(self):
         self.svc.client.svcinfo.lsfabric.side_effect = [
