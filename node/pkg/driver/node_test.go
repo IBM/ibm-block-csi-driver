@@ -18,11 +18,8 @@ package driver_test
 
 import (
 	"context"
-	"fmt"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"path"
-	"path/filepath"
-	"reflect"
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -48,7 +45,27 @@ func newTestNodeService(nodeUtils driver.NodeUtilsInterface, nodeMounter driver.
 	}
 }
 
+func newTestNodeServiceStaging(nodeUtils driver.NodeUtilsInterface, osDevCon device_connectivity.OsDeviceConnectivityInterface) driver.NodeService {
+	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
+		"iscsi": osDevCon, "fc":  osDevCon}
+
+	return driver.NodeService{
+		Hostname:         "test-host",
+		ConfigYaml:       driver.ConfigFile{},
+		VolumeIdLocksMap: driver.NewSyncLock(),
+		NodeUtils:        nodeUtils,
+		OsDeviceConnectivityMapping: osDeviceConnectivityMapping,
+	}
+}
+
 func TestNodeStageVolume(t *testing.T) {
+	conTypeIscsi := "iscsi"
+	volId := "vol-test"
+	lun := 10
+	mpathDeviceName := "dm-2"
+	mpathDevice := "/dev/" + mpathDeviceName
+	arrayInitiators := []string{"host;iqn;wwn"}
+	internalError := status.Error(codes.Internal, "internal error")
 	stdVolCap := &csi.VolumeCapability{
 		AccessType: &csi.VolumeCapability_Mount{
 			Mount: &csi.VolumeCapability_MountVolume{},
@@ -57,76 +74,168 @@ func TestNodeStageVolume(t *testing.T) {
 			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 		},
 	}
+
 	testCases := []struct {
-		name       string
-		req        *csi.NodeStageVolumeRequest
-		expErrCode codes.Code
+		name     string
+		testFunc func(t *testing.T)
 	}{
 		{
 			name: "fail no VolumeId",
-			req: &csi.NodeStageVolumeRequest{
-				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-				StagingTargetPath: "/test/path",
-				VolumeCapability:  stdVolCap,
+			testFunc: func(t *testing.T) {
+				driver := newTestNodeService(nil, nil)
+				req := &csi.NodeStageVolumeRequest{
+					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+					StagingTargetPath: "/test/path",
+					VolumeCapability:  stdVolCap,
+				}
+				_, err := driver.NodeStageVolume(context.TODO(), req)
+				assertError(t, err, codes.InvalidArgument)
 			},
-			expErrCode: codes.InvalidArgument,
 		},
 		{
 			name: "fail no StagingTargetPath",
-			req: &csi.NodeStageVolumeRequest{
-				PublishContext:   map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-				VolumeCapability: stdVolCap,
-				VolumeId:         "vol-test",
+			testFunc: func(t *testing.T) {
+				driver := newTestNodeService(nil, nil)
+				req := &csi.NodeStageVolumeRequest{
+					PublishContext:   map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+					VolumeCapability: stdVolCap,
+					VolumeId:         volId,
+				}
+				_, err := driver.NodeStageVolume(context.TODO(), req)
+				assertError(t, err, codes.InvalidArgument)
 			},
-			expErrCode: codes.InvalidArgument,
 		},
 		{
 			name: "fail no VolumeCapability",
-			req: &csi.NodeStageVolumeRequest{
-				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-				StagingTargetPath: "/test/path",
-				VolumeId:          "vol-test",
+			testFunc: func(t *testing.T) {
+				driver := newTestNodeService(nil, nil)
+				req := &csi.NodeStageVolumeRequest{
+					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+					StagingTargetPath: "/test/path",
+					VolumeId:          volId,
+				}
+				_, err := driver.NodeStageVolume(context.TODO(), req)
+				assertError(t, err, codes.InvalidArgument)
 			},
-			expErrCode: codes.InvalidArgument,
 		},
 		{
-			name: "fail invalid VolumeCapability ",
-			req: &csi.NodeStageVolumeRequest{
-				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-				StagingTargetPath: "/test/path",
-				VolumeCapability: &csi.VolumeCapability{
-					AccessMode: &csi.VolumeCapability_AccessMode{
-						Mode: csi.VolumeCapability_AccessMode_UNKNOWN,
+			name: "fail invalid VolumeCapability",
+			testFunc: func(t *testing.T) {
+				driver := newTestNodeService(nil, nil)
+				req := &csi.NodeStageVolumeRequest{
+					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+					StagingTargetPath: "/test/path",
+					VolumeCapability: &csi.VolumeCapability{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_UNKNOWN,
+						},
 					},
-				},
-				VolumeId: "vol-test",
+					VolumeId: volId,
+				}
+				_, err := driver.NodeStageVolume(context.TODO(), req)
+				assertError(t, err, codes.InvalidArgument)
 			},
-			expErrCode: codes.InvalidArgument,
+		},
+		{
+			name: "fail parse PublishContext",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				driver := newTestNodeService(mockNodeUtils, mockMounter)
+
+				req := &csi.NodeStageVolumeRequest{
+					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+					StagingTargetPath: "/test/path",
+					VolumeCapability: stdVolCap,
+					VolumeId: volId,
+				}
+
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(req.PublishContext, driver.ConfigYaml).Return("", 0, nil, internalError)
+
+				_, err := driver.NodeStageVolume(context.TODO(), req)
+				assertError(t, err, codes.InvalidArgument)
+			},
+		},
+		{
+			name: "fail rescan devices",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				driver := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+
+				req := &csi.NodeStageVolumeRequest{
+					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+					StagingTargetPath: "/test/path",
+					VolumeCapability: stdVolCap,
+					VolumeId: volId,
+				}
+
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(req.PublishContext, driver.ConfigYaml).Return(conTypeIscsi, lun, arrayInitiators, nil).AnyTimes()
+				mockOsRescanCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(internalError)
+
+				_, err := driver.NodeStageVolume(context.TODO(), req)
+				assertError(t, err, codes.Internal)
+			},
+		},
+		{
+			name: "fail get mpath device",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				driver := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+
+				req := &csi.NodeStageVolumeRequest{
+					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+					StagingTargetPath: "/test/path",
+					VolumeCapability: stdVolCap,
+					VolumeId: volId,
+				}
+
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(req.PublishContext, driver.ConfigYaml).Return(conTypeIscsi, lun, arrayInitiators, nil).AnyTimes()
+				mockOsRescanCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
+				mockOsRescanCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return("", internalError)
+
+				_, err := driver.NodeStageVolume(context.TODO(), req)
+				assertError(t, err, codes.Internal)
+			},
+		},
+		{
+			name: "fail get devices of multipath",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				driver := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+
+				req := &csi.NodeStageVolumeRequest{
+					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+					StagingTargetPath: "/test/path",
+					VolumeCapability: stdVolCap,
+					VolumeId: volId,
+				}
+
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(req.PublishContext, driver.ConfigYaml).Return(conTypeIscsi, lun, arrayInitiators, nil).AnyTimes()
+				mockOsRescanCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
+				mockOsRescanCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return("", internalError)
+
+				_, err := driver.NodeStageVolume(context.TODO(), req)
+				assertError(t, err, codes.Internal)
+			},
 		},
 	}
-
 	for _, tc := range testCases {
-
-		t.Run(tc.name, func(t *testing.T) {
-
-			d := newTestNodeService(nil, nil)
-
-			_, err := d.NodeStageVolume(context.TODO(), tc.req)
-			if err != nil {
-				srvErr, ok := status.FromError(err)
-				if !ok {
-					t.Fatalf("Could not get error status code from error: %v", srvErr)
-				}
-				if srvErr.Code() != tc.expErrCode {
-					t.Fatalf("Expected error code %d, got %d message %s", tc.expErrCode, srvErr.Code(), srvErr.Message())
-				}
-			} else if tc.expErrCode != codes.OK {
-				t.Fatalf("Expected error %v, got no error", tc.expErrCode)
-			}
-		})
+		t.Run(tc.name, tc.testFunc)
 	}
 }
-
+/*
 func TestNodePublishVolume(t *testing.T) {
 	fsTypeXfs := "ext4"
 	targetPath := "/test/path"
@@ -629,6 +738,7 @@ func TestNodeGetInfo(t *testing.T) {
 		})
 	}
 }
+*/
 
 func assertError(t *testing.T, err error, expectedErrorCode codes.Code) {
 	if err == nil {
