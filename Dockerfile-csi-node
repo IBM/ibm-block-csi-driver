@@ -45,6 +45,8 @@ COPY --from=builder /go/src/github.com/ibm/ibm-block-csi-driver/common/config.ya
 COPY --from=builder /go/src/github.com/ibm/ibm-block-csi-driver/bin/ibm-block-csi-node-driver .
 COPY ./LICENSE /licenses/
 COPY ./NOTICES /licenses/
+COPY ./node/scripts/entrypoint.sh .
+RUN chmod 755 ./entrypoint.sh
 
 RUN mkdir /chroot
 ADD chroot-host-wrapper.sh /chroot
@@ -52,18 +54,18 @@ RUN chmod 777 /chroot/chroot-host-wrapper.sh
 RUN    ln -s /chroot/chroot-host-wrapper.sh /chroot/blkid \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/blockdev \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/iscsiadm \
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/iscsid \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/lsblk \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/lsscsi \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/mkfs.ext3 \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/mkfs.ext4 \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/mkfs.xfs \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/fsck \
-    && ln -s /chroot/chroot-host-wrapper.sh /chroot/mount \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/multipath \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/multipathd \
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/mount \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/umount
 
 ENV PATH="/chroot:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
-
-ENTRYPOINT ["/root/ibm-block-csi-node-driver"]
+ENTRYPOINT ["/root/entrypoint.sh"]

@@ -36,6 +36,12 @@ BadNodeIdError_message = "Bad node id format for node id : {0}"
 
 VolumeMappedToMultipleHostsError_message = "Volume is already mapped to different hosts {0}"
 
+UnsupportedStorageVersionError_message = 'Unsupported storage system microcode version {}, the version should not be lower than {}'  # noqa
+
+VolumeCreationError_message = 'Failed to create volume {}'
+
+VolumeDeletionError_message = 'Failed to delete volume {}'
+
 NoIscsiTargetsFoundError_message = "Could not find iSCSI targets for endpoint: {0}"
 
 NoIscsiTargetsSpecifiedError_message = "No iSCSI targets specified"

@@ -15,6 +15,10 @@ from controller.common.csi_logger import set_log_level
 from controller.common.node_info import NodeIdInfo
 from controller.common.utils import set_current_thread_name
 from controller.controller_server.errors import ValidationException
+from controller.common.utils import set_current_thread_name
+from controller.common.node_info import NodeIdInfo
+from controller.common import settings
+from controller.array_action.array_mediator_action import map_volume, unmap_volume
 from controller.csi_general import csi_pb2
 from controller.csi_general import csi_pb2_grpc
 
@@ -54,6 +58,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         volume_name = request.name
         logger.debug("volume name : {}".format(volume_name))
 
+        if config.PARAMETERS_PREFIX in request.parameters:
+            volume_prefix = request.parameters[config.PARAMETERS_PREFIX]
+            volume_full_name = volume_prefix + settings.NAME_PREFIX_SEPARATOR + volume_name
+        else:
+            volume_prefix = ""
+            volume_full_name = volume_name
+
         secrets = request.secrets
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
 
@@ -64,19 +75,26 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             ]
         }
 
-        if config.PARAMETERS_PREFIX in request.parameters:
-            volume_prefix = request.parameters[config.PARAMETERS_PREFIX]
-            volume_name = volume_prefix + "_" + volume_name
-
         try:
             # TODO : pass multiple array addresses
             with ArrayConnectionManager(user, password, array_addresses) as array_mediator:
                 logger.debug(array_mediator)
 
-                if len(volume_name) > array_mediator.max_vol_name_length:
-                    volume_name = volume_name[:array_mediator.max_vol_name_length]
-                    logger.warning("volume name is too long - cutting it to be of size : {0}. new name : {1}".format(
-                        array_mediator.max_vol_name_length, volume_name))
+                if len(volume_prefix) > array_mediator.max_volume_prefix_length:
+                    raise controller_errors.IllegalObjectName(
+                        "The volume name prefix {} is too long, max allowed length is {}".format(
+                            volume_prefix,
+                            array_mediator.max_volume_prefix_length,
+                        )
+                    )
+
+                if len(volume_full_name) > array_mediator.max_vol_name_length:
+                    raise controller_errors.IllegalObjectName(
+                        "The volume name {} is too long, max allowed length is {}".format(
+                            volume_full_name,
+                            array_mediator.max_vol_name_length,
+                        )
+                    )
 
                 size = request.capacity_range.required_bytes
 
@@ -85,14 +103,18 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug("requested size is 0 so the default size will be used : {0} ".format(
                         size))
                 try:
-                    vol = array_mediator.get_volume(volume_name)
+                    vol = array_mediator.get_volume(
+                        volume_full_name,
+                        volume_context=request.parameters,
+                        volume_prefix=volume_prefix,
+                    )
 
                 except controller_errors.VolumeNotFoundError as ex:
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
                     array_mediator.validate_supported_capabilities(capabilities)
-                    vol = array_mediator.create_volume(volume_name, size, capabilities, pool)
+                    vol = array_mediator.create_volume(volume_full_name, size, capabilities, pool, volume_prefix)
 
                 else:
                     logger.debug("volume found : {}".format(vol))
