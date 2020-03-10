@@ -331,8 +331,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         wwpn = "fake_wwpn"
         self.client_mock.get_fcports.return_value = [
             Munch({
-            "wwpn": wwpn,
-            "state": IOPORT_STATUS_ONLINE,
+                "wwpn": wwpn,
+                "state": IOPORT_STATUS_ONLINE,
             })
         ]
         self.assertListEqual(self.array.get_array_fc_wwns(), [wwpn])
@@ -383,4 +383,3 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             self.array.get_host_by_host_identifiers(
                 Initiators('', ["new_wwpn", "another_wwpn"])
             )
-
