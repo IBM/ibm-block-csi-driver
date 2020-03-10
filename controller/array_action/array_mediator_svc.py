@@ -1,4 +1,5 @@
 from collections import defaultdict
+
 from pysvc import errors as svc_errors
 from pysvc.unified.client import connect
 from pysvc.unified.response import CLIFailureError
