@@ -53,7 +53,9 @@ func newTestNodeService(nodeUtils driver.NodeUtilsInterface, nodeMounter driver.
 
 func newTestNodeServiceStaging(nodeUtils driver.NodeUtilsInterface, osDevCon device_connectivity.OsDeviceConnectivityInterface) driver.NodeService {
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
-		driver.ConnectionTypeISCSI: osDevCon, driver.ConnectionTypeFS: osDevCon}
+		driver.ConnectionTypeISCSI: osDevCon,
+		driver.ConnectionTypeFS: osDevCon
+	}
 
 	return driver.NodeService{
 		Hostname:         "test-host",
