@@ -35,7 +35,7 @@ import (
 
 const (
 	ConnectionTypeISCSI = "iscsi"
-	ConnectionTypeFS = "fs"
+	ConnectionTypeFS    = "fs"
 )
 
 type Driver struct {

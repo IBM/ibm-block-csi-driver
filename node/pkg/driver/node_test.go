@@ -54,14 +54,14 @@ func newTestNodeService(nodeUtils driver.NodeUtilsInterface, nodeMounter driver.
 func newTestNodeServiceStaging(nodeUtils driver.NodeUtilsInterface, osDevCon device_connectivity.OsDeviceConnectivityInterface) driver.NodeService {
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
 		driver.ConnectionTypeISCSI: osDevCon,
-		driver.ConnectionTypeFS: osDevCon,
+		driver.ConnectionTypeFS:    osDevCon,
 	}
 
 	return driver.NodeService{
-		Hostname:         "test-host",
-		ConfigYaml:       driver.ConfigFile{},
-		VolumeIdLocksMap: driver.NewSyncLock(),
-		NodeUtils:        nodeUtils,
+		Hostname:                    "test-host",
+		ConfigYaml:                  driver.ConfigFile{},
+		VolumeIdLocksMap:            driver.NewSyncLock(),
+		NodeUtils:                   nodeUtils,
 		OsDeviceConnectivityMapping: osDeviceConnectivityMapping,
 	}
 }
@@ -98,10 +98,10 @@ func TestNodeStageVolume(t *testing.T) {
 	}
 	publishContext := map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"}
 	stagingRequest := &csi.NodeStageVolumeRequest{
-		PublishContext:  publishContext,
+		PublishContext:    publishContext,
 		StagingTargetPath: stagingPath,
-		VolumeCapability: stdVolCap,
-		VolumeId: volId,
+		VolumeCapability:  stdVolCap,
+		VolumeId:          volId,
 	}
 
 	testCases := []struct {
