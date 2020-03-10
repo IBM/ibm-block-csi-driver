@@ -1,23 +1,23 @@
-import grpc
-import time
-from optparse import OptionParser
-import yaml
 import os.path
-
+import time
 from concurrent import futures
-from controller.csi_general import csi_pb2
-from controller.csi_general import csi_pb2_grpc
-from controller.array_action.array_connection_manager import ArrayConnectionManager
-from controller.common.csi_logger import get_stdout_logger
-from controller.common.csi_logger import set_log_level
+from optparse import OptionParser
+
+import grpc
+import yaml
+
+import controller.array_action.errors as controller_errors
 import controller.controller_server.config as config
 import controller.controller_server.utils as utils
-import controller.array_action.errors as controller_errors
-from controller.controller_server.errors import ValidationException
-from controller.common.utils import set_current_thread_name
-from controller.common.node_info import NodeIdInfo
+from controller.array_action.array_connection_manager import ArrayConnectionManager
 from controller.common import settings
-from controller.array_action.array_mediator_action import map_volume, unmap_volume
+from controller.common.csi_logger import get_stdout_logger
+from controller.common.csi_logger import set_log_level
+from controller.common.node_info import NodeIdInfo
+from controller.common.utils import set_current_thread_name
+from controller.controller_server.errors import ValidationException
+from controller.csi_general import csi_pb2
+from controller.csi_general import csi_pb2_grpc
 
 logger = None  # is set in ControllerServicer::__init__
 
@@ -210,9 +210,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.debug("node name for this publish operation is : {0}".format(node_name))
 
             user, password, array_addresses = utils.get_array_connection_info_from_secret(request.secrets)
-            lun, connectivity_type, array_initiators = map_volume(user, password, array_addresses, array_type, vol_id,
-                                                                  initiators)
-
+            with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
+                lun, connectivity_type, array_initiators = array_mediator.map_volume_by_initiators(vol_id,
+                                                                                                   initiators)
             logger.info("finished ControllerPublishVolume")
             res = utils.generate_csi_publish_volume_response(lun,
                                                              connectivity_type,
@@ -278,7 +278,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             user, password, array_addresses = utils.get_array_connection_info_from_secret(request.secrets)
 
-            unmap_volume(user, password, array_addresses, array_type, vol_id, initiators)
+            with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
+                array_mediator.unmap_volume_by_initiators(vol_id, initiators)
 
             logger.info("finished ControllerUnpublishVolume")
             return csi_pb2.ControllerUnpublishVolumeResponse()

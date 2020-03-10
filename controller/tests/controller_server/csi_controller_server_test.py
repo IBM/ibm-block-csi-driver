@@ -589,7 +589,6 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         context = utils.FakeContext()
 
         self.mediator.map_volume.side_effect = [array_errors.LunAlreadyInUseError("", ""), 2]
-        self.mediator.map_volume.get_array_iqns.return_value = "array-iqn"
         enter.return_value = self.mediator
         res = self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
