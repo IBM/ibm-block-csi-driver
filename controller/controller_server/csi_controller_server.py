@@ -10,15 +10,12 @@ import controller.array_action.errors as controller_errors
 import controller.controller_server.config as config
 import controller.controller_server.utils as utils
 from controller.array_action.array_connection_manager import ArrayConnectionManager
+from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.csi_logger import set_log_level
 from controller.common.node_info import NodeIdInfo
 from controller.common.utils import set_current_thread_name
 from controller.controller_server.errors import ValidationException
-from controller.common.utils import set_current_thread_name
-from controller.common.node_info import NodeIdInfo
-from controller.common import settings
-from controller.array_action.array_mediator_action import map_volume, unmap_volume
 from controller.csi_general import csi_pb2
 from controller.csi_general import csi_pb2_grpc
 
