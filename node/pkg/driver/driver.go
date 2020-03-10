@@ -33,6 +33,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
+const (
+	ConnectionTypeISCSI = "iscsi"
+	ConnectionTypeFS = "fs"
+)
+
 type Driver struct {
 	NodeService
 	srv      *grpc.Server
@@ -55,8 +60,8 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 	syncLock := NewSyncLock()
 	executer := &executer.Executer{}
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
-		"iscsi": device_connectivity.NewOsDeviceConnectivityIscsi(executer),
-		"fc":    device_connectivity.NewOsDeviceConnectivityFc(executer),
+		ConnectionTypeISCSI: device_connectivity.NewOsDeviceConnectivityIscsi(executer),
+		ConnectionTypeFS:    device_connectivity.NewOsDeviceConnectivityFc(executer),
 		// TODO nvme
 	}
 	return &Driver{
