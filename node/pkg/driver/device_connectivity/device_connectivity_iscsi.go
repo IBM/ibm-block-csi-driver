@@ -34,17 +34,22 @@ func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface) OsDeviceC
 	}
 }
 
+func (r OsDeviceConnectivityIscsi) iscsiCmd(args ...string) (string, error) {
+	out, err := exec.Command("iscsiadm", args...).CombinedOutput()
+	return string(out), err
+}
+
 func (r OsDeviceConnectivityIscsi) iscsiDiscoverAndLogin(iqn, ip string) error {
 	logger.Debugf("iscsiDiscoverAndLogin: iqn {%s}, ip {%s}", iqn, ip)
-	_, err := exec.Command("iscsiadm", "-m", "discovery", "-t", "sendtargets", "-p", ip).CombinedOutput()
+	output, err := r.iscsiCmd("-m", "discovery", "-t", "sendtargets", "-p", ip)
 	if err != nil {
-		logger.Error(err)
+		logger.Errorf("Failed to discover iSCSI: {%s}, error: {%s}", output, err)
 		return err
 	}
 
-	_, err = exec.Command("iscsiadm", "-m", "node", "-p", ip+":3260", "-T", iqn, "--login").CombinedOutput()
+	output, err = r.iscsiCmd("-m", "node", "-p", ip+":3260", "-T", iqn, "--login")
 	if err != nil {
-		logger.Error(err)
+		logger.Errorf("Failed to login iSCSI: {%s}, error: {%s}", output, err)
 		return err
 	}
 	return nil

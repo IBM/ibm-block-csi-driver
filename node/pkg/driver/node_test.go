@@ -36,6 +36,7 @@ import (
 const (
 	PublishContextParamLun          string = "PUBLISH_CONTEXT_LUN" // TODO for some reason I coun't take it from config.yaml
 	PublishContextParamConnectivity string = "PUBLISH_CONTEXT_CONNECTIVITY"
+	PublishContextParamArrayIqn     string = "PUBLISH_CONTEXT_ARRAY_IQN"
 )
 
 func newTestNodeService(nodeUtils driver.NodeUtilsInterface, nodeMounter driver.NodeMounter) driver.NodeService {
@@ -97,6 +98,24 @@ func TestNodeStageVolume(t *testing.T) {
 				VolumeCapability: &csi.VolumeCapability{
 					AccessMode: &csi.VolumeCapability_AccessMode{
 						Mode: csi.VolumeCapability_AccessMode_UNKNOWN,
+					},
+				},
+				VolumeId: "vol-test",
+			},
+			expErrCode: codes.InvalidArgument,
+		},
+		{
+			name: "fail invalid arrayInitiators ",
+			req: &csi.NodeStageVolumeRequest{
+				PublishContext: map[string]string{
+					PublishContextParamLun:          "1",
+					PublishContextParamConnectivity: "iSCSI",
+					PublishContextParamArrayIqn:     "iqn.1994-05.com.redhat:686358c930fe",
+				},
+				StagingTargetPath: "/test/path",
+				VolumeCapability: &csi.VolumeCapability{
+					AccessMode: &csi.VolumeCapability_AccessMode{
+						Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 					},
 				},
 				VolumeId: "vol-test",
