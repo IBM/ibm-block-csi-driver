@@ -341,7 +341,7 @@ func TestNodeUnstageVolume(t *testing.T) {
 	stageInfo["connectivity"] = conType
 
 	unstageRequest := &csi.NodeUnstageVolumeRequest{
-		VolumeId: volId,
+		VolumeId:          volId,
 		StagingTargetPath: stagingPath,
 	}
 
