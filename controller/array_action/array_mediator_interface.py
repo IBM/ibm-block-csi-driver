@@ -30,7 +30,7 @@ class ArrayMediator:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def create_volume(self, vol_name, size_in_bytes, capabilities, pool):
+    def create_volume(self, vol_name, size_in_bytes, capabilities, pool, volume_prefix=""):
         """
         This function should create a volume in the storage system.
 
@@ -38,7 +38,8 @@ class ArrayMediator:
             vol_name      : name of the volume to be created in the stoarge system
             size_in_bytes : size in bytes of the volume
             capabilities  : dict of capabilities {<capbility_name>:<value>}
-            pool          : pool name to create the volume in.
+            pool          : pool name to create the volume in
+            volume_prefix : name prefix of the volume
 
         Returns:
             volume_id : the volume WWN.
@@ -71,12 +72,15 @@ class ArrayMediator:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get_volume(self, volume_name):
+    def get_volume(self, volume_name, volume_context=None, volume_prefix=""):
         """
         This function return volume info about the volume.
 
         Args:
-            vol_name : name of the volume to be created in the storage system
+            volume_name: name of the volume on storage system.
+            volume_context: context of the volume to find the volume more efficiently.
+            volume_prefix : name prefix of the volume
+
 
         Returns:
            Volume
@@ -215,6 +219,14 @@ class ArrayMediator:
     def max_vol_name_length(self):
         """
         The max number of concurrent connections to the storage system.
+        """
+        raise NotImplementedError
+
+    @property
+    @abc.abstractmethod
+    def max_volume_prefix_length(self):
+        """
+        The max allowed length of a volume name prefix.
         """
         raise NotImplementedError
 

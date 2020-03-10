@@ -7,6 +7,9 @@ class BaseArrayActionException(Exception):
         return self.message
 
 
+# =============================================================================
+# System errors
+# =============================================================================
 class NoConnectionAvailableException(BaseArrayActionException):
 
     def __init__(self, endpoint):
@@ -25,10 +28,31 @@ class CredentialsError(BaseArrayActionException):
         self.message = messages.CredentialsError_message.format(endpoint)
 
 
+class UnsupportedStorageVersionError(BaseArrayActionException):
+
+    def __init__(self, version, supported_version):
+        self.message = messages.UnsupportedStorageVersionError_message.format(version, supported_version)  # noqa
+
+
+# =============================================================================
+# Volume errors
+# =============================================================================
 class VolumeNotFoundError(BaseArrayActionException):
 
     def __init__(self, name):
         self.message = messages.VolumeNotFoundError_message.format(name)
+
+
+class VolumeCreationError(BaseArrayActionException):
+
+    def __init__(self, name):
+        self.message = messages.VolumeCreationError_message.format(name)
+
+
+class VolumeDeletionError(BaseArrayActionException):
+
+    def __init__(self, volume_id):
+        self.message = messages.VolumeDeletionError_message.format(volume_id)
 
 
 class IllegalObjectName(BaseArrayActionException):
