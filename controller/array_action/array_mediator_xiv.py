@@ -3,7 +3,7 @@ from random import randint
 from pyxcli.client import XCLIClient
 from pyxcli import errors as xcli_errors
 from controller.common.csi_logger import get_stdout_logger
-from controller.array_action.array_mediator_interface import ArrayMediator
+from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.array_action_types import Volume
 import controller.array_action.errors as controller_errors
 from controller.array_action.config import ISCSI_CONNECTIVITY_TYPE
@@ -15,7 +15,7 @@ array_connections_dict = {}
 logger = get_stdout_logger()
 
 
-class XIVArrayMediator(ArrayMediator):
+class XIVArrayMediator(ArrayMediatorAbstract):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
     MAX_LUN_NUMBER = 250

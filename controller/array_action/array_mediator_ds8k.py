@@ -4,7 +4,7 @@ from packaging.version import parse
 from pyds8k import exceptions
 from controller.common.csi_logger import get_stdout_logger
 from controller.common import settings
-from controller.array_action.array_mediator_interface import ArrayMediator
+from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.utils import classproperty
 from controller.array_action.ds8k_rest_client import RESTClient
 import controller.array_action.errors as array_errors
@@ -66,7 +66,7 @@ def shorten_volume_name(name, prefix):
         return (prefix + settings.NAME_PREFIX_SEPARATOR + hashed)[:MAX_VOLUME_LENGTH]
 
 
-class DS8KArrayMediator(ArrayMediator):
+class DS8KArrayMediator(ArrayMediatorAbstract):
     SUPPORTED_FROM_VERSION = '7.5.1'
 
     @classproperty

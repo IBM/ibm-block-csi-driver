@@ -2,7 +2,7 @@ from pysvc.unified.client import connect
 from pysvc import errors as svc_errors
 from pysvc.unified.response import CLIFailureError
 from controller.common.csi_logger import get_stdout_logger
-from controller.array_action.array_mediator_interface import ArrayMediator
+from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.array_action_types import Volume
 import controller.array_action.errors as controller_errors
 from controller.array_action.utils import classproperty
@@ -56,7 +56,7 @@ def build_kwargs_from_capabilities(capabilities, pool_name, volume_name,
     return cli_kwargs
 
 
-class SVCArrayMediator(ArrayMediator):
+class SVCArrayMediator(ArrayMediatorAbstract):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
     MAX_LUN_NUMBER = 511

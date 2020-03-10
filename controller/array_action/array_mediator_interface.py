@@ -1,9 +1,9 @@
-import abc
+from abc import ABC, abstractmethod
 
 
-class ArrayMediator:
+class ArrayMediator(ABC):
 
-    @abc.abstractmethod
+    @abstractmethod
     def __init__(self, user, password, address):
         """
         This is the init function for the class.
@@ -19,7 +19,7 @@ class ArrayMediator:
         """
         raise NotImplementedError
 
-    @abc.abstractmethod
+    @abstractmethod
     def disconnect(self):
         """
         This function disconnect the storage system connection that was opened in the init phase.
@@ -29,7 +29,7 @@ class ArrayMediator:
         """
         raise NotImplementedError
 
-    @abc.abstractmethod
+    @abstractmethod
     def create_volume(self, vol_name, size_in_bytes, capabilities, pool, volume_prefix=""):
         """
         This function should create a volume in the storage system.
@@ -54,7 +54,7 @@ class ArrayMediator:
         """
         raise NotImplementedError
 
-    @abc.abstractmethod
+    @abstractmethod
     def delete_volume(self, volume_id):
         """
         This function should delete a volume in the storage system.
@@ -71,7 +71,7 @@ class ArrayMediator:
         """
         raise NotImplementedError
 
-    @abc.abstractmethod
+    @abstractmethod
     def get_volume(self, volume_name, volume_context=None, volume_prefix=""):
         """
         This function return volume info about the volume.
@@ -92,7 +92,7 @@ class ArrayMediator:
         """
         raise NotImplementedError
 
-    @abc.abstractmethod
+    @abstractmethod
     def get_volume_mappings(self, volume_id):
         """
         This function return volume mappings.
@@ -108,7 +108,7 @@ class ArrayMediator:
         """
         raise NotImplementedError
 
-    @abc.abstractmethod
+    @abstractmethod
     def map_volume(self, volume_id, host_name):
         """
         This function will find the next available lun for the host and map the volume to it.
@@ -130,7 +130,28 @@ class ArrayMediator:
         """
         raise NotImplementedError
 
-    @abc.abstractmethod
+    @abstractmethod
+    def unmap_volume(self, volume_id, host_name):
+        """
+        This function will un-map the volume from the host.
+
+        Args:
+           volume_id : the volume WWN.
+           host_name : the name of the host to un-map the volume from.
+
+        Returns:
+           None
+
+        Raises:
+            VolumeAlreadyUnmapped
+            volumeNotFound
+            hostNotFound
+            PermissionDenied
+            UnMappingError
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def get_array_iqns(self):
         """
         This function will return the iscsi name of the storage array
@@ -146,7 +167,7 @@ class ArrayMediator:
         """
         raise NotImplementedError
 
-    @abc.abstractmethod
+    @abstractmethod
     def get_array_fc_wwns(self, host_name=None):
         """
         This function will return the wwn of the connected
@@ -163,7 +184,7 @@ class ArrayMediator:
         """
         raise NotImplementedError
 
-    @abc.abstractmethod
+    @abstractmethod
     def get_host_by_host_identifiers(self, initiators):
         """
         This function will find the host name by iscsi iqn or fc wwns.
@@ -182,7 +203,7 @@ class ArrayMediator:
         """
         raise NotImplementedError
 
-    @abc.abstractmethod
+    @abstractmethod
     def validate_supported_capabilities(self, capabilities):
         """
         This function will check if the capabilities passed to the create volume are valid
@@ -199,7 +220,7 @@ class ArrayMediator:
         raise NotImplementedError
 
     @property
-    @abc.abstractmethod
+    @abstractmethod
     def array_type(self):
         """
         The storage system type.
@@ -207,7 +228,7 @@ class ArrayMediator:
         raise NotImplementedError
 
     @property
-    @abc.abstractmethod
+    @abstractmethod
     def port(self):
         """
         The storage system management port number.
@@ -215,7 +236,7 @@ class ArrayMediator:
         raise NotImplementedError
 
     @property
-    @abc.abstractmethod
+    @abstractmethod
     def max_vol_name_length(self):
         """
         The max number of concurrent connections to the storage system.
@@ -223,7 +244,7 @@ class ArrayMediator:
         raise NotImplementedError
 
     @property
-    @abc.abstractmethod
+    @abstractmethod
     def max_volume_prefix_length(self):
         """
         The max allowed length of a volume name prefix.
@@ -231,7 +252,7 @@ class ArrayMediator:
         raise NotImplementedError
 
     @property
-    @abc.abstractmethod
+    @abstractmethod
     def max_connections(self):
         """
         The max number of concurrent connections to the storage system.
@@ -239,7 +260,7 @@ class ArrayMediator:
         raise NotImplementedError
 
     @property
-    @abc.abstractmethod
+    @abstractmethod
     def minimal_volume_size_in_bytes(self):
         """
         The minimal volume size in bytes (used in case trying to provision volume with zero size).
@@ -247,7 +268,7 @@ class ArrayMediator:
         raise NotImplementedError
 
     @property
-    @abc.abstractmethod
+    @abstractmethod
     def max_lun_retries(self):
         """
             The maximum number of times a map operation will retry if lun is already in use
