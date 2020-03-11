@@ -16,9 +16,11 @@ logger = get_stdout_logger()
 
 
 # response error codes
-INVALID_CREDENTIALS = 'BE7A002D'
-RESOURCE_NOT_EXISTS = 'BE7A0001'
-VOLUME_NOT_FOUND_FOR_MAPPING = 'BE586015'
+ERROR_CODE_INVALID_CREDENTIALS = 'BE7A002D'
+ERROR_CODE_RESOURCE_NOT_EXISTS = 'BE7A0001'
+ERROR_CODE_VOLUME_NOT_FOUND_FOR_MAPPING = 'BE586015'
+
+
 MAX_VOLUME_LENGTH = 16
 IOPORT_STATUS_ONLINE = 'online'
 
@@ -126,7 +128,7 @@ class DS8KArrayMediator(ArrayMediator):
         except exceptions.ClientError as e:
             # BE7A002D=Authentication has failed because the user name and
             # password combination that you have entered is not valid.
-            if INVALID_CREDENTIALS in str(e.message).upper():
+            if ERROR_CODE_INVALID_CREDENTIALS in str(e.message).upper():
                 raise array_errors.CredentialsError(self.service_address)
             else:
                 raise ConnectionError()
@@ -220,7 +222,7 @@ class DS8KArrayMediator(ArrayMediator):
                 logger.info("finished creating volume {}".format(name))
                 return self._generate_volume_response(self.client.get_volume(vol.id))
         except exceptions.NotFound as ex:
-            if RESOURCE_NOT_EXISTS in str(ex.message).upper():
+            if ERROR_CODE_RESOURCE_NOT_EXISTS in str(ex.message).upper():
                 raise array_errors.PoolDoesNotExist(pool_id, self.identifier)
             else:
                 logger.error(
@@ -310,7 +312,7 @@ class DS8KArrayMediator(ArrayMediator):
             raise array_errors.HostNotFoundError(host_name)
         except exceptions.ClientException as ex:
             # [BE586015] addLunMappings Volume group operation failure: volume does not exist.
-            if VOLUME_NOT_FOUND_FOR_MAPPING in str(ex.message).upper():
+            if ERROR_CODE_VOLUME_NOT_FOUND_FOR_MAPPING in str(ex.message).upper():
                 raise array_errors.VolumeNotFoundError(scsi_id)
             else:
                 raise array_errors.MappingError(scsi_id, host_name, ex.details)
@@ -344,7 +346,6 @@ class DS8KArrayMediator(ArrayMediator):
 
     def get_array_fc_wwns(self, host_name=None):
         logger.debug("Getting the connected fc port wwpns from array")
-        wwpns = []
 
         # remove this line when pyds8k support get_ioports_by_host
         host_name = None
@@ -353,9 +354,8 @@ class DS8KArrayMediator(ArrayMediator):
                 fc_ports = self.client.get_ioports_by_host(host_name)
             else:
                 fc_ports = self.client.get_fcports()
-            for fc_port in fc_ports:
-                if fc_port.state == IOPORT_STATUS_ONLINE:
-                    wwpns.append(fc_port.wwpn)
+
+            wwpns = [p.wwpn for p in fc_ports if p.state == IOPORT_STATUS_ONLINE]
             logger.debug("Found wwpns: {}".format(wwpns))
             return wwpns
         except exceptions.ClientException as ex:
