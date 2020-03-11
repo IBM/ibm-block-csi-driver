@@ -4,7 +4,7 @@ from controller.csi_general import csi_pb2
 from controller.controller_server.csi_controller_server import ControllerServicer
 import controller.controller_server.utils as utils
 from controller.controller_server.errors import ValidationException
-from controller.array_action.errors import VolumeNotFoundError, HostNotFoundError, NoIscsiTargetsSpecifiedError
+from controller.array_action.errors import VolumeNotFoundError, HostNotFoundError
 
 
 class TestUtils(unittest.TestCase):
@@ -14,6 +14,7 @@ class TestUtils(unittest.TestCase):
         self.servicer = ControllerServicer(self.fqdn)
         self.config = {"controller": {"publish_context_lun_parameter": "lun",
                                       "publish_context_connectivity_parameter": "connectivity_type",
+                                      "publish_context_separator": ",",
                                       "publish_context_array_iqn": "array_iqn",
                                       "publish_context_fc_initiators": "fc_wwns"}
                        }
@@ -292,11 +293,6 @@ class TestUtils(unittest.TestCase):
 
         res = utils.choose_connectivity_type(["iscsi", "fc"])
         self.assertEqual(res, "fc")
-
-    def test_generate_publish_volume_response_error(self):
-        with self.assertRaises(NoIscsiTargetsSpecifiedError):
-            utils.generate_csi_publish_volume_response(0, "iscsi", self.config,
-                                                       {"1": []})
 
     def test_generate_publish_volume_response_success(self):
         res = utils.generate_csi_publish_volume_response(0, "iscsi", self.config,

@@ -44,6 +44,4 @@ VolumeDeletionError_message = 'Failed to delete volume {}'
 
 NoIscsiTargetsFoundError_message = "Could not find iSCSI targets for endpoint: {0}"
 
-NoIscsiTargetsSpecifiedError_message = "No iSCSI targets specified"
-
 UnsupportedConnectivityTypeError_message = "Unsupported connectivity type: {0}"

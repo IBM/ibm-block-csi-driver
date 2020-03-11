@@ -157,12 +157,6 @@ class NoIscsiTargetsFoundError(BaseArrayActionException):
         self.message = messages.NoIscsiTargetsFoundError_message.format(endpoint)
 
 
-class NoIscsiTargetsSpecifiedError(BaseArrayActionException):
-
-    def __init__(self):
-        self.message = messages.NoIscsiTargetsSpecifiedError_message
-
-
 class UnsupportedConnectivityTypeError(BaseArrayActionException):
 
     def __init__(self, connectivity_type):

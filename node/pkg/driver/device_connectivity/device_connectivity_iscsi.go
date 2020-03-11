@@ -19,8 +19,10 @@ package device_connectivity
 import (
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
-	"os/exec"
+	"time"
 )
+
+var iscsiCmdTimeout = 30 * time.Second
 
 type OsDeviceConnectivityIscsi struct {
 	Executer          executer.ExecuterInterface
@@ -35,19 +37,19 @@ func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface) OsDeviceC
 }
 
 func (r OsDeviceConnectivityIscsi) iscsiCmd(args ...string) (string, error) {
-	out, err := exec.Command("iscsiadm", args...).CombinedOutput()
+	out, err := r.Executer.ExecuteWithTimeout(int(iscsiCmdTimeout.Seconds()), "iscsiadm", args)
 	return string(out), err
 }
 
-func (r OsDeviceConnectivityIscsi) iscsiDiscoverAndLogin(iqn, ip string) error {
-	logger.Debugf("iscsiDiscoverAndLogin: iqn {%s}, ip {%s}", iqn, ip)
-	output, err := r.iscsiCmd("-m", "discovery", "-t", "sendtargets", "-p", ip)
+func (r OsDeviceConnectivityIscsi) iscsiDiscoverAndLogin(targetName, targetPortal string) error {
+	logger.Debugf("iscsiDiscoverAndLogin: target: {%s}, portal: {%s}", targetPortal, targetPortal)
+	output, err := r.iscsiCmd("-m", "discovery", "-t", "sendtargets", "-p", targetPortal)
 	if err != nil {
 		logger.Errorf("Failed to discover iSCSI: {%s}, error: {%s}", output, err)
 		return err
 	}
 
-	output, err = r.iscsiCmd("-m", "node", "-p", ip+":3260", "-T", iqn, "--login")
+	output, err = r.iscsiCmd("-m", "node", "-p", targetPortal+":3260", "-T", targetName, "--login")
 	if err != nil {
 		logger.Errorf("Failed to login iSCSI: {%s}, error: {%s}", output, err)
 		return err
@@ -58,9 +60,9 @@ func (r OsDeviceConnectivityIscsi) iscsiDiscoverAndLogin(iqn, ip string) error {
 func (r OsDeviceConnectivityIscsi) EnsureLogin(ipsByArrayIdentifier map[string][]string) error {
 	isAnyLoginSucceeded := false
 	var err error
-	for arrayIdentifier, ips := range ipsByArrayIdentifier {
-		for _, ip := range ips {
-			err = r.iscsiDiscoverAndLogin(arrayIdentifier, ip)
+	for targetName, targetPortals := range ipsByArrayIdentifier {
+		for _, targetPortal := range targetPortals {
+			err = r.iscsiDiscoverAndLogin(targetName, targetPortal)
 			if err == nil {
 				isAnyLoginSucceeded = true
 			}

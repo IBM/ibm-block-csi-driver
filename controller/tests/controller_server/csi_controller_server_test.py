@@ -625,15 +625,11 @@ class TestControllerServerPublishVolume(unittest.TestCase):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_publish_volume_get_iscsi_targets_by_iqn_excpetions(self, enter):
         context = utils.FakeContext()
-
-        self.mediator.get_iscsi_targets_by_iqn.side_effect = [array_errors.NoIscsiTargetsSpecifiedError()]
-        enter.return_value = self.mediator
-        self.servicer.ControllerPublishVolume(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
-
         self.mediator.get_iscsi_targets_by_iqn.side_effect = [array_errors.NoIscsiTargetsFoundError("some_endpoint")]
         enter.return_value = self.mediator
+
         self.servicer.ControllerPublishVolume(self.request, context)
+
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
     @patch("controller.controller_server.utils.generate_csi_publish_volume_response")

@@ -424,11 +424,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             ips_by_iqn[iqn].extend(ips)
         return dict(ips_by_iqn)
 
+    def _get_iscsi_targets_by_node_id(self):
+        ports = self._list_ip_ports()
+        return self._extract_ips_by_node_id(ports)
+
     def get_iscsi_targets_by_iqn(self):
         logger.debug("Getting iscsi targets by iqn")
         iqns_by_node_id = self._get_array_iqns_by_node_id()
-        ports = self._list_ip_ports()
-        ips_by_node_id = self._extract_ips_by_node_id(ports)
+        ips_by_node_id = self._get_iscsi_targets_by_node_id()
         ips_by_iqn = self._unify_ips_by_iqn(iqns_by_node_id, ips_by_node_id)
 
         if ips_by_iqn and any(ips_by_iqn.values()):
