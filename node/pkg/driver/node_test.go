@@ -116,8 +116,8 @@ func TestNodeStageVolume(t *testing.T) {
 					StagingTargetPath: stagingPath,
 					VolumeCapability:  stdVolCap,
 				}
-				driver := newTestNodeService(nil, nil)
-				_, err := driver.NodeStageVolume(context.TODO(), req)
+				node := newTestNodeService(nil, nil)
+				_, err := node.NodeStageVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
@@ -129,8 +129,8 @@ func TestNodeStageVolume(t *testing.T) {
 					VolumeCapability: stdVolCap,
 					VolumeId:         volId,
 				}
-				driver := newTestNodeService(nil, nil)
-				_, err := driver.NodeStageVolume(context.TODO(), req)
+				node := newTestNodeService(nil, nil)
+				_, err := node.NodeStageVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
@@ -142,8 +142,8 @@ func TestNodeStageVolume(t *testing.T) {
 					StagingTargetPath: stagingPath,
 					VolumeId:          volId,
 				}
-				driver := newTestNodeService(nil, nil)
-				_, err := driver.NodeStageVolume(context.TODO(), req)
+				node := newTestNodeService(nil, nil)
+				_, err := node.NodeStageVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
@@ -160,8 +160,8 @@ func TestNodeStageVolume(t *testing.T) {
 					},
 					VolumeId: volId,
 				}
-				driver := newTestNodeService(nil, nil)
-				_, err := driver.NodeStageVolume(context.TODO(), req)
+				node := newTestNodeService(nil, nil)
+				_, err := node.NodeStageVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
@@ -172,11 +172,11 @@ func TestNodeStageVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockMounter := mocks.NewMockNodeMounter(mockCtl)
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				driver := newTestNodeService(mockNodeUtils, mockMounter)
+				node := newTestNodeService(mockNodeUtils, mockMounter)
 
-				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, driver.ConfigYaml).Return("", 0, nil, dummyError)
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return("", 0, nil, dummyError)
 
-				_, err := driver.NodeStageVolume(context.TODO(), stagingRequest)
+				_, err := node.NodeStageVolume(context.TODO(), stagingRequest)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
@@ -187,12 +187,12 @@ func TestNodeStageVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
 				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
-				driver := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
 
-				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, driver.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
 				mockOsRescanCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(dummyError)
 
-				_, err := driver.NodeStageVolume(context.TODO(), stagingRequest)
+				_, err := node.NodeStageVolume(context.TODO(), stagingRequest)
 				assertError(t, err, codes.Internal)
 			},
 		},
@@ -203,13 +203,13 @@ func TestNodeStageVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
 				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
-				driver := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
 
-				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, driver.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
 				mockOsRescanCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
 				mockOsRescanCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return("", dummyError)
 
-				_, err := driver.NodeStageVolume(context.TODO(), stagingRequest)
+				_, err := node.NodeStageVolume(context.TODO(), stagingRequest)
 				assertError(t, err, codes.Internal)
 			},
 		},
@@ -220,14 +220,14 @@ func TestNodeStageVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
 				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
-				driver := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
 
-				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, driver.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
 				mockOsRescanCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
 				mockOsRescanCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return("", dummyError)
 
-				_, err := driver.NodeStageVolume(context.TODO(), stagingRequest)
+				_, err := node.NodeStageVolume(context.TODO(), stagingRequest)
 				assertError(t, err, codes.Internal)
 			},
 		},
@@ -238,16 +238,16 @@ func TestNodeStageVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
 				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
-				driver := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
 
-				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, driver.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
 				mockOsRescanCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
 				mockOsRescanCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(sysDevices, nil)
 				mockNodeUtils.EXPECT().StageInfoFileIsExist(stageInfoPath).Return(false)
 				mockNodeUtils.EXPECT().WriteStageInfoToFile(stageInfoPath, newStageInfo).Return(nil)
 
-				_, err := driver.NodeStageVolume(context.TODO(), stagingRequest)
+				_, err := node.NodeStageVolume(context.TODO(), stagingRequest)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
 				}
@@ -260,9 +260,9 @@ func TestNodeStageVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
 				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
-				driver := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
 
-				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, driver.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
 				mockOsRescanCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
 				mockOsRescanCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(sysDevices, nil)
@@ -270,7 +270,7 @@ func TestNodeStageVolume(t *testing.T) {
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stageInfoPath).Return(nil, dummyError)
 				mockNodeUtils.EXPECT().WriteStageInfoToFile(stageInfoPath, newStageInfo).Return(nil)
 
-				_, err := driver.NodeStageVolume(context.TODO(), stagingRequest)
+				_, err := node.NodeStageVolume(context.TODO(), stagingRequest)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
 				}
@@ -283,16 +283,16 @@ func TestNodeStageVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
 				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
-				driver := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
 
-				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, driver.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
 				mockOsRescanCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
 				mockOsRescanCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(sysDevices, nil)
 				mockNodeUtils.EXPECT().StageInfoFileIsExist(stageInfoPath).Return(true)
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stageInfoPath).Return(newStageInfo, nil)
 
-				_, err := driver.NodeStageVolume(context.TODO(), stagingRequest)
+				_, err := node.NodeStageVolume(context.TODO(), stagingRequest)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
 				}
@@ -305,16 +305,16 @@ func TestNodeStageVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
 				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
-				driver := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
 
-				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, driver.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
 				mockOsRescanCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
 				mockOsRescanCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(sysDevices, nil)
 				mockNodeUtils.EXPECT().StageInfoFileIsExist(stageInfoPath).Return(true)
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stageInfoPath).Return(currentStageInfo, nil)
 
-				_, err := driver.NodeStageVolume(context.TODO(), stagingRequest)
+				_, err := node.NodeStageVolume(context.TODO(), stagingRequest)
 				assertError(t, err, codes.AlreadyExists)
 			},
 		},
@@ -352,22 +352,22 @@ func TestNodeUnstageVolume(t *testing.T) {
 		{
 			name: "fail no VolumeId",
 			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
+				node := newTestNodeService(nil, nil)
 				req := &csi.NodeUnstageVolumeRequest{
 					StagingTargetPath: stagingPath,
 				}
-				_, err := driver.NodeUnstageVolume(context.TODO(), req)
+				_, err := node.NodeUnstageVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
 		{
 			name: "fail no StagingTargetPath",
 			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
+				node := newTestNodeService(nil, nil)
 				req := &csi.NodeUnstageVolumeRequest{
 					VolumeId: volId,
 				}
-				_, err := driver.NodeUnstageVolume(context.TODO(), req)
+				_, err := node.NodeUnstageVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
@@ -377,11 +377,11 @@ func TestNodeUnstageVolume(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				defer mockCtl.Finish()
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				driver := newTestNodeServiceStaging(mockNodeUtils, nil)
+				node := newTestNodeServiceStaging(mockNodeUtils, nil)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stageInfoPath).Return(nil, dummyError)
 
-				_, err := driver.NodeUnstageVolume(context.TODO(), unstageRequest)
+				_, err := node.NodeUnstageVolume(context.TODO(), unstageRequest)
 				assertError(t, err, codes.Internal)
 			},
 		},
@@ -392,12 +392,12 @@ func TestNodeUnstageVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
 				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
-				driver := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stageInfoPath).Return(stageInfo, nil)
 				mockOsRescanCon.EXPECT().FlushMultipathDevice(mpathDeviceName).Return(dummyError)
 
-				_, err := driver.NodeUnstageVolume(context.TODO(), unstageRequest)
+				_, err := node.NodeUnstageVolume(context.TODO(), unstageRequest)
 				assertError(t, err, codes.Internal)
 			},
 		},
@@ -407,11 +407,11 @@ func TestNodeUnstageVolume(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				defer mockCtl.Finish()
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				driver := newTestNodeServiceStaging(mockNodeUtils, nil)
+				node := newTestNodeServiceStaging(mockNodeUtils, nil)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stageInfoPath).Return(nil, fileNotExistErr)
 
-				_, err := driver.NodeUnstageVolume(context.TODO(), unstageRequest)
+				_, err := node.NodeUnstageVolume(context.TODO(), unstageRequest)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
 				}
@@ -424,14 +424,14 @@ func TestNodeUnstageVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
 				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
-				driver := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stageInfoPath).Return(stageInfo, nil)
 				mockOsRescanCon.EXPECT().FlushMultipathDevice(mpathDeviceName).Return(nil)
 				mockOsRescanCon.EXPECT().RemovePhysicalDevice(sysDevicesList).Return(nil)
 				mockNodeUtils.EXPECT().ClearStageInfoFile(stageInfoPath).Return(nil)
 
-				_, err := driver.NodeUnstageVolume(context.TODO(), unstageRequest)
+				_, err := node.NodeUnstageVolume(context.TODO(), unstageRequest)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
 				}
@@ -476,7 +476,7 @@ func TestNodePublishVolume(t *testing.T) {
 		{
 			name: "fail no VolumeId",
 			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
+				node := newTestNodeService(nil, nil)
 				req := &csi.NodePublishVolumeRequest{
 					PublishContext:    map[string]string{},
 					StagingTargetPath: stagingTargetPath,
@@ -484,14 +484,14 @@ func TestNodePublishVolume(t *testing.T) {
 					VolumeCapability:  fsVolCap,
 				}
 
-				_, err := driver.NodePublishVolume(context.TODO(), req)
+				_, err := node.NodePublishVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
 		{
 			name: "fail no StagingTargetPath",
 			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
+				node := newTestNodeService(nil, nil)
 				req := &csi.NodePublishVolumeRequest{
 					PublishContext:   map[string]string{},
 					TargetPath:       targetPath,
@@ -499,14 +499,14 @@ func TestNodePublishVolume(t *testing.T) {
 					VolumeId:         "vol-test",
 				}
 
-				_, err := driver.NodePublishVolume(context.TODO(), req)
+				_, err := node.NodePublishVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
 		{
 			name: "fail no TargetPath",
 			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
+				node := newTestNodeService(nil, nil)
 				req := &csi.NodePublishVolumeRequest{
 					PublishContext:    map[string]string{},
 					StagingTargetPath: stagingTargetPath,
@@ -514,14 +514,14 @@ func TestNodePublishVolume(t *testing.T) {
 					VolumeId:          "vol-test",
 				}
 
-				_, err := driver.NodePublishVolume(context.TODO(), req)
+				_, err := node.NodePublishVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
 		{
 			name: "fail no VolumeCapability",
 			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
+				node := newTestNodeService(nil, nil)
 				req := &csi.NodePublishVolumeRequest{
 					PublishContext:    map[string]string{},
 					StagingTargetPath: stagingTargetPath,
@@ -529,14 +529,14 @@ func TestNodePublishVolume(t *testing.T) {
 					VolumeId:          "vol-test",
 				}
 
-				_, err := driver.NodePublishVolume(context.TODO(), req)
+				_, err := node.NodePublishVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
 		{
 			name: "fail invalid VolumeCapability",
 			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
+				node := newTestNodeService(nil, nil)
 				req := &csi.NodePublishVolumeRequest{
 					PublishContext:    map[string]string{},
 					StagingTargetPath: stagingTargetPath,
@@ -549,7 +549,7 @@ func TestNodePublishVolume(t *testing.T) {
 					VolumeId: "vol-test",
 				}
 
-				_, err := driver.NodePublishVolume(context.TODO(), req)
+				_, err := node.NodePublishVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
@@ -560,7 +560,7 @@ func TestNodePublishVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockMounter := mocks.NewMockNodeMounter(mockCtl)
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				driver := newTestNodeService(mockNodeUtils, mockMounter)
+				node := newTestNodeService(mockNodeUtils, mockMounter)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
 				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix).AnyTimes()
@@ -576,7 +576,7 @@ func TestNodePublishVolume(t *testing.T) {
 					VolumeId:          "vol-test",
 				}
 
-				_, err := driver.NodePublishVolume(context.TODO(), req)
+				_, err := node.NodePublishVolume(context.TODO(), req)
 				assertError(t, err, codes.AlreadyExists)
 			},
 		},
@@ -587,7 +587,7 @@ func TestNodePublishVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockMounter := mocks.NewMockNodeMounter(mockCtl)
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				driver := newTestNodeService(mockNodeUtils, mockMounter)
+				node := newTestNodeService(mockNodeUtils, mockMounter)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
 				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix).AnyTimes()
@@ -603,7 +603,7 @@ func TestNodePublishVolume(t *testing.T) {
 					VolumeId:          "vol-test",
 				}
 
-				_, err := driver.NodePublishVolume(context.TODO(), req)
+				_, err := node.NodePublishVolume(context.TODO(), req)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
 				}
@@ -616,7 +616,7 @@ func TestNodePublishVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockMounter := mocks.NewMockNodeMounter(mockCtl)
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				driver := newTestNodeService(mockNodeUtils, mockMounter)
+				node := newTestNodeService(mockNodeUtils, mockMounter)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
 				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix).AnyTimes()
@@ -632,7 +632,7 @@ func TestNodePublishVolume(t *testing.T) {
 					VolumeId:          "vol-test",
 				}
 
-				_, err := driver.NodePublishVolume(context.TODO(), req)
+				_, err := node.NodePublishVolume(context.TODO(), req)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
 				}
@@ -645,7 +645,7 @@ func TestNodePublishVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockMounter := mocks.NewMockNodeMounter(mockCtl)
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				driver := newTestNodeService(mockNodeUtils, mockMounter)
+				node := newTestNodeService(mockNodeUtils, mockMounter)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
 				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix).AnyTimes()
@@ -665,7 +665,7 @@ func TestNodePublishVolume(t *testing.T) {
 					VolumeId:          "vol-test",
 				}
 
-				_, err := driver.NodePublishVolume(context.TODO(), req)
+				_, err := node.NodePublishVolume(context.TODO(), req)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
 				}
@@ -678,7 +678,7 @@ func TestNodePublishVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockMounter := mocks.NewMockNodeMounter(mockCtl)
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				driver := newTestNodeService(mockNodeUtils, mockMounter)
+				node := newTestNodeService(mockNodeUtils, mockMounter)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
 				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix).AnyTimes()
@@ -697,7 +697,7 @@ func TestNodePublishVolume(t *testing.T) {
 					VolumeId:          "vol-test",
 				}
 
-				_, err := driver.NodePublishVolume(context.TODO(), req)
+				_, err := node.NodePublishVolume(context.TODO(), req)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
 				}
@@ -720,24 +720,24 @@ func TestNodeUnpublishVolume(t *testing.T) {
 		{
 			name: "fail no VolumeId",
 			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
+				node := newTestNodeService(nil, nil)
 
 				req := &csi.NodeUnpublishVolumeRequest{
 					TargetPath: targetPath,
 				}
-				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
+				_, err := node.NodeUnpublishVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
 		{
 			name: "fail no TargetPath",
 			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
+				node := newTestNodeService(nil, nil)
 
 				req := &csi.NodeUnpublishVolumeRequest{
 					VolumeId: "vol-test",
 				}
-				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
+				_, err := node.NodeUnpublishVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
@@ -748,7 +748,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockMounter := mocks.NewMockNodeMounter(mockCtl)
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				driver := newTestNodeService(mockNodeUtils, mockMounter)
+				node := newTestNodeService(mockNodeUtils, mockMounter)
 
 				req := &csi.NodeUnpublishVolumeRequest{
 					TargetPath: targetPath,
@@ -759,7 +759,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 				mockNodeUtils.EXPECT().IsNotMountPoint(targetPathWithHostPrefix).Return(false, nil)
 				mockMounter.EXPECT().Unmount(targetPath).Return(nil)
 				mockNodeUtils.EXPECT().RemoveFileOrDirectory(targetPathWithHostPrefix)
-				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
+				_, err := node.NodeUnpublishVolume(context.TODO(), req)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
 				}
@@ -772,7 +772,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockMounter := mocks.NewMockNodeMounter(mockCtl)
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				driver := newTestNodeService(mockNodeUtils, mockMounter)
+				node := newTestNodeService(mockNodeUtils, mockMounter)
 
 				req := &csi.NodeUnpublishVolumeRequest{
 					TargetPath: targetPath,
@@ -780,7 +780,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 				}
 				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(false)
-				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
+				_, err := node.NodeUnpublishVolume(context.TODO(), req)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
 				}

@@ -55,8 +55,8 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 	syncLock := NewSyncLock()
 	executer := &executer.Executer{}
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
-		ConnectionTypeISCSI: device_connectivity.NewOsDeviceConnectivityIscsi(executer),
-		ConnectionTypeFC:    device_connectivity.NewOsDeviceConnectivityFc(executer),
+		device_connectivity.ConnectionTypeISCSI: device_connectivity.NewOsDeviceConnectivityIscsi(executer),
+		device_connectivity.ConnectionTypeFC:    device_connectivity.NewOsDeviceConnectivityFc(executer),
 		// TODO nvme
 	}
 	return &Driver{
