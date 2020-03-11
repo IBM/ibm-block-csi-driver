@@ -6,7 +6,7 @@ from controller.common.csi_logger import get_stdout_logger
 from controller.common import settings
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.utils import classproperty
-from controller.array_action.ds8k_rest_client import RESTClient
+from controller.array_action.ds8k_rest_client import RESTClient, scsilun_to_int
 import controller.array_action.errors as array_errors
 from controller.array_action import config
 from controller.array_action.array_action_types import Volume
@@ -16,9 +16,13 @@ logger = get_stdout_logger()
 
 
 # response error codes
-INVALID_CREDENTIALS = 'BE7A002D'
-RESOURCE_NOT_EXISTS = 'BE7A0001'
+ERROR_CODE_INVALID_CREDENTIALS = 'BE7A002D'
+ERROR_CODE_RESOURCE_NOT_EXISTS = 'BE7A0001'
+ERROR_CODE_VOLUME_NOT_FOUND_FOR_MAPPING = 'BE586015'
+
+
 MAX_VOLUME_LENGTH = 16
+IOPORT_STATUS_ONLINE = 'online'
 
 
 def parse_version(bundle):
@@ -124,7 +128,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except exceptions.ClientError as e:
             # BE7A002D=Authentication has failed because the user name and
             # password combination that you have entered is not valid.
-            if INVALID_CREDENTIALS in str(e.message).upper():
+            if ERROR_CODE_INVALID_CREDENTIALS in str(e.message).upper():
                 raise array_errors.CredentialsError(self.service_address)
             else:
                 raise ConnectionError()
@@ -218,7 +222,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 logger.info("finished creating volume {}".format(name))
                 return self._generate_volume_response(self.client.get_volume(vol.id))
         except exceptions.NotFound as ex:
-            if RESOURCE_NOT_EXISTS in str(ex.message).upper():
+            if ERROR_CODE_RESOURCE_NOT_EXISTS in str(ex.message).upper():
                 raise array_errors.PoolDoesNotExist(pool_id, self.identifier)
             else:
                 logger.error(
@@ -279,27 +283,102 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         raise array_errors.VolumeNotFoundError(name)
 
     def get_volume_mappings(self, volume_id):
-        # TODO: CSI-1197
-        pass
+        logger.debug("Getting volume mappings for volume {}".format(volume_id))
+        volume_id = get_volume_id_from_scsi_identifier(volume_id)
+        try:
+            host_name_to_lun_id = {}
+            for host in self.client.get_hosts():
+                host_mappings = host.mappings_briefs
+                for mapping in host_mappings:
+                    if volume_id == mapping["volume_id"]:
+                        host_name_to_lun_id[host.name] = mapping["lunid"]
+                        break
+            logger.debug("Found volume mappings: {}".format(host_name_to_lun_id))
+            return host_name_to_lun_id
+        except exceptions.ClientException as ex:
+            logger.error(
+                "Failed to get volume mappings. Reason is: {}".format(ex.details)
+            )
+            raise ex
 
     def map_volume(self, volume_id, host_name):
-        # TODO: CSI-1198
-        pass
+        logger.debug("Mapping volume {} to host {}".format(volume_id, host_name))
+        array_volume_id = get_volume_id_from_scsi_identifier(volume_id)
+        try:
+            mapping = self.client.map_volume_to_host(host_name, array_volume_id)
+            lun = scsilun_to_int(mapping.lunid)
+            logger.debug("Successfully mapped volume to host with lun {}".format(lun))
+            return lun
+        except exceptions.NotFound:
+            raise array_errors.HostNotFoundError(host_name)
+        except exceptions.ClientException as ex:
+            # [BE586015] addLunMappings Volume group operation failure: volume does not exist.
+            if ERROR_CODE_VOLUME_NOT_FOUND_FOR_MAPPING in str(ex.message).upper():
+                raise array_errors.VolumeNotFoundError(volume_id)
+            else:
+                raise array_errors.MappingError(volume_id, host_name, ex.details)
 
     def unmap_volume(self, volume_id, host_name):
-        # TODO: CSI-1199
-        pass
+        logger.debug("Unmapping volume {} from host {}".format(volume_id, host_name))
+        array_volume_id = get_volume_id_from_scsi_identifier(volume_id)
+        try:
+            mappings = self.client.get_host_mappings(host_name)
+            lunid = None
+            for mapping in mappings:
+                if mapping.volume == array_volume_id:
+                    lunid = mapping.lunid
+                    break
+            if lunid is not None:
+                self.client.unmap_volume_from_host(
+                    host_name=host_name,
+                    lunid=lunid
+                )
+                logger.debug("Successfully unmapped volume from host.")
+            else:
+                raise array_errors.VolumeNotFoundError(volume_id)
+        except exceptions.NotFound:
+            raise array_errors.HostNotFoundError(host_name)
+        except exceptions.ClientException as ex:
+            raise array_errors.UnMappingError(volume_id, host_name, ex.details)
 
     def get_array_iqns(self):
         return []
 
     def get_array_fc_wwns(self, host_name=None):
-        # TODO: CSI-1200
-        pass
+        logger.debug("Getting the connected fc port wwpns from array")
+
+        # remove this line when pyds8k support get_ioports_by_host
+        host_name = None
+        try:
+            if host_name:
+                fc_ports = self.client.get_ioports_by_host(host_name)
+            else:
+                fc_ports = self.client.get_fcports()
+
+            wwpns = [p.wwpn for p in fc_ports if p.state == IOPORT_STATUS_ONLINE]
+            logger.debug("Found wwpns: {}".format(wwpns))
+            return wwpns
+        except exceptions.ClientException as ex:
+            logger.error(
+                "Failed to get array fc wwpn. Reason is: {}".format(ex.details)
+            )
+            raise ex
 
     def get_host_by_host_identifiers(self, initiators):
-        # TODO: CSI-1201
-        pass
+        logger.debug("Getting host by initiators: {}".format(initiators))
+        found = ""
+        for host in self.client.get_hosts():
+            host_ports = host.host_ports_briefs
+            wwpns = [p["wwpn"] for p in host_ports]
+            if initiators.is_array_wwns_match(wwpns):
+                found = host.name
+                break
+        if found:
+            logger.debug("found host {0} with fc wwpns: {1}".format(found, initiators.fc_wwns))
+            return found, [config.FC_CONNECTIVITY_TYPE]
+        else:
+            logger.debug("can not found host by initiators: {0} ".format(initiators))
+            raise array_errors.HostNotFoundError(initiators)
 
     def validate_supported_capabilities(self, capabilities):
         logger.debug("Validating capabilities: {0}".format(capabilities))
