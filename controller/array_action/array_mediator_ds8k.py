@@ -303,10 +303,9 @@ class DS8KArrayMediator(ArrayMediator):
 
     def map_volume(self, volume_id, host_name):
         logger.debug("Mapping volume {} to host {}".format(volume_id, host_name))
-        scsi_id = volume_id
-        volume_id = get_volume_id_from_scsi_identifier(volume_id)
+        array_volume_id = get_volume_id_from_scsi_identifier(volume_id)
         try:
-            mapping = self.client.map_volume_to_host(host_name, volume_id)
+            mapping = self.client.map_volume_to_host(host_name, array_volume_id)
             lun = scsilun_to_int(mapping.lunid)
             logger.debug("Successfully mapped volume to host with lun {}".format(lun))
             return lun
@@ -315,19 +314,18 @@ class DS8KArrayMediator(ArrayMediator):
         except exceptions.ClientException as ex:
             # [BE586015] addLunMappings Volume group operation failure: volume does not exist.
             if ERROR_CODE_VOLUME_NOT_FOUND_FOR_MAPPING in str(ex.message).upper():
-                raise array_errors.VolumeNotFoundError(scsi_id)
+                raise array_errors.VolumeNotFoundError(volume_id)
             else:
-                raise array_errors.MappingError(scsi_id, host_name, ex.details)
+                raise array_errors.MappingError(volume_id, host_name, ex.details)
 
     def unmap_volume(self, volume_id, host_name):
         logger.debug("Unmapping volume {} from host {}".format(volume_id, host_name))
-        scsi_id = volume_id
-        volume_id = get_volume_id_from_scsi_identifier(volume_id)
+        array_volume_id = get_volume_id_from_scsi_identifier(volume_id)
         try:
             mappings = self.client.get_host_mappings(host_name)
             lunid = None
             for mapping in mappings:
-                if mapping.volume == volume_id:
+                if mapping.volume == array_volume_id:
                     lunid = mapping.lunid
                     break
             if lunid is not None:
@@ -337,11 +335,11 @@ class DS8KArrayMediator(ArrayMediator):
                 )
                 logger.debug("Successfully unmapped volume from host.")
             else:
-                raise array_errors.VolumeNotFoundError(scsi_id)
+                raise array_errors.VolumeNotFoundError(volume_id)
         except exceptions.NotFound:
             raise array_errors.HostNotFoundError(host_name)
         except exceptions.ClientException as ex:
-            raise array_errors.UnMappingError(scsi_id, host_name, ex.details)
+            raise array_errors.UnMappingError(volume_id, host_name, ex.details)
 
     def get_array_iqns(self):
         return []
