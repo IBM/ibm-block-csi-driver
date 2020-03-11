@@ -19,6 +19,7 @@ package driver
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"io/ioutil"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"os"
@@ -104,10 +105,10 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, c
 	}
 
 	connectivityType := publishContext[configYaml.Controller.Publish_context_connectivity_parameter]
-	if connectivityType == ConnectionTypeISCSI {
+	if connectivityType == device_connectivity.ConnectionTypeISCSI {
 		arrayInitiators = strings.Split(publishContext[configYaml.Controller.Publish_context_array_iqn], ",")
 	}
-	if connectivityType == ConnectionTypeFC {
+	if connectivityType == device_connectivity.ConnectionTypeFC {
 		arrayInitiators = strings.Split(publishContext[configYaml.Controller.Publish_context_fc_initiators], ",")
 	}
 
@@ -205,7 +206,7 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 
 	fpaths, err := n.Executer.FilepathGlob(FCPortPath)
 	if fpaths == nil {
-		err = fmt.Errorf(ErrorUnsupportedConnectivityType, ConnectionTypeFC)
+		err = fmt.Errorf(ErrorUnsupportedConnectivityType, device_connectivity.ConnectionTypeFC)
 	}
 	if err != nil {
 		return nil, err

@@ -53,8 +53,8 @@ func newTestNodeService(nodeUtils driver.NodeUtilsInterface, nodeMounter driver.
 
 func newTestNodeServiceStaging(nodeUtils driver.NodeUtilsInterface, osDevCon device_connectivity.OsDeviceConnectivityInterface) driver.NodeService {
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
-		driver.ConnectionTypeISCSI: osDevCon,
-		driver.ConnectionTypeFC:    osDevCon,
+		device_connectivity.ConnectionTypeISCSI: osDevCon,
+		device_connectivity.ConnectionTypeFC:    osDevCon,
 	}
 
 	return driver.NodeService{
@@ -68,7 +68,7 @@ func newTestNodeServiceStaging(nodeUtils driver.NodeUtilsInterface, osDevCon dev
 
 func TestNodeStageVolume(t *testing.T) {
 	dummyError := errors.New("Dummy error")
-	conType := driver.ConnectionTypeISCSI
+	conType := device_connectivity.ConnectionTypeISCSI
 	volId := "vol-test"
 	lun := 10
 	mpathDeviceName := "dm-2"
@@ -96,7 +96,7 @@ func TestNodeStageVolume(t *testing.T) {
 			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 		},
 	}
-	publishContext := map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: driver.ConnectionTypeISCSI}
+	publishContext := map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: device_connectivity.ConnectionTypeISCSI}
 	stagingRequest := &csi.NodeStageVolumeRequest{
 		PublishContext:    publishContext,
 		StagingTargetPath: stagingPath,
@@ -112,7 +112,7 @@ func TestNodeStageVolume(t *testing.T) {
 			name: "fail no VolumeId",
 			testFunc: func(t *testing.T) {
 				req := &csi.NodeStageVolumeRequest{
-					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: driver.ConnectionTypeISCSI},
+					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: device_connectivity.ConnectionTypeISCSI},
 					StagingTargetPath: stagingPath,
 					VolumeCapability:  stdVolCap,
 				}
@@ -125,7 +125,7 @@ func TestNodeStageVolume(t *testing.T) {
 			name: "fail no StagingTargetPath",
 			testFunc: func(t *testing.T) {
 				req := &csi.NodeStageVolumeRequest{
-					PublishContext:   map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: driver.ConnectionTypeISCSI},
+					PublishContext:   map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: device_connectivity.ConnectionTypeISCSI},
 					VolumeCapability: stdVolCap,
 					VolumeId:         volId,
 				}
@@ -138,7 +138,7 @@ func TestNodeStageVolume(t *testing.T) {
 			name: "fail no VolumeCapability",
 			testFunc: func(t *testing.T) {
 				req := &csi.NodeStageVolumeRequest{
-					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: driver.ConnectionTypeISCSI},
+					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: device_connectivity.ConnectionTypeISCSI},
 					StagingTargetPath: stagingPath,
 					VolumeId:          volId,
 				}
@@ -151,7 +151,7 @@ func TestNodeStageVolume(t *testing.T) {
 			name: "fail invalid VolumeCapability",
 			testFunc: func(t *testing.T) {
 				req := &csi.NodeStageVolumeRequest{
-					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: driver.ConnectionTypeISCSI},
+					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: device_connectivity.ConnectionTypeISCSI},
 					StagingTargetPath: "/test/path",
 					VolumeCapability: &csi.VolumeCapability{
 						AccessMode: &csi.VolumeCapability_AccessMode{
@@ -327,7 +327,7 @@ func TestNodeStageVolume(t *testing.T) {
 func TestNodeUnstageVolume(t *testing.T) {
 	dummyError := errors.New("Dummy error")
 	_, fileNotExistErr := os.Stat("DUMMY_FILE")
-	conType := driver.ConnectionTypeISCSI
+	conType := device_connectivity.ConnectionTypeISCSI
 	volId := "vol-test"
 	mpathDeviceName := "dm-2"
 	sysDevices := "/dev/d1,/dev/d2"

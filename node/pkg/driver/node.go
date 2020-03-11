@@ -50,8 +50,8 @@ var (
 	defaultFSType              = "ext4"
 	StageInfoFilename          = ".stageInfo.json"
 	supportedConnectivityTypes = map[string]bool{
-		ConnectionTypeISCSI: true,
-		ConnectionTypeFC:    true,
+		device_connectivity.ConnectionTypeISCSI: true,
+		device_connectivity.ConnectionTypeFC:    true,
 		// TODO add nvme later on
 	}
 

@@ -33,11 +33,6 @@ import (
 	"k8s.io/kubernetes/pkg/util/mount"
 )
 
-const (
-	ConnectionTypeISCSI = "iscsi"
-	ConnectionTypeFC    = "fc"
-)
-
 type Driver struct {
 	NodeService
 	srv      *grpc.Server
