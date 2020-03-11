@@ -67,7 +67,7 @@ func newTestNodeServiceStaging(nodeUtils driver.NodeUtilsInterface, osDevCon dev
 }
 
 func TestNodeStageVolume(t *testing.T) {
-	dummyError := errors.New("Dumyh error")
+	dummyError := errors.New("Dummy error")
 	conType := driver.ConnectionTypeISCSI
 	volId := "vol-test"
 	lun := 10
@@ -325,7 +325,7 @@ func TestNodeStageVolume(t *testing.T) {
 }
 
 func TestNodeUnstageVolume(t *testing.T) {
-	dummyError := errors.New("Dumyh error")
+	dummyError := errors.New("Dummy error")
 	_, fileNotExistErr := os.Stat("DUMMY_FILE")
 	conType := driver.ConnectionTypeISCSI
 	volId := "vol-test"
