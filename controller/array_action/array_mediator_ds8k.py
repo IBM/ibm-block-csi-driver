@@ -6,7 +6,7 @@ from controller.common.csi_logger import get_stdout_logger
 from controller.common import settings
 from controller.array_action.array_mediator_interface import ArrayMediator
 from controller.array_action.utils import classproperty
-from controller.array_action.ds8k_rest_client import RESTClient
+from controller.array_action.ds8k_rest_client import RESTClient, scsilun_to_int
 import controller.array_action.errors as array_errors
 from controller.array_action import config
 from controller.array_action.array_action_types import Volume
@@ -306,8 +306,10 @@ class DS8KArrayMediator(ArrayMediator):
         scsi_id = volume_id
         volume_id = get_volume_id_from_scsi_identifier(volume_id)
         try:
-            self.client.map_volume_to_host(host_name, volume_id)
-            logger.debug("Successfully mapped volume to host.")
+            mapping = self.client.map_volume_to_host(host_name, volume_id)
+            lun = scsilun_to_int(mapping.lunid)
+            logger.debug("Successfully mapped volume to host with lun {}".format(lun))
+            return lun
         except exceptions.NotFound:
             raise array_errors.HostNotFoundError(host_name)
         except exceptions.ClientException as ex:
