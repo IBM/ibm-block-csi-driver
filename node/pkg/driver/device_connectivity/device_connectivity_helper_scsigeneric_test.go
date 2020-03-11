@@ -18,6 +18,7 @@ package device_connectivity_test
 
 import (
 	"fmt"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 	"os"
 	"path"
 	"reflect"
@@ -252,7 +253,7 @@ func TestGetMpathDevice(t *testing.T) {
 
 			var mcalls []*gomock.Call
 			for index, r := range tc.waitForPathToExistReturns {
-				path := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", tc.arrayIdentifiers[index], "lun", strconv.Itoa(lunId)}, "-")
+				path := strings.Join([]string{"/dev/disk/by-path/ip*", driver.ConnectionTypeISCSI, tc.arrayIdentifiers[index], "lun", strconv.Itoa(lunId)}, "-")
 				call := fake_helper.EXPECT().WaitForPathToExist(path, 5, 1).Return(
 					r.devicePaths,
 					r.exists,
@@ -267,7 +268,7 @@ func TestGetMpathDevice(t *testing.T) {
 			gomock.InOrder(mcalls...)
 
 			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fake_executer, fake_helper, fake_mutex)
-			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, tc.arrayIdentifiers, "iscsi")
+			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, tc.arrayIdentifiers, driver.ConnectionTypeISCSI)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")
@@ -472,7 +473,7 @@ func TestGetMpathDevice(t *testing.T) {
 			var mcalls []*gomock.Call
 			for index, r := range tc.waitForPathToExistReturns {
 				array_inititor := "0x" + strings.ToLower(string(tc.arrayIdentifiers[index]))
-				path := strings.Join([]string{getFcPath("*"), "fc", array_inititor, "lun", strconv.Itoa(lunId)}, "-")
+				path := strings.Join([]string{getFcPath("*"), driver.ConnectionTypeFC, array_inititor, "lun", strconv.Itoa(lunId)}, "-")
 				call := fake_helper.EXPECT().WaitForPathToExist(path, 5, 1).Return(
 					r.devicePaths,
 					r.exists,
@@ -487,7 +488,7 @@ func TestGetMpathDevice(t *testing.T) {
 			gomock.InOrder(mcalls...)
 
 			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fake_executer, fake_helper, fake_mutex)
-			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, tc.arrayIdentifiers, "fc")
+			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, tc.arrayIdentifiers, driver.ConnectionTypeFC)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")

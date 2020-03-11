@@ -127,7 +127,7 @@ func TestParseFCPortsName(t *testing.T) {
 		},
 		{
 			name:   "fc unsupported",
-			expErr: fmt.Errorf(driver.ErrorUnsupportedConnectivityType, "FC"),
+			expErr: fmt.Errorf(driver.ErrorUnsupportedConnectivityType, driver.ConnectionTypeFC),
 		},
 		{
 			name:          "one FC port",

@@ -17,6 +17,7 @@
 package device_connectivity
 
 import (
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
@@ -47,7 +48,7 @@ func (r OsDeviceConnectivityFc) GetMpathDevice(volumeId string, lunId int, array
 
 			   Return Value: "dm-X" of the volumeID by using the LunID and the array wwn.
 	*/
-	return r.HelperScsiGeneric.GetMpathDevice(volumeId, lunId, arrayIdentifiers, "fc")
+	return r.HelperScsiGeneric.GetMpathDevice(volumeId, lunId, arrayIdentifiers, driver.ConnectionTypeFC)
 }
 
 func (r OsDeviceConnectivityFc) FlushMultipathDevice(mpathDevice string) error {

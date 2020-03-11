@@ -54,7 +54,7 @@ func newTestNodeService(nodeUtils driver.NodeUtilsInterface, nodeMounter driver.
 func newTestNodeServiceStaging(nodeUtils driver.NodeUtilsInterface, osDevCon device_connectivity.OsDeviceConnectivityInterface) driver.NodeService {
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
 		driver.ConnectionTypeISCSI: osDevCon,
-		driver.ConnectionTypeFS:    osDevCon,
+		driver.ConnectionTypeFC:    osDevCon,
 	}
 
 	return driver.NodeService{
@@ -96,7 +96,7 @@ func TestNodeStageVolume(t *testing.T) {
 			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 		},
 	}
-	publishContext := map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"}
+	publishContext := map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: driver.ConnectionTypeISCSI}
 	stagingRequest := &csi.NodeStageVolumeRequest{
 		PublishContext:    publishContext,
 		StagingTargetPath: stagingPath,
@@ -111,12 +111,12 @@ func TestNodeStageVolume(t *testing.T) {
 		{
 			name: "fail no VolumeId",
 			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
 				req := &csi.NodeStageVolumeRequest{
-					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: driver.ConnectionTypeISCSI},
 					StagingTargetPath: stagingPath,
 					VolumeCapability:  stdVolCap,
 				}
+				driver := newTestNodeService(nil, nil)
 				_, err := driver.NodeStageVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
@@ -124,12 +124,12 @@ func TestNodeStageVolume(t *testing.T) {
 		{
 			name: "fail no StagingTargetPath",
 			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
 				req := &csi.NodeStageVolumeRequest{
-					PublishContext:   map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+					PublishContext:   map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: driver.ConnectionTypeISCSI},
 					VolumeCapability: stdVolCap,
 					VolumeId:         volId,
 				}
+				driver := newTestNodeService(nil, nil)
 				_, err := driver.NodeStageVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
@@ -137,12 +137,12 @@ func TestNodeStageVolume(t *testing.T) {
 		{
 			name: "fail no VolumeCapability",
 			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
 				req := &csi.NodeStageVolumeRequest{
-					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: driver.ConnectionTypeISCSI},
 					StagingTargetPath: stagingPath,
 					VolumeId:          volId,
 				}
+				driver := newTestNodeService(nil, nil)
 				_, err := driver.NodeStageVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
@@ -150,9 +150,8 @@ func TestNodeStageVolume(t *testing.T) {
 		{
 			name: "fail invalid VolumeCapability",
 			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
 				req := &csi.NodeStageVolumeRequest{
-					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
+					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: driver.ConnectionTypeISCSI},
 					StagingTargetPath: "/test/path",
 					VolumeCapability: &csi.VolumeCapability{
 						AccessMode: &csi.VolumeCapability_AccessMode{
@@ -161,6 +160,7 @@ func TestNodeStageVolume(t *testing.T) {
 					},
 					VolumeId: volId,
 				}
+				driver := newTestNodeService(nil, nil)
 				_, err := driver.NodeStageVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},

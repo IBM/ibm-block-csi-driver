@@ -35,7 +35,7 @@ import (
 
 const (
 	ConnectionTypeISCSI = "iscsi"
-	ConnectionTypeFS    = "fs"
+	ConnectionTypeFC    = "fc"
 )
 
 type Driver struct {
@@ -61,7 +61,7 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 	executer := &executer.Executer{}
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
 		ConnectionTypeISCSI: device_connectivity.NewOsDeviceConnectivityIscsi(executer),
-		ConnectionTypeFS:    device_connectivity.NewOsDeviceConnectivityFc(executer),
+		ConnectionTypeFC:    device_connectivity.NewOsDeviceConnectivityFc(executer),
 		// TODO nvme
 	}
 	return &Driver{
