@@ -22,6 +22,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
 	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"io/ioutil"
 	"os"
@@ -127,7 +128,7 @@ func TestParseFCPortsName(t *testing.T) {
 		},
 		{
 			name:   "fc unsupported",
-			expErr: fmt.Errorf(driver.ErrorUnsupportedConnectivityType, "FC"),
+			expErr: fmt.Errorf(driver.ErrorUnsupportedConnectivityType, device_connectivity.ConnectionTypeFC),
 		},
 		{
 			name:          "one FC port",

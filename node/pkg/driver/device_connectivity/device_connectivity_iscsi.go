@@ -93,7 +93,7 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, ar
 
 			   Return Value: "dm-X" of the volumeID by using the LunID and the arrayIqn.
 	*/
-	return r.HelperScsiGeneric.GetMpathDevice(volumeId, lunId, arrayIdentifiers, "iscsi")
+	return r.HelperScsiGeneric.GetMpathDevice(volumeId, lunId, arrayIdentifiers, ConnectionTypeISCSI)
 }
 
 func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(mpathDevice string) error {

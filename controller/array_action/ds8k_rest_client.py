@@ -203,7 +203,7 @@ class RESTClient(object):
             host_name=host_name,
             volume_id=volume_id,
             lunid=int_to_scsilun(lunid) if lunid else ''
-        )
+        )[0]
 
     def unmap_volume_from_host(self, host_name, lunid):
         return self._client.unmap_volume_from_host(

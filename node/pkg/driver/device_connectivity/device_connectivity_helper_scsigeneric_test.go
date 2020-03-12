@@ -27,10 +27,10 @@ import (
 	"sync"
 	"testing"
 
-	gomock "github.com/golang/mock/gomock"
-	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
+	"github.com/golang/mock/gomock"
+	"github.com/ibm/ibm-block-csi-driver/node/mocks"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
-	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
 type WaitForPathToExistReturn struct {
@@ -252,7 +252,7 @@ func TestGetMpathDevice(t *testing.T) {
 
 			var mcalls []*gomock.Call
 			for index, r := range tc.waitForPathToExistReturns {
-				path := strings.Join([]string{"/dev/disk/by-path/ip*", "iscsi", tc.arrayIdentifiers[index], "lun", strconv.Itoa(lunId)}, "-")
+				path := strings.Join([]string{"/dev/disk/by-path/ip*", device_connectivity.ConnectionTypeISCSI, tc.arrayIdentifiers[index], "lun", strconv.Itoa(lunId)}, "-")
 				call := fake_helper.EXPECT().WaitForPathToExist(path, 5, 1).Return(
 					r.devicePaths,
 					r.exists,
@@ -267,7 +267,7 @@ func TestGetMpathDevice(t *testing.T) {
 			gomock.InOrder(mcalls...)
 
 			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fake_executer, fake_helper, fake_mutex)
-			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, tc.arrayIdentifiers, "iscsi")
+			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, tc.arrayIdentifiers, device_connectivity.ConnectionTypeISCSI)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")
@@ -472,7 +472,7 @@ func TestGetMpathDevice(t *testing.T) {
 			var mcalls []*gomock.Call
 			for index, r := range tc.waitForPathToExistReturns {
 				array_inititor := "0x" + strings.ToLower(string(tc.arrayIdentifiers[index]))
-				path := strings.Join([]string{getFcPath("*"), "fc", array_inititor, "lun", strconv.Itoa(lunId)}, "-")
+				path := strings.Join([]string{getFcPath("*"), device_connectivity.ConnectionTypeFC, array_inititor, "lun", strconv.Itoa(lunId)}, "-")
 				call := fake_helper.EXPECT().WaitForPathToExist(path, 5, 1).Return(
 					r.devicePaths,
 					r.exists,
@@ -487,7 +487,7 @@ func TestGetMpathDevice(t *testing.T) {
 			gomock.InOrder(mcalls...)
 
 			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fake_executer, fake_helper, fake_mutex)
-			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, tc.arrayIdentifiers, "fc")
+			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, tc.arrayIdentifiers, device_connectivity.ConnectionTypeFC)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")
