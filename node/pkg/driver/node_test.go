@@ -159,7 +159,7 @@ func TestNodeStageVolume(t *testing.T) {
 			testFunc: func(t *testing.T) {
 				req := &csi.NodeStageVolumeRequest{
 					PublishContext:    publishContext,
-					StagingTargetPath: "/test/path",
+					StagingTargetPath: stagingPath,
 					VolumeCapability: &csi.VolumeCapability{
 						AccessMode: &csi.VolumeCapability_AccessMode{
 							Mode: csi.VolumeCapability_AccessMode_UNKNOWN,
@@ -181,7 +181,7 @@ func TestNodeStageVolume(t *testing.T) {
 						PublishContextParamConnectivity: device_connectivity.ConnectionTypeISCSI,
 						PublishContextParamArrayIqn:     "iqn.1994-05.com.redhat:686358c930fe",
 					},
-					StagingTargetPath: "/test/path",
+					StagingTargetPath: stagingPath,
 					VolumeCapability: &csi.VolumeCapability{
 						AccessMode: &csi.VolumeCapability_AccessMode{
 							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
