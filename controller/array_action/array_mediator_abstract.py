@@ -3,8 +3,8 @@ from retry import retry
 
 import controller.array_action.errors as controller_errors
 from controller.array_action.array_mediator_interface import ArrayMediator
-from controller.array_action.config import FC_CONNECTIVITY_TYPE
-from controller.array_action.errors import NoConnectionAvailableException
+from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
+from controller.array_action.errors import NoConnectionAvailableException, UnsupportedConnectivityTypeError
 from controller.common.csi_logger import get_stdout_logger
 from controller.controller_server import utils
 
@@ -25,8 +25,11 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
 
         if FC_CONNECTIVITY_TYPE == connectivity_type:
             array_initiators = self.get_array_fc_wwns(host_name)
-        else:
+        elif ISCSI_CONNECTIVITY_TYPE == connectivity_type:
             array_initiators = self.get_iscsi_targets_by_iqn()
+        else:
+            raise UnsupportedConnectivityTypeError(connectivity_type)
+
         mappings = self.get_volume_mappings(vol_id)
         if len(mappings) >= 1:
             logger.debug(

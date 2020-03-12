@@ -205,11 +205,9 @@ def generate_csi_publish_volume_response(lun, connectivity_type, config, array_i
 
         array_initiators_param = config["controller"]["publish_context_array_iqn"]
         publish_context[array_initiators_param] = separator.join(array_initiators.keys())
-    elif connectivity_type == FC_CONNECTIVITY_TYPE:
+    else:
         array_initiators_param = config["controller"]["publish_context_fc_initiators"]
         publish_context[array_initiators_param] = separator.join(array_initiators)
-    else:
-        raise UnsupportedConnectivityTypeError(connectivity_type)
 
     res = csi_pb2.ControllerPublishVolumeResponse(publish_context=publish_context)
 

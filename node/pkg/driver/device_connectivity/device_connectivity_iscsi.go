@@ -41,15 +41,15 @@ func (r OsDeviceConnectivityIscsi) iscsiCmd(args ...string) (string, error) {
 	return string(out), err
 }
 
-func (r OsDeviceConnectivityIscsi) iscsiDiscoverAndLogin(targetName, targetPortal string) error {
-	logger.Debugf("iscsiDiscoverAndLogin: target: {%s}, portal: {%s}", targetPortal, targetPortal)
-	output, err := r.iscsiCmd("-m", "discovery", "-t", "sendtargets", "-p", targetPortal)
+func (r OsDeviceConnectivityIscsi) iscsiDiscoverAndLogin(targetName, portal string) error {
+	logger.Debugf("iscsiDiscoverAndLogin: target: {%s}, portal: {%s}", portal, portal)
+	output, err := r.iscsiCmd("-m", "discoverydb", "-t", "sendtargets", "-p", portal, "--discover")
 	if err != nil {
 		logger.Errorf("Failed to discover iSCSI: {%s}, error: {%s}", output, err)
 		return err
 	}
 
-	output, err = r.iscsiCmd("-m", "node", "-p", targetPortal+":3260", "-T", targetName, "--login")
+	output, err = r.iscsiCmd("-m", "node", "-p", portal+":3260", "-T", targetName, "--login")
 	if err != nil {
 		logger.Errorf("Failed to login iSCSI: {%s}, error: {%s}", output, err)
 		return err
@@ -57,12 +57,12 @@ func (r OsDeviceConnectivityIscsi) iscsiDiscoverAndLogin(targetName, targetPorta
 	return nil
 }
 
-func (r OsDeviceConnectivityIscsi) EnsureLogin(ipsByArrayIdentifier map[string][]string) error {
+func (r OsDeviceConnectivityIscsi) EnsureLogin(portalsByTarget map[string][]string) error {
 	isAnyLoginSucceeded := false
 	var err error
-	for targetName, targetPortals := range ipsByArrayIdentifier {
-		for _, targetPortal := range targetPortals {
-			err = r.iscsiDiscoverAndLogin(targetName, targetPortal)
+	for targetName, portals := range portalsByTarget {
+		for _, portal := range portals {
+			err = r.iscsiDiscoverAndLogin(targetName, portal)
 			if err == nil {
 				isAnyLoginSucceeded = true
 			}

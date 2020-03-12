@@ -632,11 +632,11 @@ class TestControllerServerPublishVolume(unittest.TestCase):
 
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
-    @patch("controller.controller_server.utils.generate_csi_publish_volume_response")
+    @patch("controller.array_action.array_mediator_abstract.ArrayMediatorAbstract.map_volume_by_initiators")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_generate_csi_publish_volume_response_exceptions(self, enter, generate_csi_publish_volume_response):
+    def test_map_volume_by_initiators_exceptions(self, enter, map_volume_by_initiators):
         context = utils.FakeContext()
-        generate_csi_publish_volume_response.side_effect = [
+        map_volume_by_initiators.side_effect = [
             array_errors.UnsupportedConnectivityTypeError("usb")]
         enter.return_value = self.mediator
         self.servicer.ControllerPublishVolume(self.request, context)
