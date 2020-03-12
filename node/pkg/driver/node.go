@@ -50,8 +50,8 @@ var (
 	defaultFSType              = "ext4"
 	StageInfoFilename          = ".stageInfo.json"
 	supportedConnectivityTypes = map[string]bool{
-		"iscsi": true,
-		"fc":    true,
+		device_connectivity.ConnectionTypeISCSI: true,
+		device_connectivity.ConnectionTypeFC:    true,
 		// TODO add nvme later on
 	}
 
@@ -173,7 +173,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 				(stageInfo["sysDevices"] != existingStageInfo["sysDevices"]) ||
 				(stageInfo["connectivity"] != existingStageInfo["connectivity"]) {
 				logger.Errorf("Stage info is not as expected. expected:  {%v}. got : {%v}", stageInfo, existingStageInfo)
-				return nil, status.Error(codes.AlreadyExists, err.Error())
+				return nil, status.Error(codes.AlreadyExists, "Stage info file is not as expected")
 			}
 			logger.Warningf("Idempotent case: stage info file is the same as expected. NodeStageVolume Finished: multipath device is ready [%s] to be mounted by NodePublishVolume API.", baseDevice)
 			return &csi.NodeStageVolumeResponse{}, nil

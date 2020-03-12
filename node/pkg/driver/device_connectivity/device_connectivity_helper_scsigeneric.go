@@ -28,7 +28,7 @@ import (
 	"time"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
-	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
 //go:generate mockgen -destination=../../../mocks/mock_OsDeviceConnectivityHelperScsiGenericInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity OsDeviceConnectivityHelperScsiGenericInterface
@@ -55,7 +55,9 @@ var (
 )
 
 const (
-	DevPath = "/dev"
+	DevPath             = "/dev"
+	ConnectionTypeISCSI = "iscsi"
+	ConnectionTypeFC    = "fc"
 )
 
 func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperScsiGenericInterface {
@@ -128,7 +130,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 	var targetPath string
 	lunIdStr := strconv.Itoa(lunId)
 
-	if connectivityType == "fc" {
+	if connectivityType == ConnectionTypeFC {
 		targetPath = fmt.Sprintf("/dev/disk/by-path/%s*", fcSubsystem)
 		// In host, the path like this: /dev/disk/by-path/pci-0000:13:00.0-fc-0x500507680b25c0aa-lun-0
 		// So add prefix "0x" for the arrayIdentifiers
@@ -136,7 +138,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 			arrayIdentifiers[index] = "0x" + strings.ToLower(wwn)
 		}
 	}
-	if connectivityType == "iscsi" {
+	if connectivityType == ConnectionTypeISCSI {
 		targetPath = "/dev/disk/by-path/ip*"
 	}
 
