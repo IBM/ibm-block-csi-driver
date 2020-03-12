@@ -406,7 +406,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.NoIscsiTargetsFoundError(self.endpoint)
 
     @staticmethod
-    def _extract_ips_by_node_id(ports):
+    def _create_ips_by_node_id_map(ports):
         ips_by_node_id = defaultdict(list)
         for port in ports:
             if port.IP_address:
@@ -426,7 +426,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _get_iscsi_targets_by_node_id(self):
         ports = self._list_ip_ports()
-        return self._extract_ips_by_node_id(ports)
+        return self._create_ips_by_node_id_map(ports)
 
     def get_iscsi_targets_by_iqn(self):
         logger.debug("Getting iscsi targets by iqn")

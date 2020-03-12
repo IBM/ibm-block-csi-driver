@@ -22,7 +22,10 @@ import (
 	"time"
 )
 
-var iscsiCmdTimeout = 30 * time.Second
+const (
+	iscsiCmdTimeout = 30 * time.Second
+	iscsiPort       = 3260
+)
 
 type OsDeviceConnectivityIscsi struct {
 	Executer          executer.ExecuterInterface
@@ -49,7 +52,8 @@ func (r OsDeviceConnectivityIscsi) iscsiDiscoverAndLogin(targetName, portal stri
 		return err
 	}
 
-	output, err = r.iscsiCmd("-m", "node", "-p", portal+":3260", "-T", targetName, "--login")
+	portalWithPort := portal + ":" + string(iscsiPort)
+	output, err = r.iscsiCmd("-m", "node", "-p", portalWithPort, "-T", targetName, "--login")
 	if err != nil {
 		logger.Errorf("Failed to login iSCSI: {%s}, error: {%s}", output, err)
 		return err

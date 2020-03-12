@@ -33,7 +33,7 @@ func NewOsDeviceConnectivityFc(executer executer.ExecuterInterface) OsDeviceConn
 }
 
 func (r OsDeviceConnectivityFc) EnsureLogin(_ map[string][]string) error {
-	return nil
+	return nil // FC doesn't require login
 }
 
 func (r OsDeviceConnectivityFc) RescanDevices(lunId int, arrayIdentifiers []string) error {
