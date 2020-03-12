@@ -36,7 +36,8 @@ import (
 const (
 	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
 	// Command lines inside the container will show /host prefix.
-	PrefixChrootOfHostRoot = "/host"
+	PrefixChrootOfHostRoot  = "/host"
+	PublishContextSeparator = ","
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
@@ -107,17 +108,17 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, c
 
 	connectivityType := publishContext[configYaml.Controller.Publish_context_connectivity_parameter]
 	if connectivityType == device_connectivity.ConnectionTypeISCSI {
-		iqns := strings.Split(publishContext[configYaml.Controller.Publish_context_array_iqn], ",")
+		iqns := strings.Split(publishContext[configYaml.Controller.Publish_context_array_iqn], PublishContextSeparator)
 		for _, iqn := range iqns {
 			if ips, iqnExists := publishContext[iqn]; iqnExists {
-				ipsByArrayInitiator[iqn] = strings.Split(ips, ",")
+				ipsByArrayInitiator[iqn] = strings.Split(ips, PublishContextSeparator)
 			} else {
 				logger.Errorf("Publish context does not contain any iscsi target IP for {%v}", iqn)
 			}
 		}
 	}
 	if connectivityType == device_connectivity.ConnectionTypeFC {
-		wwns := strings.Split(publishContext[configYaml.Controller.Publish_context_fc_initiators], ",")
+		wwns := strings.Split(publishContext[configYaml.Controller.Publish_context_fc_initiators], PublishContextSeparator)
 		for _, wwn := range wwns {
 			ipsByArrayInitiator[wwn] = nil
 		}
