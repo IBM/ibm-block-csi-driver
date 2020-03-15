@@ -46,7 +46,7 @@ parameters:
   csi.storage.k8s.io/controller-publish-secret-namespace: kube-system
 
   csi.storage.k8s.io/fstype: xfs   # Optional. values ext4/xfs. The default is ext4.
-  volume_name_prefix: demo1        # Optional. Please don't use a very long prefix, the max allowed length of a volume name is 63. Prefix for DS8K system is not recommended.
+  volume_name_prefix: demo1        # Optional. Please don't use a very long prefix, the max allowed length of a volume name is 63. Prefix for DS8K system should not longer than 5.
 $> kubectl create -f demo-storageclass-gold-A9000R.yaml
 storageclass.storage.k8s.io/gold created
 ```
