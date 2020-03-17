@@ -32,7 +32,7 @@ class ConnectionPool(pools.Pool):
             self.free_items.popleft().disconnect()
             self.current_size -= 1
 
-    def create(self):
+    def create(self):  # pylint: disable=method-hidden
         try:
             return self.med_class(self.username, self.password, self.endpoints)
         except Exception:
