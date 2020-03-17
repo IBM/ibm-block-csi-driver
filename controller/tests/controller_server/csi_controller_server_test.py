@@ -535,9 +535,8 @@ class TestControllerServerPublishVolume(ControllerServerTestBase):
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '2')
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "fc")
 
-        self.mediator.map_volume.side_effect = [
-                                                   array_errors.LunAlreadyInUseError("", "")] * (
-                                                           self.mediator.max_lun_retries + 1)
+        self.mediator.map_volume.side_effect = \
+            [array_errors.LunAlreadyInUseError("", "")] * (self.mediator.max_lun_retries + 1)
 
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.RESOURCE_EXHAUSTED)

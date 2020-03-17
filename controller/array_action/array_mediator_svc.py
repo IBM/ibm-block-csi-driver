@@ -137,8 +137,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 bytes=True, object_id=volume_name).as_single_element
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
-                if (OBJ_NOT_FOUND in ex.my_message or
-                        NAME_NOT_MEET in ex.my_message):
+                if OBJ_NOT_FOUND in ex.my_message or NAME_NOT_MEET in ex.my_message:
                     logger.error("Volume not found")
                     raise controller_errors.VolumeNotFoundError(volume_name)
         except Exception as ex:
@@ -207,8 +206,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 if NAME_NOT_MEET in ex.my_message:
                     raise controller_errors.PoolDoesNotExist(pool,
                                                              self.endpoint)
-                if (POOL_NOT_MATCH_VOL_CAPABILITIES in ex.my_message
-                        or NOT_REDUCTION_POOL in ex.my_message):
+                if POOL_NOT_MATCH_VOL_CAPABILITIES in ex.my_message or NOT_REDUCTION_POOL in ex.my_message:
                     raise controller_errors.PoolDoesNotMatchCapabilities(
                         pool, capabilities, ex)
                 raise ex
@@ -224,8 +222,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 logger.warning("Failed to delete volume {}".format(vol_name))
-                if (OBJ_NOT_FOUND in ex.my_message
-                        or VOL_NOT_FOUND in ex.my_message):
+                if OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message:
                     raise controller_errors.VolumeNotFoundError(vol_name)
                 else:
                     raise ex

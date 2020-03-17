@@ -65,7 +65,7 @@ def shorten_volume_name(name, prefix):
     if not prefix:
         return hash_string(name)[:MAX_VOLUME_LENGTH]
     else:
-        name_without_prefix = str(name).split(prefix+settings.NAME_PREFIX_SEPARATOR, 2)[1]
+        name_without_prefix = str(name).split(prefix + settings.NAME_PREFIX_SEPARATOR, 2)[1]
         hashed = hash_string(name_without_prefix)
         return (prefix + settings.NAME_PREFIX_SEPARATOR + hashed)[:MAX_VOLUME_LENGTH]
 
@@ -137,8 +137,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 'Failed to connect to DS8K array {}, reason is {}'.format(
                     self.identifier,
                     e.details
-                    )
                 )
+            )
             raise ConnectionError()
 
     def disconnect(self):

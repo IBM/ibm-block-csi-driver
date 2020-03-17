@@ -157,13 +157,10 @@ class TestStorageAgent(unittest.TestCase):
 
         def blocking_action():
             with self.agent.get_mediator():
-                print("start blocking_action, current_size: {}, free_items: {}".format(self.agent.conn_pool.current_size, len(self.agent.conn_pool.free_items)))
                 gevent.sleep(0.2)
-            print("finish blocking_action, free_items: {}".format(len(self.agent.conn_pool.free_items)))
 
         def new_action():
             called = False
-            print("start new_action, current_size: {}, free_items: {}".format(self.agent.conn_pool.current_size, len(self.agent.conn_pool.free_items)))
             if is_timeout:
                 with self.assertRaises(array_errors.NoConnectionAvailableException):
                     with self.agent.get_mediator(timeout=timeout):
