@@ -19,8 +19,8 @@ package device_connectivity
 //go:generate mockgen -destination=../../../mocks/mock_OsDeviceConnectivityInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity OsDeviceConnectivityInterface
 
 type OsDeviceConnectivityInterface interface {
-	EnsureLogin(ipsByArrayIdentifier map[string][]string) error // For iSCSI login
-	RescanDevices(lunId int, arrayIdentifier []string) error    // For NVME lunID will be namespace ID.
+	EnsureLogin(ipsByArrayIdentifier map[string][]string)    // For iSCSI login
+	RescanDevices(lunId int, arrayIdentifier []string) error // For NVME lunID will be namespace ID.
 	GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
 	RemovePhysicalDevice(sysDevices []string) error

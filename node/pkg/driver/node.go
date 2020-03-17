@@ -133,9 +133,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
 	}
 
-	if err := osDeviceConnectivity.EnsureLogin(ipsByArrayInitiator); err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
+	osDeviceConnectivity.EnsureLogin(ipsByArrayInitiator)
 
 	err = osDeviceConnectivity.RescanDevices(lun, arrayInitiators)
 	if err != nil {

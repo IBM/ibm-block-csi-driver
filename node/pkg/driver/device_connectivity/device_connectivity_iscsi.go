@@ -17,14 +17,18 @@
 package device_connectivity
 
 import (
+	"errors"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"os/exec"
+	"strings"
 	"time"
 )
 
 const (
-	iscsiCmdTimeout = 30 * time.Second
-	iscsiPort       = 3260
+	iscsiCmdTimeout     = 30 * time.Second
+	iscsiPort           = 3260
+	iSCSIErrNoObjsFound = 21
 )
 
 type OsDeviceConnectivityIscsi struct {
@@ -44,38 +48,95 @@ func (r OsDeviceConnectivityIscsi) iscsiCmd(args ...string) (string, error) {
 	return string(out), err
 }
 
-func (r OsDeviceConnectivityIscsi) iscsiDiscoverAndLogin(targetName, portal string) error {
-	logger.Debugf("iscsiDiscoverAndLogin: target: {%s}, portal: {%s}", portal, portal)
+func (r OsDeviceConnectivityIscsi) iscsiDiscover(portal string) error {
 	output, err := r.iscsiCmd("-m", "discoverydb", "-t", "sendtargets", "-p", portal, "--discover")
 	if err != nil {
 		logger.Errorf("Failed to discover iSCSI: {%s}, error: {%s}", output, err)
 		return err
 	}
-
-	portalWithPort := portal + ":" + string(iscsiPort)
-	output, err = r.iscsiCmd("-m", "node", "-p", portalWithPort, "-T", targetName, "--login")
-	if err != nil {
-		logger.Errorf("Failed to login iSCSI: {%s}, error: {%s}", output, err)
-		return err
-	}
 	return nil
 }
 
-func (r OsDeviceConnectivityIscsi) EnsureLogin(portalsByTarget map[string][]string) error {
-	isAnyLoginSucceeded := false
-	var err error
+func (r OsDeviceConnectivityIscsi) iscsiLogin(targetName, portal string) {
+	portalWithPort := portal + ":" + string(iscsiPort)
+	output, err := r.iscsiCmd("-m", "node", "-p", portalWithPort, "-T", targetName, "--login")
+	if err != nil {
+		logger.Errorf("Failed to login iSCSI: {%s}, error: {%s}", output, err)
+	}
+}
+
+func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions() ([]string, error) {
+	output, err := r.iscsiCmd("-m", "session")
+	if err != nil {
+		if exitError, isExitError := err.(*exec.ExitError); isExitError && exitError.ExitCode() == iSCSIErrNoObjsFound {
+			logger.Debug("No active iSCSI sessions.")
+			return []string{}, nil
+		}
+		logger.Error("Failed to check iSCSI sessions.")
+		return nil, err
+	}
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	return lines, nil
+}
+
+func (r OsDeviceConnectivityIscsi) getAllSessions() (map[string]map[string]bool, error) {
+	lines, err := r.iscsiGetRawSessions()
+	if err != nil {
+		return nil, err
+	}
+	parseErr := errors.New("failed to parse iSCSI sessions")
+	portalsByTarget := make(map[string]map[string]bool)
+	for _, line := range lines {
+		parts := strings.Fields(line)
+		if len(parts) < 4 {
+			return nil, parseErr
+		}
+		portalInfo, targetName := parts[2], parts[3]
+		ipPortSeparatorIndex := strings.LastIndex(portalInfo, ":")
+		if ipPortSeparatorIndex < 0 {
+			return nil, parseErr
+		}
+		ip := portalInfo[:ipPortSeparatorIndex]
+		portalsByTarget[targetName][ip] = true
+	}
+	return portalsByTarget, nil
+}
+
+func (r OsDeviceConnectivityIscsi) filterLoggedIn(portalsByTarget map[string][]string) (map[string][]string, error) {
+	loggedInPortalsByTarget, err := r.getAllSessions()
+	if err != nil {
+		return nil, err
+	}
+	filteredPortalsByTarget := make(map[string][]string)
 	for targetName, portals := range portalsByTarget {
 		for _, portal := range portals {
-			err = r.iscsiDiscoverAndLogin(targetName, portal)
-			if err == nil {
-				isAnyLoginSucceeded = true
+			if !loggedInPortalsByTarget[targetName][portal] {
+				portals := filteredPortalsByTarget[targetName]
+				filteredPortalsByTarget[targetName] = append(portals, portal)
 			}
 		}
 	}
-	if !isAnyLoginSucceeded {
-		return err
+	return filteredPortalsByTarget, nil
+}
+
+func (r OsDeviceConnectivityIscsi) discoverAndLogin(portalsByTarget map[string][]string) {
+	for targetName, portals := range portalsByTarget {
+		if err := r.iscsiDiscover(targetName); err != nil {
+			continue
+		}
+		for _, portal := range portals {
+			r.iscsiLogin(targetName, portal)
+		}
 	}
-	return nil
+}
+
+func (r OsDeviceConnectivityIscsi) EnsureLogin(allPortalsByTarget map[string][]string) {
+	portalsByTarget, err := r.filterLoggedIn(allPortalsByTarget)
+	if err == nil {
+		r.discoverAndLogin(portalsByTarget)
+	} else {
+		logger.Errorf("Failed to filter logged in iSCSI portals: {%v}", err)
+	}
 }
 
 func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifiers []string) error {
