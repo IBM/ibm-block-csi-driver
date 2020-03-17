@@ -144,6 +144,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def disconnect(self):
         pass
 
+    def is_active(self):
+        return True
+
     def get_system_info(self):
         return self.client.get_system()
 

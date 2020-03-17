@@ -1,0 +1,139 @@
+import socket
+from queue import Empty
+from collections import OrderedDict
+from contextlib import contextmanager
+from controller.array_action.connection_pool import ConnectionPool
+from controller.common.csi_logger import get_stdout_logger
+from controller.common import settings
+from controller.array_action.errors import FailedToFindStorageSystemType
+from controller.array_action.array_mediator_xiv import XIVArrayMediator
+from controller.array_action.array_mediator_svc import SVCArrayMediator
+from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
+import controller.array_action.errors as array_errors
+
+logger = get_stdout_logger()
+_array_agents = []
+
+array_type_to_port = OrderedDict()
+# Don't change the order here since svc port (22) is also opened in ds8k.
+array_type_to_port[XIVArrayMediator.array_type] = XIVArrayMediator.port
+array_type_to_port[DS8KArrayMediator.array_type] = DS8KArrayMediator.port
+array_type_to_port[SVCArrayMediator.array_type] = SVCArrayMediator.port
+
+array_type_to_mediator = {
+    XIVArrayMediator.array_type: XIVArrayMediator,
+    SVCArrayMediator.array_type: SVCArrayMediator,
+    DS8KArrayMediator.array_type: DS8KArrayMediator,
+}
+
+
+def _socket_connect_test(host, port, timeout=1):
+    """
+    function to test socket connection to host:port.
+
+    :param host: ip address or host name
+    :param port: port
+    :param timeout: connection timeout
+
+    :return:  0 - on successful connection
+             -1 - on any exception, or specific connection errors with that error number
+             other values - on other connection errors
+    """
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        ret = sock.connect_ex((host, port))
+        sock.close()
+        return ret
+    except socket.gaierror as e:
+        logger.debug('could not resolve hostname "{HOST}": {ERROR}'.format(HOST=host, ERROR=e))
+        return -1
+    except Exception as e:
+        logger.debug('socket_connect {}'.format(e))
+        return -1
+
+
+def get_agent(username, password, endpoints, array_type=None):
+    for found in filter(lambda a: a.endpoints == endpoints and a.username == username, _array_agents):
+        # delete the agent and clear all the connections if password is changed.
+        if found.password != password:
+            _array_agents.remove(found)
+            del found
+        else:
+            return found
+    agent = StorageAgent(endpoints, username, password, array_type)
+    _array_agents.append(agent)
+    return agent
+
+
+def get_agents():
+    return _array_agents
+
+
+def clear_agents():
+    try:
+        while True:
+            agent = _array_agents.pop()
+            # close all the connections
+            del agent
+    except IndexError:
+        pass
+
+
+class StorageAgent(object):
+
+    def __init__(self, endpoints, username, password, array_type=None):
+        self.username = username
+        self.password = password
+        self.endpoints = endpoints
+        self.conn_pool = None
+
+        if not array_type:
+            array_type = self.detect_array_type()
+
+        med_class = array_type_to_mediator[array_type]
+
+        self.conn_pool = ConnectionPool(
+            endpoints=self.endpoints,
+            username=self.username,
+            password=self.password,
+            med_class=med_class,
+            # Specifying a non-zero min_size pre-populates the pool with min_size items
+            min_size=1,
+            max_size=min(med_class.max_connections, settings.CSI_CONTROLLER_SERVER_WORKERS)
+        )
+
+    def __del__(self):
+        if self.conn_pool:
+            # close all the connections
+            pool = self.conn_pool
+            self.conn_pool = None
+            del pool
+
+    def detect_array_type(self):
+        logger.debug("detecting array connection type")
+
+        # Don't change the order here since svc port (22) is also opened in ds8k.
+        for storage_type, port in array_type_to_port.items():
+            for endpoint in self.endpoints:
+                if _socket_connect_test(endpoint, port) == 0:
+                    logger.debug("storage array type is : {0}".format(storage_type))
+                    return storage_type
+
+        raise FailedToFindStorageSystemType(self.endpoints)
+
+    @contextmanager
+    def get_mediator(self, timeout=None):
+        """
+        Get an object out of the pool, for use with with statement.
+        Like the self.conn_pool.item() method.
+        """
+        try:
+            med = self.conn_pool.get(timeout=timeout)
+        except Empty:
+            raise array_errors.NoConnectionAvailableException(", ".join(self.endpoints))
+
+        try:
+            yield med
+        finally:
+            self.conn_pool.put(med)

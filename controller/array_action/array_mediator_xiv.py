@@ -76,6 +76,9 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         if self.client and self.client.is_connected():
             self.client.close()
 
+    def is_active(self):
+        return True
+
     def _convert_size_blocks_to_bytes(self, size_in_blocks):
         return size_in_blocks * self.BLOCK_SIZE_IN_BYTES
 

@@ -117,6 +117,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if self.client:
             self.client.close()
 
+    def is_active(self):
+        return self.client.transport.transport.get_transport().is_active()
+
     def _generate_volume_response(self, cli_volume):
         return Volume(
             int(cli_volume.capacity),

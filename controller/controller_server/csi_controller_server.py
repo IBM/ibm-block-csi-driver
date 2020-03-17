@@ -1,3 +1,10 @@
+# use greenlet instead of real threads.
+from gevent import monkey
+monkey.patch_all()
+
+import grpc._cython.cygrpc
+grpc._cython.cygrpc.init_grpc_gevent()
+
 import os.path
 import time
 from concurrent import futures
@@ -9,7 +16,7 @@ import yaml
 import controller.array_action.errors as controller_errors
 import controller.controller_server.config as config
 import controller.controller_server.utils as utils
-from controller.array_action.array_connection_manager import ArrayConnectionManager
+from controller.array_action.storage_agent import get_agent
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.csi_logger import set_log_level
@@ -74,7 +81,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         try:
             # TODO : pass multiple array addresses
-            with ArrayConnectionManager(user, password, array_addresses) as array_mediator:
+            with get_agent(user, password, array_addresses).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
 
                 if len(volume_prefix) > array_mediator.max_volume_prefix_length:
@@ -162,7 +169,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.warning("volume id is invalid. error : {}".format(ex))
                 return csi_pb2.DeleteVolumeResponse()
 
-            with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
+            with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
 
                 logger.debug(array_mediator)
 
@@ -210,7 +217,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.debug("node name for this publish operation is : {0}".format(node_name))
 
             user, password, array_addresses = utils.get_array_connection_info_from_secret(request.secrets)
-            with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
+            with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 lun, connectivity_type, array_initiators = array_mediator.map_volume_by_initiators(vol_id,
                                                                                                    initiators)
             logger.info("finished ControllerPublishVolume")
@@ -278,7 +285,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             user, password, array_addresses = utils.get_array_connection_info_from_secret(request.secrets)
 
-            with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
+            with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 array_mediator.unmap_volume_by_initiators(vol_id, initiators)
 
             logger.info("finished ControllerUnpublishVolume")
@@ -383,7 +390,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         return csi_pb2.ProbeResponse()
 
     def start_server(self):
-        controller_server = grpc.server(futures.ThreadPoolExecutor(max_workers=10))
+        controller_server = grpc.server(futures.ThreadPoolExecutor(max_workers=settings.CSI_CONTROLLER_SERVER_WORKERS))
 
         csi_pb2_grpc.add_ControllerServicer_to_server(self, controller_server)
         csi_pb2_grpc.add_IdentityServicer_to_server(self, controller_server)
