@@ -31,6 +31,7 @@ class ConnectionPool(object):
 
     def create(self):
         try:
+            logger.debug("Creating a new connection for endpoint {}".format(", ".join(self.endpoints)))
             return self.med_class(self.username, self.password, self.endpoints)
         except Exception:
             raise
@@ -39,7 +40,7 @@ class ConnectionPool(object):
         """
         Return an item from the pool, when one is available.
 
-        This may cause the calling greenthread to block. Check if a connection is
+        This may cause the calling thread to block. Check if a connection is
         active before returning it. For dead connections, create and return a new connection.
 
         If optional args *block* is true and *timeout* is ``None`` (the default),
@@ -50,6 +51,7 @@ class ConnectionPool(object):
         (*timeout* is ignored in that case).
         """
 
+        # if there is a free and active item in the channel, return it directly.
         while True:
             try:
                 item = self.channel.get(block=False)
@@ -59,20 +61,26 @@ class ConnectionPool(object):
                     with self.lock:
                         self.current_size -= 1
                     try:
+                        logger.debug("The connection for storage {} is inactive, close it".format(item.identifier))
                         item.disconnect()
                     except Exception as ex:
                         # failed to disconnect the mediator, delete the stale client.
-                        logger.error("Failed to disconnect the connection before use, reason is {}".format(ex))
+                        logger.error(
+                            "Failed to disconnect the connection for storage {} before use, "
+                            "reason is {}".format(item.identifier, ex)
+                        )
                         del item
             except Empty:
                 break
 
+        # If there is no free items, and current_size is not full, create a new item.
         if self.current_size < self.max_size:
             created = self.create()
             with self.lock:
                 self.current_size += 1
             return created
 
+        # If current_size is full, waiting for an available one.
         return self.channel.get(block, timeout)
 
     def put(self, item):
@@ -82,16 +90,21 @@ class ConnectionPool(object):
         if self.current_size > self.max_size:
             with self.lock:
                 self.current_size -= 1
-
-            try:
-                item.disconnect()
-            except Exception as ex:
-                # failed to disconnect the mediator, delete the stale client.
-                logger.error("Failed to disconnect the connection after use, reason is {}".format(ex))
-                del item
+            discard = True
         else:
             try:
                 self.channel.put(item, block=False)
                 return
             except Full:
+                discard = True
+
+        if discard:
+            try:
                 item.disconnect()
+            except Exception as ex:
+                # failed to disconnect the mediator, delete the stale client.
+                logger.error(
+                    "Failed to disconnect the connection for storage {} after use, "
+                    "reason is {}".format(item.identifier, ex)
+                )
+                del item

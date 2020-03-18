@@ -229,6 +229,14 @@ class ArrayMediator(ABC):
 
     @property
     @abstractmethod
+    def identifier(self):
+        """
+        The storage system identifier.
+        """
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
     def array_type(self):
         """
         The storage system type.

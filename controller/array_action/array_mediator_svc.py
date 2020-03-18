@@ -100,6 +100,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.StorageManagementIPsNotSupportError(
                 endpoint)
         self.endpoint = endpoint[0]
+        self._identifier = None
 
         logger.debug("in init")
         self._connect()
@@ -116,6 +117,18 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def disconnect(self):
         if self.client:
             self.client.close()
+
+    def get_system_info(self):
+        for cluster in self.client.svcinfo.lssystem():
+            if cluster['location'] == 'local':
+                return cluster
+
+    @property
+    def identifier(self):
+        if self._identifier is None:
+            cluster = self.get_system_info()
+            self._identifier = cluster['id_alias']
+        return self._identifier
 
     def is_active(self):
         return self.client.transport.transport.get_transport().is_active()

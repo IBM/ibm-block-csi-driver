@@ -63,13 +63,13 @@ def get_agent(username, password, endpoints, array_type=None):
             # delete the agent and clear all the connections if password is changed.
             if found.password != password:
                 logger.debug(
-                    "The password is changed for endpoints {}, "
+                    "The password is changed for endpoint {}, "
                     "remove the cached connection".format(endpoint_key)
                 )
                 del _array_agents[(username, endpoint_key)]
                 del found
             else:
-                logger.debug("Found a cached connection {}, reuse it".format(endpoint_key))
+                logger.debug("Found a cached connection for endpoint {}, reuse it".format(endpoint_key))
                 return found
         logger.debug("Creating a new connection for endpoints {}".format(endpoint_key))
         agent = StorageAgent(endpoints, username, password, array_type)
