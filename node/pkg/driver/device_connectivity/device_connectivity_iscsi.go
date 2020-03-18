@@ -121,8 +121,10 @@ func (r OsDeviceConnectivityIscsi) filterLoggedIn(portalsByTarget map[string][]s
 
 func (r OsDeviceConnectivityIscsi) discoverAndLogin(portalsByTarget map[string][]string) {
 	for targetName, portals := range portalsByTarget {
-		if err := r.iscsiDiscover(targetName); err != nil {
-			continue
+		for _, portal := range portals {
+			if err := r.iscsiDiscover(portal); err != nil {
+				continue
+			}
 		}
 		for _, portal := range portals {
 			r.iscsiLogin(targetName, portal)
