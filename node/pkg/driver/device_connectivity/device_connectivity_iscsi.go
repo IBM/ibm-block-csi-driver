@@ -119,12 +119,20 @@ func (r OsDeviceConnectivityIscsi) filterLoggedIn(portalsByTarget map[string][]s
 	return filteredPortalsByTarget, nil
 }
 
+func (r OsDeviceConnectivityIscsi) iscsiDiscoverAny(portals []string) bool {
+	for _, portal := range portals {
+		if err := r.iscsiDiscover(portal); err != nil {
+			return true
+		}
+	}
+	return false
+}
+
 func (r OsDeviceConnectivityIscsi) discoverAndLogin(portalsByTarget map[string][]string) {
 	for targetName, portals := range portalsByTarget {
-		for _, portal := range portals {
-			if err := r.iscsiDiscover(portal); err != nil {
-				continue
-			}
+		isAnyDiscoverySucceeded := r.iscsiDiscoverAny(portals)
+		if !isAnyDiscoverySucceeded {
+			continue
 		}
 		for _, portal := range portals {
 			r.iscsiLogin(targetName, portal)
