@@ -1,7 +1,8 @@
 import unittest
-import gevent
-import time
-from controller.array_action.storage_agent import StorageAgent
+from threading import Thread
+from queue import Queue
+from time import sleep
+from controller.array_action.storage_agent import StorageAgent, get_agent, clear_agents, get_agents
 from munch import Munch
 from mock import patch, NonCallableMagicMock, Mock
 from controller.array_action.errors import FailedToFindStorageSystemType
@@ -58,6 +59,38 @@ class TestStorageAgent(unittest.TestCase):
 
         self.agent = StorageAgent(["ds8k_host", ], "", "")
 
+    def tearDown(self):
+        clear_agents()
+
+    def test_get_agent_return_new(self):
+        self.assertEqual(len(get_agents()), 0)
+        agent = get_agent("", "", ["ds8k_host", ])
+        self.assertIsInstance(agent, StorageAgent)
+        self.assertEqual(len(get_agents()), 1)
+        get_agent("test", "test", ["ds8k_host", ])
+        self.assertEqual(len(get_agents()), 2)
+
+    def test_get_agent_return_existing(self):
+        name = "test_name"
+        password = "test_password"
+        endpoints = ["ds8k_host", ]
+        self.assertEqual(len(get_agents()), 0)
+        agent = get_agent(name, password, endpoints)
+        self.assertEqual(len(get_agents()), 1)
+        new_agent = get_agent(name, password, endpoints)
+        self.assertEqual(len(get_agents()), 1)
+        self.assertEqual(id(agent), id(new_agent))
+
+    def test_get_agent_return_new_when_password_changed(self):
+        name = "test_name"
+        endpoints = ["ds8k_host", ]
+        self.assertEqual(len(get_agents()), 0)
+        agent = get_agent(name, "pa", endpoints)
+        self.assertEqual(len(get_agents()), 1)
+        new_agent = get_agent(name, "pb", endpoints)
+        self.assertEqual(len(get_agents()), 1)
+        self.assertNotEqual(id(agent), id(new_agent))
+
     @patch("controller.array_action.storage_agent.ConnectionPool")
     def test_detect_array_type(self, _):
         self.assertEqual(
@@ -112,25 +145,6 @@ class TestStorageAgent(unittest.TestCase):
 
         self.assertEqual(self.agent.conn_pool.current_size, 3)
 
-    def test_get_multiple_mediators_parallelly_in_different_threads(self):
-
-        def verify_mediator(current_size):
-            with self.agent.get_mediator() as mediator:
-                self.assertIsInstance(mediator, DS8KArrayMediator)
-                self.assertEqual(self.agent.conn_pool.current_size, current_size)
-                self.assertEqual(self.client_mock.get_system.call_count, current_size)
-                gevent.sleep(0.1)
-
-        g1 = gevent.spawn(verify_mediator, 1)
-        g2 = gevent.spawn(verify_mediator, 2)
-        g3 = gevent.spawn(verify_mediator, 3)
-
-        g1.join()
-        g2.join()
-        g3.join()
-
-        self.assertEqual(self.agent.conn_pool.current_size, 3)
-
     def test_get_mediator_find_one_inactive(self):
         with self.agent.get_mediator() as mediator, self.agent.get_mediator():
             mediator.is_active = Mock(return_value=False)
@@ -143,46 +157,68 @@ class TestStorageAgent(unittest.TestCase):
         # After some iteration, the inactive client is disconnected and removed.
         self.assertEqual(self.agent.conn_pool.current_size, 1)
 
+    def test_get_multiple_mediators_parallelly_in_different_threads(self):
+
+        def verify_mediator(current_size):
+            agent = get_agent("test", "test", ["ds8k_host", ])
+            with agent.get_mediator() as mediator:
+                self.assertIsInstance(mediator, DS8KArrayMediator)
+                self.assertEqual(agent.conn_pool.current_size, current_size)
+                # get_system is called in setUp() too.
+                self.assertEqual(self.client_mock.get_system.call_count, current_size + 1)
+                sleep(0.2)
+
+        t1 = Thread(target=verify_mediator, args=(1, ))
+        t2 = Thread(target=verify_mediator, args=(2, ))
+        t3 = Thread(target=verify_mediator, args=(3, ))
+
+        t1.start()
+        t2.start()
+        t3.start()
+        t1.join()
+        t2.join()
+        t3.join()
+
+        self.assertEqual(get_agent("test", "test", ["ds8k_host", ]).conn_pool.current_size, 3)
+
     def test_get_mediator_timeout(self):
-        self._test_get_mediator_with_timeout()
+        self._test_get_mediator_timeout()
 
     def test_get_mediator_find_available_one_before_timeout(self):
-        # self._test_get_mediator_with_timeout(False)
-        pass
+        self._test_get_mediator_timeout(False)
 
-    def _test_get_mediator_with_timeout(self, is_timeout=True):
-        timeout = 10
+    def _test_get_mediator_timeout(self, is_timeout=True):
+
+        timeout = 0.3
         if is_timeout:
             timeout = 0.1
 
         def blocking_action():
-            with self.agent.get_mediator():
-                gevent.sleep(0.2)
+            with get_agent("test", "test", ["ds8k_host", ]).get_mediator():
+                sleep(0.2)
 
-        def new_action():
-            called = False
+        def new_action(in_q):
             if is_timeout:
                 with self.assertRaises(array_errors.NoConnectionAvailableException):
-                    with self.agent.get_mediator(timeout=timeout):
-                        called = True
+                    with get_agent("test", "test", ["ds8k_host", ]).get_mediator(timeout=timeout):
+                        in_q.put(True)
             else:
-                with self.agent.get_mediator(timeout=timeout):
-                    called = True
-
-            # wait till all block actions finish.
-            time.sleep(0.2)
-            return called
+                with get_agent("test", "test", ["ds8k_host", ]).get_mediator(timeout=timeout):
+                    in_q.put(True)
 
         # max_size for ds8k is 10
-        for i in range(10):
-            gevent.spawn(blocking_action)
+        for _ in range(10):
+            t = Thread(target=blocking_action)
+            t.start()
 
-        # all the 10 clients are in use, the new action waits for an available client and timeout.
-        new_greenlet = gevent.spawn(new_action)
-        new_greenlet.join()
+        # all the clients are in use, the new action waits for an available one.
+        q = Queue()
+        new_thread = Thread(target=new_action, args=(q, ))
+        new_thread.start()
+        new_thread.join()
 
-        called = new_greenlet.value
         if is_timeout:
-            self.assertTrue(called is False)
+            self.assertTrue(q.empty())
         else:
-            self.assertTrue(called)
+            self.assertFalse(q.empty())
+            self.assertTrue(q.get() is True)

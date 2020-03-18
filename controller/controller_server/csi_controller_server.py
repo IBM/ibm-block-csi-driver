@@ -1,10 +1,3 @@
-# use greenlet instead of real threads.
-from gevent import monkey
-monkey.patch_all()
-
-import grpc._cython.cygrpc
-grpc._cython.cygrpc.init_grpc_gevent()
-
 import os.path
 import time
 from concurrent import futures

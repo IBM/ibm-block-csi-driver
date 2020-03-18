@@ -1,12 +1,12 @@
-from eventlet import pools
+from queue import Queue, Full, Empty
+from threading import RLock
 from controller.common.csi_logger import get_stdout_logger
-from queue import Empty
 
 logger = get_stdout_logger()
 
 
-class ConnectionPool(pools.Pool):
-    """A simple eventlet pool to hold connections."""
+class ConnectionPool(object):
+    """A simple pool to hold connections."""
 
     def __init__(self, endpoints, username, password, med_class, min_size, max_size):
         self.endpoints = endpoints
@@ -14,25 +14,22 @@ class ConnectionPool(pools.Pool):
         self.password = password
         self.med_class = med_class
 
-        super(ConnectionPool, self).__init__(min_size, max_size)
+        self.current_size = 0
+        self.max_size = max_size
+        self.channel = Queue(max_size)
+        self.lock = RLock()
 
-    def __del__(self):
-        if not self.current_size:
-            return
-        # change the size of the pool to reduce the number
-        # of elements on the pool via puts.
-        self.resize(1)
-        # release all but the last connection using
-        # get and put to allow any get waiters to complete.
-        while self.waiting() or self.current_size > 1:
-            conn = self.get()
-            self.put(conn)
-        # Now free everything that is left
-        while self.free_items:
-            self.free_items.popleft().disconnect()
-            self.current_size -= 1
+        for x in range(min_size):
+            self.put(self.get())
+    #
+    # def __del__(self):
+    #     # how to wait for all the outside live clients to finish?
+    #     while self.current_size:
+    #         item = self.get()
+    #         item.disconnect()
+    #         self.current_size -= 1
 
-    def create(self):  # pylint: disable=method-hidden
+    def create(self):
         try:
             return self.med_class(self.username, self.password, self.endpoints)
         except Exception:
@@ -53,42 +50,48 @@ class ConnectionPool(pools.Pool):
         (*timeout* is ignored in that case).
         """
 
-        while self.free_items:
-            mediator = self.free_items.popleft()
-            if mediator.is_active():
-                return mediator
-            else:
-                try:
-                    mediator.disconnect()
-                except Exception as ex:
-                    # failed to disconnect the mediator, delete the stale client.
-                    logger.error("Failed to disconnect the array mediator, reason is {}".format(ex))
-                    del mediator
-                self.current_size -= 1
-
-        self.current_size += 1
-        if self.current_size <= self.max_size:
+        while True:
             try:
-                created = self.create()
-            except Exception:
-                self.current_size -= 1
-                raise
+                item = self.channel.get(block=False)
+                if item.is_active():
+                    return item
+                else:
+                    with self.lock:
+                        self.current_size -= 1
+                    try:
+                        item.disconnect()
+                    except Exception as ex:
+                        # failed to disconnect the mediator, delete the stale client.
+                        logger.error("Failed to disconnect the connection before use, reason is {}".format(ex))
+                        del item
+            except Empty:
+                break
+
+        if self.current_size < self.max_size:
+            created = self.create()
+            with self.lock:
+                self.current_size += 1
             return created
-        self.current_size -= 1  # did not create
+
         return self.channel.get(block, timeout)
 
-    def put(self, mediator):
-        # If we have more connections then we should just disconnect it
+    def put(self, item):
+        """
+        Put an item back into the pool, when done.  This may cause the putting thread to block.
+        """
         if self.current_size > self.max_size:
-            mediator.disconnect()
-            self.current_size -= 1
-            return
-        super(ConnectionPool, self).put(mediator)
-
-    def remove(self, mediator):
-        """Close an mediator client and remove it from free_items."""
-        mediator.disconnect()
-        if mediator in self.free_items:
-            self.free_items.remove(mediator)
-            if self.current_size > 0:
+            with self.lock:
                 self.current_size -= 1
+
+            try:
+                item.disconnect()
+            except Exception as ex:
+                # failed to disconnect the mediator, delete the stale client.
+                logger.error("Failed to disconnect the connection after use, reason is {}".format(ex))
+                del item
+        else:
+            try:
+                self.channel.put(item, block=False)
+                return
+            except Full:
+                item.disconnect()

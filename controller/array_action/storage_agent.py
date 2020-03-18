@@ -1,4 +1,5 @@
 import socket
+from threading import RLock
 from queue import Empty
 from collections import OrderedDict
 from contextlib import contextmanager
@@ -12,7 +13,8 @@ from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
 import controller.array_action.errors as array_errors
 
 logger = get_stdout_logger()
-_array_agents = []
+_array_agents = {}
+lock = RLock()
 
 array_type_to_port = OrderedDict()
 # Don't change the order here since svc port (22) is also opened in ds8k.
@@ -54,16 +56,25 @@ def _socket_connect_test(host, port, timeout=1):
 
 
 def get_agent(username, password, endpoints, array_type=None):
-    for found in filter(lambda a: a.endpoints == endpoints and a.username == username, _array_agents):
-        # delete the agent and clear all the connections if password is changed.
-        if found.password != password:
-            _array_agents.remove(found)
-            del found
-        else:
-            return found
-    agent = StorageAgent(endpoints, username, password, array_type)
-    _array_agents.append(agent)
-    return agent
+    endpoint_key = settings.ENDPOINTS_SEPARATOR.join(endpoints)
+    with lock:
+        found = _array_agents.get((username, endpoint_key), None)
+        if found:
+            # delete the agent and clear all the connections if password is changed.
+            if found.password != password:
+                logger.debug(
+                    "The password is changed for endpoints {}, "
+                    "remove the cached connection".format(endpoint_key)
+                )
+                del _array_agents[(username, endpoint_key)]
+                del found
+            else:
+                logger.debug("Found a cached connection {}, reuse it".format(endpoint_key))
+                return found
+        logger.debug("Creating a new connection for endpoints {}".format(endpoint_key))
+        agent = StorageAgent(endpoints, username, password, array_type)
+        _array_agents[(username, endpoint_key)] = agent
+        return agent
 
 
 def get_agents():
@@ -71,13 +82,16 @@ def get_agents():
 
 
 def clear_agents():
-    try:
-        while True:
-            agent = _array_agents.pop()
-            # close all the connections
-            del agent
-    except IndexError:
-        pass
+    with lock:
+        agents = [v for v in _array_agents.values()]
+        _array_agents.clear()
+        try:
+            while True:
+                agent = agents.pop()
+                # close all the connections
+                del agent
+        except IndexError:
+            pass
 
 
 class StorageAgent(object):
