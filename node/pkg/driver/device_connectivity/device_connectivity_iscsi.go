@@ -130,12 +130,10 @@ func (r OsDeviceConnectivityIscsi) iscsiDiscoverAny(portals []string) bool {
 
 func (r OsDeviceConnectivityIscsi) discoverAndLogin(portalsByTarget map[string][]string) {
 	for targetName, portals := range portalsByTarget {
-		isAnyDiscoverySucceeded := r.iscsiDiscoverAny(portals)
-		if !isAnyDiscoverySucceeded {
-			continue
-		}
-		for _, portal := range portals {
-			r.iscsiLogin(targetName, portal)
+		if ok := r.iscsiDiscoverAny(portals); ok {
+			for _, portal := range portals {
+				r.iscsiLogin(targetName, portal)
+			}
 		}
 	}
 }
