@@ -97,6 +97,9 @@ func (r OsDeviceConnectivityIscsi) getAllSessions() (map[string]map[string]bool,
 			return nil, parseErr
 		}
 		ip := portalInfo[:ipPortSeparatorIndex]
+		if set := portalsByTarget[targetName]; set == nil {
+			portalsByTarget[targetName] = make(map[string]bool)
+		}
 		portalsByTarget[targetName][ip] = true
 	}
 	return portalsByTarget, nil
