@@ -69,9 +69,9 @@ def get_agent(username, password, endpoints, array_type=None):
                 del _array_agents[(username, endpoint_key)]
                 del found
             else:
-                logger.debug("Found a cached connection for endpoint {}, reuse it".format(endpoint_key))
+                logger.debug("Found a cached agent for endpoint {}, reuse it".format(endpoint_key))
                 return found
-        logger.debug("Creating a new connection for endpoints {}".format(endpoint_key))
+        logger.debug("Creating a new agent for endpoint {}".format(endpoint_key))
         agent = StorageAgent(endpoints, username, password, array_type)
         _array_agents[(username, endpoint_key)] = agent
         return agent
