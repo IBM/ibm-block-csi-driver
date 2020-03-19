@@ -273,7 +273,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def get_iscsi_targets_by_iqn(self):
         config_get_list = self.client.cmd.config_get().as_list
         array_iqn = [a for a in config_get_list if a["name"] == "iscsi_name"][0]["value"]
-        return {array_iqn: None}  # TODO: CSI-1166 replace None with list of iscsi target IPs (ipinterface_list)
+        return {array_iqn: []}  # TODO: CSI-1166 replace [] with list of iscsi target IPs (ipinterface_list)
 
     def get_array_fc_wwns(self, host_name):
         fc_wwns_objects = self.client.cmd.fc_port_list()
