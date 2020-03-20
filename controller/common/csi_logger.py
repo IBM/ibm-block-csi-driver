@@ -30,13 +30,3 @@ def set_log_level(log_level_to_set):
     global log_level
     if log_level_to_set:
         log_level = log_level_to_set.upper()
-
-
-root = logging.getLogger()
-root.setLevel(logging.DEBUG)
-
-h = logging.StreamHandler(sys.stdout)
-h.setLevel(logging.DEBUG)
-f = logging.Formatter(ENTRY)
-h.setFormatter(f)
-root.addHandler(h)

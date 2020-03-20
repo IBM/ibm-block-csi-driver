@@ -75,8 +75,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         try:
             # TODO : pass multiple array addresses
             with get_agent(user, password, array_addresses).get_mediator() as array_mediator:
-                logger.debug(array_mediator)
-
                 if len(volume_prefix) > array_mediator.max_volume_prefix_length:
                     raise controller_errors.IllegalObjectName(
                         "The volume name prefix {} is too long, max allowed length is {}".format(

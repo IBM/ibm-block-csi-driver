@@ -21,13 +21,14 @@ class ConnectionPool(object):
 
         for x in range(min_size):
             self.put(self.get())
-    #
-    # def __del__(self):
-    #     # how to wait for all the outside live clients to finish?
-    #     while self.current_size:
-    #         item = self.get()
-    #         item.disconnect()
-    #         self.current_size -= 1
+
+    def __del__(self):
+        # delete the free clients in queue, and wait for outside ones.
+        while self.current_size:
+            item = self.get()
+            item.disconnect()
+            with self.lock:
+                self.current_size -= 1
 
     def create(self):
         try:

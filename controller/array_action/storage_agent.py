@@ -127,7 +127,6 @@ class StorageAgent(object):
     def detect_array_type(self):
         logger.debug("detecting array connection type")
 
-        # Don't change the order here since svc port (22) is also opened in ds8k.
         for storage_type, port in array_type_to_port.items():
             for endpoint in self.endpoints:
                 if _socket_connect_test(endpoint, port) == 0:
