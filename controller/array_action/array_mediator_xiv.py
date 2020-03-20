@@ -270,10 +270,26 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             else:
                 raise controller_errors.UnMappingError(vol_name, host_name, ex)
 
-    def get_iscsi_targets_by_iqn(self):
+    def _get_iscsi_targets(self):
+        ip_interfaces = self.client.cmd.ipinterface_list().as_list
+        iscsi_interfaces = (i for i in ip_interfaces if i.type == "iSCSI")
+        ips = []
+        for interface in iscsi_interfaces:
+            if interface.address:
+                ips.append(interface.address)
+            if interface.address6:
+                ipv6 = interface.address6.join('[]')
+                ips.append(ipv6)
+        return ips
+
+    def _get_array_iqn(self):
         config_get_list = self.client.cmd.config_get().as_list
-        array_iqn = [a for a in config_get_list if a["name"] == "iscsi_name"][0]["value"]
-        return {array_iqn: []}  # TODO: CSI-1166 replace [] with list of iscsi target IPs (ipinterface_list)
+        return next(c.value for c in config_get_list if c.name == "iscsi_name")
+
+    def get_iscsi_targets_by_iqn(self):
+        array_iqn = self._get_array_iqn()
+        iscsi_targets = self._get_iscsi_targets()
+        return {array_iqn: iscsi_targets}
 
     def get_array_fc_wwns(self, host_name):
         fc_wwns_objects = self.client.cmd.fc_port_list()
