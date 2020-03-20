@@ -11,11 +11,11 @@ def get_stdout_logger():
     if not getattr(csi_logger, 'handler_set', None):
         global log_level
         csi_logger.setLevel(log_level)
-        handler = logging.StreamHandler(sys.stdout)
-        handler.setLevel(logging.DEBUG)
-        formatter = logging.Formatter(ENTRY)
-        handler.setFormatter(formatter)
-        csi_logger.addHandler(handler)
+        # handler = logging.StreamHandler(sys.stdout)
+        # handler.setLevel(logging.DEBUG)
+        # formatter = logging.Formatter(ENTRY)
+        # handler.setFormatter(formatter)
+        # csi_logger.addHandler(handler)
 
         csi_logger.handler_set = True
 
@@ -30,3 +30,14 @@ def set_log_level(log_level_to_set):
     global log_level
     if log_level_to_set:
         log_level = log_level_to_set.upper()
+
+
+
+root = logging.getLogger()
+root.setLevel(logging.DEBUG)
+
+h = logging.StreamHandler(sys.stdout)
+h.setLevel(logging.DEBUG)
+f = logging.Formatter(ENTRY)
+h.setFormatter(f)
+root.addHandler(h)

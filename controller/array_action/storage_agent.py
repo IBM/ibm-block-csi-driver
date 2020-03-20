@@ -1,3 +1,4 @@
+import os
 import socket
 from threading import RLock
 from queue import Empty
@@ -114,7 +115,8 @@ class StorageAgent(object):
             med_class=med_class,
             # Specifying a non-zero min_size pre-populates the pool with min_size items
             min_size=1,
-            max_size=min(med_class.max_connections, settings.CSI_CONTROLLER_SERVER_WORKERS)
+            max_size=min(med_class.max_connections, os.getenv("DS8K_SESSIONS", settings.CSI_CONTROLLER_SERVER_WORKERS))
+            # max_size=min(med_class.max_connections, settings.CSI_CONTROLLER_SERVER_WORKERS)
         )
 
     def __del__(self):
