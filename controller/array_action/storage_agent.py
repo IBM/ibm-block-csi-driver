@@ -138,8 +138,7 @@ class StorageAgent(object):
     @contextmanager
     def get_mediator(self, timeout=None):
         """
-        Get an object out of the pool, for use with with statement.
-        Like the self.conn_pool.item() method.
+        Get an object out of the pool, for use with with-statement.
         """
         try:
             med = self.conn_pool.get(timeout=timeout)

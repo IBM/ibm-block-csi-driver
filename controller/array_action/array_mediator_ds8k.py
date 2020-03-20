@@ -203,27 +203,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 'capacity_in_bytes': size_in_bytes,
                 'pool_id': pool_id,
                 'tp': self.get_se_capability_value(capabilities),
-
             })
-            logger.debug(
-                "Start to create volume with parameters: {}".format(cli_kwargs)
-            )
-
-            try:
-                # get the volume before creating again, to make sure it is not existing,
-                # because volume name is not unique in ds8k.
-                vol = self.get_volume(
-                    name,
-                    volume_context={config.CONTEXT_POOL: pool_id},
-                    volume_prefix=volume_prefix
-                )
-                logger.info("Found volume {}".format(name))
-                return vol
-            except array_errors.VolumeNotFoundError:
-                vol = self.client.create_volume(**cli_kwargs)
-
-                logger.info("finished creating volume {}".format(name))
-                return self._generate_volume_response(self.client.get_volume(vol.id))
+            logger.debug("Start to create volume with parameters: {}".format(cli_kwargs))
+            vol = self.client.create_volume(**cli_kwargs)
+            logger.info("finished creating volume {}".format(name))
+            return self._generate_volume_response(self.client.get_volume(vol.id))
         except exceptions.NotFound as ex:
             if ERROR_CODE_RESOURCE_NOT_EXISTS in str(ex.message).upper():
                 raise array_errors.PoolDoesNotExist(pool_id, self.identifier)

@@ -97,18 +97,17 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     size = array_mediator.minimal_volume_size_in_bytes
                     logger.debug("requested size is 0 so the default size will be used : {0} ".format(
                         size))
+
+                array_mediator.validate_supported_capabilities(capabilities)
                 try:
                     vol = array_mediator.get_volume(
                         volume_full_name,
                         volume_context=request.parameters,
                         volume_prefix=volume_prefix,
                     )
-
                 except controller_errors.VolumeNotFoundError as ex:
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
-
-                    array_mediator.validate_supported_capabilities(capabilities)
                     vol = array_mediator.create_volume(volume_full_name, size, capabilities, pool, volume_prefix)
 
                 else:
