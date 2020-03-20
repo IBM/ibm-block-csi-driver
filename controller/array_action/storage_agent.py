@@ -107,6 +107,7 @@ class StorageAgent(object):
             array_type = self.detect_array_type()
 
         med_class = array_type_to_mediator[array_type]
+        sessions = int(os.getenv("DS8K_SESSIONS", settings.CSI_CONTROLLER_SERVER_WORKERS))
 
         self.conn_pool = ConnectionPool(
             endpoints=self.endpoints,
@@ -115,7 +116,7 @@ class StorageAgent(object):
             med_class=med_class,
             # Specifying a non-zero min_size pre-populates the pool with min_size items
             min_size=1,
-            max_size=min(med_class.max_connections, os.getenv("DS8K_SESSIONS", settings.CSI_CONTROLLER_SERVER_WORKERS))
+            max_size=min(int(med_class.max_connections), sessions),
             # max_size=min(med_class.max_connections, settings.CSI_CONTROLLER_SERVER_WORKERS)
         )
 
