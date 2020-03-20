@@ -32,7 +32,6 @@ def set_log_level(log_level_to_set):
         log_level = log_level_to_set.upper()
 
 
-
 root = logging.getLogger()
 root.setLevel(logging.DEBUG)
 
