@@ -54,7 +54,7 @@ func NewWithExecutor(mounterPath string, e executer.ExecuterInterface) mount.Int
 // Unmount unmounts the target.
 func (mounter *Mounter) Unmount(target string) error {
 	logger.Infof("Unmounting %s", target)
-	output, err := mounter.executer.ExecuteWithTimeout(int(timeout.Seconds()), "umount", []string{target})
+	output, err := mounter.executer.ExecuteWithTimeout(int(timeout.Seconds()*1000), "umount", []string{target})
 	if err != nil {
 		return fmt.Errorf("Unmount failed: %v\nUnmounting arguments: %s\nOutput: %s\n", err, target, string(output))
 	}
