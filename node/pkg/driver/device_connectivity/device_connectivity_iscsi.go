@@ -21,6 +21,7 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -58,7 +59,7 @@ func (r OsDeviceConnectivityIscsi) iscsiDiscover(portal string) error {
 }
 
 func (r OsDeviceConnectivityIscsi) iscsiLogin(targetName, portal string) {
-	portalWithPort := portal + ":" + string(iscsiPort)
+	portalWithPort := portal + ":" + strconv.Itoa(iscsiPort)
 	output, err := r.iscsiCmd("-m", "node", "-p", portalWithPort, "-T", targetName, "--login")
 	if err != nil {
 		logger.Errorf("Failed to login iSCSI: {%s}, error: {%s}", output, err)
