@@ -271,10 +271,18 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise array_errors.VolumeNotFoundError(name)
 
         volume_candidates = []
+
         if config.CONTEXT_POOL in volume_context:
-            volume_candidates = self.client.get_volumes_by_pool(
-                volume_context[config.CONTEXT_POOL]
-            )
+            try:
+                volume_candidates = self.client.get_volumes_by_pool(
+                    volume_context[config.CONTEXT_POOL]
+                )
+            except exceptions.NotFound as ex:
+                if ERROR_CODE_RESOURCE_NOT_EXISTS in str(ex.message).upper():
+                    raise array_errors.PoolDoesNotExist(volume_context[config.CONTEXT_POOL], self.identifier)
+                else:
+                    raise ex
+
         for vol in volume_candidates:
             if vol.name == shorten_volume_name(name, volume_prefix):
                 logger.debug("Found volume: {}".format(vol))
