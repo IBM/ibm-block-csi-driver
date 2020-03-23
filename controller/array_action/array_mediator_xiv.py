@@ -271,7 +271,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                 raise controller_errors.UnMappingError(vol_name, host_name, ex)
 
     def _get_iscsi_targets(self):
-        ip_interfaces = self.client.cmd.ipinterface_list().as_list
+        ip_interfaces = self.client.cmd.ipinterface_list()
         iscsi_interfaces = (i for i in ip_interfaces if i.type == "iSCSI")
         ips = []
         for interface in iscsi_interfaces:
