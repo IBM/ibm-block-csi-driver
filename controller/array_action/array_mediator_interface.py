@@ -152,18 +152,19 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_array_iqns(self):
+    def get_iscsi_targets_by_iqn(self):
         """
-        This function will return the iscsi name of the storage array
+        This function will return a mapping of the storage array iscsi names to their iscsi target IPs
 
         Args:
             None
 
         Returns:
-            iscsi_names : list of iscsi addressses of the storage
+            ips_by_iqn : A dict mapping array-iqns to their list of IPs ({iqn1:[ip1, ip2], iqn2:[ip3, ip4, ...], ...})
 
         Raises:
-            None
+            PermissionDeniedError
+            NoIscsiTargetsFoundError
         """
         raise NotImplementedError
 

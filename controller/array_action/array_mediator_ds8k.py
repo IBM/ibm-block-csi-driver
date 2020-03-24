@@ -349,8 +349,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except exceptions.ClientException as ex:
             raise array_errors.UnMappingError(volume_id, host_name, ex.details)
 
-    def get_array_iqns(self):
-        return []
+    def get_iscsi_targets_by_iqn(self):
+        return {}
 
     def get_array_fc_wwns(self, host_name=None):
         logger.debug("Getting the connected fc port wwpns from array")

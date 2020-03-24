@@ -39,6 +39,7 @@ import (
 const (
 	PublishContextParamLun          string = "PUBLISH_CONTEXT_LUN" // TODO for some reason I coun't take it from config.yaml
 	PublishContextParamConnectivity string = "PUBLISH_CONTEXT_CONNECTIVITY"
+	PublishContextParamArrayIqn     string = "PUBLISH_CONTEXT_ARRAY_IQN"
 )
 
 func newTestNodeService(nodeUtils driver.NodeUtilsInterface, nodeMounter driver.NodeMounter) driver.NodeService {
@@ -74,7 +75,8 @@ func TestNodeStageVolume(t *testing.T) {
 	mpathDeviceName := "dm-2"
 	sysDevices := "/dev/d1,/dev/d2"
 	mpathDevice := "/dev/" + mpathDeviceName
-	arrayInitiators := []string{"host;iqn;wwn"}
+	ipsByArrayInitiator := map[string][]string{"iqn.1994-05.com.redhat:686358c930fe": {"1.2.3.4", "[::1]"}}
+	arrayInitiators := []string{"iqn.1994-05.com.redhat:686358c930fe"}
 	stagingPath := "/test/path"
 	stageInfoPath := path.Join(stagingPath, driver.StageInfoFilename)
 
@@ -96,7 +98,12 @@ func TestNodeStageVolume(t *testing.T) {
 			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 		},
 	}
-	publishContext := map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: device_connectivity.ConnectionTypeISCSI}
+	publishContext := map[string]string{
+		PublishContextParamLun:                "1",
+		PublishContextParamConnectivity:       device_connectivity.ConnectionTypeISCSI,
+		PublishContextParamArrayIqn:           "iqn.1994-05.com.redhat:686358c930fe",
+		"iqn.1994-05.com.redhat:686358c930fe": "1.2.3.4,[::1]",
+	}
 	stagingRequest := &csi.NodeStageVolumeRequest{
 		PublishContext:    publishContext,
 		StagingTargetPath: stagingPath,
@@ -112,7 +119,7 @@ func TestNodeStageVolume(t *testing.T) {
 			name: "fail no VolumeId",
 			testFunc: func(t *testing.T) {
 				req := &csi.NodeStageVolumeRequest{
-					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: device_connectivity.ConnectionTypeISCSI},
+					PublishContext:    publishContext,
 					StagingTargetPath: stagingPath,
 					VolumeCapability:  stdVolCap,
 				}
@@ -125,7 +132,7 @@ func TestNodeStageVolume(t *testing.T) {
 			name: "fail no StagingTargetPath",
 			testFunc: func(t *testing.T) {
 				req := &csi.NodeStageVolumeRequest{
-					PublishContext:   map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: device_connectivity.ConnectionTypeISCSI},
+					PublishContext:   publishContext,
 					VolumeCapability: stdVolCap,
 					VolumeId:         volId,
 				}
@@ -138,7 +145,7 @@ func TestNodeStageVolume(t *testing.T) {
 			name: "fail no VolumeCapability",
 			testFunc: func(t *testing.T) {
 				req := &csi.NodeStageVolumeRequest{
-					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: device_connectivity.ConnectionTypeISCSI},
+					PublishContext:    publishContext,
 					StagingTargetPath: stagingPath,
 					VolumeId:          volId,
 				}
@@ -151,11 +158,33 @@ func TestNodeStageVolume(t *testing.T) {
 			name: "fail invalid VolumeCapability",
 			testFunc: func(t *testing.T) {
 				req := &csi.NodeStageVolumeRequest{
-					PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: device_connectivity.ConnectionTypeISCSI},
-					StagingTargetPath: "/test/path",
+					PublishContext:    publishContext,
+					StagingTargetPath: stagingPath,
 					VolumeCapability: &csi.VolumeCapability{
 						AccessMode: &csi.VolumeCapability_AccessMode{
 							Mode: csi.VolumeCapability_AccessMode_UNKNOWN,
+						},
+					},
+					VolumeId: volId,
+				}
+				node := newTestNodeService(nil, nil)
+				_, err := node.NodeStageVolume(context.TODO(), req)
+				assertError(t, err, codes.InvalidArgument)
+			},
+		},
+		{
+			name: "fail invalid arrayInitiators ",
+			testFunc: func(t *testing.T) {
+				req := &csi.NodeStageVolumeRequest{
+					PublishContext: map[string]string{
+						PublishContextParamLun:          "1",
+						PublishContextParamConnectivity: device_connectivity.ConnectionTypeISCSI,
+						PublishContextParamArrayIqn:     "iqn.1994-05.com.redhat:686358c930fe",
+					},
+					StagingTargetPath: stagingPath,
+					VolumeCapability: &csi.VolumeCapability{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 						},
 					},
 					VolumeId: volId,
@@ -186,11 +215,13 @@ func TestNodeStageVolume(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				defer mockCtl.Finish()
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
-				node := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+				mockOsDeviceCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsDeviceCon)
 
-				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
-				mockOsRescanCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(dummyError)
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
+				mockOsDeviceCon.EXPECT().EnsureLogin(ipsByArrayInitiator)
+				mockOsDeviceCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(dummyError)
 
 				_, err := node.NodeStageVolume(context.TODO(), stagingRequest)
 				assertError(t, err, codes.Internal)
@@ -202,12 +233,14 @@ func TestNodeStageVolume(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				defer mockCtl.Finish()
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
-				node := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+				mockOsDeviceCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsDeviceCon)
 
-				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
-				mockOsRescanCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
-				mockOsRescanCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return("", dummyError)
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
+				mockOsDeviceCon.EXPECT().EnsureLogin(ipsByArrayInitiator)
+				mockOsDeviceCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
+				mockOsDeviceCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return("", dummyError)
 
 				_, err := node.NodeStageVolume(context.TODO(), stagingRequest)
 				assertError(t, err, codes.Internal)
@@ -219,12 +252,14 @@ func TestNodeStageVolume(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				defer mockCtl.Finish()
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
-				node := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+				mockOsDeviceCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsDeviceCon)
 
-				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
-				mockOsRescanCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
-				mockOsRescanCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
+				mockOsDeviceCon.EXPECT().EnsureLogin(ipsByArrayInitiator)
+				mockOsDeviceCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
+				mockOsDeviceCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return("", dummyError)
 
 				_, err := node.NodeStageVolume(context.TODO(), stagingRequest)
@@ -237,12 +272,14 @@ func TestNodeStageVolume(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				defer mockCtl.Finish()
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
-				node := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+				mockOsDeviceCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsDeviceCon)
 
-				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
-				mockOsRescanCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
-				mockOsRescanCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
+				mockOsDeviceCon.EXPECT().EnsureLogin(ipsByArrayInitiator)
+				mockOsDeviceCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
+				mockOsDeviceCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(sysDevices, nil)
 				mockNodeUtils.EXPECT().StageInfoFileIsExist(stageInfoPath).Return(false)
 				mockNodeUtils.EXPECT().WriteStageInfoToFile(stageInfoPath, newStageInfo).Return(nil)
@@ -259,12 +296,14 @@ func TestNodeStageVolume(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				defer mockCtl.Finish()
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
-				node := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+				mockOsDeviceCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsDeviceCon)
 
-				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
-				mockOsRescanCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
-				mockOsRescanCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
+				mockOsDeviceCon.EXPECT().EnsureLogin(ipsByArrayInitiator)
+				mockOsDeviceCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
+				mockOsDeviceCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(sysDevices, nil)
 				mockNodeUtils.EXPECT().StageInfoFileIsExist(stageInfoPath).Return(true)
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stageInfoPath).Return(nil, dummyError)
@@ -282,12 +321,14 @@ func TestNodeStageVolume(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				defer mockCtl.Finish()
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
-				node := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+				mockOsDeviceCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsDeviceCon)
 
-				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
-				mockOsRescanCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
-				mockOsRescanCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
+				mockOsDeviceCon.EXPECT().EnsureLogin(ipsByArrayInitiator)
+				mockOsDeviceCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
+				mockOsDeviceCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(sysDevices, nil)
 				mockNodeUtils.EXPECT().StageInfoFileIsExist(stageInfoPath).Return(true)
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stageInfoPath).Return(newStageInfo, nil)
@@ -304,12 +345,14 @@ func TestNodeStageVolume(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				defer mockCtl.Finish()
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
-				node := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+				mockOsDeviceCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsDeviceCon)
 
-				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, arrayInitiators, nil).AnyTimes()
-				mockOsRescanCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
-				mockOsRescanCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
+				mockOsDeviceCon.EXPECT().EnsureLogin(ipsByArrayInitiator)
+				mockOsDeviceCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
+				mockOsDeviceCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(sysDevices, nil)
 				mockNodeUtils.EXPECT().StageInfoFileIsExist(stageInfoPath).Return(true)
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stageInfoPath).Return(currentStageInfo, nil)
@@ -391,11 +434,11 @@ func TestNodeUnstageVolume(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				defer mockCtl.Finish()
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
-				node := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+				mockOsDeviceCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsDeviceCon)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stageInfoPath).Return(stageInfo, nil)
-				mockOsRescanCon.EXPECT().FlushMultipathDevice(mpathDeviceName).Return(dummyError)
+				mockOsDeviceCon.EXPECT().FlushMultipathDevice(mpathDeviceName).Return(dummyError)
 
 				_, err := node.NodeUnstageVolume(context.TODO(), unstageRequest)
 				assertError(t, err, codes.Internal)
@@ -423,12 +466,12 @@ func TestNodeUnstageVolume(t *testing.T) {
 				mockCtl := gomock.NewController(t)
 				defer mockCtl.Finish()
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				mockOsRescanCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
-				node := newTestNodeServiceStaging(mockNodeUtils, mockOsRescanCon)
+				mockOsDeviceCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsDeviceCon)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stageInfoPath).Return(stageInfo, nil)
-				mockOsRescanCon.EXPECT().FlushMultipathDevice(mpathDeviceName).Return(nil)
-				mockOsRescanCon.EXPECT().RemovePhysicalDevice(sysDevicesList).Return(nil)
+				mockOsDeviceCon.EXPECT().FlushMultipathDevice(mpathDeviceName).Return(nil)
+				mockOsDeviceCon.EXPECT().RemovePhysicalDevice(sysDevicesList).Return(nil)
 				mockNodeUtils.EXPECT().ClearStageInfoFile(stageInfoPath).Return(nil)
 
 				_, err := node.NodeUnstageVolume(context.TODO(), unstageRequest)
