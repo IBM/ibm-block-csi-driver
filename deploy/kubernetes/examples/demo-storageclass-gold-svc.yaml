@@ -1,5 +1,5 @@
 ##################################################
-# Storage class example for IBM Block CSI Driver using A9000.
+# Storage class example for IBM Block CSI Driver using SVC.
 ##################################################
 
 kind: StorageClass
@@ -8,11 +8,12 @@ metadata:
   name: gold
 provisioner: block.csi.ibm.com
 parameters:
+  SpaceEfficiency: deduplicated
   pool: gold
 
-  csi.storage.k8s.io/provisioner-secret-name: a9000-array
+  csi.storage.k8s.io/provisioner-secret-name: svc-array
   csi.storage.k8s.io/provisioner-secret-namespace: kube-system
-  csi.storage.k8s.io/controller-publish-secret-name: a9000-array
+  csi.storage.k8s.io/controller-publish-secret-name: svc-array
   csi.storage.k8s.io/controller-publish-secret-namespace: kube-system
 
   csi.storage.k8s.io/fstype: xfs   # Optional. values ext4\xfs. The default is ext4.
