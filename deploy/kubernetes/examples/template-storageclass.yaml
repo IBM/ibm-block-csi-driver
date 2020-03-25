@@ -1,6 +1,6 @@
 ##################################################
 # Storage class template for IBM Block CSI Driver
-# All the VALUE fields must be set.
+# All the <VALUE> fields must be set.
 ##################################################
 
 kind: StorageClass

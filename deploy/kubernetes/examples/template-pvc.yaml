@@ -1,7 +1,12 @@
+##################################################
+# Storage class template for IBM Block CSI Driver
+# All the <VALUE> fields must be set.
+##################################################
+
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: <VALUE_MANE>
+  name: <VALUE_NAME>
 spec:
   # volumeMode: <VALUE_VOLUME_MODE> # Optional. values Filesystem\Block. The default is Filesystem.
   storageClassName: <VALUE_STORAGE_CLASS_NAME>
