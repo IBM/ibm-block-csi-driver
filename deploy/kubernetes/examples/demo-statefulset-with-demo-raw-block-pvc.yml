@@ -1,7 +1,7 @@
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-  name: demo-statefulset-file-system
+  name: demo-statefulset-raw-block
 spec:
   selector:
     matchLabels:
@@ -18,13 +18,13 @@ spec:
         image: registry.access.redhat.com/ubi8/ubi:latest
         command: [ "/bin/sh", "-c", "--" ]
         args: [ "while true; do sleep 30; done;" ]
-        volumeMounts:
+        volumeDevices:
           - name: demo-volume
-            mountPath: "/data"
+            devicePath: "/dev/block"
       volumes:
       - name: demo-volume
         persistentVolumeClaim:
-          claimName: demo-pvc-file-system
+          claimName: demo-pvc-raw-block
 
 #      nodeSelector:
 #        kubernetes.io/hostname: NODESELECTOR

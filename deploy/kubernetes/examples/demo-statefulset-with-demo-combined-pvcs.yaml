@@ -1,7 +1,7 @@
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-  name: demo-statefulset-file-system
+  name: demo-statefulset-combined
 spec:
   selector:
     matchLabels:
@@ -19,13 +19,18 @@ spec:
         command: [ "/bin/sh", "-c", "--" ]
         args: [ "while true; do sleep 30; done;" ]
         volumeMounts:
-          - name: demo-volume
+          - name: demo-volume-file-system
             mountPath: "/data"
+        volumeDevices:
+          - name: demo-volume-raw-block
+            devicePath: "/dev/block"            
       volumes:
-      - name: demo-volume
+      - name: demo-volume-file-system
         persistentVolumeClaim:
           claimName: demo-pvc-file-system
-
+      - name: demo-volume-raw-block
+        persistentVolumeClaim:
+          claimName: demo-pvc-raw-block
+          
 #      nodeSelector:
 #        kubernetes.io/hostname: NODESELECTOR
-      
