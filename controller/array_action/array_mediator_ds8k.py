@@ -135,7 +135,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except exceptions.ClientException as e:
             logger.error(
                 'Failed to connect to DS8K array {}, reason is {}'.format(
-                    self.identifier,
+                    self.service_address,
                     e.details
                     )
                 )
