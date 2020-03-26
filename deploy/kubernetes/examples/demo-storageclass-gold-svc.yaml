@@ -1,5 +1,5 @@
 #############################################################
-# Storage class example for IBM Block CSI Driver using SVC. #
+# Storage class example for IBM Block CSI Driver using SVC.
 #############################################################
 
 kind: StorageClass

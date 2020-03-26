@@ -1,3 +1,7 @@
+#############$$$$$$$$############################
+# StatefulSet example for IBM Block CSI Driver.
+#################################################
+
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
