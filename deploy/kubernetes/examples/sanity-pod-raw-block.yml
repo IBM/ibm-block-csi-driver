@@ -10,7 +10,7 @@ spec:
     args: [ "while true; do date; sleep 5; date >&2; sleep 5; done;" ]
     volumeDevices:
        - name: sanity-volume
-         mountPath: "/dev"
+         devicePath: "/dev"
   volumes:
   - name: sanity-volume
     persistentVolumeClaim:

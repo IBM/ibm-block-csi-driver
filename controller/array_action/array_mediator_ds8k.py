@@ -135,7 +135,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except exceptions.ClientException as e:
             logger.error(
                 'Failed to connect to DS8K array {}, reason is {}'.format(
-                    self.identifier,
+                    self.service_address,
                     e.details
                 )
             )
@@ -258,10 +258,18 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise array_errors.VolumeNotFoundError(name)
 
         volume_candidates = []
+
         if config.CONTEXT_POOL in volume_context:
-            volume_candidates = self.client.get_volumes_by_pool(
-                volume_context[config.CONTEXT_POOL]
-            )
+            try:
+                volume_candidates = self.client.get_volumes_by_pool(
+                    volume_context[config.CONTEXT_POOL]
+                )
+            except exceptions.NotFound as ex:
+                if ERROR_CODE_RESOURCE_NOT_EXISTS in str(ex.message).upper():
+                    raise array_errors.PoolDoesNotExist(volume_context[config.CONTEXT_POOL], self.identifier)
+                else:
+                    raise ex
+
         for vol in volume_candidates:
             if vol.name == shorten_volume_name(name, volume_prefix):
                 logger.debug("Found volume: {}".format(vol))
@@ -328,8 +336,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except exceptions.ClientException as ex:
             raise array_errors.UnMappingError(volume_id, host_name, ex.details)
 
-    def get_array_iqns(self):
-        return []
+    def get_iscsi_targets_by_iqn(self):
+        return {}
 
     def get_array_fc_wwns(self, host_name=None):
         logger.debug("Getting the connected fc port wwpns from array")

@@ -4,7 +4,7 @@ from controller.csi_general import csi_pb2
 from controller.controller_server.errors import ValidationException
 import controller.controller_server.messages as messages
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
-from controller.array_action.errors import HostNotFoundError, VolumeNotFoundError
+from controller.array_action.errors import HostNotFoundError, VolumeNotFoundError, UnsupportedConnectivityTypeError
 
 logger = get_stdout_logger()
 
@@ -192,15 +192,24 @@ def generate_csi_publish_volume_response(lun, connectivity_type, config, array_i
 
     lun_param = config["controller"]["publish_context_lun_parameter"]
     connectivity_param = config["controller"]["publish_context_connectivity_parameter"]
-    hash_by_connectivity = {
-        'iscsi': config["controller"]["publish_context_array_iqn"],
-        'fc': config["controller"]["publish_context_fc_initiators"]}
+    separator = config["controller"]["publish_context_separator"]
 
-    array_initiators = ",".join(array_initiators)
-    res = csi_pb2.ControllerPublishVolumeResponse(
-        publish_context={lun_param: str(lun),
-                         connectivity_param: connectivity_type,
-                         hash_by_connectivity[connectivity_type]: array_initiators})
+    publish_context = {
+        lun_param: str(lun),
+        connectivity_param: connectivity_type
+    }
+
+    if connectivity_type == ISCSI_CONNECTIVITY_TYPE:
+        for iqn, ips in array_initiators.items():
+            publish_context[iqn] = separator.join(ips)
+
+        array_initiators_param = config["controller"]["publish_context_array_iqn"]
+        publish_context[array_initiators_param] = separator.join(array_initiators.keys())
+    else:
+        array_initiators_param = config["controller"]["publish_context_fc_initiators"]
+        publish_context[array_initiators_param] = separator.join(array_initiators)
+
+    res = csi_pb2.ControllerPublishVolumeResponse(publish_context=publish_context)
 
     logger.debug("publish volume response is :{0}".format(res))
     return res

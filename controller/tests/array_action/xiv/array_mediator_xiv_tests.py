@@ -335,3 +335,21 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_unmap_volume_success(self):
         self.mediator.client.cmd.unmap_vol.return_value = None
         self.mediator.unmap_volume("vol", "host")
+
+    def test_get_iscsi_targets_by_iqn_fail(self):
+        self.mediator.client.cmd.config_get.return_value = Mock(as_list=[])
+        self.mediator.client.cmd.ipinterface_list.return_value = []
+
+        with self.assertRaises(Exception):
+            self.mediator.get_iscsi_targets_by_iqn()
+
+    def test_get_iscsi_targets_by_iqn_success(self):
+        config_param = utils.get_mock_xiv_config_param(name="iscsi_name", value="iqn1")
+        self.mediator.client.cmd.config_get.return_value = Mock(as_list=[config_param])
+        ip_interface = utils.get_mock_xiv_ip_interface("iSCSI", address="1.2.3.4")
+        ip_interface6 = utils.get_mock_xiv_ip_interface("iSCSI", address6="::1")
+        self.mediator.client.cmd.ipinterface_list.return_value = [ip_interface, ip_interface6]
+
+        targets_by_iqn = self.mediator.get_iscsi_targets_by_iqn()
+
+        self.assertEqual(targets_by_iqn, {"iqn1": ["1.2.3.4", "[::1]"]})

@@ -1,7 +1,11 @@
+#########################################
+# PVC example for IBM Block CSI Driver.
+#########################################
+
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: demo-pvc
+  name: demo-pvc-file-system
 spec:
   volumeMode: Filesystem
   accessModes:

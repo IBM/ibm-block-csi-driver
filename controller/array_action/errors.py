@@ -149,3 +149,15 @@ class VolumeMappedToMultipleHostsError(BaseArrayActionException):
 
     def __init__(self, hosts):
         self.message = messages.VolumeMappedToMultipleHostsError_message.format(hosts)
+
+
+class NoIscsiTargetsFoundError(BaseArrayActionException):
+
+    def __init__(self, endpoint):
+        self.message = messages.NoIscsiTargetsFoundError_message.format(endpoint)
+
+
+class UnsupportedConnectivityTypeError(BaseArrayActionException):
+
+    def __init__(self, connectivity_type):
+        self.message = messages.UnsupportedConnectivityTypeError_message.format(connectivity_type)

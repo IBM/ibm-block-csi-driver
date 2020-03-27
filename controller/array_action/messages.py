@@ -41,3 +41,7 @@ UnsupportedStorageVersionError_message = 'Unsupported storage system microcode v
 VolumeCreationError_message = 'Failed to create volume {}'
 
 VolumeDeletionError_message = 'Failed to delete volume {}'
+
+NoIscsiTargetsFoundError_message = "Could not find iSCSI targets for endpoint: {0}"
+
+UnsupportedConnectivityTypeError_message = "Unsupported connectivity type: {0}"

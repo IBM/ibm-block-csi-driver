@@ -243,13 +243,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return csi_pb2.ControllerPublishVolumeResponse()
 
         except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError,
-                controller_errors.BadNodeIdError) as ex:
+                controller_errors.BadNodeIdError, controller_errors.NoIscsiTargetsFoundError) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)
             return csi_pb2.ControllerPublishVolumeResponse()
 
-        except ValidationException as ex:
+        except (ValidationException, controller_errors.UnsupportedConnectivityTypeError) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
