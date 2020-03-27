@@ -1,20 +1,19 @@
 import unittest
+
+# from unittest import mock as umock
 import grpc
+from mock import patch, Mock, call
 
-from mock import patch, Mock, call, NonCallableMagicMock
-from controller.tests import utils
-
-from controller.csi_general import csi_pb2
-from controller.array_action.array_mediator_xiv import XIVArrayMediator
-from controller.controller_server.csi_controller_server import ControllerServicer
-from controller.controller_server.test_settings import vol_name
 import controller.array_action.errors as array_errors
 import controller.controller_server.errors as controller_errors
-
+from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.controller_server.config import PARAMETERS_PREFIX
+from controller.controller_server.csi_controller_server import ControllerServicer
+from controller.controller_server.test_settings import vol_name
+from controller.csi_general import csi_pb2
+from controller.tests import utils
 
-
-class ControllerServerTestBase(unittest.TestCase):
+class TestControllerServerCreateVolume(unittest.TestCase):
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
     def setUp(self, connect):
@@ -22,23 +21,10 @@ class ControllerServerTestBase(unittest.TestCase):
         self.mediator = XIVArrayMediator("user", "password", self.fqdn)
         self.mediator.client = Mock()
 
-        self.agent_mock = NonCallableMagicMock()
-        patcher = patch('controller.controller_server.csi_controller_server.get_agent')
-        self.get_agent_mock = patcher.start()
-        self.addCleanup(patcher.stop)
-        self.get_agent_mock.return_value = self.agent_mock
-        self.agent_mock.get_mediator.return_value.__enter__.return_value = self.mediator
-
-        self.servicer = ControllerServicer(self.fqdn)
-
-
-class TestControllerServerCreateVolume(ControllerServerTestBase):
-
-    def setUp(self):
-        super(TestControllerServerCreateVolume, self).setUp()
-
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.side_effect = [array_errors.VolumeNotFoundError("vol")]
+
+        self.servicer = ControllerServicer(self.fqdn)
 
         self.request = Mock()
         caps = Mock()
@@ -56,7 +42,10 @@ class TestControllerServerCreateVolume(ControllerServerTestBase):
         self.request.capacity_range.required_bytes = self.capacity_bytes
         self.request.name = vol_name
 
-    def test_create_volume_with_empty_name(self):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_create_volume_with_empty_name(self, a_enter, a_exit):
+        a_enter.return_value = self.mediator
         self.request.name = ""
         context = utils.FakeContext()
         res = self.servicer.CreateVolume(self.request, context)
@@ -64,17 +53,26 @@ class TestControllerServerCreateVolume(ControllerServerTestBase):
         self.assertTrue("name" in context.details)
         self.assertEqual(res, csi_pb2.CreateVolumeResponse())
 
-    def test_create_volume_succeeds(self):
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_create_volume_succeeds(self, a_exit, a_enter, array_type):
+        a_enter.return_value = self.mediator
         context = utils.FakeContext()
 
         self.mediator.create_volume = Mock()
         self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn", "xiv")
+        array_type.return_value = "a9k"
         res = self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.mediator.get_volume.assert_called_once_with(vol_name, volume_context={'pool': 'pool1'}, volume_prefix="")
         self.mediator.create_volume.assert_called_once_with(vol_name, 10, {}, 'pool1', "")
 
-    def test_create_volume_with_wrong_secrets(self):
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_create_volume_with_wrong_secrets(self, a_enter, a_exit, array_type):
+        a_enter.return_value = self.mediator
         context = utils.FakeContext()
 
         self.request.secrets = {"password": "pass", "management_address": "mg"}
@@ -94,7 +92,11 @@ class TestControllerServerCreateVolume(ControllerServerTestBase):
 
         self.request.secrets = []
 
-    def test_create_volume_with_wrong_parameters(self):
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_create_volume_with_wrong_parameters(self, a_enter, a_exit, array_type):
+        a_enter.return_value = self.mediator
         context = utils.FakeContext()
 
         self.request.parameters = {"pool": "pool1"}
@@ -107,7 +109,10 @@ class TestControllerServerCreateVolume(ControllerServerTestBase):
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "pool parameter is missing")
         self.assertTrue("parameter" in context.details)
 
-    def test_create_volume_with_wrong_volume_capabilities(self):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_create_volume_with_wrong_volume_capabilities(self, a_enter, a_exit):
+        a_enter.return_value = self.mediator
         context = utils.FakeContext()
 
         caps = Mock()
@@ -130,24 +135,33 @@ class TestControllerServerCreateVolume(ControllerServerTestBase):
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "wrong access_mode")
         self.assertTrue("access mode" in context.details)
 
-    def test_create_volume_with_array_connection_exception(self):
-        self.agent_mock.get_mediator.return_value.__enter__.side_effect = Exception("error")
-
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_create_volume_with_array_connection_exception(self, a_enter, a_exit, array_type):
+        a_enter.side_effect = [Exception("error")]
         context = utils.FakeContext()
         res = self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL, "connection error occured in array_connection")
         self.assertTrue("error" in context.details)
 
-    def test_create_volume_with_get_array_type_exception(self):
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_create_volume_with_get_array_type_exception(self, a_enter, a_exit, array_type):
+        a_enter.return_value = self.mediator
         context = utils.FakeContext()
-        self.get_agent_mock.side_effect = array_errors.FailedToFindStorageSystemType("endpoint")
+        array_type.side_effect = [array_errors.FailedToFindStorageSystemType("endpoint")]
         res = self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL, "failed to find storage system")
         msg = array_errors.FailedToFindStorageSystemType("endpoint").message
         self.assertTrue(msg in context.details)
 
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.get_volume")
-    def test_create_volume_get_volume_exception(self, get_volume):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_create_volume_get_volume_exception(self, a_enter, get_volume, array_type):
+        a_enter.return_value = self.mediator
         self.mediator.get_volume.side_effect = [Exception("error")]
         context = utils.FakeContext()
         res = self.servicer.CreateVolume(self.request, context)
@@ -155,8 +169,11 @@ class TestControllerServerCreateVolume(ControllerServerTestBase):
         self.assertTrue("error" in context.details)
         self.mediator.get_volume.assert_called_once_with(vol_name, volume_context={'pool': 'pool1'}, volume_prefix="")
 
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.get_volume")
-    def test_create_volume_with_get_volume_illegal_object_name_exception(self, get_volume):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_create_volume_with_get_volume_illegal_object_name_exception(self, a_enter, get_volume, array_type):
+        a_enter.return_value = self.mediator
         self.mediator.get_volume.side_effect = [array_errors.IllegalObjectName("vol")]
         context = utils.FakeContext()
         res = self.servicer.CreateVolume(self.request, context)
@@ -166,8 +183,11 @@ class TestControllerServerCreateVolume(ControllerServerTestBase):
         self.assertTrue(msg in context.details)
         self.mediator.get_volume.assert_called_once_with(vol_name, volume_context={'pool': 'pool1'}, volume_prefix="")
 
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.create_volume")
-    def create_volume_returns_error(self, create_volume, return_code, err):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def create_volume_returns_error(self, a_enter, create_volume, array_type, return_code, err):
+        a_enter.return_value = self.mediator
         create_volume.side_effect = [err]
 
         context = utils.FakeContext()
@@ -203,34 +223,49 @@ class TestControllerServerCreateVolume(ControllerServerTestBase):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INTERNAL,
                                          err=Exception("error"))
 
-    def test_create_volume_with_name_prefix(self):
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_create_volume_with_name_prefix(self, a_exit, a_enter, array_type):
+        a_enter.return_value = self.mediator
         context = utils.FakeContext()
 
         self.request.name = "some_name"
         self.request.parameters[PARAMETERS_PREFIX] = "prefix"
         self.mediator.create_volume = Mock()
         self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn", "xiv")
+        array_type.return_value = "a9k"
         res = self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.mediator.create_volume.assert_called_once_with("prefix_some_name", 10, {}, "pool1", "prefix")
 
-    def test_create_volume_with_zero_size(self):
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_create_volume_with_zero_size(self, a_exit, a_enter, array_type):
+        a_enter.return_value = self.mediator
         context = utils.FakeContext()
 
         self.request.capacity_range.required_bytes = 0
         self.mediator.create_volume = Mock()
         self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn", "xiv")
+        array_type.return_value = "a9k"
         res = self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.mediator.create_volume.assert_called_once_with(self.request.name, 1 * 1024 * 1024 * 1024, {}, "pool1", "")
 
 
-class TestControllerServerDeleteVolume(ControllerServerTestBase):
+class TestControllerServerDeleteVolume(unittest.TestCase):
 
-    def setUp(self):
-        super(TestControllerServerDeleteVolume, self).setUp()
+    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
+    def setUp(self, connect):
+        self.fqdn = "fqdn"
+        self.mediator = XIVArrayMediator("user", "password", self.fqdn)
+        self.mediator.client = Mock()
 
         self.mediator.get_volume = Mock()
+
+        self.servicer = ControllerServicer(self.fqdn)
 
         self.request = Mock()
 
@@ -239,7 +274,10 @@ class TestControllerServerDeleteVolume(ControllerServerTestBase):
 
         self.request.volume_id = "xiv:vol-id"
 
-    def test_delete_volume_with_wrong_secrets(self):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_delete_volume_with_wrong_secrets(self, a_enter, a_exit):
+        a_enter.return_value = self.mediator
         context = utils.FakeContext()
 
         self.request.secrets = {"password": "pass", "management_address": "mg"}
@@ -257,21 +295,28 @@ class TestControllerServerDeleteVolume(ControllerServerTestBase):
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "mgmt address is missing in secrets")
         self.assertTrue("secret" in context.details)
 
-    def test_delete_volume_invalid_volume_id(self):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_delete_volume_invalid_volume_id(self, a_enter, a_exit):
+        a_enter.return_value = self.mediator
         context = utils.FakeContext()
         self.request.volume_id = "wrong_id"
         res = self.servicer.DeleteVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
 
-    def test_delete_volume_with_array_connection_exception(self):
-        self.agent_mock.get_mediator.return_value.__enter__.side_effect = Exception("a_enter error")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_delete_volume_with_array_connection_exception(self, a_enter, a_exit):
+        a_enter.side_effect = [Exception("a_enter error")]
         context = utils.FakeContext()
         res = self.servicer.DeleteVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL, "array connection internal error")
         self.assertTrue("a_enter error" in context.details)
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.delete_volume")
-    def delete_volume_returns_error(self, delete_volume, error, return_code):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def delete_volume_returns_error(self, a_enter, delete_volume, error, return_code):
+        a_enter.return_value = self.mediator
         delete_volume.side_effect = [error]
         context = utils.FakeContext()
         res = self.servicer.DeleteVolume(self.request, context)
@@ -287,18 +332,23 @@ class TestControllerServerDeleteVolume(ControllerServerTestBase):
         self.delete_volume_returns_error(error=Exception("error"), return_code=grpc.StatusCode.INTERNAL)
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.delete_volume")
-    def test_delete_volume_succeeds(self, delete_volume):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_delete_volume_succeeds(self, a_enter, delete_volume):
+        a_enter.return_value = self.mediator
         context = utils.FakeContext()
         res = self.servicer.DeleteVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
 
 
-class TestControllerServerPublishVolume(ControllerServerTestBase):
+class TestControllerServerPublishVolume(unittest.TestCase):
 
-    def setUp(self):
-        super(TestControllerServerPublishVolume, self).setUp()
-
+    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
+    def setUp(self, connect):
+        self.fqdn = "fqdn"
         self.hostname = "hostname"
+        self.mediator = XIVArrayMediator("user", "password", self.fqdn)
+        self.mediator.client = Mock()
+
         self.mediator.get_host_by_host_identifiers = Mock()
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi"]
 
@@ -308,8 +358,10 @@ class TestControllerServerPublishVolume(ControllerServerTestBase):
         self.mediator.map_volume = Mock()
         self.mediator.map_volume.return_value = 1
 
-        self.mediator.get_array_iqns = Mock()
-        self.mediator.get_array_iqns.return_value = "array-iqn"
+        self.mediator.get_iscsi_targets_by_iqn = Mock()
+        self.mediator.get_iscsi_targets_by_iqn.return_value = {"iqn1": ["1.1.1.1", "2.2.2.2"], "iqn2": ["[::1]"]}
+
+        self.servicer = ControllerServicer(self.fqdn)
 
         self.request = Mock()
         arr_type = XIVArrayMediator.array_type
@@ -327,7 +379,10 @@ class TestControllerServerPublishVolume(ControllerServerTestBase):
         caps.access_mode.mode = access_types.SINGLE_NODE_WRITER
         self.request.volume_capability = caps
 
-    def test_publish_volume_success(self):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_publish_volume_success(self, enter):
+        enter.return_value = self.mediator
+
         context = utils.FakeContext()
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -354,25 +409,30 @@ class TestControllerServerPublishVolume(ControllerServerTestBase):
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
-    def test_publish_volume_get_host_by_host_identifiers_exception(self):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_publish_volume_get_host_by_host_identifiers_exception(self, enter):
         context = utils.FakeContext()
 
         self.mediator.get_host_by_host_identifiers = Mock()
         self.mediator.get_host_by_host_identifiers.side_effect = [array_errors.MultipleHostsFoundError("", "")]
+        enter.return_value = self.mediator
 
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertTrue("Multiple hosts" in context.details)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
 
         self.mediator.get_host_by_host_identifiers.side_effect = [array_errors.HostNotFoundError("")]
+        enter.return_value = self.mediator
 
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
-    def test_publish_volume_get_volume_mappings_one_map_for_existing_host(self):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_publish_volume_get_volume_mappings_one_map_for_existing_host(self, enter):
         context = utils.FakeContext()
         self.mediator.get_volume_mappings = Mock()
         self.mediator.get_volume_mappings.return_value = {self.hostname: 2}
+        enter.return_value = self.mediator
 
         res = self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -380,14 +440,13 @@ class TestControllerServerPublishVolume(ControllerServerTestBase):
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '2')
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "iscsi")
 
-    def test_publish_volume_with_connectivity_type_fc(self):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_publish_volume_with_connectivity_type_fc(self, enter):
         context = utils.FakeContext()
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi", "fc"]
         self.mediator.get_array_fc_wwns = Mock()
         self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
-        self.mediator.get_array_iqns = Mock()
-        self.mediator.get_array_iqns.return_value = [
-            "iqn.1994-05.com.redhat:686358c930fe"]
+        enter.return_value = self.mediator
 
         res = self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -396,13 +455,13 @@ class TestControllerServerPublishVolume(ControllerServerTestBase):
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "fc")
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_ARRAY_FC_INITIATORS"], "500143802426baf4")
 
-    def test_publish_volume_with_connectivity_type_iscsi(self):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_publish_volume_with_connectivity_type_iscsi(self, enter):
         context = utils.FakeContext()
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi"]
-        self.mediator.get_array_iqns = Mock()
-        self.mediator.get_array_iqns.return_value = ["iqn.1994-05.com.redhat:686358c930fe"]
         self.mediator.get_array_fc_wwns = Mock()
         self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
+        enter.return_value = self.mediator
 
         res = self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -410,17 +469,19 @@ class TestControllerServerPublishVolume(ControllerServerTestBase):
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '1')
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
                          "iscsi")
-        self.assertEqual(
-            res.publish_context["PUBLISH_CONTEXT_ARRAY_IQN"],
-            "iqn.1994-05.com.redhat:686358c930fe")
+        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_ARRAY_IQN"],
+                         "iqn1,iqn2")
+        self.assertEqual(res.publish_context["iqn1"],
+                         "1.1.1.1,2.2.2.2")
+        self.assertEqual(res.publish_context["iqn2"],
+                         "[::1]")
 
-    def test_publish_volume_with_node_id_only_has_iqns(self):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_publish_volume_with_node_id_only_has_iqns(self, enter):
         context = utils.FakeContext()
         self.request.node_id = "hostname;iqn.1994-05.com.redhat:686358c930fe;"
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi"]
-        self.mediator.get_array_iqns = Mock()
-        self.mediator.get_array_iqns.return_value = [
-            "iqn.1994-05.com.redhat:686358c930fe"]
+        enter.return_value = self.mediator
 
         res = self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -428,16 +489,22 @@ class TestControllerServerPublishVolume(ControllerServerTestBase):
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '1')
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
                          "iscsi")
-        self.assertEqual(
-            res.publish_context["PUBLISH_CONTEXT_ARRAY_IQN"],
-            "iqn.1994-05.com.redhat:686358c930fe")
+        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_ARRAY_IQN"],
+                         "iqn1,iqn2")
+        self.assertEqual(res.publish_context["iqn1"],
+                         "1.1.1.1,2.2.2.2")
+        self.assertEqual(res.publish_context["iqn2"],
+                         "[::1]")
 
-    def test_publish_volume_with_node_id_only_has_wwns(self):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_publish_volume_with_node_id_only_has_wwns(self, enter):
         context = utils.FakeContext()
         self.request.node_id = "hostname;;500143802426baf4"
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["fc"]
         self.mediator.get_array_fc_wwns = Mock()
         self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
+        self.mediator.get_iscsi_targets_by_iqn.return_value = {}
+        enter.return_value = self.mediator
 
         res = self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -454,6 +521,7 @@ class TestControllerServerPublishVolume(ControllerServerTestBase):
         self.mediator.get_array_fc_wwns = Mock()
         self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4",
                                                         "500143806626bae2"]
+        enter.return_value = self.mediator
 
         res = self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -465,50 +533,61 @@ class TestControllerServerPublishVolume(ControllerServerTestBase):
             res.publish_context["PUBLISH_CONTEXT_ARRAY_FC_INITIATORS"],
             "500143802426baf4,500143806626bae2")
 
-    def test_publish_volume_get_volume_mappings_one_map_for_other_host(self):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_publish_volume_get_volume_mappings_one_map_for_other_host(self, enter):
         context = utils.FakeContext()
         self.mediator.get_volume_mappings = Mock()
         self.mediator.get_volume_mappings.return_value = {"other-hostname": 3}
+        enter.return_value = self.mediator
 
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.FAILED_PRECONDITION)
         self.assertTrue("Volume is already mapped" in context.details)
 
-    def test_publish_volume_get_volume_mappings_more_then_one_mapping(self):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_publish_volume_get_volume_mappings_more_then_one_mapping(self, enter):
         context = utils.FakeContext()
         self.mediator.get_volume_mappings = Mock()
         self.mediator.get_volume_mappings.return_value = {"other-hostname": 3, self.hostname: 4}
+        enter.return_value = self.mediator
 
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.FAILED_PRECONDITION)
         self.assertTrue("Volume is already mapped" in context.details)
 
-    def test_publish_volume_map_volume_excpetions(self):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_publish_volume_map_volume_excpetions(self, enter):
         context = utils.FakeContext()
 
         self.mediator.map_volume.side_effect = [array_errors.PermissionDeniedError("msg")]
 
+        enter.return_value = self.mediator
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.PERMISSION_DENIED)
 
         self.mediator.map_volume.side_effect = [array_errors.VolumeNotFoundError("vol")]
+        enter.return_value = self.mediator
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
         self.mediator.map_volume.side_effect = [array_errors.HostNotFoundError("host")]
+        enter.return_value = self.mediator
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
         self.mediator.map_volume.side_effect = [array_errors.MappingError("", "", "")]
+        enter.return_value = self.mediator
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
 
     @patch.object(XIVArrayMediator, "MAX_LUN_NUMBER", 3)
     @patch.object(XIVArrayMediator, "MIN_LUN_NUMBER", 1)
-    def test_publish_volume_map_volume_lun_already_in_use(self):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_publish_volume_map_volume_lun_already_in_use(self, enter):
         context = utils.FakeContext()
 
         self.mediator.map_volume.side_effect = [array_errors.LunAlreadyInUseError("", ""), 2]
+        enter.return_value = self.mediator
         res = self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '2')
@@ -520,7 +599,7 @@ class TestControllerServerPublishVolume(ControllerServerTestBase):
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["fc"]
         self.mediator.get_array_fc_wwns = Mock()
         self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
-
+        enter.return_value = self.mediator
         res = self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '2')
@@ -529,30 +608,56 @@ class TestControllerServerPublishVolume(ControllerServerTestBase):
 
         self.mediator.map_volume.side_effect = [array_errors.LunAlreadyInUseError("", ""),
                                                 array_errors.LunAlreadyInUseError("", ""), 2]
-
+        enter.return_value = self.mediator
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '2')
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "fc")
 
-        self.mediator.map_volume.side_effect = \
-            [array_errors.LunAlreadyInUseError("", "")] * (self.mediator.max_lun_retries + 1)
-
+        self.mediator.map_volume.side_effect = [
+                                                   array_errors.LunAlreadyInUseError("", "")] * (
+                                                       self.mediator.max_lun_retries + 1)
+        enter.return_value = self.mediator
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.RESOURCE_EXHAUSTED)
 
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_publish_volume_get_iscsi_targets_by_iqn_excpetions(self, enter):
+        context = utils.FakeContext()
+        self.mediator.get_iscsi_targets_by_iqn.side_effect = [array_errors.NoIscsiTargetsFoundError("some_endpoint")]
+        enter.return_value = self.mediator
 
-class TestControllerServerUnPublishVolume(ControllerServerTestBase):
+        self.servicer.ControllerPublishVolume(self.request, context)
 
-    def setUp(self):
-        super(TestControllerServerUnPublishVolume, self).setUp()
+        self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
+    @patch("controller.array_action.array_mediator_abstract.ArrayMediatorAbstract.map_volume_by_initiators")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_map_volume_by_initiators_exceptions(self, enter, map_volume_by_initiators):
+        context = utils.FakeContext()
+        map_volume_by_initiators.side_effect = [
+            array_errors.UnsupportedConnectivityTypeError("usb")]
+        enter.return_value = self.mediator
+        self.servicer.ControllerPublishVolume(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
+
+
+class TestControllerServerUnPublishVolume(unittest.TestCase):
+
+    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
+    def setUp(self, connect):
+        self.fqdn = "fqdn"
         self.hostname = "hostname"
+        self.mediator = XIVArrayMediator("user", "password", self.fqdn)
+        self.mediator.client = Mock()
+
         self.mediator.get_host_by_host_identifiers = Mock()
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi"]
 
         self.mediator.unmap_volume = Mock()
         self.mediator.unmap_volume.return_value = None
+
+        self.servicer = ControllerServicer(self.fqdn)
 
         self.request = Mock()
         arr_type = XIVArrayMediator.array_type
@@ -561,7 +666,9 @@ class TestControllerServerUnPublishVolume(ControllerServerTestBase):
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
         self.request.volume_context = {}
 
-    def test_unpublish_volume_success(self):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_unpublish_volume_success(self, enter):
+        enter.return_value = self.mediator
         context = utils.FakeContext()
         self.servicer.ControllerUnpublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -588,45 +695,54 @@ class TestControllerServerUnPublishVolume(ControllerServerTestBase):
         self.servicer.ControllerUnpublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
-    def test_unpublish_volume_get_host_by_host_identifiers_exception(self):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_unpublish_volume_get_host_by_host_identifiers_exception(self, enter):
         context = utils.FakeContext()
 
         self.mediator.get_host_by_host_identifiers = Mock()
         self.mediator.get_host_by_host_identifiers.side_effect = [array_errors.MultipleHostsFoundError("", "")]
+        enter.return_value = self.mediator
 
         self.servicer.ControllerUnpublishVolume(self.request, context)
         self.assertTrue("Multiple hosts" in context.details)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
 
         self.mediator.get_host_by_host_identifiers.side_effect = [array_errors.HostNotFoundError("")]
+        enter.return_value = self.mediator
 
         self.servicer.ControllerUnpublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
-    def test_unpublish_volume_unmap_volume_excpetions(self):
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_unpublish_volume_unmap_volume_excpetions(self, enter):
         context = utils.FakeContext()
 
         self.mediator.unmap_volume.side_effect = [array_errors.PermissionDeniedError("msg")]
+        enter.return_value = self.mediator
         self.servicer.ControllerUnpublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.PERMISSION_DENIED)
 
         context = utils.FakeContext()
         self.mediator.unmap_volume.side_effect = [array_errors.VolumeNotFoundError("vol")]
+        enter.return_value = self.mediator
         self.servicer.ControllerUnpublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
         context = utils.FakeContext()
         self.mediator.unmap_volume.side_effect = [array_errors.HostNotFoundError("host")]
+        enter.return_value = self.mediator
         self.servicer.ControllerUnpublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
         context = utils.FakeContext()
         self.mediator.unmap_volume.side_effect = [array_errors.UnMappingError("", "", "")]
+        enter.return_value = self.mediator
         self.servicer.ControllerUnpublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
 
         context = utils.FakeContext()
         self.mediator.unmap_volume.side_effect = [array_errors.VolumeAlreadyUnmappedError("")]
+        enter.return_value = self.mediator
         self.servicer.ControllerUnpublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
 

@@ -29,6 +29,18 @@ array_type_to_mediator = {
 }
 
 
+def detect_array_type(endpoints):
+    logger.debug("detecting array connection type")
+
+    for storage_type, port in array_type_to_port.items():
+        for endpoint in endpoints:
+            if _socket_connect_test(endpoint, port) == 0:
+                logger.debug("storage array type is : {0}".format(storage_type))
+                return storage_type
+
+    raise FailedToFindStorageSystemType(endpoints)
+
+
 def _socket_connect_test(host, port, timeout=1):
     """
     function to test socket connection to host:port.
@@ -103,7 +115,7 @@ class StorageAgent(object):
         self.conn_pool = None
 
         if not array_type:
-            array_type = self.detect_array_type()
+            array_type = detect_array_type(self.endpoints)
 
         med_class = array_type_to_mediator[array_type]
 
@@ -123,17 +135,6 @@ class StorageAgent(object):
             pool = self.conn_pool
             self.conn_pool = None
             del pool
-
-    def detect_array_type(self):
-        logger.debug("detecting array connection type")
-
-        for storage_type, port in array_type_to_port.items():
-            for endpoint in self.endpoints:
-                if _socket_connect_test(endpoint, port) == 0:
-                    logger.debug("storage array type is : {0}".format(storage_type))
-                    return storage_type
-
-        raise FailedToFindStorageSystemType(self.endpoints)
 
     @contextmanager
     def get_mediator(self, timeout=None):

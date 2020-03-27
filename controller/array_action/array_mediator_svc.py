@@ -7,6 +7,7 @@ from controller.array_action.array_action_types import Volume
 import controller.array_action.errors as controller_errors
 from controller.array_action.utils import classproperty
 import controller.array_action.config as config
+from controller.common import settings
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -64,7 +65,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     @classproperty
     def array_type(self):
-        return 'SVC'
+        return settings.ARRAY_TYPE_SVC
 
     @classproperty
     def port(self):

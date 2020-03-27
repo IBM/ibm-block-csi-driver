@@ -10,6 +10,7 @@ from controller.array_action.config import ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.config import FC_CONNECTIVITY_TYPE
 from controller.array_action.utils import classproperty
 from controller.common.utils import string_to_array
+from controller.common import settings
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -23,7 +24,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     @classproperty
     def array_type(self):
-        return 'A9000'
+        return settings.ARRAY_TYPE_XIV
 
     @classproperty
     def port(self):
