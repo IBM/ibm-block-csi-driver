@@ -2,7 +2,7 @@ import unittest
 from threading import Thread
 from queue import Queue
 from time import sleep
-from controller.array_action.storage_agent import StorageAgent, get_agent, clear_agents, get_agents
+from controller.array_action.storage_agent import StorageAgent, get_agent, clear_agents, get_agents, detect_array_type
 from munch import Munch
 from mock import patch, NonCallableMagicMock, Mock
 from controller.array_action.errors import FailedToFindStorageSystemType
@@ -94,22 +94,22 @@ class TestStorageAgent(unittest.TestCase):
     @patch("controller.array_action.storage_agent.ConnectionPool")
     def test_detect_array_type(self, _):
         self.assertEqual(
-            StorageAgent(["svc_host", ], "", "").detect_array_type(),
+            detect_array_type(["svc_host", ]),
             SVCArrayMediator.array_type
         )
 
         self.assertEqual(
-            StorageAgent(["ds8k_host", ], "", "").detect_array_type(),
+            detect_array_type(["ds8k_host", ]),
             DS8KArrayMediator.array_type
         )
 
         self.assertEqual(
-            StorageAgent(["xiv_host", ], "", "").detect_array_type(),
+            detect_array_type(["xiv_host", ]),
             XIVArrayMediator.array_type
         )
 
         with self.assertRaises(FailedToFindStorageSystemType):
-            StorageAgent(["unknown_host", ], "", "",)
+            detect_array_type(["unknown_host", ])
 
     def test_init_StorageAgent_prepopulates_one_mediator(self):
         # one mediator client is already initialized.

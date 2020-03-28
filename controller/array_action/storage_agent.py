@@ -3,7 +3,7 @@ from threading import RLock
 from queue import Empty
 from collections import OrderedDict
 from contextlib import contextmanager
-from controller.array_action.connection_pool import ConnectionPool
+from controller.array_action.array_connection_pool import ConnectionPool
 from controller.common.csi_logger import get_stdout_logger
 from controller.common import settings
 from controller.array_action.errors import FailedToFindStorageSystemType
@@ -107,11 +107,15 @@ def clear_agents():
 
 
 class StorageAgent(object):
+    """
+    StorageAgent is an agent which caches several mediators of the same storage for reuse cross threads.
+    """
 
     def __init__(self, endpoints, username, password, array_type=None):
         self.username = username
         self.password = password
         self.endpoints = endpoints
+        self.endpoint_key = settings.ENDPOINTS_SEPARATOR.join(endpoints)
         self.conn_pool = None
 
         if not array_type:
@@ -144,7 +148,7 @@ class StorageAgent(object):
         try:
             med = self.conn_pool.get(timeout=timeout)
         except Empty:
-            raise array_errors.NoConnectionAvailableException(", ".join(self.endpoints))
+            raise array_errors.NoConnectionAvailableException(", ".join(self.endpoint_key))
 
         try:
             yield med
