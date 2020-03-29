@@ -12,4 +12,4 @@ pyxcli==1.2.1
 # SVC python client
 pysvc==1.1.1
 # DS8K python client
-pyds8k==1.0.0
+pyds8k==1.1.0
