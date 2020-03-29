@@ -114,11 +114,9 @@ Source:
 Events:                <none>
 
 ##### View the newly created volume on the storage system side of thing (Using XCLI utility):
-$> xcli vol_list pool=gold 
-Name                                             Size (GB)   Master Name   Consistency Group   Pool   Creator   Written (GB)   
------------------------------------------------- ----------- ------------- ------------------- ------ --------- -------------- 
-demo1_pvc-828ce909-6eb2-11ea-abc8-005056a49b44   1                                             gold   admin     0
-
+$> lsvdisk
+id  name                                             IO_group_id IO_group_name status mdisk_grp_id mdisk_grp_name capacity  type    FC_id FC_name RC_id RC_name vdisk_UID                        fc_map_count copy_count fast_write_state se_copy_count RC_change compressed_copy_count parent_mdisk_grp_id parent_mdisk_grp_name formatting encrypt volume_id volume_name    function protocol
+0   demo_pvc-828ce909-6eb2-11ea-abc8-005056a49b44    0           io_grp0       online 0            gold           1GB       striped                             60050768018F82A010000000000001C4 0            1          not_empty        0             no        1                     0                   gold                  no         no      0                        demo_pvc-828ce909-6eb2-11ea-abc8-005056a49b44     scsi
 ```
 
 
