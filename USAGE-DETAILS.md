@@ -80,13 +80,13 @@ View the PVC and the created PV:
 ```sh
 $> kubectl get pv,pvc
 NAME                                                    CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM              STORAGECLASS   REASON   AGE
-persistentvolume/828ce909-6eb2-11ea-abc8-005056a49b44   1Gi        RWO            Delete           Bound    default/demo-pvc   gold                    78s
+persistentvolume/pvc-828ce909-6eb2-11ea-abc8-005056a49b44   1Gi        RWO            Delete           Bound    default/demo-pvc   gold                    78s
 
 NAME                                         STATUS   VOLUME                                 CAPACITY   ACCESS MODES   STORAGECLASS   AGE
-persistentvolumeclaim/demo-pvc-file-system   Bound    828ce909-6eb2-11ea-abc8-005056a49b44   1Gi        RWO            gold           78s
+persistentvolumeclaim/demo-pvc-file-system   Bound    pvc-828ce909-6eb2-11ea-abc8-005056a49b44   1Gi        RWO            gold           78s
 
 
-$> kubectl describe persistentvolume/828ce909-6eb2-11ea-abc8-005056a49b44
+$> kubectl describe persistentvolume/pvc-828ce909-6eb2-11ea-abc8-005056a49b44
 Name:            pvc-828ce909-6eb2-11ea-abc8-005056a49b44
 Labels:          <none>
 Annotations:     pv.kubernetes.io/provisioned-by: block.csi.ibm.com
@@ -117,7 +117,7 @@ Events:                <none>
 $> xcli vol_list pool=gold 
 Name                                             Size (GB)   Master Name   Consistency Group   Pool   Creator   Written (GB)   
 ------------------------------------------------ ----------- ------------- ------------------- ------ --------- -------------- 
-demo1_pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d5f   1                                             gold   admin     0
+demo1_pvc-828ce909-6eb2-11ea-abc8-005056a49b44   1                                             gold   admin     0
 
 ```
 
@@ -191,8 +191,8 @@ File
 Log into the worker node that has the running pod and display the newly attached volume on the node.
 
 ```sh
-###### Verify which worker node is running the pod demo-statefulset-0 
-$> kubectl describe pod demo-statefulset-0| grep "^Node:"
+###### Verify which worker node is running the pod demo-statefulset-file-system-0 
+$> kubectl describe pod demo-statefulset-file-system-0| grep "^Node:"
 Node: k8s-node1/hostname
 
 ###### Establish an SSH connection and log into the worker node
@@ -200,7 +200,7 @@ $> ssh k8s-node1
 
 ###### List multipath devices on the worker node (view the same `mpathz` that was mentioned above) 
 $>[k8s-node1]  multipath -ll
-mpathz (36001738cfc9035eb0000000000d1f68f) dm-3 IBM     ,2810XIV         
+mpathz (828ce9096eb211eaabc8005056a49b44) dm-3 IBM     ,2810XIV         
 size=1.0G features='1 queue_if_no_path' hwhandler='0' wp=rw
 `-+- policy='service-time 0' prio=1 status=active
   |- 37:0:0:12 sdc 8:32 active ready running
@@ -214,19 +214,19 @@ lrwxrwxrwx. 1 root root 7 Aug 12 19:29 /dev/mapper/mpathz -> ../dm-3
 $>[k8s-node1]  lsblk /dev/sdb /dev/sdc
 NAME     MAJ:MIN RM SIZE RO TYPE  MOUNTPOINT
 sdb        8:16   0   1G  0 disk  
-└─mpathz 253:3    0   1G  0 mpath /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-a04bd32f-bd0f-11e9-a1f5
+└─mpathz 253:3    0   1G  0 mpath /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-828ce909-6eb2-11ea-abc8-005056a49b44
 sdc        8:32   0   1G  0 disk  
-└─mpathz 253:3    0   1G  0 mpath /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-a04bd32f-bd0f-11e9-a1f5
+└─mpathz 253:3    0   1G  0 mpath /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-828ce909-6eb2-11ea-abc8-005056a49b44
 
 ###### View the PV mounted on this host 
 ######  (All PV mountpoints looks like the following: `/var/lib/kubelet/pods/*/volumes/kubernetes.io~csi/pvc-*/mount`) 
 $>[k8s-node1]  df | egrep pvc
-/dev/mapper/mpathz      1038336    32944   1005392   4% /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d5f/mount
+/dev/mapper/mpathz      1038336    32944   1005392   4% /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-828ce909-6eb2-11ea-abc8-005056a49b44/mount
 
 
 ##### Details about the driver internal metadata file `.stageInfo.json` are stored in the k8s PV node stage path `/var/lib/kubelet/plugins/kubernetes.io/csi/pv/<PVC-ID>/globalmount/.stageInfo.json`. The CSI driver creates it during the  NodeStage API, and it is used by the NodePublishVolume, NodeUnPublishVolume, and NodeUnStage CSI APIs later on.
 
-$> cat /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-711b6fef-bcf9-11e9-a1f5-005056a45d5f/globalmount/.stageInfo.json
+$> cat /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-828ce909-6eb2-11ea-abc8-005056a49b44/globalmount/.stageInfo.json
 {"connectivity":"iscsi","mpathDevice":"dm-3","sysDevices":",sdb,sdc"}
 
 ```
@@ -235,11 +235,11 @@ $> cat /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-711b6fef-bcf9-11e9-a1f5
 Delete StatefulSet and then restart, in order to validate data (/data/FILE) remains in the persistent volume.
 
 ```sh
-$> kubectl delete statefulset/demo-statefulset
-statefulset/demo-statefulset deleted
+$> kubectl delete statefulset/demo-statefulset-file-system
+statefulset/demo-statefulsetfile-system deleted
 
-### Wait until the pod is deleted. Once deleted the '"demo-statefulset" not found' is returned.
-$> kubectl get statefulset/demo-statefulset
+### Wait until the pod is deleted. Once deleted the '"demo-statefulset-file-system" not found' is returned.
+$> kubectl get statefulset/demo-statefulset-file-system
 NAME                 READY   STATUS        RESTARTS   AGE
 demo-statefulset-0   0/1     Terminating   0          91m
 
@@ -255,10 +255,10 @@ lsblk: /dev/sdc: not a block device
 
 
 ###### Recreate the StatefulSet again in order to verify /data/FILE exists
-$> kubectl create -f demo-statefulset-with-demo-pvc.yml
-statefulset/demo-statefulset created
+$> kubectl create -f demo-statefulset-file-system.yml
+statefulset/demo-statefulset-file-system created
 
-$> kubectl exec demo-statefulset-0 ls /data/FILE
+$> kubectl exec demo-statefulset-file-system-0 ls /data/FILE
 File
 ```
 
@@ -266,14 +266,14 @@ File
 Delete StatefulSet and PVC
 
 ```sh
-$> kubectl delete statefulset/demo-statefulset
-statefulset/demo-statefulset deleted
+$> kubectl delete statefulset/demo-statefulset-file-system
+statefulset/demo-statefulset-file-system deleted
 
-$> kubectl get statefulset/demo-statefulset
+$> kubectl get statefulset/demo-statefulset-file-system
 No resources found.
 
-$> kubectl delete pvc/demo-pvc
-persistentvolumeclaim/demo-pvc deleted
+$> kubectl delete pvc/demo-pvc-file-system
+persistentvolumeclaim/demo-pvc-file-system deleted
 
 $> kubectl get pv,pvc
 No resources found.
