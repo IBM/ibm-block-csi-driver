@@ -245,7 +245,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                 "name": host_name,
             })
         ]
-        self.assertDictEqual(self.array.get_volume_mappings(scsi_id), {host_name: lunid})
+        self.assertDictEqual(self.array.get_volume_mappings(scsi_id), {host_name: int(lunid)})
 
     def test_map_volume_host_not_found(self):
         self.client_mock.map_volume_to_host.side_effect = NotFound("404")

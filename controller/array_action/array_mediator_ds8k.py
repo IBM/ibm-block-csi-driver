@@ -299,7 +299,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 host_mappings = host.mappings_briefs
                 for mapping in host_mappings:
                     if volume_id == mapping["volume_id"]:
-                        host_name_to_lun_id[host.name] = mapping["lunid"]
+                        host_name_to_lun_id[host.name] = scsilun_to_int(mapping["lunid"])
                         break
             logger.debug("Found volume mappings: {}".format(host_name_to_lun_id))
             return host_name_to_lun_id
@@ -341,7 +341,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                     host_name=host_name,
                     lunid=lunid
                 )
-                logger.debug("Successfully unmapped volume from host.")
+                logger.debug("Successfully unmapped volume from host with lun {}.".format(lunid))
             else:
                 raise array_errors.VolumeNotFoundError(volume_id)
         except exceptions.NotFound:
