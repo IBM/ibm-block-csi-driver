@@ -3,18 +3,23 @@
 The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage.
 
 Supported container platforms:
-  - OpenShift v4.2
-  - Kubernetes v1.14
+  - Kubernetes v1.14 (x86 architecture)
+  - Kubernetes v1.16 (x86 architecture)
+  - OpenShift v4.2 (x86, IBM Z architectureS)
+  - OpenShift v4.3 (x86 architecture)
 
 Supported IBM storage systems:
   - IBM FlashSystem 9100
+  - IBM FlashSystem A9000/R
   - IBM Spectrum Virtualize
   - IBM Storwize
-  - IBM FlashSystem A9000/R
-
+  - IBM DS8880
+  - IBM DS8900
+  
 Supported operating systems:
-  - RHEL 7.x (x86 architecture)
-
+  - Red Hat Enterprise Linux 7.x (x86 architecture)
+  - Red Hat Enterprise Linux CoreOS (x86, IBM Z architectureS)
+   
 Full documentation can be found on the [IBM knowledge center](https://www.ibm.com/support/knowledgecenter/SSRQ8T).
 
 ## Table of content:
@@ -70,25 +75,6 @@ multipath -ll
 
 3.3.1. Make sure that the login to the iSCSI targets is permanent and remains available after a reboot of the worker node. To do this, verify that the node.startup in the /etc/iscsi/iscsid.conf file is set to automatic. If not, set it as required and then restart the iscsid service `$> service iscsid restart`.
 
-3.3.2. Discover and log into at least two iSCSI targets on the relevant storage systems. (NOTE: Without at least two ports, a multipath device will not be created.)
-
-```sh
-$> iscsiadm -m discoverydb -t st -p ${STORAGE-SYSTEM-iSCSI-PORT-IP1}:3260 --discover
-$> iscsiadm -m node -p ${STORAGE-SYSTEM-iSCSI-PORT-IP1} --login
-
-$> iscsiadm -m discoverydb -t st -p ${STORAGE-SYSTEM-iSCSI-PORT-IP2}:3260 --discover
-$> iscsiadm -m node -p ${STORAGE-SYSTEM-iSCSI-PORT-IP2} --login
-```
-
-3.3.3. Verify that the login was successful and display all targets that you logged into. The portal value must be the iSCSI target IP address.
-
-```sh
-$> iscsiadm -m session --rescan
-Rescanning session [sid: 1, target: {storage system IQN},
-portal: {STORAGE-SYSTEM-iSCSI-PORT-IP1},{port number}
-portal: {STORAGE-SYSTEM-iSCSI-PORT-IP2},{port number}
-```
-
 End of worker node setup.
 
 
@@ -121,14 +107,14 @@ Create a secret file as follows `array-secret.yaml` and update the relevant cred
 kind: Secret
 apiVersion: v1
 metadata:
-  name: <VALUE-1>
-  namespace: kube-system
+  name:  <NAME>
+  namespace: <NAMESPACE>
 type: Opaque
 stringData:
-  management_address: <VALUE-2,VALUE-3> # Array managment addresses
-  username: <VALUE-4>                   # Array username  
+  management_address: <ADDRESS_1,ADDRESS_2> # Array management addresses
+  username: <USERNAME>                      # Array username
 data:
-  password: <VALUE-5 base64>            # Array password
+  password: <PASSWORD base64>               # Array password
 ```
 
 Apply the secret:
@@ -139,7 +125,7 @@ $> kubectl apply -f array-secret.yaml
 
 #### 2. Create storage classes
 
-Create a storage class yaml file `storageclass-gold.yaml` as follows, with the relevant capabilities, pool and, array secret:
+Create a storage class yaml file `storageclass-gold-svc.yaml` as follows, with the relevant capabilities, pool and, array secret:
 
 ```sh
 kind: StorageClass
@@ -148,21 +134,22 @@ metadata:
   name: gold
 provisioner: block.csi.ibm.com
 parameters:
-  #SpaceEfficiency: <VALUE>    # Optional: Values applicable for Storwize are: thin, compressed, or deduplicated
-  pool: <VALUE_POOL_NAME>
+  SpaceEfficiency: deduplicated
+  pool: gold
 
-  csi.storage.k8s.io/provisioner-secret-name: <VALUE_ARRAY_SECRET>
-  csi.storage.k8s.io/provisioner-secret-namespace: <VALUE_ARRAY_SECRET_NAMESPACE>
-  csi.storage.k8s.io/controller-publish-secret-name: <VALUE_ARRAY_SECRET>
-  csi.storage.k8s.io/controller-publish-secret-namespace: <VALUE_ARRAY_SECRET_NAMESPACE>
+  csi.storage.k8s.io/provisioner-secret-name: svc-array
+  csi.storage.k8s.io/provisioner-secret-namespace: csi-ns
+  csi.storage.k8s.io/controller-publish-secret-name: svc-array
+  csi.storage.k8s.io/controller-publish-secret-namespace: csi-ns
 
-  csi.storage.k8s.io/fstype: xfs   # Optional: Values ext4/xfs. The default is ext4.
+  csi.storage.k8s.io/fstype: xfs   # Optional. values ext4\xfs. The default is ext4.
+  volume_name_prefix: demo         # Optional.
 ```
 
 Apply the storage class:
 
 ```sh
-$> kubectl apply -f storageclass-gold.yaml
+$> kubectl apply -f storageclass-gold-svc.yaml
 storageclass.storage.k8s.io/gold created
 ```
 
@@ -175,35 +162,36 @@ storageclass.storage.k8s.io/gold created
 
 
 ## Driver usage
-Create PVC demo-pvc-gold using `demo-pvc-gold.yaml`:
+Create PVC demo-pvc-file-system using `demo-pvc-file-system.yaml`:
 
 ```sh 
-$> cat demo-pvc-gold.yaml
-apiVersion: v1
+$> cat demo-pvc-file-system.yaml
 kind: PersistentVolumeClaim
+apiVersion: v1
 metadata:
-  name: pvc-demo
+  name: demo-pvc-file-system
 spec:
+  volumeMode: Filesystem
   accessModes:
   - ReadWriteOnce
   resources:
     requests:
       storage: 1Gi
   storageClassName: gold
-
-$> kubectl apply -f demo-pvc-gold.yaml
-persistentvolumeclaim/demo-pvc created
+      
+$> kubectl apply -f demo-pvc-file-system.yaml
+persistentvolumeclaim/demo-pvc-file-system created
 ```
 
 
-Create StatefulSet application `demo-statefulset` that uses the demo-pvc.
+Create StatefulSet application `demo-statefulset-file-system` that uses the demo-pvc-file-system.
 
 ```sh
-$> cat demo-statefulset-with-demo-pvc.yml
+$> cat demo-statefulset-file-system.yml
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-  name: demo-statefulset
+  name: demo-statefulset-file-system
 spec:
   selector:
     matchLabels:
@@ -216,31 +204,31 @@ spec:
         app: demo-statefulset
     spec:
       containers:
-      - name: container1
+      - name: container-demo
         image: registry.access.redhat.com/ubi8/ubi:latest
         command: [ "/bin/sh", "-c", "--" ]
         args: [ "while true; do sleep 30; done;" ]
         volumeMounts:
-          - name: pvc-demo
+          - name: demo-volume
             mountPath: "/data"
       volumes:
-      - name: pvc-demo
+      - name: demo-volume
         persistentVolumeClaim:
-          claimName: pvc-demo
+          claimName: demo-pvc-file-system
 
-      #nodeSelector:
-      #  kubernetes.io/hostname: NODESELECTOR
+#      nodeSelector:
+#        kubernetes.io/hostname: NODESELECTOR
+      
 
-
-$> kubectl create -f demo-statefulset-with-demo-pvc.yml
-statefulset/demo-statefulset created
+$> kubectl create -f demo-statefulset-file-system.yml
+statefulset/demo-statefulset-file-system created
 
 $> kubectl get pod demo-statefulset-0
-NAME                 READY   STATUS    RESTARTS   AGE
-demo-statefulset-0   1/1     Running   0          43s
+NAME                             READY   STATUS    RESTARTS   AGE
+demo-statefulset-file-system-0   1/1     Running   0          43s
 
 ###### Review the mountpoint inside the pod:
-$> kubectl exec demo-statefulset-0 -- bash -c "df -h /data"
+$> kubectl exec demo-statefulset-file-system-0 -- bash -c "df -h /data"
 Filesystem          Size  Used Avail Use% Mounted on
 /dev/mapper/mpathz 1014M   33M  982M   4% /data
 ```
@@ -249,14 +237,14 @@ Filesystem          Size  Used Avail Use% Mounted on
 Delete StatefulSet and PVC
 
 ```sh
-$> kubectl delete statefulset/demo-statefulset
-statefulset/demo-statefulset deleted
+$> kubectl delete statefulset/demo-statefulset-file-system
+statefulset/demo-statefulset-file-system deleted
 
-$> kubectl get statefulset/demo-statefulset
+$> kubectl get statefulset/demo-statefulset-file-system
 No resources found.
 
-$> kubectl delete pvc/demo-pvc
-persistentvolumeclaim/demo-pvc deleted
+$> kubectl delete pvc/demo-pvc-file-system
+persistentvolumeclaim/demo-pvc-file-system deleted
 
 $> kubectl get pv,pvc
 No resources found.
