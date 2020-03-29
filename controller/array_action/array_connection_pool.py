@@ -26,10 +26,10 @@ class ConnectionPool(object):
 
     def __del__(self):
         # delete the free clients in queue, and wait for outside ones.
-        while self.current_size:
-            item = self.get()
-            item.disconnect()
-            with self.lock:
+        with self.lock:
+            while self.current_size:
+                item = self.get()
+                item.disconnect()
                 self.current_size -= 1
 
     def create(self):
