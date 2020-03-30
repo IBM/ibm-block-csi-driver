@@ -131,7 +131,7 @@ func convertIntToScsilun(lunId int) string {
 	if lunId < 256 {
 		return strconv.Itoa(lunId)
 	} else {
-		converted := (pretreated_lun >> 16 & 0xFFFF) | (pretreated_lun&0xFFFF)<<16
+		converted := (lunId >> 16 & 0xFFFF) | (lunId&0xFFFF)<<16
 		return fmt.Sprintf("0x%x00000000", converted)
 	}
 }
