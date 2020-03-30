@@ -118,8 +118,26 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 	return nil
 }
 
+/*
+There are two style lun number, one's decimal value is <256 and the other
+is full as 16 hex digit. According to T10 SAM, when decimal value is more
+than 256 and it is converted to the full 16 hex digit, it should be
+swapped and converted into hex.
+
+see the udev function format_lun_number
+https://github.com/systemd/systemd/blob/c4ae2704b7e921a0b05486a7b201be6770a04ea7/src/udev/udev-builtin-path_id.c#L58
+*/
+func convertIntToScsilun(lunId int) string {
+	if lunId < 256 {
+		return strconv.Itoa(lunId)
+	} else {
+		converted := (lunId >> 16 & 0xFFFF) | (lunId&0xFFFF)<<16
+		return fmt.Sprintf("0x%x00000000", converted)
+	}
+}
+
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string, connectivityType string) (string, error) {
-	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] that relats to lunId=%d and arrayIdentifiers=%s", volumeId, lunId, arrayIdentifiers)
+	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] that relates to lunId=%d and arrayIdentifiers=%s", volumeId, lunId, arrayIdentifiers)
 
 	if len(arrayIdentifiers) == 0 {
 		e := &ErrorNotFoundArrayIdentifiers{lunId}
@@ -128,7 +146,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 	var devicePaths []string
 	var errStrings []string
 	var targetPath string
-	lunIdStr := strconv.Itoa(lunId)
+	lunIdStr := convertIntToScsilun(lunId)
 
 	if connectivityType == ConnectionTypeFC {
 		targetPath = fmt.Sprintf("/dev/disk/by-path/%s*", fcSubsystem)
@@ -144,7 +162,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 
 	for _, arrayIdentifier := range arrayIdentifiers {
 		dp := strings.Join([]string{targetPath, connectivityType, arrayIdentifier, "lun", lunIdStr}, "-")
-		logger.Infof("GetMpathDevice: Get the mpath devices related to connectivityType=%s initiator=%s and lunID=%s : {%v}", connectivityType, arrayIdentifier, lunIdStr, dp)
+		logger.Infof("GetMpathDevice: Get the mpath devices related to connectivityType=%s initiator=%s and lunID=%d : {%v}", connectivityType, arrayIdentifier, lunId, dp)
 		dps, exists, e := r.Helper.WaitForPathToExist(dp, 5, 1)
 		if e != nil {
 			logger.Errorf("GetMpathDevice: No device found error : %v ", e.Error())
