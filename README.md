@@ -1,26 +1,25 @@
-# IBM block storage CSI driver 
+# Operator for IBM block storage CSI driver
+The Container Storage Interface (CSI) Driver for IBM block storage systems enables container orchestrators such as Kubernetes to manage the life cycle of persistent storage.
 
-The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage.
+This is the official operator to deploy and manage IBM block storage CSI driver.
 
 Supported container platforms:
-  - Kubernetes v1.14 (x86 architecture)
-  - Kubernetes v1.16 (x86 architecture)
-  - OpenShift v4.2 (x86, IBM Z architectureS)
-  - OpenShift v4.3 (x86 architecture)
+  - OpenShift v4.2
+  - OpenShift v4.3
+  - Kubernetes v1.14
+  - Kubernetes v1.16
 
 Supported IBM storage systems:
-  - IBM FlashSystem 9100
+  - IBM Spectrum Virtualize Family (including IBM Flash family members built with IBM Spectrum Virtualize (FlashSystem 5010, 5030, 5100, 7200, 9100, 9200, 9200R) and IBM SAN Volume Controller (SVC) models SV2, SA2)
   - IBM FlashSystem A9000/R
-  - IBM Spectrum Virtualize
-  - IBM Storwize
   - IBM DS8880
   - IBM DS8900
-  
+
 Supported operating systems:
-  - Red Hat Enterprise Linux 7.x (x86 architecture)
-  - Red Hat Enterprise Linux CoreOS (x86, IBM Z architectureS)
-   
-Full documentation can be found on the [IBM knowledge center](https://www.ibm.com/support/knowledgecenter/SSRQ8T).
+  - RHEL 7.x (x86 architecture)
+  - RHCOS (x86 and IBM Z architecture)
+
+Full documentation can be found on the [IBM Knowledge Center](https://www.ibm.com/support/knowledgecenter/SSRQ8T).
 
 ## Table of content:
 * [Prerequisites for driver installation](#prerequisites-for-driver-installation)
