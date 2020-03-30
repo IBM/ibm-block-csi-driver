@@ -128,11 +128,12 @@ see the udev function format_lun_number
 https://github.com/systemd/systemd/blob/c4ae2704b7e921a0b05486a7b201be6770a04ea7/src/udev/udev-builtin-path_id.c#L58
 */
 func convertIntToScsilun(lunId int) string {
-    if lunId < 256:
-        return strconv.Itoa(lunId)
-    else:
+	if lunId < 256 {
+		return strconv.Itoa(lunId)
+	} else {
 		converted := (pretreated_lun >> 16 & 0xFFFF) | (pretreated_lun&0xFFFF)<<16
-        return fmt.Sprintf("0x%x00000000", converted)
+		return fmt.Sprintf("0x%x00000000", converted)
+	}
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string, connectivityType string) (string, error) {
