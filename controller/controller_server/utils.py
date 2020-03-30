@@ -4,7 +4,7 @@ from controller.csi_general import csi_pb2
 from controller.controller_server.errors import ValidationException
 import controller.controller_server.messages as messages
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
-from controller.array_action.errors import HostNotFoundError, VolumeNotFoundError
+from controller.array_action.errors import HostNotFoundError, VolumeNotFoundError, UnsupportedConnectivityTypeError
 
 logger = get_stdout_logger()
 
@@ -39,13 +39,14 @@ def validate_secret(secret):
 
 def validate_csi_volume_capability(cap):
     logger.debug("validating csi volume capability : {0}".format(cap))
-    if cap.mount:
+    if cap.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_MOUNT):
         if cap.mount.fs_type and (cap.mount.fs_type not in config.SUPPORTED_FS_TYPES):
             raise ValidationException(messages.unsupported_fs_type_message.format(cap.mount.fs_type))
 
-    else:
-        logger.error(messages.only_mount_supported_message)
-        raise ValidationException(messages.only_mount_supported_message)
+    elif not cap.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_BLOCK):
+        # should never get here since the value can be only mount (for fs volume) or block (for raw block)
+        logger.error(messages.unsupported_volume_access_type_message)
+        raise ValidationException(messages.unsupported_volume_access_type_message)
 
     if cap.access_mode.mode not in config.SUPPORTED_ACCESS_MODE:
         logger.error("unsupported access mode : {}".format(cap.access_mode))
@@ -104,7 +105,8 @@ def generate_csi_create_volume_response(new_vol):
     logger.debug("creating volume response for vol : {0}".format(new_vol))
 
     vol_context = {"volume_name": new_vol.volume_name,
-                   "array_address": ",".join(new_vol.array_address if isinstance(new_vol.array_address, list) else [new_vol.array_address]),
+                   "array_address": ",".join(
+                       new_vol.array_address if isinstance(new_vol.array_address, list) else [new_vol.array_address]),
                    "pool_name": new_vol.pool_name,
                    "storage_type": new_vol.array_type
                    }
@@ -184,20 +186,30 @@ def choose_connectivity_type(connecitvity_types):
         logger.debug("connectivity type is : {0}".format(ISCSI_CONNECTIVITY_TYPE))
         return ISCSI_CONNECTIVITY_TYPE
 
+
 def generate_csi_publish_volume_response(lun, connectivity_type, config, array_initiators):
     logger.debug("generating publish volume response for lun :{0}, connectivity : {1}".format(lun, connectivity_type))
 
     lun_param = config["controller"]["publish_context_lun_parameter"]
     connectivity_param = config["controller"]["publish_context_connectivity_parameter"]
-    hash_by_connectivity = {
-        'iscsi': config["controller"]["publish_context_array_iqn"],
-        'fc': config["controller"]["publish_context_fc_initiators"]}
+    separator = config["controller"]["publish_context_separator"]
 
-    array_initiators = ",".join(array_initiators)
-    res = csi_pb2.ControllerPublishVolumeResponse(
-        publish_context={lun_param: str(lun),
-                         connectivity_param: connectivity_type,
-                         hash_by_connectivity[connectivity_type]: array_initiators})
+    publish_context = {
+        lun_param: str(lun),
+        connectivity_param: connectivity_type
+    }
+
+    if connectivity_type == ISCSI_CONNECTIVITY_TYPE:
+        for iqn, ips in array_initiators.items():
+            publish_context[iqn] = separator.join(ips)
+
+        array_initiators_param = config["controller"]["publish_context_array_iqn"]
+        publish_context[array_initiators_param] = separator.join(array_initiators.keys())
+    else:
+        array_initiators_param = config["controller"]["publish_context_fc_initiators"]
+        publish_context[array_initiators_param] = separator.join(array_initiators)
+
+    res = csi_pb2.ControllerPublishVolumeResponse(publish_context=publish_context)
 
     logger.debug("publish volume response is :{0}".format(res))
     return res

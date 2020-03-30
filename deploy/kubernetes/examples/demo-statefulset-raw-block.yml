@@ -1,7 +1,11 @@
+#############$$$$$$$$############################
+# StatefulSet example for IBM Block CSI Driver.
+#################################################
+
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-  name: demo-statefulset
+  name: demo-statefulset-raw-block
 spec:
   selector:
     matchLabels:
@@ -14,17 +18,17 @@ spec:
         app: demo-statefulset
     spec:
       containers:
-      - name: container1
+      - name: container-demo
         image: registry.access.redhat.com/ubi8/ubi:latest
         command: [ "/bin/sh", "-c", "--" ]
         args: [ "while true; do sleep 30; done;" ]
-        volumeMounts:
-          - name: demo-pvc
-            mountPath: "/data"
+        volumeDevices:
+          - name: demo-volume
+            devicePath: "/dev/block"
       volumes:
-      - name: demo-pvc
+      - name: demo-volume
         persistentVolumeClaim:
-          claimName: demo-pvc
+          claimName: demo-pvc-raw-block
 
 #      nodeSelector:
 #        kubernetes.io/hostname: NODESELECTOR

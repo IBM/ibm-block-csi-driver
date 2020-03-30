@@ -32,6 +32,10 @@ func NewOsDeviceConnectivityFc(executer executer.ExecuterInterface) OsDeviceConn
 	}
 }
 
+func (r OsDeviceConnectivityFc) EnsureLogin(_ map[string][]string) {
+	// FC doesn't require login
+}
+
 func (r OsDeviceConnectivityFc) RescanDevices(lunId int, arrayIdentifiers []string) error {
 	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers)
 }
@@ -47,7 +51,7 @@ func (r OsDeviceConnectivityFc) GetMpathDevice(volumeId string, lunId int, array
 
 			   Return Value: "dm-X" of the volumeID by using the LunID and the array wwn.
 	*/
-	return r.HelperScsiGeneric.GetMpathDevice(volumeId, lunId, arrayIdentifiers, "fc")
+	return r.HelperScsiGeneric.GetMpathDevice(volumeId, lunId, arrayIdentifiers, ConnectionTypeFC)
 }
 
 func (r OsDeviceConnectivityFc) FlushMultipathDevice(mpathDevice string) error {

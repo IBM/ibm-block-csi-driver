@@ -12,6 +12,12 @@ class TestUtils(unittest.TestCase):
     def setUp(self):
         self.fqdn = "fqdn"
         self.servicer = ControllerServicer(self.fqdn)
+        self.config = {"controller": {"publish_context_lun_parameter": "lun",
+                                      "publish_context_connectivity_parameter": "connectivity_type",
+                                      "publish_context_separator": ",",
+                                      "publish_context_array_iqn": "array_iqn",
+                                      "publish_context_fc_initiators": "fc_wwns"}
+                       }
 
     def test_validate_secrets(self):
         username = "user"
@@ -40,32 +46,38 @@ class TestUtils(unittest.TestCase):
         with self.assertRaises(ValidationException):
             utils.validate_secret(secrets)
 
-    def test_validate_volume_capabilities(self):
-        caps = Mock()
-        caps.mount = Mock()
-        caps.mount.fs_type = "ext4"
-        access_types = csi_pb2.VolumeCapability.AccessMode
-        caps.access_mode.mode = access_types.SINGLE_NODE_WRITER
+    def test_validate_file_system_volume_capabilities(self):
+        cap = Mock()
+        cap.mount = Mock()
+        cap.mount.fs_type = "ext4"
+        access_mode = csi_pb2.VolumeCapability.AccessMode
+        cap.access_mode.mode = access_mode.SINGLE_NODE_WRITER
+        cap.HasField.return_value = True
 
-        utils.validate_csi_volume_capabilties([caps])
+        utils.validate_csi_volume_capabilties([cap])
 
         with self.assertRaises(ValidationException):
             utils.validate_csi_volume_capabilties([])
 
-        caps.mount.fs_type = "ext41"
+        cap.mount.fs_type = "ext4dummy"
         with self.assertRaises(ValidationException):
-            utils.validate_csi_volume_capabilties([caps])
+            utils.validate_csi_volume_capabilties([cap])
 
-        caps.mount.fs_type = "ext4"
-        caps.access_mode.mode = access_types.SINGLE_NODE_READER_ONLY
+        cap.mount.fs_type = "ext4"
+        cap.access_mode.mode = access_mode.SINGLE_NODE_READER_ONLY
         with self.assertRaises(ValidationException):
-            utils.validate_csi_volume_capabilties([caps])
+            utils.validate_csi_volume_capabilties([cap])
 
+    def test_validate_raw_block_volume_capabilities(self):
         caps = Mock()
-        caps.mount = None
-        caps.access_mode.mode = access_types.SINGLE_NODE_READER_ONLY
-        with self.assertRaises(ValidationException):
-            utils.validate_csi_volume_capabilties([caps])
+        caps.block = Mock()
+        access_mode = csi_pb2.VolumeCapability.AccessMode
+        caps.access_mode.mode = access_mode.SINGLE_NODE_WRITER
+        is_mount = False
+        is_block = True
+        caps.HasField.side_effect = [is_mount, is_block]
+
+        utils.validate_csi_volume_capabilties([caps])
 
     @patch('controller.controller_server.utils.validate_secret')
     @patch('controller.controller_server.utils.validate_csi_volume_capabilties')
@@ -282,25 +294,17 @@ class TestUtils(unittest.TestCase):
         res = utils.choose_connectivity_type(["iscsi", "fc"])
         self.assertEqual(res, "fc")
 
-    def test_generate_publish_volume_response(self):
-        config_a = {"controller": {"publish_context_lun_parameter": "lun",
-                                   "publish_context_connectivity_parameter":
-                                       "connectivity_type",
-                                   "publish_context_array_iqn": "array_iqn",
-                                   "publish_context_fc_initiators": "fc_wwns"}
-                  }
-        res = utils.generate_csi_publish_volume_response(0, "iscsi", config_a,
-                                                         ["1"])
+    def test_generate_publish_volume_response_success(self):
+        res = utils.generate_csi_publish_volume_response(0, "iscsi", self.config,
+                                                         {"iqn": ["1.1.1.1", "2.2.2.2"],
+                                                          "iqn2": ["3.3.3.3", "::1"]})
         self.assertEqual(res.publish_context["lun"], '0')
         self.assertEqual(res.publish_context["connectivity_type"], "iscsi")
-        self.assertEqual(res.publish_context["array_iqn"], '1')
+        self.assertEqual(res.publish_context["array_iqn"], "iqn,iqn2")
+        self.assertEqual(res.publish_context["iqn"], "1.1.1.1,2.2.2.2")
+        self.assertEqual(res.publish_context["iqn2"], "3.3.3.3,::1")
 
-        config_b = {"controller": {"publish_context_lun_parameter": "lun",
-                                   "publish_context_connectivity_parameter": "connectivity_type",
-                                   "publish_context_array_iqn": "array_iqn",
-                                   "publish_context_fc_initiators": "fc_wwns"}
-                    }
-        res = utils.generate_csi_publish_volume_response(1, "fc", config_b,
+        res = utils.generate_csi_publish_volume_response(1, "fc", self.config,
                                                          ["wwn1", "wwn2"])
         self.assertEqual(res.publish_context["lun"], '1')
         self.assertEqual(res.publish_context["connectivity_type"], "fc")

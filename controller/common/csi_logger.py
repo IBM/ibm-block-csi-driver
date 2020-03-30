@@ -1,7 +1,9 @@
 import logging
 import sys
 
-log_level="DEBUG"
+log_level = "DEBUG"
+ENTRY = '%(asctime)s %(levelname)s\t[%(thread)d] [%(threadName)s] (%(filename)s:%(funcName)s:%(lineno)d) - %(message)s'
+
 
 def get_stdout_logger():
     csi_logger = logging.getLogger("csi_logger")
@@ -11,14 +13,14 @@ def get_stdout_logger():
         csi_logger.setLevel(log_level)
         handler = logging.StreamHandler(sys.stdout)
         handler.setLevel(logging.DEBUG)
-        formatter = logging.Formatter(
-            '%(asctime)s %(levelname)s\t[%(thread)d] [%(threadName)s] (%(filename)s:%(funcName)s:%(lineno)d) - %(message)s')
+        formatter = logging.Formatter(ENTRY)
         handler.setFormatter(formatter)
         csi_logger.addHandler(handler)
 
         csi_logger.handler_set = True
 
     return csi_logger
+
 
 def set_log_level(log_level_to_set):
     """

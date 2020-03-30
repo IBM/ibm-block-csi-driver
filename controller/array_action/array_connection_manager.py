@@ -5,32 +5,35 @@ from controller.common.csi_logger import get_stdout_logger
 from controller.array_action.errors import NoConnectionAvailableException, FailedToFindStorageSystemType
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.array_action.array_mediator_svc import SVCArrayMediator
+from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
 
 connection_lock_dict = {}
 array_connections_dict = {}
 
-
 logger = get_stdout_logger()
 
 
-def _socket_connect_test(ipaddr, port, timeout=1):
-    '''
-    function to test socket connection to ip:port.
+def _socket_connect_test(host, port, timeout=1):
+    """
+    function to test socket connection to host:port.
 
-    :param ipaddr: ip address
+    :param host: ip address or host name
     :param port: port
     :param timeout: connection timeout
 
     :return:  0 - on successful connection
-             -1 for exception + other return codes for connection errors.
-
-    '''
+             -1 - on any exception, or specific connection errors with that error number
+             other values - on other connection errors
+    """
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(timeout)
-        ret = sock.connect_ex((ipaddr, port))
+        ret = sock.connect_ex((host, port))
         sock.close()
         return ret
+    except socket.gaierror as e:
+        logger.debug('could not resolve hostname "{HOST}": {ERROR}'.format(HOST=host, ERROR=e))
+        return -1
     except Exception as e:
         logger.debug('socket_connect {}'.format(e))
         return -1
@@ -38,11 +41,12 @@ def _socket_connect_test(ipaddr, port, timeout=1):
 
 class ArrayConnectionManager(object):
 
-
     def __init__(self, user, password, endpoint, array_type=None):  # TODO return the params back.
         self.array_mediator_class_dict = {
             XIVArrayMediator.array_type: XIVArrayMediator,
-            SVCArrayMediator.array_type: SVCArrayMediator}
+            SVCArrayMediator.array_type: SVCArrayMediator,
+            DS8KArrayMediator.array_type: DS8KArrayMediator,
+        }
 
         self.array_type = array_type
         self.user = user
@@ -111,8 +115,11 @@ class ArrayConnectionManager(object):
     def detect_array_type(self):
         logger.debug("detecting array connection type")
 
+        # Don't change the order here since svc port (22) is also opened in ds8k.
         for storage_type, port in [(XIVArrayMediator.array_type, XIVArrayMediator.port),
-                                   (SVCArrayMediator.array_type, SVCArrayMediator.port)]:  # ds8k : 8452
+                                   (DS8KArrayMediator.array_type, DS8KArrayMediator.port),
+                                   (SVCArrayMediator.array_type, SVCArrayMediator.port),
+                                   ]:
 
             for endpoint in self.endpoints:
                 if _socket_connect_test(endpoint, port) == 0:

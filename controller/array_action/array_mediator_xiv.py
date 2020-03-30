@@ -1,21 +1,21 @@
 from random import randint
 
-from pyxcli.client import XCLIClient
 from pyxcli import errors as xcli_errors
-from controller.common.csi_logger import get_stdout_logger
-from controller.array_action.array_mediator_interface import ArrayMediator
-from controller.array_action.array_action_types import Volume
+from pyxcli.client import XCLIClient
+
 import controller.array_action.errors as controller_errors
-from controller.array_action.config import ISCSI_CONNECTIVITY_TYPE
-from controller.array_action.config import FC_CONNECTIVITY_TYPE
+from controller.array_action.array_action_types import Volume
+from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
+from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.utils import classproperty
+from controller.common.csi_logger import get_stdout_logger
 from controller.common.utils import string_to_array
 
 array_connections_dict = {}
 logger = get_stdout_logger()
 
 
-class XIVArrayMediator(ArrayMediator):
+class XIVArrayMediator(ArrayMediatorAbstract):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
     MAX_LUN_NUMBER = 250
@@ -32,6 +32,10 @@ class XIVArrayMediator(ArrayMediator):
     @classproperty
     def max_vol_name_length(self):
         return 63
+
+    @classproperty
+    def max_volume_prefix_length(self):
+        return 20
 
     @classproperty
     def max_connections(self):
@@ -83,17 +87,17 @@ class XIVArrayMediator(ArrayMediator):
                       cli_volume.pool_name,
                       self.array_type)
 
-    def get_volume(self, vol_name):
-        logger.debug("Get volume : {}".format(vol_name))
+    def get_volume(self, volume_name, volume_context=None, volume_prefix=""):
+        logger.debug("Get volume : {}".format(volume_name))
         try:
-            cli_volume = self.client.cmd.vol_list(vol=vol_name).as_single_element
+            cli_volume = self.client.cmd.vol_list(vol=volume_name).as_single_element
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectName(ex.status)
 
         logger.debug("cli volume returned : {}".format(cli_volume))
         if not cli_volume:
-            raise controller_errors.VolumeNotFoundError(vol_name)
+            raise controller_errors.VolumeNotFoundError(volume_name)
 
         array_vol = self._generate_volume_response(cli_volume)
         return array_vol
@@ -110,7 +114,7 @@ class XIVArrayMediator(ArrayMediator):
         """:rtype: float"""
         return float(size_in_bytes) / self.BLOCK_SIZE_IN_BYTES
 
-    def create_volume(self, name, size_in_bytes, capabilities, pool):
+    def create_volume(self, name, size_in_bytes, capabilities, pool, volume_prefix=""):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with capabilities : {}".format(
             name, size_in_bytes, pool, capabilities))
 
@@ -266,10 +270,26 @@ class XIVArrayMediator(ArrayMediator):
             else:
                 raise controller_errors.UnMappingError(vol_name, host_name, ex)
 
-    def get_array_iqns(self):
+    def _get_iscsi_targets(self):
+        ip_interfaces = self.client.cmd.ipinterface_list()
+        iscsi_interfaces = (i for i in ip_interfaces if i.type == "iSCSI")
+        ips = []
+        for interface in iscsi_interfaces:
+            if interface.address:
+                ips.append(interface.address)
+            if interface.address6:
+                ipv6 = interface.address6.join('[]')
+                ips.append(ipv6)
+        return ips
+
+    def _get_array_iqn(self):
         config_get_list = self.client.cmd.config_get().as_list
-        array_iqn = [a for a in config_get_list if a["name"] == "iscsi_name"][0]["value"]
-        return [array_iqn]
+        return next(c.value for c in config_get_list if c.name == "iscsi_name")
+
+    def get_iscsi_targets_by_iqn(self):
+        array_iqn = self._get_array_iqn()
+        iscsi_targets = self._get_iscsi_targets()
+        return {array_iqn: iscsi_targets}
 
     def get_array_fc_wwns(self, host_name):
         fc_wwns_objects = self.client.cmd.fc_port_list()
