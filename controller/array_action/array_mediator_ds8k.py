@@ -355,12 +355,12 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def get_array_fc_wwns(self, host_name=None):
         logger.debug("Getting the connected fc port wwpns from array")
 
-        # remove this line when pyds8k support get_ioports_by_host
-        host_name = None
         try:
             if host_name:
+                logger.debug("Getting the connected fc port wwpns from array - hostname")
                 fc_ports = self.client.get_ioports_by_host(host_name)
             else:
+                logger.debug("Getting the connected fc port wwpns from array - all")
                 fc_ports = self.client.get_fcports()
 
             wwpns = [p.wwpn for p in fc_ports if p.state == IOPORT_STATUS_ONLINE]
