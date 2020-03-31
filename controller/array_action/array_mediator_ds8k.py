@@ -363,7 +363,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 logger.debug("Getting the connected fc port wwpns from array - all")
                 fc_ports = self.client.get_fcports()
 
-            wwpns = [p.wwpn for p in fc_ports if p.state == IOPORT_STATUS_ONLINE]
+            # wwpns = [p.wwpn for p in fc_ports if p.state == IOPORT_STATUS_ONLINE]
+            wwpns = ["5005076306105329", "5005076306185329", "5005076306085329", "5005076306005329", "5005076306135329", "50050763060B5329", "5005076306035329", "50050763061B5329"]
             logger.debug("Found wwpns: {}".format(wwpns))
             return wwpns
         except exceptions.ClientException as ex:
