@@ -360,8 +360,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
         try:
             host = self.client.get_host(host_name)
-            logger.debug("++++++++++++++++++++ HOST {}".format(host))
             if not host:
+                logger.warn("Host {} doesn't exist on array".format(host_name))
                 return []
             wwpns = [port[LOGIN_PORT_WWPN] for port in host.login_ports if
                      port[LOGIN_PORT_STATE] == LOGIN_PORT_STATE_ONLINE]
