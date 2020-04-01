@@ -310,33 +310,35 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.unmap_volume_from_host.assert_called_once_with(host_name=host_name, lunid=lunid)
 
     def test_get_array_fc_wwns_failed_with_ClientException(self):
-        self.client_mock.get_fcports.side_effect = ClientException("500")
+        self.client_mock.get_host.side_effect = ClientException("500")
         with self.assertRaises(ClientException):
             self.array.get_array_fc_wwns()
 
     def test_get_array_fc_wwns_skip_offline_port(self):
         wwpn1 = "fake_wwpn"
         wwpn2 = "offine_wwpn"
-        self.client_mock.get_fcports.return_value = [
-            Munch({
-                "wwpn": wwpn1,
-                "state": IOPORT_STATUS_ONLINE,
-            }),
-            Munch({
-                "wwpn": wwpn2,
-                "state": "offline",
-            }),
-        ]
+        self.client_mock.get_host.return_value = Munch(
+            {"login_ports": [
+                {
+                    "wwpn": wwpn1,
+                    "state": IOPORT_STATUS_ONLINE,
+                },
+                {
+                    "wwpn": wwpn2,
+                    "state": "offline",
+                }
+            ]})
         self.assertListEqual(self.array.get_array_fc_wwns(), [wwpn1])
 
     def test_get_array_fc_wwns(self):
         wwpn = "fake_wwpn"
-        self.client_mock.get_fcports.return_value = [
-            Munch({
-                "wwpn": wwpn,
-                "state": IOPORT_STATUS_ONLINE,
-            })
-        ]
+        self.client_mock.get_host.return_value = Munch(
+            {"login_ports": [
+                {
+                    "wwpn": wwpn,
+                    "state": IOPORT_STATUS_ONLINE
+                }
+            ]})
         self.assertListEqual(self.array.get_array_fc_wwns(), [wwpn])
 
     def test_get_host_by_identifiers(self):

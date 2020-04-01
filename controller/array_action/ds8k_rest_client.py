@@ -139,9 +139,6 @@ class RESTClient(object):
     def get_host_mappings(self, host_name):
         return self._client.get_mappings_by_host(host_name)
 
-    def get_ioports_by_host(self, host_name):
-        return self._client.get_ioports_by_host(host_name)
-
     def get_online_login_ports_by_host(self, host_name):
         host = self._client.get_host(host_name)
         if not host:
