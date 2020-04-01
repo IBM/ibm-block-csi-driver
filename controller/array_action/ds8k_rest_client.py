@@ -2,10 +2,6 @@ from pyds8k.client.ds8k.v1.client import Client
 from pyds8k.exceptions import NotFound
 from controller.common.csi_logger import get_stdout_logger
 
-LOGIN_PORT_WWPN = 'wwpn'
-LOGIN_PORT_STATE = 'state'
-LOGIN_PORT_STATE_ONLINE = 'online'
-
 logger = get_stdout_logger()
 
 
@@ -138,17 +134,6 @@ class RESTClient(object):
 
     def get_host_mappings(self, host_name):
         return self._client.get_mappings_by_host(host_name)
-
-    def get_online_login_ports_by_host(self, host_name):
-        host = self._client.get_host(host_name)
-        logger.debug("+++++++++++++ HOST {}".format(host))
-        logger.debug("+++++++++++++ HOST {}".format(host.login_ports))
-        for p in host.login_ports:
-            logger.debug("+++++++++++++ PORT {}".format(p))
-            logger.debug("+++++++++++++ PORT WWN {}".format(p[LOGIN_PORT_WWPN]))
-        if not host:
-            return []
-        return [port[LOGIN_PORT_WWPN] for port in host.login_ports if port[LOGIN_PORT_WWPN] == LOGIN_PORT_STATE_ONLINE]
 
     def get_user(self):
         return self._client.get_users(user_name=self.user)

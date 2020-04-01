@@ -312,7 +312,6 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_get_array_fc_wwns_failed_with_ClientException(self):
         ds8k_client = Mock()
         ds8k_client.side_effect = ClientException("500")
-        self.client_mock._client = ds8k_client
         with self.assertRaises(ClientException):
             self.array.get_array_fc_wwns()
 

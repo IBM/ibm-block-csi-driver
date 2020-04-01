@@ -11,6 +11,9 @@ import controller.array_action.errors as array_errors
 from controller.array_action import config
 from controller.array_action.array_action_types import Volume
 
+LOGIN_PORT_WWPN = 'wwpn'
+LOGIN_PORT_STATE = 'state'
+LOGIN_PORT_STATE_ONLINE = 'online'
 
 logger = get_stdout_logger()
 
@@ -353,22 +356,14 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return {}
 
     def get_array_fc_wwns(self, host_name=None):
-        logger.debug("+++++++++++ Getting the connected fc port wwpns for host {} from array".format(host_name))
+        logger.debug("Getting the connected fc port wwpns for host {} from array".format(host_name))
 
         try:
-            host = self.client._client.get_host(host_name)
-            logger.debug("+++++++++++++ HOST {}".format(host))
-            logger.debug("+++++++++++++ HOST {}".format(host.login_ports))
-            for p in host.login_ports:
-                logger.debug("+++++++++++++ PORT {}".format(p))
-                logger.debug("+++++++++++++ PORT WWN {}".format(p["wwpn"]))
-                logger.debug("+++++++++++++ PORT WWN TYPE {}".format(type(p["wwpn"])))
-            res = [port["wwpn"] for port in host.login_ports if
-                    port["state"] == "online"]
-            logger.debug("+++++++++++++ RES {}".format(res))
-            logger.debug("+++++++++++++ RES TYPE {}".format(type(res)))
-
-            wwpns = self.client.get_online_login_ports_by_host(host_name)
+            host = self.client.get_host(host_name)
+            if not host:
+                return []
+            wwpns = [port[LOGIN_PORT_WWPN] for port in host.login_ports if
+                     port[LOGIN_PORT_WWPN] == LOGIN_PORT_STATE_ONLINE]
             logger.debug("Found wwpns: {}".format(wwpns))
             return wwpns
         except exceptions.ClientException as ex:
