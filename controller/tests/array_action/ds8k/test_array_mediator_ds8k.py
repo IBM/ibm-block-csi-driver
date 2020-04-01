@@ -331,8 +331,10 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.assertListEqual(self.array.get_array_fc_wwns(), [wwpn1])
 
     def test_get_array_fc_wwns(self):
+        ds8k_client = Mock()
+        self.client_mock._client = ds8k_client
         wwpn = "fake_wwpn"
-        self.client_mock.get_host.return_value = Munch(
+        ds8k_client.get_host.return_value = Munch(
             {"login_ports": [
                 {
                     "wwpn": wwpn,
