@@ -310,8 +310,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.unmap_volume_from_host.assert_called_once_with(host_name=host_name, lunid=lunid)
 
     def test_get_array_fc_wwns_failed_with_ClientException(self):
-        ds8k_client = Mock()
-        ds8k_client.side_effect = ClientException("500")
+        self.client_mock.side_effect = ClientException("500")
         with self.assertRaises(ClientException):
             self.array.get_array_fc_wwns()
 
@@ -333,15 +332,13 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_get_array_fc_wwns(self):
         wwpn = "fake_wwpn"
-        ds8k_client = Mock()
-        ds8k_client.get_host.return_value = Munch(
+        self.client_mock.get_host.return_value = Munch(
             {"login_ports": [
                 {
                     "wwpn": wwpn,
                     "state": IOPORT_STATUS_ONLINE
                 }
             ]})
-        self.client_mock._client = ds8k_client
         self.assertListEqual(self.array.get_array_fc_wwns(), [wwpn])
 
     def test_get_host_by_identifiers(self):
