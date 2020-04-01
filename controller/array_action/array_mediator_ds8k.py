@@ -361,7 +361,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             logger.debug("+++++++++++++ HOST {}".format(host.login_ports))
             for p in host.login_ports:
                 logger.debug("+++++++++++++ PORT {}".format(p))
-                logger.debug("+++++++++++++ PORT WWN {}".format(p[LOGIN_PORT_WWPN]))
+                logger.debug("+++++++++++++ PORT WWN {}".format(p["wwpn"]))
 
             wwpns = self.client.get_online_login_ports_by_host(host_name)
             logger.debug("Found wwpns: {}".format(wwpns))
