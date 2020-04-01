@@ -310,7 +310,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.unmap_volume_from_host.assert_called_once_with(host_name=host_name, lunid=lunid)
 
     def test_get_array_fc_wwns_failed_with_ClientException(self):
-        self.client_mock.side_effect = ClientException("500")
+        self.client_mock.get_host.side_effect = ClientException("500")
         with self.assertRaises(ClientException):
             self.array.get_array_fc_wwns()
 
