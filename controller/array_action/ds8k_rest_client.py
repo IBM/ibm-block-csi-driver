@@ -141,6 +141,11 @@ class RESTClient(object):
 
     def get_online_login_ports_by_host(self, host_name):
         host = self._client.get_host(host_name)
+        logger.debug("+++++++++++++ HOST {}".format(host))
+        logger.debug("+++++++++++++ HOST {}".format(host.login_ports))
+        for p in host.login_ports:
+            logger.debug("+++++++++++++ PORT {}".format(p))
+            logger.debug("+++++++++++++ PORT WWN {}".format(p[LOGIN_PORT_WWPN]))
         if not host:
             return []
         return [port[LOGIN_PORT_WWPN] for port in host.login_ports if port[LOGIN_PORT_WWPN] == LOGIN_PORT_STATE_ONLINE]
