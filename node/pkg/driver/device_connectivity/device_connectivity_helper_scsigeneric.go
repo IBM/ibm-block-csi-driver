@@ -51,8 +51,8 @@ type OsDeviceConnectivityHelperScsiGeneric struct {
 }
 
 type WaitForMpathResult struct {
-	dps []string
-	err error
+	devicesPaths []string
+	err          error
 }
 
 var (
@@ -153,7 +153,6 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 	var devicePaths []string
 	var errStrings []string
 	var targetPath string
-	lunIdStr := convertIntToScsilun(lunId)
 
 	if connectivityType == ConnectionTypeFC {
 		targetPath = fmt.Sprintf("/dev/disk/by-path/%s*", fcSubsystem)
@@ -175,7 +174,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 
 	for i := 1; i <= len(arrayIdentifiers); i++ {
 		mpathRes := <-ch
-		devicePaths = append(devicePaths, mpathRes.dps...)
+		devicePaths = append(devicePaths, mpathRes.devicesPaths...)
 		if mpathRes.err != nil {
 			errStrings = append(errStrings, mpathRes.err.Error())
 		}
@@ -233,7 +232,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) waitForMpath(targetPath string, c
 		e := &MultipleDeviceNotFoundForLunError{volumeId, lunId, []string{arrayIdentifier}}
 		logger.Errorf(e.Error())
 	}
-	res := &WaitForMpathResult{dps: dps, err: e}
+	res := &WaitForMpathResult{devicesPaths: dps, err: e}
 	ch <- res
 }
 
