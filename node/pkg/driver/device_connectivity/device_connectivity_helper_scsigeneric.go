@@ -60,11 +60,11 @@ var (
 )
 
 const (
-	DevPath             		= "/dev"
-	ConnectionTypeISCSI 		= "iscsi"
-	ConnectionTypeFC    		= "fc"
-	waitForMpathRetries 		= 5
-	waitForMpathWaitIntervalSec = 5
+	DevPath                     = "/dev"
+	ConnectionTypeISCSI         = "iscsi"
+	ConnectionTypeFC            = "fc"
+	waitForMpathRetries         = 5
+	waitForMpathWaitIntervalSec = 1
 )
 
 func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperScsiGenericInterface {
