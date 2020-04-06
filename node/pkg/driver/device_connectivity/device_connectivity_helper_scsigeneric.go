@@ -224,7 +224,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) waitForMpath(targetPath string, c
 	ch chan<- *WaitForMpathResult) {
 	lunIdStr := convertIntToScsilun(lunId)
 	dp := strings.Join([]string{targetPath, connectivityType, arrayIdentifier, "lun", lunIdStr}, "-")
-	logger.Infof("GetMpathDevice: Get the mpath devices related to connectivityType=%s initiator=%s and lunID=%s : {%v}", connectivityType, arrayIdentifier, lunId, dp)
+	logger.Infof("GetMpathDevice: Get the mpath devices related to connectivityType=%s initiator=%s and lunID=%d : {%v}", connectivityType, arrayIdentifier, lunId, dp)
 	dps, exists, e := r.Helper.WaitForPathToExist(dp, waitForMpathRetries, waitForMpathWaitIntervalSec)
 	if e != nil {
 		logger.Errorf("GetMpathDevice: No device found error : %v ", e.Error())
