@@ -170,11 +170,11 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 	logger.Debugf("GetMpathDevice: Start concurrent multipath devices search for volume : [%s]", volumeId)
 	ch := make(chan *WaitForMpathResult)
 	for _, arrayIdentifier := range arrayIdentifiers {
-		go r.waitForMpath(targetPath, connectivityType, arrayIdentifier,  lunId, volumeId, ch)
+		go r.waitForMpath(targetPath, connectivityType, arrayIdentifier, lunId, volumeId, ch)
 	}
 
 	for i := 1; i <= len(arrayIdentifiers); i++ {
-		mpathRes := <- ch
+		mpathRes := <-ch
 		devicePaths = append(devicePaths, mpathRes.dps...)
 		if mpathRes.err != nil {
 			errStrings = append(errStrings, mpathRes.err.Error())
@@ -221,8 +221,8 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 	return md, nil
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) waitForMpath(targetPath string, connectivityType string, arrayIdentifier string,  lunId int, volumeId string,
-					ch chan <- *WaitForMpathResult) {
+func (r OsDeviceConnectivityHelperScsiGeneric) waitForMpath(targetPath string, connectivityType string, arrayIdentifier string, lunId int, volumeId string,
+	ch chan<- *WaitForMpathResult) {
 	lunIdStr := convertIntToScsilun(lunId)
 	dp := strings.Join([]string{targetPath, connectivityType, arrayIdentifier, "lun", lunIdStr}, "-")
 	logger.Infof("GetMpathDevice: Get the mpath devices related to connectivityType=%s initiator=%s and lunID=%s : {%v}", connectivityType, arrayIdentifier, lunId, dp)
