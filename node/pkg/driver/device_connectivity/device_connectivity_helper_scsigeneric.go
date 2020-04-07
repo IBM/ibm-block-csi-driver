@@ -22,7 +22,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -184,7 +183,6 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 	logger.Debugf("GetMpathDevice: Finished concurrent multipath devices search for volume : [%s]", volumeId)
 
 	if len(devicePaths) == 0 && len(errStrings) != 0 {
-		sort.Strings(errStrings)
 		err := errors.New(strings.Join(errStrings, ","))
 		return "", err
 	}

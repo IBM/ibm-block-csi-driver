@@ -26,6 +26,7 @@ import (
 	"path"
 	"reflect"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -60,6 +61,14 @@ func getFcPath(fileNameSuffix string) string {
 	}
 	var fileName = fileNamePrefix + fileNameSuffix
 	return path.Join(byPathDir, fileName)
+}
+
+func areSringsEqualsAsSet(str1, str2 string) bool {
+	sl1 := strings.Split(str1, ",")
+	sl2 := strings.Split(str2, ",")
+	sort.Strings(sl1)
+	sort.Strings(sl2)
+	return reflect.DeepEqual(sl1, sl2)
 }
 
 type GetMultipathDiskReturn struct {
@@ -233,7 +242,7 @@ func TestGetMpathDevice(t *testing.T) {
 				},
 			},
 
-			expErr:      fmt.Errorf("Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[X]]. Please check the host connectivity to the storage.,error"),
+			expErr:      fmt.Errorf("error,Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[X]]. Please check the host connectivity to the storage."),
 			expDMdevice: "",
 		},
 	}
@@ -272,7 +281,7 @@ func TestGetMpathDevice(t *testing.T) {
 						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
 					}
 				} else {
-					if err.Error() != tc.expErr.Error() {
+					if !areSringsEqualsAsSet(err.Error(), tc.expErr.Error()) {
 						t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())
 					}
 				}
@@ -449,7 +458,7 @@ func TestGetMpathDevice(t *testing.T) {
 				},
 			},
 
-			expErr:      fmt.Errorf("Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[0xy]]. Please check the host connectivity to the storage.,error"),
+			expErr:      fmt.Errorf("error,Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[0xy]]. Please check the host connectivity to the storage."),
 			expDMdevice: "",
 		},
 	}
@@ -488,7 +497,7 @@ func TestGetMpathDevice(t *testing.T) {
 						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
 					}
 				} else {
-					if err.Error() != tc.expErr.Error() {
+					if !areSringsEqualsAsSet(err.Error(), tc.expErr.Error()) {
 						t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())
 					}
 				}
