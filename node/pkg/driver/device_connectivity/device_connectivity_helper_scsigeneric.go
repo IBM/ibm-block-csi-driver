@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -63,8 +64,8 @@ const (
 	DevPath                     = "/dev"
 	ConnectionTypeISCSI         = "iscsi"
 	ConnectionTypeFC            = "fc"
-	waitForMpathRetries         = 5
-	waitForMpathWaitIntervalSec = 1
+	WaitForMpathRetries         = 5
+	WaitForMpathWaitIntervalSec = 1
 )
 
 func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperScsiGenericInterface {
@@ -183,6 +184,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 	logger.Debugf("GetMpathDevice: Finished concurrent multipath devices search for volume : [%s]", volumeId)
 
 	if len(devicePaths) == 0 && len(errStrings) != 0 {
+		sort.Strings(errStrings)
 		err := errors.New(strings.Join(errStrings, ","))
 		return "", err
 	}
@@ -225,11 +227,11 @@ func (r OsDeviceConnectivityHelperScsiGeneric) waitForMpath(targetPath string, c
 	lunIdStr := convertIntToScsilun(lunId)
 	dp := strings.Join([]string{targetPath, connectivityType, arrayIdentifier, "lun", lunIdStr}, "-")
 	logger.Infof("GetMpathDevice: Get the mpath devices related to connectivityType=%s initiator=%s and lunID=%d : {%v}", connectivityType, arrayIdentifier, lunId, dp)
-	dps, exists, e := r.Helper.WaitForPathToExist(dp, waitForMpathRetries, waitForMpathWaitIntervalSec)
+	dps, exists, e := r.Helper.WaitForPathToExist(dp, WaitForMpathRetries, WaitForMpathWaitIntervalSec)
 	if e != nil {
 		logger.Errorf("GetMpathDevice: No device found error : %v ", e.Error())
 	} else if !exists {
-		e := &MultipleDeviceNotFoundForLunError{volumeId, lunId, []string{arrayIdentifier}}
+		e = &MultipleDeviceNotFoundForLunError{volumeId, lunId, []string{arrayIdentifier}}
 		logger.Errorf(e.Error())
 	}
 	res := &WaitForMpathResult{devicesPaths: dps, err: e}
