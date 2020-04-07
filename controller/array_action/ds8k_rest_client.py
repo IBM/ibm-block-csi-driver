@@ -129,9 +129,6 @@ class RESTClient(object):
     def get_volumes_by_lss(self, lss_number):
         return self._client.get_volumes_by_lss(lss_number)
 
-    def get_fcports(self):
-        return self._client.get_ioports()
-
     def get_host_mappings(self, host_name):
         return self._client.get_mappings_by_host(host_name)
 

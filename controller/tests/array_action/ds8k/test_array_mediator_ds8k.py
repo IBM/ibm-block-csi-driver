@@ -1,6 +1,6 @@
 import unittest
 from munch import Munch
-from mock import patch, NonCallableMagicMock, Mock
+from mock import patch, NonCallableMagicMock
 from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
 from controller.array_action.array_mediator_ds8k import shorten_volume_name
 from controller.array_action.array_mediator_ds8k import IOPORT_STATUS_ONLINE
