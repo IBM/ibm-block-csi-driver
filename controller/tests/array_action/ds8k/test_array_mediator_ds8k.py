@@ -3,7 +3,7 @@ from munch import Munch
 from mock import patch, NonCallableMagicMock
 from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
 from controller.array_action.array_mediator_ds8k import shorten_volume_name
-from controller.array_action.array_mediator_ds8k import IOPORT_STATUS_ONLINE
+from controller.array_action.array_mediator_ds8k import LOGIN_PORT_WWPN, LOGIN_PORT_STATE, LOGIN_PORT_STATE_ONLINE
 from pyds8k.exceptions import ClientError, ClientException, NotFound
 from controller.common import settings
 import controller.array_action.errors as array_errors
@@ -320,12 +320,12 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.get_host.return_value = Munch(
             {"login_ports": [
                 {
-                    "wwpn": wwpn1,
-                    "state": IOPORT_STATUS_ONLINE,
+                    LOGIN_PORT_WWPN: wwpn1,
+                    LOGIN_PORT_STATE: LOGIN_PORT_STATE_ONLINE,
                 },
                 {
-                    "wwpn": wwpn2,
-                    "state": "offline",
+                    LOGIN_PORT_WWPN: wwpn2,
+                    LOGIN_PORT_STATE: "offline",
                 }
             ]})
         self.assertListEqual(self.array.get_array_fc_wwns(), [wwpn1])
@@ -335,8 +335,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.get_host.return_value = Munch(
             {"login_ports": [
                 {
-                    "wwpn": wwpn,
-                    "state": IOPORT_STATUS_ONLINE
+                    LOGIN_PORT_WWPN: wwpn,
+                    LOGIN_PORT_STATE: LOGIN_PORT_STATE_ONLINE
                 }
             ]})
         self.assertListEqual(self.array.get_array_fc_wwns(), [wwpn])
