@@ -260,7 +260,7 @@ func TestGetMpathDevice(t *testing.T) {
 
 			for index, r := range tc.waitForPathToExistReturns {
 				path := strings.Join([]string{"/dev/disk/by-path/ip*", device_connectivity.ConnectionTypeISCSI, tc.arrayIdentifiers[index], "lun", strconv.Itoa(lunId)}, "-")
-				fake_helper.EXPECT().WaitForPathToExist(path, 5, 1).Return(
+				fake_helper.EXPECT().WaitForPathToExist(path, device_connectivity.WaitForMpathRetries, device_connectivity.WaitForMpathWaitIntervalSec).Return(
 					r.devicePaths,
 					r.exists,
 					r.err)
