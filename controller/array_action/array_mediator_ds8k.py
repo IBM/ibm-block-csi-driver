@@ -10,9 +10,10 @@ from controller.array_action.ds8k_rest_client import RESTClient, scsilun_to_int
 import controller.array_action.errors as array_errors
 from controller.array_action import config
 from controller.array_action.array_action_types import Volume
+from pyds8k.resources.ds8k.v1.common import attr_names
 
-LOGIN_PORT_WWPN = 'wwpn'
-LOGIN_PORT_STATE = 'state'
+LOGIN_PORT_WWPN = attr_names.IOPORT_WWPN
+LOGIN_PORT_STATE = attr_names.IOPORT_STATUS
 LOGIN_PORT_STATE_ONLINE = 'online'
 
 logger = get_stdout_logger()
@@ -25,7 +26,6 @@ ERROR_CODE_VOLUME_NOT_FOUND_FOR_MAPPING = 'BE586015'
 
 
 MAX_VOLUME_LENGTH = 16
-IOPORT_STATUS_ONLINE = 'online'
 
 
 def parse_version(bundle):
