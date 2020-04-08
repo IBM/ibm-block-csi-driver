@@ -3,7 +3,7 @@ from munch import Munch
 from mock import patch, NonCallableMagicMock
 from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
 from controller.array_action.array_mediator_ds8k import shorten_volume_name
-from controller.array_action.array_mediator_ds8k import IOPORT_STATUS_ONLINE
+from controller.array_action.array_mediator_ds8k import LOGIN_PORT_WWPN, LOGIN_PORT_STATE, LOGIN_PORT_STATE_ONLINE
 from pyds8k.exceptions import ClientError, ClientException, NotFound
 from controller.common import settings
 import controller.array_action.errors as array_errors
@@ -310,33 +310,35 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.unmap_volume_from_host.assert_called_once_with(host_name=host_name, lunid=lunid)
 
     def test_get_array_fc_wwns_failed_with_ClientException(self):
-        self.client_mock.get_fcports.side_effect = ClientException("500")
+        self.client_mock.get_host.side_effect = ClientException("500")
         with self.assertRaises(ClientException):
             self.array.get_array_fc_wwns()
 
     def test_get_array_fc_wwns_skip_offline_port(self):
         wwpn1 = "fake_wwpn"
         wwpn2 = "offine_wwpn"
-        self.client_mock.get_fcports.return_value = [
-            Munch({
-                "wwpn": wwpn1,
-                "state": IOPORT_STATUS_ONLINE,
-            }),
-            Munch({
-                "wwpn": wwpn2,
-                "state": "offline",
-            }),
-        ]
+        self.client_mock.get_host.return_value = Munch(
+            {"login_ports": [
+                {
+                    LOGIN_PORT_WWPN: wwpn1,
+                    LOGIN_PORT_STATE: LOGIN_PORT_STATE_ONLINE,
+                },
+                {
+                    LOGIN_PORT_WWPN: wwpn2,
+                    LOGIN_PORT_STATE: "offline",
+                }
+            ]})
         self.assertListEqual(self.array.get_array_fc_wwns(), [wwpn1])
 
     def test_get_array_fc_wwns(self):
         wwpn = "fake_wwpn"
-        self.client_mock.get_fcports.return_value = [
-            Munch({
-                "wwpn": wwpn,
-                "state": IOPORT_STATUS_ONLINE,
-            })
-        ]
+        self.client_mock.get_host.return_value = Munch(
+            {"login_ports": [
+                {
+                    LOGIN_PORT_WWPN: wwpn,
+                    LOGIN_PORT_STATE: LOGIN_PORT_STATE_ONLINE
+                }
+            ]})
         self.assertListEqual(self.array.get_array_fc_wwns(), [wwpn])
 
     def test_get_host_by_identifiers(self):
