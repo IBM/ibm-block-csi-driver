@@ -18,19 +18,19 @@ package device_connectivity_test
 
 import (
 	"fmt"
-	"os"
-	"path"
-	"reflect"
-	"runtime"
-	"strconv"
-	"strings"
-	"sync"
-	"testing"
-
 	"github.com/golang/mock/gomock"
 	"github.com/ibm/ibm-block-csi-driver/node/mocks"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"os"
+	"path"
+	"reflect"
+	"runtime"
+	"sort"
+	"strconv"
+	"strings"
+	"sync"
+	"testing"
 )
 
 type WaitForPathToExistReturn struct {
@@ -61,6 +61,14 @@ func getFcPath(fileNameSuffix string) string {
 	}
 	var fileName = fileNamePrefix + fileNameSuffix
 	return path.Join(byPathDir, fileName)
+}
+
+func areStringsEqualAsSet(str1, str2 string) bool {
+	sl1 := strings.Split(str1, device_connectivity.GetMpahDevErrorsSep)
+	sl2 := strings.Split(str2, device_connectivity.GetMpahDevErrorsSep)
+	sort.Strings(sl1)
+	sort.Strings(sl2)
+	return reflect.DeepEqual(sl1, sl2)
 }
 
 type GetMultipathDiskReturn struct {
@@ -220,7 +228,7 @@ func TestGetMpathDevice(t *testing.T) {
 
 		{
 			name:             "Should fail when WaitForPathToExist return error with the first array iqn, and found no sd device with the second array iqn",
-			arrayIdentifiers: []string{"X", "Y"},
+			arrayIdentifiers: []string{"X", "X"},
 			waitForPathToExistReturns: []WaitForPathToExistReturn{
 				WaitForPathToExistReturn{
 					devicePaths: nil,
@@ -234,7 +242,7 @@ func TestGetMpathDevice(t *testing.T) {
 				},
 			},
 
-			expErr:      fmt.Errorf("error,Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[Y]]. Please check the host connectivity to the storage."),
+			expErr:      fmt.Errorf("error,Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[X]]. Please check the host connectivity to the storage."),
 			expDMdevice: "",
 		},
 	}
@@ -250,21 +258,17 @@ func TestGetMpathDevice(t *testing.T) {
 			fake_mutex := &sync.Mutex{}
 			lunId := 0
 
-			var mcalls []*gomock.Call
 			for index, r := range tc.waitForPathToExistReturns {
 				path := strings.Join([]string{"/dev/disk/by-path/ip*", device_connectivity.ConnectionTypeISCSI, tc.arrayIdentifiers[index], "lun", strconv.Itoa(lunId)}, "-")
-				call := fake_helper.EXPECT().WaitForPathToExist(path, 5, 1).Return(
+				fake_helper.EXPECT().WaitForPathToExist(path, device_connectivity.WaitForMpathRetries, device_connectivity.WaitForMpathWaitIntervalSec).Return(
 					r.devicePaths,
 					r.exists,
 					r.err)
-				mcalls = append(mcalls, call)
 			}
 
 			for _, r := range tc.getMultipathDiskReturns {
-				call := fake_helper.EXPECT().GetMultipathDisk(r.pathParam).Return(r.path, r.err)
-				mcalls = append(mcalls, call)
+				fake_helper.EXPECT().GetMultipathDisk(r.pathParam).Return(r.path, r.err)
 			}
-			gomock.InOrder(mcalls...)
 
 			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fake_executer, fake_helper, fake_mutex)
 			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, tc.arrayIdentifiers, device_connectivity.ConnectionTypeISCSI)
@@ -277,8 +281,8 @@ func TestGetMpathDevice(t *testing.T) {
 						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
 					}
 				} else {
-					if err.Error() != tc.expErr.Error() {
-						t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())
+					if !areStringsEqualAsSet(err.Error(), tc.expErr.Error()) {
+						t.Fatalf("Expected error %s, got %s", tc.expErr, err.Error())
 					}
 				}
 			}
@@ -440,7 +444,7 @@ func TestGetMpathDevice(t *testing.T) {
 
 		{
 			name:             "Should fail when WaitForPathToExist return error with the first array wwn, and found no sd device with the second array wwn",
-			arrayIdentifiers: []string{"x", "y"},
+			arrayIdentifiers: []string{"Y", "Y"},
 			waitForPathToExistReturns: []WaitForPathToExistReturn{
 				WaitForPathToExistReturn{
 					devicePaths: nil,
@@ -469,22 +473,18 @@ func TestGetMpathDevice(t *testing.T) {
 			fake_mutex := &sync.Mutex{}
 			lunId := 0
 
-			var mcalls []*gomock.Call
 			for index, r := range tc.waitForPathToExistReturns {
 				array_inititor := "0x" + strings.ToLower(string(tc.arrayIdentifiers[index]))
 				path := strings.Join([]string{getFcPath("*"), device_connectivity.ConnectionTypeFC, array_inititor, "lun", strconv.Itoa(lunId)}, "-")
-				call := fake_helper.EXPECT().WaitForPathToExist(path, 5, 1).Return(
+				fake_helper.EXPECT().WaitForPathToExist(path, device_connectivity.WaitForMpathRetries, device_connectivity.WaitForMpathWaitIntervalSec).Return(
 					r.devicePaths,
 					r.exists,
 					r.err)
-				mcalls = append(mcalls, call)
 			}
 
 			for _, r := range tc.getMultipathDiskReturns {
-				call := fake_helper.EXPECT().GetMultipathDisk(r.pathParam).Return(r.path, r.err)
-				mcalls = append(mcalls, call)
+				fake_helper.EXPECT().GetMultipathDisk(r.pathParam).Return(r.path, r.err)
 			}
-			gomock.InOrder(mcalls...)
 
 			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fake_executer, fake_helper, fake_mutex)
 			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, tc.arrayIdentifiers, device_connectivity.ConnectionTypeFC)
@@ -497,8 +497,8 @@ func TestGetMpathDevice(t *testing.T) {
 						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
 					}
 				} else {
-					if err.Error() != tc.expErr.Error() {
-						t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())
+					if !areStringsEqualAsSet(err.Error(), tc.expErr.Error()) {
+						t.Fatalf("Expected error %s, got %s", tc.expErr, err.Error())
 					}
 				}
 			}
