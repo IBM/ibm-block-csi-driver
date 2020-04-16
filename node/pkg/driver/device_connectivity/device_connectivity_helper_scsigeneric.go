@@ -65,6 +65,9 @@ const (
 	ConnectionTypeFC            = "fc"
 	WaitForMpathRetries         = 5
 	WaitForMpathWaitIntervalSec = 1
+	FC_HOST_SYSFS_PATH          = "/sys/class/fc_remote_ports/rport-*/port_name"
+	IscsiHostRexExPath          = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
+	GetMpahDevErrorsSep         = ","
 )
 
 func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperScsiGenericInterface {
@@ -426,12 +429,6 @@ func (o OsDeviceConnectivityHelperGeneric) GetMultipathDisk(path string) (string
 	logger.Errorf(err.Error())
 	return "", err
 }
-
-const (
-	FC_HOST_SYSFS_PATH = "/sys/class/fc_remote_ports/rport-*/port_name"
-	IscsiHostRexExPath = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
-	GetMpahDevErrorsSep = ","
-)
 
 func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error) {
 	/*
