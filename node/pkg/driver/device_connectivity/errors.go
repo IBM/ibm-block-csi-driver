@@ -19,13 +19,13 @@ func (e *MultipleDmDevicesError) Error() string {
 	return fmt.Sprintf("Detected more then one multipath devices (%s) for single volume (%s) with lunID %d from array target iqn %v", mps, e.VolumeId, e.LunId, e.ArrayIqns)
 }
 
-type MultipleDeviceNotFoundForLunError struct {
+type MultipathDeviceNotFoundForLunError struct {
 	VolumeId  string
 	LunId     int
 	ArrayIqns []string
 }
 
-func (e *MultipleDeviceNotFoundForLunError) Error() string {
+func (e *MultipathDeviceNotFoundForLunError) Error() string {
 	return fmt.Sprintf("Couldn't find multipath device for volumeID [%s] lunID [%d] from array [%s]. Please check the host connectivity to the storage.", e.VolumeId, e.LunId, e.ArrayIqns)
 }
 

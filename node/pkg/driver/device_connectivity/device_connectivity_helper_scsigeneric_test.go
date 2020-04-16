@@ -63,9 +63,9 @@ func getFcPath(fileNameSuffix string) string {
 	return path.Join(byPathDir, fileName)
 }
 
-func areSringsEqualsAsSet(str1, str2 string) bool {
-	sl1 := strings.Split(str1, ",")
-	sl2 := strings.Split(str2, ",")
+func areStringsEqualAsSet(str1, str2 string, sep string) bool {
+	sl1 := strings.Split(str1, sep)
+	sl2 := strings.Split(str2, sep)
 	sort.Strings(sl1)
 	sort.Strings(sl2)
 	return reflect.DeepEqual(sl1, sl2)
@@ -281,8 +281,8 @@ func TestGetMpathDevice(t *testing.T) {
 						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
 					}
 				} else {
-					if !areSringsEqualsAsSet(err.Error(), tc.expErr.Error()) {
-						t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())
+					if !areStringsEqualAsSet(err.Error(), tc.expErr.Error(), device_connectivity.GetMpahDevErrorsSep) {
+						t.Fatalf("Expected error %s, got %s", tc.expErr, err.Error())
 					}
 				}
 			}
@@ -497,8 +497,8 @@ func TestGetMpathDevice(t *testing.T) {
 						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
 					}
 				} else {
-					if !areSringsEqualsAsSet(err.Error(), tc.expErr.Error()) {
-						t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())
+					if !areStringsEqualAsSet(err.Error(), tc.expErr.Error(), device_connectivity.GetMpahDevErrorsSep) {
+						t.Fatalf("Expected error %s, got %s", tc.expErr, err.Error())
 					}
 				}
 			}
