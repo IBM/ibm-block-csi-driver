@@ -413,19 +413,21 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def _get_volume_name_and_prefix(self, request, array_mediator):
         return self._get_object_name_and_prefix(request, array_mediator.max_volume_prefix_length,
-                                                array_mediator.max_vol_name_length, config.OBJECT_TYPE_NAME_VOLUME)
+                                                array_mediator.max_vol_name_length, config.OBJECT_TYPE_NAME_VOLUME,
+                                                config.PARAMETERS_VOLUME_NAME_PREFIX)
 
     def _get_snapshot_name(self, request, array_mediator):
         name, _ = self._get_object_name_and_prefix(request, array_mediator.max_snapshot_prefix_length,
                                                    array_mediator.max_snapshot_name_length,
-                                                   config.OBJECT_TYPE_NAME_SNAPSHOT)
+                                                   config.OBJECT_TYPE_NAME_SNAPSHOT,
+                                                   config.PARAMETERS_VOLUME_NAME_PREFIX)
         return name
 
-    def _get_object_name_and_prefix(self, request, max_name_prefix_length, max_name_length, object_type):
+    def _get_object_name_and_prefix(self, request, max_name_prefix_length, max_name_length, object_type, prefix_param_name):
         name = request.name
         prefix = ""
-        if request.parameters and (config.PARAMETERS_PREFIX in request.parameters):
-            prefix = request.parameters[config.PARAMETERS_PREFIX]
+        if request.parameters and (prefix_param_name in request.parameters):
+            prefix = request.parameters[prefix_param_name]
             if len(prefix) > max_name_prefix_length:
                 raise controller_errors.IllegalObjectName(
                     "The {} name prefix {} is too long, max allowed length is {}".format(
