@@ -102,12 +102,12 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     @classproperty
     def max_snapshot_name_length(self):
         # TODO: CSI-1339
-        raise NotImplementedError
+        pass
 
     @classproperty
     def max_snapshot_prefix_length(self):
         # TODO: CSI-1339
-        raise NotImplementedError
+        pass
 
     @classproperty
     def minimal_volume_size_in_bytes(self):
