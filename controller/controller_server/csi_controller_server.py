@@ -317,7 +317,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.debug(array_mediator)
                 snapshot_name = self._get_snapshot_name(request, array_mediator)
                 # TODO:
-                logger.info("++++++++++++ snap name ".format(snapshot_name))
+                logger.info("++++++++++++ snap name {0} ".format(snapshot_name))
                 volume_name = array_mediator.get_volume_name(vol_id)
                 logger.info("Snapshot name : {}. Volume name : {}".format(snapshot_name, volume_name))
                 snapshot = array_mediator.get_snapshot(snapshot_name)
