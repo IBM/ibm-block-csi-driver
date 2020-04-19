@@ -198,7 +198,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     def test_create_snapshot_cuts_name_if_its_too_long(self, a_exit, a_enter, array_type):
         a_enter.return_value = self.mediator
-        self.mediator.max_snapshot_name_length.return_value = 63
+        self.mediator.max_snapshot_name_length = 63
         context = utils.FakeContext()
         self.servicer.CreateVolume(self.request, context)
         context = utils.FakeContext()
