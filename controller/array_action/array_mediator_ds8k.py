@@ -305,7 +305,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def get_volume_name(self, volume_id):
         # TODO: CSI-1339
-        raise NotImplementedError
+        pass
 
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume {}".format(volume_id))
@@ -368,15 +368,15 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def get_snapshot(self, snapshot_name):
         # TODO: CSI-1339
-        raise NotImplementedError
+        pass
 
     def create_snapshot(self, name, volume_name):
         # TODO: CSI-1339
-        raise NotImplementedError
+        pass
 
     def delete_snapshot(self, snapshot_id):
         # TODO: CSI-1040
-        raise NotImplementedError
+        pass
 
     def get_iscsi_targets_by_iqn(self):
         return {}

@@ -162,7 +162,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def get_volume_name(self, volume_id):
         # TODO: CSI-1024
-        raise NotImplementedError
+        pass
 
     def validate_supported_capabilities(self, capabilities):
         logger.debug("validate_supported_capabilities for "
@@ -251,15 +251,15 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def get_snapshot(self, snapshot_name):
         # TODO: CSI-1024
-        raise NotImplementedError
+        pass
 
     def create_snapshot(self, name, volume_name):
         # TODO: CSI-1024
-        raise NotImplementedError
+        pass
 
     def delete_snapshot(self, snapshot_id):
         # TODO: CSI-1025
-        raise NotImplementedError
+        pass
 
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host id for initiators : {0}".format(initiators))
