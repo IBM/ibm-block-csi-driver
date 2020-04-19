@@ -371,7 +371,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_create_snapshot_with_get_snapshot_name_too_long_exception(self, a_exit, a_enter, array_type):
+    def test_create_volume_with_get_volume_name_too_long_exception(self, a_exit, a_enter, array_type):
         a_enter.return_value = self.mediator
         self.mediator.max_vol_name_length = 63
         context = utils.FakeContext()
