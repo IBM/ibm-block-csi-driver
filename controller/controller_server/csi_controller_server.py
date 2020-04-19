@@ -420,7 +420,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         name, _ = self._get_object_name_and_prefix(request, array_mediator.max_snapshot_prefix_length,
                                                    array_mediator.max_snapshot_name_length,
                                                    config.OBJECT_TYPE_NAME_SNAPSHOT,
-                                                   config.PARAMETERS_VOLUME_NAME_PREFIX)
+                                                   config.PARAMETERS_SNAPSHOT_NAME_PREFIX)
         return name
 
     def _get_object_name_and_prefix(self, request, max_name_prefix_length, max_name_length, object_type,
