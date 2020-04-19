@@ -315,7 +315,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             _, vol_id = utils.get_volume_id_info(source_volume_id)
             with ArrayConnectionManager(user, password, array_addresses) as array_mediator:
                 logger.debug(array_mediator)
-                snapshot_name = self._get_snapshot_name(request, array_mediator)
+                try:
+                    snapshot_name = self._get_snapshot_name(request, array_mediator)
+                except Exception as ex:
+                    logger.error("an internal exception occurred type {0} msg {1}".format(type(ex), ex.message))
+                    throw ex
                 # TODO:
                 logger.info("++++++++++++ snap name {0} ".format(snapshot_name))
                 volume_name = array_mediator.get_volume_name(vol_id)
