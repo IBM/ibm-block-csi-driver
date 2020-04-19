@@ -100,6 +100,16 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return 50
 
     @classproperty
+    def max_snapshot_name_length(self):
+        # TODO: CSI-1339
+        raise NotImplementedError
+
+    @classproperty
+    def max_snapshot_prefix_length(self):
+        # TODO: CSI-1339
+        raise NotImplementedError
+
+    @classproperty
     def minimal_volume_size_in_bytes(self):
         return 512  # 1 block, 512 bytes
 
@@ -293,6 +303,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
         raise array_errors.VolumeNotFoundError(name)
 
+    def get_volume_name(self, volume_id):
+        # TODO: CSI-1339
+        raise NotImplementedError
+
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume {}".format(volume_id))
         volume_id = get_volume_id_from_scsi_identifier(volume_id)
@@ -351,6 +365,18 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise array_errors.HostNotFoundError(host_name)
         except exceptions.ClientException as ex:
             raise array_errors.UnMappingError(volume_id, host_name, ex.details)
+
+    def get_snapshot(self, snapshot_name):
+        # TODO: CSI-1339
+        raise NotImplementedError
+
+    def create_snapshot(self, name, volume_name):
+        # TODO: CSI-1339
+        raise NotImplementedError
+
+    def delete_snapshot(self, snapshot_id):
+        # TODO: CSI-1040
+        raise NotImplementedError
 
     def get_iscsi_targets_by_iqn(self):
         return {}

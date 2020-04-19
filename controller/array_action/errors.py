@@ -161,3 +161,15 @@ class UnsupportedConnectivityTypeError(BaseArrayActionException):
 
     def __init__(self, connectivity_type):
         self.message = messages.UnsupportedConnectivityTypeError_message.format(connectivity_type)
+
+
+class SnapshotNotFoundError(BaseArrayActionException):
+
+    def __init__(self, name):
+        self.message = messages.SnapshotNotFoundError_message.format(name)
+
+
+class SnapshotAlreadyExists(BaseArrayActionException):
+
+    def __init__(self, snapshot, array):
+        self.message = messages.SnapshotAlreadyExistsError_message.format(snapshot, array)

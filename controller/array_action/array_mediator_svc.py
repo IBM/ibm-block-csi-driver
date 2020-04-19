@@ -82,6 +82,16 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return 20
 
     @classproperty
+    def max_snapshot_name_length(self):
+        # TODO: CSI-1024
+        raise NotImplementedError
+
+    @classproperty
+    def max_snapshot_prefix_length(self):
+        # TODO: CSI-1024
+        raise NotImplementedError
+
+    @classproperty
     def max_connections(self):
         return 2
 
@@ -149,6 +159,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.VolumeNotFoundError(volume_name)
         logger.debug("cli volume returned : {}".format(cli_volume))
         return self._generate_volume_response(cli_volume)
+
+    def get_volume_name(self, volume_id):
+        # TODO: CSI-1024
+        raise NotImplementedError
 
     def validate_supported_capabilities(self, capabilities):
         logger.debug("validate_supported_capabilities for "
@@ -234,6 +248,18 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise ex
 
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
+
+    def get_snapshot(self, snapshot_name):
+        # TODO: CSI-1024
+        raise NotImplementedError
+
+    def create_snapshot(self, name, volume_name):
+        # TODO: CSI-1024
+        raise NotImplementedError
+
+    def delete_snapshot(self, snapshot_id):
+        # TODO: CSI-1025
+        raise NotImplementedError
 
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host id for initiators : {0}".format(initiators))
