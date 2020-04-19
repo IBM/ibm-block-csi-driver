@@ -311,7 +311,6 @@ class ArrayMediator(ABC):
         """
         raise NotImplementedError
 
-
     @property
     @abstractmethod
     def max_snapshot_name_length(self):
