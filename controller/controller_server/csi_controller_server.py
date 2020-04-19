@@ -423,7 +423,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                    config.PARAMETERS_VOLUME_NAME_PREFIX)
         return name
 
-    def _get_object_name_and_prefix(self, request, max_name_prefix_length, max_name_length, object_type, prefix_param_name):
+    def _get_object_name_and_prefix(self, request, max_name_prefix_length, max_name_length, object_type,
+                                    prefix_param_name):
         name = request.name
         prefix = ""
         if request.parameters and (prefix_param_name in request.parameters):
