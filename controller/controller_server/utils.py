@@ -76,7 +76,7 @@ def validate_create_volume_request(request):
     logger.debug("validating create volume request")
 
     logger.debug("validating volume name")
-    if request.name:
+    if not request.name:
         raise ValidationException(messages.name_should_not_be_empty_message)
 
     logger.debug("validating volume capacity")
