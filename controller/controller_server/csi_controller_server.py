@@ -341,6 +341,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 res = utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
                 logger.info("finished create snapshot")
                 return res
+            logger.info("++++++++++++ after with ")
         except (array_errors.IllegalObjectName, array_errors.VolumeNotFoundError) as ex:
             # TODO:
             logger.info("++++++++++++ throw ")
@@ -361,6 +362,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateSnapshotResponse()
+
+        logger.info("++++++++++++ END ")
 
     def DeleteSnapshot(self, request, context):
         # TODO: CSI-752
