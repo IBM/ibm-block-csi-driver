@@ -25,7 +25,7 @@ def get_snapshot_id(new_snapshot):
     return _get_object_id(new_snapshot)
 
 
-def _get_snapshot_volume_id(obj):
+def _get_object_id(obj):
     return config.PARAMETERS_OBJECT_ID_DELIMITER.join((obj.array_type, obj.id))
 
 

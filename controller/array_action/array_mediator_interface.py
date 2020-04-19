@@ -92,7 +92,7 @@ class ArrayMediator(ABC):
         """
         raise NotImplementedError
 
-    @abc.abstractmethod
+    @abstractmethod
     def get_volume_name(self, volume_id):
         """
         This function return volume mappings.
@@ -164,7 +164,7 @@ class ArrayMediator(ABC):
         """
         raise NotImplementedError
 
-    @abc.abstractmethod
+    @abstractmethod
     def get_snapshot(self, snapshot_name):
         """
         This function return snapshot info about the snapshot.
@@ -179,7 +179,7 @@ class ArrayMediator(ABC):
         """
         raise NotImplementedError
 
-    @abc.abstractmethod
+    @abstractmethod
     def create_snapshot(self, name, volume_name):
         """
         This function should create a snapshot from volume in the storage system.
@@ -196,7 +196,7 @@ class ArrayMediator(ABC):
         """
         raise NotImplementedError
 
-    @abc.abstractmethod
+    @abstractmethod
     def delete_snapshot(self, snapshot_id):
         """
         This function should delete a snapshot in the storage system.
