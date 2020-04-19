@@ -317,11 +317,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.debug(array_mediator)
                 try:
                     snapshot_name = self._get_snapshot_name(request, array_mediator)
-                except Exception as ex:
-                    logger.error("an internal exception occurred type {0} msg {1}".format(type(ex), ex.message))
-                    raise ex
-                # TODO:
-                logger.info("++++++++++++ snap name {0} ".format(snapshot_name))
+                except array_errors.IllegalObjectName as ex:
+                    context.set_details(ex.message)
+                    context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                    return csi_pb2.CreateSnapshotResponse()
                 volume_name = array_mediator.get_volume_name(vol_id)
                 logger.info("Snapshot name : {}. Volume name : {}".format(snapshot_name, volume_name))
                 snapshot = array_mediator.get_snapshot(snapshot_name)
@@ -341,10 +340,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 res = utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
                 logger.info("finished create snapshot")
                 return res
-            logger.info("++++++++++++ after with ")
         except (array_errors.IllegalObjectName, array_errors.VolumeNotFoundError) as ex:
-            # TODO:
-            logger.info("++++++++++++ throw ")
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateSnapshotResponse()
@@ -362,8 +358,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateSnapshotResponse()
-
-        logger.info("++++++++++++ END ")
 
     def DeleteSnapshot(self, request, context):
         # TODO: CSI-752
@@ -449,11 +443,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     )
                 )
             name = settings.NAME_PREFIX_SEPARATOR.join((prefix, name))
-        # TODO:
-        logger.info("+++++++++++++++++++ Name {0} len {1} max len {2}".format(name, len(name), max_name_length))
         if len(name) > max_name_length:
-            # TODO:
-            logger.info("++++++++++++++++ EXC Name {0} len {1} max len {2}".format(name, len(name), max_name_length))
             raise array_errors.IllegalObjectName(
                 "The {} name {} is too long, max allowed length is {}".format(
                     object_type,
