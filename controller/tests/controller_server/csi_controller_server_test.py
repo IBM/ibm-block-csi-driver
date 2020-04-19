@@ -196,7 +196,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_create_snapshot_cuts_name_if_its_too_long(self, a_exit, a_enter, array_type):
+    def test_create_snapshot_with_get_snapshot_name_too_long_exception(self, a_exit, a_enter, array_type):
         a_enter.return_value = self.mediator
         self.mediator.get_volume_name = Mock()
         self.mediator.get_volume_name.return_value = snap_vol_name
@@ -226,7 +226,13 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.mediator.create_snapshot.assert_called_once_with("prefix_some_name", "snap_vol")
 
 
-class TestControllerServerCreateVolume(unittest.TestCase):
+class TestControllerServerCreateVolume(AbstractControllerTest):
+
+    def get_create_object_method(self):
+        return self.servicer.CreateVolume
+
+    def get_create_object_method_response(self):
+        return csi_pb2.CreateVolumeResponse
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
     def setUp(self, connect):
@@ -258,13 +264,7 @@ class TestControllerServerCreateVolume(unittest.TestCase):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     def test_create_volume_with_empty_name(self, a_enter, a_exit):
-        a_enter.return_value = self.mediator
-        self.request.name = ""
-        context = utils.FakeContext()
-        res = self.servicer.CreateVolume(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
-        self.assertTrue("name" in context.details)
-        self.assertEqual(res, csi_pb2.CreateVolumeResponse())
+        self._test_create_object_with_empty_name(a_enter)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
@@ -285,25 +285,7 @@ class TestControllerServerCreateVolume(unittest.TestCase):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     def test_create_volume_with_wrong_secrets(self, a_enter, a_exit, array_type):
-        a_enter.return_value = self.mediator
-        context = utils.FakeContext()
-
-        self.request.secrets = {"password": "pass", "management_address": "mg"}
-        self.servicer.CreateVolume(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "username is missing in secrets")
-        self.assertTrue("secret" in context.details)
-
-        self.request.secrets = {"username": "user", "management_address": "mg"}
-        self.servicer.CreateVolume(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "password is missing in secrets")
-        self.assertTrue("secret" in context.details)
-
-        self.request.secrets = {"username": "user", "password": "pass"}
-        self.servicer.CreateVolume(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "mgmt address is missing in secrets")
-        self.assertTrue("secret" in context.details)
-
-        self.request.secrets = []
+        self._test_create_object_with_wrong_secrets(a_enter)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
@@ -352,23 +334,13 @@ class TestControllerServerCreateVolume(unittest.TestCase):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     def test_create_volume_with_array_connection_exception(self, a_enter, a_exit, array_type):
-        a_enter.side_effect = [Exception("error")]
-        context = utils.FakeContext()
-        res = self.servicer.CreateVolume(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INTERNAL, "connection error occured in array_connection")
-        self.assertTrue("error" in context.details)
+        self._test_create_object_with_array_connection_exception(a_enter)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     def test_create_volume_with_get_array_type_exception(self, a_enter, a_exit, array_type):
-        a_enter.return_value = self.mediator
-        context = utils.FakeContext()
-        array_type.side_effect = [array_errors.FailedToFindStorageSystemType("endpoint")]
-        res = self.servicer.CreateVolume(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INTERNAL, "failed to find storage system")
-        msg = array_errors.FailedToFindStorageSystemType("endpoint").message
-        self.assertTrue(msg in context.details)
+        self._test_create_object_with_get_array_type_exception(a_enter, array_type)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.get_volume")

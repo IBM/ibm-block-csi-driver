@@ -70,7 +70,14 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             # TODO : pass multiple array addresses
             with ArrayConnectionManager(user, password, array_addresses) as array_mediator:
                 logger.debug(array_mediator)
-                volume_full_name, volume_prefix = self._get_volume_name_and_prefix(request, array_mediator)
+                # TODO: CSI-1358 - remove try/catch
+                try:
+                    volume_full_name, volume_prefix = self._get_volume_name_and_prefix(request, array_mediator)
+                except array_errors.IllegalObjectName as ex:
+                    context.set_details(ex.message)
+                    context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                    return csi_pb2.CreateSnapshotResponse()
+
                 size = request.capacity_range.required_bytes
 
                 if size == 0:
@@ -315,12 +322,14 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             _, vol_id = utils.get_volume_id_info(source_volume_id)
             with ArrayConnectionManager(user, password, array_addresses) as array_mediator:
                 logger.debug(array_mediator)
+                # TODO: CSI-1358 - remove try/catch
                 try:
                     snapshot_name = self._get_snapshot_name(request, array_mediator)
                 except array_errors.IllegalObjectName as ex:
                     context.set_details(ex.message)
                     context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
                     return csi_pb2.CreateSnapshotResponse()
+
                 volume_name = array_mediator.get_volume_name(vol_id)
                 logger.info("Snapshot name : {}. Volume name : {}".format(snapshot_name, volume_name))
                 snapshot = array_mediator.get_snapshot(snapshot_name)
