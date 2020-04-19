@@ -200,8 +200,6 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         a_enter.return_value = self.mediator
         self.mediator.max_snapshot_name_length = 63
         context = utils.FakeContext()
-        self.servicer.CreateVolume(self.request, context)
-        context = utils.FakeContext()
         self.request.name = "a" * 128
         self.servicer.CreateSnapshot(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
@@ -221,7 +219,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, "snap", "wwn",
                                                                                                "snap_vol", "xiv")
         array_type.return_value = "a9k"
-        res = self.servicer.CreateSnapshot(self.request, context)
+        self.servicer.CreateSnapshot(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.mediator.create_snapshot.assert_called_once_with("prefix_some_name", "snap_vol")
 
