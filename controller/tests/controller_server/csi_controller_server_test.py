@@ -198,6 +198,8 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     def test_create_snapshot_cuts_name_if_its_too_long(self, a_exit, a_enter, array_type):
         a_enter.return_value = self.mediator
+        self.mediator.get_volume_name = Mock()
+        self.mediator.get_volume_name.return_value = snap_vol_name
         self.mediator.max_snapshot_name_length = 63
         context = utils.FakeContext()
         self.request.name = "a" * 128
