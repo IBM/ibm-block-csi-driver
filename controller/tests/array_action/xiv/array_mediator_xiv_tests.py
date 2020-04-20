@@ -116,7 +116,6 @@ class TestArrayMediatorXIV(unittest.TestCase):
         snap_vol_name = "snap_vol"
         snap_wwn = "1235678"
         snap_capacity = 17
-        self.mediator.client.cmd.snapshot_create = Mock()
         xcli_snap = utils.get_mock_xiv_snapshot(snap_capacity, snap_name, snap_wwn, snap_vol_name)
         self.mediator.client.cmd.snapshot_create.return_value = xcli_snap
         self.mediator.create_snapshot(snap_name, snap_vol_name)
