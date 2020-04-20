@@ -97,7 +97,9 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def _generate_snapshot_response(self, cli_snapshot):
         logger.debug(
-            "++++++++++++++++++++++++ _generate_snapshot_response : {} name  {} capacity {}".format(cli_snapshot, cli_snapshot.name, cli_snapshot.capacity))
+            "++++++++++++++++++++++++ _generate_snapshot_response : {} name  {} capacity {}".format(cli_snapshot,
+                                                                                                    cli_snapshot.name,
+                                                                                                    cli_snapshot.capacity))
         return Snapshot(self._convert_size_blocks_to_bytes(int(cli_snapshot.capacity)),
                         cli_snapshot.wwn,
                         cli_snapshot.name,
