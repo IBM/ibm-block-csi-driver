@@ -115,16 +115,16 @@ class TestArrayMediatorXIV(unittest.TestCase):
         snap_name = "snap"
         snap_vol_name = "snap_vol"
         xcli_snap = self._get_snapshot_mock(snap_name, snap_vol_name)
-        self.mediator.client.cmd.snapshot_create.return_value = xcli_snap
+        self.mediator.client.cmd.get_snapshot.return_value = xcli_snap
         res = self.mediator.get_snapshot(snap_name)
-        self.assertTrue(res.name == snap_name)
+        self.assertTrue(res.snapshot_name == snap_name)
         self.assertTrue(res.volume_name == snap_vol_name)
 
     def test_get_snapshot_same_name_vol_exists_error(self):
         snap_name = "snap"
         snap_vol_name = ""
         xcli_snap = self._get_snapshot_mock(snap_name, snap_vol_name)
-        self.mediator.client.cmd.snapshot_create.return_value = xcli_snap
+        self.mediator.client.cmd.get_snapshot.return_value = xcli_snap
         with self.assertRaises(array_errors.IllegalObjectName):
             self.mediator.get_snapshot(snap_name)
 
@@ -140,7 +140,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         xcli_snap = self._get_snapshot_mock(snap_name, snap_vol_name)
         self.mediator.client.cmd.snapshot_create.return_value = xcli_snap
         res = self.mediator.create_snapshot(snap_name, snap_vol_name)
-        self.assertTrue(res.name == snap_name)
+        self.assertTrue(res.snapshot_name == snap_name)
         self.assertTrue(res.volume_name == snap_vol_name)
 
     def test_create_snapshot_return_illegal_name_for_object(self):
