@@ -169,6 +169,12 @@ class SnapshotNotFoundError(BaseArrayActionException):
         self.message = messages.SnapshotNotFoundError_message.format(name)
 
 
+class SnapshotNotFoundVolumeWithSameNameExists(BaseArrayActionException):
+
+    def __init__(self, snapshot, array):
+        self.message = messages.SnapshotNotFoundVolumeWithSameNameExistsError_message.format(snapshot, array)
+
+
 class SnapshotAlreadyExists(BaseArrayActionException):
 
     def __init__(self, snapshot, array):
