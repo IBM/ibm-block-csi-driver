@@ -16,7 +16,7 @@ def get_mock_xiv_snapshot(capacity, name, wwn, vol_name):
     snap.name = name
     snap.wwn = wwn
     snap.master_name = vol_name
-    snap.pool_name = "pool-name"
+    snap.pool_name = "pool_name"
     return snap
 
 
