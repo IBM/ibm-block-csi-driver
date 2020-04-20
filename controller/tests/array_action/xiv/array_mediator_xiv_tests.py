@@ -73,11 +73,6 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(array_errors.IllegalObjectName):
             self.mediator.create_volume("vol", 10, [], "pool1")
 
-    def _test_create_snapshot_error(self, xcli_exception, expected_exception):
-        self.mediator.client.cmd.snapshot_create.side_effect = [xcli_exception("", "snap", "")]
-        with self.assertRaises(expected_exception):
-            self.mediator.create_snapshot("snap", "vol")
-
     def test_create_volume_return_volume_exists_error(self):
         self.mediator.client.cmd.vol_create.side_effect = [xcli_errors.VolumeExistsError("", "vol", "")]
         with self.assertRaises(array_errors.VolumeAlreadyExists):
@@ -117,8 +112,14 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.delete_volume("vol-wwn")
 
     def test_create_snapshot_succeeds(self):
+        snap_name = "snap"
+        snap_vol_name = "snap_vol"
+        snap_wwn = "1235678"
+        snap_capacity = 17
         self.mediator.client.cmd.snapshot_create = Mock()
-        self.mediator.create_snapshot("snap", "vol")
+        xcli_snap = utils.get_mock_xiv_snapshot(snap_capacity, snap_name, snap_wwn, snap_vol_name)
+        self.mediator.client.cmd.snapshot_create.return_value = xcli_snap
+        self.mediator.create_snapshot(snap_name, snap_vol_name)
 
     def test_create_snapshot_return_illegal_name_for_object(self):
         self._test_create_snapshot_error(xcli_errors.IllegalNameForObjectError, array_errors.IllegalObjectName)
@@ -137,6 +138,11 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_create_snapshot_generate_snapshot_response_return_exception(self, response):
         response.side_effect = Exception("err")
         with self.assertRaises(Exception):
+            self.mediator.create_snapshot("snap", "vol")
+
+    def _test_create_snapshot_error(self, xcli_exception, expected_exception):
+        self.mediator.client.cmd.snapshot_create.side_effect = [xcli_exception("", "snap", "")]
+        with self.assertRaises(expected_exception):
             self.mediator.create_snapshot("snap", "vol")
 
     def test_property(self):
