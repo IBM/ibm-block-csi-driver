@@ -125,7 +125,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         snap_vol_name = ""
         xcli_snap = self._get_single_snapshot_result_mock(snap_name, snap_vol_name)
         self.mediator.client.cmd.vol_list.return_value = xcli_snap
-        with self.assertRaises(array_errors.IllegalObjectName):
+        with self.assertRaises(array_errors.SnapshotNotFoundVolumeWithSameNameExists):
             self.mediator.get_snapshot(snap_name)
 
     def test_get_snapshot_returns_illegal_object_name(self):
