@@ -193,7 +193,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         if not cli_snapshot:
             return None
         if not cli_snapshot.master_name:
-            raise array_errors.SnapshotNotFoundVolumeWithSameNameExists(cli_snapshot.name)
+            raise array_errors.SnapshotNotFoundVolumeWithSameNameExists(cli_snapshot.name, self.endpoint)
         array_snapshot = self._generate_snapshot_response(cli_snapshot)
         return array_snapshot
 
