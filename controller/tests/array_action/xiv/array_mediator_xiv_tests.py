@@ -130,7 +130,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self._test_create_snapshot_error(xcli_errors.VolumeBadNameError, array_errors.VolumeNotFoundError)
 
     def test_create_snapshot_return_permission_error(self):
-        self._test_create_snapshot_error(xcli_errors.OperationForbiddenForUserCategoryError, array_errors.PermissionDeniedError)
+        self._test_create_snapshot_error(xcli_errors.OperationForbiddenForUserCategoryError,
+                                         array_errors.PermissionDeniedError)
 
     @patch.object(XIVArrayMediator, "_generate_snapshot_response")
     def test_create_snapshot_generate_snapshot_response_return_exception(self, response):
