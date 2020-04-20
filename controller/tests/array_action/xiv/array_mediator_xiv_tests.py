@@ -73,6 +73,11 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(array_errors.IllegalObjectName):
             self.mediator.create_volume("vol", 10, [], "pool1")
 
+    def _test_create_snapshot_error(self, xcli_exception, expected_exception):
+        self.mediator.client.cmd.snapshot_create.side_effect = [xcli_exception("", "snap", "")]
+        with self.assertRaises(expected_exception):
+            self.mediator.create_snapshot("snap", "vol")
+
     def test_create_volume_return_volume_exists_error(self):
         self.mediator.client.cmd.vol_create.side_effect = [xcli_errors.VolumeExistsError("", "vol", "")]
         with self.assertRaises(array_errors.VolumeAlreadyExists):
@@ -110,6 +115,28 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_delete_volume_succeeds(self):
         self.mediator.client.cmd.vol_delete = Mock()
         self.mediator.delete_volume("vol-wwn")
+
+    def test_create_snapshot_succeeds(self):
+        self.mediator.client.cmd.snapshot_create = Mock()
+        self.mediator.create_snapshot("snap", "vol")
+
+    def test_create_snapshot_return_illegal_name_for_object(self):
+        self._test_create_snapshot_error(xcli_errors.IllegalNameForObjectError, array_errors.IllegalObjectName)
+
+    def test_create_snapshot_return_snapshot_exists_error(self):
+        self._test_create_snapshot_error(xcli_errors.VolumeExistsError, array_errors.SnapshotAlreadyExists)
+
+    def test_create_snapshot_return_volume_does_not_exists_error(self):
+        self._test_create_snapshot_error(xcli_errors.VolumeBadNameError, array_errors.VolumeNotFoundError)
+
+    def test_create_snapshot_return_permission_error(self):
+        self._test_create_snapshot_error(xcli_errors.OperationForbiddenForUserCategoryError, array_errors.PermissionDeniedError)
+
+    @patch.object(XIVArrayMediator, "_generate_snapshot_response")
+    def test_create_snapshot_generate_snapshot_response_return_exception(self, response):
+        response.side_effect = Exception("err")
+        with self.assertRaises(Exception):
+            self.mediator.create_snapshot("snap", "vol")
 
     def test_property(self):
         self.assertEqual(XIVArrayMediator.port, 7778)
