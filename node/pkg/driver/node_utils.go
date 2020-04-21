@@ -19,6 +19,7 @@ package driver
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"io/ioutil"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"os"
@@ -35,7 +36,8 @@ import (
 const (
 	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
 	// Command lines inside the container will show /host prefix.
-	PrefixChrootOfHostRoot = "/host"
+	PrefixChrootOfHostRoot  = "/host"
+	PublishContextSeparator = ","
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
@@ -43,7 +45,8 @@ const (
 type NodeUtilsInterface interface {
 	ParseIscsiInitiators() (string, error)
 	ParseFCPorts() ([]string, error)
-	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, []string, error)
+	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, map[string][]string, error)
+	GetArrayInitiators(ipsByArrayInitiator map[string][]string) []string
 	GetSysDevicesFromMpath(baseDevice string) (string, error)
 
 	// TODO refactor and move all staging methods to dedicate interface.
@@ -60,13 +63,13 @@ type NodeUtilsInterface interface {
 
 type NodeUtils struct {
 	Executer executer.ExecuterInterface
-	mounter mount.Interface
+	mounter  mount.Interface
 }
 
 func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface) *NodeUtils {
 	return &NodeUtils{
 		Executer: executer,
-		mounter: mounter,
+		mounter:  mounter,
 	}
 }
 
@@ -93,26 +96,45 @@ func (n NodeUtils) ParseIscsiInitiators() (string, error) {
 	return iscsiIqn, nil
 }
 
-func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, []string, error) {
-	// this will return :  connectivityType, lun, arrayInitiators, error
-	var arrayInitiators []string
-	str_lun := publishContext[configYaml.Controller.Publish_context_lun_parameter]
+func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, map[string][]string, error) {
+	// this will return :  connectivityType, lun, ipsByArrayInitiator, error
+	ipsByArrayInitiator := make(map[string][]string)
+	strLun := publishContext[configYaml.Controller.Publish_context_lun_parameter]
 
-	lun, err := strconv.Atoi(str_lun)
+	lun, err := strconv.Atoi(strLun)
 	if err != nil {
 		return "", -1, nil, err
 	}
 
 	connectivityType := publishContext[configYaml.Controller.Publish_context_connectivity_parameter]
-	if connectivityType == "iscsi" {
-		arrayInitiators = strings.Split(publishContext[configYaml.Controller.Publish_context_array_iqn], ",")
+	if connectivityType == device_connectivity.ConnectionTypeISCSI {
+		iqns := strings.Split(publishContext[configYaml.Controller.Publish_context_array_iqn], PublishContextSeparator)
+		for _, iqn := range iqns {
+			if ips, iqnExists := publishContext[iqn]; iqnExists {
+				ipsByArrayInitiator[iqn] = strings.Split(ips, PublishContextSeparator)
+			} else {
+				logger.Errorf("Publish context does not contain any iscsi target IP for {%v}", iqn)
+			}
+		}
 	}
-	if connectivityType == "fc" {
-		arrayInitiators = strings.Split(publishContext[configYaml.Controller.Publish_context_fc_initiators], ",")
+	if connectivityType == device_connectivity.ConnectionTypeFC {
+		wwns := strings.Split(publishContext[configYaml.Controller.Publish_context_fc_initiators], PublishContextSeparator)
+		for _, wwn := range wwns {
+			ipsByArrayInitiator[wwn] = nil
+		}
 	}
 
-	logger.Debugf("PublishContext relevant info : connectivityType=%v, lun=%v, arrayInitiators=%v", connectivityType, lun, arrayInitiators)
-	return connectivityType, lun, arrayInitiators, nil
+	logger.Debugf("PublishContext relevant info : connectivityType=%v, lun=%v, arrayInitiators=%v",
+		connectivityType, lun, ipsByArrayInitiator)
+	return connectivityType, lun, ipsByArrayInitiator, nil
+}
+
+func (n NodeUtils) GetArrayInitiators(ipsByArrayInitiator map[string][]string) []string {
+	arrayInitiators := make([]string, 0, len(ipsByArrayInitiator))
+	for arrayInitiator := range ipsByArrayInitiator {
+		arrayInitiators = append(arrayInitiators, arrayInitiator)
+	}
+	return arrayInitiators
 }
 
 func (n NodeUtils) WriteStageInfoToFile(fPath string, info map[string]string) error {
@@ -121,11 +143,11 @@ func (n NodeUtils) WriteStageInfoToFile(fPath string, info map[string]string) er
 	fPath = n.GetPodPath(fPath)
 	stagePath := filepath.Dir(fPath)
 	if _, err := os.Stat(stagePath); os.IsNotExist(err) {
-        logger.Debugf("The filePath [%s] is not existed. Create it.", stagePath)
-        if err = os.MkdirAll(stagePath, os.FileMode(0755)); err != nil {
-            logger.Debugf("The filePath [%s] create fail. Error: [%v]", stagePath, err)
-        }
-    }
+		logger.Debugf("The filePath [%s] is not existed. Create it.", stagePath)
+		if err = os.MkdirAll(stagePath, os.FileMode(0755)); err != nil {
+			logger.Debugf("The filePath [%s] create fail. Error: [%v]", stagePath, err)
+		}
+	}
 	logger.Debugf("WriteStageInfo file : path {%v}, info {%v}", fPath, info)
 	stageInfo, err := json.Marshal(info)
 	if err != nil {
@@ -205,7 +227,7 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 
 	fpaths, err := n.Executer.FilepathGlob(FCPortPath)
 	if fpaths == nil {
-		err = fmt.Errorf(ErrorUnsupportedConnectivityType, "FC")
+		err = fmt.Errorf(ErrorUnsupportedConnectivityType, device_connectivity.ConnectionTypeFC)
 	}
 	if err != nil {
 		return nil, err

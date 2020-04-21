@@ -18,16 +18,19 @@ package driver_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
-	"path"
-	"path/filepath"
-	"reflect"
-	"testing"
-
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/golang/mock/gomock"
 	"github.com/ibm/ibm-block-csi-driver/node/mocks"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
+	"os"
+	"path"
+	"path/filepath"
+	"reflect"
+	"strings"
+	"testing"
+
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -36,19 +39,57 @@ import (
 const (
 	PublishContextParamLun          string = "PUBLISH_CONTEXT_LUN" // TODO for some reason I coun't take it from config.yaml
 	PublishContextParamConnectivity string = "PUBLISH_CONTEXT_CONNECTIVITY"
+	PublishContextParamArrayIqn     string = "PUBLISH_CONTEXT_ARRAY_IQN"
 )
 
 func newTestNodeService(nodeUtils driver.NodeUtilsInterface, nodeMounter driver.NodeMounter) driver.NodeService {
 	return driver.NodeService{
-		Hostname:   "test-host",
-		ConfigYaml: driver.ConfigFile{},
+		Hostname:         "test-host",
+		ConfigYaml:       driver.ConfigFile{},
 		VolumeIdLocksMap: driver.NewSyncLock(),
-		NodeUtils:  nodeUtils,
-		Mounter: nodeMounter,
+		NodeUtils:        nodeUtils,
+		Mounter:          nodeMounter,
+	}
+}
+
+func newTestNodeServiceStaging(nodeUtils driver.NodeUtilsInterface, osDevCon device_connectivity.OsDeviceConnectivityInterface) driver.NodeService {
+	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
+		device_connectivity.ConnectionTypeISCSI: osDevCon,
+		device_connectivity.ConnectionTypeFC:    osDevCon,
+	}
+
+	return driver.NodeService{
+		Hostname:                    "test-host",
+		ConfigYaml:                  driver.ConfigFile{},
+		VolumeIdLocksMap:            driver.NewSyncLock(),
+		NodeUtils:                   nodeUtils,
+		OsDeviceConnectivityMapping: osDeviceConnectivityMapping,
 	}
 }
 
 func TestNodeStageVolume(t *testing.T) {
+	dummyError := errors.New("Dummy error")
+	conType := device_connectivity.ConnectionTypeISCSI
+	volId := "vol-test"
+	lun := 10
+	mpathDeviceName := "dm-2"
+	sysDevices := "/dev/d1,/dev/d2"
+	mpathDevice := "/dev/" + mpathDeviceName
+	ipsByArrayInitiator := map[string][]string{"iqn.1994-05.com.redhat:686358c930fe": {"1.2.3.4", "[::1]"}}
+	arrayInitiators := []string{"iqn.1994-05.com.redhat:686358c930fe"}
+	stagingPath := "/test/path"
+	stageInfoPath := path.Join(stagingPath, driver.StageInfoFilename)
+
+	newStageInfo := make(map[string]string)
+	newStageInfo["mpathDevice"] = mpathDeviceName
+	newStageInfo["sysDevices"] = sysDevices
+	newStageInfo["connectivity"] = conType
+
+	currentStageInfo := make(map[string]string)
+	currentStageInfo["mpathDevice"] = ""
+	currentStageInfo["sysDevices"] = sysDevices
+	currentStageInfo["connectivity"] = conType
+
 	stdVolCap := &csi.VolumeCapability{
 		AccessType: &csi.VolumeCapability_Mount{
 			Mount: &csi.VolumeCapability_MountVolume{},
@@ -57,73 +98,391 @@ func TestNodeStageVolume(t *testing.T) {
 			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 		},
 	}
+	publishContext := map[string]string{
+		PublishContextParamLun:                "1",
+		PublishContextParamConnectivity:       device_connectivity.ConnectionTypeISCSI,
+		PublishContextParamArrayIqn:           "iqn.1994-05.com.redhat:686358c930fe",
+		"iqn.1994-05.com.redhat:686358c930fe": "1.2.3.4,[::1]",
+	}
+	stagingRequest := &csi.NodeStageVolumeRequest{
+		PublishContext:    publishContext,
+		StagingTargetPath: stagingPath,
+		VolumeCapability:  stdVolCap,
+		VolumeId:          volId,
+	}
+
 	testCases := []struct {
-		name       string
-		req        *csi.NodeStageVolumeRequest
-		expErrCode codes.Code
+		name     string
+		testFunc func(t *testing.T)
 	}{
 		{
 			name: "fail no VolumeId",
-			req: &csi.NodeStageVolumeRequest{
-				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-				StagingTargetPath: "/test/path",
-				VolumeCapability:  stdVolCap,
+			testFunc: func(t *testing.T) {
+				req := &csi.NodeStageVolumeRequest{
+					PublishContext:    publishContext,
+					StagingTargetPath: stagingPath,
+					VolumeCapability:  stdVolCap,
+				}
+				node := newTestNodeService(nil, nil)
+				_, err := node.NodeStageVolume(context.TODO(), req)
+				assertError(t, err, codes.InvalidArgument)
 			},
-			expErrCode: codes.InvalidArgument,
 		},
 		{
 			name: "fail no StagingTargetPath",
-			req: &csi.NodeStageVolumeRequest{
-				PublishContext:   map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-				VolumeCapability: stdVolCap,
-				VolumeId:         "vol-test",
+			testFunc: func(t *testing.T) {
+				req := &csi.NodeStageVolumeRequest{
+					PublishContext:   publishContext,
+					VolumeCapability: stdVolCap,
+					VolumeId:         volId,
+				}
+				node := newTestNodeService(nil, nil)
+				_, err := node.NodeStageVolume(context.TODO(), req)
+				assertError(t, err, codes.InvalidArgument)
 			},
-			expErrCode: codes.InvalidArgument,
 		},
 		{
 			name: "fail no VolumeCapability",
-			req: &csi.NodeStageVolumeRequest{
-				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-				StagingTargetPath: "/test/path",
-				VolumeId:          "vol-test",
+			testFunc: func(t *testing.T) {
+				req := &csi.NodeStageVolumeRequest{
+					PublishContext:    publishContext,
+					StagingTargetPath: stagingPath,
+					VolumeId:          volId,
+				}
+				node := newTestNodeService(nil, nil)
+				_, err := node.NodeStageVolume(context.TODO(), req)
+				assertError(t, err, codes.InvalidArgument)
 			},
-			expErrCode: codes.InvalidArgument,
 		},
 		{
-			name: "fail invalid VolumeCapability ",
-			req: &csi.NodeStageVolumeRequest{
-				PublishContext:    map[string]string{PublishContextParamLun: "1", PublishContextParamConnectivity: "iSCSI"},
-				StagingTargetPath: "/test/path",
-				VolumeCapability: &csi.VolumeCapability{
-					AccessMode: &csi.VolumeCapability_AccessMode{
-						Mode: csi.VolumeCapability_AccessMode_UNKNOWN,
+			name: "fail invalid VolumeCapability",
+			testFunc: func(t *testing.T) {
+				req := &csi.NodeStageVolumeRequest{
+					PublishContext:    publishContext,
+					StagingTargetPath: stagingPath,
+					VolumeCapability: &csi.VolumeCapability{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_UNKNOWN,
+						},
 					},
-				},
-				VolumeId: "vol-test",
+					VolumeId: volId,
+				}
+				node := newTestNodeService(nil, nil)
+				_, err := node.NodeStageVolume(context.TODO(), req)
+				assertError(t, err, codes.InvalidArgument)
 			},
-			expErrCode: codes.InvalidArgument,
+		},
+		{
+			name: "fail invalid arrayInitiators ",
+			testFunc: func(t *testing.T) {
+				req := &csi.NodeStageVolumeRequest{
+					PublishContext: map[string]string{
+						PublishContextParamLun:          "1",
+						PublishContextParamConnectivity: device_connectivity.ConnectionTypeISCSI,
+						PublishContextParamArrayIqn:     "iqn.1994-05.com.redhat:686358c930fe",
+					},
+					StagingTargetPath: stagingPath,
+					VolumeCapability: &csi.VolumeCapability{
+						AccessMode: &csi.VolumeCapability_AccessMode{
+							Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
+						},
+					},
+					VolumeId: volId,
+				}
+				node := newTestNodeService(nil, nil)
+				_, err := node.NodeStageVolume(context.TODO(), req)
+				assertError(t, err, codes.InvalidArgument)
+			},
+		},
+		{
+			name: "fail parse PublishContext",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				node := newTestNodeService(mockNodeUtils, mockMounter)
+
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return("", 0, nil, dummyError)
+
+				_, err := node.NodeStageVolume(context.TODO(), stagingRequest)
+				assertError(t, err, codes.InvalidArgument)
+			},
+		},
+		{
+			name: "fail rescan devices",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsDeviceCon)
+
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
+				mockOsDeviceCon.EXPECT().EnsureLogin(ipsByArrayInitiator)
+				mockOsDeviceCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(dummyError)
+
+				_, err := node.NodeStageVolume(context.TODO(), stagingRequest)
+				assertError(t, err, codes.Internal)
+			},
+		},
+		{
+			name: "fail get mpath device",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsDeviceCon)
+
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
+				mockOsDeviceCon.EXPECT().EnsureLogin(ipsByArrayInitiator)
+				mockOsDeviceCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
+				mockOsDeviceCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return("", dummyError)
+
+				_, err := node.NodeStageVolume(context.TODO(), stagingRequest)
+				assertError(t, err, codes.Internal)
+			},
+		},
+		{
+			name: "fail get devices of multipath",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsDeviceCon)
+
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
+				mockOsDeviceCon.EXPECT().EnsureLogin(ipsByArrayInitiator)
+				mockOsDeviceCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
+				mockOsDeviceCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return("", dummyError)
+
+				_, err := node.NodeStageVolume(context.TODO(), stagingRequest)
+				assertError(t, err, codes.Internal)
+			},
+		},
+		{
+			name: "success new staging file",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsDeviceCon)
+
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
+				mockOsDeviceCon.EXPECT().EnsureLogin(ipsByArrayInitiator)
+				mockOsDeviceCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
+				mockOsDeviceCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(sysDevices, nil)
+				mockNodeUtils.EXPECT().StageInfoFileIsExist(stageInfoPath).Return(false)
+				mockNodeUtils.EXPECT().WriteStageInfoToFile(stageInfoPath, newStageInfo).Return(nil)
+
+				_, err := node.NodeStageVolume(context.TODO(), stagingRequest)
+				if err != nil {
+					t.Fatalf("Expect no error but got: %v", err)
+				}
+			},
+		},
+		{
+			name: "success cannot read staging file",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsDeviceCon)
+
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
+				mockOsDeviceCon.EXPECT().EnsureLogin(ipsByArrayInitiator)
+				mockOsDeviceCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
+				mockOsDeviceCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(sysDevices, nil)
+				mockNodeUtils.EXPECT().StageInfoFileIsExist(stageInfoPath).Return(true)
+				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stageInfoPath).Return(nil, dummyError)
+				mockNodeUtils.EXPECT().WriteStageInfoToFile(stageInfoPath, newStageInfo).Return(nil)
+
+				_, err := node.NodeStageVolume(context.TODO(), stagingRequest)
+				if err != nil {
+					t.Fatalf("Expect no error but got: %v", err)
+				}
+			},
+		},
+		{
+			name: "success idempotent",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsDeviceCon)
+
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
+				mockOsDeviceCon.EXPECT().EnsureLogin(ipsByArrayInitiator)
+				mockOsDeviceCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
+				mockOsDeviceCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(sysDevices, nil)
+				mockNodeUtils.EXPECT().StageInfoFileIsExist(stageInfoPath).Return(true)
+				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stageInfoPath).Return(newStageInfo, nil)
+
+				_, err := node.NodeStageVolume(context.TODO(), stagingRequest)
+				if err != nil {
+					t.Fatalf("Expect no error but got: %v", err)
+				}
+			},
+		},
+		{
+			name: "fail different staging file",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsDeviceCon)
+
+				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext, node.ConfigYaml).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
+				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
+				mockOsDeviceCon.EXPECT().EnsureLogin(ipsByArrayInitiator)
+				mockOsDeviceCon.EXPECT().RescanDevices(lun, arrayInitiators).Return(nil)
+				mockOsDeviceCon.EXPECT().GetMpathDevice(volId, lun, arrayInitiators).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(sysDevices, nil)
+				mockNodeUtils.EXPECT().StageInfoFileIsExist(stageInfoPath).Return(true)
+				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stageInfoPath).Return(currentStageInfo, nil)
+
+				_, err := node.NodeStageVolume(context.TODO(), stagingRequest)
+				assertError(t, err, codes.AlreadyExists)
+			},
 		},
 	}
-
 	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
 
-		t.Run(tc.name, func(t *testing.T) {
+func TestNodeUnstageVolume(t *testing.T) {
+	dummyError := errors.New("Dummy error")
+	_, fileNotExistErr := os.Stat("DUMMY_FILE")
+	conType := device_connectivity.ConnectionTypeISCSI
+	volId := "vol-test"
+	mpathDeviceName := "dm-2"
+	sysDevices := "/dev/d1,/dev/d2"
+	sysDevicesList := strings.Split(sysDevices, ",")
+	stagingPath := "/test/path"
+	stageInfoPath := path.Join(stagingPath, driver.StageInfoFilename)
 
-			d := newTestNodeService(nil, nil)
+	stageInfo := make(map[string]string)
+	stageInfo["mpathDevice"] = mpathDeviceName
+	stageInfo["sysDevices"] = sysDevices
+	stageInfo["connectivity"] = conType
 
-			_, err := d.NodeStageVolume(context.TODO(), tc.req)
-			if err != nil {
-				srvErr, ok := status.FromError(err)
-				if !ok {
-					t.Fatalf("Could not get error status code from error: %v", srvErr)
+	unstageRequest := &csi.NodeUnstageVolumeRequest{
+		VolumeId:          volId,
+		StagingTargetPath: stagingPath,
+	}
+
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "fail no VolumeId",
+			testFunc: func(t *testing.T) {
+				node := newTestNodeService(nil, nil)
+				req := &csi.NodeUnstageVolumeRequest{
+					StagingTargetPath: stagingPath,
 				}
-				if srvErr.Code() != tc.expErrCode {
-					t.Fatalf("Expected error code %d, got %d message %s", tc.expErrCode, srvErr.Code(), srvErr.Message())
+				_, err := node.NodeUnstageVolume(context.TODO(), req)
+				assertError(t, err, codes.InvalidArgument)
+			},
+		},
+		{
+			name: "fail no StagingTargetPath",
+			testFunc: func(t *testing.T) {
+				node := newTestNodeService(nil, nil)
+				req := &csi.NodeUnstageVolumeRequest{
+					VolumeId: volId,
 				}
-			} else if tc.expErrCode != codes.OK {
-				t.Fatalf("Expected error %v, got no error", tc.expErrCode)
-			}
-		})
+				_, err := node.NodeUnstageVolume(context.TODO(), req)
+				assertError(t, err, codes.InvalidArgument)
+			},
+		},
+		{
+			name: "fail cannot read staging file",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, nil)
+
+				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stageInfoPath).Return(nil, dummyError)
+
+				_, err := node.NodeUnstageVolume(context.TODO(), unstageRequest)
+				assertError(t, err, codes.Internal)
+			},
+		},
+		{
+			name: "fail flush multipath",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsDeviceCon)
+
+				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stageInfoPath).Return(stageInfo, nil)
+				mockOsDeviceCon.EXPECT().FlushMultipathDevice(mpathDeviceName).Return(dummyError)
+
+				_, err := node.NodeUnstageVolume(context.TODO(), unstageRequest)
+				assertError(t, err, codes.Internal)
+			},
+		},
+		{
+			name: "success idempotent",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, nil)
+
+				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stageInfoPath).Return(nil, fileNotExistErr)
+
+				_, err := node.NodeUnstageVolume(context.TODO(), unstageRequest)
+				if err != nil {
+					t.Fatalf("Expect no error but got: %v", err)
+				}
+			},
+		},
+		{
+			name: "success normal",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceCon := mocks.NewMockOsDeviceConnectivityInterface(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, mockOsDeviceCon)
+
+				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stageInfoPath).Return(stageInfo, nil)
+				mockOsDeviceCon.EXPECT().FlushMultipathDevice(mpathDeviceName).Return(nil)
+				mockOsDeviceCon.EXPECT().RemovePhysicalDevice(sysDevicesList).Return(nil)
+				mockNodeUtils.EXPECT().ClearStageInfoFile(stageInfoPath).Return(nil)
+
+				_, err := node.NodeUnstageVolume(context.TODO(), unstageRequest)
+				if err != nil {
+					t.Fatalf("Expect no error but got: %v", err)
+				}
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
 	}
 }
 
@@ -160,7 +519,7 @@ func TestNodePublishVolume(t *testing.T) {
 		{
 			name: "fail no VolumeId",
 			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
+				node := newTestNodeService(nil, nil)
 				req := &csi.NodePublishVolumeRequest{
 					PublishContext:    map[string]string{},
 					StagingTargetPath: stagingTargetPath,
@@ -168,29 +527,29 @@ func TestNodePublishVolume(t *testing.T) {
 					VolumeCapability:  fsVolCap,
 				}
 
-				_, err := driver.NodePublishVolume(context.TODO(), req)
+				_, err := node.NodePublishVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
 		{
 			name: "fail no StagingTargetPath",
 			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
+				node := newTestNodeService(nil, nil)
 				req := &csi.NodePublishVolumeRequest{
-					PublishContext:    map[string]string{},
-					TargetPath:        targetPath,
-					VolumeCapability:  fsVolCap,
-					VolumeId:          "vol-test",
+					PublishContext:   map[string]string{},
+					TargetPath:       targetPath,
+					VolumeCapability: fsVolCap,
+					VolumeId:         "vol-test",
 				}
 
-				_, err := driver.NodePublishVolume(context.TODO(), req)
+				_, err := node.NodePublishVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
 		{
 			name: "fail no TargetPath",
 			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
+				node := newTestNodeService(nil, nil)
 				req := &csi.NodePublishVolumeRequest{
 					PublishContext:    map[string]string{},
 					StagingTargetPath: stagingTargetPath,
@@ -198,14 +557,14 @@ func TestNodePublishVolume(t *testing.T) {
 					VolumeId:          "vol-test",
 				}
 
-				_, err := driver.NodePublishVolume(context.TODO(), req)
+				_, err := node.NodePublishVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
 		{
 			name: "fail no VolumeCapability",
 			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
+				node := newTestNodeService(nil, nil)
 				req := &csi.NodePublishVolumeRequest{
 					PublishContext:    map[string]string{},
 					StagingTargetPath: stagingTargetPath,
@@ -213,14 +572,14 @@ func TestNodePublishVolume(t *testing.T) {
 					VolumeId:          "vol-test",
 				}
 
-				_, err := driver.NodePublishVolume(context.TODO(), req)
+				_, err := node.NodePublishVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
 		{
 			name: "fail invalid VolumeCapability",
 			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
+				node := newTestNodeService(nil, nil)
 				req := &csi.NodePublishVolumeRequest{
 					PublishContext:    map[string]string{},
 					StagingTargetPath: stagingTargetPath,
@@ -230,10 +589,10 @@ func TestNodePublishVolume(t *testing.T) {
 							Mode: csi.VolumeCapability_AccessMode_UNKNOWN,
 						},
 					},
-					VolumeId:          "vol-test",
+					VolumeId: "vol-test",
 				}
 
-				_, err := driver.NodePublishVolume(context.TODO(), req)
+				_, err := node.NodePublishVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
@@ -244,7 +603,7 @@ func TestNodePublishVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockMounter := mocks.NewMockNodeMounter(mockCtl)
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				driver := newTestNodeService(mockNodeUtils, mockMounter)
+				node := newTestNodeService(mockNodeUtils, mockMounter)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
 				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix).AnyTimes()
@@ -260,7 +619,7 @@ func TestNodePublishVolume(t *testing.T) {
 					VolumeId:          "vol-test",
 				}
 
-				_, err := driver.NodePublishVolume(context.TODO(), req)
+				_, err := node.NodePublishVolume(context.TODO(), req)
 				assertError(t, err, codes.AlreadyExists)
 			},
 		},
@@ -271,7 +630,7 @@ func TestNodePublishVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockMounter := mocks.NewMockNodeMounter(mockCtl)
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				driver := newTestNodeService(mockNodeUtils, mockMounter)
+				node := newTestNodeService(mockNodeUtils, mockMounter)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
 				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix).AnyTimes()
@@ -287,7 +646,7 @@ func TestNodePublishVolume(t *testing.T) {
 					VolumeId:          "vol-test",
 				}
 
-				_, err := driver.NodePublishVolume(context.TODO(), req)
+				_, err := node.NodePublishVolume(context.TODO(), req)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
 				}
@@ -300,7 +659,7 @@ func TestNodePublishVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockMounter := mocks.NewMockNodeMounter(mockCtl)
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				driver := newTestNodeService(mockNodeUtils, mockMounter)
+				node := newTestNodeService(mockNodeUtils, mockMounter)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
 				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix).AnyTimes()
@@ -316,7 +675,7 @@ func TestNodePublishVolume(t *testing.T) {
 					VolumeId:          "vol-test",
 				}
 
-				_, err := driver.NodePublishVolume(context.TODO(), req)
+				_, err := node.NodePublishVolume(context.TODO(), req)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
 				}
@@ -329,7 +688,7 @@ func TestNodePublishVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockMounter := mocks.NewMockNodeMounter(mockCtl)
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				driver := newTestNodeService(mockNodeUtils, mockMounter)
+				node := newTestNodeService(mockNodeUtils, mockMounter)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
 				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix).AnyTimes()
@@ -349,7 +708,7 @@ func TestNodePublishVolume(t *testing.T) {
 					VolumeId:          "vol-test",
 				}
 
-				_, err := driver.NodePublishVolume(context.TODO(), req)
+				_, err := node.NodePublishVolume(context.TODO(), req)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
 				}
@@ -362,7 +721,7 @@ func TestNodePublishVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockMounter := mocks.NewMockNodeMounter(mockCtl)
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				driver := newTestNodeService(mockNodeUtils, mockMounter)
+				node := newTestNodeService(mockNodeUtils, mockMounter)
 
 				mockNodeUtils.EXPECT().ReadFromStagingInfoFile(stagingTargetFile).Return(stagingInfo, nil)
 				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix).AnyTimes()
@@ -381,7 +740,7 @@ func TestNodePublishVolume(t *testing.T) {
 					VolumeId:          "vol-test",
 				}
 
-				_, err := driver.NodePublishVolume(context.TODO(), req)
+				_, err := node.NodePublishVolume(context.TODO(), req)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
 				}
@@ -404,24 +763,24 @@ func TestNodeUnpublishVolume(t *testing.T) {
 		{
 			name: "fail no VolumeId",
 			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
+				node := newTestNodeService(nil, nil)
 
 				req := &csi.NodeUnpublishVolumeRequest{
 					TargetPath: targetPath,
 				}
-				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
+				_, err := node.NodeUnpublishVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
 		{
 			name: "fail no TargetPath",
 			testFunc: func(t *testing.T) {
-				driver := newTestNodeService(nil, nil)
+				node := newTestNodeService(nil, nil)
 
 				req := &csi.NodeUnpublishVolumeRequest{
 					VolumeId: "vol-test",
 				}
-				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
+				_, err := node.NodeUnpublishVolume(context.TODO(), req)
 				assertError(t, err, codes.InvalidArgument)
 			},
 		},
@@ -432,7 +791,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockMounter := mocks.NewMockNodeMounter(mockCtl)
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				driver := newTestNodeService(mockNodeUtils, mockMounter)
+				node := newTestNodeService(mockNodeUtils, mockMounter)
 
 				req := &csi.NodeUnpublishVolumeRequest{
 					TargetPath: targetPath,
@@ -443,7 +802,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 				mockNodeUtils.EXPECT().IsNotMountPoint(targetPathWithHostPrefix).Return(false, nil)
 				mockMounter.EXPECT().Unmount(targetPath).Return(nil)
 				mockNodeUtils.EXPECT().RemoveFileOrDirectory(targetPathWithHostPrefix)
-				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
+				_, err := node.NodeUnpublishVolume(context.TODO(), req)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
 				}
@@ -456,7 +815,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 				defer mockCtl.Finish()
 				mockMounter := mocks.NewMockNodeMounter(mockCtl)
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-				driver := newTestNodeService(mockNodeUtils, mockMounter)
+				node := newTestNodeService(mockNodeUtils, mockMounter)
 
 				req := &csi.NodeUnpublishVolumeRequest{
 					TargetPath: targetPath,
@@ -464,7 +823,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 				}
 				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(false)
-				_, err := driver.NodeUnpublishVolume(context.TODO(), req)
+				_, err := node.NodeUnpublishVolume(context.TODO(), req)
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
 				}
@@ -535,58 +894,58 @@ func TestNodeGetInfo(t *testing.T) {
 		return_fc_err  error
 		expErr         error
 		expNodeId      string
-		iscsiExists      bool
+		iscsiExists    bool
 		fcExists       bool
 	}{
 		{
-			name: "good iqn, empty fc with error from node_utils",
+			name:          "good iqn, empty fc with error from node_utils",
 			return_fc_err: fmt.Errorf("some error"),
-			expErr: status.Error(codes.Internal, fmt.Errorf("some error").Error()),
-			iscsiExists: true,
-			fcExists: true,
+			expErr:        status.Error(codes.Internal, fmt.Errorf("some error").Error()),
+			iscsiExists:   true,
+			fcExists:      true,
 		},
 		{
-			name: "empty iqn with error, one fc port",
-			return_fcs: []string{"10000000c9934d9f"},
-			expNodeId: "test-host;;10000000c9934d9f",
+			name:        "empty iqn with error, one fc port",
+			return_fcs:  []string{"10000000c9934d9f"},
+			expNodeId:   "test-host;;10000000c9934d9f",
 			iscsiExists: true,
-			fcExists: true,
+			fcExists:    true,
 		},
 		{
-			name: "empty iqn with error from node_utils, one more fc ports",
-			return_iqn: "",
-			return_fcs: []string{"10000000c9934d9f","10000000c9934d9h"},
-			expNodeId: "test-host;;10000000c9934d9f:10000000c9934d9h",
+			name:        "empty iqn with error from node_utils, one more fc ports",
+			return_iqn:  "",
+			return_fcs:  []string{"10000000c9934d9f", "10000000c9934d9h"},
+			expNodeId:   "test-host;;10000000c9934d9f:10000000c9934d9h",
 			iscsiExists: true,
-			fcExists: true,
+			fcExists:    true,
 		},
 		{
-			name: "good iqn and good fcs",
-			return_iqn: "iqn.1994-07.com.redhat:e123456789",
-			return_fcs: []string{"10000000c9934d9f","10000000c9934d9h"},
-			expNodeId: "test-host;iqn.1994-07.com.redhat:e123456789;10000000c9934d9f:10000000c9934d9h",
+			name:        "good iqn and good fcs",
+			return_iqn:  "iqn.1994-07.com.redhat:e123456789",
+			return_fcs:  []string{"10000000c9934d9f", "10000000c9934d9h"},
+			expNodeId:   "test-host;iqn.1994-07.com.redhat:e123456789;10000000c9934d9f:10000000c9934d9h",
 			iscsiExists: true,
-			fcExists: true,
+			fcExists:    true,
 		},
 		{
-			name: "iqn and fc path are inexistent",
+			name:        "iqn and fc path are inexistent",
 			iscsiExists: false,
-			fcExists: false,
-			expErr: status.Error(codes.Internal, fmt.Errorf("Cannot find valid fc wwns or iscsi iqn").Error()),
+			fcExists:    false,
+			expErr:      status.Error(codes.Internal, fmt.Errorf("Cannot find valid fc wwns or iscsi iqn").Error()),
 		},
 		{
-			name: "iqn path is inexistsent",
+			name:        "iqn path is inexistsent",
 			iscsiExists: false,
-			fcExists: true,
-			return_fcs: []string{"10000000c9934d9f"},
-			expNodeId: "test-host;;10000000c9934d9f",
+			fcExists:    true,
+			return_fcs:  []string{"10000000c9934d9f"},
+			expNodeId:   "test-host;;10000000c9934d9f",
 		},
 		{
-			name: "fc path is inexistent",
+			name:        "fc path is inexistent",
 			iscsiExists: true,
-			fcExists: false,
-			return_iqn: "iqn.1994-07.com.redhat:e123456789",
-			expNodeId: "test-host;iqn.1994-07.com.redhat:e123456789;",
+			fcExists:    false,
+			return_iqn:  "iqn.1994-07.com.redhat:e123456789",
+			expNodeId:   "test-host;iqn.1994-07.com.redhat:e123456789;",
 		},
 	}
 	for _, tc := range testCases {
@@ -608,7 +967,7 @@ func TestNodeGetInfo(t *testing.T) {
 				}
 			}
 
-			d:= newTestNodeService(fake_nodeutils, nil)
+			d := newTestNodeService(fake_nodeutils, nil)
 
 			expResponse := &csi.NodeGetInfoResponse{NodeId: tc.expNodeId}
 

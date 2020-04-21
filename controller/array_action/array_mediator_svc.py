@@ -1,12 +1,15 @@
-from pysvc.unified.client import connect
+from collections import defaultdict
+
 from pysvc import errors as svc_errors
+from pysvc.unified.client import connect
 from pysvc.unified.response import CLIFailureError
-from controller.common.csi_logger import get_stdout_logger
-from controller.array_action.array_mediator_interface import ArrayMediator
-from controller.array_action.array_action_types import Volume
-import controller.array_action.errors as controller_errors
-from controller.array_action.utils import classproperty
+
 import controller.array_action.config as config
+import controller.array_action.errors as controller_errors
+from controller.array_action.array_action_types import Volume
+from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
+from controller.array_action.utils import classproperty
+from controller.common.csi_logger import get_stdout_logger
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -56,7 +59,7 @@ def build_kwargs_from_capabilities(capabilities, pool_name, volume_name,
     return cli_kwargs
 
 
-class SVCArrayMediator(ArrayMediator):
+class SVCArrayMediator(ArrayMediatorAbstract):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
     MAX_LUN_NUMBER = 511
@@ -73,6 +76,10 @@ class SVCArrayMediator(ArrayMediator):
     @classproperty
     def max_vol_name_length(self):
         return 63
+
+    @classproperty
+    def max_volume_prefix_length(self):
+        return 20
 
     @classproperty
     def max_connections(self):
@@ -122,24 +129,24 @@ class SVCArrayMediator(ArrayMediator):
             cli_volume.mdisk_grp_name,
             self.array_type)
 
-    def get_volume(self, vol_name):
-        logger.debug("Get volume : {}".format(vol_name))
+    def get_volume(self, volume_name, volume_context=None, volume_prefix=""):
+        logger.debug("Get volume : {}".format(volume_name))
         cli_volume = None
         try:
             cli_volume = self.client.svcinfo.lsvdisk(
-                bytes=True, object_id=vol_name).as_single_element
+                bytes=True, object_id=volume_name).as_single_element
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 if (OBJ_NOT_FOUND in ex.my_message or
                         NAME_NOT_MEET in ex.my_message):
                     logger.error("Volume not found")
-                    raise controller_errors.VolumeNotFoundError(vol_name)
+                    raise controller_errors.VolumeNotFoundError(volume_name)
         except Exception as ex:
             logger.exception(ex)
             raise ex
 
         if not cli_volume:
-            raise controller_errors.VolumeNotFoundError(vol_name)
+            raise controller_errors.VolumeNotFoundError(volume_name)
         logger.debug("cli volume returned : {}".format(cli_volume))
         return self._generate_volume_response(cli_volume)
 
@@ -178,7 +185,7 @@ class SVCArrayMediator(ArrayMediator):
         logger.debug("found volume name : {0}".format(vol_name))
         return vol_name
 
-    def create_volume(self, name, size_in_bytes, capabilities, pool):
+    def create_volume(self, name, size_in_bytes, capabilities, pool, volume_prefix=""):
         logger.info("creating volume with name : {}. size : {} . in pool : {} "
                     "with capabilities : {}".format(name, size_in_bytes, pool,
                                                     capabilities))
@@ -379,16 +386,59 @@ class SVCArrayMediator(ArrayMediator):
             logger.exception(ex)
             raise ex
 
-    def get_array_iqns(self):
-        logger.debug("Getting array nodes iscsi name")
+    def _get_array_iqns_by_node_id(self):
+        logger.debug("Getting array nodes id and iscsi name")
         try:
             nodes_list = self.client.svcinfo.lsnode()
-            array_iqns = [node.iscsi_name for node in nodes_list
-                          if node.status.lower() == "online"]
+            array_iqns_by_id = {node.id: node.iscsi_name for node in nodes_list
+                                if node.status.lower() == "online"}
         except Exception as ex:
             logger.exception(ex)
             raise ex
-        return array_iqns
+        logger.debug("Found iqns by node id: {}".format(array_iqns_by_id))
+        return array_iqns_by_id
+
+    def _list_ip_ports(self):
+        try:
+            return self.client.svcinfo.lsportip(filtervalue='state=configured:failover=no')
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            logger.error("Get iscsi targets failed. Reason is: {}".format(ex))
+            raise controller_errors.NoIscsiTargetsFoundError(self.endpoint)
+
+    @staticmethod
+    def _create_ips_by_node_id_map(ports):
+        ips_by_node_id = defaultdict(list)
+        for port in ports:
+            if port.IP_address:
+                ips_by_node_id[port.node_id].append(port.IP_address)
+            if port.IP_address_6:
+                ipv6 = port.IP_address_6.join('[]')
+                ips_by_node_id[port.node_id].append(ipv6)
+        return dict(ips_by_node_id)
+
+    @staticmethod
+    def _unify_ips_by_iqn(iqns_by_node_id, ips_by_node_id):
+        ips_by_iqn = defaultdict(list)
+        for node_id, iqn in iqns_by_node_id.items():
+            ips = ips_by_node_id.get(node_id, [])
+            ips_by_iqn[iqn].extend(ips)
+        return dict(ips_by_iqn)
+
+    def _get_iscsi_targets_by_node_id(self):
+        ports = self._list_ip_ports()
+        return self._create_ips_by_node_id_map(ports)
+
+    def get_iscsi_targets_by_iqn(self):
+        logger.debug("Getting iscsi targets by iqn")
+        iqns_by_node_id = self._get_array_iqns_by_node_id()
+        ips_by_node_id = self._get_iscsi_targets_by_node_id()
+        ips_by_iqn = self._unify_ips_by_iqn(iqns_by_node_id, ips_by_node_id)
+
+        if ips_by_iqn and any(ips_by_iqn.values()):
+            logger.debug("Found iscsi target IPs by iqn: {}".format(ips_by_iqn))
+            return ips_by_iqn
+        else:
+            raise controller_errors.NoIscsiTargetsFoundError(self.endpoint)
 
     def get_array_fc_wwns(self, host_name):
         logger.debug("Getting the connected fc port wwn value from array "

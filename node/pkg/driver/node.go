@@ -50,8 +50,8 @@ var (
 	defaultFSType              = "ext4"
 	StageInfoFilename          = ".stageInfo.json"
 	supportedConnectivityTypes = map[string]bool{
-		"iscsi": true,
-		"fc":    true,
+		device_connectivity.ConnectionTypeISCSI: true,
+		device_connectivity.ConnectionTypeFC:    true,
 		// TODO add nvme later on
 	}
 
@@ -59,8 +59,8 @@ var (
 )
 
 const (
-	FCPath                 = "/sys/class/fc_host"
-	FCPortPath             = "/sys/class/fc_host/host*/port_name"
+	FCPath     = "/sys/class/fc_host"
+	FCPortPath = "/sys/class/fc_host/host*/port_name"
 )
 
 //go:generate mockgen -destination=../../mocks/mock_NodeMounter.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeMounter
@@ -120,10 +120,11 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volId, "NodeStageVolume")
 
-	connectivityType, lun, arrayInitiators, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
+	connectivityType, lun, ipsByArrayInitiator, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	arrayInitiators := d.NodeUtils.GetArrayInitiators(ipsByArrayInitiator)
 
 	stagingPath := req.GetStagingTargetPath() // e.g in k8s /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-21967c74-b456-11e9-b93e-005056a45d5f/globalmount
 
@@ -131,6 +132,8 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	if !ok {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
 	}
+
+	osDeviceConnectivity.EnsureLogin(ipsByArrayInitiator)
 
 	err = osDeviceConnectivity.RescanDevices(lun, arrayInitiators)
 	if err != nil {
@@ -173,7 +176,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 				(stageInfo["sysDevices"] != existingStageInfo["sysDevices"]) ||
 				(stageInfo["connectivity"] != existingStageInfo["connectivity"]) {
 				logger.Errorf("Stage info is not as expected. expected:  {%v}. got : {%v}", stageInfo, existingStageInfo)
-				return nil, status.Error(codes.AlreadyExists, err.Error())
+				return nil, status.Error(codes.AlreadyExists, "Stage info file is not as expected")
 			}
 			logger.Warningf("Idempotent case: stage info file is the same as expected. NodeStageVolume Finished: multipath device is ready [%s] to be mounted by NodePublishVolume API.", baseDevice)
 			return &csi.NodeStageVolumeResponse{}, nil
@@ -218,7 +221,7 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{"Volume Access Type is not supported"}
 	}
 
-	connectivityType, lun, arrayInitiators, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
+	connectivityType, lun, ipsByArrayInitiator, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
 	if err != nil {
 		return &RequestValidationError{fmt.Sprintf("Fail to parse PublishContext %v with err = %v", req.PublishContext, err)}
 	}
@@ -231,8 +234,23 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong lun id %d.", lun)}
 	}
 
-	if len(arrayInitiators) == 0 {
-		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong arrayInitiators %s.", arrayInitiators)}
+	if len(ipsByArrayInitiator) == 0 {
+		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong arrayInitiators %v.",
+			ipsByArrayInitiator)}
+	}
+
+	if connectivityType == device_connectivity.ConnectionTypeISCSI {
+		isAnyIpFound := false
+		for arrayInitiator := range ipsByArrayInitiator {
+			if _, ok := req.PublishContext[arrayInitiator]; ok {
+				isAnyIpFound = true
+				break
+			}
+		}
+		if !isAnyIpFound {
+			return &RequestValidationError{fmt.Sprintf("PublishContext with no iscsi target IP %v.",
+				req.PublishContext)}
+		}
 	}
 
 	return nil

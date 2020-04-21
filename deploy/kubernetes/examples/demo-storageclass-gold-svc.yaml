@@ -1,0 +1,20 @@
+#############################################################
+# Storage class example for IBM Block CSI Driver using SVC.
+#############################################################
+
+kind: StorageClass
+apiVersion: storage.k8s.io/v1
+metadata:
+  name: gold
+provisioner: block.csi.ibm.com
+parameters:
+  SpaceEfficiency: deduplicated
+  pool: gold
+
+  csi.storage.k8s.io/provisioner-secret-name: svc-array
+  csi.storage.k8s.io/provisioner-secret-namespace: csi-ns
+  csi.storage.k8s.io/controller-publish-secret-name: svc-array
+  csi.storage.k8s.io/controller-publish-secret-namespace: csi-ns
+
+  csi.storage.k8s.io/fstype: xfs   # Optional. values ext4\xfs. The default is ext4.
+  volume_name_prefix: demo         # Optional.
