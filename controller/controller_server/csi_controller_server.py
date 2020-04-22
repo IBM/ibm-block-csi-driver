@@ -351,8 +351,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
             context.set_details(ex)
             return csi_pb2.CreateSnapshotResponse()
-        except (
-        controller_errors.SnapshotAlreadyExists, controller_errors.SnapshotNotFoundVolumeWithSameNameExists) as ex:
+        except (controller_errors.SnapshotAlreadyExists,
+                controller_errors.SnapshotNotFoundVolumeWithSameNameExists) as ex:
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.ALREADY_EXISTS)
             return csi_pb2.CreateSnapshotResponse()
