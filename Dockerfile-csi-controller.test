@@ -20,6 +20,8 @@ FROM registry.access.redhat.com/ubi7/python-36:1-58
 
 COPY controller/requirements.txt /driver/controller/
 RUN pip3 install --upgrade pip==19.1.1
+# avoid default boringssl lib, since it does not support z systems
+ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
 RUN pip3 install -r /driver/controller/requirements.txt
 
 # Requires to run local testing
