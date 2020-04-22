@@ -323,16 +323,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             with ArrayConnectionManager(user, password, array_addresses) as array_mediator:
                 logger.debug(array_mediator)
                 # TODO: CSI-1358 - remove try/catch
-                # try:
-                logger.info("++++ before")
-                snapshot_name = self._get_snapshot_name(request, array_mediator)
-                if len(snapshot_name) > 10:
-                    raise controller_errors.IllegalObjectName("The error")
-                logger.info("++++ after")
-                # except controller_errors.IllegalObjectName as ex:
-                #     context.set_details(ex.message)
-                #     context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                #     return csi_pb2.CreateSnapshotResponse()
+                try:
+                    snapshot_name = self._get_snapshot_name(request, array_mediator)
+                except controller_errors.IllegalObjectName as ex:
+                    context.set_details(ex.message)
+                    context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                    return csi_pb2.CreateSnapshotResponse()
 
                 volume_name = array_mediator.get_volume_name(vol_id)
                 logger.info("Snapshot name : {}. Volume name : {}".format(snapshot_name, volume_name))
@@ -346,11 +342,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.debug("generating create snapshot response")
                 res = utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
                 logger.info("finished create snapshot")
-                logger.info("++++ return res")
                 return res
-            logger.info("++++ after with")
         except (controller_errors.IllegalObjectName, controller_errors.VolumeNotFoundError) as ex:
-            logger.info("++++ ILLEGAL OBJECT NAME")
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateSnapshotResponse()
@@ -369,7 +362,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateSnapshotResponse()
-        logger.info("++++ end")
 
     def DeleteSnapshot(self, request, context):
         # TODO: CSI-752
