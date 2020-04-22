@@ -84,11 +84,11 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         if self.client and self.client.is_connected():
             self.client.close()
 
-    def _get_snapshot_or_volume_size_in_bytes(self, snapshot_or_volume):
-        return int(snapshot_or_volume.capacity) * self.BLOCK_SIZE_IN_BYTES
+    def _get_volume_or_snapshot_size_in_bytes(self, volume_or_snapshot):
+        return int(volume_or_snapshot.capacity) * self.BLOCK_SIZE_IN_BYTES
 
     def _generate_volume_response(self, cli_volume):
-        return Volume(self._get_snapshot_or_volume_size_in_bytes(cli_volume.capacity),
+        return Volume(self._get_volume_or_snapshot_size_in_bytes(cli_volume),
                       cli_volume.wwn,
                       cli_volume.name,
                       self.endpoint,
@@ -96,7 +96,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                       self.array_type)
 
     def _generate_snapshot_response(self, cli_snapshot):
-        return Snapshot(self._get_snapshot_or_volume_size_in_bytes(cli_snapshot.capacity),
+        return Snapshot(self._get_volume_or_snapshot_size_in_bytes(cli_snapshot),
                         cli_snapshot.wwn,
                         cli_snapshot.name,
                         self.endpoint,
