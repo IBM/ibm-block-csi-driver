@@ -30,11 +30,11 @@ RUN pip3 install -r /driver/controller/requirements-tests.txt
 
 COPY ./common /driver/common
 COPY ./controller /driver/controller
-
 USER root
-RUN chown 1001 /driver
-USER 1001
-
+RUN groupadd -g 9999 appuser && \
+    useradd -r -u 9999 -g appuser appuser
+RUN chown -R appuser:appuser /driver
+USER appuser
 WORKDIR /driver
 
 ENTRYPOINT ["/driver/controller/scripts/entrypoint-test.sh"]
