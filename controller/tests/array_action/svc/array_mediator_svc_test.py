@@ -227,7 +227,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(SVCArrayMediator.port, 22)
         self.assertEqual(SVCArrayMediator.minimal_volume_size_in_bytes, 512)
         self.assertEqual(SVCArrayMediator.array_type, 'SVC')
-        self.assertEqual(SVCArrayMediator.max_vol_name_length, 63)
+        self.assertEqual(SVCArrayMediator.max_volume_name_length, 63)
         self.assertEqual(SVCArrayMediator.max_connections, 2)
         self.assertEqual(SVCArrayMediator.max_lun_retries, 10)
 

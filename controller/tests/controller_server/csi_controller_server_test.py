@@ -378,7 +378,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     def test_create_volume_with_get_volume_name_too_long_exception(self, a_exit, a_enter, array_type):
         a_enter.return_value = self.mediator
-        self.mediator.max_vol_name_length = 63
+        self.mediator.max_volume_name_length = 63
         context = utils.FakeContext()
         self.request.name = "a" * 128
         self.servicer.CreateVolume(self.request, context)

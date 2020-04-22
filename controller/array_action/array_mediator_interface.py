@@ -173,7 +173,7 @@ class ArrayMediator(ABC):
         Returns:
            Snapshot
         Raises:
-            SnapshotNotFound
+            SnapshotNotFoundVolumeWithSameNameExists
             IllegalObjectName
             PermissionDenied
         """
@@ -297,7 +297,7 @@ class ArrayMediator(ABC):
 
     @property
     @abstractmethod
-    def max_vol_name_length(self):
+    def max_volume_name_length(self):
         """
         The max allowed volume name length
         """

@@ -74,7 +74,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return 22
 
     @classproperty
-    def max_vol_name_length(self):
+    def max_volume_name_length(self):
         return 63
 
     @classproperty
