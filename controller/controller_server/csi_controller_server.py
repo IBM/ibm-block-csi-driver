@@ -445,7 +445,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         if request.parameters and (prefix_param_name in request.parameters):
             prefix = request.parameters[prefix_param_name]
             if len(prefix) > max_name_prefix_length:
-                raise controller_errors.IllegalObjectName(
+                raise controller_errors.PermissionDeniedError(
                     "The {} name prefix {} is too long, max allowed length is {}".format(
                         object_type,
                         prefix,
@@ -454,7 +454,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 )
             name = settings.NAME_PREFIX_SEPARATOR.join((prefix, name))
         if len(name) > max_name_length:
-            raise controller_errors.IllegalObjectName(
+            raise controller_errors.PermissionDeniedError(
                 "The {} name {} is too long, max allowed length is {}".format(
                     object_type,
                     name,
