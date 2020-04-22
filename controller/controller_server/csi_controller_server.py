@@ -326,6 +326,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 # try:
                 logger.info("++++ before")
                 snapshot_name = self._get_snapshot_name(request, array_mediator)
+                if len(snapshot_name) > 10:
+                    raise controller_errors.IllegalObjectName("The error")
                 logger.info("++++ after")
                 # except controller_errors.IllegalObjectName as ex:
                 #     context.set_details(ex.message)
@@ -445,7 +447,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         if request.parameters and (prefix_param_name in request.parameters):
             prefix = request.parameters[prefix_param_name]
             if len(prefix) > max_name_prefix_length:
-                raise controller_errors.PermissionDeniedError(
+                raise controller_errors.IllegalObjectName(
                     "The {} name prefix {} is too long, max allowed length is {}".format(
                         object_type,
                         prefix,
@@ -454,7 +456,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 )
             name = settings.NAME_PREFIX_SEPARATOR.join((prefix, name))
         if len(name) > max_name_length:
-            raise controller_errors.PermissionDeniedError(
+            raise controller_errors.IllegalObjectName(
                 "The {} name {} is too long, max allowed length is {}".format(
                     object_type,
                     name,
