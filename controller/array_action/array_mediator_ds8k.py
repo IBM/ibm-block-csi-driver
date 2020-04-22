@@ -374,10 +374,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         # TODO: CSI-1339
         pass
 
-    def delete_snapshot(self, snapshot_id):
-        # TODO: CSI-1040
-        pass
-
     def get_iscsi_targets_by_iqn(self):
         return {}
 
