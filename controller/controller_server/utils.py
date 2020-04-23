@@ -184,14 +184,23 @@ def validate_publish_volume_request(request):
 
 
 def get_volume_id_info(volume_id):
-    logger.debug("getting volume info for vol id : {0}".format(volume_id))
-    split_vol = volume_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)
-    if len(split_vol) != 2:
-        raise VolumeNotFoundError(volume_id)
+    return _get_object_id(volume_id, config.OBJECT_TYPE_NAME_VOLUME)
 
-    array_type, vol_id = split_vol
-    logger.debug("volume id : {0}, array type :{1}".format(vol_id, array_type))
-    return array_type, vol_id
+
+def get_snapshot_id_info(snapshot_id):
+    return _get_object_id(snapshot_id, config.OBJECT_TYPE_NAME_SNAPSHOT)
+
+
+def _get_object_id_info(full_object_id, object_type):
+    logger.debug("getting {0} info for id : {0}".format(object_type, full_object_id))
+    splitted_object_id = object_type_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)
+    if len(splitted_object_id) != 2:
+        # TODO - add other exception
+        raise VolumeNotFoundError(full_object_id)
+
+    array_type, object_id = splitted_object_id
+    logger.debug("volume id : {0}, array type :{1}".format(object_id, array_type))
+    return array_type, object_id
 
 
 def get_node_id_info(node_id):

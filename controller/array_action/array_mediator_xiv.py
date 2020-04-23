@@ -158,6 +158,17 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
+    def copy_volume_from_snapshot(self, volume_name, src_snapshot):
+        try:
+            return self.client.cmd.vol_copy(vol_src=src_snapshot.name, vol_trg=volume_name)
+        except xcli_errors.IllegalNameForObjectError as ex:
+            print(ex)
+            logger.exception(ex)
+            raise controller_errors.IllegalObjectName(ex.status)
+        except xcli_errors.OperationForbiddenForUserCategoryError as ex:
+            logger.exception(ex)
+            raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
+
     def _get_vol_by_wwn(self, volume_id):
         vol_by_wwn = self.client.cmd.vol_list(wwn=volume_id).as_single_element
         if not vol_by_wwn:
@@ -166,6 +177,9 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         vol_name = vol_by_wwn.name
         logger.debug("found volume name : {0}".format(vol_name))
         return vol_name
+
+    def _get_snapshot_by_id(self, snapshot_id):
+        return self.client.cmd.vol_list(wwn=snapshot_id).as_single_element
 
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))

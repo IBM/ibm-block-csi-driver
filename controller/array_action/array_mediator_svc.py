@@ -230,6 +230,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise ex
 
+    def copy_volume_from_snapshot(self, volume_name, src_snapshot):
+        # TODO
+        pass
+
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
         vol_name = self._get_vol_by_wwn(volume_id)

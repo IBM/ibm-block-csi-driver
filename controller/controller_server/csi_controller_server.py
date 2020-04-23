@@ -44,6 +44,32 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def CreateVolume(self, request, context):
         set_current_thread_name(request.name)
         logger.info("create volume")
+
+        VOLUME_SOURCE_SNAPSHOT = "snapshot"
+        VOLUME_SOURCE_VOLUME = "volume"
+        source_snapshot_id = None
+        source_snapshot = None
+        source = request.volume_content_source
+        if source:
+            if source.HasField(VOLUME_SOURCE_SNAPSHOT):
+                logger.info("Volume source snapshot specified")
+                source_snapshot = source.snapshot
+                logger.info("Source snapshot specified: {0}".format(source_snapshot))
+                source_snapshot_full_id = source_snapshot.snapshot_id
+                if not source_snapshot_full_id:
+                    logger.error("Volume source snapshot has no id specified")
+                    source_snapshot_id = utils.get_snapshot_id(source_snapshot_full_id)
+            elif source.HasField(VOLUME_SOURCE_VOLUME):
+                logger.error("Volume source not supported")
+
+        logger.info("Source snapshot id specified: {0}".format(source_snapshot_id))
+
+        # csi.v1.CreateVolumeRequest.volume_content_source
+        # csi.v1.VolumeContentSource.snapshot
+        # csi.v1.VolumeContentSource.volume
+        # VolumeContentSource.type
+        # csi.v1.VolumeContentSource.SnapshotSource.snapshot_id
+
         try:
             utils.validate_create_volume_request(request)
         except ValidationException as ex:
@@ -90,14 +116,15 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         volume_context=request.parameters,
                         volume_prefix=volume_prefix,
                     )
-
+                    if source_snapshot_id:
+                        source_snapshot = array_mediator.get_snapshot_by_id(source_snapshot_id)
                 except controller_errors.VolumeNotFoundError:
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
                     array_mediator.validate_supported_capabilities(capabilities)
                     vol = array_mediator.create_volume(volume_full_name, size, capabilities, pool, volume_prefix)
-
+                    array_mediator.copy_volume_from_snapshot(volume_name, source_snapshot)
                 else:
                     logger.debug("volume found : {}".format(vol))
 
@@ -105,6 +132,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         context.set_details("Volume was already created with different size.")
                         context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                         return csi_pb2.CreateVolumeResponse()
+                    # TODO validate vs snapshot
 
                 logger.debug("generating create volume response")
                 res = utils.generate_csi_create_volume_response(vol)

@@ -55,6 +55,10 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def copy_volume_from_snapshot(self, volume_name, src_snapshot):
+        raise NotImplementedError
+
+    @abstractmethod
     def delete_volume(self, volume_id):
         """
         This function should delete a volume in the storage system.

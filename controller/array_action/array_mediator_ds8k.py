@@ -256,6 +256,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             )
             raise array_errors.VolumeCreationError(name)
 
+    def copy_volume_from_snapshot(self, volume_name, src_snapshot):
+        # TODO
+        pass
+
     def delete_volume(self, volume_id):
         logger.info("Deleting volume {}".format(volume_id))
         try:
