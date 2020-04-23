@@ -184,16 +184,16 @@ def validate_publish_volume_request(request):
 
 
 def get_volume_id_info(volume_id):
-    return _get_object_id(volume_id, config.OBJECT_TYPE_NAME_VOLUME)
+    return _get_object_id_info(volume_id, config.OBJECT_TYPE_NAME_VOLUME)
 
 
 def get_snapshot_id_info(snapshot_id):
-    return _get_object_id(snapshot_id, config.OBJECT_TYPE_NAME_SNAPSHOT)
+    return _get_object_id_info(snapshot_id, config.OBJECT_TYPE_NAME_SNAPSHOT)
 
 
 def _get_object_id_info(full_object_id, object_type):
     logger.debug("getting {0} info for id : {0}".format(object_type, full_object_id))
-    splitted_object_id = object_type_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)
+    splitted_object_id = full_object_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)
     if len(splitted_object_id) != 2:
         # TODO - add other exception
         raise VolumeNotFoundError(full_object_id)
