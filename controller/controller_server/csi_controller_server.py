@@ -422,7 +422,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def _get_volume_name_and_prefix(self, request, array_mediator):
         return self._get_object_name_and_prefix(request, array_mediator.max_volume_prefix_length,
-                                                array_mediator.max_volume_name_length, config.OBJECT_TYPE_NAME_VOLUME,
+                                                array_mediator.max_volume_name_length,
+                                                config.OBJECT_TYPE_NAME_VOLUME,
                                                 config.PARAMETERS_VOLUME_NAME_PREFIX)
 
     def _get_snapshot_name(self, request, array_mediator):
