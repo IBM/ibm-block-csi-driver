@@ -192,7 +192,7 @@ def get_snapshot_id_info(snapshot_id):
 
 
 def _get_object_id_info(full_object_id, object_type):
-    logger.debug("getting {0} info for id : {0}".format(object_type, full_object_id))
+    logger.debug("getting {0} info for id : {1}".format(object_type, full_object_id))
     splitted_object_id = full_object_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)
     if len(splitted_object_id) != 2:
         # TODO - add other exception
