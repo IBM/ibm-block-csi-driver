@@ -103,8 +103,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_create_snapshot_succeeds(self, a_exit, a_enter, array_type):
+    def test_create_snapshot_succeeds(self, a_enter, array_type):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
         self.mediator.create_snapshot = Mock()
@@ -119,16 +118,12 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.mediator.get_snapshot.assert_called_once_with(snap_name)
         self.mediator.create_snapshot.assert_called_once_with(snap_name, snap_vol_name)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_create_snapshot_with_wrong_secrets(self, a_enter, a_exit, array_type):
+    def test_create_snapshot_with_wrong_secrets(self, a_enter):
         self._test_create_object_with_wrong_secrets(a_enter)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_create_snapshot_with_array_connection_exception(self, a_enter, a_exit, array_type):
+    def test_create_snapshot_with_array_connection_exception(self, a_enter):
         self._test_create_object_with_array_connection_exception(a_enter)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
