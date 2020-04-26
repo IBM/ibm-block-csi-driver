@@ -23,7 +23,7 @@ pipeline {
         stage ('CSI-deployment: k8s yamls validation') {
             steps {
                 env.arch= sh (uname -m)
-                if ("$env.arch" = "x86_64"){
+                if ("$env.arch" == "x86_64"){
                         sh './scripts/run_yamlcheck.sh'
                 }
             }
