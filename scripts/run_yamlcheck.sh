@@ -1,6 +1,6 @@
 #!/bin/bash -xe
 
-arch=$('/usr/bin/uname -m')
+arch=$(uname -m)
 echo arch
 if [ "$arch" = "x86_64" ];
 then
