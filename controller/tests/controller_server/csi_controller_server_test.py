@@ -209,8 +209,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_create_snapshot_with_name_prefix(self, a_exit, a_enter, array_type):
+    def test_create_snapshot_with_name_prefix(self, a_enter, array_type):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
         self.mediator.get_volume_name = Mock()
