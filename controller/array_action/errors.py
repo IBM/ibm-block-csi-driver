@@ -163,10 +163,10 @@ class UnsupportedConnectivityTypeError(BaseArrayActionException):
         self.message = messages.UnsupportedConnectivityTypeError_message.format(connectivity_type)
 
 
-class SnapshotNotFoundVolumeWithSameNameExists(BaseArrayActionException):
+class SnapshotNameBelongsToVolumeError(BaseArrayActionException):
 
     def __init__(self, snapshot, array):
-        self.message = messages.SnapshotNotFoundVolumeWithSameNameExistsError_message.format(snapshot, array)
+        self.message = messages.SnapshotNameBelongsToVolumeError_message.format(snapshot, array)
 
 
 class SnapshotAlreadyExists(BaseArrayActionException):
