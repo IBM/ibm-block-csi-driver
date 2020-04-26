@@ -205,7 +205,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     def test_create_snapshot_with_same_volume_name_exists_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.ALREADY_EXISTS,
                                            err=array_errors.SnapshotNameBelongsToVolumeError("snap",
-                                                                                                     "endpoint"))
+                                                                                             "endpoint"))
 
     def test_create_snapshot_with_other_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INTERNAL, err=Exception("error"))
