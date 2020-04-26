@@ -46,8 +46,6 @@ NoIscsiTargetsFoundError_message = "Could not find iSCSI targets for endpoint: {
 
 UnsupportedConnectivityTypeError_message = "Unsupported connectivity type: {0}"
 
-SnapshotNotFoundError_message = "Snapshot was not found : {0} "
-
 SnapshotAlreadyExistsError_message = "Snapshot already exists : {0} , array : {1}"
 
 SnapshotNotFoundVolumeWithSameNameExistsError_message = "Snapshot not found. Volume with the same name exists. \

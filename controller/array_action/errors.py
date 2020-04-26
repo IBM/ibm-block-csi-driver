@@ -163,12 +163,6 @@ class UnsupportedConnectivityTypeError(BaseArrayActionException):
         self.message = messages.UnsupportedConnectivityTypeError_message.format(connectivity_type)
 
 
-class SnapshotNotFoundError(BaseArrayActionException):
-
-    def __init__(self, name):
-        self.message = messages.SnapshotNotFoundError_message.format(name)
-
-
 class SnapshotNotFoundVolumeWithSameNameExists(BaseArrayActionException):
 
     def __init__(self, snapshot, array):
