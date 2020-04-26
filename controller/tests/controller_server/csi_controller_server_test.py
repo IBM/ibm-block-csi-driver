@@ -271,8 +271,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_create_volume_succeeds(self, a_exit, a_enter, array_type):
+    def test_create_volume_succeeds(self, a_enter, array_type):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
 
@@ -284,16 +283,12 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.get_volume.assert_called_once_with(vol_name, volume_context={'pool': 'pool1'}, volume_prefix="")
         self.mediator.create_volume.assert_called_once_with(vol_name, 10, {}, 'pool1', "")
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_create_volume_with_wrong_secrets(self, a_enter, a_exit, array_type):
+    def test_create_volume_with_wrong_secrets(self, a_enter):
         self._test_create_object_with_wrong_secrets(a_enter)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_create_volume_with_wrong_parameters(self, a_enter, a_exit, array_type):
+    def test_create_volume_with_wrong_parameters(self, a_enter):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
 
@@ -308,8 +303,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.assertTrue("parameter" in context.details)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_create_volume_with_wrong_volume_capabilities(self, a_enter, a_exit):
+    def test_create_volume_with_wrong_volume_capabilities(self, a_enter):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
 
@@ -335,8 +329,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_create_volume_with_array_connection_exception(self, a_enter, a_exit, array_type):
+    def test_create_volume_with_array_connection_exception(self, a_enter, array_type):
         self._test_create_object_with_array_connection_exception(a_enter)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")

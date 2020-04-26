@@ -145,7 +145,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.assertTrue(res.snapshot_name == snap_name)
         self.assertTrue(res.volume_name == snap_vol_name)
         self.assertTrue(res.capacity_bytes == size_in_bytes)
-        self.assertFalse(res.capacity_bytes == size_in_bytes)
+        self.assertTrue(res.capacity_bytes == size_in_bytes)
 
     def test_create_snapshot_return_illegal_name_for_object(self):
         self._test_create_snapshot_error(xcli_errors.IllegalNameForObjectError, array_errors.IllegalObjectName)
