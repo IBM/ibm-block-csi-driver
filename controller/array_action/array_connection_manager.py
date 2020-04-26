@@ -67,7 +67,6 @@ class ArrayConnectionManager(object):
         return arr_connection
 
     def __exit__(self, type, value, traceback):
-        logger.debug("++++ exception  {}".format(type))
         logger.debug("closing the connection")
         with connection_lock_dict[self.endpoint_key]:  # TODO: when moving to python 3 add tiemout!
             if self.connected:

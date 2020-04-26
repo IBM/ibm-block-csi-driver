@@ -70,7 +70,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             # TODO : pass multiple array addresses
             with ArrayConnectionManager(user, password, array_addresses) as array_mediator:
                 logger.debug(array_mediator)
-                # TODO: CSI-1358 - remove try/catch
+                # TODO: CSI-1358 - remove try/except
                 try:
                     volume_full_name, volume_prefix = self._get_volume_name_and_prefix(request, array_mediator)
                 except controller_errors.IllegalObjectName as ex:
@@ -322,7 +322,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             _, vol_id = utils.get_volume_id_info(source_volume_id)
             with ArrayConnectionManager(user, password, array_addresses) as array_mediator:
                 logger.debug(array_mediator)
-                # TODO: CSI-1358 - remove try/catch
+                # TODO: CSI-1358 - remove try/except
                 try:
                     snapshot_name = self._get_snapshot_name(request, array_mediator)
                 except controller_errors.IllegalObjectName as ex:
@@ -368,12 +368,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.info("Delete snapshot")
         return csi_pb2.DeleteSnapshotResponse()
 
-    def ListSnapshots(self, request, context):
-        logger.info("ListSnapshots")
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        logger.info("finished ListSnapshots")
-        return csi_pb2.ListSnapshotsResponse()
-
     def GetCapacity(self, request, context):
         logger.info("GetCapacity")
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
@@ -389,8 +383,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_VOLUME"))),
                 csi_pb2.ControllerServiceCapability(
                     rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_SNAPSHOT"))),
-                csi_pb2.ControllerServiceCapability(
-                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("LIST_SNAPSHOTS"))),
                 csi_pb2.ControllerServiceCapability(
                     rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("PUBLISH_UNPUBLISH_VOLUME")))])
 
@@ -441,7 +433,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             prefix = request.parameters[prefix_param_name]
             if len(prefix) > max_name_prefix_length:
                 raise controller_errors.IllegalObjectName(
-                    "The {} name prefix {} is too long, max allowed length is {}".format(
+                    "The {} name prefix '{}' is too long, max allowed length is {}".format(
                         object_type,
                         prefix,
                         max_name_prefix_length
@@ -450,7 +442,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             name = settings.NAME_PREFIX_SEPARATOR.join((prefix, name))
         if len(name) > max_name_length:
             raise controller_errors.IllegalObjectName(
-                "The {} name {} is too long, max allowed length is {}".format(
+                "The {} name '{}' is too long, max allowed length is {}".format(
                     object_type,
                     name,
                     max_name_length
