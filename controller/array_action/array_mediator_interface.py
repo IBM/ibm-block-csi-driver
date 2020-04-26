@@ -99,7 +99,7 @@ class ArrayMediator(ABC):
     @abstractmethod
     def get_volume_name(self, volume_id):
         """
-        This function return volume mappings.
+        This function return volume name.
         Args:
            volume_id : volume id
         Returns:
