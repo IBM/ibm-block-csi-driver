@@ -368,11 +368,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def get_snapshot(self, snapshot_name):
         # TODO: CSI-1339
-        pass
+        raise NotImplementedError
 
     def create_snapshot(self, name, volume_name):
         # TODO: CSI-1339
-        pass
+        raise NotImplementedError
 
     def get_iscsi_targets_by_iqn(self):
         return {}
