@@ -1,6 +1,6 @@
 import unittest
 from pyxcli import errors as xcli_errors
-from controller.array_action.array_mediator_xiv import XIVArrayMediator
+from controller.array_action.array_mediator_xiv import XIVArrayMediator, byt
 from mock import patch, Mock
 import controller.array_action.errors as array_errors
 from controller.tests.array_action.xiv import utils
@@ -137,11 +137,15 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_create_snapshot_succeeds(self):
         snap_name = "snap"
         snap_vol_name = "snap_vol"
-        xcli_snap = self._get_single_snapshot_result_mock(snap_name, snap_vol_name)
+        size_in_blocks_string = "10"
+        size_in_bytes = int(size_in_blocks_string ) * XIVArrayMediator.BLOCK_SIZE_IN_BYTE
+        xcli_snap = self._get_single_snapshot_result_mock(snap_name, snap_vol_name, snap_capacity=size_in_blocks_string)
         self.mediator.client.cmd.snapshot_create.return_value = xcli_snap
         res = self.mediator.create_snapshot(snap_name, snap_vol_name)
         self.assertTrue(res.snapshot_name == snap_name)
         self.assertTrue(res.volume_name == snap_vol_name)
+        self.assertTrue(res.capacity_bytes == size_in_bytes)
+        self.assertFalse(res.capacity_bytes == size_in_bytes)
 
     def test_create_snapshot_return_illegal_name_for_object(self):
         self._test_create_snapshot_error(xcli_errors.IllegalNameForObjectError, array_errors.IllegalObjectName)
@@ -167,9 +171,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(expected_exception):
             self.mediator.create_snapshot("snap", "vol")
 
-    def _get_single_snapshot_result_mock(self, snap_name, snap_vol_name):
+    def _get_single_snapshot_result_mock(self, snap_name, snap_vol_name, snap_capacity="17"):
         snap_wwn = "1235678"
-        snap_capacity = "17"
         xcli_snap = Mock()
         xcli_snap.as_single_element = utils.get_mock_xiv_snapshot(snap_capacity, snap_name, snap_wwn, snap_vol_name)
         return xcli_snap
