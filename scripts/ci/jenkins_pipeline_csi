@@ -26,6 +26,7 @@ pipeline {
                     env.arch = sh (returnStdout: true, script: 'uname -m')
                     echo env.arch
                     if (env.arch == "x86_64"){
+                            echo 'yamls validation starting:'
                             sh './scripts/run_yamlcheck.sh'
                     }
                 }
