@@ -24,6 +24,7 @@ pipeline {
             steps {
                 script{
                     env.arch = sh (returnStdout: true, script: 'uname -m')
+                    echo env.arch
                     if (env.arch == "x86_64"){
                             sh './scripts/run_yamlcheck.sh'
                     }
