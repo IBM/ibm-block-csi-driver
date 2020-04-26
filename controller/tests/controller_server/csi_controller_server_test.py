@@ -25,7 +25,7 @@ class AbstractControllerTest(unittest.TestCase):
     def get_create_object_method_response(self):
         raise NotImplementedError
 
-    def _test_create_object_with_empty_name(self):
+    def _test_create_object_with_empty_name(self, a_enter):
         a_enter.return_value = self.mediator
         self.request.name = ""
         context = utils.FakeContext()
@@ -97,8 +97,9 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.request.name = snap_name
         self.request.source_volume_id = "A9000:12345678"
 
-    def test_create_snapshot_with_empty_name(self):
-        self._test_create_object_with_empty_name()
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_create_snapshot_with_empty_name(self, a_enter):
+        self._test_create_object_with_empty_name(a_enter)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
@@ -264,8 +265,9 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.request.capacity_range.required_bytes = self.capacity_bytes
         self.request.name = vol_name
 
-    def test_create_volume_with_empty_name(self):
-        self._test_create_object_with_empty_name()
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_create_volume_with_empty_name(self, a_enter):
+        self._test_create_object_with_empty_name(a_enter)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")

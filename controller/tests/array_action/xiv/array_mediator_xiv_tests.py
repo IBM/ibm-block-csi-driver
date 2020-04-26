@@ -138,7 +138,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         snap_name = "snap"
         snap_vol_name = "snap_vol"
         size_in_blocks_string = "10"
-        size_in_bytes = int(size_in_blocks_string ) * XIVArrayMediator.BLOCK_SIZE_IN_BYTE
+        size_in_bytes = int(size_in_blocks_string) * XIVArrayMediator.BLOCK_SIZE_IN_BYTE
         xcli_snap = self._get_single_snapshot_result_mock(snap_name, snap_vol_name, snap_capacity=size_in_blocks_string)
         self.mediator.client.cmd.snapshot_create.return_value = xcli_snap
         res = self.mediator.create_snapshot(snap_name, snap_vol_name)
