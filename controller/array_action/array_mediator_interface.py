@@ -187,7 +187,7 @@ class ArrayMediator(ABC):
             name           : name of the snapshot to be created in the storage system
             volume_name    : name of the volume to be created from
         Returns:
-            Snapshot object
+            Snapshot
         Raises:
             SnapshotAlreadyExists
             VolumeNotFound

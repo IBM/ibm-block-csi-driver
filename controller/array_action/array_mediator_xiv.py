@@ -39,11 +39,11 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     @classproperty
     def max_snapshot_name_length(self):
-        return 63
+        return self.max_snapshot_name_length
 
     @classproperty
     def max_snapshot_prefix_length(self):
-        return 20
+        return self.max_volume_prefix_length
 
     @classproperty
     def max_connections(self):
