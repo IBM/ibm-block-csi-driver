@@ -330,8 +330,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self._test_create_object_with_array_connection_exception(a_enter)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_create_volume_with_get_array_type_exception(self, a_enter, a_exit, array_type):
         self._test_create_object_with_get_array_type_exception(a_enter, array_type)
 
