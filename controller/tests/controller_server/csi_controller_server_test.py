@@ -468,7 +468,7 @@ class TestControllerServerDeleteVolume(unittest.TestCase):
         self.mediator = XIVArrayMediator("user", "password", self.fqdn)
         self.mediator.client = Mock()
 
-        self.mediator.get_volume = Mock()test_create_snapshot_with_empty_name
+        self.mediator.get_volume = Mock()
 
         self.servicer = ControllerServicer(self.fqdn)
 
