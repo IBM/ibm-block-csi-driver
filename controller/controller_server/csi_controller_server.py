@@ -341,7 +341,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                                              volume_name))
                         context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                         return csi_pb2.CreateSnapshotResponse()
-                else
+                else:
                     logger.debug(
                         "Snapshot doesn't exist. Creating a new snapshot {0} from volume {1}".format(snapshot_name,
                                                                                                      volume_name))
