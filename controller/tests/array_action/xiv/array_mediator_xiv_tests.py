@@ -84,7 +84,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
             self.mediator.create_volume("vol", 10, [], "pool1")
 
     @patch.object(XIVArrayMediator, "_generate_volume_response")
-    def test_create_volume__generate_volume_response_return_exception(self, response):
+    def test_create_volume__generate_volume_response_raise_exception(self, response):
         response.side_effect = Exception("err")
         with self.assertRaises(Exception):
             self.mediator.create_volume("vol", 10, [], "pool1")
@@ -161,7 +161,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
                                          array_errors.PermissionDeniedError)
 
     @patch.object(XIVArrayMediator, "_generate_snapshot_response")
-    def test_create_snapshot_generate_snapshot_response_return_exception(self, response):
+    def test_create_snapshot_generate_snapshot_response_raise_exception(self, response):
         response.side_effect = Exception("err")
         with self.assertRaises(Exception):
             self.mediator.create_snapshot("snap", "vol")
