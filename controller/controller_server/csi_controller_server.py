@@ -335,7 +335,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 snapshot = array_mediator.get_snapshot(snapshot_name)
                 if snapshot.volume_name != volume_name:
                     context.set_details(
-                        messages.SnapshotWrongVolumeError_message.format(snapshot_name, snapshot.volume_name, volume_name))
+                        messages.SnapshotWrongVolumeError_message.format(snapshot_name, snapshot.volume_name,
+                                                                         volume_name))
                     context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                     return csi_pb2.CreateSnapshotResponse()
 
