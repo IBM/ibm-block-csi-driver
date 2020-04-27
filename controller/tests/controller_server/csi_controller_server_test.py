@@ -119,6 +119,22 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.mediator.get_snapshot.assert_called_once_with(snap_name)
         self.mediator.create_snapshot.assert_called_once_with(snap_name, snap_vol_name)
 
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_create_snapshot_belongs_to_wrong_volume(self, a_exit, a_enter, array_type):
+        a_enter.return_value = self.mediator
+        context = utils.FakeContext()
+        self.mediator.create_snapshot = Mock()
+        self.mediator.get_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, snap_name, "wwn",
+                                                                                            "wrong_volume_name", "xiv")
+        self.mediator.get_volume_name = Mock()
+        self.mediator.get_volume_name.return_value = snap_vol_name
+
+        array_type.return_value = "a9k"
+        self.servicer.CreateSnapshot(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.ALREADY_EXISTS)
+
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_create_snapshot_with_wrong_secrets(self, a_enter):
         self._test_create_object_with_wrong_secrets(a_enter)
@@ -452,7 +468,7 @@ class TestControllerServerDeleteVolume(unittest.TestCase):
         self.mediator = XIVArrayMediator("user", "password", self.fqdn)
         self.mediator.client = Mock()
 
-        self.mediator.get_volume = Mock()
+        self.mediator.get_volume = Mock()test_create_snapshot_with_empty_name
 
         self.servicer = ControllerServicer(self.fqdn)
 

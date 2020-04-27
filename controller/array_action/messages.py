@@ -51,4 +51,4 @@ SnapshotAlreadyExistsError_message = "Snapshot already exists : {0} , array : {1
 SnapshotNameBelongsToVolumeError_message = "Snapshot not found. Volume with the same name exists. \
                                                          Name : {0} , array : {1}"
 
-SnapshotWrongVolume_message = "Snapshot {0} exists but it is of Volume {1} and not {2}"
+SnapshotWrongVolumeError_message = "Snapshot {0} exists but it is of Volume {1} and not {2}"
