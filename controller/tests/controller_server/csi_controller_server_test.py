@@ -137,7 +137,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.get_snapshot")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_create_snapshot_get_snapshot_exception(self, a_enter, get_volume, array_type):
+    def test_create_snapshot_get_snapshot_exception(self, a_enter, get_snapshot, array_type):
         a_enter.return_value = self.mediator
         self.mediator.get_snapshot.side_effect = [Exception("error")]
         context = utils.FakeContext()
