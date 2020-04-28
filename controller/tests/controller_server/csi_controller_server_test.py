@@ -22,7 +22,7 @@ class AbstractControllerTest(unittest.TestCase):
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get_create_object_method_response(self):
+    def get_create_object_response_method(self):
         raise NotImplementedError
 
     def _test_create_object_with_empty_name(self, a_enter):
@@ -32,7 +32,7 @@ class AbstractControllerTest(unittest.TestCase):
         res = self.get_create_object_method()(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertTrue("name" in context.details)
-        self.assertEqual(res, self.get_create_object_method_response()())
+        self.assertEqual(res, self.get_create_object_response_method()())
 
     def _test_create_object_with_wrong_secrets(self, a_enter):
         a_enter.return_value = self.mediator
@@ -77,7 +77,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     def get_create_object_method(self):
         return self.servicer.CreateSnapshot
 
-    def get_create_object_method_response(self):
+    def get_create_object_response_method(self):
         return csi_pb2.CreateSnapshotResponse
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
@@ -248,7 +248,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     def get_create_object_method(self):
         return self.servicer.CreateVolume
 
-    def get_create_object_method_response(self):
+    def get_create_object_response_method(self):
         return csi_pb2.CreateVolumeResponse
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
