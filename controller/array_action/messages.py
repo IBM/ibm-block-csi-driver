@@ -26,7 +26,7 @@ NoAvailableLunError_message = "No available lun was found for host : {0}"
 
 LunAlreadyInUse_message = "Lun : {0} is already mapped for host : {1}"
 
-MappingError_message = "Mapping error has occured while mapping vol : {0} to host : {1}. error : {2}"
+MappingError_message = "Mapping error has occurred while mapping vol : {0} to host : {1}. error : {2}"
 
 VolumeAlreadyUnmapped_message = "Volume: {0} is already unmapped."
 
@@ -45,3 +45,10 @@ VolumeDeletionError_message = 'Failed to delete volume {}'
 NoIscsiTargetsFoundError_message = "Could not find iSCSI targets for endpoint: {0}"
 
 UnsupportedConnectivityTypeError_message = "Unsupported connectivity type: {0}"
+
+SnapshotAlreadyExistsError_message = "Snapshot already exists : {0} , array : {1}"
+
+SnapshotNameBelongsToVolumeError_message = "Snapshot not found. Volume with the same name exists. \
+                                                         Name : {0} , array : {1}"
+
+SnapshotWrongVolumeError_message = "Snapshot {0} exists but it is of Volume {1} and not {2}"

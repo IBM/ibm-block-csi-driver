@@ -85,7 +85,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return 8452
 
     @classproperty
-    def max_vol_name_length(self):
+    def max_volume_name_length(self):
         # the max length is 16 on storage side, it is too short, use shorten_volume_name to workaround it.
         # so 63 here is just a soft limit, to make sure the volume name won't be very long.
         return 63
@@ -98,6 +98,16 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def max_connections(self):
         # max for rest api is 128.
         return 50
+
+    @classproperty
+    def max_snapshot_name_length(self):
+        # TODO: CSI-1339
+        pass
+
+    @classproperty
+    def max_snapshot_prefix_length(self):
+        # TODO: CSI-1339
+        pass
 
     @classproperty
     def minimal_volume_size_in_bytes(self):
@@ -293,6 +303,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
         raise array_errors.VolumeNotFoundError(name)
 
+    def get_volume_name(self, volume_id):
+        # TODO: CSI-1339
+        pass
+
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume {}".format(volume_id))
         volume_id = get_volume_id_from_scsi_identifier(volume_id)
@@ -351,6 +365,14 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise array_errors.HostNotFoundError(host_name)
         except exceptions.ClientException as ex:
             raise array_errors.UnMappingError(volume_id, host_name, ex.details)
+
+    def get_snapshot(self, snapshot_name):
+        # TODO: CSI-1339
+        raise NotImplementedError
+
+    def create_snapshot(self, name, volume_name):
+        # TODO: CSI-1339
+        raise NotImplementedError
 
     def get_iscsi_targets_by_iqn(self):
         return {}

@@ -14,6 +14,18 @@ def get_mock_mediator_response_volume(size, name, wwn, array_type):
     return vol
 
 
+def get_mock_mediator_response_snapshot(size, name, wwn, volume_name, array_type):
+    snapshot = Mock()
+    snapshot.capacity_bytes = size
+    snapshot.id = wwn
+    snapshot.snapshot_name = name
+    snapshot.volume_name = volume_name
+    snapshot.array_address = "arr1"
+    snapshot.array_type = array_type
+
+    return snapshot
+
+
 class FakeContext:
 
     def __init__(self):

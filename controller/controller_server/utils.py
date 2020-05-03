@@ -5,6 +5,7 @@ from controller.controller_server.errors import ValidationException
 import controller.controller_server.messages as messages
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.errors import HostNotFoundError, VolumeNotFoundError, UnsupportedConnectivityTypeError
+from google.protobuf.timestamp_pb2 import Timestamp
 
 logger = get_stdout_logger()
 
@@ -17,10 +18,15 @@ def get_array_connection_info_from_secret(secrets):
 
 
 def get_vol_id(new_vol):
-    logger.debug('getting vol id for vol : {0}'.format(new_vol))
-    vol_id = "{0}{1}{2}".format(new_vol.array_type, config.PARAMETERS_VOLUME_ID_DELIMITER, new_vol.id)
-    logger.debug("vol id is : {0}".format(vol_id))
-    return vol_id
+    return _get_object_id(new_vol)
+
+
+def get_snapshot_id(new_snapshot):
+    return _get_object_id(new_snapshot)
+
+
+def _get_object_id(obj):
+    return config.PARAMETERS_OBJECT_ID_DELIMITER.join((obj.array_type, obj.id))
 
 
 def validate_secret(secret):
@@ -70,13 +76,13 @@ def validate_create_volume_request(request):
     logger.debug("validating create volume request")
 
     logger.debug("validating volume name")
-    if request.name == '':
-        raise ValidationException(messages.name_should_be_empty_message)
+    if not request.name:
+        raise ValidationException(messages.name_should_not_be_empty_message)
 
     logger.debug("validating volume capacity")
     if request.capacity_range:
         if request.capacity_range.required_bytes < 0:
-            raise ValidationException(messages.size_bigget_then_0_message)
+            raise ValidationException(messages.size_bigger_than_0_message)
 
     else:
         raise ValidationException(messages.no_capacity_range_message)
@@ -101,6 +107,17 @@ def validate_create_volume_request(request):
     logger.debug("request validation finished.")
 
 
+def validate_create_snapshot_request(request):
+    logger.debug("validating create snapshot request")
+    logger.debug("validating snapshot name")
+    if not request.name:
+        raise ValidationException(messages.name_should_not_be_empty_message)
+    logger.debug("validating secrets")
+    if request.secrets:
+        validate_secret(request.secrets)
+    logger.debug("request validation finished.")
+
+
 def generate_csi_create_volume_response(new_vol):
     logger.debug("creating volume response for vol : {0}".format(new_vol))
 
@@ -117,6 +134,20 @@ def generate_csi_create_volume_response(new_vol):
         volume_context=vol_context))
 
     logger.debug("finished creating volume response : {0}".format(res))
+    return res
+
+
+def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
+    logger.debug("creating snapshot response for snapshot : {0}".format(new_snapshot))
+
+    res = csi_pb2.CreateSnapshotResponse(snapshot=csi_pb2.Snapshot(
+        size_bytes=new_snapshot.capacity_bytes,
+        snapshot_id=get_snapshot_id(new_snapshot),
+        source_volume_id=source_volume_id,
+        creation_time=get_current_timestamp(),
+        ready_to_use=new_snapshot.is_ready))
+
+    logger.debug("finished creating snapshot response : {0}".format(res))
     return res
 
 
@@ -138,7 +169,7 @@ def validate_publish_volume_request(request):
 
     logger.debug("validating readonly")
     if request.readonly:
-        raise ValidationException(messages.readoly_not_supported_message)
+        raise ValidationException(messages.readonly_not_supported_message)
 
     logger.debug("validating volume capabilities")
     validate_csi_volume_capability(request.volume_capability)
@@ -154,7 +185,7 @@ def validate_publish_volume_request(request):
 
 def get_volume_id_info(volume_id):
     logger.debug("getting volume info for vol id : {0}".format(volume_id))
-    split_vol = volume_id.split(config.PARAMETERS_VOLUME_ID_DELIMITER)
+    split_vol = volume_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)
     if len(split_vol) != 2:
         raise VolumeNotFoundError(volume_id)
 
@@ -219,7 +250,7 @@ def validate_unpublish_volume_request(request):
     logger.debug("validating unpublish volume request")
 
     logger.debug("validating volume id")
-    if len(request.volume_id.split(config.PARAMETERS_VOLUME_ID_DELIMITER)) != 2:
+    if len(request.volume_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)) != 2:
         raise ValidationException(messages.volume_id_wrong_format_message)
 
     logger.debug("validating secrets")
@@ -229,3 +260,9 @@ def validate_unpublish_volume_request(request):
         raise ValidationException(messages.secret_missing_message)
 
     logger.debug("unpublish volume request validation finished.")
+
+
+def get_current_timestamp():
+    res = Timestamp()
+    res.GetCurrentTime()
+    return res

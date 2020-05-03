@@ -66,7 +66,7 @@ class ArrayMediator(ABC):
             None
 
         Raises:
-            volumeNotFound
+            VolumeNotFound
             PermissionDenied
         """
         raise NotImplementedError
@@ -86,9 +86,22 @@ class ArrayMediator(ABC):
            Volume
 
         Raises:
-            volumeNotFound
+            VolumeNotFound
             IllegalObjectName
             PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_volume_name(self, volume_id):
+        """
+        This function return volume name.
+        Args:
+           volume_id : volume id
+        Returns:
+           volume name
+        Raises:
+            VolumeNotFound
         """
         raise NotImplementedError
 
@@ -104,7 +117,7 @@ class ArrayMediator(ABC):
            mapped_host_luns : a dict like this: {<host name>:<lun id>,...}
 
         Raises:
-            volumeNotFound
+            VolumeNotFound
         """
         raise NotImplementedError
 
@@ -123,8 +136,8 @@ class ArrayMediator(ABC):
         Raises:
             NoAvailableLun
             LunAlreadyInUse
-            volumeNotFound
-            hostNotFound
+            VolumeNotFound
+            HostNotFound
             PermissionDenied
             MappingError
         """
@@ -144,10 +157,42 @@ class ArrayMediator(ABC):
 
         Raises:
             VolumeAlreadyUnmapped
-            volumeNotFound
-            hostNotFound
+            VolumeNotFound
+            HostNotFound
             PermissionDenied
             UnMappingError
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_snapshot(self, snapshot_name):
+        """
+        This function return snapshot info about the snapshot.
+        Args:
+            snapshot_name : name of the snapshot in the storage system
+        Returns:
+           Snapshot
+        Raises:
+            SnapshotNameBelongsToVolumeError
+            IllegalObjectName
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def create_snapshot(self, name, volume_name):
+        """
+        This function should create a snapshot from volume in the storage system.
+        Args:
+            name           : name of the snapshot to be created in the storage system
+            volume_name    : name of the volume to be created from
+        Returns:
+            Snapshot
+        Raises:
+            SnapshotAlreadyExists
+            VolumeNotFound
+            IllegalObjectName
+            PermissionDenied
         """
         raise NotImplementedError
 
@@ -198,7 +243,7 @@ class ArrayMediator(ABC):
            hostname           : the name of the host
 
         Raises:
-            hostNotFound
+            HostNotFound
             multipleHostsFoundError
             PermissionDenied
         """
@@ -238,9 +283,9 @@ class ArrayMediator(ABC):
 
     @property
     @abstractmethod
-    def max_vol_name_length(self):
+    def max_volume_name_length(self):
         """
-        The max number of concurrent connections to the storage system.
+        The max allowed volume name length
         """
         raise NotImplementedError
 
@@ -249,6 +294,22 @@ class ArrayMediator(ABC):
     def max_volume_prefix_length(self):
         """
         The max allowed length of a volume name prefix.
+        """
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def max_snapshot_name_length(self):
+        """
+        The max allowed snapshot name length
+        """
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def max_snapshot_prefix_length(self):
+        """
+        The max allowed length of a snapshot name prefix.
         """
         raise NotImplementedError
 
