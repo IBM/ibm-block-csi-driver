@@ -6,7 +6,6 @@ from pysvc.unified.response import CLIFailureError
 
 import controller.array_action.config as config
 import controller.array_action.errors as controller_errors
-import utils
 from controller.array_action.array_action_types import Volume
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.utils import classproperty
@@ -306,12 +305,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _get_detailed_hosts_list_cmd(self, host_list):
         writer = StringIO()
-        for i in range(hosts_multiplier):
-            for host in host_list:
-                host_id = host.get(HOST_ID_PARAM)
-                writer.write(LIST_HOSTS_CMD)
-                writer.write(host_id)
-                writer.write(LIST_CMDS_SEPARATOR)
+        for host in host_list:
+            host_id = host.get(HOST_ID_PARAM)
+            writer.write(LIST_HOSTS_CMD)
+            writer.write(host_id)
+            writer.write(LIST_CMDS_SEPARATOR)
         return writer.getvalue()
 
     def get_volume_mappings(self, volume_id):

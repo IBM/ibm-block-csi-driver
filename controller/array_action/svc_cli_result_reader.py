@@ -1,5 +1,6 @@
-from utils import bytes_to_string
 from controller.common.csi_logger import get_stdout_logger
+
+UTF_8 = "utf-8"
 
 logger = get_stdout_logger()
 
@@ -61,10 +62,10 @@ class SVCListResultsReader:
             logger.warn("Command returned empty response")
             return ""
         res_output_as_bytes = raw_command_res[0]
-        res_output_as_string = bytes_to_string(res_output_as_bytes).strip()
+        res_output_as_string = _bytes_to_string(res_output_as_bytes).strip()
         if len(raw_command_res) == 2:
             res_errors_as_bytes = raw_command_res[1]
-            res_errors_as_string = bytes_to_string(res_errors_as_bytes).strip()
+            res_errors_as_string = _bytes_to_string(res_errors_as_bytes).strip()
             if res_errors_as_string:
                 logger.warn("Errors returned from in cli command {0}".format(res_errors_as_string))
         return res_output_as_string
@@ -97,3 +98,7 @@ class SVCListResultsElement:
 
     def __str__(self):
         return self._dict.__str__()
+
+
+def _bytes_to_string(input_as_bytes):
+    return input_as_bytes.decode(UTF_8)

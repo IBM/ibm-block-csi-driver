@@ -1,10 +1,3 @@
-UTF_8 = "utf-8"
-
-
-def bytes_to_string(input_as_bytes):
-    return input_as_bytes.decode(UTF_8)
-
-
 class classproperty(object):
 
     def __init__(self, function):
