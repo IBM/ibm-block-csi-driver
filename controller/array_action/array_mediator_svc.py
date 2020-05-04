@@ -33,6 +33,7 @@ HOST_NAME_PARAM = 'name'
 HOST_ISCSI_NAMES_PARAM = 'iscsi_name'
 HOST_WWPNS_PARAM = 'WWPN'
 
+
 def is_warning_message(ex):
     """ Return True if the exception message is warning """
     info_seperated_by_quotation = str(ex).split('"')

@@ -4,6 +4,7 @@ UTF_8 = "utf-8"
 
 logger = get_stdout_logger()
 
+
 class SVCListResultsReader:
     ID_PARAM_NAME = "id"
 
@@ -23,7 +24,8 @@ class SVCListResultsReader:
                     self._next_object_id = param_value
                     self._current_index -= 1
                 else:
-                    raise StopIteration("First element is {0}. Expected {1}".format(line, SVCListResultsReader.ID_PARAM_NAME))
+                    raise StopIteration(
+                        "First element is {0}. Expected {1}".format(line, SVCListResultsReader.ID_PARAM_NAME))
 
     def has_next(self):
         return self._next_object_id
