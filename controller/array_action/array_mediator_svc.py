@@ -10,7 +10,7 @@ from controller.array_action.array_action_types import Volume
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.utils import classproperty
 from controller.common.csi_logger import get_stdout_logger
-from svc_cli_result_reader import SVCListResultsReader
+from controller.array_action.svc_cli_result_reader import SVCListResultsReader
 from io import StringIO
 
 array_connections_dict = {}
