@@ -6,10 +6,13 @@ from pysvc.unified.response import CLIFailureError
 
 import controller.array_action.config as config
 import controller.array_action.errors as controller_errors
+import utils
 from controller.array_action.array_action_types import Volume
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.utils import classproperty
 from controller.common.csi_logger import get_stdout_logger
+from svc_cli_result_reader import SVCListResultsReader
+from io import StringIO
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -24,6 +27,12 @@ VOL_NOT_FOUND = 'CMMVC8957E'
 POOL_NOT_MATCH_VOL_CAPABILITIES = 'CMMVC9292E'
 NOT_REDUCTION_POOL = 'CMMVC9301E'
 
+LIST_HOSTS_CMD = "lshost "
+LIST_CMDS_SEPARATOR = "; "
+HOST_ID_PARAM = 'id'
+HOST_NAME_PARAM = 'name'
+HOST_ISCSI_NAMES_PARAM = 'iscsi_name'
+HOST_WWPNS_PARAM = 'WWPN'
 
 def is_warning_message(ex):
     """ Return True if the exception message is warning """
@@ -259,23 +268,24 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host id for initiators : {0}".format(initiators))
-        host_list = self.client.svcinfo.lshost()
+        hosts_list = self.client.svcinfo.lshost()
+        detailed_hosts_list_cmd = self._get_detailed_hosts_list_cmd(hosts_list)
+        logger.debug("Getting detailed hosts list")
+        detailed_host_list_res = self.client.send_raw_command(detailed_hosts_list_cmd)
+        logger.debug("Finding the correct host")
+        hosts_reader = SVCListResultsReader(detailed_host_list_res)
         iscsi_host, fc_host = None, None
-        for host in host_list:
-            host_detail = self.client.svcinfo.lshost(
-                object_id=host.get('id', '')).as_single_element
-            iscsi_names = host_detail.get('iscsi_name', '')
-            wwns_value = host_detail.get('WWPN', [])
-            if not isinstance(wwns_value, list):
-                wwns_value = [wwns_value, ]
-            if not isinstance(iscsi_names, list):
-                iscsi_names = [] if len(iscsi_names) == 0 else [iscsi_names]
+        while hosts_reader.has_next():
+            host_detail = hosts_reader.get_next()
+            host_name = host_detail.get_as_list(HOST_NAME_PARAM)
+            iscsi_names = host_detail.get_as_list(HOST_ISCSI_NAMES_PARAM)
+            wwns_value = host_detail.get_as_list(HOST_WWPNS_PARAM)
             if initiators.is_array_iscsi_iqns_match(iscsi_names):
-                iscsi_host = host_detail.get('name', '')
+                iscsi_host = host_name
                 logger.debug("found iscsi iqn in list : {0} for host : "
                              "{1}".format(initiators.iscsi_iqn, iscsi_host))
             if initiators.is_array_wwns_match(wwns_value):
-                fc_host = host_detail.get('name', '')
+                fc_host = host_name
                 logger.debug("found fc wwns in list : {0} for host : "
                              "{1}".format(initiators.fc_wwns, fc_host))
         if iscsi_host and fc_host:
@@ -293,6 +303,16 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         else:
             logger.debug("can not found host by using initiators: {0} ".format(initiators))
             raise controller_errors.HostNotFoundError(initiators)
+
+    def _get_detailed_hosts_list_cmd(self, host_list):
+        writer = StringIO()
+        for i in range(hosts_multiplier):
+            for host in host_list:
+                host_id = host.get(HOST_ID_PARAM)
+                writer.write(LIST_HOSTS_CMD)
+                writer.write(host_id)
+                writer.write(LIST_CMDS_SEPARATOR)
+        return writer.getvalue()
 
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume id : "
