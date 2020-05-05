@@ -290,9 +290,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
         logger.debug("Finding the correct host")
         hosts_reader = SVCListResultsReader(detailed_hosts_list_string)
-        # TODO
-        logger.debug(hosts_reader)
-        logger.debug(type(hosts_reader))
         iscsi_host, fc_host = None, None
         for host_details in hosts_reader:
             host_name = host_details.get(HOST_NAME_PARAM)
