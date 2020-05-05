@@ -5,12 +5,16 @@ from controller.array_action.array_mediator_svc import \
     SVCArrayMediator, \
     build_kwargs_from_capabilities, \
     HOST_ID_PARAM, HOST_NAME_PARAM, HOST_ISCSI_NAMES_PARAM, HOST_WWPNS_PARAM
+from controller.array_action.utils import UTF_8
 from controller.array_action.svc_cli_result_reader import SVCListResultsElement
 import controller.array_action.errors as array_errors
 from pysvc.unified.response import CLIFailureError
 from pysvc import errors as svc_errors
 import controller.array_action.config as config
 from controller.common.node_info import Initiators
+
+
+EMPTY_BYTES =  bytes("", UTF_8)
 
 
 class TestArrayMediatorSVC(unittest.TestCase):
@@ -398,10 +402,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lshost = Mock()
         self.svc.client.svcinfo.lshost.return_value = self._create_hosts_list_result(hosts)
         self.svc.client.svcinfo.send_raw_command = Mock()
-        self.svc.client.svcinfo.send_raw_command.return_value = ""
+        self.svc.client.svcinfo.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
         list_result_reader.__iter__.return_value = self._create_hosts_list_result(hosts)
-        host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
-            'iqn.test.2', ['ABC3']))
+        host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators('iqn.test.2', ['ABC3']))
         self.assertEqual('test_host_3', host)
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE,
                           config.FC_CONNECTIVITY_TYPE], connectivity_type)
