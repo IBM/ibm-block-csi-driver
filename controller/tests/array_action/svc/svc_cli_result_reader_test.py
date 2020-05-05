@@ -1,4 +1,5 @@
 from controller.array_action.svc_cli_result_reader import SVCListResultsReader
+from controller.array_action import errors
 import unittest
 
 host_1 = "\n".join(("id 1", "name host_1", "WWPN wwpn1", "protocol fc", "WWPN wwpn2"))
@@ -36,7 +37,7 @@ class TestSVCListReader(unittest.TestCase):
 
     def test_illegal_input(self):
         illegal_input = "\n".join(("name host_3", "id 3"))
-        with self.assertRaises(StopIteration):
+        with self.assertRaises(errors.InvalidCliResponseError):
             SVCListResultsReader(illegal_input)
 
     def _assert_host_1(self, host):
