@@ -392,7 +392,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     #     self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE,
     #                       config.FC_CONNECTIVITY_TYPE], connectivity_type)
 
-    @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader")
+    @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
     def test_get_host_by_identifiers_return_iscsi_and_fc_all_support(self, list_result_reader):
         host_1 = self._create_host_as_dictonary('host_id_1', 'test_host_1', None, ['abc1'])
         host_2 = self._create_host_as_dictonary('host_id_2', 'test_host_3', 'iqn.test.6', ['abcd3'])
@@ -402,7 +402,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lshost.return_value = self._create_hosts_list_result(hosts)
         self.svc.client.send_raw_command = Mock()
         self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
-        list_result_reader.__iter__.return_value = self._create_hosts_list_result(hosts)
+        list_result_reader.return_value = self._create_hosts_list_result(hosts)
         host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators('iqn.test.2', ['ABC3']))
         self.assertEqual('test_host_3', host)
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE,
