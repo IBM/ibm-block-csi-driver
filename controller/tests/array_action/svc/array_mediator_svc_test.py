@@ -429,7 +429,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                 current_element.add(HOST_ISCSI_NAMES_PARAM, iscsi_name)
             wwpns_list = host_dict.get(HOST_WWPNS_PARAM)
             if wwpns_list:
-                for wwpn in wwpns_list
+                for wwpn in wwpns_list:
                     current_element.add(HOST_WWPNS_PARAM, wwpn)
             res.append(current_element)
         return res
