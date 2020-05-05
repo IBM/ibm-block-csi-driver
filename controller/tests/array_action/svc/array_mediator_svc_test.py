@@ -312,90 +312,48 @@ class TestArrayMediatorSVC(unittest.TestCase):
     #     self.assertEqual('test_host_3', host)
     #     self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_type)
     #
-    # def test_get_host_by_identifiers_return_iscsi_host_with_list_iqn(self):
-    #     host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
-    #                               'WWPN': ['abc1']})
-    #     host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_3',
-    #                               'iscsi_name': ['iqn.test.2', 'iqn.test.22'],
-    #                               'WWPN': ['abc3']})
-    #     host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
-    #                               'WWPN': ['abc3'],
-    #                               'iscsi_name': 'iqn.test.3'})
-    #     ret1 = [host_munch_ret_1, host_munch_ret_2]
-    #     ret2 = Munch(as_single_element=host_munch_ret_2)
-    #     ret3 = Munch(as_single_element=host_munch_ret_3)
-    #     self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
-    #     host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
-    #         'iqn.test.2', ['abcd3']))
-    #     self.assertEqual('test_host_3', host)
-    #     self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_type)
-    #
-    # def test_get_host_by_identifiers_return_fc_host(self):
-    #     host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
-    #                               'WWPN': ['abc1']})
-    #     host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_3',
-    #                               'iscsi_name': '',
-    #                               'WWPN': 'abc3'})
-    #     host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
-    #                               'WWPN': ['abc1', 'abc3'],
-    #                               'iscsi_name': 'iqn.test.3'})
-    #     ret1 = [host_munch_ret_1, host_munch_ret_2]
-    #     ret2 = Munch(as_single_element=host_munch_ret_2)
-    #     ret3 = Munch(as_single_element=host_munch_ret_3)
-    #     self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
-    #     host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
-    #         'iqn.test.6', ['abc3', 'ABC1']))
-    #     self.assertEqual('test_host_3', host)
-    #     self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_type)
-    #
-    #     self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
-    #     host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
-    #         'iqn.test.6', ['abc3']))
-    #     self.assertEqual('test_host_3', host)
-    #     self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_type)
-    #
-    # def test_get_host_by_identifiers_with_wrong_fc_iscsi_raise_not_found(self):
-    #     host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
-    #                               'WWPN': ['abc1']})
-    #     host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_3',
-    #                               'iscsi_name': 'iqn.test.2',
-    #                               'WWPN': ['abc3']})
-    #     host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
-    #                               'WWPN': ['abc1', 'abc3'],
-    #                               'iscsi_name': 'iqn.test.3'})
-    #     ret1 = [host_munch_ret_1, host_munch_ret_2]
-    #     ret2 = Munch(as_single_element=host_munch_ret_2)
-    #     ret3 = Munch(as_single_element=host_munch_ret_3)
-    #     self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
-    #     with self.assertRaises(array_errors.HostNotFoundError):
-    #         self.svc.get_host_by_host_identifiers(Initiators('', []))
-    #     self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
-    #     with self.assertRaises(array_errors.HostNotFoundError):
-    #         self.svc.get_host_by_host_identifiers(Initiators('123', ['a', 'b']))
-    #
-    # done
-    # def test_get_host_by_identifiers_return_iscsi_and_fc_all_support(self):
-    #     host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
-    #                               'WWPN': ['abc1']})
-    #     host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_3',
-    #                               'iscsi_name': 'iqn.test.6',
-    #                               'WWPN': ['abcd3']})
-    #     host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
-    #                               'WWPN': ['abc3'],
-    #                               'iscsi_name': 'iqn.test.2'})
-    #     ret1 = [host_munch_ret_1, host_munch_ret_2]
-    #     ret2 = Munch(as_single_element=host_munch_ret_2)
-    #     ret3 = Munch(as_single_element=host_munch_ret_3)
-    #     self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
-    #     host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
-    #         'iqn.test.2', ['ABC3']))
-    #     self.assertEqual('test_host_3', host)
-    #     self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE,
-    #                       config.FC_CONNECTIVITY_TYPE], connectivity_type)
+
+    @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
+    def test_get_host_by_identifiers_return_iscsi_host_with_list_iqn(self, result_reader_iter):
+        host_1 = self._get_host_as_dictonary('host_id_1', 'test_host_1', [], ['abc1'])
+        host_2 = self._get_host_as_dictonary('host_id_2', 'test_host_2', ['iqn.test.2', 'iqn.test.22'], ['abc3'])
+        host_3 = self._get_host_as_dictonary('host_id_3', 'test_host_3', 'iqn.test.3', ['abc3'])
+        hosts = [host_1, host_2, host_3]
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
+        self.svc.client.send_raw_command = Mock()
+        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
+        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
+        host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
+            'iqn.test.2', ['abcd3']))
+        self.assertEqual('test_host_3', host)
+        self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_type)
+
+    @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
+    def test_get_host_by_identifiers_return_fc_host(self, result_reader_iter):
+        host_1 = self._get_host_as_dictonary('host_id_1', 'test_host_1', [], ['abc1'])
+        host_2 = self._get_host_as_dictonary('host_id_2', 'test_host_2', [''], ['abc2'])
+        host_3 = self._get_host_as_dictonary('host_id_3', 'test_host_3', 'iqn.test.3', ['abc1', 'abc3'])
+        hosts = [host_1, host_2, host_3]
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
+        self.svc.client.send_raw_command = Mock()
+        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
+        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
+        host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
+            'iqn.test.6', ['abc3', 'ABC1']))
+        self.assertEqual('test_host_3', host)
+        self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_type)
+
+        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
+        host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
+            'iqn.test.6', ['abc3']))
+        self.assertEqual('test_host_3', host)
+        self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_type)
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
     def test_get_host_by_identifiers_with_wrong_fc_iscsi_raise_not_found(self, result_reader_iter):
-        host_1 = self._get_host_as_dictonary('host_id_1', 'test_host_1', None, ['abc1'])
+        host_1 = self._get_host_as_dictonary('host_id_1', 'test_host_1', [], ['abc1'])
         host_2 = self._get_host_as_dictonary('host_id_2', 'test_host_2', 'iqn.test.2', ['abc3'])
         host_3 = self._get_host_as_dictonary('host_id_3', 'test_host_3', 'iqn.test.3', ['abc3'])
         hosts = [host_1, host_2, host_3]
@@ -412,7 +370,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
     def test_get_host_by_identifiers_return_iscsi_and_fc_all_support(self, result_reader_iter):
-        host_1 = self._get_host_as_dictonary('host_id_1', 'test_host_1', None, ['abc1'])
+        host_1 = self._get_host_as_dictonary('host_id_1', 'test_host_1', [], ['abc1'])
         host_2 = self._get_host_as_dictonary('host_id_2', 'test_host_2', 'iqn.test.6', ['abcd3'])
         host_3 = self._get_host_as_dictonary('host_id_3', 'test_host_3', 'iqn.test.2', ['abc3'])
         hosts = [host_1, host_2, host_3]
@@ -426,12 +384,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE,
                           config.FC_CONNECTIVITY_TYPE], connectivity_type)
 
-    def _get_host_as_dictonary(self, id, name, iscsi_name, wwpns_list):
+    def _get_host_as_dictonary(self, id, name, iscsi_names_list, wwpns_list):
         res = {}
         res[HOST_ID_PARAM] = id
         res[HOST_NAME_PARAM] = name
-        if iscsi_name is not None:
-            res[HOST_ISCSI_NAMES_PARAM] = iscsi_name
+        if iscsi_names_list is not None:
+            res[HOST_ISCSI_NAMES_PARAM] = iscsi_names_list
         if wwpns_list is not None:
             res[HOST_WWPNS_PARAM] = wwpns_list
         return res
@@ -445,9 +403,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
             current_element = SVCListResultsElement()
             current_element.add(HOST_ID_PARAM, host_dict.get(HOST_ID_PARAM))
             current_element.add(HOST_NAME_PARAM, host_dict.get(HOST_NAME_PARAM))
-            iscsi_name = host_dict.get(HOST_ISCSI_NAMES_PARAM)
-            if iscsi_name:
-                current_element.add(HOST_ISCSI_NAMES_PARAM, iscsi_name)
+            iscsi_names_list = host_dict.get(HOST_ISCSI_NAMES_PARAM)
+            if iscsi_names_list:
+                for iscsi_name in iscsi_names_list:
+                    current_element.add(HOST_ISCSI_NAMES_PARAM, iscsi_name)
             wwpns_list = host_dict.get(HOST_WWPNS_PARAM)
             if wwpns_list:
                 for wwpn in wwpns_list:
