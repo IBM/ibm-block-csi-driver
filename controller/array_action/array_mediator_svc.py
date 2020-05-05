@@ -27,8 +27,8 @@ VOL_NOT_FOUND = 'CMMVC8957E'
 POOL_NOT_MATCH_VOL_CAPABILITIES = 'CMMVC9292E'
 NOT_REDUCTION_POOL = 'CMMVC9301E'
 
-LIST_HOSTS_CMD = "lshost "
-LIST_CMDS_SEPARATOR = "; "
+LIST_HOSTS_CMD = "lshost"
+LIST_CMDS_SEPARATOR = ";"
 HOST_ID_PARAM = 'id'
 HOST_NAME_PARAM = 'name'
 HOST_ISCSI_NAMES_PARAM = 'iscsi_name'
@@ -275,8 +275,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         detailed_host_list_output, detailed_host_list_errors = self.client.send_raw_command(detailed_hosts_list_cmd)
         detailed_host_list_errors = bytes_to_string(detailed_host_list_errors)
         if not detailed_host_list_errors:
-            #TODO
-            raise controller_errors.HostNotFoundError(detailed_host_list_errors)
+            logger.error("Errors returned from getting detailed hosts list: {0}".format(detailed_host_list_errors))
         logger.debug("Finding the correct host")
         hosts_reader = SVCListResultsReader(detailed_host_list_output)
         iscsi_host, fc_host = None, None
@@ -313,6 +312,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         for host in host_list:
             host_id = host.get(HOST_ID_PARAM)
             writer.write(LIST_HOSTS_CMD)
+            writer.write(" ")
             writer.write(host_id)
             writer.write(LIST_CMDS_SEPARATOR)
         return writer.getvalue()
