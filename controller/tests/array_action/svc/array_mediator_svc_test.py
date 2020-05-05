@@ -13,8 +13,7 @@ from pysvc import errors as svc_errors
 import controller.array_action.config as config
 from controller.common.node_info import Initiators
 
-
-EMPTY_BYTES =  bytes("", UTF_8)
+EMPTY_BYTES = bytes("", UTF_8)
 
 
 class TestArrayMediatorSVC(unittest.TestCase):
