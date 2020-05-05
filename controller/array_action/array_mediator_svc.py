@@ -271,6 +271,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host id for initiators : {0}".format(initiators))
         hosts_list = self.client.svcinfo.lshost()
+        if not hosts_list:
+            logger.debug(
+                "Can not found host by using initiators: {0}. No hosts defined on the array {1} ".format(initiators,
+                                                                                                         self.endpoint))
+            raise controller_errors.HostNotFoundError(initiators)
 
         # for each host get its detailoed info from array by sending batch of commands
         detailed_hosts_list_cmd = self._get_detailed_hosts_list_cmd(hosts_list)

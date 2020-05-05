@@ -236,82 +236,56 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(SVCArrayMediator.max_connections, 2)
         self.assertEqual(SVCArrayMediator.max_lun_retries, 10)
 
-    # def test_get_host_by_identifiers_returns_host_not_found(self):
-    #     host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
-    #                               'iscsi_name': 'iqn.test.1'})
-    #     host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_1',
-    #                               'iscsi_name': 'iqn.test.2'})
-    #     host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
-    #                               'iscsi_name': 'iqn.test.3'})
-    #     ret1 = [host_munch_ret_1, host_munch_ret_2]
-    #     ret2 = Munch(as_single_element=host_munch_ret_3)
-    #
-    #     self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret2]
-    #     with self.assertRaises(array_errors.HostNotFoundError):
-    #         self.svc.get_host_by_host_identifiers(Initiators('Test_iqn', ['Test_wwn']))
-    #
-    # def test_get_host_by_identifier_return_host_not_found_when_no_hosts_exist(
-    #         self):
-    #     host_munch_ret_1 = Munch({})
-    #     host_munch_ret_2 = Munch({})
-    #     host_munch_ret_3 = Munch({})
-    #     ret1 = [host_munch_ret_1, host_munch_ret_2]
-    #     ret2 = Munch(as_single_element=host_munch_ret_3)
-    #
-    #     self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret2]
-    #     with self.assertRaises(array_errors.HostNotFoundError):
-    #         self.svc.get_host_by_host_identifiers(Initiators('Test_iqn', ['Test_wwn']))
-    #
-    # def test_get_host_by_identifiers_raise_multiplehostsfounderror(self):
-    #     host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
-    #                               'iscsi_name': 'iqn.test.1'})
-    #     host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_2',
-    #                               'iscsi_name': 'iqn.test.3'})
-    #     host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
-    #                               'WWPN': ['Test_wwn']})
-    #     ret1 = [host_munch_ret_1, host_munch_ret_2]
-    #     ret2 = Munch(as_single_element=host_munch_ret_2)
-    #     ret3 = Munch(as_single_element=host_munch_ret_3)
-    #     self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
-    #     with self.assertRaises(array_errors.MultipleHostsFoundError):
-    #         self.svc.get_host_by_host_identifiers(Initiators('iqn.test.3', ['Test_wwn']))
-    #
-    # def test_get_host_by_identifiers_return_iscsi_host(self):
-    #     host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
-    #                               'WWPN': ['abc1']})
-    #     host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_3',
-    #                               'iscsi_name': ['iqn.test.2'],
-    #                               'WWPN': ['abc3']})
-    #     host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
-    #                               'WWPN': ['abc3'],
-    #                               'iscsi_name': 'iqn.test.3'})
-    #     ret1 = [host_munch_ret_1, host_munch_ret_2]
-    #     ret2 = Munch(as_single_element=host_munch_ret_2)
-    #     ret3 = Munch(as_single_element=host_munch_ret_3)
-    #     self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
-    #     host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
-    #         'iqn.test.2', ['abcd3']))
-    #     self.assertEqual('test_host_3', host)
-    #     self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_type)
-    #
-    # def test_get_host_by_identifiers_return_iscsi_host_with_string_iqn(self):
-    #     host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
-    #                               'WWPN': ['abc1']})
-    #     host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_3',
-    #                               'iscsi_name': 'iqn.test.2',
-    #                               'WWPN': ['abc3']})
-    #     host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
-    #                               'WWPN': ['abc3'],
-    #                               'iscsi_name': 'iqn.test.3'})
-    #     ret1 = [host_munch_ret_1, host_munch_ret_2]
-    #     ret2 = Munch(as_single_element=host_munch_ret_2)
-    #     ret3 = Munch(as_single_element=host_munch_ret_3)
-    #     self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
-    #     host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
-    #         'iqn.test.2', ['abcd3']))
-    #     self.assertEqual('test_host_3', host)
-    #     self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_type)
-    #
+    @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
+    def test_get_host_by_identifiers_returns_host_not_found(self, result_reader_iter):
+        host_1 = self._get_host_as_dictonary('host_id_1', 'test_host_1', ['iqn.test.1'], [])
+        host_2 = self._get_host_as_dictonary('host_id_2', 'test_host_2', ['iqn.test.2'], [])
+        host_3 = self._get_host_as_dictonary('host_id_3', 'test_host_3', ['iqn.test.3'], [])
+        hosts = [host_1, host_2, host_3]
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
+        self.svc.client.send_raw_command = Mock()
+        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
+        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
+        with self.assertRaises(array_errors.HostNotFoundError):
+            self.svc.get_host_by_host_identifiers(Initiators('Test_iqn', ['Test_wwn']))
+
+    def test_get_host_by_identifier_return_host_not_found_when_no_hosts_exist(self):
+        hosts = []
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
+        with self.assertRaises(array_errors.HostNotFoundError):
+            self.svc.get_host_by_host_identifiers(Initiators('Test_iqn', ['Test_wwn']))
+
+    @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
+    def test_get_host_by_identifiers_raise_multiplehostsfounderror(self, result_reader_iter):
+        host_1 = self._get_host_as_dictonary('host_id_1', 'test_host_1', ['iqn.test.1'], [])
+        host_2 = self._get_host_as_dictonary('host_id_2', 'test_host_2', ['iqn.test.3'], [])
+        host_3 = self._get_host_as_dictonary('host_id_3', 'test_host_3', [], ['Test_wwn'])
+        hosts = [host_1, host_2, host_3]
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
+        self.svc.client.send_raw_command = Mock()
+        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
+        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
+        with self.assertRaises(array_errors.MultipleHostsFoundError):
+            self.svc.get_host_by_host_identifiers(Initiators('iqn.test.3', ['Test_wwn']))
+
+    @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
+    def test_get_host_by_identifiers_return_iscsi_host(self, result_reader_iter):
+        host_1 = self._get_host_as_dictonary('host_id_1', 'test_host_1', [], ['abc1'])
+        host_2 = self._get_host_as_dictonary('host_id_2', 'test_host_2', ['iqn.test.2'], ['abc3'])
+        host_3 = self._get_host_as_dictonary('host_id_3', 'test_host_3', ['iqn.test.3'], ['abc3'])
+        hosts = [host_1, host_2, host_3]
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
+        self.svc.client.send_raw_command = Mock()
+        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
+        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
+        host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
+            'iqn.test.2', ['abcd3']))
+        self.assertEqual('test_host_2', host)
+        self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_type)
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
     def test_get_host_by_identifiers_return_iscsi_host_with_list_iqn(self, result_reader_iter):
@@ -326,7 +300,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
         host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
             'iqn.test.2', ['abcd3']))
-        self.assertEqual('test_host_3', host)
+        self.assertEqual('test_host_2', host)
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_type)
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
