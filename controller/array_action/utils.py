@@ -1,8 +1,5 @@
-UTF_8 = "utf-8"
-
-
 def bytes_to_string(input_as_bytes):
-    return input_as_bytes.decode(UTF_8)
+    return input_as_bytes.decode()
 
 
 class classproperty(object):
