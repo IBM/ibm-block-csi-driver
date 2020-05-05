@@ -33,7 +33,7 @@ HOST_ID_PARAM = 'id'
 HOST_NAME_PARAM = 'name'
 HOST_ISCSI_NAMES_PARAM = 'iscsi_name'
 HOST_WWPNS_PARAM = 'WWPN'
-
+MAX_HOSTS_LIST_ERROR_LOG_LENGTH = 100
 
 def is_warning_message(ex):
     """ Return True if the exception message is warning """
@@ -273,9 +273,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         detailed_hosts_list_cmd = self._get_detailed_hosts_list_cmd(hosts_list)
         logger.debug("Getting detailed hosts list")
         detailed_host_list_output, detailed_host_list_errors = self.client.send_raw_command(detailed_hosts_list_cmd)
-        detailed_host_list_errors = bytes_to_string(detailed_host_list_errors)
+        detailed_host_list_error_msg = self._get_formatted_hosts_list_error_msg(detailed_host_list_errors)
         if not detailed_host_list_errors:
-            logger.error("Errors returned from getting detailed hosts list: {0}".format(detailed_host_list_errors))
+            logger.error("Errors returned from getting detailed hosts list: {0}".format(detailed_host_list_error_msg))
         logger.debug("Finding the correct host")
         hosts_reader = SVCListResultsReader(detailed_host_list_output)
         iscsi_host, fc_host = None, None
@@ -316,6 +316,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             writer.write(host_id)
             writer.write(LIST_CMDS_SEPARATOR)
         return writer.getvalue()
+
+    def _get_formatted_hosts_list_error_msg(self, detailed_host_list_errors_bytes):
+        detailed_host_list_errors = bytes_to_string(detailed_host_list_errors_bytes)
+        if not detailed_host_list_errors:
+            return ""
+        elif len(detailed_host_list_errors) <= MAX_HOSTS_LIST_ERROR_LOG_LENGTH
+            return detailed_host_list_errors
+        return "{0} ...".format(detailed_host_list_errors[:MAX_HOSTS_LIST_ERROR_LOG_LENGTH])
 
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume id : "
