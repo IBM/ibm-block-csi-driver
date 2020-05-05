@@ -8,9 +8,10 @@ import controller.array_action.config as config
 import controller.array_action.errors as controller_errors
 from controller.array_action.array_action_types import Volume
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
-from controller.array_action.utils import classproperty
+from controller.array_action.utils import classproperty, bytes_to_string
 from controller.common.csi_logger import get_stdout_logger
 from controller.array_action.svc_cli_result_reader import SVCListResultsReader
+
 from io import StringIO
 
 array_connections_dict = {}
@@ -271,15 +272,18 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         hosts_list = self.client.svcinfo.lshost()
         detailed_hosts_list_cmd = self._get_detailed_hosts_list_cmd(hosts_list)
         logger.debug("Getting detailed hosts list")
-        detailed_host_list_res = self.client.send_raw_command(detailed_hosts_list_cmd)
+        detailed_host_list_output, detailed_host_list_errors = self.client.send_raw_command(detailed_hosts_list_cmd)
+        detailed_host_list_errors = bytes_to_string(detailed_host_list_errors)
+        if not detailed_host_list_errors:
+            #TODO
+            raise controller_errors.HostNotFoundError(detailed_host_list_errors)
         logger.debug("Finding the correct host")
-        hosts_reader = SVCListResultsReader(detailed_host_list_res)
+        hosts_reader = SVCListResultsReader(detailed_host_list_output)
         iscsi_host, fc_host = None, None
-        while hosts_reader.has_next():
-            host_detail = hosts_reader.get_next()
-            host_name = host_detail.get_as_list(HOST_NAME_PARAM)
-            iscsi_names = host_detail.get_as_list(HOST_ISCSI_NAMES_PARAM)
-            wwns_value = host_detail.get_as_list(HOST_WWPNS_PARAM)
+        for host_details in hosts_reader:
+            host_name = host_details.get_as_list(HOST_NAME_PARAM)
+            iscsi_names = host_details.get_as_list(HOST_ISCSI_NAMES_PARAM)
+            wwns_value = host_details.get_as_list(HOST_WWPNS_PARAM)
             if initiators.is_array_iscsi_iqns_match(iscsi_names):
                 iscsi_host = host_name
                 logger.debug("found iscsi iqn in list : {0} for host : "

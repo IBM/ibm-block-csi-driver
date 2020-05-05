@@ -27,12 +27,12 @@ class SVCListResultsReader:
                     raise StopIteration(
                         "First element is {0}. Expected {1}".format(line, SVCListResultsReader.ID_PARAM_NAME))
 
-    def has_next(self):
-        return self._next_object_id
+    def __iter__(self):
+        return self
 
-    def get_next(self):
-        if not self.has_next():
-            raise StopIteration("No more entries exist")
+    def __next__(self):
+        if not self._has_next():
+            raise StopIteration
         res = SVCListResultsElement()
         res.add(SVCListResultsReader.ID_PARAM_NAME, self._next_object_id)
         self._current_index += 1
@@ -53,11 +53,11 @@ class SVCListResultsReader:
     def _parse_param(self, line):
         splitted_line = line.split()
         name = splitted_line[0]
-        if len(splitted_line) == 1:
-            value = ""
-        else:
-            value = splitted_line[1]
+        value = line[len(name):].strip() if len(splitted_line) > 1 else ""
         return name, value
+
+    def _has_next(self):
+        return self._next_object_id
 
     def _get_command_res_output(self, raw_command_res):
         if not raw_command_res:
@@ -101,6 +101,3 @@ class SVCListResultsElement:
     def __str__(self):
         return self._dict.__str__()
 
-
-def _bytes_to_string(input_as_bytes):
-    return input_as_bytes.decode(UTF_8)
