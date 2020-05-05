@@ -395,7 +395,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         host_2 = self._create_host_as_dictonary('host_id_2', 'test_host_3', 'iqn.test.6', ['abcd3'])
         host_3 = self._create_host_as_dictonary('host_id_3', 'test_host_3', 'iqn.test.2', ['abc3'])
         hosts = [host_1, host_2, host_3]
-        self.svc.client.svcinfo.lshost =  Mock()
+        self.svc.client.svcinfo.lshost = Mock()
         self.svc.client.svcinfo.lshost.return_value = self._create_hosts_list_result(hosts)
         list_result_reader.__iter__.return_value = self._create_hosts_list_result(hosts)
         host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
@@ -404,14 +404,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE,
                           config.FC_CONNECTIVITY_TYPE], connectivity_type)
 
-
     def _create_host_as_dictonary(self, id, name, iscsi_name, wwpns_list):
         res = {}
         res[HOST_ID_PARAM] = id
         res[HOST_NAME_PARAM] = name
-        if iscsi_name != None:
+        if iscsi_name is not None:
             res[iscsi_name] = iscsi_name
-        if wwpns_list != None:
+        if wwpns_list is not None:
             res[HOST_WWPNS_PARAM] = wwpns_list
         return res
 
