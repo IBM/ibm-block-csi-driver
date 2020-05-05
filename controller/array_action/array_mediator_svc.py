@@ -290,7 +290,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.debug(type(hosts_reader))
         iscsi_host, fc_host = None, None
         for host_details in hosts_reader:
-            host_name = host_details.get_as_list(HOST_NAME_PARAM)
+            host_name = host_details.get(HOST_NAME_PARAM)
             iscsi_names = host_details.get_as_list(HOST_ISCSI_NAMES_PARAM)
             wwns_value = host_details.get_as_list(HOST_WWPNS_PARAM)
             if initiators.is_array_iscsi_iqns_match(iscsi_names):
