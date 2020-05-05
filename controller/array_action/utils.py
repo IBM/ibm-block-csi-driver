@@ -1,4 +1,4 @@
-UTF_8 = "utf-8"
+from controller.array_action.config import UTF_8
 
 
 def bytes_to_string(input_as_bytes):

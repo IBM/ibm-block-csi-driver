@@ -4,7 +4,7 @@ from mock import patch, Mock, MagicMock
 from controller.array_action.array_mediator_svc import SVCArrayMediator, build_kwargs_from_capabilities, \
     HOST_ID_PARAM, HOST_NAME_PARAM, HOST_ISCSI_NAMES_PARAM, HOST_WWPNS_PARAM
 from controller.array_action.svc_cli_result_reader import SVCListResultsElement
-from controller.array_action.utils import UTF_8
+from controller.array_action.config import UTF_8
 import controller.array_action.errors as array_errors
 from pysvc.unified.response import CLIFailureError
 from pysvc import errors as svc_errors

@@ -8,3 +8,5 @@ CAPABILITY_THICK = 'thick'
 
 # volume context
 CONTEXT_POOL = "pool"
+
+UTF_8 = "utf-8"
