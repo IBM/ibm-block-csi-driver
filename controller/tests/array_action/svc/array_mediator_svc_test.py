@@ -317,7 +317,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_host_by_identifiers_return_iscsi_host_with_list_iqn(self, result_reader_iter):
         host_1 = self._get_host_as_dictonary('host_id_1', 'test_host_1', [], ['abc1'])
         host_2 = self._get_host_as_dictonary('host_id_2', 'test_host_2', ['iqn.test.2', 'iqn.test.22'], ['abc3'])
-        host_3 = self._get_host_as_dictonary('host_id_3', 'test_host_3', 'iqn.test.3', ['abc3'])
+        host_3 = self._get_host_as_dictonary('host_id_3', 'test_host_3', ['iqn.test.3'], ['abc3'])
         hosts = [host_1, host_2, host_3]
         self.svc.client.svcinfo.lshost = Mock()
         self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
@@ -333,7 +333,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_host_by_identifiers_return_fc_host(self, result_reader_iter):
         host_1 = self._get_host_as_dictonary('host_id_1', 'test_host_1', [], ['abc1'])
         host_2 = self._get_host_as_dictonary('host_id_2', 'test_host_2', [''], ['abc2'])
-        host_3 = self._get_host_as_dictonary('host_id_3', 'test_host_3', 'iqn.test.3', ['abc1', 'abc3'])
+        host_3 = self._get_host_as_dictonary('host_id_3', 'test_host_3', ['iqn.test.3'], ['abc1', 'abc3'])
         hosts = [host_1, host_2, host_3]
         self.svc.client.svcinfo.lshost = Mock()
         self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
@@ -354,8 +354,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
     def test_get_host_by_identifiers_with_wrong_fc_iscsi_raise_not_found(self, result_reader_iter):
         host_1 = self._get_host_as_dictonary('host_id_1', 'test_host_1', [], ['abc1'])
-        host_2 = self._get_host_as_dictonary('host_id_2', 'test_host_2', 'iqn.test.2', ['abc3'])
-        host_3 = self._get_host_as_dictonary('host_id_3', 'test_host_3', 'iqn.test.3', ['abc3'])
+        host_2 = self._get_host_as_dictonary('host_id_2', 'test_host_2', ['iqn.test.2'], ['abc3'])
+        host_3 = self._get_host_as_dictonary('host_id_3', 'test_host_3', ['iqn.test.3'], ['abc3'])
         hosts = [host_1, host_2, host_3]
         self.svc.client.svcinfo.lshost = Mock()
         self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
@@ -371,8 +371,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
     def test_get_host_by_identifiers_return_iscsi_and_fc_all_support(self, result_reader_iter):
         host_1 = self._get_host_as_dictonary('host_id_1', 'test_host_1', [], ['abc1'])
-        host_2 = self._get_host_as_dictonary('host_id_2', 'test_host_2', 'iqn.test.6', ['abcd3'])
-        host_3 = self._get_host_as_dictonary('host_id_3', 'test_host_3', 'iqn.test.2', ['abc3'])
+        host_2 = self._get_host_as_dictonary('host_id_2', 'test_host_2', ['iqn.test.6'], ['abcd3'])
+        host_3 = self._get_host_as_dictonary('host_id_3', 'test_host_3', ['iqn.test.2'], ['abc3'])
         hosts = [host_1, host_2, host_3]
         self.svc.client.svcinfo.lshost = Mock()
         self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
