@@ -393,7 +393,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     #                       config.FC_CONNECTIVITY_TYPE], connectivity_type)
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
-    def test_get_host_by_identifiers_return_iscsi_and_fc_all_support(self, list_result_reader):
+    def test_get_host_by_identifiers_return_iscsi_and_fc_all_support(self, result_reader_iter):
         host_1 = self._create_host_as_dictonary('host_id_1', 'test_host_1', None, ['abc1'])
         host_2 = self._create_host_as_dictonary('host_id_2', 'test_host_3', 'iqn.test.6', ['abcd3'])
         host_3 = self._create_host_as_dictonary('host_id_3', 'test_host_3', 'iqn.test.2', ['abc3'])
@@ -402,7 +402,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lshost.return_value = self._create_hosts_list_result(hosts)
         self.svc.client.send_raw_command = Mock()
         self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
-        list_result_reader.return_value = iter(self._create_hosts_list_result(hosts))
+        result_reader_iter.return_value = self._create_detailed_hosts_list_result(hosts)
         host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators('iqn.test.2', ['ABC3']))
         self.assertEqual('test_host_3', host)
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE,
@@ -422,7 +422,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         return [Munch(host_dict) for host_dict in hosts_dict]
 
     def _create_detailed_hosts_list_result(self, hosts_dict):
-        res = []
+        detailed_hosts_list = []
         for host_dict in hosts_dict:
             current_element = SVCListResultsElement()
             current_element.add(HOST_ID_PARAM, host_dict.get(HOST_ID_PARAM))
@@ -434,8 +434,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
             if wwpns_list:
                 for wwpn in wwpns_list:
                     current_element.add(HOST_WWPNS_PARAM, wwpn)
-            res.append(current_element)
-        return res
+            detailed_hosts_list.append(current_element)
+        return iter(detailed_hosts_list)
 
     def test_get_volume_mappings_empty_mapping_list(self):
         self.svc.client.svcinfo.lsvdiskhostmap.return_value = []
