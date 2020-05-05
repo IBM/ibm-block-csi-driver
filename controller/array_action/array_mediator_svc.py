@@ -35,6 +35,7 @@ HOST_ISCSI_NAMES_PARAM = 'iscsi_name'
 HOST_WWPNS_PARAM = 'WWPN'
 MAX_HOSTS_LIST_ERR_MSG_LENGTH = 300
 
+
 def is_warning_message(ex):
     """ Return True if the exception message is warning """
     info_seperated_by_quotation = str(ex).split('"')
@@ -279,7 +280,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         detailed_hosts_list_error_msg = self._get_formatted_hosts_list_error_msg(detailed_hosts_list_errors)
         if not detailed_hosts_list_errors:
             logger.error("Errors returned from getting detailed hosts list: {0}".format(detailed_hosts_list_error_msg))
-        
+
         logger.debug("Finding the correct host")
         hosts_reader = SVCListResultsReader(detailed_hosts_list_string)
         iscsi_host, fc_host = None, None
