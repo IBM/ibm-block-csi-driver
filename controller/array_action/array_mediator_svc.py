@@ -277,11 +277,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.debug("Getting detailed hosts list")
         # TODO
         logger.debug(hosts_list)
-        logger.debug(detailed_hosts_list_cmd)
-        logger.debug(type(self.client.send_raw_command))
         detailed_hosts_list_output, detailed_hosts_list_errors = self.client.send_raw_command(detailed_hosts_list_cmd)
-        # TODO
-        logger.debug("done")
         detailed_hosts_list_string = bytes_to_string(detailed_hosts_list_output)
         detailed_hosts_list_error_msg = self._get_formatted_hosts_list_error_msg(detailed_hosts_list_errors)
         if not detailed_hosts_list_errors:
@@ -289,6 +285,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
         logger.debug("Finding the correct host")
         hosts_reader = SVCListResultsReader(detailed_hosts_list_string)
+        # TODO
+        logger.debug(hosts_reader)
+        logger.debug(type(hosts_reader))
         iscsi_host, fc_host = None, None
         for host_details in hosts_reader:
             host_name = host_details.get_as_list(HOST_NAME_PARAM)
