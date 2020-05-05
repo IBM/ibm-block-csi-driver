@@ -373,6 +373,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     #     with self.assertRaises(array_errors.HostNotFoundError):
     #         self.svc.get_host_by_host_identifiers(Initiators('123', ['a', 'b']))
     #
+    # done
     # def test_get_host_by_identifiers_return_iscsi_and_fc_all_support(self):
     #     host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
     #                               'WWPN': ['abc1']})
@@ -391,6 +392,25 @@ class TestArrayMediatorSVC(unittest.TestCase):
     #     self.assertEqual('test_host_3', host)
     #     self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE,
     #                       config.FC_CONNECTIVITY_TYPE], connectivity_type)
+
+    # def test_get_host_by_identifiers_with_wrong_fc_iscsi_raise_not_found(self):
+    #     host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
+    #                               'WWPN': ['abc1']})
+    #     host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_3',
+    #                               'iscsi_name': 'iqn.test.2',
+    #                               'WWPN': ['abc3']})
+    #     host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
+    #                               'WWPN': ['abc1', 'abc3'],
+    #                               'iscsi_name': 'iqn.test.3'})
+    #     ret1 = [host_munch_ret_1, host_munch_ret_2]
+    #     ret2 = Munch(as_single_element=host_munch_ret_2)
+    #     ret3 = Munch(as_single_element=host_munch_ret_3)
+    #     self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
+    #     with self.assertRaises(array_errors.HostNotFoundError):
+    #         self.svc.get_host_by_host_identifiers(Initiators('', []))
+    #     self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
+    #     with self.assertRaises(array_errors.HostNotFoundError):
+    #         self.svc.get_host_by_host_identifiers(Initiators('123', ['a', 'b']))
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
     def test_get_host_by_identifiers_return_iscsi_and_fc_all_support(self, result_reader_iter):
@@ -413,7 +433,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         res[HOST_ID_PARAM] = id
         res[HOST_NAME_PARAM] = name
         if iscsi_name is not None:
-            res[iscsi_name] = iscsi_name
+            res[HOST_ISCSI_NAMES_PARAM] = iscsi_name
         if wwpns_list is not None:
             res[HOST_WWPNS_PARAM] = wwpns_list
         return res
