@@ -5,6 +5,7 @@ from controller.array_action.array_mediator_svc import \
     SVCArrayMediator, \
     build_kwargs_from_capabilities, \
     HOST_ID_PARAM, HOST_NAME_PARAM, HOST_ISCSI_NAMES_PARAM, HOST_WWPNS_PARAM
+from controller.array_action.utils import UTF_8
 from controller.array_action.svc_cli_result_reader import SVCListResultsElement
 import controller.array_action.errors as array_errors
 from pysvc.unified.response import CLIFailureError
@@ -12,7 +13,7 @@ from pysvc import errors as svc_errors
 import controller.array_action.config as config
 from controller.common.node_info import Initiators
 
-EMPTY_BYTES = bytes("")
+EMPTY_BYTES = bytes("", UTF_8)
 
 
 class TestArrayMediatorSVC(unittest.TestCase):
@@ -234,20 +235,6 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(SVCArrayMediator.max_volume_name_length, 63)
         self.assertEqual(SVCArrayMediator.max_connections, 2)
         self.assertEqual(SVCArrayMediator.max_lun_retries, 10)
-
-
-    @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
-    def test_get_host_by_identifiers_returns_host_not_found(self, result_reader_iter):
-        host = self._get_host_as_dictonary('host_id_1', 'test_host_1', ['iqn.test.1'], [])
-        hosts = [host]
-        self.svc.client.svcinfo.lshost = Mock()
-        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
-        self.svc.client.send_raw_command = Mock()
-        detailed_hosts_list_error = bytes("Test error")
-        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, detailed_hosts_list_error
-        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
-        with self.assertRaises(array_errors.InvalidCliResponseError):
-            self.svc.get_host_by_host_identifiers(Initiators('Test_iqn', ['Test_wwn']))
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
     def test_get_host_by_identifiers_returns_host_not_found(self, result_reader_iter):
