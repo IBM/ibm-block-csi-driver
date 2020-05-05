@@ -1,15 +1,13 @@
 from controller.common.csi_logger import get_stdout_logger
 
-UTF_8 = "utf-8"
-
 logger = get_stdout_logger()
 
 
 class SVCListResultsReader:
     ID_PARAM_NAME = "id"
 
-    def __init__(self, raw_command_res):
-        self._hosts_raw_list = self._get_command_res_output(raw_command_res)
+    def __init__(self, hosts_raw_list_as_string):
+        self._hosts_raw_list = hosts_raw_list_as_string.split("\n")
         self._current_index = 0
         self._next_object_id = None
         self._init_first_object_id()
@@ -58,19 +56,6 @@ class SVCListResultsReader:
 
     def _has_next(self):
         return self._next_object_id
-
-    def _get_command_res_output(self, raw_command_res):
-        if not raw_command_res:
-            logger.warn("Command returned empty response")
-            return ""
-        res_output_as_bytes = raw_command_res[0]
-        res_output_as_string = _bytes_to_string(res_output_as_bytes).strip()
-        if len(raw_command_res) == 2:
-            res_errors_as_bytes = raw_command_res[1]
-            res_errors_as_string = _bytes_to_string(res_errors_as_bytes).strip()
-            if res_errors_as_string:
-                logger.warn("Errors returned from in cli command {0}".format(res_errors_as_string))
-        return res_output_as_string
 
 
 class SVCListResultsElement:

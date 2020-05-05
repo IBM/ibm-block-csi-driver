@@ -270,14 +270,18 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host id for initiators : {0}".format(initiators))
         hosts_list = self.client.svcinfo.lshost()
+
+        # for each host get its detailoed info from array by sending batch of commands
         detailed_hosts_list_cmd = self._get_detailed_hosts_list_cmd(hosts_list)
         logger.debug("Getting detailed hosts list")
-        detailed_host_list_output, detailed_host_list_errors = self.client.send_raw_command(detailed_hosts_list_cmd)
-        detailed_host_list_error_msg = self._get_formatted_hosts_list_error_msg(detailed_host_list_errors)
-        if not detailed_host_list_errors:
-            logger.error("Errors returned from getting detailed hosts list: {0}".format(detailed_host_list_error_msg))
+        detailed_hosts_list_output, detailed_hosts_list_errors = self.client.send_raw_command(detailed_hosts_list_cmd)
+        detailed_hosts_list_string = bytes_to_string(detailed_hosts_list_output)
+        detailed_hosts_list_error_msg = self._get_formatted_hosts_list_error_msg(detailed_hosts_list_errors)
+        if not detailed_hosts_list_errors:
+            logger.error("Errors returned from getting detailed hosts list: {0}".format(detailed_hosts_list_error_msg))
+        
         logger.debug("Finding the correct host")
-        hosts_reader = SVCListResultsReader(detailed_host_list_output)
+        hosts_reader = SVCListResultsReader(detailed_hosts_list_string)
         iscsi_host, fc_host = None, None
         for host_details in hosts_reader:
             host_name = host_details.get_as_list(HOST_NAME_PARAM)
