@@ -1,9 +1,11 @@
 import unittest
 from munch import Munch
-from mock import patch, Mock
-from controller.array_action.array_mediator_svc import SVCArrayMediator
+from mock import patch, Mock, MagicMock
 from controller.array_action.array_mediator_svc import \
-    build_kwargs_from_capabilities
+    SVCArrayMediator, \
+    build_kwargs_from_capabilities, \
+    HOST_ID_PARAM, HOST_NAME_PARAM, HOST_ISCSI_NAMES_PARAM, HOST_WWPNS_PARAM
+from controller.array_action.svc_cli_result_reader import SVCListResultsElement
 import controller.array_action.errors as array_errors
 from pysvc.unified.response import CLIFailureError
 from pysvc import errors as svc_errors
@@ -386,6 +388,51 @@ class TestArrayMediatorSVC(unittest.TestCase):
     #     self.assertEqual('test_host_3', host)
     #     self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE,
     #                       config.FC_CONNECTIVITY_TYPE], connectivity_type)
+
+    @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader")
+    def test_get_host_by_identifiers_return_iscsi_and_fc_all_support(self, list_result_reader):
+        host_1 = self._create_host_as_dictonary('host_id_1', 'test_host_1', None, ['abc1'])
+        host_2 = self._create_host_as_dictonary('host_id_2', 'test_host_3', 'iqn.test.6', ['abcd3'])
+        host_3 = self._create_host_as_dictonary('host_id_3', 'test_host_3', 'iqn.test.2', ['abc3'])
+        hosts = [host_1, host_2, host_3]
+        self.svc.client.svcinfo.lshost =  Mock()
+        self.svc.client.svcinfo.lshost.return_value = self._create_hosts_list_result(hosts)
+        list_result_reader.__iter__.return_value = self._create_hosts_list_result(hosts)
+        host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
+            'iqn.test.2', ['ABC3']))
+        self.assertEqual('test_host_3', host)
+        self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE,
+                          config.FC_CONNECTIVITY_TYPE], connectivity_type)
+
+
+    def _create_host_as_dictonary(self, id, name, iscsi_name, wwpns_list):
+        res = {}
+        res[HOST_ID_PARAM] = id
+        res[HOST_NAME_PARAM] = name
+        if iscsi_name != None:
+            res[iscsi_name] = iscsi_name
+        if wwpns_list != None:
+            res[HOST_WWPNS_PARAM] = wwpns_list
+        return res
+
+    def _create_hosts_list_result(self, hosts_dict):
+        return [Munch(host_dict) for host_dict in hosts_dict]
+
+    def _create_detailed_hosts_list_result(self, hosts_dict):
+        res = []
+        for host_dict in hosts_dict:
+            current_element = SVCListResultsElement()
+            current_element.add(HOST_ID_PARAM, host_dict.get(HOST_ID_PARAM))
+            current_element.add(HOST_NAME_PARAM, host_dict.get(HOST_NAME_PARAM))
+            iscsi_name = host_dict.get(HOST_ISCSI_NAMES_PARAM)
+            if iscsi_name:
+                current_element.add(HOST_ISCSI_NAMES_PARAM, iscsi_name)
+            wwpns_list = host_dict.get(HOST_WWPNS_PARAM)
+            if wwpns_list:
+                for wwpn in wwpns_list
+                    current_element.add(HOST_WWPNS_PARAM, wwpn)
+            res.append(current_element)
+        return res
 
     def test_get_volume_mappings_empty_mapping_list(self):
         self.svc.client.svcinfo.lsvdiskhostmap.return_value = []
