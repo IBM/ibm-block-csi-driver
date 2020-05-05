@@ -1,10 +1,12 @@
 from controller.common.csi_logger import get_stdout_logger
+import controller.array_action.errors as controller_errors
 
 logger = get_stdout_logger()
 
+ID_PARAM_NAME = "id"
+
 
 class SVCListResultsReader:
-    ID_PARAM_NAME = "id"
 
     def __init__(self, hosts_raw_list_as_string):
         self._hosts_raw_list = hosts_raw_list_as_string.split("\n")
@@ -18,12 +20,12 @@ class SVCListResultsReader:
             self._current_index += 1
             if line:
                 param_name, param_value = self._parse_param(line)
-                if param_name == SVCListResultsReader.ID_PARAM_NAME:
+                if param_name == ID_PARAM_NAME:
                     self._next_object_id = param_value
                     self._current_index -= 1
                 else:
-                    raise StopIteration(
-                        "First element is {0}. Expected {1}".format(line, SVCListResultsReader.ID_PARAM_NAME))
+                    raise controller_errors.InvalidCliResponseError(
+                        "First element is {0}. Expected {1}".format(line, ID_PARAM_NAME))
 
     def __iter__(self):
         return self
@@ -32,7 +34,7 @@ class SVCListResultsReader:
         if not self._has_next():
             raise StopIteration
         res = SVCListResultsElement()
-        res.add(SVCListResultsReader.ID_PARAM_NAME, self._next_object_id)
+        res.add(ID_PARAM_NAME, self._next_object_id)
         self._current_index += 1
         self._next_object_id = None
         while self._current_index < len(self._hosts_raw_list):
@@ -41,7 +43,7 @@ class SVCListResultsReader:
             if not line:
                 continue
             param_name, param_value = self._parse_param(line)
-            if param_name == SVCListResultsReader.ID_PARAM_NAME:
+            if param_name == ID_PARAM_NAME:
                 self._next_object_id = param_value
                 self._current_index -= 1
                 return res
