@@ -400,8 +400,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         hosts = [host_1, host_2, host_3]
         self.svc.client.svcinfo.lshost = Mock()
         self.svc.client.svcinfo.lshost.return_value = self._create_hosts_list_result(hosts)
-        self.svc.client.svcinfo.send_raw_command = Mock()
-        self.svc.client.svcinfo.send_raw_command.return_value = (EMPTY_BYTES, EMPTY_BYTES)
+        self.svc.client.send_raw_command = Mock()
+        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
         list_result_reader.__iter__.return_value = self._create_hosts_list_result(hosts)
         host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators('iqn.test.2', ['ABC3']))
         self.assertEqual('test_host_3', host)
