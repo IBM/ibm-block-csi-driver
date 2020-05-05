@@ -33,7 +33,7 @@ HOST_ID_PARAM = 'id'
 HOST_NAME_PARAM = 'name'
 HOST_ISCSI_NAMES_PARAM = 'iscsi_name'
 HOST_WWPNS_PARAM = 'WWPN'
-MAX_HOSTS_LIST_ERROR_LOG_LENGTH = 100
+MAX_HOSTS_LIST_ERR_MSG_LENGTH = 300
 
 def is_warning_message(ex):
     """ Return True if the exception message is warning """
@@ -321,9 +321,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         detailed_host_list_errors = bytes_to_string(detailed_host_list_errors_bytes)
         if not detailed_host_list_errors:
             return ""
-        elif len(detailed_host_list_errors) <= MAX_HOSTS_LIST_ERROR_LOG_LENGTH
+        elif len(detailed_host_list_errors) <= MAX_HOSTS_LIST_ERR_MSG_LENGTH:
             return detailed_host_list_errors
-        return "{0} ...".format(detailed_host_list_errors[:MAX_HOSTS_LIST_ERROR_LOG_LENGTH])
+        return "{0} ...".format(detailed_host_list_errors[:MAX_HOSTS_LIST_ERR_MSG_LENGTH])
 
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume id : "
