@@ -1,5 +1,8 @@
+UTF_8 = "utf-8"
+
+
 def bytes_to_string(input_as_bytes):
-    return input_as_bytes.decode() if input_as_bytes else ""
+    return input_as_bytes.decode(UTF_8) if input_as_bytes else ""
 
 
 class classproperty(object):
