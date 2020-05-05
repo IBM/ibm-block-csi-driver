@@ -5,6 +5,7 @@ host_1 = "\n".join(("id 1", "name host_1", "WWPN wwpn1", "protocol fc", "WWPN ww
 host_2 = "\n".join(("id 2", "name host_2", "", "   ", "iscsi", "status   not active"))
 host_3 = "\n".join(("id 3", "name host_3", "iscsi iscsi1"))
 
+
 class TestSVCListReader(unittest.TestCase):
 
     def test_single_host_success(self):
@@ -34,24 +35,24 @@ class TestSVCListReader(unittest.TestCase):
         self.assertFalse(hosts_list)
 
     def test_illegal_input(self):
-       illegal_input = "\n".join(("name host_3", "id 3"))
-       with self.assertRaises(StopIteration):
+        illegal_input = "\n".join(("name host_3", "id 3"))
+        with self.assertRaises(StopIteration):
             SVCListResultsReader(illegal_input)
 
     def _assert_host_1(self, host):
-            self.assertEqual(host.get("id"), "1")
-            self.assertEqual(host.get("name"), "host_1")
-            self.assertEqual(host.get_as_list("WWPN"), ["wwpn1", "wwpn2"])
-            self.assertEqual(host.get("protocol"), "fc")
-            self.assertEqual(host.get_as_list("protocol"), ["fc"])
-            self.assertEqual(host.get("non_existing_value", "no-value"), "no-value")
-            self.assertEqual(host.get_as_list("non_existing_value"), [])
+        self.assertEqual(host.get("id"), "1")
+        self.assertEqual(host.get("name"), "host_1")
+        self.assertEqual(host.get_as_list("WWPN"), ["wwpn1", "wwpn2"])
+        self.assertEqual(host.get("protocol"), "fc")
+        self.assertEqual(host.get_as_list("protocol"), ["fc"])
+        self.assertEqual(host.get("non_existing_value", "no-value"), "no-value")
+        self.assertEqual(host.get_as_list("non_existing_value"), [])
 
     def _assert_host_2(self, host):
-            self.assertEqual(host.get("id"), "2")
-            self.assertEqual(host.get("name"), "host_2")
-            self.assertEqual(host.get("iscsi"), "")
-            self.assertEqual(host.get("status"), "not active")
+        self.assertEqual(host.get("id"), "2")
+        self.assertEqual(host.get("name"), "host_2")
+        self.assertEqual(host.get("iscsi"), "")
+        self.assertEqual(host.get("status"), "not active")
 
     def _assert_host_3(self, host):
         self.assertEqual(host.get("id"), "3")
