@@ -344,7 +344,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             wwpns = host_details.get_as_list(HOST_WWPNS_PARAM)
             host = SvcHostInfo(host_id, host_name, iscsi_names, wwpns)
             res.append(host)
-        return res;
+        return res
 
     def _get_detailed_hosts_list_cmd(self, host_list):
         writer = StringIO()
