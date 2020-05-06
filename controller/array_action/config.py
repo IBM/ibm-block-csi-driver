@@ -8,3 +8,6 @@ CAPABILITY_THICK = 'thick'
 
 # volume context
 CONTEXT_POOL = "pool"
+
+SRC_OBJECT_TYPE_VOLUME = 1
+SRC_OBJECT_TYPE_SNAPSHOT = 2

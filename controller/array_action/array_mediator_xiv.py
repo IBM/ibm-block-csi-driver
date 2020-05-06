@@ -4,7 +4,7 @@ from pyxcli import errors as xcli_errors
 from pyxcli.client import XCLIClient
 
 import controller.array_action.errors as controller_errors
-from controller.array_action.array_action_types import Volume, Snapshot
+from controller.array_action.array_action_types import Volume, Snapshot, VolumeSrcObjectType
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.utils import classproperty
@@ -88,11 +88,20 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         return int(volume_or_snapshot.capacity) * self.BLOCK_SIZE_IN_BYTES
 
     def _generate_volume_response(self, cli_volume):
+        copy_src_object_wwn = cli_volume.copy_master_wwn if cli_volume.vol_copy_type == "copy" else None
+        copy_src_object_type = None
+        if copy_src_object_wwn:
+            copy_src_object_type = VolumeSrcObjectType.UNKNOWN
+            src_cli_vol = self._get_volume_by_id(copy_src_object_wwn)
+            if src_cli_vol:
+                copy_src_object_type = VolumeSrcObjectType.SNAPSHOT if src_cli_vol.maser_name else VolumeSrcObjectType.VOLUME
         return Volume(self._get_volume_or_snapshot_size_in_bytes(cli_volume),
                       cli_volume.wwn,
                       cli_volume.name,
                       self.endpoint,
                       cli_volume.pool_name,
+                      copy_src_object_type,
+                      copy_src_object_wwn,
                       self.array_type)
 
     def _generate_snapshot_response(self, cli_snapshot):
@@ -160,15 +169,21 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def copy_volume_from_snapshot(self, volume_name, src_snapshot):
         try:
-            return self.client.cmd.vol_copy(vol_src=src_snapshot.name, vol_trg=volume_name)
+            cli_volume = self.client.cmd.vol_copy(vol_src=src_snapshot.name, vol_trg=volume_name)
+            logger.info("finished creating cli volume : {0} from snapshot {1}".format(cli_volume, src_snapshot))
+            return self._generate_volume_response(cli_volume)
         except xcli_errors.IllegalNameForObjectError as ex:
-            print(ex)
             logger.exception(ex)
             raise controller_errors.IllegalObjectName(ex.status)
+        except xcli_errors.SourceVolumeBadNameError as ex:
+            logger.exception(ex)
+            raise controller_errors.SnapshotNotFoundError(name)
+        except xcli_errors.TargetVolumeBadNameError as ex:
+            logger.exception(ex)
+            raise controller_errors.VolumeNotFoundError(name)
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
-            raise controller_errors.PermissionDeniedError(
-                "create vol : {0} from snapshot : {1}".format(volume_name, src_snapshot.name))
+            raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
     def _get_vol_by_wwn(self, volume_id):
         vol_by_wwn = self.client.cmd.vol_list(wwn=volume_id).as_single_element

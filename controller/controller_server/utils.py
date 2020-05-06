@@ -104,6 +104,21 @@ def validate_create_volume_request(request):
     else:
         raise ValidationException(messages.params_are_missing_message)
 
+    logger.debug("validating volume copy source")
+    source = request.volume_content_source
+    if source:
+        if source.HasField(config.VOLUME_SOURCE_SNAPSHOT):
+            source_snapshot = source.snapshot
+            logger.info("Source snapshot specified: {0}".format(source_snapshot))
+            source_snapshot_id = source_snapshot.snapshot_id
+            if not source_snapshot_id:
+                logger.error("Volume source snapshot has no id specified")
+                raise ValidationException(messages.params_are_missing_message)
+        elif source.HasField(config.VOLUME_SOURCE_VOLUME):
+            raise ValidationException(messages.params_are_missing_message)
+        else:
+            raise ValidationException(messages.params_are_missing_message)
+
     logger.debug("request validation finished.")
 
 

@@ -7,6 +7,7 @@ import grpc
 import yaml
 
 import controller.array_action.errors as controller_errors
+from controller.array_action.array_action_types import VolumeSrcObjectType
 import controller.controller_server.config as config
 import controller.controller_server.utils as utils
 from controller.array_action.array_connection_manager import ArrayConnectionManager
@@ -44,14 +45,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def CreateVolume(self, request, context):
         set_current_thread_name(request.name)
         logger.info("create volume")
-
-        VOLUME_SOURCE_SNAPSHOT = "snapshot"
-        VOLUME_SOURCE_VOLUME = "volume"
         source_snapshot_id = None
         source_snapshot = None
         source = request.volume_content_source
         if source:
-            if source.HasField(VOLUME_SOURCE_SNAPSHOT):
+            if source.HasField(config.VOLUME_SOURCE_SNAPSHOT):
                 logger.info("Volume source snapshot specified")
                 source_snapshot = source.snapshot
                 logger.info("Source snapshot specified: {0}".format(source_snapshot))
@@ -59,7 +57,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 if not source_snapshot_full_id:
                     logger.error("Volume source snapshot has no id specified")
                     source_snapshot_id = utils.get_snapshot_id(source_snapshot_full_id)
-            elif source.HasField(VOLUME_SOURCE_VOLUME):
+            elif source.HasField(config.VOLUME_SOURCE_VOLUME):
                 logger.error("Volume source not supported")
 
         logger.info("Source snapshot id specified: {0}".format(source_snapshot_id))
@@ -116,8 +114,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         volume_context=request.parameters,
                         volume_prefix=volume_prefix,
                     )
-                    if source_snapshot_id:
-                        source_snapshot = array_mediator.get_snapshot_by_id(source_snapshot_id)
                 except controller_errors.VolumeNotFoundError:
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
@@ -132,7 +128,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         context.set_details("Volume was already created with different size.")
                         context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                         return csi_pb2.CreateVolumeResponse()
-                    # TODO validate vs snapshot
+
+                    if source_snapshot_id and vol.is_copy_of_snapshpot(source_snapshot_id):
+                        logger.error("Volume exists but it is not copy of snapshot {0}. Volume : {1}",
+                                     source_snapshot_id, vol)
+                        context.set_code(grpc.StatusCode.INTERNAL)
+                        return csi_pb2.CreateVolumeResponse()
 
                 logger.debug("generating create volume response")
                 res = utils.generate_csi_create_volume_response(vol)
