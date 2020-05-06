@@ -71,11 +71,11 @@ def build_kwargs_from_capabilities(capabilities, pool_name, volume_name,
 
 
 class SvcHostInfo:
-    def __init__(self, host_id, host_name, iscsi_names, wwpns):
+    def __init__(self, host_id, host_name, iscsi_names, wwns):
         self._id = host_id
         self._name = host_name
         self._iscsi_names = iscsi_names
-        self._wwpns = wwpns
+        self._wwns = wwns
 
     def get_id(self):
         return self._id
@@ -86,8 +86,8 @@ class SvcHostInfo:
     def get_iscsi(self):
         return self._iscsi_names
 
-    def get_wwpns(self):
-        return self._wwpns
+    def get_wwns(self):
+        return self._wwns
 
 
 class SVCArrayMediator(ArrayMediatorAbstract):
@@ -295,7 +295,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         for host in detailed_hosts_list:
             host_name = host.get_name()
             iscsi_names = host.get_iscsi()
-            wwns_value = host.get_wwpns()
+            wwns_value = host.get_wwns()
             if initiators.is_array_iscsi_iqns_match(iscsi_names):
                 iscsi_host = host_name
                 logger.debug("found iscsi iqn in list : {0} for host : "
@@ -321,12 +321,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.HostNotFoundError(initiators)
 
     def _get_detailed_hosts_list(self):
+        logger.debug("Getting detailed hosts list on array {0}".format(self.endpoint))
         hosts_list = self.client.svcinfo.lshost()
         if not hosts_list:
-            logger.debug(
-                "Can not found host by using initiators: {0}. No hosts defined on the array {1} ".format(initiators,
-                                                                                                         self.endpoint))
-            raise controller_errors.HostNotFoundError(initiators)
+            return []
 
         # for each host get its detailed info from array by sending batch of commands
         detailed_hosts_list_cmd = self._get_detailed_hosts_list_cmd(hosts_list)
@@ -337,7 +335,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if not detailed_hosts_list_errors:
             logger.error("Errors returned from getting detailed hosts list: {0}".format(detailed_hosts_list_error_msg))
 
-        logger.debug("Finding the correct host")
         hosts_reader = SVCListResultsReader(detailed_hosts_list_string)
         res = []
         for host_details in hosts_reader:
