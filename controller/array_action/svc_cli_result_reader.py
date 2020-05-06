@@ -7,7 +7,13 @@ ID_PARAM_NAME = "id"
 
 
 class SVCListResultsReader:
-
+    """
+    Iterable object user to read raw command response from m SVS array.
+    Each object in response is translated to SVCListResultsElement.
+    Input is received as string which represents '\n' separated list or returned lines from output.
+    Line with id (e.g. 'id 1') is recognized as first line of object ans used as separator between objects
+    (e.g. in input "id 1\nname n3\nid 2\nname n2" first object starts with line 'id 1' and ends with 'id 2')
+    """
     def __init__(self, hosts_raw_list_as_string):
         self._hosts_raw_list = hosts_raw_list_as_string.split("\n")
         self._current_index = 0
@@ -22,7 +28,6 @@ class SVCListResultsReader:
                 param_name, param_value = self._parse_param(line)
                 if param_name == ID_PARAM_NAME:
                     self._next_object_id = param_value
-                    self._current_index -= 1
                 else:
                     raise controller_errors.InvalidCliResponseError(
                         "First element is {0}. Expected {1}".format(line, ID_PARAM_NAME))
@@ -31,11 +36,14 @@ class SVCListResultsReader:
         return self
 
     def __next__(self):
+        """
+        Assumed self._current_index points to the line after line 'id <id>' of the next object
+        :return: Next object
+        """
         if not self._has_next():
             raise StopIteration
         res = SVCListResultsElement()
         res.add(ID_PARAM_NAME, self._next_object_id)
-        self._current_index += 1
         self._next_object_id = None
         while self._current_index < len(self._hosts_raw_list):
             line = self._hosts_raw_list[self._current_index].strip()
@@ -45,7 +53,6 @@ class SVCListResultsReader:
             param_name, param_value = self._parse_param(line)
             if param_name == ID_PARAM_NAME:
                 self._next_object_id = param_value
-                self._current_index -= 1
                 return res
             res.add(param_name, param_value)
         return res
