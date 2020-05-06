@@ -306,14 +306,15 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
         # for each host get its detailed info from array by sending batch of commands
         detailed_hosts_list_cmd = self._get_detailed_hosts_list_cmd(hosts_list)
-        logger.debug("Getting detailed hosts list")
+        logger.debug("Sending getting detailed hosts list commands batch")
         detailed_hosts_list_output, detailed_hosts_list_errors = self.client.send_raw_command(detailed_hosts_list_cmd)
-        detailed_hosts_list_string = bytes_to_string(detailed_hosts_list_output)
+        detailed_hosts_list_as_string = bytes_to_string(detailed_hosts_list_output)
         detailed_hosts_list_error_msg = self._get_formatted_hosts_list_error_msg(detailed_hosts_list_errors)
         if not detailed_hosts_list_errors:
             logger.error("Errors returned from getting detailed hosts list: {0}".format(detailed_hosts_list_error_msg))
 
-        hosts_reader = SVCListResultsReader(detailed_hosts_list_string)
+        logger.debug("Reading detailed hosts list commands batch response")
+        hosts_reader = SVCListResultsReader(detailed_hosts_list_as_string)
         res = []
         for host_details in hosts_reader:
             host_id = host_details.get(HOST_ID_PARAM)

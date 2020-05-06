@@ -42,6 +42,7 @@ class SVCListResultsReader:
         """
         if not self._has_next():
             raise StopIteration
+
         res = SVCListResultsElement()
         res.add(ID_PARAM_NAME, self._next_object_id)
         self._next_object_id = None
