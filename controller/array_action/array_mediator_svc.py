@@ -6,7 +6,7 @@ from pysvc.unified.response import CLIFailureError
 
 import controller.array_action.config as config
 import controller.array_action.errors as controller_errors
-from controller.array_action.array_action_types import Volume
+from controller.array_action.array_action_types import Volume, Host
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.utils import classproperty, bytes_to_string
 from controller.common.csi_logger import get_stdout_logger
@@ -68,26 +68,6 @@ def build_kwargs_from_capabilities(capabilities, pool_name, volume_name,
             cli_kwargs.update({'compressed': True, 'deduplicated': True})
 
     return cli_kwargs
-
-
-class SvcHostInfo:
-    def __init__(self, host_id, host_name, iscsi_names, wwns):
-        self._id = host_id
-        self._name = host_name
-        self._iscsi_names = iscsi_names
-        self._wwns = wwns
-
-    def get_id(self):
-        return self._id
-
-    def get_name(self):
-        return self._name
-
-    def get_iscsi(self):
-        return self._iscsi_names
-
-    def get_wwns(self):
-        return self._wwns
 
 
 class SVCArrayMediator(ArrayMediatorAbstract):
@@ -293,14 +273,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         detailed_hosts_list = self._get_detailed_hosts_list()
         iscsi_host, fc_host = None, None
         for host in detailed_hosts_list:
-            host_name = host.get_name()
-            iscsi_names = host.get_iscsi()
-            wwns_value = host.get_wwns()
-            if initiators.is_array_iscsi_iqns_match(iscsi_names):
+            host_name = host.name
+            if initiators.is_array_iscsi_iqns_match(host.iscsi_names):
                 iscsi_host = host_name
                 logger.debug("found iscsi iqn in list : {0} for host : "
                              "{1}".format(initiators.iscsi_iqn, iscsi_host))
-            if initiators.is_array_wwns_match(wwns_value):
+            if initiators.is_array_wwns_match(host.wwns):
                 fc_host = host_name
                 logger.debug("found fc wwns in list : {0} for host : "
                              "{1}".format(initiators.fc_wwns, fc_host))
@@ -342,7 +320,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             host_name = host_details.get(HOST_NAME_PARAM)
             iscsi_names = host_details.get_as_list(HOST_ISCSI_NAMES_PARAM)
             wwpns = host_details.get_as_list(HOST_WWPNS_PARAM)
-            host = SvcHostInfo(host_id, host_name, iscsi_names, wwpns)
+            host = Host(host_id, host_name, iscsi_names, wwpns)
             res.append(host)
         return res
 
