@@ -273,13 +273,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         detailed_hosts_list = self._get_detailed_hosts_list()
         iscsi_host, fc_host = None, None
         for host in detailed_hosts_list:
-            host_name = host.name
             if initiators.is_array_iscsi_iqns_match(host.iscsi_names):
-                iscsi_host = host_name
+                iscsi_host = host.name
                 logger.debug("found iscsi iqn in list : {0} for host : "
                              "{1}".format(initiators.iscsi_iqn, iscsi_host))
             if initiators.is_array_wwns_match(host.wwns):
-                fc_host = host_name
+                fc_host = host.name
                 logger.debug("found fc wwns in list : {0} for host : "
                              "{1}".format(initiators.fc_wwns, fc_host))
         if iscsi_host and fc_host:
@@ -320,8 +319,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             host_id = host_details.get(HOST_ID_PARAM)
             host_name = host_details.get(HOST_NAME_PARAM)
             iscsi_names = host_details.get_as_list(HOST_ISCSI_NAMES_PARAM)
-            wwpns = host_details.get_as_list(HOST_WWPNS_PARAM)
-            host = Host(host_id, host_name, iscsi_names, wwpns)
+            wwns = host_details.get_as_list(HOST_WWPNS_PARAM)
+            host = Host(host_id, host_name, iscsi_names, wwns)
             res.append(host)
         return res
 

@@ -8,10 +8,10 @@ ID_PARAM_NAME = "id"
 
 class SVCListResultsReader:
     """
-    Iterable object user to read raw command response from m SVS array.
+    Iterable object used to read raw command response from m SVS array.
     Each object in response is translated to SVCListResultsElement.
-    Input is received as string which represents '\n' separated list or returned lines from output.
-    Line with id (e.g. 'id 1') is recognized as first line of object ans used as separator between objects
+    Input is received as string which represents '\n'-separated list of returned lines from output.
+    Line with param 'id' (e.g. 'id 1') is recognized as first line of object ans used as separator between objects
     (e.g. in input "id 1\nname n3\nid 2\nname n2" first object starts with line 'id 1' and ends with 'id 2')
     """
     def __init__(self, hosts_raw_list_as_string):
@@ -21,6 +21,12 @@ class SVCListResultsReader:
         self._init_first_object_id()
 
     def _init_first_object_id(self):
+        """
+        Set _init_first_object_id to id o the first object and _current_index to point to next line
+
+        Raises:
+            InvalidCliResponseError
+        """
         while not self._next_object_id and self._current_index < len(self._hosts_raw_list):
             line = self._hosts_raw_list[self._current_index].strip()
             self._current_index += 1
@@ -38,8 +44,13 @@ class SVCListResultsReader:
     def __next__(self):
         """
         Assumed self._current_index points to the line after line 'id <id>' of the next object
-        :return: Next object
+
+        Returns:
+            Next object as SVCListResultsElement.
+        Raises:
+            StopIteration
         """
+
         if not self._has_next():
             raise StopIteration
 
@@ -59,6 +70,12 @@ class SVCListResultsReader:
         return res
 
     def _parse_param(self, line):
+        """
+        Args:
+            line : lin e representing <param-name> <param-value> (para value may be empty or contains whitespaces)
+        Returns:
+            param-name, param-value
+        """
         splitted_line = line.split()
         name = splitted_line[0]
         value = line[len(name):].strip() if len(splitted_line) > 1 else ""
@@ -69,6 +86,9 @@ class SVCListResultsReader:
 
 
 class SVCListResultsElement:
+    """
+    Single parsed object returned from SVC list command
+    """
     def __init__(self):
         self._dict = {}
 
