@@ -147,7 +147,7 @@ def generate_csi_create_volume_response(new_vol):
         logger.debug("+++++++++++++ GOT CONTENT SOURCE")
         snapshot_source = csi_pb2.VolumeContentSource.SnapshotSource(snapshot_id=new_vol.copy_src_object_id)
         logger.debug(snapshot_source)
-        content_source = csi_pb2.VolumeContentSource(snapshot_source=snapshot_source)
+        content_source = csi_pb2.VolumeContentSource(snapshot=snapshot_source)
         logger.debug(content_source)
 
     res = csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(
