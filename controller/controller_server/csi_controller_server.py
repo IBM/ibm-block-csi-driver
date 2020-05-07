@@ -151,7 +151,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.info("++++++++++++++++++ SNAPSHOT +")
             source_snapshot = source.snapshot
             logger.info(source)
-            return source_snapshot.snapshot_id
+            return utils.get_snapshot_id_info(source_snapshot.snapshot_id)
         return None
 
     def DeleteVolume(self, request, context):
