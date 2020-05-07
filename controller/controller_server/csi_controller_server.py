@@ -109,12 +109,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return csi_pb2.CreateVolumeResponse()
 
                     if src_snapshot_id and vol.copy_src_object_id and vol.copy_src_object_id != src_snapshot_id:
-                        logger.error("Volume {0} is a copy but not of Snapshot {1}.".format(vol.name, src_snapshot_id))
+                        logger.error(
+                            "Volume {0} is a copy but not of Snapshot {1}.".format(vol.volume_name, src_snapshot_id))
                         context.set_code(grpc.StatusCode.INTERNAL)
                         return csi_pb2.CreateVolumeResponse()
 
                 if src_snapshot_id:
-                    logger.error("Copy Snapshot {0} data to Volume {1}.".format(src_snapshot_id, vol.name))
+                    logger.error("Copy Snapshot {0} data to Volume {1}.".format(src_snapshot_id, vol.volume_name))
                     array_mediator.copy_volume_from_snapshot(vol.name, src_snapshot_id)
 
                 logger.debug("generating create volume response")
