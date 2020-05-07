@@ -58,7 +58,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.debug("volume name : {}".format(volume_name))
 
         src_snapshot_id = self._get_src_snapshot_id(request)
-        logger.debug("Source snapsahot id : {}".format(src_snapshot_id))
+        logger.debug("Source snapshot id : {}".format(src_snapshot_id))
 
         secrets = request.secrets
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
@@ -143,9 +143,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def _get_src_snapshot_id(self, request):
         source = request.volume_content_source
+        logger.info(source)
         if source and source.HasField(config.VOLUME_SOURCE_SNAPSHOT):
+            logger.info("++++++++++++++++++ SNAPSHOT +")
             source_snapshot = source.snapshot
-            return utils.get_snapshot_id(source_snapshot.snapshot_id)
+            logger.info(source)
+            return source_snapshot.snapshot_id
         return None
 
     def DeleteVolume(self, request, context):
