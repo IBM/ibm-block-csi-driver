@@ -7,7 +7,6 @@ import grpc
 import yaml
 
 import controller.array_action.errors as controller_errors
-from controller.array_action.array_action_types import VolumeSrcObjectType
 import controller.controller_server.config as config
 import controller.controller_server.utils as utils
 from controller.array_action.array_connection_manager import ArrayConnectionManager
@@ -110,7 +109,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return csi_pb2.CreateVolumeResponse()
 
                     if src_snapshot_id and vol.copy_src_object_id and vol.copy_src_object_id != src_snapshot_id:
-                        logger.error("Volume {0} is a copy but not of Snapshot {1}.", vol, src_snapshot_id)
+                        logger.error("Volume {0} is a copy but not of Snapshot {1}.".format(vol, src_snapshot_id))
                         context.set_code(grpc.StatusCode.INTERNAL)
                         return csi_pb2.CreateVolumeResponse()
 
