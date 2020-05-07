@@ -174,6 +174,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                     src_snapshot_id))
                 raise controller_errors.SnapshotNotFoundVolumeWithSameIdExistsError(src_snapshot_id, self.endpoint)
 
+            self.client.cmd.vol_format(vol=name)
             cli_volume = self.client.cmd.vol_copy(vol_src=src_snapshot_name, vol_trg=name)
             return self._generate_volume_response(cli_volume)
         except xcli_errors.IllegalNameForObjectError as ex:
