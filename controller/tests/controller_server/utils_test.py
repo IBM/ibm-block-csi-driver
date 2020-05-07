@@ -68,6 +68,30 @@ class TestUtils(unittest.TestCase):
         with self.assertRaises(ValidationException):
             utils.validate_csi_volume_capabilties([cap])
 
+
+    def test_validate_create_volume_source_empty(self):
+        request = Mock()
+        request.source = csi_pb2.VolumeContentSource()
+        utils.validate_create_volume_source(request)
+
+
+    def test_validate_create_volume_source_snapshot(self):
+        request = Mock()
+        src_anapshot_id = "snap_id"
+        snapshot_source = csi_pb2.VolumeContentSource.SnapshotSource(snapshot_id=src_anapshot_id)
+        request.source = csi_pb2.VolumeContentSource(snapshot=snapshot_source)
+        utils.validate_create_volume_source(request)
+
+
+    def test_validate_create_volume_source_volume(self):
+        request = Mock()
+        src_vol_id = "vol_id"
+        volume_source = csi_pb2.VolumeContentSource.VolumeSource(volume_id=src_vol_id)
+        request.source = csi_pb2.VolumeContentSource(volume=volume_source)
+        with self.assertRaises(ValidationException):
+            utils.validate_create_volume_source(request)
+
+
     def test_validate_raw_block_volume_capabilities(self):
         caps = Mock()
         caps.block = Mock()
