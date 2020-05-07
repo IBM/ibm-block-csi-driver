@@ -147,12 +147,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def _get_src_snapshot_id(self, request):
         source = request.volume_content_source
         logger.info(source)
+        res = None
         if source and source.HasField(config.VOLUME_SOURCE_SNAPSHOT):
             logger.info("++++++++++++++++++ SNAPSHOT +")
             source_snapshot = source.snapshot
             logger.info(source)
-            return utils.get_snapshot_id_info(source_snapshot.snapshot_id)
-        return None
+            _, res = utils.get_snapshot_id_info(source_snapshot.snapshot_id)
+        return res
 
     def DeleteVolume(self, request, context):
         set_current_thread_name(request.volume_id)
