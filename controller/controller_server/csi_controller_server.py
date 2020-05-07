@@ -114,7 +114,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return csi_pb2.CreateVolumeResponse()
 
                 if src_snapshot_id:
-                    array_mediator.create_volume_from_snapshot(vol.name, src_snapshot_id)
+                    logger.error("Copy Snapshot data to Volume. Volume name {0}, Snapshot id {1}".format(vol, vol.name,
+                                                                                                         src_snapshot_id))
+                    array_mediator.copy_volume_from_snapshot(vol.name, src_snapshot_id)
 
                 logger.debug("generating create volume response")
                 res = utils.generate_csi_create_volume_response(vol)
