@@ -96,7 +96,8 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.capacity_bytes = 10
         self.request.name = snap_name
         self.request.source_volume_id = "A9000:12345678"
-
+        self.request.volume_content_source = None
+    
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     def test_create_snapshot_with_empty_name(self, a_enter, a_exit):
