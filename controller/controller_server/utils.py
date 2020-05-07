@@ -133,22 +133,16 @@ def validate_create_snapshot_request(request):
 
 def generate_csi_create_volume_response(new_vol):
     logger.debug("creating volume response for vol : {0}".format(new_vol))
-    logger.debug("+++++++++++++ creating volume response for vol SRC : {0}".format(new_vol.copy_src_object_id))
-
     vol_context = {"volume_name": new_vol.volume_name,
                    "array_address": ",".join(
                        new_vol.array_address if isinstance(new_vol.array_address, list) else [new_vol.array_address]),
                    "pool_name": new_vol.pool_name,
                    "storage_type": new_vol.array_type
                    }
-
     content_source = None
     if new_vol.copy_src_object_id:
-        logger.debug("+++++++++++++ GOT CONTENT SOURCE")
         snapshot_source = csi_pb2.VolumeContentSource.SnapshotSource(snapshot_id=new_vol.copy_src_object_id)
-        logger.debug(snapshot_source)
         content_source = csi_pb2.VolumeContentSource(snapshot=snapshot_source)
-        logger.debug(content_source)
 
     res = csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(
         capacity_bytes=new_vol.capacity_bytes,
