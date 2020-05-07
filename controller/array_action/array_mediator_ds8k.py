@@ -185,6 +185,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             vol_id=self._generate_volume_scsi_identifier(res.id),
             vol_name=res.name,
             array_address=self.service_address,
+            copy_src_object_id=None, # TODO: CSI-1026
             pool_name=res.pool,
             array_type=self.array_type
         )
@@ -256,8 +257,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             )
             raise array_errors.VolumeCreationError(name)
 
-    def copy_volume_from_snapshot(self, volume_name, src_snapshot):
-        # TODO
+    def create_volume_from_snapshot(self, name, src_snapshot_id):
+        # TODO:	CSI-1338
         pass
 
     def delete_volume(self, volume_id):

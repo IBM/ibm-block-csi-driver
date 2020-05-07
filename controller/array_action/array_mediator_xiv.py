@@ -4,7 +4,8 @@ from pyxcli import errors as xcli_errors
 from pyxcli.client import XCLIClient
 
 import controller.array_action.errors as controller_errors
-from controller.array_action.array_action_types import Volume, Snapshot, VolumeSrcObjectType
+import controller.array_action.messages as controller_error_messages
+from controller.array_action.array_action_types import Volume, Snapshot
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.utils import classproperty
@@ -89,18 +90,11 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def _generate_volume_response(self, cli_volume):
         copy_src_object_wwn = cli_volume.copy_master_wwn if cli_volume.vol_copy_type == "copy" else None
-        copy_src_object_type = None
-        if copy_src_object_wwn:
-            copy_src_object_type = VolumeSrcObjectType.UNKNOWN
-            src_cli_vol = self._get_volume_by_id(copy_src_object_wwn)
-            if src_cli_vol:
-                copy_src_object_type = VolumeSrcObjectType.SNAPSHOT if src_cli_vol.maser_name else VolumeSrcObjectType.VOLUME
         return Volume(self._get_volume_or_snapshot_size_in_bytes(cli_volume),
                       cli_volume.wwn,
                       cli_volume.name,
                       self.endpoint,
                       cli_volume.pool_name,
-                      copy_src_object_type,
                       copy_src_object_wwn,
                       self.array_type)
 
@@ -167,9 +161,20 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
-    def copy_volume_from_snapshot(self, volume_name, src_snapshot):
+    def copy_volume_from_snapshot(self, name, src_snapshot_id):
+        src_snapshot_name = None
         try:
-            cli_volume = self.client.cmd.vol_copy(vol_src=src_snapshot.name, vol_trg=volume_name)
+            src_snapshot = self._get_snapshot_by_id(src_snapshot_id)
+            if not src_snapshot:
+                logger.exception(controller_error_messages.SnapshotNotFoundError_message.format(src_snapshot_id))
+                raise controller_errors.SnapshotNotFoundError(src_snapshot_id)
+            src_snapshot_name = src_snapshot.name
+            if not src_snapshot.master_name:
+                logger.exception(controller_error_messages.SnapshotNotFoundVolumeWithSameIdExistsError_message.format(
+                    src_snapshot_id))
+                raise controller_errors.SnapshotNotFoundVolumeWithSameIdExistsError(src_snapshot_id, self.endpoint)
+
+            cli_volume = self.client.cmd.vol_copy(vol_src=src_snapshot_name, vol_trg=name)
             logger.info("finished creating cli volume : {0} from snapshot {1}".format(cli_volume, src_snapshot))
             return self._generate_volume_response(cli_volume)
         except xcli_errors.IllegalNameForObjectError as ex:
@@ -177,7 +182,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.IllegalObjectName(ex.status)
         except xcli_errors.SourceVolumeBadNameError as ex:
             logger.exception(ex)
-            raise controller_errors.SnapshotNotFoundError(name)
+            raise controller_errors.SnapshotNotFoundError(src_snapshot_name)
         except xcli_errors.TargetVolumeBadNameError as ex:
             logger.exception(ex)
             raise controller_errors.VolumeNotFoundError(name)

@@ -53,4 +53,7 @@ SnapshotAlreadyExistsError_message = "Snapshot already exists : {0} , array : {1
 SnapshotNotFoundVolumeWithSameNameExistsError_message = "Snapshot not found. Volume with the same name exists. \
                                                          Name : {0} , array : {1}"
 
+SnapshotNotFoundVolumeWithSameIdExistsError_message = "Snapshot not found. Volume with the same id exists. \
+                                                         Id : {0} , array : {1}"
+
 SnapshotWrongVolume_message = "Snapshot {0} exists but it is of Volume {1} and not {2}"

@@ -45,28 +45,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def CreateVolume(self, request, context):
         set_current_thread_name(request.name)
         logger.info("create volume")
-        source_snapshot_id = None
-        source_snapshot = None
-        source = request.volume_content_source
-        if source:
-            if source.HasField(config.VOLUME_SOURCE_SNAPSHOT):
-                logger.info("Volume source snapshot specified")
-                source_snapshot = source.snapshot
-                logger.info("Source snapshot specified: {0}".format(source_snapshot))
-                source_snapshot_full_id = source_snapshot.snapshot_id
-                if not source_snapshot_full_id:
-                    logger.error("Volume source snapshot has no id specified")
-                    source_snapshot_id = utils.get_snapshot_id(source_snapshot_full_id)
-            elif source.HasField(config.VOLUME_SOURCE_VOLUME):
-                logger.error("Volume source not supported")
-
-        logger.info("Source snapshot id specified: {0}".format(source_snapshot_id))
-
-        # csi.v1.CreateVolumeRequest.volume_content_source
-        # csi.v1.VolumeContentSource.snapshot
-        # csi.v1.VolumeContentSource.volume
-        # VolumeContentSource.type
-        # csi.v1.VolumeContentSource.SnapshotSource.snapshot_id
 
         try:
             utils.validate_create_volume_request(request)
@@ -79,6 +57,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         volume_name = request.name
         logger.debug("volume name : {}".format(volume_name))
+
+        src_snapshot_id = self._get_src_snapshot_id(request)
+        logger.debug("Source snapsahot id : {}".format(src_snapshot_id))
 
         secrets = request.secrets
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
@@ -120,7 +101,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                     array_mediator.validate_supported_capabilities(capabilities)
                     vol = array_mediator.create_volume(volume_full_name, size, capabilities, pool, volume_prefix)
-                    array_mediator.copy_volume_from_snapshot(volume_name, source_snapshot)
                 else:
                     logger.debug("volume found : {}".format(vol))
 
@@ -129,11 +109,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                         return csi_pb2.CreateVolumeResponse()
 
-                    if source_snapshot_id and vol.is_copy_of_snapshpot(source_snapshot_id):
-                        logger.error("Volume exists but it is not copy of snapshot {0}. Volume : {1}",
-                                     source_snapshot_id, vol)
+                    if src_snapshot_id and vol.copy_src_object_id and vol.copy_src_object_id != src_snapshot_id:
+                        logger.error("Volume {0} is a copy but not of Snapshot {1}.", vol, src_snapshot_id)
                         context.set_code(grpc.StatusCode.INTERNAL)
                         return csi_pb2.CreateVolumeResponse()
+
+                if src_snapshot_id:
+                    array_mediator.create_volume_from_snapshot(vol.name, src_snapshot_id)
 
                 logger.debug("generating create volume response")
                 res = utils.generate_csi_create_volume_response(vol)
@@ -159,6 +141,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateVolumeResponse()
+
+    def _get_src_snapshot_id(self, request):
+        source = request.volume_content_source
+        if source and source.HasField(config.VOLUME_SOURCE_SNAPSHOT):
+            source_snapshot = source.snapshot
+            return utils.get_snapshot_id(source_snapshot.snapshot_id)
+        return None
 
     def DeleteVolume(self, request, context):
         set_current_thread_name(request.volume_id)

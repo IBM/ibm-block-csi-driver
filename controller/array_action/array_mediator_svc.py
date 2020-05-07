@@ -137,6 +137,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             cli_volume.name,
             self.endpoint,
             cli_volume.mdisk_grp_name,
+            None, #TODO: CSI-1026 - src object
             self.array_type)
 
     def get_volume(self, volume_name, volume_context=None, volume_prefix=""):
@@ -230,8 +231,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise ex
 
-    def copy_volume_from_snapshot(self, volume_name, src_snapshot):
-        # TODO
+    def copy_volume_from_snapshot(self, name, src_snapshot_id):
+        # TODO:	CSI-1026
         pass
 
     def delete_volume(self, volume_id):
