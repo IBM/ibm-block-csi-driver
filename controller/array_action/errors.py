@@ -175,7 +175,6 @@ class SnapshotNotFoundVolumeWithSameNameExists(BaseArrayActionException):
         self.message = messages.SnapshotNotFoundVolumeWithSameNameExistsError_message.format(snapshot, array)
 
 
-
 class SnapshotNotFoundVolumeWithSameIdExistsError(BaseArrayActionException):
 
     def __init__(self, snapshot, array):

@@ -137,7 +137,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             cli_volume.name,
             self.endpoint,
             cli_volume.mdisk_grp_name,
-            None, #TODO: CSI-1026 - src object
+            None,  # TODO: CSI-1026 - src object
             self.array_type)
 
     def get_volume(self, volume_name, volume_context=None, volume_prefix=""):
