@@ -115,9 +115,7 @@ def validate_create_volume_request(request):
                 logger.error("Volume source snapshot has no id specified")
                 raise ValidationException(messages.params_are_missing_message)
         elif source.HasField(config.VOLUME_SOURCE_VOLUME):
-            raise ValidationException(messages.params_are_missing_message)
-        else:
-            raise ValidationException(messages.params_are_missing_message)
+            raise ValidationException(messages.create_vol_from_vol_unsupported_message)
 
     logger.debug("request validation finished.")
 
