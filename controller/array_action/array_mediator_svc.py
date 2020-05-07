@@ -13,6 +13,7 @@ from controller.common.csi_logger import get_stdout_logger
 from controller.array_action.svc_cli_result_reader import SVCListResultsReader
 
 from io import StringIO
+import textwrap
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -303,7 +304,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if not hosts_list:
             return []
 
-        # for each host get its detailed info from array by sending batch of commands
+        # get all hosts details by sending a single batch of commands, in which each command is per host
         detailed_hosts_list_cmd = self._get_detailed_hosts_list_cmd(hosts_list)
         logger.debug("Sending getting detailed hosts list commands batch")
         detailed_hosts_list_output, detailed_hosts_list_errors = self.client.send_raw_command(detailed_hosts_list_cmd)
@@ -336,11 +337,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _get_formatted_hosts_list_error_msg(self, detailed_host_list_errors_bytes):
         detailed_host_list_errors = bytes_to_string(detailed_host_list_errors_bytes)
-        if not detailed_host_list_errors:
-            return ""
-        elif len(detailed_host_list_errors) <= MAX_HOSTS_LIST_ERR_MSG_LENGTH:
-            return detailed_host_list_errors
-        return "{0} ...".format(detailed_host_list_errors[:MAX_HOSTS_LIST_ERR_MSG_LENGTH])
+        return textwrap.shorten(detailed_host_list_errors, width=MAX_HOSTS_LIST_ERR_MSG_LENGTH, placeholder="...")
 
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume id : "

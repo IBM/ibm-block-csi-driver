@@ -1,4 +1,5 @@
-from controller.array_action.config import UTF_8
+import encodings
+UTF_8 = encodings.utf_8.getregentry().name
 
 
 def bytes_to_string(input_as_bytes):

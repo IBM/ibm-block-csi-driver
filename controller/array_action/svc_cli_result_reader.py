@@ -8,14 +8,14 @@ ID_PARAM_NAME = "id"
 
 class SVCListResultsReader:
     """
-    Iterable object used to read raw command response from m SVS array.
+    Iterable object used to read raw command response from SVC array.
     Each object in response is translated to SVCListResultsElement.
     Input is received as string which represents '\n'-separated list of returned lines from output.
     Line with param 'id' (e.g. 'id 1') is recognized as first line of object ans used as separator between objects
     (e.g. in input "id 1\nname n3\nid 2\nname n2" first object starts with line 'id 1' and ends with 'id 2')
     """
     def __init__(self, hosts_raw_list_as_string):
-        self._hosts_raw_list = hosts_raw_list_as_string.split("\n")
+        self._hosts_raw_list = hosts_raw_list_as_string.splitlines()
         self._current_index = 0
         self._next_object_id = None
         self._init_first_object_id()
@@ -72,7 +72,7 @@ class SVCListResultsReader:
     def _parse_param(self, line):
         """
         Args:
-            line : lin e representing <param-name> <param-value> (para value may be empty or contains whitespaces)
+            line : line representing <param-name> <param-value> (param value may be empty or contains whitespaces)
         Returns:
             param-name, param-value
         """
