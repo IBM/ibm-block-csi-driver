@@ -233,7 +233,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def copy_volume_from_snapshot(self, name, src_snapshot_id):
         # TODO:	CSI-1026
-        pass
+        raise NotImplementedError
 
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
