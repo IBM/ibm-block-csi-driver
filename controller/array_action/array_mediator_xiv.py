@@ -89,7 +89,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         return int(volume_or_snapshot.capacity) * self.BLOCK_SIZE_IN_BYTES
 
     def _generate_volume_response(self, cli_volume):
-        copy_src_object_wwn = cli_volume.copy_master_wwn if cli_volume.vol_copy_type == "copy" else None
+        copy_src_object_wwn = cli_volume.copy_master_wwn if cli_volume.vol_copy_type == "Copy" else None
         return Volume(self._get_volume_or_snapshot_size_in_bytes(cli_volume),
                       cli_volume.wwn,
                       cli_volume.name,
@@ -175,8 +175,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                 raise controller_errors.SnapshotNotFoundVolumeWithSameIdExistsError(src_snapshot_id, self.endpoint)
 
             self.client.cmd.vol_format(vol=name)
-            cli_volume = self.client.cmd.vol_copy(vol_src=src_snapshot_name, vol_trg=name)
-            return self._generate_volume_response(cli_volume)
+            self.client.cmd.vol_copy(vol_src=src_snapshot_name, vol_trg=name)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectName(ex.status)
