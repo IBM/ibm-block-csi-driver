@@ -96,7 +96,6 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.capacity_bytes = 10
         self.request.name = snap_name
         self.request.source_volume_id = "A9000:12345678"
-        self.request.volume_content_source = None
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
@@ -266,6 +265,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.capacity_bytes = 10
         self.request.capacity_range.required_bytes = self.capacity_bytes
         self.request.name = vol_name
+        self.request.volume_content_source = None
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
