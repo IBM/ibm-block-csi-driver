@@ -103,11 +103,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 else:
                     logger.debug("volume found : {}".format(vol))
 
+                    logger.debug("+++++++++++++++ before capacity check")
                     if not (vol.capacity_bytes == request.capacity_range.required_bytes):
                         context.set_details("Volume was already created with different size.")
                         context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                         return csi_pb2.CreateVolumeResponse()
 
+                    logger.debug("+++++++++++++++ after capacity check")
                     vol_name = vol.volume_name
                     if src_snapshot_id and vol.copy_src_object_id and vol.copy_src_object_id != src_snapshot_id:
                         logger.error(
