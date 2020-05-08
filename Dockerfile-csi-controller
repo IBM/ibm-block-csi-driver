@@ -12,21 +12,39 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM centos:7
-RUN yum --enablerepo=extras -y install epel-release && yum -y install python2-pip
+FROM registry.access.redhat.com/ubi7/python-36:1-58
+MAINTAINER IBM Storage
+
+ARG VERSION=1.1.0
+ARG BUILD_NUMBER=0
+
+###Required Labels
+LABEL name="IBM block storage CSI driver controller" \
+      vendor="IBM" \
+      version=$VERSION \
+      release=$BUILD_NUMBER \
+      summary="The controller component of the IBM block storage CSI driver" \
+      description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage." \
+      io.k8s.display-name="IBM block storage CSI driver controller" \
+      io.k8s.description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage." \
+      io.openshift.tags=ibm,csi,ibm-block-csi-driver,ibm-block-csi-node
 
 COPY controller/requirements.txt /driver/controller/
-RUN pip install -r /driver/controller/requirements.txt
-
+RUN pip3 install --upgrade pip==19.1.1
+# avoid default boringssl lib, since it does not support z systems
+ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
+RUN pip3 install -r /driver/controller/requirements.txt
 
 COPY ./common /driver/common
 COPY ./controller /driver/controller
-RUN groupadd -g 9999 appuser && \
-    useradd -r -u 9999 -g appuser appuser
-RUN chown -R appuser:appuser /driver
-USER appuser
+COPY ./LICENSE /licenses/
+COPY ./NOTICES /licenses/
+
 WORKDIR /driver
 ENV PYTHONPATH=/driver
+
+# Note: UBI runs with app-user by default.
+
 ENTRYPOINT ["/driver/controller/scripts/entrypoint.sh"]
 
 

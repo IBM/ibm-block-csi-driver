@@ -1,0 +1,10 @@
+apiVersion: snapshot.storage.k8s.io/v1beta1
+kind: VolumeSnapshotClass
+metadata:
+  name: <NAME>
+driver: block.csi.ibm.com
+deletionPolicy: <DELETION_PRIORITY> # Retain or Delete
+parameters:
+  csi.storage.k8s.io/snapshotter-secret-name: <ARRAY_SECRET>
+  csi.storage.k8s.io/snapshotter-secret-namespace: <ARRAY_SECRET_NAMESPACE>
+  snapshot_name_prefix: <NAME_PREFIX>     # Optional.

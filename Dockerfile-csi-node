@@ -1,0 +1,74 @@
+# Copyright IBM Corporation 2019.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Build stage
+FROM golang:1.12.6 as builder
+
+WORKDIR /go/src/github.com/ibm/ibm-block-csi-driver
+ENV GO111MODULE=on
+
+# Populate the module cache based on the go.{mod,sum} files.
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
+
+COPY . .
+RUN make ibm-block-csi-driver
+
+# Final stage
+FROM registry.access.redhat.com/ubi7/ubi-minimal:7.7-138
+MAINTAINER IBM Storage
+
+ARG VERSION=1.1.0
+ARG BUILD_NUMBER=0
+
+LABEL name="IBM block storage CSI driver node" \
+      vendor="IBM" \
+      version=$VERSION \
+      release=$BUILD_NUMBER \
+      summary="The node component of the IBM block storage CSI driver" \
+      description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage." \
+      io.k8s.display-name="IBM block storage CSI driver node" \
+      io.k8s.description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage." \
+      io.openshift.tags=ibm,csi,ibm-block-csi-driver,ibm-block-csi-node
+
+WORKDIR /root
+COPY --from=builder /go/src/github.com/ibm/ibm-block-csi-driver/common/config.yaml .
+COPY --from=builder /go/src/github.com/ibm/ibm-block-csi-driver/bin/ibm-block-csi-node-driver .
+COPY ./LICENSE /licenses/
+COPY ./NOTICES /licenses/
+COPY ./node/scripts/entrypoint.sh .
+RUN chmod 755 ./entrypoint.sh
+
+RUN mkdir /chroot
+ADD chroot-host-wrapper.sh /chroot
+RUN chmod 777 /chroot/chroot-host-wrapper.sh
+RUN    ln -s /chroot/chroot-host-wrapper.sh /chroot/blkid \
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/blockdev \
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/iscsiadm \
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/iscsid \
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/lsblk \
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/lsscsi \
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/mkfs.ext3 \
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/mkfs.ext4 \
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/mkfs.xfs \
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/fsck \
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/multipath \
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/multipathd \
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/mount \
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/umount
+
+ENV PATH="/chroot:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+ENTRYPOINT ["/root/entrypoint.sh"]

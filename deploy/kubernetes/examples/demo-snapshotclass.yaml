@@ -1,0 +1,10 @@
+apiVersion: snapshot.storage.k8s.io/v1beta1
+kind: VolumeSnapshotClass
+metadata:
+  name: demo-snapshotclass
+driver: block.csi.ibm.com
+deletionPolicy: Delete
+parameters:
+  csi.storage.k8s.io/snapshotter-secret-name: a9000-array1
+  csi.storage.k8s.io/snapshotter-secret-namespace: kube-system
+  snapshot_name_prefix: demo
