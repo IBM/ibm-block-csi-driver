@@ -98,13 +98,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     @classproperty
     def max_snapshot_name_length(self):
-        # TODO: CSI-1024
-        pass
+        return self.max_volume_name_length
 
     @classproperty
     def max_snapshot_prefix_length(self):
-        # TODO: CSI-1024
-        pass
+        return self.max_volume_prefix_length
 
     @classproperty
     def max_connections(self):
