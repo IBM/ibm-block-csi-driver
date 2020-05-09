@@ -5,6 +5,7 @@ from controller.common.csi_logger import get_stdout_logger
 from controller.array_action.errors import NoConnectionAvailableException, FailedToFindStorageSystemType
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.array_action.array_mediator_svc import SVCArrayMediator
+from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
 
 connection_lock_dict = {}
 array_connections_dict = {}
@@ -43,7 +44,9 @@ class ArrayConnectionManager(object):
     def __init__(self, user, password, endpoint, array_type=None):  # TODO return the params back.
         self.array_mediator_class_dict = {
             XIVArrayMediator.array_type: XIVArrayMediator,
-            SVCArrayMediator.array_type: SVCArrayMediator}
+            SVCArrayMediator.array_type: SVCArrayMediator,
+            DS8KArrayMediator.array_type: DS8KArrayMediator,
+        }
 
         self.array_type = array_type
         self.user = user
@@ -112,8 +115,11 @@ class ArrayConnectionManager(object):
     def detect_array_type(self):
         logger.debug("detecting array connection type")
 
+        # Don't change the order here since svc port (22) is also opened in ds8k.
         for storage_type, port in [(XIVArrayMediator.array_type, XIVArrayMediator.port),
-                                   (SVCArrayMediator.array_type, SVCArrayMediator.port)]:  # ds8k : 8452
+                                   (DS8KArrayMediator.array_type, DS8KArrayMediator.port),
+                                   (SVCArrayMediator.array_type, SVCArrayMediator.port),
+                                   ]:
 
             for endpoint in self.endpoints:
                 if _socket_connect_test(endpoint, port) == 0:

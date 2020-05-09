@@ -10,6 +10,16 @@ def get_mock_xiv_volume(size, name, wwn):
     return vol
 
 
+def get_mock_xiv_snapshot(capacity, name, wwn, vol_name):
+    snap = Mock()
+    snap.capacity = capacity
+    snap.name = name
+    snap.wwn = wwn
+    snap.master_name = vol_name
+    snap.pool_name = "pool_name"
+    return snap
+
+
 def get_mock_xiv_host(name, iscsi_ports, fc_ports):
     host = Mock()
     host.iscsi_ports = iscsi_ports
@@ -29,3 +39,18 @@ def get_mock_xiv_host_mapping(lun):
     mapping = Mock()
     mapping.lun = lun
     return mapping
+
+
+def get_mock_xiv_ip_interface(type_, address=None, address6=None):
+    ip_interface = Mock()
+    ip_interface.type = type_
+    ip_interface.address = address
+    ip_interface.address6 = address6
+    return ip_interface
+
+
+def get_mock_xiv_config_param(name, value):
+    config_param = Mock()
+    config_param.name = name
+    config_param.value = value
+    return config_param

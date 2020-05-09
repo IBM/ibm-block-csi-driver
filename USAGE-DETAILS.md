@@ -4,130 +4,131 @@
 
 ## Driver Usage Details
 This section shows how to:
-- Create k8s secret `a9000-array1` for the storage system. (The example below uses FlashSystem A9000R as an example but the same can be used for FlashSystem A9000 and FlashSystem 9100.)
+- Create k8s secret `svc-secret` for the storage system.
 - Create storage class `gold`.
-- Create PVC `demo-pvc`from the storage class `gold` and show some details on the created PVC and PV.
-- Create StatefulSet application `demo-statefulset` and observe the mountpoint \ multipath device that was created by the driver. 
-- Write some data inside the 'demo-stateful', delete the 'demo-stateful' and then create it again, to validate that the data remains.
+- Create PVC `demo-pvc-file-system`from the storage class `gold` and show some details on the created PVC and PV.
+- Create StatefulSet application `demo-statefulset-file-system` and observe the mountpoint \ multipath device that was created by the driver. 
+- Write some data inside the 'demo-statefulset-file-system', delete the 'demo-statefulset-file-system' and then create it again, to validate that the data remains.
 
 Create secret and storage class:
 
 ```sh
 ###### Create secret 
-$> cat demo-secret-a9000-array1.yaml
+$> cat demo-secret.yaml
 kind: Secret
 apiVersion: v1
 metadata:
-  name: a9000-array1
+  name: svc-array
   namespace: kube-system
 type: Opaque
 stringData:
-  management_address: <VALUE-2>     # Replace with valid FlashSystem A9000 management address
-  username: <VALUE-3>               # Replace with valid username
+  management_address: <ADDRESS_1,ADDRESS_2> # Array management addresses
+  username: <USERNAME>                      # Array username
 data:
-  password: <VALUE-4 base64>        # Replace with valid password
+  password: <PASSWORD base64>               # Array password
   
-$> kubectl create -f demo-secret-a9000-array1.yaml
-secret/a9000-array1 created
+$> kubectl create -f demo-secret.yaml
+secret/svc-array created
 
 ###### Create storage class
-$> cat demo-storageclass-gold-A9000R.yaml
+$> cat demo-storageclass-gold-svc.yaml
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
   name: gold
 provisioner: block.csi.ibm.com
 parameters:
+  SpaceEfficiency: deduplicated
   pool: gold
 
-  csi.storage.k8s.io/provisioner-secret-name: a9000-array1
+  csi.storage.k8s.io/provisioner-secret-name: svc-array
   csi.storage.k8s.io/provisioner-secret-namespace: kube-system
-  csi.storage.k8s.io/controller-publish-secret-name: a9000-array1
-  csi.storage.k8s.io/controller-publish-secret-namespace: kube-system
+  csi.storage.k8s.io/controller-publish-secret-name: svc-array
+  csi.storage.k8s.io/controller-publish-secret-namespace: kube-systen
 
-  csi.storage.k8s.io/fstype: xfs   # Optional. values ext4/xfs. The default is ext4.
-  volume_name_prefix: demo1        # Optional.
+  csi.storage.k8s.io/fstype: xfs   # Optional. values ext4\xfs. The default is ext4.
+  volume_name_prefix: demo         # Optional.
 
-$> kubectl create -f demo-storageclass-gold-A9000R.yaml
+$> kubectl create -f demo-storageclass-gold.yaml
 storageclass.storage.k8s.io/gold created
 ```
 
 Create PVC demo-pvc-gold using `demo-pvc-gold.yaml`:
 
 ```sh 
-$> cat demo-pvc-gold.yaml
-apiVersion: v1
+$> cat demo-pvc-file-system.yaml
 kind: PersistentVolumeClaim
+apiVersion: v1
 metadata:
-  name: pvc-demo
+  name: demo-pvc-file-system
 spec:
+  volumeMode: Filesystem
   accessModes:
   - ReadWriteOnce
   resources:
     requests:
       storage: 1Gi
   storageClassName: gold
+      
 
-
-$> kubectl apply -f demo-pvc-gold.yaml
-persistentvolumeclaim/demo-pvc created
+$> kubectl apply -f demo-pvc-file-system.yaml
+persistentvolumeclaim/demo-pvc-file-system created
 ```
 
 View the PVC and the created PV:
 
 ```sh
 $> kubectl get pv,pvc
-NAME                                                        CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM              STORAGECLASS   REASON   AGE
-persistentvolume/pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d5f   1Gi        RWO            Delete           Bound    default/demo-pvc   gold                    78s
+NAME                                                    CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM              STORAGECLASS   REASON   AGE
+persistentvolume/pvc-828ce909-6eb2-11ea-abc8-005056a49b44   1Gi        RWO            Delete           Bound    default/demo-pvc   gold                    78s
 
-NAME                             STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
-persistentvolumeclaim/demo-pvc   Bound    pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d5f   1Gi        RWO            gold           78s
+NAME                                         STATUS   VOLUME                                 CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+persistentvolumeclaim/demo-pvc-file-system   Bound    pvc-828ce909-6eb2-11ea-abc8-005056a49b44   1Gi        RWO            gold           78s
 
 
-$> kubectl describe persistentvolume/pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d5f
-Name:            pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d5f
+$> kubectl describe persistentvolume/pvc-828ce909-6eb2-11ea-abc8-005056a49b44
+Name:            pvc-828ce909-6eb2-11ea-abc8-005056a49b44
 Labels:          <none>
 Annotations:     pv.kubernetes.io/provisioned-by: block.csi.ibm.com
-Finalizers:      [kubernetes.io/pv-protection]
+Finalizers:      [kubernetes.io/pv-protection external-attacher/block-csi-ibm-com]
 StorageClass:    gold
 Status:          Bound
-Claim:           default/demo-pvc
+Claim:           default/demo-pvc-file-system
 Reclaim Policy:  Delete
 Access Modes:    RWO
 VolumeMode:      Filesystem
 Capacity:        1Gi
 Node Affinity:   <none>
-Message:         
+Message:
 Source:
     Type:              CSI (a Container Storage Interface (CSI) volume source)
     Driver:            block.csi.ibm.com
-    VolumeHandle:      A9000:6001738CFC9035EB0000000000D1F68F
+    VolumeHandle:      SVC:60050760718106998000000000000543
     ReadOnly:          false
-    VolumeAttributes:      array_address=<IP>
-                           pool_name=gold
-                           storage.kubernetes.io/csiProvisionerIdentity=1565550204603-8081-block.csi.ibm.com
-                           storage_type=A9000
-                           volume_name=demo1_pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d5f
+    VolumeAttributes:      array_address=baremetal10-cluster.xiv.ibm.com
+                           pool_name=csi_svcPool
+                           storage.kubernetes.io/csiProvisionerIdentity=1585146948772-8081-
+                           block.csi.ibm.com
+                           storage_type=SVC
+                           volume_name=demo_pvc-828ce909-6eb2-11ea-abc8-005056a49b44
 Events:                <none>
 
 ##### View the newly created volume on the storage system side of thing (Using XCLI utility):
-$> xcli vol_list pool=gold 
-Name                                             Size (GB)   Master Name   Consistency Group   Pool   Creator   Written (GB)   
------------------------------------------------- ----------- ------------- ------------------- ------ --------- -------------- 
-demo1_pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d5f   1                                             gold   admin     0
-
+$> lsvdisk
+id  name                                             IO_group_id IO_group_name status mdisk_grp_id mdisk_grp_name capacity  type    FC_id FC_name RC_id RC_name vdisk_UID                        fc_map_count copy_count fast_write_state se_copy_count RC_change compressed_copy_count parent_mdisk_grp_id parent_mdisk_grp_name formatting encrypt volume_id volume_name    function protocol
+0   demo_pvc-828ce909-6eb2-11ea-abc8-005056a49b44    0           io_grp0       online 0            gold           1GB       striped                             60050768018F82A010000000000001C4 0            1          not_empty        0             no        1                     0                   gold                  no         no      0                        demo_pvc-828ce909-6eb2-11ea-abc8-005056a49b44     scsi
 ```
 
 
 
-Create StatefulSet application `demo-statefulset` that uses the demo-pvc.
+Create StatefulSet application `demo-statefulset-file-system` that uses the demo-pvc-file-system.
 
 ```sh
-$> cat demo-statefulset-with-demo-pvc.yml
+$> cat demo-statefulset-file-system.yml
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-  name: demo-statefulset
+  name: demo-statefulset-file-system
 spec:
   selector:
     matchLabels:
@@ -140,47 +141,47 @@ spec:
         app: demo-statefulset
     spec:
       containers:
-      - name: container1
+      - name: container-demo
         image: registry.access.redhat.com/ubi8/ubi:latest
         command: [ "/bin/sh", "-c", "--" ]
         args: [ "while true; do sleep 30; done;" ]
         volumeMounts:
-          - name: demo-pvc
+          - name: demo-volume
             mountPath: "/data"
       volumes:
-      - name: demo-pvc
+      - name: demo-volume
         persistentVolumeClaim:
-          claimName: demo-pvc
+          claimName: demo-pvc-file-system
 
-      #nodeSelector:
-      #  kubernetes.io/hostname: NODESELECTOR
+#      nodeSelector:
+#        kubernetes.io/hostname: NODESELECTOR
+      
 
-
-$> kubectl create -f demo-statefulset-with-demo-pvc.yml
-statefulset/demo-statefulset created
+$> kubectl create -f demo-statefulset-file-system.yml
+statefulset/demo-statefulset-file-system created
 ```
 
 Display the newly created pod (make sure that the pod status is Running) and write data to its persistent volume. 
 
 ```sh
 ###### Wait for the pod Status to be Running.
-$> kubectl get pod demo-statefulset-0
-NAME                 READY   STATUS    RESTARTS   AGE
-demo-statefulset-0   1/1     Running   0          43s
+$> kubectl get pod demo-statefulset-file-system-0
+NAME                             READY   STATUS    RESTARTS   AGE
+demo-statefulset-file-system-0   1/1     Running   0          43s
 
 
 ###### Review the mountpoint inside the pod:
-$> kubectl exec demo-statefulset-0 -- bash -c "df -h /data"
+$> kubectl exec demo-statefulset-file-system-0 -- bash -c "df -h /data"
 Filesystem          Size  Used Avail Use% Mounted on
 /dev/mapper/mpathz 1014M   33M  982M   4% /data
 
-$> kubectl exec demo-statefulset-0 -- bash -c "mount | grep /data"
+$> kubectl exec demo-statefulset-file-system-0 -- bash -c "mount | grep /data"
 /dev/mapper/mpathz on /data type xfs (rw,relatime,seclabel,attr2,inode64,noquota)
 
 
-###### Write data in the PV inside the demo-statefulset-0 pod  (the PV mounted inside the pod at /data)
-$> kubectl exec demo-statefulset-0 touch /data/FILE
-$> kubectl exec demo-statefulset-0 ls /data/FILE
+###### Write data in the PV inside the demo-statefulset-file-system-0 pod  (the PV mounted inside the pod at /data)
+$> kubectl exec demo-statefulset-file-system-0 touch /data/FILE
+$> kubectl exec demo-statefulset-file-system-0 ls /data/FILE
 File
 
 ```
@@ -188,8 +189,8 @@ File
 Log into the worker node that has the running pod and display the newly attached volume on the node.
 
 ```sh
-###### Verify which worker node is running the pod demo-statefulset-0 
-$> kubectl describe pod demo-statefulset-0| grep "^Node:"
+###### Verify which worker node is running the pod demo-statefulset-file-system-0 
+$> kubectl describe pod demo-statefulset-file-system-0| grep "^Node:"
 Node: k8s-node1/hostname
 
 ###### Establish an SSH connection and log into the worker node
@@ -197,7 +198,7 @@ $> ssh k8s-node1
 
 ###### List multipath devices on the worker node (view the same `mpathz` that was mentioned above) 
 $>[k8s-node1]  multipath -ll
-mpathz (36001738cfc9035eb0000000000d1f68f) dm-3 IBM     ,2810XIV         
+mpathz (828ce9096eb211eaabc8005056a49b44) dm-3 IBM     ,2810XIV         
 size=1.0G features='1 queue_if_no_path' hwhandler='0' wp=rw
 `-+- policy='service-time 0' prio=1 status=active
   |- 37:0:0:12 sdc 8:32 active ready running
@@ -211,19 +212,19 @@ lrwxrwxrwx. 1 root root 7 Aug 12 19:29 /dev/mapper/mpathz -> ../dm-3
 $>[k8s-node1]  lsblk /dev/sdb /dev/sdc
 NAME     MAJ:MIN RM SIZE RO TYPE  MOUNTPOINT
 sdb        8:16   0   1G  0 disk  
-└─mpathz 253:3    0   1G  0 mpath /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-a04bd32f-bd0f-11e9-a1f5
+└─mpathz 253:3    0   1G  0 mpath /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-828ce909-6eb2-11ea-abc8-005056a49b44
 sdc        8:32   0   1G  0 disk  
-└─mpathz 253:3    0   1G  0 mpath /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-a04bd32f-bd0f-11e9-a1f5
+└─mpathz 253:3    0   1G  0 mpath /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-828ce909-6eb2-11ea-abc8-005056a49b44
 
 ###### View the PV mounted on this host 
 ######  (All PV mountpoints looks like the following: `/var/lib/kubelet/pods/*/volumes/kubernetes.io~csi/pvc-*/mount`) 
 $>[k8s-node1]  df | egrep pvc
-/dev/mapper/mpathz      1038336    32944   1005392   4% /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-a04bd32f-bd0f-11e9-a1f5-005056a45d5f/mount
+/dev/mapper/mpathz      1038336    32944   1005392   4% /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-828ce909-6eb2-11ea-abc8-005056a49b44/mount
 
 
 ##### Details about the driver internal metadata file `.stageInfo.json` are stored in the k8s PV node stage path `/var/lib/kubelet/plugins/kubernetes.io/csi/pv/<PVC-ID>/globalmount/.stageInfo.json`. The CSI driver creates it during the  NodeStage API, and it is used by the NodePublishVolume, NodeUnPublishVolume, and NodeUnStage CSI APIs later on.
 
-$> cat /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-711b6fef-bcf9-11e9-a1f5-005056a45d5f/globalmount/.stageInfo.json
+$> cat /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-828ce909-6eb2-11ea-abc8-005056a49b44/globalmount/.stageInfo.json
 {"connectivity":"iscsi","mpathDevice":"dm-3","sysDevices":",sdb,sdc"}
 
 ```
@@ -232,11 +233,11 @@ $> cat /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-711b6fef-bcf9-11e9-a1f5
 Delete StatefulSet and then restart, in order to validate data (/data/FILE) remains in the persistent volume.
 
 ```sh
-$> kubectl delete statefulset/demo-statefulset
-statefulset/demo-statefulset deleted
+$> kubectl delete statefulset/demo-statefulset-file-system
+statefulset/demo-statefulsetfile-system deleted
 
-### Wait until the pod is deleted. Once deleted the '"demo-statefulset" not found' is returned.
-$> kubectl get statefulset/demo-statefulset
+### Wait until the pod is deleted. Once deleted the '"demo-statefulset-file-system" not found' is returned.
+$> kubectl get statefulset/demo-statefulset-file-system
 NAME                 READY   STATUS        RESTARTS   AGE
 demo-statefulset-0   0/1     Terminating   0          91m
 
@@ -252,10 +253,10 @@ lsblk: /dev/sdc: not a block device
 
 
 ###### Recreate the StatefulSet again in order to verify /data/FILE exists
-$> kubectl create -f demo-statefulset-with-demo-pvc.yml
-statefulset/demo-statefulset created
+$> kubectl create -f demo-statefulset-file-system.yml
+statefulset/demo-statefulset-file-system created
 
-$> kubectl exec demo-statefulset-0 ls /data/FILE
+$> kubectl exec demo-statefulset-file-system-0 ls /data/FILE
 File
 ```
 
@@ -263,14 +264,14 @@ File
 Delete StatefulSet and PVC
 
 ```sh
-$> kubectl delete statefulset/demo-statefulset
-statefulset/demo-statefulset deleted
+$> kubectl delete statefulset/demo-statefulset-file-system
+statefulset/demo-statefulset-file-system deleted
 
-$> kubectl get statefulset/demo-statefulset
+$> kubectl get statefulset/demo-statefulset-file-system
 No resources found.
 
-$> kubectl delete pvc/demo-pvc
-persistentvolumeclaim/demo-pvc deleted
+$> kubectl delete pvc/demo-pvc-file-system
+persistentvolumeclaim/demo-pvc-file-system deleted
 
 $> kubectl get pv,pvc
 No resources found.
@@ -356,7 +357,7 @@ daemonset.extensions/ibm-block-csi-node     2       2         2          2      
 
 ## Licensing
 
-Copyright 2019 IBM Corp.
+Copyright 2020 IBM Corp.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

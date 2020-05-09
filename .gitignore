@@ -6,3 +6,4 @@
 /.metadata/
 /bin/
 node/mocks
+build/reports

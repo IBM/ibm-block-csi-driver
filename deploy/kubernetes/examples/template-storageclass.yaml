@@ -1,25 +1,25 @@
 ##################################################
 # Storage class template for IBM Block CSI Driver
-# All the VALUE fields must be set.
+# All the <VALUE> fields must be set.
 ##################################################
 
 kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
-  name: <VALUE_NAME>
+  name: <NAME>
 provisioner: block.csi.ibm.com
 parameters:
-  #capabilities:                               # Optional.
+  #capabilities:                               # Optional
   #  SpaceEfficiency=<VALUE>
   capacity:
-    pool=<VALUE_POOL_NAME>
+    pool=<POOL_NAME>
 
-  csi.storage.k8s.io/provisioner-secret-name: <VALUE_ARRAY_SECRET>
-  csi.storage.k8s.io/provisioner-secret-namespace: <VALUE_ARRAY_SECRET_NAMESPACE>
-  csi.storage.k8s.io/controller-publish-secret-name: <VALUE_ARRAY_SECRET>
-  csi.storage.k8s.io/controller-publish-secret-namespace: <VALUE_ARRAY_SECRET_NAMESPACE>
+  csi.storage.k8s.io/provisioner-secret-name: <ARRAY_SECRET>
+  csi.storage.k8s.io/provisioner-secret-namespace: <ARRAY_SECRET_NAMESPACE>
+  csi.storage.k8s.io/controller-publish-secret-name: <ARRAY_SECRET>
+  csi.storage.k8s.io/controller-publish-secret-namespace: <ARRAY_SECRET_NAMESPACE>
 
 
-  #csi.storage.k8s.io/fstype: <VALUE_FSTYPE>   # Optional. values ext4\xfs. The default is ext4.
-  #volume_name_prefix: <VALUE_PREFIX>          # Optional.
+  #csi.storage.k8s.io/fstype: <FSTYPE>   # Optional. values ext4\xfs. The default is ext4.
+  #volume_name_prefix: <PREFIX>          # Optional
 

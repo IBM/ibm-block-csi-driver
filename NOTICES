@@ -1,11 +1,11 @@
 
 Additional Third Party Software License Agreements and Notices 
 
-This file details additional Third Party Software License Agreements
+This file details additional third party software license agreements
 and third party notices and information that are required 
 to be reproduced for the following programs:
    
-IBM Block Storage CSI Driver version 1.0.0
+IBM Block Storage CSI Driver version 1.1.0
 
 
 
@@ -170,7 +170,7 @@ Version 7
 
 ===========================================================================
 END OF TERMS AND CONDITIONS FOR SEPARATELY LICENSED CODE for IBM Block 
-Storage CSI Driver version 1.0.0
+Storage CSI Driver version 1.1.0
 ===========================================================================
 
 
@@ -211,11 +211,9 @@ grpcio version 1.20.1
 grpcio-tools version 1.20.1
 k8s.io/apimachinery commit f97a4e5
 kubernetes-mount version 1.13.1
-mock version 1.3.1
+mock
 retry version 1.8.2
 yaml version 2.2.2
-
----------------------------------------------------------------------------
 
 ---------------------------------------------------------------------------
 Start of Apache Software License Version 2.0
@@ -425,9 +423,6 @@ limitations under the License.
 
 ---------------------------------------------------------------------------
 End of Apache Software License Version 2.0
----------------------------------------------------------------------------
-
-
 ---------------------------------------------------------------------------
 
 
@@ -1084,8 +1079,7 @@ SOFTWARE.
 
 
 ===========================================================================
-END OF setuptools (python) version 41.0.1 NOTICES AND
-INFORMATION 
+END OF setuptools (python) version 41.0.1 NOTICES AND INFORMATION 
 ===========================================================================
 
 
@@ -1175,23 +1169,8 @@ END OF yaml version 2.2.2 NOTICES AND INFORMATION
 ===========================================================================
 
 
-=========================================================================
-Section 3 - Other IBM Open Source Project codes
-=========================================================================
-
-Use of other IBM Open Source Project codes in IBM Block
-Storage CSI Driver Version 1.0.0
-
-https://github.com/IBM/pyxcli (Apache v2) 
-https://github.com/IBM/pysvc  (Apache v2)
-
--------------------------------------------------------------------------
-
-
-
-
 ===========================================================================
 END OF NOTICES AND INFORMATION FOR IBM Block Storage CSI
-Driver Version 1.0.0 Third Party Licenses and Notices 
+Driver Version 1.1.0 Third Party Licenses and Notices 
 ===========================================================================
 
