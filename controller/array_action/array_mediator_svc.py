@@ -336,7 +336,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         output_as_bytes, errors_as_bytes = self.client.send_raw_command(cmd)
         output_as_str = bytes_to_string(output_as_bytes)
         errors_as_str = bytes_to_string(errors_as_bytes)
-        return output_as_str, errors_as_str
+        formatted_errors_as_str = self._get_formatted_hosts_list_error_msg(errors_as_str)
+        return output_as_str, formatted_errors_as_str
 
     def _get_formatted_hosts_list_error_msg(self, detailed_host_list_errors):
         if len(detailed_host_list_errors) <= HOSTS_LIST_ERR_MSG_MAX_LENGTH:
