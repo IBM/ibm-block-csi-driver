@@ -452,6 +452,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         return csi_pb2.GetPluginInfoResponse(name=name, vendor_version=version)
 
     def _get_volume_name_and_prefix(self, request, array_mediator):
+        logger.info("++++++++++++ get name and prefix")
         return self._get_object_name_and_prefix(request, array_mediator.max_volume_prefix_length,
                                                 array_mediator.max_volume_name_length,
                                                 config.OBJECT_TYPE_NAME_VOLUME,
@@ -467,6 +468,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def _get_object_name_and_prefix(self, request, max_name_prefix_length, max_name_length, object_type,
                                     prefix_param_name):
         name = request.name
+        logger.info("++++++++++++ get name and prefi name {0}".format(name))
+        logger.info(max_name_length)
         prefix = ""
         if request.parameters and (prefix_param_name in request.parameters):
             prefix = request.parameters[prefix_param_name]
