@@ -324,6 +324,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         vol_mock.is_empty = True
         vol_mock.copy_src_object_id = None
         self.mediator.create_volume.return_value = vol_mock
+        array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.mediator.copy_volume_from_snapshot = Mock()
