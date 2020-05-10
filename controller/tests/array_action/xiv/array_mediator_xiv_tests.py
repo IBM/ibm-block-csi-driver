@@ -115,7 +115,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         vol_name = "vol"
         snap_id = "wwn"
         cli_snap = Mock()
-        xcli_snap.master_name = vol_name
+        cli_snap.master_name = vol_name
         self.mediator.client.cmd.vol_list.return_value = cli_snap
         self.mediator.copy_volume_from_snapshot(vol_name, snap_id)
 
@@ -134,7 +134,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         vol_name = "vol"
         snap_id = "wwn"
         cli_snap = Mock()
-        xcli_snap.master_name = vol_name
+        cli_snap.master_name = vol_name
         self.mediator.client.cmd.vol_list.return_value = cli_snap
         with self.assertRaises(array_errors.SnapshotNotFoundVolumeWithSameIdExistsError):
             self.mediator.copy_volume_from_snapshot_not_found(vol_name, snap_id)
