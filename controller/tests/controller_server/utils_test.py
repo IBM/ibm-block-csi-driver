@@ -71,7 +71,7 @@ class TestUtils(unittest.TestCase):
     def test_validate_create_volume_source_empty(self):
         request = Mock()
         source = Mock()
-        request.source = source
+        request.volume_content_source = source
         is_snapshot_source = False
         is_volume_source = False
         source.HasField.side_effect = [is_snapshot_source, is_volume_source]
@@ -80,19 +80,19 @@ class TestUtils(unittest.TestCase):
     def test_validate_create_volume_source_snapshot(self):
         request = Mock()
         snapshot_source = Mock()
-        request.source = snapshot_source
+        request.volume_content_source = snapshot_source
         snapshot_source.snapshot_id = "snap_id"
         is_snapshot_source = True
         snapshot_source.HasField.side_effect = [is_snapshot_source]
         utils.validate_create_volume_source(request)
 
     def test_validate_create_volume_source_volume(self):
+        request = Mock()
+        volume_source = Mock()
         is_snapshot_source = False
         is_volume_source = True
-        volume_source = Mock()
         volume_source.HasField.side_effect = [is_snapshot_source, is_volume_source]
-        request = Mock()
-        request.source = volume_source
+        request.volume_content_source = volume_source
         with self.assertRaises(ValidationException):
             utils.validate_create_volume_source(request)
 
