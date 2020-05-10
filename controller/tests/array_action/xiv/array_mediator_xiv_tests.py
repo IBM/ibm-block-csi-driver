@@ -137,7 +137,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         cli_snap.master_name = vol_name
         self.mediator.client.cmd.vol_list.return_value = cli_snap
         with self.assertRaises(array_errors.SnapshotNotFoundVolumeWithSameIdExistsError):
-            self.mediator.copy_volume_from_snapshot_not_found(vol_name, snap_id)
+            self.mediator.copy_volume_from_snapshot(vol_name, snap_id)
 
     def test_copy_volume_from_snapshot_failed_to_format(self):
         self._test_copy_volume_from_snapshot_error(xcli_errors.VolumeBadNameError("", "", ""),
@@ -164,7 +164,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         snap_id = "wwn"
         self.mediator.client.cmd.vol_list.side_effect = [xcli_exception]
         with self.assertRaises(expected_array_exception):
-            self.mediator.copy_volume_from_snapshot_not_found(vol_name, snap_id)
+            self.mediator.copy_volume_from_snapshot(vol_name, snap_id)
 
     def test_get_snapshot_return_correct_value(self):
         snap_name = "snap"
