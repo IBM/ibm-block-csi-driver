@@ -113,8 +113,6 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         logger.debug("Get volume : {}".format(volume_name))
         try:
             cli_volume = self.client.cmd.vol_list(vol=volume_name).as_single_element
-            if cli_volume.master_name:
-                raise controller_errors.VolumeNotFoundSnapshotWithSameNameExists(volume_name, self.endpoint)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectName(ex.status)
@@ -122,6 +120,9 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         logger.debug("cli volume returned : {}".format(cli_volume))
         if not cli_volume:
             raise controller_errors.VolumeNotFoundError(volume_name)
+
+        if cli_volume.master_name:
+            raise controller_errors.VolumeNotFoundSnapshotWithSameNameExists(volume_name, self.endpoint)
 
         array_vol = self._generate_volume_response(cli_volume)
         return array_vol
@@ -186,7 +187,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         except xcli_errors.SourceVolumeBadNameError as ex:
             logger.exception(ex)
             raise controller_errors.SnapshotNotFoundError(src_snapshot_name)
-        except xcli_errors.TargetVolumeBadNameError as ex:
+        except {xcli_errors.VolumeBadNameError, xcli_errors.TargetVolumeBadNameError} as ex:
             logger.exception(ex)
             raise controller_errors.VolumeNotFoundError(name)
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:

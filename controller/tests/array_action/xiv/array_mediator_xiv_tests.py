@@ -111,6 +111,43 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_delete = Mock()
         self.mediator.delete_volume("vol-wwn")
 
+    def copy_volume_from_snapshot_succeeds(self):
+        vol_name = "vol"
+        snap_id = "wwn"
+        cli_snap = Mock()
+        xcli_snap.master_name = vol_name
+        self.mediator.client.cmd.vol_list.return_value = cli_snap
+        self.mediator.copy_volume_from_snapshot(vol_name, snap_id)
+
+    def copy_volume_from_snapshot_not_found(self):
+        vol_name = "vol"
+        snap_id = "wwn"
+        cli_snap = Mock()
+        cli_snap.master_name = vol_name
+        self.mediator.client.cmd.vol_list.return_value = None
+        with self.assertRaises(array_errors.SnapshotNotFoundError):
+            self.mediator.copy_volume_from_snapshot(vol_name, snap_id)
+
+        self.mediator.copy_volume_from_snapshot(vol_name, snap_id)
+
+    def copy_volume_from_snapshot_not_snapshot(self):
+        vol_name = "vol"
+        snap_id = "wwn"
+        cli_snap = Mock()
+        xcli_snap.master_name = vol_name
+        self.mediator.client.cmd.vol_list.return_value = cli_snap
+        with self.assertRaises(array_errors.SnapshotNotFoundVolumeWithSameIdExistsError:
+            self.mediator.copy_volume_from_snapshot_not_found(vol_name, snap_id)
+
+    def copy_volume_from_snapshot_failed_to_format(self):
+        vol_name = "vol"
+        snap_id = "wwn"
+        cli_snap = Mock()
+        xcli_snap.master_name = vol_name
+        self.mediator.client.cmd.vol_list.return_value = cli_snap
+        with self.assertRaises(array_errors.VolumeNotFoundError):
+            self.mediator.copy_volume_from_snapshot_not_found(vol_name, snap_id)
+
     def test_get_snapshot_return_correct_value(self):
         snap_name = "snap"
         snap_vol_name = "snap_vol"
