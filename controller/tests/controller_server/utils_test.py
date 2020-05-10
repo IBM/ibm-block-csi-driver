@@ -70,21 +70,29 @@ class TestUtils(unittest.TestCase):
 
     def test_validate_create_volume_source_empty(self):
         request = Mock()
-        request.source = csi_pb2.VolumeContentSource()
+        source = Mock()
+        request.source = source
+        is_snapshot_source = False
+        is_volume_source = False
+        source.HasField.side_effect = [is_snapshot_source, is_volume_source]
         utils.validate_create_volume_source(request)
 
     def test_validate_create_volume_source_snapshot(self):
         request = Mock()
-        src_anapshot_id = "snap_id"
-        snapshot_source = csi_pb2.VolumeContentSource.SnapshotSource(snapshot_id=src_anapshot_id)
-        request.source = csi_pb2.VolumeContentSource(snapshot=snapshot_source)
+        snapshot_source = Mock()
+        request.source = snapshot_source
+        snapshot_source.snapshot_id = "snap_id"
+        is_snapshot_source = True
+        snapshot_source.HasField.side_effect = [is_snapshot_source]
         utils.validate_create_volume_source(request)
 
     def test_validate_create_volume_source_volume(self):
         request = Mock()
-        src_vol_id = "vol_id"
-        volume_source = csi_pb2.VolumeContentSource.VolumeSource(volume_id=src_vol_id)
-        request.source = csi_pb2.VolumeContentSource(volume=volume_source)
+        volume_source = Mock()
+        request.source = volume_source
+        is_snapshot_source = False
+        is_volume_source = True
+        volume_source.HasField.side_effect = [is_snapshot_source, is_volume_source]
         with self.assertRaises(ValidationException):
             utils.validate_create_volume_source(request)
 
