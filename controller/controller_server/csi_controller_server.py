@@ -76,7 +76,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.debug(array_mediator)
                 # TODO: CSI-1358 - remove try/except
                 try:
+                    logger.info("++++++++++++++ get ol name and prefix")
                     volume_full_name, volume_prefix = self._get_volume_name_and_prefix(request, array_mediator)
+                    logger.info("++++++++++++++ get ol name and prefix. Name {0}".format(volume_full_name))
                 except controller_errors.IllegalObjectName as ex:
                     context.set_details(ex.message)
                     context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
@@ -89,11 +91,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug("requested size is 0 so the default size will be used : {0} ".format(
                         size))
                 try:
+                    logger.info("++++++++++++++ get volume")
                     vol = array_mediator.get_volume(
                         volume_full_name,
                         volume_context=request.parameters,
                         volume_prefix=volume_prefix,
                     )
+                    logger.info(vol) #TODO
                 except controller_errors.VolumeNotFoundError:
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
@@ -118,6 +122,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return csi_pb2.CreateVolumeResponse()
 
                 vol_name = vol.volume_name
+                logger.info("++++++++++++++ VOL NAME {0}".format(vol_name))
                 if src_snapshot_id:
                     if not vol.is_empty:
                         context.set_details("Volume is not empty.")
