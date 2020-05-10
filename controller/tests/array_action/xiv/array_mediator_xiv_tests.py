@@ -128,11 +128,10 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(array_errors.SnapshotNotFoundError):
             self.mediator.copy_volume_from_snapshot(vol_name, snap_id)
 
-    def test_copy_volume_from_snapshot_not_snapshot(self):
-        vol_name = "vol"
+    def test_copy_volume_from_snapshot_not_a_snapshot(self):
         snap_id = "wwn"
         cli_snap = Mock()
-        cli_snap.master_name = vol_name
+        cli_snap.master_name = ""
         self.mediator.client.cmd.vol_list.return_value = cli_snap
         with self.assertRaises(array_errors.SnapshotNotFoundVolumeWithSameIdExistsError):
             self.mediator.copy_volume_from_snapshot(vol_name, snap_id)
