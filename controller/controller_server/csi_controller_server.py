@@ -97,7 +97,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         volume_context=request.parameters,
                         volume_prefix=volume_prefix,
                     )
-                    logger.info(vol) #TODO
+                    # TODO
+                    logger.info(vol)
                 except controller_errors.VolumeNotFoundError:
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
