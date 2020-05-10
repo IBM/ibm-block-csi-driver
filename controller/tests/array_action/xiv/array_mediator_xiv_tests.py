@@ -128,8 +128,6 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(array_errors.SnapshotNotFoundError):
             self.mediator.copy_volume_from_snapshot(vol_name, snap_id)
 
-        self.mediator.copy_volume_from_snapshot(vol_name, snap_id)
-
     def test_copy_volume_from_snapshot_not_snapshot(self):
         vol_name = "vol"
         snap_id = "wwn"
@@ -155,7 +153,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self._test_copy_volume_from_snapshot_error(xcli_errors.SourceVolumeBadNameError("", "", ""),
                                                    array_errors.VolumeNotFoundError)
 
-    def test_copy_volume_from_snapshot_failed_permissio_denied(self):
+    def test_copy_volume_from_snapshot_failed_permission_denied(self):
         self._test_copy_volume_from_snapshot_error(xcli_errors.OperationForbiddenForUserCategoryError("", "", ""),
                                                    array_errors.PermissionDeniedError)
 

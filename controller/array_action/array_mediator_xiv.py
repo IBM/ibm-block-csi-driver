@@ -204,7 +204,8 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         return vol_name
 
     def _get_snapshot_by_id(self, snapshot_id):
-        return self.client.cmd.vol_list(wwn=snapshot_id).as_single_element
+        snapshot = self.client.cmd.vol_list(wwn=snapshot_id)
+        return snapshot.as_single_element if snapshot else None
 
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
