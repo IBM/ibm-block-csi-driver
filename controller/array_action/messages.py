@@ -6,6 +6,9 @@ StorageManagementIPsNotSupportError_message = "Invalid Management IP for SVC : {
 
 VolumeNotFoundError_message = "Volume was not found : {0} "
 
+VolumeNotFoundSnapshotWithSameNameExistsError_message = "Volume not found. Snapshot with the same id exists. \
+                                                         Name : {0} , array : {1}"
+
 PoolDoesNotMatchCapabilities_message = "Pool : {0} does not match the following capabilities : {1} . error : {2}"
 
 StorageClassCapabilityNotSupported_message = "Storage class capability is not supported : {0} "

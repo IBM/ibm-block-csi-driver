@@ -42,6 +42,10 @@ class VolumeNotFoundError(BaseArrayActionException):
     def __init__(self, name):
         self.message = messages.VolumeNotFoundError_message.format(name)
 
+class VolumeNotFoundSnapshotWithSameNameExists(BaseArrayActionException):
+
+    def __init__(self, volume, array):
+        self.message = messages.VolumeNotFoundSnapshotWithSameNameExistsError_message.format(volume, array)
 
 class VolumeCreationError(BaseArrayActionException):
 

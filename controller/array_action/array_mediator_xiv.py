@@ -113,6 +113,8 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         logger.debug("Get volume : {}".format(volume_name))
         try:
             cli_volume = self.client.cmd.vol_list(vol=volume_name).as_single_element
+            if cli_volume.master_name:
+                raise controller_errors.VolumeNotFoundSnapshotWithSameNameExists(volume_name, self.endpoint)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectName(ex.status)
