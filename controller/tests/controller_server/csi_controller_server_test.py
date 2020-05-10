@@ -336,7 +336,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         snapshot.snapshot_id = "a9000:{0}".format(snapshot_id)
         is_snapshot_source = True
         source.HasField.return_value = is_snapshot_source
-        return snapshot_source
+        return source
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
