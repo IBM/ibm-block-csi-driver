@@ -13,7 +13,6 @@ from controller.common.csi_logger import get_stdout_logger
 from controller.array_action.svc_cli_result_reader import SVCListResultsReader
 
 from io import StringIO
-import textwrap
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -34,7 +33,7 @@ HOST_ID_PARAM = 'id'
 HOST_NAME_PARAM = 'name'
 HOST_ISCSI_NAMES_PARAM = 'iscsi_name'
 HOST_WWPNS_PARAM = 'WWPN'
-MAX_HOSTS_LIST_ERR_MSG_LENGTH = 300
+HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
 
 
 def is_warning_message(ex):
@@ -307,14 +306,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         # get all hosts details by sending a single batch of commands, in which each command is per host
         detailed_hosts_list_cmd = self._get_detailed_hosts_list_cmd(hosts_list)
         logger.debug("Sending getting detailed hosts list commands batch")
-        detailed_hosts_list_output, detailed_hosts_list_errors = self.client.send_raw_command(detailed_hosts_list_cmd)
-        detailed_hosts_list_as_string = bytes_to_string(detailed_hosts_list_output)
-        detailed_hosts_list_error_msg = self._get_formatted_hosts_list_error_msg(detailed_hosts_list_errors)
+        detailed_hosts_list_output, detailed_hosts_list_errors = send_raw_cli_command(detailed_hosts_list_cmd)
         if not detailed_hosts_list_errors:
-            logger.error("Errors returned from getting detailed hosts list: {0}".format(detailed_hosts_list_error_msg))
+            logger.error("Errors returned from getting detailed hosts list: {0}".format(detailed_hosts_list_errors))
 
         logger.debug("Reading detailed hosts list commands batch response")
-        hosts_reader = SVCListResultsReader(detailed_hosts_list_as_string)
+        hosts_reader = SVCListResultsReader(detailed_hosts_list_output)
         res = []
         for host_details in hosts_reader:
             host_id = host_details.get(HOST_ID_PARAM)
@@ -335,9 +332,16 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             writer.write(LIST_CMDS_SEPARATOR)
         return writer.getvalue()
 
-    def _get_formatted_hosts_list_error_msg(self, detailed_host_list_errors_bytes):
-        detailed_host_list_errors = bytes_to_string(detailed_host_list_errors_bytes)
-        return textwrap.shorten(detailed_host_list_errors, width=MAX_HOSTS_LIST_ERR_MSG_LENGTH, placeholder="...")
+    def send_raw_cli_command(self, cmd):
+        output_as_bytes, errors_as_bytes = self.client.send_raw_command(cmd)
+        output_as_str = bytes_to_string(output_as_bytes)
+        errors_as_str = bytes_to_string(errors_as_bytes)
+        return output_as_str, errors_as_str
+
+    def _get_formatted_hosts_list_error_msg(self, detailed_host_list_errors):
+        if len(detailed_host_list_errors) <= HOSTS_LIST_ERR_MSG_MAX_LENGTH:
+            return detailed_host_list_errors
+        return "{0} ...".format(detailed_host_list_errors[HOSTS_LIST_ERR_MSG_MAX_LENGTH])
 
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume id : "
