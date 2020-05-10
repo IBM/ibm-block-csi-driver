@@ -90,12 +90,14 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def _generate_volume_response(self, cli_volume):
         copy_src_object_wwn = cli_volume.copy_master_wwn if cli_volume.vol_copy_type == "Copy" else None
+        is_empty = cli_volume.written == "0"
         return Volume(self._get_volume_or_snapshot_size_in_bytes(cli_volume),
                       cli_volume.wwn,
                       cli_volume.name,
                       self.endpoint,
                       cli_volume.pool_name,
                       copy_src_object_wwn,
+                      is_empty,
                       self.array_type)
 
     def _generate_snapshot_response(self, cli_snapshot):

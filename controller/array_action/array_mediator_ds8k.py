@@ -186,6 +186,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             vol_name=res.name,
             array_address=self.service_address,
             copy_src_object_id=None,  # TODO: CSI-1026
+            is_empty=None,  # TODO: CSI-1026
             pool_name=res.pool,
             array_type=self.array_type
         )
