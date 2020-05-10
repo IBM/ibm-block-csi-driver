@@ -326,6 +326,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.create_volume.return_value = vol_mock
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
+        self.mediator.copy_volume_from_snapshot = Mock()
         self.mediator.copy_volume_from_snapshot.assert_called_once_with(vol_name, snap_id)
 
     def _get_snapshot_source(self, snapshot_id):
