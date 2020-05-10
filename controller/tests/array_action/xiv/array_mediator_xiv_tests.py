@@ -111,7 +111,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_delete = Mock()
         self.mediator.delete_volume("vol-wwn")
 
-    def copy_volume_from_snapshot_succeeds(self):
+    def test_copy_volume_from_snapshot_succeeds(self):
         vol_name = "vol"
         snap_id = "wwn"
         cli_snap = Mock()
@@ -119,7 +119,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_list.return_value = cli_snap
         self.mediator.copy_volume_from_snapshot(vol_name, snap_id)
 
-    def copy_volume_from_snapshot_not_found(self):
+    def test_copy_volume_from_snapshot_not_found(self):
         vol_name = "vol"
         snap_id = "wwn"
         cli_snap = Mock()
@@ -130,7 +130,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
         self.mediator.copy_volume_from_snapshot(vol_name, snap_id)
 
-    def copy_volume_from_snapshot_not_snapshot(self):
+    def test_copy_volume_from_snapshot_not_snapshot(self):
         vol_name = "vol"
         snap_id = "wwn"
         cli_snap = Mock()
@@ -139,11 +139,31 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(array_errors.SnapshotNotFoundVolumeWithSameIdExistsError):
             self.mediator.copy_volume_from_snapshot_not_found(vol_name, snap_id)
 
-    def copy_volume_from_snapshot_failed_to_format(self):
+    def test_copy_volume_from_snapshot_failed_to_format(self):
+        self._test_copy_volume_from_snapshot_error(xcli_errors.VolumeBadNameError("", "", ""),
+                                                   array_errors.VolumeNotFoundError)
+
+    def test_copy_volume_from_snapshot_failed_illegal_name(self):
+        self._test_copy_volume_from_snapshot_error(xcli_errors.IllegalNameForObjectError("", "", ""),
+                                                   array_errors.IllegalObjectName)
+
+    def test_copy_volume_from_snapshot_failed_snapshot_not_fpund(self):
+        self._test_copy_volume_from_snapshot_error(xcli_errors.SourceVolumeBadNameError("", "", ""),
+                                                   array_errors.SnapshotNotFoundError)
+
+    def test_copy_volume_from_snapshot_failed_volume_not_fpund(self):
+        self._test_copy_volume_from_snapshot_error(xcli_errors.SourceVolumeBadNameError("", "", ""),
+                                                   array_errors.VolumeNotFoundError)
+
+    def test_copy_volume_from_snapshot_failed_permissio_denied(self):
+        self._test_copy_volume_from_snapshot_error(xcli_errors.OperationForbiddenForUserCategoryError("", "", ""),
+                                                   array_errors.PermissionDeniedError)
+
+    def _test_copy_volume_from_snapshot_error(self, xcli_exception, expected_array_exception):
         vol_name = "vol"
         snap_id = "wwn"
-        self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.VolumeBadNameError("", vol_name, "")]
-        with self.assertRaises(array_errors.VolumeNotFoundError):
+        self.mediator.client.cmd.vol_list.side_effect = [xcli_exception]
+        with self.assertRaises(expected_array_exception):
             self.mediator.copy_volume_from_snapshot_not_found(vol_name, snap_id)
 
     def test_get_snapshot_return_correct_value(self):
