@@ -310,6 +310,31 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "pool parameter is missing")
         self.assertTrue("parameter" in context.details)
 
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_create_volume_from_snapshot_success(self, a_enter, a_exit, array_type):
+        a_enter.return_value = self.mediator
+        context = utils.FakeContext()
+        snap_id = "wwn"
+        self.volume_content_source = self._get_snapshot_source(snap_id)
+
+        self.mediator.create_volume = Mock()
+        vol_mock = utils.get_mock_mediator_response_volume(10, "vol", "wwn", "xiv")
+        vol_mock.is_empty = True
+        vol_mock.copy_src_object_id = None
+        self.mediator.create_volume.return_value = vol_mock
+        self.servicer.CreateVolume(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.OK)
+        self.mediator.copy_volume_from_snapshot.assert_called_once_with(vol_name, snap_id)
+
+    def _get_snapshot_source(self, snapshot_id):
+        snapshot_source = Mock()
+        snapshot_source.snapshot_id = snap_request_id = "a9000:{0}".format(snapshot_id)
+        is_snapshot_source = False
+        snapshot_source.HasField.return_value = is_snapshot_source
+        return snapshot_source
+
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     def test_create_volume_with_wrong_volume_capabilities(self, a_enter, a_exit):
