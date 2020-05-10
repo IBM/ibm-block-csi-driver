@@ -330,10 +330,12 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.copy_volume_from_snapshot.assert_called_once_with(vol_name, snap_id)
 
     def _get_snapshot_source(self, snapshot_id):
-        snapshot_source = Mock()
-        snapshot_source.snapshot_id = "a9000:{0}".format(snapshot_id)
+        source = Mock()
+        snapshot = Mock()
+        source.snapshot = snapshot
+        snapshot.snapshot_id = "a9000:{0}".format(snapshot_id)
         is_snapshot_source = True
-        snapshot_source.HasField.return_value = is_snapshot_source
+        source.HasField.return_value = is_snapshot_source
         return snapshot_source
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
