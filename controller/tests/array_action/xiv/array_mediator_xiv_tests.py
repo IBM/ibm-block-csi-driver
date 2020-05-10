@@ -150,7 +150,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
                                                    array_errors.SnapshotNotFoundError)
 
     def test_copy_volume_from_snapshot_failed_volume_not_fpund(self):
-        self._test_copy_volume_from_snapshot_error(xcli_errors.SourceVolumeBadNameError("", "", ""),
+        self._test_copy_volume_from_snapshot_error(xcli_errors.TargetVolumeBadNameError("", "", ""),
                                                    array_errors.VolumeNotFoundError)
 
     def test_copy_volume_from_snapshot_failed_permission_denied(self):

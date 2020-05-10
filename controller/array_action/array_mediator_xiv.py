@@ -204,8 +204,13 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         return vol_name
 
     def _get_snapshot_by_id(self, snapshot_id):
-        snapshot = self.client.cmd.vol_list(wwn=snapshot_id)
-        return snapshot.as_single_element if snapshot else None
+        snapshots_cli_res = self.client.cmd.vol_list(wwn=snapshot_id)
+        snapshot = None
+        if snapshots_cli_res:
+            snapshot = snapshot.as_single_element
+            if snapshot.master_name:
+                raise controller_errors.SnapshotNotFoundVolumeWithSameIdExistsError(snapshot_id, self.endpoint)
+        return snapshot
 
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
