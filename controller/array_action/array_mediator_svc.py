@@ -200,9 +200,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         cli_volume = self._get_cli_volume(volume_name)
         return self._generate_volume_response(cli_volume)
 
-    def get_volume_name(self, volume_id):
-        cli_volume = self._get_cli_volume(volume_id)
-        return cli_volume.name
+    def get_volume_name(self, wwn):
+        return self._get_vol_by_wwn(wwn)
 
     def validate_supported_capabilities(self, capabilities):
         logger.debug("validate_supported_capabilities for "
