@@ -306,7 +306,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         # get all hosts details by sending a single batch of commands, in which each command is per host
         detailed_hosts_list_cmd = self._get_detailed_hosts_list_cmd(hosts_list)
         logger.debug("Sending getting detailed hosts list commands batch")
-        detailed_hosts_list_output, detailed_hosts_list_errors = send_raw_cli_command(detailed_hosts_list_cmd)
+        detailed_hosts_list_output, detailed_hosts_list_errors = self._send_raw_cli_command(detailed_hosts_list_cmd)
         if not detailed_hosts_list_errors:
             logger.error("Errors returned from getting detailed hosts list: {0}".format(detailed_hosts_list_errors))
 
@@ -332,7 +332,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             writer.write(LIST_CMDS_SEPARATOR)
         return writer.getvalue()
 
-    def send_raw_cli_command(self, cmd):
+    def _send_raw_cli_command(self, cmd):
         output_as_bytes, errors_as_bytes = self.client.send_raw_command(cmd)
         output_as_str = bytes_to_string(output_as_bytes)
         errors_as_str = bytes_to_string(errors_as_bytes)
