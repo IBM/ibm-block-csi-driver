@@ -331,8 +331,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
     def _get_snapshot_source(self, snapshot_id):
         snapshot_source = Mock()
-        snapshot_source.snapshot_id = snap_request_id = "a9000:{0}".format(snapshot_id)
-        is_snapshot_source = False
+        snapshot_source.snapshot_id = "a9000:{0}".format(snapshot_id)
+        is_snapshot_source = True
         snapshot_source.HasField.return_value = is_snapshot_source
         return snapshot_source
 
