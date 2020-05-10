@@ -314,6 +314,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     def test_create_volume_from_snapshot_success(self, a_enter, a_exit, array_type):
+        self.mediator.max_volume_name_length = 63
+        self.mediator.max_volume_prefix_length = 10
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
         snap_id = "wwn"
