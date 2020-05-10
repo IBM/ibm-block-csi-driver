@@ -121,7 +121,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 if src_snapshot_id:
                     if not vol.is_empty:
                         context.set_details("Volume is not empty.")
-                        context.set_code(grpc.StatusCode.INTERNAL
+                        context.set_code(grpc.StatusCode.INTERNAL)
                         return csi_pb2.CreateVolumeResponse()
 
                     logger.error("Copy Snapshot {0} data to Volume {1}.".format(src_snapshot_id, vol_name))
