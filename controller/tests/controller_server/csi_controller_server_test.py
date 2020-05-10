@@ -317,7 +317,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
         snap_id = "wwn"
-        self.volume_content_source = self._get_snapshot_source(snap_id)
+        self.request.volume_content_source = self._get_snapshot_source(snap_id)
 
         self.mediator.create_volume = Mock()
         vol_mock = utils.get_mock_mediator_response_volume(10, "vol", "wwn", "xiv")

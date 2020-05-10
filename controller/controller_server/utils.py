@@ -75,6 +75,7 @@ def validate_csi_volume_capabilties(capabilities):
 def validate_create_volume_source(request):
     source = request.volume_content_source
     if source:
+        logger.info(source)
         if source.HasField(config.VOLUME_SOURCE_SNAPSHOT):
             source_snapshot = source.snapshot
             logger.info("Source snapshot specified: {0}".format(source_snapshot))
