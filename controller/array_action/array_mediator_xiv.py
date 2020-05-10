@@ -208,7 +208,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         snapshot = None
         if snapshots_cli_res:
             snapshot = snapshots_cli_res.as_single_element
-            if snapshot.master_name:
+            if not snapshot.master_name:
                 raise controller_errors.SnapshotNotFoundVolumeWithSameIdExistsError(snapshot_id, self.endpoint)
         return snapshot
 
