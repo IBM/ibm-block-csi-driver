@@ -105,7 +105,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                     array_mediator.validate_supported_capabilities(capabilities)
                     is_src_snap_capacity_correct = self._validate_copy_vol_src_snap_capacity(array_mediator, request,
-                                                                                              src_snapshot_id)
+                                                                                             src_snapshot_id)
                     if not is_src_snap_capacity_correct:
                         context.set_details("Source Snapshot capacity doesn't match Volume capacity request")
                         context.set_code(grpc.StatusCode.ALREADY_EXISTS)
