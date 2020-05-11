@@ -153,6 +153,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return csi_pb2.CreateVolumeResponse()
 
     def _handle_existing_vol_src_snap(self, vol, src_snapshot_id, context):
+        # TODO
+        logger.debug(vol)
+        logger.debug("+++++++++ _handle snap {0}".format(src_snapshot_id))
+        if vol.copy_src_object_id:
+            logger.debug("+++++++++ _handle snap vol {0}".format(vol.copy_src_object_id))
+
         if not src_snapshot_id:
             return None
         vol_name = vol.volume_name
