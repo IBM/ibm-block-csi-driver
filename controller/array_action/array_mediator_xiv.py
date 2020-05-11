@@ -200,7 +200,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             if not src_snapshot:
                 logger.exception(controller_error_messages.SnapshotNotFoundError_message.format(src_snapshot_id))
                 raise controller_errors.SnapshotNotFoundError(src_snapshot_id)
-            snapshot_capacity = _convert_size_blocks_to_bytes(src_snapshot.capacity)
+            snapshot_capacity = self._convert_size_blocks_to_bytes(src_snapshot.capacity)
             logger.debug("Validate Snapshot {0} capacity {1}. Minimal required capacity : {2}".format(src_snapshot_id,
                                                                                                       snapshot_capacity,
                                                                                                       min_capacity))
