@@ -307,7 +307,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         detailed_hosts_list_cmd = self._get_detailed_hosts_list_cmd(hosts_list)
         logger.debug("Sending getting detailed hosts list commands batch")
         detailed_hosts_list_output, detailed_hosts_list_errors = self._send_raw_cli_command(detailed_hosts_list_cmd)
-        if not detailed_hosts_list_errors:
+        if detailed_hosts_list_errors:
             logger.error("Errors returned from getting detailed hosts list: {0}".format(detailed_hosts_list_errors))
 
         logger.debug("Reading detailed hosts list commands batch response")
