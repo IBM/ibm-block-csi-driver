@@ -314,11 +314,13 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     def test_create_volume_from_snapshot_success(self, a_enter, a_exit, array_type):
-        a_enter.return_value = self.mediator
-        self.mediator.max_volume_name_length = Mock()
-        self.mediator.max_volume_name_length.return_value = Mock()
-        self.mediator.max_volume_prefix_length = Mock()
-        self.mediator.max_volume_prefix_length.return_value = Mock()
+        mediator = Mock()
+        mediator.max_volume_name_length = Mock()
+        mediator.max_volume_name_length.return_value = Mock()
+        mediator.max_volume_prefix_length = Mock()
+        mediator.max_volume_prefix_length.return_value = Mock()
+
+        a_enter.return_value = mediator
 
         context = utils.FakeContext()
 
