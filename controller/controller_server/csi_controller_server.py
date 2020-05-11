@@ -114,7 +114,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                         return csi_pb2.CreateVolumeResponse()
 
-                    logger.debug("+++++++++++++++ after capacity check")
+                    logger.debug(
+                        "+++++++++++++++ after idemp check v {0} s {1}".format(vol.copy_src_object_id, src_snapshot_id))
                     vol_name = vol.volume_name
                     if src_snapshot_id and vol.copy_src_object_id and vol.copy_src_object_id != src_snapshot_id:
                         logger.error(
