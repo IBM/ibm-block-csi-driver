@@ -101,7 +101,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                       self.array_type)
 
     def _generate_snapshot_response(self, cli_snapshot):
-        return Volume(self._convert_size_blocks_to_bytes(cli_snapshot.capacity),
+        return Snapshot(self._convert_size_blocks_to_bytes(cli_snapshot.capacity),
                         cli_snapshot.wwn,
                         cli_snapshot.name,
                         self.endpoint,
