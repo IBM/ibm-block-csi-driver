@@ -248,7 +248,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.side_effect = [array_errors.VolumeNotFoundError("vol")]
         self.mediator.copy_volume_from_snapshot = Mock()
-        
+
         self.servicer = ControllerServicer(self.fqdn)
 
         self.request = Mock()
