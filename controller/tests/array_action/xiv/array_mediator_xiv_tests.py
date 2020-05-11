@@ -119,8 +119,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         snapshot_cli_res_mock = Mock()
         snapshot_cli_res_mock.as_single_element = cli_snap
         self.mediator.client.cmd.vol_list.return_value = snapshot_cli_res_mock
-        self.mediator.copy_volume_from_snapshot = Mock()
-        self.mediator.copy_volume_from_snapshot.assert_called_once_with(vol_name, snap_id)
+        self.mediator.copy_volume_from_snapshot(vol_name, snap_id)
 
     def test_copy_volume_from_snapshot_not_found(self):
         vol_name = "vol"
