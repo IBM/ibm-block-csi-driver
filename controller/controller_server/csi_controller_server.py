@@ -159,6 +159,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return csi_pb2.CreateVolumeResponse()
 
     def _validate_copy_vol_src_snap_capacity(self, array_mediator, request, src_snapshot_id):
+        logger.info("+++++++++++++++++ _validate_copy_vol_src_snap_capacity")
+        logger.info(request.capacity_range)
         if not src_snapshot_id or not request.capacity_range:
             return False
         min_capacity = request.capacity_range.required_bytes
