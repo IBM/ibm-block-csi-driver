@@ -327,6 +327,9 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.mediator.copy_volume_from_snapshot.assert_called_once_with(vol_name, snap_id)
 
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_create_volume_from_snapshot_idempotent(self, a_enter, a_exit, array_type):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
@@ -340,6 +343,9 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.mediator.copy_volume_from_snapshot.assert_not_called()
 
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_create_volume_from_snapshot_error_not_empty(self, a_enter, a_exit, array_type):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
@@ -353,6 +359,9 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
 
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_create_volume_from_snapshot_error_other_source(self, a_enter, a_exit, array_type):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
