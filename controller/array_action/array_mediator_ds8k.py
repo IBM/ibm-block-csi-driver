@@ -262,7 +262,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         # TODO:	CSI-1338
         raise NotImplementedError
 
-    def validate_copy_vol_src_snap_capacity(self, src_snapshot_id, min_capacity, max_capacity):
+    def validate_copy_vol_src_snap_capacity(self, src_snapshot_id, min_capacity):
         # TODO:	CSI-1338
         raise NotImplementedError
 

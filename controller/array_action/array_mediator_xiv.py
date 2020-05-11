@@ -194,7 +194,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
-    def validate_copy_vol_src_snap_capacity(self, src_snapshot_id, min_capacity, max_capacity):
+    def validate_copy_vol_src_snap_capacity(self, src_snapshot_id, min_capacity):
         try:
             src_snapshot = self._get_snapshot_by_id(src_snapshot_id)
             if not src_snapshot:
@@ -202,9 +202,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                 raise controller_errors.SnapshotNotFoundError(src_snapshot_id)
             snapshot_capacity = src_snapshot.capacity
             logger.debug("Validate Snapshot {0} capacity {1}".format(src_snapshot_id, snapshot_capacity))
-            is_snapshot_too_small = min_capacity and min_capacity != 0 and snapshot_capacity < min_capacity
-            is_snapshot_too_big = max_capacity and snapshot_capacity > max_capacity
-            return not is_snapshot_too_small and not is_snapshot_too_big
+            return min_capacity != 0 and snapshot_capacity < min_capacity
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectName(ex.status)

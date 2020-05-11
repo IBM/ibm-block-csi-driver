@@ -264,9 +264,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
         self.request.parameters = {"pool": self.pool}
         self.capacity_bytes = 10
-        self.limit_bytes = 1000
         self.request.capacity_range.required_bytes = self.capacity_bytes
-        self.request.capacity_range.limit_bytes = self.limit_bytes
         self.request.name = vol_name
         self.request.volume_content_source = None
 
