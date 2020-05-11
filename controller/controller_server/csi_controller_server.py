@@ -115,10 +115,14 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return csi_pb2.CreateVolumeResponse()
 
                     logger.debug(
-                        "+++++++++++++++ after idemp check v {0} s {1}".format(vol.copy_src_object_id, src_snapshot_id))
+                        "+++++++++++++++ before idemp check v {0} s {1}".format(vol.copy_src_object_id, src_snapshot_id))
                     copy_source_res = self._handle_existing_vol_src_snap(vol, src_snapshot_id)
+                    logger.debug(
+                        "+++++++++++++++ after idemp check v {0} s {1}".format(vol.copy_src_object_id, src_snapshot_id))
                     if copy_source_res:
+                        logger.debug("+++++++++++++++ after if handled ret")
                         return copy_source_res
+                    logger.debug("+++++++++++++++ after if handled")
 
                 vol_name = vol.volume_name
                 logger.info("++++++++++++++ VOL NAME {0}".format(vol_name))
@@ -154,7 +158,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def _handle_existing_vol_src_snap(self, vol, src_snapshot_id, context):
         # TODO
-        logger.debug(vol)
+        logger.debug("aaaaaaaaaaaaaaaaaaaaaaaaaa")
         logger.debug("+++++++++ _handle snap {0}".format(src_snapshot_id))
         if vol.copy_src_object_id:
             logger.debug("+++++++++ _handle snap vol {0}".format(vol.copy_src_object_id))
