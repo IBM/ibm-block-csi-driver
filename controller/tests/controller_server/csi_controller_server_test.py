@@ -264,7 +264,9 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
         self.request.parameters = {"pool": self.pool}
         self.capacity_bytes = 10
+        self.limit_bytes = 1000
         self.request.capacity_range.required_bytes = self.capacity_bytes
+        self.request.capacity_range.limit_bytes = self.limit_bytes
         self.request.name = vol_name
         self.request.volume_content_source = None
 
@@ -316,9 +318,6 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_create_volume_from_snapshot_success(self, a_enter, a_exit, array_type):
         a_enter.return_value = self.mediator
-        self.request.capacity_range = Mock()
-        self.request.capacity_range.required_bytes = 0
-        self.request.capacity_range.limit_bytes = 0
         context = utils.FakeContext()
         snap_id = "wwn1"
         self.request.volume_content_source = self._get_snapshot_source(snap_id)
@@ -354,15 +353,11 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     def test_create_volume_from_snapshot_bad_snapshot_capacity(self, a_enter, a_exit, array_type):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
-        self.request.capacity_range = Mock()
-        self.request.capacity_range.required_bytes = 1000
-        self.request.capacity_range.limit_bytes = 0
-
         snap_id = "wwn1"
         self.request.volume_content_source = self._get_snapshot_source(snap_id)
         self.mediator.create_volume = Mock()
         self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
-        insufficient_snap_capacity = 17
+        insufficient_snap_capacity = 1
         self.mediator.get_snapshot_by_id = utils.get_mock_mediator_response_snapshot(insufficient_snap_capacity, "nnap",
                                                                                      snap_id, "vol", "a9k")
         self.mediator.validate_copy_vol_src_snap_capacity = Mock()
@@ -449,9 +444,6 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
     def _test_create_volume_from_snapshot_error(self, a_enter, array_type, array_exception):
         a_enter.return_value = self.mediator
-        self.request.capacity_range = Mock()
-        self.request.capacity_range.required_bytes = 0
-        self.request.capacity_range.limit_bytes = 0
         context = utils.FakeContext()
         snap_id = "wwn1"
         self.request.volume_content_source = self._get_snapshot_source(snap_id)
