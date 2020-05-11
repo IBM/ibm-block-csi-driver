@@ -71,8 +71,8 @@ def get_capabilities_from_cli_volume(cli_volume):
     if cli_volume.deduplicated_copy == 'yes':
         capability = config.CAPABILITY_DEDUPLICATED
     if cli_volume.compressed_copy == 'yes':
-        capability =  config.CAPABILITY_COMPRESSED
-    return {config.CAPABILITIES_SPACEEFFICIENCY : capability}
+        capability = config.CAPABILITY_COMPRESSED
+    return {config.CAPABILITIES_SPACEEFFICIENCY: capability}
 
 
 class SVCArrayMediator(ArrayMediatorAbstract):
