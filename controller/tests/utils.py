@@ -10,8 +10,8 @@ def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_src_obje
     vol.array_address = "arr1"
     vol.pool_name = "pool1"
     vol.array_type = array_type
-    self.copy_src_object_id = copy_src_object_id
-    self.is_empty = is_empty
+    vol.copy_src_object_id = copy_src_object_id
+    vol.is_empty = is_empty
 
     return vol
 
