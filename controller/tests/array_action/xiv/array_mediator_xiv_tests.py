@@ -179,11 +179,11 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
     def test_validate_copy_vol_src_snap_capacity_returns_false(self):
         cli_snap = Mock()
-        cli_snap.capacity = 50
+        cli_snap.capacity = 1
         snapshot_cli_res_mock = Mock()
         snapshot_cli_res_mock.as_single_element = cli_snap
         self.mediator.client.cmd.vol_list.return_value = snapshot_cli_res_mock
-        is_correct = self.mediator.validate_copy_vol_src_snap_capacity(src_snapshot_id="wwn1", min_capacity=100)
+        is_correct = self.mediator.validate_copy_vol_src_snap_capacity(src_snapshot_id="wwn1", min_capacity=1000)
         self.assertFalse(is_correct)
 
     def test_validate_copy_vol_src_snap_capacity_min_capacity_zero(self):
