@@ -116,21 +116,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                     logger.debug(
                         "+++++++++++++++ after idemp check v {0} s {1}".format(vol.copy_src_object_id, src_snapshot_id))
-                    vol_name = vol.volume_name
-                    if src_snapshot_id and vol.copy_src_object_id and vol.copy_src_object_id != src_snapshot_id:
-                        logger.error(
-                            "Volume {0} is a copy but not of Snapshot {1}.".format(vol_name, src_snapshot_id))
-                        context.set_code(grpc.StatusCode.INTERNAL)
-                        return csi_pb2.CreateVolumeResponse()
+                    copy_source_res = self._handle_existing_vol_src_snap(vol, src_snapshot_id)
+                    if copy_source_res:
+                        return copy_source_res
 
                 vol_name = vol.volume_name
                 logger.info("++++++++++++++ VOL NAME {0}".format(vol_name))
                 if src_snapshot_id:
-                    if not vol.is_empty:
-                        context.set_details("Volume is not empty.")
-                        context.set_code(grpc.StatusCode.INTERNAL)
-                        return csi_pb2.CreateVolumeResponse()
-
                     logger.error("Copy Snapshot {0} data to Volume {1}.".format(src_snapshot_id, vol_name))
                     array_mediator.copy_volume_from_snapshot(vol_name, src_snapshot_id)
                     vol.copy_src_object_id = src_snapshot_id
@@ -159,6 +151,27 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateVolumeResponse()
+
+    def _handle_existing_vol_src_snap(self, vol, src_snapshot_id, context):
+        vol_name = vol.volume_name
+        if src_snapshot_id:
+            return None
+        if not vol.is_empty:
+            context.set_details("Volume is not empty.")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            return csi_pb2.CreateVolumeResponse()
+        if vol.copy_src_object_id:
+            return None
+        if vol.copy_src_object_id == src_snapshot_id:
+            logger.debug(
+                "Volume {0} exists and is already copy of Snapshot {1}.".format(vol_name, src_snapshot_id))
+            context.set_code(grpc.StatusCode.OK)
+        else:
+            logger.debug(
+                "Volume {0} is a copy but not of Snapshot {1}.".format(vol_name, src_snapshot_id))
+            context.set_details("Volume was already exists but created but from different source.")
+            context.set_code(grpc.StatusCode.INTERNAL)
+        return csi_pb2.CreateVolumeResponse()
 
     def _get_src_snapshot_id(self, request):
         source = request.volume_content_source
