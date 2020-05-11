@@ -65,13 +65,14 @@ def build_kwargs_from_capabilities(capabilities, pool_name, volume_name,
 
 
 def get_capabilities_from_cli_volume(cli_volume):
+    capability = config.CAPABILITY_THICK
     if cli_volume.se_copy == 'yes':
-        return config.CAPABILITY_THIN
-    if cli_volume.deduplicated_copy:
-        return config.CAPABILITY_DEDUPLICATED
+        capability = config.CAPABILITY_THIN
+    if cli_volume.deduplicated_copy == 'yes':
+        capability = config.CAPABILITY_DEDUPLICATED
     if cli_volume.compressed_copy == 'yes':
-        return config.CAPABILITY_COMPRESSED
-    return config.CAPABILITY_THICK
+        capability =  config.CAPABILITY_COMPRESSED
+    return {config.CAPABILITIES_SPACEEFFICIENCY : capability}
 
 
 class SVCArrayMediator(ArrayMediatorAbstract):
@@ -253,7 +254,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                                                         name, size)
             self.client.svctask.mkvolume(**cli_kwargs)
             vol = self._get_cli_volume(name)
-            logger.info("finished creating cli volume : {}".format(vol))
+            logger.info("finished creating cli volume : {}".format(vol.name))
             return vol
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
