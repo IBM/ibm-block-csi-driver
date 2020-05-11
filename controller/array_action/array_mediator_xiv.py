@@ -194,6 +194,24 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
+    def validate_copy_vol_src_snap_capacity(self, src_snapshot_id, min_capacity, max_capacity):
+        try:
+            src_snapshot = self._get_snapshot_by_id(src_snapshot_id)
+            if not src_snapshot:
+                logger.exception(controller_error_messages.SnapshotNotFoundError_message.format(src_snapshot_id))
+                raise controller_errors.SnapshotNotFoundError(src_snapshot_id)
+            snapshot_capacity = src_snapshot.capacity
+            logger.debug("Validate Snapshot {0} capacity {1}".format(src_snapshot_id, snapshot_capacity))
+            is_snapshot_too_small = min_capacity and min_capacity != 0 and snapshot_capacity < min_capacity
+            is_snapshot_too_big = max_capacity and snapshot_capacity > max_capacity
+            return is_snapshot_too_small or is_snapshot_too_big
+        except xcli_errors.IllegalNameForObjectError as ex:
+            logger.exception(ex)
+            raise controller_errors.IllegalObjectName(ex.status)
+        except xcli_errors.OperationForbiddenForUserCategoryError as ex:
+            logger.exception(ex)
+            raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
+
     def _get_vol_by_wwn(self, volume_id):
         vol_by_wwn = self.client.cmd.vol_list(wwn=volume_id).as_single_element
         if not vol_by_wwn:

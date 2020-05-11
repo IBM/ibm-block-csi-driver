@@ -236,6 +236,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         # TODO:	CSI-1026
         raise NotImplementedError
 
+    def validate_copy_vol_src_snap_capacity(self, src_snapshot_id, min_capacity, max_capacity):
+        # TODO:	CSI-1026
+        raise NotImplementedError
+
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
         vol_name = self._get_vol_by_wwn(volume_id)

@@ -262,6 +262,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         # TODO:	CSI-1338
         raise NotImplementedError
 
+    def validate_copy_vol_src_snap_capacity(self, src_snapshot_id, min_capacity, max_capacity):
+        # TODO:	CSI-1338
+        raise NotImplementedError
+
     def delete_volume(self, volume_id):
         logger.info("Deleting volume {}".format(volume_id))
         try:

@@ -16,9 +16,9 @@ def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_src_obje
     return vol
 
 
-def get_mock_mediator_response_snapshot(size, name, wwn, volume_name, array_type):
+def get_mock_mediator_response_snapshot(capacity, name, wwn, volume_name, array_type):
     snapshot = Mock()
-    snapshot.capacity_bytes = size
+    snapshot.capacity_bytes = capacity
     snapshot.id = wwn
     snapshot.snapshot_name = name
     snapshot.volume_name = volume_name

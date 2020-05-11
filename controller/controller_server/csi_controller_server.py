@@ -104,9 +104,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
                     array_mediator.validate_supported_capabilities(capabilities)
-                    is_src_snapshot_too_big = self._is_source_snapshot_too_big(array_mediator, request, src_snapshot_id)
-                    if is_src_snapshot_too_big:
-                        context.set_details("Source Snapshot is too big")
+                    is_src_snap_capacity_correct = self._validate_copy_vol_src_snap_capacity(array_mediator, request,
+                                                                                              src_snapshot_id)
+                    if not is_src_snap_capacity_correct:
+                        context.set_details("Source Snapshot capacity doesn't match Volume capacity request")
                         context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                         return csi_pb2.CreateVolumeResponse()
 
@@ -157,14 +158,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateVolumeResponse()
 
-    def _is_source_snapshot_too_big(self, array_mediator, request, src_snapshot_id):
-        if not src_snapshot_id:
+    def _validate_copy_vol_src_snap_capacity(self, array_mediator, request, src_snapshot_id):
+        if not src_snapshot_id or not request.capacity_range:
             return False
-        request_capacity = request.capacity_range.required_bytes
-        src_snapshot = array_mediator.get_snapshot_by_id(src_snapshot_id)
-        logger.debug("Validate source Snapshot capacity. Snapshot capacity : {0}. Request capacity {1}".format(
-            src_snapshot.capacirty, request_capacity))
-        return src_snapshot.capacirty > request_capacity
+        min_capacity = request.capacity_range.required_bytes
+        max_capacity = request.capacity_range.limit_bytes
+        return array_mediator.validate_copy_vol_src_snap_capacity(src_snapshot_id, min_capacity, max_capacity)
 
     def _create_volume(self, array_mediator, volume_name, size, capabilities, pool, volume_prefix, src_snapshot_id):
         vol = array_mediator.create_volume(volume_name, size, capabilities, pool, volume_prefix)
