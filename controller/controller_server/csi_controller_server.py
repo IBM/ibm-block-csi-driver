@@ -115,7 +115,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return csi_pb2.CreateVolumeResponse()
 
                     logger.debug(
-                        "+++++++++++++++ before idemp check v {0} s {1}".format(vol.copy_src_object_id, src_snapshot_id))
+                        "+++++++++++++++ before idemp check v {0} s {1}".format(vol.copy_src_object_id,
+                                                                                src_snapshot_id))
                     copy_source_res = self._handle_existing_vol_src_snap(vol, src_snapshot_id)
                     logger.debug(
                         "+++++++++++++++ after idemp check v {0} s {1}".format(vol.copy_src_object_id, src_snapshot_id))
