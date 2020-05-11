@@ -85,13 +85,13 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         if self.client and self.client.is_connected():
             self.client.close()
 
-    def _get_volume_or_snapshot_size_in_bytes(self, volume_or_snapshot):
-        return int(volume_or_snapshot.capacity) * self.BLOCK_SIZE_IN_BYTES
+    def _convert_size_blocks_to_bytes(self, size_in_blocks):
+        return int(size_in_blocks) * self.BLOCK_SIZE_IN_BYTES
 
     def _generate_volume_response(self, cli_volume):
         copy_src_object_wwn = cli_volume.copy_master_wwn if cli_volume.vol_copy_type == "Copy" else None
         is_empty = cli_volume.written == "0"
-        return Volume(self._get_volume_or_snapshot_size_in_bytes(cli_volume),
+        return Volume(self._convert_size_blocks_to_bytes(cli_volume.capacity),
                       cli_volume.wwn,
                       cli_volume.name,
                       self.endpoint,
@@ -101,7 +101,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                       self.array_type)
 
     def _generate_snapshot_response(self, cli_snapshot):
-        return Snapshot(self._get_volume_or_snapshot_size_in_bytes(cli_snapshot),
+        return Volume(self._convert_size_blocks_to_bytes(cli_snapshot.capacity),
                         cli_snapshot.wwn,
                         cli_snapshot.name,
                         self.endpoint,
@@ -200,7 +200,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             if not src_snapshot:
                 logger.exception(controller_error_messages.SnapshotNotFoundError_message.format(src_snapshot_id))
                 raise controller_errors.SnapshotNotFoundError(src_snapshot_id)
-            snapshot_capacity = src_snapshot.capacity
+            snapshot_capacity = _convert_size_blocks_to_bytes(src_snapshot.capacity)
             logger.debug("Validate Snapshot {0} capacity {1}. Minimal required capacity : {2}".format(src_snapshot_id,
                                                                                                       snapshot_capacity,
                                                                                                       min_capacity))
