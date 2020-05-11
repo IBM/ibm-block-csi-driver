@@ -117,9 +117,10 @@ class TestArrayMediatorXIV(unittest.TestCase):
         cli_snap = Mock()
         cli_snap.master_name = vol_name
         snapshot_cli_res_mock = Mock()
-        snapshot_cli_res_mock.as_single_element = snapshot_cli_res_mock
-        self.mediator.client.cmd.vol_list.return_value = cli_snap
-        self.mediator.copy_volume_from_snapshot(vol_name, snap_id)
+        snapshot_cli_res_mock.as_single_element = cli_snap
+        self.mediator.client.cmd.vol_list.return_value = snapshot_cli_res_mock
+        self.mediator.copy_volume_from_snapshot = Mock()
+        self.mediator.copy_volume_from_snapshot.assert_called_once_with(vol_name, snap_id)
 
     def test_copy_volume_from_snapshot_not_found(self):
         vol_name = "vol"
@@ -172,7 +173,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         cli_snap = Mock()
         cli_snap.capacity = 200
         snapshot_cli_res_mock = Mock()
-        snapshot_cli_res_mock.as_single_element = snapshot_cli_res_mock
+        snapshot_cli_res_mock.as_single_element = cli_snap
         self.mediator.client.cmd.vol_list.return_value = snapshot_cli_res_mock
         is_correct = self.mediator.validate_copy_vol_src_snap_capacity(src_snapshot_id="wwn1", min_capacity=100)
         self.assertTrue(is_correct)
@@ -181,7 +182,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         cli_snap = Mock()
         cli_snap.capacity = 50
         snapshot_cli_res_mock = Mock()
-        snapshot_cli_res_mock.as_single_element = snapshot_cli_res_mock
+        snapshot_cli_res_mock.as_single_element = cli_snap
         self.mediator.client.cmd.vol_list.return_value = snapshot_cli_res_mock
         is_correct = self.mediator.validate_copy_vol_src_snap_capacity(src_snapshot_id="wwn1", min_capacity=100)
         self.assertFalse(is_correct)
@@ -190,7 +191,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         cli_snap = Mock()
         cli_snap.capacity = 200
         snapshot_cli_res_mock = Mock()
-        snapshot_cli_res_mock.as_single_element = snapshot_cli_res_mock
+        snapshot_cli_res_mock.as_single_element = cli_snap
         self.mediator.client.cmd.vol_list.return_value = snapshot_cli_res_mock
         is_correct = self.mediator.validate_copy_vol_src_snap_capacity(src_snapshot_id="wwn1", min_capacity=0)
         self.assertTrue(is_correct)
