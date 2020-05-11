@@ -168,6 +168,30 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(expected_array_exception):
             self.mediator.copy_volume_from_snapshot(vol_name, snap_id)
 
+    def test_validate_copy_vol_src_snap_capacity_returns_true(self):
+        cli_snap = Mock()
+        cli_snap.capacity = 200
+        snapshot_cli_res_mock = Mock()
+        snapshot_cli_res_mock.as_single_element = snapshot_cli_res_mock
+        self.mediator.client.cmd.vol_list.return_value = cli_snap
+        self.mediator.validate_copy_vol_src_snap_capacity(src_snapshot_id="wwn1", min_capacity=100)
+
+    def test_validate_copy_vol_src_snap_capacity_returns_false(self):
+        cli_snap = Mock()
+        cli_snap.capacity = 50
+        snapshot_cli_res_mock = Mock()
+        snapshot_cli_res_mock.as_single_element = snapshot_cli_res_mock
+        self.mediator.client.cmd.vol_list.return_value = cli_snap
+        self.mediator.validate_copy_vol_src_snap_capacity(src_snapshot_id="wwn1", min_capacity=100)
+
+    def test_validate_copy_vol_src_snap_capacity_min_capacity_zero(self):
+        cli_snap = Mock()
+        cli_snap.capacity = 200
+        snapshot_cli_res_mock = Mock()
+        snapshot_cli_res_mock.as_single_element = snapshot_cli_res_mock
+        self.mediator.client.cmd.vol_list.return_value = cli_snap
+        self.mediator.validate_copy_vol_src_snap_capacity(src_snapshot_id="wwn1", min_capacity=0)
+
     def test_get_snapshot_return_correct_value(self):
         snap_name = "snap"
         snap_vol_name = "snap_vol"
