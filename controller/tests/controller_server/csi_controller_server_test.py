@@ -394,7 +394,32 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_create_volume_from_snapshot_no_src(self, a_enter, a_exit, array_type):
+    def test_create_volume_from_snapshot_src_snapshot_not_found(self, a_enter, a_exit, array_type):
+        array_exception = array_errors.SnapshotNotFoundError("")
+        self._test_create_volume_from_snapshot_error(a_enter, array_type, array_exception)
+
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_create_volume_from_snapshot_target_volume_not_found(self, a_enter, a_exit, array_type):
+        array_exception = array_errors.VolumeNotFoundError("")
+        self._test_create_volume_from_snapshot_error(a_enter, array_type, array_exception)
+
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_create_volume_from_snapshot_illegal_object_name(self, a_enter, a_exit, array_type):
+        array_exception = array_errors.IllegalObjectName("")
+        self._test_create_volume_from_snapshot_error(a_enter, array_type, array_exception)
+
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_create_volume_from_snapshot_permission_denied(self, a_enter, a_exit, array_type):
+        array_exception = array_errors.PermissionDeniedError("")
+        self._test_create_volume_from_snapshot_error(a_enter, array_type, array_exception)
+
+    def _test_create_volume_from_snapshot_error(self, a_enter, array_type, array_exception):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
         snap_id = "wwn1"
@@ -403,7 +428,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         vol_mock = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
         self.mediator.get_volume.return_value = vol_mock
         self.mediator.copy_volume_from_snapshot = Mock()
-        self.mediator.copy_volume_from_snapshot.side_effect = [array_errors.SnapshotNotFoundError(snap_id)]
+        self.mediator.copy_volume_from_snapshot.side_effect = [array_exception]
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
