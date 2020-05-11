@@ -335,9 +335,9 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         context = utils.FakeContext()
         snap_id = "wwn1"
         self.request.volume_content_source = self._get_snapshot_source(snap_id)
-        self.mediator.create_volume = Mock()
+        self.mediator.get_volume = Mock()
         vol_mock = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k", copy_src_object_id=snap_id)
-        self.mediator.create_volume.return_value = vol_mock
+        self.mediator.get_volume.return_value = vol_mock
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -351,10 +351,10 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         context = utils.FakeContext()
         snap_id = "wwn1"
         self.request.volume_content_source = self._get_snapshot_source(snap_id)
-        self.mediator.create_volume = Mock()
+        self.mediator.get_volume = Mock()
         vol_mock = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k", is_empty=False,
                                                            copy_src_object_id=snap_id)
-        self.mediator.create_volume.return_value = vol_mock
+        self.mediator.get_volume.return_value = vol_mock
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
@@ -368,9 +368,9 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         snap_id = "wwn1"
         vol_src_id = "wwn3"
         self.request.volume_content_source = self._get_snapshot_source(snap_id)
-        self.mediator.create_volume = Mock()
+        self.mediator.get_volume = Mock()
         vol_mock = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k",  copy_src_object_id=vol_src_id)
-        self.mediator.create_volume.return_value = vol_mock
+        self.mediator.get_volume.return_value = vol_mock
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
