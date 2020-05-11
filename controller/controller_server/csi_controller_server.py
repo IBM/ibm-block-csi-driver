@@ -164,7 +164,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         if not src_snapshot_id or not request.capacity_range:
             return True
         min_capacity = request.capacity_range.required_bytes
-        return array_mediator.validate_copy_vol_src_snap_capacity(src_snapshot_id, min_capacity)
+        return array_mediator.validate_copy_vol_src_snap_capacity(src_snapshot_id, int(min_capacity))
 
     def _create_volume(self, array_mediator, volume_name, size, capabilities, pool, volume_prefix, src_snapshot_id):
         vol = array_mediator.create_volume(volume_name, size, capabilities, pool, volume_prefix)
