@@ -104,7 +104,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
                     array_mediator.validate_supported_capabilities(capabilities)
-                    vol = array_mediator.create_volume(volume_full_name, size, capabilities, pool, volume_prefix)
+                    vol = self._create_volume(array_mediator, volume_full_name, size, capabilities, pool, volume_prefix,
+                                              src_snapshot_id)
                 else:
                     logger.debug("volume found : {}".format(vol))
 
@@ -124,13 +125,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         logger.debug("+++++++++++++++ after if handled ret")
                         return copy_source_res
                     logger.debug("+++++++++++++++ after if handled")
-
-                vol_name = vol.volume_name
-                logger.info("++++++++++++++ VOL NAME {0}".format(vol_name))
-                if src_snapshot_id:
-                    logger.error("Copy Snapshot {0} data to Volume {1}.".format(src_snapshot_id, vol_name))
-                    array_mediator.copy_volume_from_snapshot(vol_name, src_snapshot_id)
-                    vol.copy_src_object_id = src_snapshot_id
 
                 logger.debug("generating create volume response")
                 res = utils.generate_csi_create_volume_response(vol)
@@ -157,6 +151,15 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateVolumeResponse()
 
+    def _create_volume(self, array_mediator, volume_name, size, capabilities, pool, volume_prefix, src_snapshot_id):
+        vol = array_mediator.create_volume(volume_name, size, capabilities, pool, volume_prefix)
+        if src_snapshot_id:
+            vol_name = vol.volume_name
+            logger.error("Copy Snapshot {0} data to Volume {1}.".format(src_snapshot_id, vol_name))
+            array_mediator.copy_volume_from_snapshot(vol_name, src_snapshot_id)
+            vol.copy_src_object_id = src_snapshot_id
+        return vol
+
     def _handle_existing_vol_src_snap(self, vol, src_snapshot_id, context):
         # TODO
         logger.debug("aaaaaaaaaaaaaaaaaaaaaaaaaa")
@@ -173,15 +176,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.INTERNAL)
             return csi_pb2.CreateVolumeResponse()
         logger.debug("+++++++++ _handle snap {0} vol {1}".format(src_snapshot_id, vol.copy_src_object_id))
-        if not vol_copy_src_object_id:
-            return None
         if vol_copy_src_object_id == src_snapshot_id:
             logger.debug(
-                "Volume {0} exists and is already copy of Snapshot {1}.".format(vol_name, src_snapshot_id))
+                "Volume {0} exists and it is copy of Snapshot {1}.".format(vol_name, src_snapshot_id))
             context.set_code(grpc.StatusCode.OK)
         else:
             logger.debug(
-                "Volume {0} is a copy but not of Snapshot {1}.".format(vol_name, src_snapshot_id))
+                "Volume {0} exists but it is not copy of Snapshot {1}.".format(vol_name, src_snapshot_id))
             context.set_details("Volume was already exists but created but from different source.")
             context.set_code(grpc.StatusCode.INTERNAL)
         return csi_pb2.CreateVolumeResponse()
