@@ -153,17 +153,18 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return csi_pb2.CreateVolumeResponse()
 
     def _handle_existing_vol_src_snap(self, vol, src_snapshot_id, context):
-        vol_name = vol.volume_name
-        if src_snapshot_id:
+        if not src_snapshot_id:
             return None
+        vol_name = vol.volume_name
+        vol_copy_src_object_id = vol.copy_src_object_id
         if not vol.is_empty:
             context.set_details("Volume is not empty.")
             context.set_code(grpc.StatusCode.INTERNAL)
             return csi_pb2.CreateVolumeResponse()
         logger.debug("+++++++++ _handle snap {0} vol {1}".format(src_snapshot_id, vol.copy_src_object_id))
-        if vol.copy_src_object_id:
+        if vol_copy_src_object_id:
             return None
-        if vol.copy_src_object_id == src_snapshot_id:
+        if vol_copy_src_object_id == src_snapshot_id:
             logger.debug(
                 "Volume {0} exists and is already copy of Snapshot {1}.".format(vol_name, src_snapshot_id))
             context.set_code(grpc.StatusCode.OK)
