@@ -315,40 +315,19 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_create_volume_from_snapshot_success(self, a_enter, a_exit, array_type):
         a_enter.return_value = self.mediator
-        # mediator = Mock()
-        # mediator.max_volume_name_length = Mock()
-        # mediator.max_volume_name_length.return_value = Mock()
-        # mediator.max_volume_prefix_length = Mock()
-        # mediator.max_volume_prefix_length.return_value = Mock()
-        #
-        # a_enter.return_value = mediator
-
         context = utils.FakeContext()
-
+        snap_id = "wwn"
+        self.request.volume_content_source = self._get_snapshot_source(snap_id)
         self.mediator.create_volume = Mock()
-        self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn", "xiv")
+        vol_mock = utils.get_mock_mediator_response_volume(10, "vol", "wwn", "xiv")
+        vol_mock.is_empty = True
+        vol_mock.copy_src_object_id = None
+        self.mediator.create_volume.return_value = vol_mock
         array_type.return_value = "a9k"
-        res = self.servicer.CreateVolume(self.request, context)
+        self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
-        self.mediator.get_volume.assert_called_once_with("aaaa", volume_context={'pool': 'pool1'}, volume_prefix="")
-        self.mediator.create_volume.assert_called_once_with(vol_name, 10, {}, 'pool1', "")
-        # self.mediator.max_volume_name_length = 63
-        # self.mediator.max_volume_prefix_length = 10
-        # a_enter.return_value = self.mediator
-        # context = utils.FakeContext()
-        # snap_id = "wwn"
-        # self.request.volume_content_source = self._get_snapshot_source(snap_id)
-        #
-        # self.mediator.create_volume = Mock()
-        # vol_mock = utils.get_mock_mediator_response_volume(10, "vol", "wwn", "xiv")
-        # vol_mock.is_empty = True
-        # vol_mock.copy_src_object_id = None
-        # self.mediator.create_volume.return_value = vol_mock
-        # array_type.return_value = "a9k"
-        # self.servicer.CreateVolume(self.request, context)
-        # self.assertEqual(context.code, grpc.StatusCode.OK)
-        # self.mediator.copy_volume_from_snapshot = Mock()
-        # self.mediator.copy_volume_from_snapshot.assert_called_once_with(vol_name, snap_id)
+        #self.mediator.copy_volume_from_snapshot = Mock()
+        self.mediator.copy_volume_from_snapshot.assert_called_once_with(vol_name, snap_id)
 
     def _get_snapshot_source(self, snapshot_id):
         source = Mock()
