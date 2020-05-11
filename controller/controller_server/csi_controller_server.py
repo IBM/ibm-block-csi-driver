@@ -160,7 +160,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details("Volume is not empty.")
             context.set_code(grpc.StatusCode.INTERNAL)
             return csi_pb2.CreateVolumeResponse()
-        logger.debug("+++++++++ _handle snap {0} vol {1}".format(src_snapshot_id. vol.copy_src_object_id))
+        logger.debug("+++++++++ _handle snap {0} vol {1}".format(src_snapshot_id, vol.copy_src_object_id))
         if vol.copy_src_object_id:
             return None
         if vol.copy_src_object_id == src_snapshot_id:
