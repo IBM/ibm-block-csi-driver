@@ -204,7 +204,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.debug("Validate Snapshot {0} capacity {1}".format(src_snapshot_id, snapshot_capacity))
             is_snapshot_too_small = min_capacity and min_capacity != 0 and snapshot_capacity < min_capacity
             is_snapshot_too_big = max_capacity and snapshot_capacity > max_capacity
-            return is_snapshot_too_small or is_snapshot_too_big
+            return not is_snapshot_too_small and not is_snapshot_too_big
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectName(ex.status)
