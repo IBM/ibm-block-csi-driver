@@ -201,7 +201,9 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                 logger.exception(controller_error_messages.SnapshotNotFoundError_message.format(src_snapshot_id))
                 raise controller_errors.SnapshotNotFoundError(src_snapshot_id)
             snapshot_capacity = src_snapshot.capacity
-            logger.debug("Validate Snapshot {0} capacity {1}".format(src_snapshot_id, snapshot_capacity))
+            logger.debug("Validate Snapshot {0} capacity {1}. Minimal required capacity : {2}".format(src_snapshot_id,
+                                                                                                      snapshot_capacity,
+                                                                                                      min_capacity))
             return min_capacity == 0 or snapshot_capacity >= min_capacity
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
