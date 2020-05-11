@@ -210,7 +210,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.IllegalObjectName(ex.status)
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
-            raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
+            raise controller_errors.PermissionDeniedError("create vol : {0}".format(src_snapshot_id))
 
     def _get_vol_by_wwn(self, volume_id):
         vol_by_wwn = self.client.cmd.vol_list(wwn=volume_id).as_single_element

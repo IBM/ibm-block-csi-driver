@@ -257,8 +257,6 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         caps.mount.fs_type = "ext4"
         access_types = csi_pb2.VolumeCapability.AccessMode
         caps.access_mode.mode = access_types.SINGLE_NODE_WRITER
-        request.capacity_range = Mock()
-        request.capacity_range.required_bytes = 100
 
         self.request.volume_capabilities = [caps]
 
@@ -353,11 +351,14 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     def test_create_volume_from_snapshot_bad_snapshot_capacity(self, a_enter, a_exit, array_type):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
+        self.request.capacity_range = Mock()
+        self.request.capacity_range.required_bytes = 1000
+
         snap_id = "wwn1"
         self.request.volume_content_source = self._get_snapshot_source(snap_id)
         self.mediator.create_volume = Mock()
         self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
-        insufficient_snap_capacity = 1
+        insufficient_snap_capacity = 17
         self.mediator.get_snapshot_by_id = utils.get_mock_mediator_response_snapshot(insufficient_snap_capacity, "nnap",
                                                                                      snap_id, "vol", "a9k")
         self.mediator.validate_copy_vol_src_snap_capacity = Mock()
