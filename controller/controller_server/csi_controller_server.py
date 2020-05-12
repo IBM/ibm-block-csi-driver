@@ -104,13 +104,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
                     array_mediator.validate_supported_capabilities(capabilities)
-                    is_src_snap_capacity_correct = self._validate_vol_src_snap_capacity(array_mediator, request,
-                                                                                        src_snapshot_id)
-                    if not is_src_snap_capacity_correct:
-                        context.set_details("Source Snapshot capacity doesn't match Volume capacity request")
-                        context.set_code(grpc.StatusCode.ALREADY_EXISTS)
-                        return csi_pb2.CreateVolumeResponse()
-
                     vol = self._create_volume(array_mediator, volume_full_name, size, capabilities, pool, volume_prefix,
                                               src_snapshot_id)
                 else:
@@ -158,14 +151,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateVolumeResponse()
 
-    def _validate_vol_src_snap_capacity(self, array_mediator, request, src_snapshot_id):
-        logger.info("+++++++++++++++++ _validate_copy_vol_src_snap_capacity")
-        logger.info(request.capacity_range)
-        if not src_snapshot_id or not request.capacity_range:
-            return True
-        min_capacity = request.capacity_range.required_bytes
-        return array_mediator.validate_copy_vol_src_snap_capacity(src_snapshot_id, int(min_capacity))
-
     def _create_volume(self, array_mediator, volume_name, size, capabilities, pool, volume_prefix, src_snapshot_id):
         vol = array_mediator.create_volume(volume_name, size, capabilities, pool, volume_prefix)
         if src_snapshot_id:
@@ -186,10 +171,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return None
         vol_name = vol.volume_name
         vol_copy_src_object_id = vol.copy_src_object_id
-        if not vol.is_empty:
-            context.set_details("Volume is not empty.")
-            context.set_code(grpc.StatusCode.INTERNAL)
-            return csi_pb2.CreateVolumeResponse()
         logger.debug("+++++++++ _handle snap {0} vol {1}".format(src_snapshot_id, vol.copy_src_object_id))
         if vol_copy_src_object_id == src_snapshot_id:
             logger.debug(

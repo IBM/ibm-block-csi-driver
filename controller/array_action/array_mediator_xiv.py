@@ -90,14 +90,12 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def _generate_volume_response(self, cli_volume):
         copy_src_object_wwn = cli_volume.copy_master_wwn if cli_volume.vol_copy_type == "Copy" else None
-        is_empty = cli_volume.written == "0"
         return Volume(self._convert_size_blocks_to_bytes(cli_volume.capacity),
                       cli_volume.wwn,
                       cli_volume.name,
                       self.endpoint,
                       cli_volume.pool_name,
                       copy_src_object_wwn,
-                      is_empty,
                       self.array_type)
 
     def _generate_snapshot_response(self, cli_snapshot):
@@ -194,23 +192,19 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
-    def validate_copy_vol_src_snap_capacity(self, src_snapshot_id, min_capacity):
+    def resize_volume(self, name, size_in_bytes):
         try:
-            src_snapshot = self._get_snapshot_by_id(src_snapshot_id)
-            if not src_snapshot:
-                logger.exception(controller_error_messages.SnapshotNotFoundError_message.format(src_snapshot_id))
-                raise controller_errors.SnapshotNotFoundError(src_snapshot_id)
-            snapshot_capacity = self._convert_size_blocks_to_bytes(src_snapshot.capacity)
-            logger.debug("Validate Snapshot {0} capacity {1}. Minimal required capacity : {2}".format(src_snapshot_id,
-                                                                                                      snapshot_capacity,
-                                                                                                      min_capacity))
-            return min_capacity == 0 or snapshot_capacity >= min_capacity
+            size_in_blocks = int(self._convert_size_bytes_to_blocks(size_in_bytes))
+            self.client.cmd.vol_resize(vol=name, size_in_blocks=size_in_blocks)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectName(ex.status)
+        except xcli_errors.VolumeBadNameError as ex:
+            logger.exception(ex)
+            raise controller_errors.VolumeNotFoundError(name)
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
-            raise controller_errors.PermissionDeniedError("create vol : {0}".format(src_snapshot_id))
+            raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
     def _get_vol_by_wwn(self, volume_id):
         vol_by_wwn = self.client.cmd.vol_list(wwn=volume_id).as_single_element

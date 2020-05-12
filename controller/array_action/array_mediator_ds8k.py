@@ -186,7 +186,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             vol_name=res.name,
             array_address=self.service_address,
             copy_src_object_id=None,  # TODO: CSI-1026
-            is_empty=None,  # TODO: CSI-1026
             pool_name=res.pool,
             array_type=self.array_type
         )
@@ -262,8 +261,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         # TODO:	CSI-1338
         raise NotImplementedError
 
-    def validate_copy_vol_src_snap_capacity(self, src_snapshot_id, min_capacity):
-        # TODO:	CSI-1338
+    def resize_volume(self, name, size_in_bytes):
+        # TODO:	CSI-1026
         raise NotImplementedError
 
     def delete_volume(self, volume_id):

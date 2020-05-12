@@ -75,20 +75,17 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def validate_copy_vol_src_snap_capacity(self, src_snapshot_id, min_capacity):
+    def resize_volume(self, name, size_in_bytes):
         """
-        This function should create a volume from snapshot in the storage system.
+        This function should resize the volume to the specified size
 
         Args:
-            src_snapshot_id     : id of snapshot to copy volume from
-            min_capacity        : min requested volume capacity
-
-        Returns:
-            Can array copy this snapshot with specified capacity to volume
+            name           : name of the volume
+            size_in_bytes  : size in bytes resize to
 
         Raises:
-            SnapshotNotFoundVolumeWithSameIdExistsError
-            SnapshotNotFoundError
+            VolumeNotFoundError
+            VolumeNotFoundError
             IllegalObjectName
             PermissionDenied
         """

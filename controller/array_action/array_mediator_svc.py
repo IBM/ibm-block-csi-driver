@@ -236,7 +236,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         # TODO:	CSI-1026
         raise NotImplementedError
 
-    def validate_copy_vol_src_snap_capacity(self, src_snapshot_id, min_capacity):
+    def resize_volume(self, name, size_in_bytes):
         # TODO:	CSI-1026
         raise NotImplementedError
 
