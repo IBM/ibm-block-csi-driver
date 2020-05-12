@@ -1,3 +1,4 @@
-#!/bin/bash -x
-pylint --errors-only --disable=no-value-for-parameter,no-member --ignore=csi_general ./controller
+#!/bin/bash
+set -x
+pylint --rcfile="$(dirname "$0")/lint.ini" ./controller
 exit $?
