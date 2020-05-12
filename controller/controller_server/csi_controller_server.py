@@ -156,7 +156,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         if src_snapshot_id:
             vol_name = vol.volume_name
             logger.error("Copy Snapshot {0} data to Volume {1}.".format(src_snapshot_id, vol_name))
-            array_mediator.copy_volume_from_snapshot(vol_name, src_snapshot_id)
+            array_mediator.copy_volume_from_snapshot(vol_name, src_snapshot_id, size)
             vol.copy_src_object_id = src_snapshot_id
         return vol
 

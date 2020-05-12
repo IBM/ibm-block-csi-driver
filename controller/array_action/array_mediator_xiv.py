@@ -164,7 +164,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
-    def copy_volume_from_snapshot(self, name, src_snapshot_id):
+    def copy_volume_from_snapshot(self, name, src_snapshot_id, min_size_in_bytes):
         src_snapshot_name = None
         try:
             src_snapshot = self._get_snapshot_by_id(src_snapshot_id)
@@ -172,13 +172,11 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                 logger.exception(controller_error_messages.SnapshotNotFoundError_message.format(src_snapshot_id))
                 raise controller_errors.SnapshotNotFoundError(src_snapshot_id)
             src_snapshot_name = src_snapshot.name
-            if not src_snapshot.master_name:
-                logger.exception(controller_error_messages.SnapshotNotFoundVolumeWithSameIdExistsError_message.format(
-                    src_snapshot_id))
-                raise controller_errors.SnapshotNotFoundVolumeWithSameIdExistsError(src_snapshot_id, self.endpoint)
-
             self.client.cmd.vol_format(vol=name)
             self.client.cmd.vol_copy(vol_src=src_snapshot_name, vol_trg=name)
+            min_size_in_blocks = int(self._convert_size_bytes_to_blocks(min_size_in_bytes))
+            if src_snapshot.capacity > min_size_in_blocks:
+                self.client.cmd.vol_resize(vol=name, size_in_blocks=min_size_in_blocks)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectName(ex.status)
@@ -186,20 +184,6 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.SnapshotNotFoundError(src_snapshot_name)
         except (xcli_errors.VolumeBadNameError, xcli_errors.TargetVolumeBadNameError) as ex:
-            logger.exception(ex)
-            raise controller_errors.VolumeNotFoundError(name)
-        except xcli_errors.OperationForbiddenForUserCategoryError as ex:
-            logger.exception(ex)
-            raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
-
-    def resize_volume(self, name, size_in_bytes):
-        try:
-            size_in_blocks = int(self._convert_size_bytes_to_blocks(size_in_bytes))
-            self.client.cmd.vol_resize(vol=name, size_in_blocks=size_in_blocks)
-        except xcli_errors.IllegalNameForObjectError as ex:
-            logger.exception(ex)
-            raise controller_errors.IllegalObjectName(ex.status)
-        except xcli_errors.VolumeBadNameError as ex:
             logger.exception(ex)
             raise controller_errors.VolumeNotFoundError(name)
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
@@ -214,15 +198,6 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         vol_name = vol_by_wwn.name
         logger.debug("found volume name : {0}".format(vol_name))
         return vol_name
-
-    def _get_snapshot_by_id(self, snapshot_id):
-        snapshots_cli_res = self.client.cmd.vol_list(wwn=snapshot_id)
-        snapshot = None
-        if snapshots_cli_res:
-            snapshot = snapshots_cli_res.as_single_element
-            if not snapshot.master_name:
-                raise controller_errors.SnapshotNotFoundVolumeWithSameIdExistsError(snapshot_id, self.endpoint)
-        return snapshot
 
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
@@ -253,6 +228,15 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.SnapshotNotFoundVolumeWithSameNameExists(cli_snapshot.name, self.endpoint)
         array_snapshot = self._generate_snapshot_response(cli_snapshot)
         return array_snapshot
+
+    def _get_snapshot_by_id(self, snapshot_id):
+        snapshots_cli_res = self.client.cmd.vol_list(wwn=snapshot_id)
+        snapshot = None
+        if snapshots_cli_res:
+            snapshot = snapshots_cli_res.as_single_element
+            if not snapshot.master_name:
+                raise controller_errors.SnapshotNotFoundVolumeWithSameIdExistsError(snapshot_id, self.endpoint)
+        return snapshot
 
     def create_snapshot(self, name, volume_name):
         logger.info("creating snapshot {0} from volume {1}".format(name, volume_name))

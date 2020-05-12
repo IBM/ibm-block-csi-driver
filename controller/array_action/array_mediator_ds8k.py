@@ -257,12 +257,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             )
             raise array_errors.VolumeCreationError(name)
 
-    def copy_volume_from_snapshot(self, name, src_snapshot_id):
+    def copy_volume_from_snapshot(self, name, src_snapshot_id, min_size_in_bytes):
         # TODO:	CSI-1338
-        raise NotImplementedError
-
-    def resize_volume(self, name, size_in_bytes):
-        # TODO:	CSI-1026
         raise NotImplementedError
 
     def delete_volume(self, volume_id):
