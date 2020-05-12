@@ -878,6 +878,16 @@ class TestControllerServerUnPublishVolume(unittest.TestCase):
         self.servicer.ControllerUnpublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
 
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    def test_unpublish_volume_success_idempotent_volume_not_found(self, a_exit, a_enter):
+        a_enter.return_value = self.mediator
+        context = utils.FakeContext()
+        self.mediator.unmap_volume_by_initiators = Mock()
+        self.mediator.unmap_volume_by_initiators.side_effect = [array_errors.VolumeNotFoundError("vol")]
+        self.servicer.ControllerUnpublishVolume(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.OK)
+
     @patch("controller.controller_server.utils.validate_unpublish_volume_request")
     def test_unpublish_volume_validation_exception(self, publish_validation):
         publish_validation.side_effect = [controller_errors.ValidationException("msg")]
