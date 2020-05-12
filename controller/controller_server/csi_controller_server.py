@@ -271,10 +271,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         except controller_errors.VolumeAlreadyUnmappedError:
             logger.debug("Idempotent case. volume is already unmapped.")
+            context.set_code(grpc.StatusCode.OK)
             return csi_pb2.ControllerUnpublishVolumeResponse()
 
         except controller_errors.VolumeNotFoundError as ex:
             logger.debug("Idempotent case. volume is already deleted.")
+            context.set_code(grpc.StatusCode.OK)
             return csi_pb2.ControllerUnpublishVolumeResponse()
 
         except controller_errors.PermissionDeniedError as ex:
