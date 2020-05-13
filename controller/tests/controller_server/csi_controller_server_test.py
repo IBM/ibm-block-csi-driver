@@ -318,20 +318,23 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     def test_create_volume_from_snapshot_success(self, a_enter, a_exit, array_type):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
-        snap_id = "wwn1"
-        snap_name = "snap"
-        snap_capacity = 100
-        self.request.volume_content_source = self._get_snapshot_source(snap_id)
+        snapshot_id = "wwn1"
+        snapshot_name = "snap"
+        snap_capacity_bytes = 100
+        self.request.volume_content_source = self._get_snapshot_source(snapshot_id)
         self.mediator.create_volume = Mock()
         self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
         self.mediator.get_snapshot_by_id = Mock()
-        self.mediator.get_snapshot_by_id.return_value = utils.get_mock_mediator_response_snapshot(snap_capacity,
-                                                                                                  snap_name,
-                                                                                                  snap_id, "vol", "a9k")
+        self.mediator.get_snapshot_by_id.return_value = utils.get_mock_mediator_response_snapshot(snap_capacity_bytes,
+                                                                                                  snapshot_name,
+                                                                                                  snapshot_id, "vol",
+                                                                                                  "a9k")
+        self.mediator._convert_size_bytes_to_blocks = Mock()
+        self.mediator._convert_size_bytes_to_blocks.return_value = snap_capacity_bytes
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
-        self.mediator.copy_volume_from_snapshot.assert_called_once_with(vol_name, snap_name, snap_capacity,
+        self.mediator.copy_volume_from_snapshot.assert_called_once_with(vol_name, snapshot_name, snap_capacity_bytes,
                                                                         self.capacity_bytes)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")

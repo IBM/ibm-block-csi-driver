@@ -206,7 +206,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_list = Mock()
         self.mediator.client.cmd.vol_list.return_value = self._get_single_snapshot_result_mock(snap_wwn=snap_id,
                                                                                                snap_vol_name="")
-        with self.assertRaises(array_errors.SnapshotNotFoundVolumeWithSameNameExists):
+        with self.assertRaises(array_errors.SnapshotNotFoundVolumeWithSameIdExists):
             self.mediator.get_snapshot_by_id(snap_id)
 
     def test_create_snapshot_succeeds(self):
