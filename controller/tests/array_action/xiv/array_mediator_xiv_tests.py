@@ -201,12 +201,18 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.assertTrue(res.snapshot_name == snap_name)
         self.assertTrue(res.volume_name == vol_name)
 
+    def test_get_snapshot_returns_illegal_object_id(self):
+        snap_name = "snap"
+        self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalValueForArgumentError("", snap_name, "")]
+        with self.assertRaises(array_errors.IllegalObjectID):
+            self.mediator.get_snapshot(snap_name)
+
     def test_get_snapshot_same_id_vol_exists_error(self):
         snap_id = "wwn1"
         self.mediator.client.cmd.vol_list = Mock()
         self.mediator.client.cmd.vol_list.return_value = self._get_single_snapshot_result_mock(snap_wwn=snap_id,
                                                                                                snap_vol_name="")
-        with self.assertRaises(array_errors.SnapshotNotFoundVolumeWithSameIdExists):
+        with self.assertRaises(array_errors.SnapshotNotFoundVolumeWithSameIdExistsError):
             self.mediator.get_snapshot_by_id(snap_id)
 
     def test_create_snapshot_succeeds(self):
