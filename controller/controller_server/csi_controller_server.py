@@ -5,6 +5,7 @@ from optparse import OptionParser
 
 import grpc
 import yaml
+from retry import retry
 
 import controller.array_action.errors as controller_errors
 import controller.controller_server.config as config
@@ -156,15 +157,24 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         vol = array_mediator.create_volume(volume_name, min_vol_size, capabilities, pool, volume_prefix)
         if src_snapshot_id:
             vol_name = vol.volume_name
-            src_snapshot = array_mediator.get_snapshot_by_id(src_snapshot_id)
-            if not src_snapshot:
-                raise controller_errors.SnapshotNotFoundError(src_snapshot_id)
-            src_snapshot_name = src_snapshot.snapshot_name
-            src_snapshot_capacity = src_snapshot.capacity_bytes
-            logger.error("Copy Snapshot {0} data to Volume {1}.".format(src_snapshot_id, vol_name))
-            array_mediator.copy_volume_from_snapshot(vol_name, src_snapshot_name, src_snapshot_capacity, min_vol_size)
-            vol.copy_src_object_id = src_snapshot.id
+            try:
+                src_snapshot = array_mediator.get_snapshot_by_id(src_snapshot_id)
+                if not src_snapshot:
+                    raise controller_errors.SnapshotNotFoundError(src_snapshot_id)
+                src_snapshot_name = src_snapshot.snapshot_name
+                src_snapshot_capacity = src_snapshot.capacity_bytes
+                logger.error("Copy Snapshot {0} data to Volume {1}.".format(src_snapshot_id, vol_name))
+                array_mediator.copy_volume_from_snapshot(vol_name, src_snapshot_name, src_snapshot_capacity, min_vol_size)
+                vol.copy_src_object_id = src_snapshot.id
+            except Exception as ex:
+                logger.error("Exception raised while creating volume from snapshot")
+                logger.exception(ex)
+                self._rollback_create_volume_from_snapshot(vol.id)
         return vol
+
+    @retry(Exception, tries=5, delay=1)
+    def _rollback_create_volume_from_snapshot(self, array_mediator, vol_id):
+        array_mediator.delete_volume(vol_id)
 
     def _handle_existing_vol_src_snap(self, vol, src_snapshot_id, context):
         # TODO
