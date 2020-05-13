@@ -164,19 +164,13 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
-    def copy_volume_from_snapshot(self, name, src_snapshot_id, min_size_in_bytes):
-        src_snapshot_name = None
+    def copy_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes, min_vol_size_in_bytes):
         try:
-            src_snapshot = self._get_snapshot_by_id(src_snapshot_id)
-            if not src_snapshot:
-                logger.exception(controller_error_messages.SnapshotNotFoundError_message.format(src_snapshot_id))
-                raise controller_errors.SnapshotNotFoundError(src_snapshot_id)
-            src_snapshot_name = src_snapshot.name
             self.client.cmd.vol_format(vol=name)
-            self.client.cmd.vol_copy(vol_src=src_snapshot_name, vol_trg=name)
-            min_size_in_blocks = int(self._convert_size_bytes_to_blocks(min_size_in_bytes))
-            if src_snapshot.capacity > min_size_in_blocks:
-                self.client.cmd.vol_resize(vol=name, size_in_blocks=min_size_in_blocks)
+            self.client.cmd.vol_copy(vol_src=src_snap_name, vol_trg=name)
+            min_vol_size_in_blocks = int(self._convert_size_bytes_to_blocks(min_vol_size_in_bytes))
+            if src_snap_capacity_in_bytes > min_vol_size_in_blocks:
+                self.client.cmd.vol_resize(vol=name, size_in_blocks=min_vol_size_in_blocks)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectName(ex.status)
@@ -229,7 +223,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         array_snapshot = self._generate_snapshot_response(cli_snapshot)
         return array_snapshot
 
-    def _get_snapshot_by_id(self, snapshot_id):
+    def get_snapshot_by_id(self, snapshot_id):
         snapshots_cli_res = self.client.cmd.vol_list(wwn=snapshot_id)
         snapshot = None
         if snapshots_cli_res:

@@ -231,7 +231,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise ex
 
-    def copy_volume_from_snapshot(self, name, src_snapshot_id, min_size_in_bytes):
+    def copy_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes, min_vol_size_in_bytes):
         # TODO:	CSI-1026
         raise NotImplementedError
 
@@ -257,6 +257,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def get_snapshot(self, snapshot_name):
         # TODO: CSI-1024
         pass
+
+    def get_snapshot_by_id(self, src_snapshot_id):
+        # TODO:	CSI-1026
+        raise NotImplementedError
 
     def create_snapshot(self, name, volume_name):
         # TODO: CSI-1024

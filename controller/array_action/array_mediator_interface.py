@@ -55,14 +55,15 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def copy_volume_from_snapshot(self, name, src_snapshot_id, min_size_in_bytes):
+    def copy_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes, min_vol_size_in_bytes):
         """
         This function should create a volume from snapshot in the storage system.
 
         Args:
-            name                : name of the volume to be created in the storage system
-            src_snapshot_id     : id of snapshot to create from
-            min_size_in_bytes   : if snapshot capacity is lower than this value vol will be increased to this value
+            name                         : name of the volume to be created in the storage system
+            src_snap_name                : name of snapshot to create from
+            src_snap_capacity_in_bytes   : capacity of snapshot to create from
+            min_vol_size_in_bytes        : if snapshot capacity is lower than this value vol will be increased to this value
 
         Returns:
             Volume
@@ -197,6 +198,19 @@ class ArrayMediator(ABC):
             SnapshotNotFoundVolumeWithSameNameExists
             IllegalObjectName
             PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_snapshot_by_id(self, snapshot_id):
+        """
+        This function return snapshot info about the snapshot.
+        Args:
+            snapshot_id : id of the snapshot in the storage system
+        Returns:
+           Snapshot
+        Raises:
+            SnapshotNotFoundVolumeWithSameNameExists
         """
         raise NotImplementedError
 

@@ -151,13 +151,19 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateVolumeResponse()
 
-    def _create_volume(self, array_mediator, volume_name, size, capabilities, pool, volume_prefix, src_snapshot_id):
-        vol = array_mediator.create_volume(volume_name, size, capabilities, pool, volume_prefix)
+    def _create_volume(self, array_mediator, volume_name, min_vol_size, capabilities, pool, volume_prefix,
+                       src_snapshot_id):
+        vol = array_mediator.create_volume(volume_name, min_vol_size, capabilities, pool, volume_prefix)
         if src_snapshot_id:
             vol_name = vol.volume_name
+            src_snapshot = array_mediator.get_snapshot_by_id(src_snapshot_id)
+            if not src_snapshot:
+                raise controller_errors.SnapshotNotFoundError(src_snapshot_id)
+            src_snapshot_name = src_snapshot.snapshot_name
+            src_snapshot_capacity = src_snapshot.capacity
             logger.error("Copy Snapshot {0} data to Volume {1}.".format(src_snapshot_id, vol_name))
-            array_mediator.copy_volume_from_snapshot(vol_name, src_snapshot_id, size)
-            vol.copy_src_object_id = src_snapshot_id
+            array_mediator.copy_volume_from_snapshot(vol_name, src_snapshot_name, src_snapshot_capacity, min_vol_size)
+            vol.copy_src_object_id = src_snapshot.id
         return vol
 
     def _handle_existing_vol_src_snap(self, vol, src_snapshot_id, context):
