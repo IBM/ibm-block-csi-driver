@@ -191,20 +191,20 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_get_snapshot_by_id_return_correct_value(self):
         snap_id = "wwn1"
         snap_name = "snap"
-        snap_vol_name = "snap_vol"
+        vol_name = "snap_vol"
         self.mediator.client.cmd.vol_list = Mock()
         self.mediator.client.cmd.vol_list.return_value = self._get_single_snapshot_result_mock(snap_name=snap_name,
-                                                                                               snap_vol_name=snap_vol_name,
+                                                                                               snap_vol_name=vol_name,
                                                                                                snap_wwn=snap_id)
         res = self.mediator.get_snapshot_by_id(snap_id)
         self.assertTrue(res.id == snap_id)
         self.assertTrue(res.snapshot_name == snap_name)
-        self.assertTrue(res.volume_name == snap_vol_name)
+        self.assertTrue(res.volume_name == vol_name)
 
     def test_get_snapshot_same_id_vol_exists_error(self):
         snap_id = "wwn1"
-        xcli_snap = self._get_single_snapshot_result_mock(snap_wwn=snap_id)
-        self.mediator.client.cmd.vol_list.return_value = xcli_snap
+        self.mediator.client.cmd.vol_list = Mpck()
+        self.mediator.client.cmd.vol_list.return_value = self._get_single_snapshot_result_mock(snap_wwn=snap_id)
         with self.assertRaises(array_errors.SnapshotNotFoundVolumeWithSameNameExists):
             self.mediator.get_snapshot_by_id(snap_id)
 
