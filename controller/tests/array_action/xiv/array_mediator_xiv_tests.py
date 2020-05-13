@@ -119,12 +119,12 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.copy_volume_from_snapshot(vol_name, src_snap_name, src_snap_capacity_in_bytes,
                                                 min_vol_size_in_bytes)
         vol_size_in_blocks = self.mediator._convert_size_bytes_to_blocks(min_vol_size_in_bytes)
-        self.client.cmd.vol_format = Mock()
-        self.client.cmd.vol_copy = Mock()
-        self.client.cmd.vol_resize = Mock()
-        self.client.cmd.vol_format.assert_called_once_with(vol=vol_name)
-        self.client.cmd.vol_copy.assert_called_once_with(vol_src=src_snap_name, vol_trg=vol_name)
-        self.client.cmd.vol_resize.assert_called_once_with(vol=vol_name, size_in_blocks=vol_size_in_blocks)
+        self.mediator.client.cmd.vol_format = Mock()
+        self.mediator.client.cmd.vol_copy = Mock()
+        self.mediator.client.cmd.vol_resize = Mock()
+        self.mediator.client.cmd.vol_format.assert_called_once_with(vol=vol_name)
+        self.mediator.client.cmd.vol_copy.assert_called_once_with(vol_src=src_snap_name, vol_trg=vol_name)
+        self.mediator.client.cmd.vol_resize.assert_called_once_with(vol=vol_name, size_in_blocks=vol_size_in_blocks)
 
     def test_copy_volume_from_snapshot_succeeds_without_resize(self):
         vol_name = "vol"
@@ -133,12 +133,12 @@ class TestArrayMediatorXIV(unittest.TestCase):
         min_vol_size_in_bytes = 500
         self.mediator.copy_volume_from_snapshot(vol_name, src_snap_name, src_snap_capacity_in_bytes,
                                                 min_vol_size_in_bytes)
-        self.client.cmd.vol_format = Mock()
-        self.client.cmd.vol_copy = Mock()
-        self.client.cmd.vol_resize = Mock()
-        self.client.cmd.vol_format.assert_called_once_with(vol=vol_name)
-        self.client.cmd.vol_copy.assert_called_once_with(vol_src=src_snap_name, vol_trg=vol_name)
-        self.client.cmd.vol_resize.assert_not_called()
+        self.mediator.client.cmd.vol_format = Mock()
+        self.mediator.client.cmd.vol_copy = Mock()
+        self.mediator.client.cmd.vol_resize = Mock()
+        self.mediator.client.cmd.vol_format.assert_called_once_with(vol=vol_name)
+        self.mediator.client.cmd.vol_copy.assert_called_once_with(vol_src=src_snap_name, vol_trg=vol_name)
+        self.mediator.client.cmd.vol_resize.assert_not_called()
 
     def test_copy_volume_from_snapshot_failed_illegal_name(self):
         self._test_copy_volume_from_snapshot_error(xcli_errors.IllegalNameForObjectError("", "", ""),
@@ -192,10 +192,11 @@ class TestArrayMediatorXIV(unittest.TestCase):
         snap_id = "wwn1"
         snap_name = "snap"
         snap_vol_name = "snap_vol"
-        xcli_snap = self._get_single_snapshot_result_mock(snap_name=snap_name, snap_vol_name=snap_vol_name,
-                                                          snap_wwn=snap_id)
-        self.mediator.client.cmd.vol_list.return_value = xcli_snap
-        res = self.mediator.get_snapshot_by_id(snap_name)
+        self.mediator.client.cmd.vol_list = Mock()
+        self.mediator.client.cmd.vol_list.return_value = self._get_single_snapshot_result_mock(snap_name=snap_name,
+                                                                                               snap_vol_name=snap_vol_name,
+                                                                                               snap_wwn=snap_id)
+        res = self.mediator.get_snapshot_by_id(snap_id)
         self.assertTrue(res.id == snap_id)
         self.assertTrue(res.snapshot_name == snap_name)
         self.assertTrue(res.volume_name == snap_vol_name)
