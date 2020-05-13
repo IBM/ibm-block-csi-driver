@@ -176,7 +176,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.IllegalObjectName(ex.status)
         except xcli_errors.SourceVolumeBadNameError as ex:
             logger.exception(ex)
-            raise controller_errors.SnapshotNotFoundError(src_snapshot_name)
+            raise controller_errors.SnapshotNotFoundError(src_snap_name)
         except (xcli_errors.VolumeBadNameError, xcli_errors.TargetVolumeBadNameError) as ex:
             logger.exception(ex)
             raise controller_errors.VolumeNotFoundError(name)

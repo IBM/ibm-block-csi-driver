@@ -123,8 +123,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.client.cmd.vol_copy = Mock()
         self.client.cmd.vol_resize = Mock()
         self.client.cmd.vol_format.assert_called_once_with(vol=vol_name)
-        self.client.cmd.vol_copy.assert_called_once_with(vol_src=snap_name, vol_trg=vol_name)
-        self.client.cmd.vol_resize.assert_called_once_with(vol=src_vol_name, size_in_blocks=vol_size_in_blocks)
+        self.client.cmd.vol_copy.assert_called_once_with(vol_src=src_snap_name, vol_trg=vol_name)
+        self.client.cmd.vol_resize.assert_called_once_with(vol=vol_name, size_in_blocks=vol_size_in_blocks)
 
     def test_copy_volume_from_snapshot_succeeds_without_resize(self):
         vol_name = "vol"
