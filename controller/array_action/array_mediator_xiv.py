@@ -165,11 +165,18 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
     def copy_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes, min_vol_size_in_bytes):
+        logger.debug(
+            "Copy Snapshot {0} data to Volume {1}. Snapshot capacity {2}. Minimal requested Volume capacity {3}".format(
+                name, src_snap_name, src_snap_capacity_in_bytes, min_vol_size_in_bytes))
         try:
+            logger.debug("Formatting Volume {0}".format(name))
             self.client.cmd.vol_format(vol=name)
+            logger.debug("Copying Snapshot {0} data to Volume {1}.".format(name, src_snap_name))
             self.client.cmd.vol_copy(vol_src=src_snap_name, vol_trg=name)
-            min_vol_size_in_blocks = int(self._convert_size_bytes_to_blocks(min_vol_size_in_bytes))
-            if src_snap_capacity_in_bytes > min_vol_size_in_blocks:
+            if min_vol_size_in_bytes > src_snap_capacity_in_bytes:
+                min_vol_size_in_blocks = int(self._convert_size_bytes_to_blocks(min_vol_size_in_bytes))
+                logger.debug(
+                    "Increasing Volume {0} size to {1} blocks.".format(name, min_vol_size_in_blocks))
                 self.client.cmd.vol_resize(vol=name, size_in_blocks=min_vol_size_in_blocks)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
