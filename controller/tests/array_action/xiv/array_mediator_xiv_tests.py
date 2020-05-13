@@ -111,43 +111,42 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_delete = Mock()
         self.mediator.delete_volume("vol-wwn")
 
-    def test_copy_volume_from_snapshot_succeeds(self):
+    def test_copy_volume_from_snapshot_succeeds_with_resize(self):
         vol_name = "vol"
-        snap_id = "wwn"
-        cli_snap = Mock()
-        cli_snap.master_name = vol_name
-        snapshot_cli_res_mock = Mock()
-        snapshot_cli_res_mock.as_single_element = cli_snap
-        self.mediator.client.cmd.vol_list.return_value = snapshot_cli_res_mock
-        self.mediator.copy_volume_from_snapshot(vol_name, snap_id)
+        src_snap_name = "snap"
+        src_snap_capacity_in_bytes = 500
+        min_vol_size_in_bytes = 1000
+        self.mediator.copy_volume_from_snapshot(vol_name, src_snap_name, src_snap_capacity_in_bytes,
+                                                min_vol_size_in_bytes)
+        vol_size_in_blocks = self.mediator._convert_size_bytes_to_blocks(min_vol_size_in_bytes)
+        self.client.cmd.vol_format = Mock()
+        self.client.cmd.vol_copy = Mock()
+        self.client.cmd.vol_resize = Mock()
+        self.client.cmd.vol_format.assert_called_once_with(vol=vol_name)
+        self.client.cmd.vol_copy.assert_called_once_with(vol_src=snap_name, vol_trg=vol_name)
+        self.client.cmd.vol_resize.assert_called_once_with(vol=src_vol_name, size_in_blocks=vol_size_in_blocks)
 
-    def test_copy_volume_from_snapshot_not_found(self):
+    def test_copy_volume_from_snapshot_succeeds_without_resize(self):
         vol_name = "vol"
-        snap_id = "wwn"
-        cli_snap = Mock()
-        cli_snap.master_name = vol_name
-        self.mediator.client.cmd.vol_list.return_value = None
-        with self.assertRaises(array_errors.SnapshotNotFoundError):
-            self.mediator.copy_volume_from_snapshot(vol_name, snap_id)
-
-    def test_copy_volume_from_snapshot_not_a_snapshot(self):
-        vol_name = "vol"
-        snap_id = "wwn"
-        cli_snap = Mock()
-        cli_snap.master_name = ""
-        snapshot_cli_res_mock = Mock()
-        snapshot_cli_res_mock.as_single_element = cli_snap
-        self.mediator.client.cmd.vol_list.return_value = snapshot_cli_res_mock
-        with self.assertRaises(array_errors.SnapshotNotFoundVolumeWithSameIdExistsError):
-            self.mediator.copy_volume_from_snapshot(vol_name, snap_id)
-
-    def test_copy_volume_from_snapshot_failed_to_format(self):
-        self._test_copy_volume_from_snapshot_error(xcli_errors.VolumeBadNameError("", "", ""),
-                                                   array_errors.VolumeNotFoundError)
+        src_snap_name = "snap"
+        src_snap_capacity_in_bytes = 1000
+        min_vol_size_in_bytes = 500
+        self.mediator.copy_volume_from_snapshot(vol_name, src_snap_name, src_snap_capacity_in_bytes,
+                                                min_vol_size_in_bytes)
+        self.client.cmd.vol_format = Mock()
+        self.client.cmd.vol_copy = Mock()
+        self.client.cmd.vol_resize = Mock()
+        self.client.cmd.vol_format.assert_called_once_with(vol=vol_name)
+        self.client.cmd.vol_copy.assert_called_once_with(vol_src=src_snap_name, vol_trg=vol_name)
+        self.client.cmd.vol_resize.assert_not_called()
 
     def test_copy_volume_from_snapshot_failed_illegal_name(self):
         self._test_copy_volume_from_snapshot_error(xcli_errors.IllegalNameForObjectError("", "", ""),
                                                    array_errors.IllegalObjectName)
+
+    def test_copy_volume_from_snapshot_failed_volume_not_dound(self):
+        self._test_copy_volume_from_snapshot_error(xcli_errors.VolumeBadNameError("", "", ""),
+                                                   array_errors.VolumeNotFoundError)
 
     def test_copy_volume_from_snapshot_failed_snapshot_not_fpund(self):
         self._test_copy_volume_from_snapshot_error(xcli_errors.SourceVolumeBadNameError("", "", ""),
@@ -162,11 +161,9 @@ class TestArrayMediatorXIV(unittest.TestCase):
                                                    array_errors.PermissionDeniedError)
 
     def _test_copy_volume_from_snapshot_error(self, xcli_exception, expected_array_exception):
-        vol_name = "vol"
-        snap_id = "wwn"
-        self.mediator.client.cmd.vol_list.side_effect = [xcli_exception]
+        self.mediator.client.cmd.vol_copy.side_effect = [xcli_exception]
         with self.assertRaises(expected_array_exception):
-            self.mediator.copy_volume_from_snapshot(vol_name, snap_id)
+            self.mediator.copy_volume_from_snapshot("vol", "snap", 0, 0)
 
     def test_get_snapshot_return_correct_value(self):
         snap_name = "snap"
