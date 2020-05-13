@@ -164,7 +164,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 src_snapshot_name = src_snapshot.snapshot_name
                 src_snapshot_capacity = src_snapshot.capacity_bytes
                 logger.error("Copy Snapshot {0} data to Volume {1}.".format(src_snapshot_id, vol_name))
-                array_mediator.copy_volume_from_snapshot(vol_name, src_snapshot_name, src_snapshot_capacity, min_vol_size)
+                array_mediator.copy_volume_from_snapshot(vol_name, src_snapshot_name, src_snapshot_capacity,
+                                                         min_vol_size)
                 vol.copy_src_object_id = src_snapshot.id
             except Exception as ex:
                 logger.error("Exception raised while creating volume from snapshot")
