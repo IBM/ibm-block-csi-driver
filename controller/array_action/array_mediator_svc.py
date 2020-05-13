@@ -26,8 +26,8 @@ VOL_NOT_FOUND = 'CMMVC8957E'
 POOL_NOT_MATCH_VOL_CAPABILITIES = 'CMMVC9292E'
 NOT_REDUCTION_POOL = 'CMMVC9301E'
 
-CLI_OBJECT_KIND_VOLUME = 'volume'
-CLI_OBJECT_KIND_FCMAP = 'fcmap'
+CLI_OBJECT_KIND_VOLUME = 'Volume'
+CLI_OBJECT_KIND_FCMAP = 'FlashCopy Mapping'
 
 
 def is_warning_message(ex):
@@ -180,7 +180,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             if not is_warning_message(ex.my_message):
                 if (OBJ_NOT_FOUND in ex.my_message or
                         NAME_NOT_MEET in ex.my_message):
-                    logger.error("{} not found".format(cli_object_kind))
+                    logger.info("{} not found".format(cli_object_kind))
+                    logger.exception(ex)
         except Exception as ex:
             logger.exception(ex)
             raise ex
@@ -193,8 +194,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.debug("cli {0} returned : {1}".format(cli_object_kind, cli_object))
         return cli_object
 
-    def _get_cli_fcmap_if_exists(self, fcmap_name_or_id):
+    def _get_fcmap_if_exists(self, fcmap_name_or_id):
         return self._get_cli_object(fcmap_name_or_id, CLI_OBJECT_KIND_FCMAP, not_exist_err=False)
+
+    def _get_fcmap(self, fcmap_name_or_id):
+        return self._get_cli_object(fcmap_name_or_id, CLI_OBJECT_KIND_FCMAP)
 
     def _get_cli_volume_if_exists(self, volume_name_or_id):
         return self._get_cli_object(volume_name_or_id, CLI_OBJECT_KIND_VOLUME, not_exist_err=False)
@@ -206,8 +210,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         cli_volume = self._get_cli_volume(volume_name)
         return self._generate_volume_response(cli_volume)
 
-    def get_volume_name(self, wwn):
-        return self._get_vol_by_wwn(wwn)
+    def get_volume_name(self, volume_id):
+        return self._get_vol_by_wwn(volume_id)
 
     def validate_supported_capabilities(self, capabilities):
         logger.debug("validate_supported_capabilities for "
@@ -303,40 +307,57 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         target_cli_volume = self._get_cli_volume_if_exists(snapshot_name)
         if not target_cli_volume:
             return None
-        flashcopy_map = self._get_cli_fcmap_if_exists(target_cli_volume.FC_id)
-        if not flashcopy_map:
-            logger.error("fcmap not found for target volume: {}".format(snapshot_name))
+        fcmap = self._get_fcmap_if_exists(target_cli_volume.FC_id)
+        if not fcmap:
+            logger.error("FlashCopy Mapping not found for target volume: {}".format(snapshot_name))
             raise controller_errors.SnapshotNameBelongsToVolumeError(target_cli_volume.name, self.endpoint)
-        source_cli_volume = self._get_cli_volume(flashcopy_map.source_vdisk_name)
-        return self._generate_snapshot_response(target_cli_volume, source_cli_volume.name)
+        return self._generate_snapshot_response(target_cli_volume, fcmap.source_vdisk_name)
 
-    def _create_target_volume(self, name, volume_name):
-        logger.info("creating target cli volume '{0}' from source volume '{1}'".format(name, volume_name))
-        source_cli_volume = self._get_cli_volume(volume_name)
+    def _create_target_volume(self, source_volume_name, target_volume_name):
+        logger.info("creating target cli volume '{0}' from source volume '{1}'".format(target_volume_name,
+                                                                                       source_volume_name))
+        source_cli_volume = self._get_cli_volume(source_volume_name)
         capabilities = get_capabilities_from_cli_volume(source_cli_volume)
         size_in_bytes = int(source_cli_volume.capacity)
         pool = source_cli_volume.mdisk_grp_name
-        return self._create_cli_volume(name, size_in_bytes, capabilities, pool)
+        return self._create_cli_volume(target_volume_name, size_in_bytes, capabilities, pool)
 
-    def _create_and_start_fcmap(self, target_volume_name, source_volume_name):
-        logger.info("creating fcmap from '{0}' to '{1}'".format(source_volume_name, target_volume_name))
+    def _create_fcmap(self, source_volume_name, target_cli_volume):
+        logger.info("creating FlashCopy Mapping from '{0}' to '{1}'".format(source_volume_name, target_cli_volume.name))
         try:
-            self.client.svctask.mkfcmap(source=source_volume_name, target=target_volume_name)
-            logger.info("starting fcmap from '{0}' to '{1}'".format(source_volume_name, target_volume_name))
-            self.client.svctask.startfcmap(prep=True, object_id=0)
+            self.client.svctask.mkfcmap(source=source_volume_name, target=target_cli_volume.name)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 if FCMAP_ALREADY_EXIST in ex.my_message:
-                    logger.info("fcmap already exists for source '{0}' and target '{1}'".format(source_volume_name,
-                                                                                                target_volume_name))
-                elif FCMAP_ALREADY_COPYING in ex.my_message:
-                    logger.info("fcmap already copying for source '{0}' and target '{1}'".format(source_volume_name,
-                                                                                                 target_volume_name))
+                    logger.info(("FlashCopy Mapping already exists"
+                                 " for source '{0}' and target '{1}'").format(source_volume_name,
+                                                                              target_cli_volume.name))
+                else:
+                    raise ex
+        return self._get_fcmap(target_cli_volume.FC_id)
+
+    def _start_fcmap(self, fcmap):
+        logger.info("starting FlashCopy Mapping '{0}' from '{1}' to '{2}'".format(fcmap.name,
+                                                                                  fcmap.source_vdisk_name,
+                                                                                  fcmap.target_vdisk_name))
+        try:
+            self.client.svctask.startfcmap(prep=True, object_id=fcmap.id)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if not is_warning_message(ex.my_message):
+                if FCMAP_ALREADY_COPYING in ex.my_message:
+                    logger.info(("FlashCopy Mapping already copying"
+                                 " from source '{0}' to target '{1}'").format(fcmap.source_vdisk_name,
+                                                                              fcmap.target_vdisk_name))
+                else:
+                    raise ex
 
     def create_snapshot(self, name, volume_name):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
-        target_cli_volume = self._create_target_volume(name, volume_name)
-        self._create_and_start_fcmap(name, volume_name)
+        target_cli_volume = self._create_target_volume(source_volume_name=volume_name,
+                                                       target_volume_name=name)
+        fcmap = self._create_fcmap(source_volume_name=volume_name,
+                                   target_cli_volume=target_cli_volume)
+        self._start_fcmap(fcmap)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
         return self._generate_snapshot_response(target_cli_volume, volume_name)
 
