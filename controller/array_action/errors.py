@@ -67,6 +67,12 @@ class IllegalObjectName(BaseArrayActionException):
         self.message = "{0}".format(msg)
 
 
+class IllegalObjectID(BaseArrayActionException):
+
+    def __init__(self, msg):
+        self.message = "{0}".format(msg)
+
+
 class PoolDoesNotMatchCapabilities(BaseArrayActionException):
 
     def __init__(self, pool, capabilities, error):

@@ -231,12 +231,16 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         return array_snapshot
 
     def get_snapshot_by_id(self, snapshot_id):
-        snapshots_cli_res = self.client.cmd.vol_list(wwn=snapshot_id)
         cli_snapshot = None
-        if snapshots_cli_res:
-            cli_snapshot = snapshots_cli_res.as_single_element
-            if not cli_snapshot.master_name:
-                raise controller_errors.SnapshotNotFoundVolumeWithSameIdExistsError(snapshot_id, self.endpoint)
+        try:
+            cli_snapshot = self.client.cmd.vol_list(wwn=snapshot_id).as_single_element
+        except xcli_errors.IllegalValueForArgumentError as ex:
+            logger.exception(ex)
+            raise controller_errors.IllegalObjectID(ex.status)
+        if not cli_snapshot:
+            return None
+        if not cli_snapshot.master_name:
+            raise controller_errors.SnapshotNotFoundVolumeWithSameIdExistsError(snapshot_id, self.endpoint)
         return self._generate_snapshot_response(cli_snapshot)
 
     def create_snapshot(self, name, volume_name):
