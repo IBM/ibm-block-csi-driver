@@ -122,7 +122,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_format = Mock()
         self.mediator.client.cmd.vol_copy = Mock()
         self.mediator.client.cmd.vol_resize = Mock()
-        self.mediator.client.cmd.vol_format.assert_called_once_with(vol_name)
+        # self.mediator.client.cmd.vol_format.assert_called_once_with(vol_name)
         self.mediator.client.cmd.vol_copy.assert_called_once_with(vol_src=src_snap_name, vol_trg=vol_name)
         self.mediator.client.cmd.vol_resize.assert_called_once_with(vol=vol_name, size_in_blocks=vol_size_in_blocks)
 
