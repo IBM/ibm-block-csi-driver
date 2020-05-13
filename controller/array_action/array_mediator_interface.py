@@ -63,7 +63,8 @@ class ArrayMediator(ABC):
             name                         : name of the volume to be created in the storage system
             src_snap_name                : name of snapshot to create from
             src_snap_capacity_in_bytes   : capacity of snapshot to create from
-            min_vol_size_in_bytes        : if snapshot capacity is lower than this value vol will be increased to this value
+            min_vol_size_in_bytes        : if snapshot capacity is lower than this value vol will
+                                           be increased to this value
 
         Returns:
             Volume
