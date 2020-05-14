@@ -261,6 +261,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self.client.svctask.mkvolume(**cli_kwargs)
             vol = self._get_cli_volume(name)
             logger.info("finished creating cli volume : {}".format(vol.name))
+            return vol
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 logger.error(msg="Cannot create volume {0}, "
