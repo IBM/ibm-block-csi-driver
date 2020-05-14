@@ -567,6 +567,10 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.request.volume_content_source = self._get_snapshot_source(snap_id)
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
+        self.mediator.get_snapshot_by_id = Mock()
+        self.mediator.get_snapshot_by_id.return_value = utils.get_mock_mediator_response_snapshot(1000, snap_name,
+                                                                                                  "wwn", vol_name,
+                                                                                                  "a9k")
         self.mediator.copy_volume_from_snapshot = Mock()
         self.mediator.copy_volume_from_snapshot.side_effect = [array_exception]
         array_type.return_value = "a9k"
