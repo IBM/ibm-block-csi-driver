@@ -96,11 +96,11 @@ class TestArrayMediatorXIV(unittest.TestCase):
         min_vol_size_in_bytes = 1000
         self.mediator.copy_volume_from_snapshot(vol_name, src_snap_name, src_snap_capacity_in_bytes,
                                                 min_vol_size_in_bytes)
-        vol_size_in_blocks = self.mediator._convert_size_bytes_to_blocks(min_vol_size_in_bytes)
         self.mediator.client.cmd.vol_format = Mock()
         self.mediator.client.cmd.vol_copy = Mock()
         self.mediator.client.cmd.vol_resize = Mock()
-        # self.mediator.client.cmd.vol_format.assert_called_once_with(vol_name)
+        vol_size_in_blocks = self.mediator._convert_size_bytes_to_blocks(min_vol_size_in_bytes)
+        self.mediator.client.cmd.vol_format.assert_called_once_with(vol_name)
         self.mediator.client.cmd.vol_copy.assert_called_once_with(vol_src=src_snap_name, vol_trg=vol_name)
         self.mediator.client.cmd.vol_resize.assert_called_once_with(vol=vol_name, size_in_blocks=vol_size_in_blocks)
 
@@ -109,11 +109,11 @@ class TestArrayMediatorXIV(unittest.TestCase):
         src_snap_name = "snap"
         src_snap_capacity_in_bytes = 1000
         min_vol_size_in_bytes = 500
-        self.mediator.copy_volume_from_snapshot(vol_name, src_snap_name, src_snap_capacity_in_bytes,
-                                                min_vol_size_in_bytes)
         self.mediator.client.cmd.vol_format = Mock()
         self.mediator.client.cmd.vol_copy = Mock()
         self.mediator.client.cmd.vol_resize = Mock()
+        self.mediator.copy_volume_from_snapshot(vol_name, src_snap_name, src_snap_capacity_in_bytes,
+                                                min_vol_size_in_bytes)
         self.mediator.client.cmd.vol_format.assert_called_once_with(vol=vol_name)
         self.mediator.client.cmd.vol_copy.assert_called_once_with(vol_src=src_snap_name, vol_trg=vol_name)
         self.mediator.client.cmd.vol_resize.assert_not_called()

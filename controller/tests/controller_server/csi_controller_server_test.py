@@ -469,6 +469,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         context = utils.FakeContext()
         snapshot_id = "wwn1"
         snap_capacity_bytes = 100
+        array_type.return_value = "a9k"
         self.request.volume_content_source = self._get_snapshot_source(snapshot_id)
         self.mediator.create_volume = Mock()
         self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, vol_name, "wwn2", "a9k")
@@ -477,10 +478,9 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
                                                                                                   snap_name,
                                                                                                   snapshot_id, vol_name,
                                                                                                   "a9k")
-        array_type.return_value = "a9k"
+        self.mediator.copy_volume_from_snapshot = Mock()
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
-        self.mediator.copy_volume_from_snapshot = Mock()
         self.mediator.copy_volume_from_snapshot.assert_called_once_with(vol_name, snap_name, snap_capacity_bytes,
                                                                         self.capacity_bytes)
 
