@@ -1,6 +1,6 @@
 pipeline {
     agent {
-        label 'docker-engine'
+        label  "${env.AGENT_LABEL}"
     }
     stages {
         stage ('CSI-controller: static code analysis') {

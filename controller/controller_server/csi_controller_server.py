@@ -413,7 +413,15 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 volume_name = array_mediator.get_volume_name(vol_id)
                 logger.info("Snapshot name : {}. Volume name : {}".format(snapshot_name, volume_name))
                 snapshot = array_mediator.get_snapshot(snapshot_name)
-                if not snapshot:
+
+                if snapshot:
+                    if snapshot.volume_name != volume_name:
+                        context.set_details(
+                            messages.SnapshotWrongVolumeError_message.format(snapshot_name, snapshot.volume_name,
+                                                                             volume_name))
+                        context.set_code(grpc.StatusCode.ALREADY_EXISTS)
+                        return csi_pb2.CreateSnapshotResponse()
+                else:
                     logger.debug(
                         "Snapshot doesn't exist. Creating a new snapshot {0} from volume {1}".format(snapshot_name,
                                                                                                      volume_name))
@@ -431,8 +439,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
             context.set_details(ex)
             return csi_pb2.CreateSnapshotResponse()
-        except (controller_errors.SnapshotAlreadyExists,
-                controller_errors.SnapshotNotFoundVolumeWithSameNameExists) as ex:
+        except controller_errors.SnapshotAlreadyExists as ex:
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.ALREADY_EXISTS)
             return csi_pb2.CreateSnapshotResponse()
@@ -493,7 +500,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         return csi_pb2.GetPluginInfoResponse(name=name, vendor_version=version)
 
     def _get_volume_name_and_prefix(self, request, array_mediator):
-        logger.info("++++++++++++ get name and prefix")
         return self._get_object_name_and_prefix(request, array_mediator.max_volume_prefix_length,
                                                 array_mediator.max_volume_name_length,
                                                 config.OBJECT_TYPE_NAME_VOLUME,
@@ -509,8 +515,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def _get_object_name_and_prefix(self, request, max_name_prefix_length, max_name_length, object_type,
                                     prefix_param_name):
         name = request.name
-        logger.info("++++++++++++ get name and prefi name {0}".format(name))
-        logger.info(max_name_length)
         prefix = ""
         if request.parameters and (prefix_param_name in request.parameters):
             prefix = request.parameters[prefix_param_name]

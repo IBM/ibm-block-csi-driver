@@ -16,12 +16,12 @@
 #    This Dockerfile.test is for running the csi controller local tests inside a container.
 #    Its similar to the Dockerfile, but with additional requirements-tests.txt and ENTRYPOINT to run the local tests.
 
-FROM centos:7
-#TODO : move to UBI like FROM registry.access.redhat.com/ubi7/python-27:2.7
-RUN yum --enablerepo=extras -y install epel-release && yum -y install python36-pip
+FROM registry.access.redhat.com/ubi7/python-36:1-58
 
 COPY controller/requirements.txt /driver/controller/
 RUN pip3 install --upgrade pip==19.1.1
+# avoid default boringssl lib, since it does not support z systems
+ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
 RUN pip3 install -r /driver/controller/requirements.txt
 
 # Requires to run local testing
@@ -30,11 +30,11 @@ RUN pip3 install -r /driver/controller/requirements-tests.txt
 
 COPY ./common /driver/common
 COPY ./controller /driver/controller
+USER root
 RUN groupadd -g 9999 appuser && \
     useradd -r -u 9999 -g appuser appuser
-RUN chown -R appuser:appuser /driver
+RUN chown -R appuser:appuser /driver /opt/app-root
 USER appuser
 WORKDIR /driver
 
 ENTRYPOINT ["/driver/controller/scripts/entrypoint-test.sh"]
-
