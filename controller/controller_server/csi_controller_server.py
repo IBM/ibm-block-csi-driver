@@ -104,8 +104,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
                     array_mediator.validate_supported_capabilities(capabilities)
-                    vol = self._create_volume(array_mediator, volume_full_name, size, capabilities, pool, volume_prefix,
-                                              src_snapshot_id)
+                    vol = array_mediator.create_volume(volume_name, min_vol_size, capabilities, pool, volume_prefix)
                 else:
                     logger.debug("volume found : {}".format(vol))
 
@@ -126,6 +125,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return copy_source_res
                     logger.debug("+++++++++++++++ after if handled")
 
+                self._copy_volume_from_snapshot(vol, src_snapshot_id, size, array_mediator)
                 logger.debug("generating create volume response")
                 res = utils.generate_csi_create_volume_response(vol)
                 logger.info("finished create volume")
@@ -151,9 +151,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateVolumeResponse()
 
-    def _create_volume(self, array_mediator, volume_name, min_vol_size, capabilities, pool, volume_prefix,
-                       src_snapshot_id):
-        vol = array_mediator.create_volume(volume_name, min_vol_size, capabilities, pool, volume_prefix)
+    def _copy_volume_from_snapshot(self, vol, src_snapshot_id, min_vol_size, array_mediator):
         if src_snapshot_id:
             vol_name = vol.volume_name
             try:
@@ -177,27 +175,40 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         array_mediator.delete_volume(vol_id)
 
     def _handle_existing_vol_src_snap(self, vol, src_snapshot_id, context):
+        """
+        This function should create a snapshot from volume in the storage system.
+        Args:
+            vol                : volume fetched or created in CreateVolume
+            src_snapshot_id    : id of snapshot we should copy to vol or None if volume shhuld not be copied
+            context            : CreateVolume response context
+        Returns:
+            if volume exists and is copy of specified snapshot - set context status to OK ad return CreateVolumeResponse
+            if volume is copy of another source - set context status to INTERNAL ad return CreateVolumeResponse
+            In any other case return null
+        """
         # TODO
         logger.debug("aaaaaaaaaaaaaaaaaaaaaaaaaa")
         logger.debug("+++++++++ _handle snap {0}".format(src_snapshot_id))
         if vol.copy_src_object_id:
             logger.debug("+++++++++ _handle snap vol {0}".format(vol.copy_src_object_id))
 
-        if not src_snapshot_id:
-            return None
         vol_name = vol.volume_name
         vol_copy_src_object_id = vol.copy_src_object_id
+        if not src_snapshot_id or not vol_copy_src_object_id:
+            return None
         logger.debug("+++++++++ _handle snap {0} vol {1}".format(src_snapshot_id, vol.copy_src_object_id))
         if vol_copy_src_object_id == src_snapshot_id:
             logger.debug(
                 "Volume {0} exists and it is copy of Snapshot {1}.".format(vol_name, src_snapshot_id))
             context.set_code(grpc.StatusCode.OK)
+            return csi_pb2.CreateVolumeResponse()
         else:
             logger.debug(
                 "Volume {0} exists but it is not copy of Snapshot {1}.".format(vol_name, src_snapshot_id))
             context.set_details("Volume was already exists but created but from different source.")
             context.set_code(grpc.StatusCode.INTERNAL)
-        return csi_pb2.CreateVolumeResponse()
+            return csi_pb2.CreateVolumeResponse()
+        return None
 
     def _get_src_snapshot_id(self, request):
         source = request.volume_content_source
