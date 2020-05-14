@@ -168,6 +168,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.error("Exception raised while creating volume from snapshot")
                 logger.exception(ex)
                 self._rollback_create_volume_from_snapshot(vol.id)
+                raise ex
         return vol
 
     @retry(Exception, tries=5, delay=1)

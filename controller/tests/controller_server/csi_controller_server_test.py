@@ -573,6 +573,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
                                                                                                   "a9k")
         self.mediator.copy_volume_from_snapshot = Mock()
         self.mediator.copy_volume_from_snapshot.side_effect = [array_exception]
+        self.mediator.delete_volume = Mock()
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
