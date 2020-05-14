@@ -126,22 +126,22 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug("+++++++++++++++ after if handled")
 
                 # TODO: CSI-1358 - remove try/except
-                try:
-                    self._copy_volume_from_snapshot(vol, src_snapshot_id, size, array_mediator)
-                except controller_errors.IllegalObjectName:
-                    context.set_details(ex.message)
-                    context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                    return csi_pb2.CreateVolumeResponse()
-                except controller_errors.PermissionDeniedError as ex:
-                    context.set_code(grpc.StatusCode.PERMISSION_DENIED)
-                    context.set_details(ex)
-                    return csi_pb2.CreateVolumeResponse()
-                except Exception as ex:
-                    logger.error("an internal exception occurred")
-                    logger.exception(ex)
-                    context.set_code(grpc.StatusCode.INTERNAL)
-                    context.set_details('an internal exception occurred : {}'.format(ex))
-                    return csi_pb2.CreateVolumeResponse()
+                # try:
+                self._copy_volume_from_snapshot(vol, src_snapshot_id, size, array_mediator)
+                # except controller_errors.IllegalObjectName:
+                #     context.set_details(ex.message)
+                #     context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                #     return csi_pb2.CreateVolumeResponse()
+                # except controller_errors.PermissionDeniedError as ex:
+                #     context.set_code(grpc.StatusCode.PERMISSION_DENIED)
+                #     context.set_details(ex)
+                #     return csi_pb2.CreateVolumeResponse()
+                # except Exception as ex:
+                #     logger.error("an internal exception occurred")
+                #     logger.exception(ex)
+                #     context.set_code(grpc.StatusCode.INTERNAL)
+                #     context.set_details('an internal exception occurred : {}'.format(ex))
+                #     return csi_pb2.CreateVolumeResponse()
 
                 logger.debug("generating create volume response")
                 res = utils.generate_csi_create_volume_response(vol)
