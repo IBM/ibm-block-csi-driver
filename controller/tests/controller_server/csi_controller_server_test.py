@@ -275,8 +275,10 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
         self.request.parameters = {"pool": self.pool}
         self.capacity_bytes = 10
+        self.request.capacity_range = Mock()
         self.request.capacity_range.required_bytes = self.capacity_bytes
         self.request.name = vol_name
+        self.request.volume_content_source = None
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_create_volume_with_empty_name(self, a_enter):
