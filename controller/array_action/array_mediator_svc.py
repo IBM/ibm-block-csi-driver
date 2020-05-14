@@ -353,7 +353,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._create_target_volume(source_volume_name=volume_name,
                                    target_volume_name=name)
         self._create_fcmap(source_volume_name=volume_name,
-                           target_cli_volume=name)
+                           target_volume_name=name)
         target_cli_volume = self._get_cli_volume(name)
         self._start_fcmap(target_cli_volume.FC_id)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
