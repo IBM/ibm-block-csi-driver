@@ -125,7 +125,24 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return copy_source_res
                     logger.debug("+++++++++++++++ after if handled")
 
-                self._copy_volume_from_snapshot(vol, src_snapshot_id, size, array_mediator)
+                # TODO: CSI-1358 - remove try/except
+                try:
+                    self._copy_volume_from_snapshot(vol, src_snapshot_id, size, array_mediator)
+                except controller_errors.IllegalObjectName:
+                    context.set_details(ex.message)
+                    context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                    return csi_pb2.CreateVolumeResponse()
+                except controller_errors.PermissionDeniedError as ex:
+                    context.set_code(grpc.StatusCode.PERMISSION_DENIED)
+                    context.set_details(ex)
+                    return csi_pb2.CreateVolumeResponse()
+                except Exception as ex:
+                    logger.error("an internal exception occurred")
+                    logger.exception(ex)
+                    context.set_code(grpc.StatusCode.INTERNAL)
+                    context.set_details('an internal exception occurred : {}'.format(ex))
+                    return csi_pb2.CreateVolumeResponse()
+
                 logger.debug("generating create volume response")
                 res = utils.generate_csi_create_volume_response(vol)
                 logger.info("finished create volume")
@@ -154,21 +171,21 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def _copy_volume_from_snapshot(self, vol, src_snapshot_id, min_vol_size, array_mediator):
         if src_snapshot_id:
             vol_name = vol.volume_name
-#            try:
-            src_snapshot = array_mediator.get_snapshot_by_id(src_snapshot_id)
-            if not src_snapshot:
-                raise controller_errors.SnapshotNotFoundError(src_snapshot_id)
-            src_snapshot_name = src_snapshot.snapshot_name
-            src_snapshot_capacity = src_snapshot.capacity_bytes
-            logger.error("Copy Snapshot {0} data to Volume {1}.".format(src_snapshot_id, vol_name))
-            array_mediator.copy_volume_from_snapshot(vol_name, src_snapshot_name, src_snapshot_capacity,
-                                                     min_vol_size)
-            vol.copy_src_object_id = src_snapshot.id
-            # except Exception as ex:
-            #     logger.error("Exception raised while creating volume from snapshot")
-            #     logger.exception(ex)
-            #     self._rollback_create_volume_from_snapshot(vol.id)
-            #     raise ex
+            try:
+                src_snapshot = array_mediator.get_snapshot_by_id(src_snapshot_id)
+                if not src_snapshot:
+                    raise controller_errors.SnapshotNotFoundError(src_snapshot_id)
+                src_snapshot_name = src_snapshot.snapshot_name
+                src_snapshot_capacity = src_snapshot.capacity_bytes
+                logger.error("Copy Snapshot {0} data to Volume {1}.".format(src_snapshot_id, vol_name))
+                array_mediator.copy_volume_from_snapshot(vol_name, src_snapshot_name, src_snapshot_capacity,
+                                                         min_vol_size)
+                vol.copy_src_object_id = src_snapshot.id
+            except Exception as ex:
+                logger.error("Exception raised while creating volume from snapshot")
+                logger.exception(ex)
+                self._rollback_create_volume_from_snapshot(vol.id)
+                raise ex
         return vol
 
     @retry(Exception, tries=5, delay=1)
