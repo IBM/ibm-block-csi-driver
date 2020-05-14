@@ -170,7 +170,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         }
         return list_methods_by_kind[cli_object_kind]
 
-    def _get_cli_object_if_exists(self, object_name_or_id, cli_object_kind):
+    def _get_cli_object_if_exists(self, object_name_or_id, cli_object_kind, not_exist_err):
         logger.debug("Get {0} : {1}".format(cli_object_kind, object_name_or_id))
         cli_object = None
         list_method = self._get_client_list_method(cli_object_kind)
@@ -181,16 +181,15 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 if (OBJ_NOT_FOUND in ex.my_message or
                         NAME_NOT_MEET in ex.my_message):
                     logger.info("{} not found".format(cli_object_kind))
-                    logger.exception(ex)
+                    if not_exist_err:
+                        raise ex
         except Exception as ex:
             logger.exception(ex)
             raise ex
         return cli_object
 
     def _get_cli_object(self, object_name_or_id, cli_object_kind, not_exist_err=True):
-        cli_object = self._get_cli_object_if_exists(object_name_or_id, cli_object_kind)
-        if not_exist_err and not cli_object:
-            raise controller_errors.VolumeNotFoundError(object_name_or_id)
+        cli_object = self._get_cli_object_if_exists(object_name_or_id, cli_object_kind, not_exist_err)
         logger.debug("cli {0} returned : {1}".format(cli_object_kind, cli_object))
         return cli_object
 
@@ -204,7 +203,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return self._get_cli_object(volume_name_or_id, CLI_OBJECT_KIND_VOLUME, not_exist_err=False)
 
     def _get_cli_volume(self, volume_name_or_id):
-        return self._get_cli_object(volume_name_or_id, CLI_OBJECT_KIND_VOLUME)
+        cli_volume = self._get_cli_object(volume_name_or_id, CLI_OBJECT_KIND_VOLUME, not_exist_err=False)
+        if not cli_volume:
+            raise controller_errors.VolumeNotFoundError(volume_name_or_id)
+        return cli_volume
 
     def get_volume(self, volume_name, volume_context=None, volume_prefix=""):
         cli_volume = self._get_cli_volume(volume_name)
@@ -259,7 +261,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self.client.svctask.mkvolume(**cli_kwargs)
             vol = self._get_cli_volume(name)
             logger.info("finished creating cli volume : {}".format(vol.name))
-            return vol
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 logger.error(msg="Cannot create volume {0}, "
@@ -320,7 +321,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         capabilities = get_capabilities_from_cli_volume(source_cli_volume)
         size_in_bytes = int(source_cli_volume.capacity)
         pool = source_cli_volume.mdisk_grp_name
-        return self._create_cli_volume(target_volume_name, size_in_bytes, capabilities, pool)
+        self._create_cli_volume(target_volume_name, size_in_bytes, capabilities, pool)
 
     def _create_fcmap(self, source_volume_name, target_cli_volume):
         logger.info("creating FlashCopy Mapping from '{0}' to '{1}'".format(source_volume_name, target_cli_volume.name))
@@ -334,30 +335,26 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                                                                               target_cli_volume.name))
                 else:
                     raise ex
-        return self._get_fcmap(target_cli_volume.FC_id)
 
-    def _start_fcmap(self, fcmap):
-        logger.info("starting FlashCopy Mapping '{0}' from '{1}' to '{2}'".format(fcmap.name,
-                                                                                  fcmap.source_vdisk_name,
-                                                                                  fcmap.target_vdisk_name))
+    def _start_fcmap(self, fcmap_id):
+        logger.info("starting FlashCopy Mapping '{0}'".format(fcmap_id))
         try:
-            self.client.svctask.startfcmap(prep=True, object_id=fcmap.id)
+            self.client.svctask.startfcmap(prep=True, object_id=fcmap_id)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 if FCMAP_ALREADY_COPYING in ex.my_message:
-                    logger.info(("FlashCopy Mapping already copying"
-                                 " from source '{0}' to target '{1}'").format(fcmap.source_vdisk_name,
-                                                                              fcmap.target_vdisk_name))
+                    logger.info("FlashCopy Mapping '{0}' already copying".format(fcmap_id))
                 else:
                     raise ex
 
     def create_snapshot(self, name, volume_name):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
-        target_cli_volume = self._create_target_volume(source_volume_name=volume_name,
-                                                       target_volume_name=name)
-        fcmap = self._create_fcmap(source_volume_name=volume_name,
-                                   target_cli_volume=target_cli_volume)
-        self._start_fcmap(fcmap)
+        self._create_target_volume(source_volume_name=volume_name,
+                                   target_volume_name=name)
+        self._create_fcmap(source_volume_name=volume_name,
+                           target_cli_volume=name)
+        target_cli_volume = self._get_cli_volume(name)
+        self._start_fcmap(target_cli_volume.FC_id)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
         return self._generate_snapshot_response(target_cli_volume, volume_name)
 
