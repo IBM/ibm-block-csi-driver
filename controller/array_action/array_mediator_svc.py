@@ -193,9 +193,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.debug("cli {0} returned : {1}".format(cli_object_kind, cli_object))
         return cli_object
 
-    def _get_fcmap_if_exists(self, fcmap_name_or_id):
-        return self._get_cli_object(fcmap_name_or_id, CLI_OBJECT_KIND_FCMAP, not_exist_err=False)
-
     def _get_fcmap(self, fcmap_name_or_id):
         return self._get_cli_object(fcmap_name_or_id, CLI_OBJECT_KIND_FCMAP)
 
@@ -309,10 +306,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         target_cli_volume = self._get_cli_volume_if_exists(snapshot_name)
         if not target_cli_volume:
             return None
-        fcmap = self._get_fcmap_if_exists(target_cli_volume.FC_id)
-        if not fcmap:
+        if not target_cli_volume.FC_id:
             logger.error("FlashCopy Mapping not found for target volume: {}".format(snapshot_name))
             raise controller_errors.SnapshotNameBelongsToVolumeError(target_cli_volume.name, self.endpoint)
+        fcmap = self._get_fcmap(target_cli_volume.FC_id)
         return self._generate_snapshot_response(target_cli_volume, fcmap.source_vdisk_name)
 
     def _create_target_volume(self, source_volume_name, target_volume_name):
