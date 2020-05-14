@@ -40,11 +40,11 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     @classproperty
     def max_snapshot_name_length(self):
-        return 63
+        return self.max_volume_name_length
 
     @classproperty
     def max_snapshot_prefix_length(self):
-        return 20
+        return self.max_volume_prefix_length
 
     @classproperty
     def max_connections(self):
@@ -120,7 +120,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.VolumeNotFoundError(volume_name)
 
         if cli_volume.master_name:
-            raise controller_errors.VolumeNotFoundSnapshotWithSameNameExists(volume_name, self.endpoint)
+            raise controller_errors.VolumeNameBelongsToSnapshotError(volume_name, self.endpoint)
 
         array_vol = self._generate_volume_response(cli_volume)
         return array_vol
@@ -226,7 +226,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         if not cli_snapshot:
             return None
         if not cli_snapshot.master_name:
-            raise controller_errors.SnapshotNotFoundVolumeWithSameNameExists(cli_snapshot.name, self.endpoint)
+            raise controller_errors.SnapshotNameBelongsToVolumeError(cli_snapshot.name, self.endpoint)
         array_snapshot = self._generate_snapshot_response(cli_snapshot)
         return array_snapshot
 
@@ -240,7 +240,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         if not cli_snapshot:
             return None
         if not cli_snapshot.master_name:
-            raise controller_errors.SnapshotNotFoundVolumeWithSameIdExistsError(snapshot_id, self.endpoint)
+            raise controller_errors.SnapshotIdBelongsToVolumeError(snapshot_id, self.endpoint)
         return self._generate_snapshot_response(cli_snapshot)
 
     def create_snapshot(self, name, volume_name):

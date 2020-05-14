@@ -43,10 +43,10 @@ class VolumeNotFoundError(BaseArrayActionException):
         self.message = messages.VolumeNotFoundError_message.format(name)
 
 
-class VolumeNotFoundSnapshotWithSameNameExists(BaseArrayActionException):
+class VolumeNameBelongsToSnapshotError(BaseArrayActionException):
 
     def __init__(self, volume, array):
-        self.message = messages.VolumeNotFoundSnapshotWithSameNameExistsError_message.format(volume, array)
+        self.message = messages.VolumeNameBelongsToSnapshotError_message.format(volume, array)
 
 
 class VolumeCreationError(BaseArrayActionException):
@@ -181,16 +181,16 @@ class SnapshotNotFoundError(BaseArrayActionException):
         self.message = messages.SnapshotNotFoundError_message.format(name)
 
 
-class SnapshotNotFoundVolumeWithSameNameExists(BaseArrayActionException):
+class SnapshotNameBelongsToVolumeError(BaseArrayActionException):
 
     def __init__(self, snapshot, array):
-        self.message = messages.SnapshotNotFoundVolumeWithSameNameExistsError_message.format(snapshot, array)
+        self.message = messages.SnapshotNameBelongsToVolumeError_message.format(snapshot, array)
 
 
-class SnapshotNotFoundVolumeWithSameIdExistsError(BaseArrayActionException):
+class SnapshotIdBelongsToVolumeError(BaseArrayActionException):
 
     def __init__(self, snapshot, array):
-        self.message = messages.SnapshotNotFoundVolumeWithSameIdExistsError_message.format(snapshot, array)
+        self.message = messages.SnapshotIdBelongsToVolumeError_message.format(snapshot, array)
 
 
 class SnapshotAlreadyExists(BaseArrayActionException):

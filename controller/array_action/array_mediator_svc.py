@@ -264,7 +264,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def create_snapshot(self, name, volume_name):
         # TODO: CSI-1024
-        pass
+        raise NotImplementedError
 
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host id for initiators : {0}".format(initiators))

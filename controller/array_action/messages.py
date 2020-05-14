@@ -6,7 +6,7 @@ StorageManagementIPsNotSupportError_message = "Invalid Management IP for SVC : {
 
 VolumeNotFoundError_message = "Volume was not found : {0} "
 
-VolumeNotFoundSnapshotWithSameNameExistsError_message = "Volume not found. Snapshot with the same id exists. \
+VolumeNameBelongsToSnapshotError_message = "Volume not found. Snapshot with the same id exists. \
                                                          Name : {0} , array : {1}"
 
 PoolDoesNotMatchCapabilities_message = "Pool : {0} does not match the following capabilities : {1} . error : {2}"
@@ -53,10 +53,10 @@ SnapshotNotFoundError_message = "Snapshot was not found : {0} "
 
 SnapshotAlreadyExistsError_message = "Snapshot already exists : {0} , array : {1}"
 
-SnapshotNotFoundVolumeWithSameNameExistsError_message = "Snapshot not found. Volume with the same name exists. \
+SnapshotNameBelongsToVolumeError_message = "Snapshot not found. Volume with the same name exists. \
                                                          Name : {0} , array : {1}"
 
-SnapshotNotFoundVolumeWithSameIdExistsError_message = "Snapshot not found. Volume with the same id exists. \
+SnapshotIdBelongsToVolumeError_message = "Snapshot not found. Volume with the same id exists. \
                                                          Id : {0} , array : {1}"
 
 SnapshotWrongVolume_message = "Snapshot {0} exists but it is of Volume {1} and not {2}"

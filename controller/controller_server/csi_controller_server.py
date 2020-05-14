@@ -45,7 +45,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def CreateVolume(self, request, context):
         set_current_thread_name(request.name)
         logger.info("create volume")
-
         try:
             utils.validate_create_volume_request(request)
         except ValidationException as ex:

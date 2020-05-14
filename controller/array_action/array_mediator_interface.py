@@ -196,7 +196,7 @@ class ArrayMediator(ABC):
         Returns:
            Snapshot
         Raises:
-            SnapshotNotFoundVolumeWithSameNameExists
+            SnapshotNameBelongsToVolumeError
             IllegalObjectName
             PermissionDenied
         """
@@ -211,7 +211,7 @@ class ArrayMediator(ABC):
         Returns:
            Snapshot
         Raises:
-            SnapshotNotFoundVolumeWithSameNameExists
+            SnapshotNameBelongsToVolumeError
         """
         raise NotImplementedError
 
