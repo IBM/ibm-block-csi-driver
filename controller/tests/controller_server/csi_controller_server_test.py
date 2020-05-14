@@ -504,7 +504,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_create_volume_from_snapshot_error_no_source(self, a_enter, a_exit, array_type):
+    def test_create_volume_from_snapshot_volume_without_source(self, a_enter, a_exit, array_type):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
         snap_id = "wwn1"
@@ -512,6 +512,11 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.request.volume_content_source = self._get_snapshot_source(snap_id)
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
+        self.mediator.get_snapshot_by_id = Mock()
+        self.mediator.get_snapshot_by_id.return_value = utils.get_mock_mediator_response_snapshot(1000, snap_name,
+                                                                                                  "wwn", vol_name,
+                                                                                                  "a9k")
+        self.mediator.copy_volume_from_snapshot = Mock()
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
