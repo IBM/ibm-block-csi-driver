@@ -519,7 +519,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.copy_volume_from_snapshot = Mock()
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
+        self.assertEqual(context.code, grpc.StatusCode.OK)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
