@@ -481,6 +481,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
+        self.mediator.copy_volume_from_snapshot = Mock()
         self.mediator.copy_volume_from_snapshot.assert_called_once_with(vol_name, snapshot_name, snap_capacity_bytes,
                                                                         self.capacity_bytes)
 
@@ -498,6 +499,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
+        self.mediator.copy_volume_from_snapshot = Mock()
         self.mediator.copy_volume_from_snapshot.assert_not_called()
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
