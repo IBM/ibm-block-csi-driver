@@ -171,9 +171,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             raise ex
         except Exception as ex:
             logger.error("Exception raised while copying Volume from Snapshot")
+            logger.error("+++++++++++++ before before  Exception raised while copying Volume from Snapshot")
             logger.exception(ex)
             try:
+                logger.error("+++++++++++++ before Exception raised while copying Volume from Snapshot")
                 self._rollback_create_volume_from_snapshot(vol.id)
+                logger.error("+++++++++++++ after Exception raised while copying Volume from Snapshot")
             except Exception:
                 pass
             raise ex
