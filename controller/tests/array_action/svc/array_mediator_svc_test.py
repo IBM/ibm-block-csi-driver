@@ -180,6 +180,30 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.rmvolume = Mock()
         self.svc.delete_volume("vol")
 
+    def test_get_snapshot_not_exist_return_none(self):
+        pass
+
+    def test_get_snapshot_has_no_fcmap_raise_error(self):
+        pass
+
+    def test_get_snapshot_get_fcmap_error_raise_error(self):
+        pass
+
+    def test_get_snapshot_success(self):
+        pass
+
+    def test_create_snapshot_create_volume_error(self):
+        pass
+
+    def test_create_snapshot_create_fcmap_error(self):
+        pass
+
+    def test_create_snapshot_start_fcmap_error(self):
+        pass
+
+    def test_create_snapshot_success(self):
+        pass
+
     def test_validate_supported_capabilities_raise_error(self):
         capabilities_a = {"SpaceEfficiency": "Test"}
         with self.assertRaises(
