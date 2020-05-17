@@ -164,10 +164,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.error("Copy Snapshot {0} data to Volume {1}.".format(src_snapshot_id, vol_name))
             array_mediator.copy_volume_from_snapshot(vol_name, src_snapshot_name, src_snapshot_capacity,
                                                      min_vol_size)
+            logger.debug("Copy Volume frm Snapshot finished")
         except controller_errors.VolumeNotFoundError as ex:
+            logger.error("Volume not found while copying Volume from Snapshot")
+            logger.exception(ex)
             raise ex
         except Exception as ex:
-            logger.error("Exception raised while creating volume from snapshot")
+            logger.error("Exception raised while copying Volume from Snapshot")
             logger.exception(ex)
             try:
                 self._rollback_create_volume_from_snapshot(vol.id)
