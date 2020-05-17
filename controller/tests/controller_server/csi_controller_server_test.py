@@ -538,14 +538,14 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
 
     # TODO: CSI-1358 - exception raized mediator inside with block are ignored. Uncomment these tests after fixing
-    #
-    # @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
-    # @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    # @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    # def test_create_volume_from_snapshot_src_snapshot_not_found(self, a_enter, a_exit, array_type):
-    #     array_exception = array_errors.SnapshotNotFoundError("")
-    #     self._test_create_volume_from_snapshot_error(a_enter, array_type, array_exception)
-    #
+
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_create_volume_from_snapshot_src_snapshot_not_found(self, a_enter, a_exit, array_type):
+        array_exception = array_errors.SnapshotNotFoundError("")
+        self._test_create_volume_from_snapshot_error(a_enter, a_exit, array_type, array_exception)
+
     # @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     # @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     # @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
@@ -566,24 +566,23 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     # def test_create_volume_from_snapshot_permission_denied(self, a_enter, a_exit, array_type):
     #     array_exception = array_errors.PermissionDeniedError("")
     #     self._test_create_volume_from_snapshot_error(a_enter, array_type, array_exception)
-    #
-    # def _test_create_volume_from_snapshot_error(self, a_enter, array_type, array_exception):
-    #     a_enter.return_value = self.mediator
-    #     context = utils.FakeContext()
-    #     snap_id = "wwn1"
-    #     self.request.volume_content_source = self._get_snapshot_source(snap_id)
-    #     self.mediator.get_volume = Mock()
-    #     self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
-    #     self.mediator.get_snapshot_by_id = Mock()
-    #     self.mediator.get_snapshot_by_id.return_value = utils.get_mock_mediator_response_snapshot(1000, snap_name,
-    #                                                                                               "wwn", vol_name,
-    #                                                                                               "a9k")
-    #     self.mediator.copy_volume_from_snapshot = Mock()
-    #     self.mediator.copy_volume_from_snapshot.side_effect = [array_exception]
-    #     self.mediator.delete_volume = Mock()
-    #     array_type.return_value = "a9k"
-    #     self.servicer.CreateVolume(self.request, context)
-    #     self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
+
+    def _test_create_volume_from_snapshot_error(self, a_enter, a_exit, array_type, array_exception):
+        a_enter.return_value = self.mediator
+        context = utils.FakeContext()
+        snap_id = "wwn1"
+        self.request.volume_content_source = self._get_snapshot_source(snap_id)
+        self.mediator.get_volume = Mock()
+        self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
+        self.mediator.get_snapshot_by_id = Mock()
+        self.mediator.get_snapshot_by_id.return_value = utils.get_mock_mediator_response_snapshot(1000, snap_name,
+                                                                                                  "wwn", vol_name,
+                                                                                                  "a9k")
+        a_exit.side_effect = [array_exception]
+        self.mediator.delete_volume = Mock()
+        array_type.return_value = "a9k"
+        self.servicer.CreateVolume(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
 
     def _get_snapshot_source(self, snapshot_id):
         source = Mock()
