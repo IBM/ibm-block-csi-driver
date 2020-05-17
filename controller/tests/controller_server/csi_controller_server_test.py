@@ -551,7 +551,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     def test_create_volume_from_snapshot_target_volume_not_found(self, a_enter, a_exit, array_type):
         array_exception = array_errors.VolumeNotFoundError("")
         self._test_create_volume_from_snapshot_error(a_enter, a_exit, array_type, array_exception,
-                                                     grpc.StatusCode.INTERNAL)
+                                                     grpc.StatusCode.INTERNAL, rollback_called=False)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
@@ -569,7 +569,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self._test_create_volume_from_snapshot_error(a_enter, a_exit, array_type, array_exception,
                                                      grpc.StatusCode.PERMISSION_DENIED)
 
-    def _test_create_volume_from_snapshot_error(self, a_enter, a_exit, array_type, array_exception, return_code):
+    def _test_create_volume_from_snapshot_error(self, a_enter, a_exit, array_type, array_exception, return_code,
+                                                rollback_called=True):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
         snap_id = "wwn1"
@@ -582,6 +583,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
                                                                                                   "a9k")
         a_exit.side_effect = [array_exception]
         self.mediator.delete_volume = Mock()
+        if rollback_called:
+            self.mediator.delete_volume.assert_called_with(vol_name)
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, return_code)
