@@ -184,9 +184,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             raise ex
         return vol
 
-    # @retry(Exception, tries=5, delay=1)
+    # retry(Exception, tries=5, delay=1)
     def _rollback_create_volume_from_snapshot(self, array_mediator, vol_id):
-        logger.debub("Rollback copy volume from snapshot. Deleting Volume {0}".format(vol_id))
+        logger.debug("Rollback copy volume from snapshot. Deleting Volume {0}".format(vol_id))
         array_mediator.delete_volume(vol_id)
 
     def _handle_existing_vol_src_snap(self, vol, src_snapshot_id, context):
