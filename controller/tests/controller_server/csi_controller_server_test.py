@@ -574,20 +574,21 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
         snap_id = "wwn1"
+        vol_id = "wwn2"
         self.request.volume_content_source = self._get_snapshot_source(snap_id)
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
         self.mediator.get_snapshot_by_id = Mock()
         self.mediator.get_snapshot_by_id.return_value = utils.get_mock_mediator_response_snapshot(1000, snap_name,
-                                                                                                  "wwn", vol_name,
+                                                                                                  vol_id, vol_name,
                                                                                                   "a9k")
         a_exit.side_effect = [array_exception]
         self.mediator.delete_volume = Mock()
-        if rollback_called:
-            self.mediator.delete_volume.assert_called_with(vol_name)
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, return_code)
+        if rollback_called:
+            self.mediator.delete_volume.assert_called_with(vol_id)
 
     def _get_snapshot_source(self, snapshot_id):
         source = Mock()
