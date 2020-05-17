@@ -537,37 +537,35 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
 
-    # TODO: CSI-1358 - exception raized mediator inside with block are ignored. Uncomment these tests after fixing
-
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_create_volume_from_snapshot_src_snapshot_not_found(self, a_enter, a_exit, array_type):
         array_exception = array_errors.SnapshotNotFoundError("")
-        self._test_create_volume_from_snapshot_error(a_enter, a_exit, array_type, array_exception)
+        self._test_create_volume_from_snapshot_error(a_enter, a_exit, array_type, array_exception, grpc.StatusCode.INTERNAL)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_create_volume_from_snapshot_target_volume_not_found(self, a_enter, a_exit, array_type):
         array_exception = array_errors.VolumeNotFoundError("")
-        self._test_create_volume_from_snapshot_error(a_enter, a_exit, array_type, array_exception)
+        self._test_create_volume_from_snapshot_error(a_enter, a_exit, array_type, array_exception, grpc.StatusCode.INTERNAL)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_create_volume_from_snapshot_illegal_object_name(self, a_enter, a_exit, array_type):
         array_exception = array_errors.IllegalObjectName("")
-        self._test_create_volume_from_snapshot_error(a_enter, a_exit, array_type, array_exception)
+        self._test_create_volume_from_snapshot_error(a_enter, a_exit, array_type, array_exception, grpc.StatusCode.INVALID_ARGUMENT)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
     def test_create_volume_from_snapshot_permission_denied(self, a_enter, a_exit, array_type):
         array_exception = array_errors.PermissionDeniedError("")
-        self._test_create_volume_from_snapshot_error(a_enter, a_exit, array_type, array_exception)
+        self._test_create_volume_from_snapshot_error(a_enter, a_exit, array_type, array_exception, grpc.StatusCode.PERMISSION_DENIED)
 
-    def _test_create_volume_from_snapshot_error(self, a_enter, a_exit, array_type, array_exception):
+    def _test_create_volume_from_snapshot_error(self, a_enter, a_exit, array_type, array_exception, return_code):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
         snap_id = "wwn1"
@@ -582,7 +580,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.delete_volume = Mock()
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
+        self.assertEqual(context.code, return_code)
 
     def _get_snapshot_source(self, snapshot_id):
         source = Mock()
