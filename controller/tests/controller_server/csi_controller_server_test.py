@@ -567,7 +567,15 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     def test_create_volume_from_snapshot_permission_denied(self, a_enter, a_exit, array_type):
         array_exception = array_errors.PermissionDeniedError("")
         self._test_create_volume_from_snapshot_error(a_enter, a_exit, array_type, array_exception,
-                                                     grpc.StatusCode.INVALID_ARGUMENT)  # TODO
+                                                     grpc.StatusCode.PERMISSION_DENIEDT)
+
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_create_volume_from_snapshot_general_error(self, a_enter, a_exit, array_type):
+        array_exception = Exception("")
+        self._test_create_volume_from_snapshot_error(a_enter, a_exit, array_type, array_exception,
+                                                     grpc.StatusCode.INTERNAL)
 
     def _test_create_volume_from_snapshot_error(self, a_enter, a_exit, array_type, array_exception, return_code,
                                                 rollback_called=True):
