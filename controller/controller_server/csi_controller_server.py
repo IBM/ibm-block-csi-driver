@@ -164,7 +164,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             array_mediator.copy_volume_from_snapshot(vol_name, src_snapshot_name, src_snapshot_capacity,
                                                      min_vol_size)
             vol.copy_src_object_id = src_snapshot.id
-        except {controller_errors.VolumeNotFoundError} as ex:
+        except controller_errors.VolumeNotFoundError as ex:
             raise ex
         except Exception as ex:
             logger.error("Exception raised while creating volume from snapshot")
