@@ -567,7 +567,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     def test_create_volume_from_snapshot_permission_denied(self, a_enter, a_exit, array_type):
         array_exception = array_errors.PermissionDeniedError("")
         self._test_create_volume_from_snapshot_error(a_enter, a_exit, array_type, array_exception,
-                                                     grpc.StatusCode.INVALID_ARGUMENT)
+                                                     grpc.StatusCode.INVALID_ARGUMENT) # TODO
 
     def _test_create_volume_from_snapshot_error(self, a_enter, a_exit, array_type, array_exception, return_code,
                                                 rollback_called=True):
@@ -586,9 +586,9 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.delete_volume = Mock()
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, context)
+        if rollback_called:
+            self.mediator.delete_volume.assert_called_with(vol_id)
         self.assertEqual(context.code, return_code)
-        # if rollback_called:
-        #     self.mediator.delete_volume.assert_called_with(vol_id)
 
     def _get_snapshot_source(self, snapshot_id):
         source = Mock()
