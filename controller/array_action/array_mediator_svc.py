@@ -359,7 +359,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             return self._create_and_start_fcmap(source_volume_name, target_volume_name)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.error("Failed to create snapshot '{0}': {1}", target_volume_name, ex)
+            logger.error("Failed to create snapshot '{0}': {1}".format(target_volume_name, ex))
             self._delete_volume(target_volume_name)
             raise ex
 
