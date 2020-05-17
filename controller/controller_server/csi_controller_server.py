@@ -175,6 +175,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.exception(ex)
             try:
                 logger.error("+++++++++++++ before Exception raised while copying Volume from Snapshot")
+                logger.error(
+                    "+++++++++++++ before Exception raised while copying Volume from Snapshot vol {0}".format(vol.id))
                 self._rollback_create_volume_from_snapshot(array_mediator, vol.id)
                 logger.error("+++++++++++++ after Exception raised while copying Volume from Snapshot")
             except Exception:
