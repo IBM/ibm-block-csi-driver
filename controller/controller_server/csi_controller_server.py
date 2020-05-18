@@ -76,9 +76,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.debug(array_mediator)
                 # TODO: CSI-1358 - remove try/except
                 try:
-                    logger.info("++++++++++++++ get ol name and prefix")
                     volume_full_name, volume_prefix = self._get_volume_name_and_prefix(request, array_mediator)
-                    logger.info("++++++++++++++ get ol name and prefix. Name {0}".format(volume_full_name))
                 except controller_errors.IllegalObjectName as ex:
                     context.set_details(ex.message)
                     context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
@@ -91,14 +89,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug("requested size is 0 so the default size will be used : {0} ".format(
                         size))
                 try:
-                    logger.info("++++++++++++++ get volume")
                     vol = array_mediator.get_volume(
                         volume_full_name,
                         volume_context=request.parameters,
                         volume_prefix=volume_prefix,
                     )
-                    # TODO
-                    logger.info(vol)
                 except controller_errors.VolumeNotFoundError:
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
@@ -108,22 +103,14 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 else:
                     logger.debug("volume found : {}".format(vol))
 
-                    logger.debug("+++++++++++++++ before capacity check")
                     if not src_snapshot_id and vol.capacity_bytes != request.capacity_range.required_bytes:
                         context.set_details("Volume was already created with different size.")
                         context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                         return csi_pb2.CreateVolumeResponse()
 
-                    logger.debug(
-                        "+++++++++++++++ before idemp check v {0} s {1}".format(vol.copy_src_object_id,
-                                                                                src_snapshot_id))
                     copy_source_res = self._handle_existing_vol_src_snap(vol, src_snapshot_id, context)
-                    logger.debug(
-                        "+++++++++++++++ after idemp check v {0} s {1}".format(vol.copy_src_object_id, src_snapshot_id))
                     if copy_source_res:
-                        logger.debug("+++++++++++++++ after if handled ret")
                         return copy_source_res
-                    logger.debug("+++++++++++++++ after if handled")
 
                 if src_snapshot_id:
                     self._copy_volume_from_snapshot(vol, src_snapshot_id, size, array_mediator)
@@ -161,16 +148,16 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 raise controller_errors.SnapshotNotFoundError(src_snapshot_id)
             src_snapshot_name = src_snapshot.snapshot_name
             src_snapshot_capacity = src_snapshot.capacity_bytes
-            logger.error("Copy Snapshot {0} data to Volume {1}.".format(src_snapshot_id, vol_name))
+            logger.debug("Copy snapshot {0} data to volume {1}.".format(src_snapshot_id, vol_name))
             array_mediator.copy_volume_from_snapshot(vol_name, src_snapshot_name, src_snapshot_capacity,
                                                      min_vol_size)
             logger.debug("Copy Volume frm Snapshot finished")
         except controller_errors.VolumeNotFoundError as ex:
-            logger.error("Volume not found while copying Volume from Snapshot")
+            logger.error("Volume not found while copying snapshot data to volume")
             logger.exception(ex)
             raise ex
         except Exception as ex:
-            logger.error("Exception raised while copying Volume from Snapshot")
+            logger.error("Exception raised while copying snapshot data to volume")
             logger.exception(ex)
             try:
                 self._rollback_create_volume_from_snapshot(array_mediator, vol.id)
@@ -181,7 +168,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     @retry(Exception, tries=5, delay=1)
     def _rollback_create_volume_from_snapshot(self, array_mediator, vol_id):
-        logger.debug("Rollback copy volume from snapshot. Deleting Volume {0}".format(vol_id))
+        logger.debug("Rollback copy volume from snapshot. Deleting volume {0}".format(vol_id))
         array_mediator.delete_volume(vol_id)
 
     def _handle_existing_vol_src_snap(self, vol, src_snapshot_id, context):
@@ -196,17 +183,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             if volume is copy of another source - set context status to INTERNAL ad return CreateVolumeResponse
             In any other case return null
         """
-        # TODO
-        logger.debug("aaaaaaaaaaaaaaaaaaaaaaaaaa")
-        logger.debug("+++++++++ _handle snap {0}".format(src_snapshot_id))
-        if vol.copy_src_object_id:
-            logger.debug("+++++++++ _handle snap vol {0}".format(vol.copy_src_object_id))
-
         vol_name = vol.volume_name
         vol_copy_src_object_id = vol.copy_src_object_id
         if not src_snapshot_id or not vol_copy_src_object_id:
             return None
-        logger.debug("+++++++++ _handle snap {0} vol {1}".format(src_snapshot_id, vol.copy_src_object_id))
         if vol_copy_src_object_id == src_snapshot_id:
             logger.debug(
                 "Volume {0} exists and it is copy of Snapshot {1}.".format(vol_name, src_snapshot_id))
@@ -218,14 +198,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details("Volume was already exists but created but from different source.")
             context.set_code(grpc.StatusCode.INTERNAL)
             return csi_pb2.CreateVolumeResponse()
-        return None
 
     def _get_src_snapshot_id(self, request):
         source = request.volume_content_source
         logger.info(source)
         res = None
         if source and source.HasField(config.VOLUME_SOURCE_SNAPSHOT):
-            logger.info("++++++++++++++++++ SNAPSHOT +")
             source_snapshot = source.snapshot
             logger.info(source)
             _, res = utils.get_snapshot_id_info(source_snapshot.snapshot_id)
