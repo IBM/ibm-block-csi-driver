@@ -170,7 +170,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         }
         return list_methods_by_kind[cli_object_kind]
 
-    def _get_cli_object_if_exists(self, object_name_or_id, cli_object_kind, not_exist_err):
+    def _get_cli_object(self, object_name_or_id, cli_object_kind, not_exist_err=True):
         logger.debug("Get {0} : {1}".format(cli_object_kind, object_name_or_id))
         cli_object = None
         list_method = self._get_client_list_method(cli_object_kind)
@@ -188,8 +188,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise ex
         return cli_object
 
-    def _get_cli_object(self, object_name_or_id, cli_object_kind, not_exist_err=True):
-        cli_object = self._get_cli_object_if_exists(object_name_or_id, cli_object_kind, not_exist_err)
+    def _get_cli_object_if_exists(self, object_name_or_id, cli_object_kind):
+        cli_object = self._get_cli_object(object_name_or_id, cli_object_kind, not_exist_err=False)
         logger.debug("cli {0} returned : {1}".format(cli_object_kind, cli_object))
         return cli_object
 
@@ -197,10 +197,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return self._get_cli_object(fcmap_name_or_id, CLI_OBJECT_KIND_FCMAP)
 
     def _get_cli_volume_if_exists(self, volume_name_or_id):
-        return self._get_cli_object(volume_name_or_id, CLI_OBJECT_KIND_VOLUME, not_exist_err=False)
+        return self._get_cli_object_if_exists(volume_name_or_id, CLI_OBJECT_KIND_VOLUME)
 
     def _get_cli_volume(self, volume_name_or_id):
-        cli_volume = self._get_cli_object(volume_name_or_id, CLI_OBJECT_KIND_VOLUME, not_exist_err=False)
+        cli_volume = self._get_cli_object_if_exists(volume_name_or_id, CLI_OBJECT_KIND_VOLUME)
         if not cli_volume:
             raise controller_errors.VolumeNotFoundError(volume_name_or_id)
         return cli_volume
@@ -282,7 +282,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         cli_volume = self._create_cli_volume(name, size_in_bytes, capabilities, pool)
         return self._generate_volume_response(cli_volume)
 
-    def _delete_volume(self, volume_name):
+    def _delete_volume(self, volume_name, not_exist_err=True):
         logger.info("deleting volume with name : {0}".format(volume_name))
         try:
             self.client.svctask.rmvolume(vdisk_id=volume_name)
@@ -290,7 +290,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             if not is_warning_message(ex.my_message):
                 logger.warning("Failed to delete volume {}".format(volume_name))
                 if (OBJ_NOT_FOUND in ex.my_message
-                        or VOL_NOT_FOUND in ex.my_message):
+                   or VOL_NOT_FOUND in ex.my_message) and not_exist_err:
                     raise controller_errors.VolumeNotFoundError(volume_name)
                 else:
                     raise ex
@@ -350,9 +350,24 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _create_and_start_fcmap(self, source_volume_name, target_volume_name):
         self._create_fcmap(source_volume_name, target_volume_name)
-        target_cli_volume = self._get_cli_volume(source_volume_name)
+        target_cli_volume = self._get_cli_volume(target_volume_name)
         self._start_fcmap(target_cli_volume.FC_id)
         return target_cli_volume
+
+    def _delete_unstarted_fcmap(self, fcmap_id):
+        logger.info("deleting fcmap with id : {0}".format(fcmap_id))
+        try:
+            self.client.svctask.rmfcmap(object_id=fcmap_id)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if not is_warning_message(ex.my_message):
+                logger.warning("Failed to delete fcmap '{0}': {1}".format(fcmap_id, ex))
+
+    def _delete_target_volume_if_exist(self, target_volume_name):
+        target_cli_volume = self._get_cli_volume_if_exists(target_volume_name)
+        if target_cli_volume and target_cli_volume.FC_id:
+            self._delete_unstarted_fcmap(target_cli_volume.FC_id)
+        if target_cli_volume:
+            self._delete_volume(target_volume_name, not_exist_err=False)
 
     def _create_snapshot(self, target_volume_name, source_volume_name):
         self._create_similar_volume(target_volume_name, source_volume_name)
@@ -360,7 +375,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return self._create_and_start_fcmap(source_volume_name, target_volume_name)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.error("Failed to create snapshot '{0}': {1}".format(target_volume_name, ex))
-            self._delete_volume(target_volume_name)
+            self._delete_target_volume_if_exist(target_volume_name)
             raise ex
 
     def create_snapshot(self, name, volume_name):
