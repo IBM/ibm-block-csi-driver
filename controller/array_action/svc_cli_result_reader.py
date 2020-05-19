@@ -22,7 +22,7 @@ class SVCListResultsReader:
 
     def _init_first_object_id(self):
         """
-        Set _init_first_object_id to id o the first object and _current_index to point to next line
+        Set _next_object_id to id of the first object and _current_index to point to next line
 
         Raises:
             InvalidCliResponseError
