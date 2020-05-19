@@ -31,7 +31,8 @@ class SVCListResultsReader:
             line = self._hosts_raw_list[self._current_index].strip()
             self._current_index += 1
             if line:
-                param_name, param_value = self._parse_param(line)
+                param_name, _, param_value = line.partition(' ')
+                param_value = param_value.strip()
                 if param_name == ID_PARAM_NAME:
                     self._next_object_id = param_value
                 else:
@@ -62,24 +63,13 @@ class SVCListResultsReader:
             self._current_index += 1
             if not line:
                 continue
-            param_name, param_value = self._parse_param(line)
+            param_name, _, param_value = line.partition(' ')
+            param_value = param_value.strip()
             if param_name == ID_PARAM_NAME:
                 self._next_object_id = param_value
                 return res
             res.add(param_name, param_value)
         return res
-
-    def _parse_param(self, line):
-        """
-        Args:
-            line : line representing <param-name> <param-value> (param value may be empty or contains whitespaces)
-        Returns:
-            param-name, param-value
-        """
-        splitted_line = line.split()
-        name = splitted_line[0]
-        value = line[len(name):].strip() if len(splitted_line) > 1 else ""
-        return name, value
 
     def _has_next(self):
         return self._next_object_id
