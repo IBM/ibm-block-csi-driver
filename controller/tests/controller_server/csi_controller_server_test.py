@@ -243,6 +243,72 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.mediator.create_snapshot.assert_called_once_with("prefix_some_name", "snap_vol")
 
 
+class TestControllerServerDeleteSnapshot(unittest.TestCase):
+    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect", Mock())
+    def setUp(self):
+        self.fqdn = "fqdn"
+        self.mediator = XIVArrayMediator("user", "password", self.fqdn)
+        self.mediator.client = Mock()
+        self.mediator.get_snapshot = Mock()
+        self.mediator.get_snapshot.return_value = None
+        self.servicer = ControllerServicer(self.fqdn)
+        self.request = Mock()
+        self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
+        self.request.parameters = {}
+        self.request.snapshot_id = "A9000:BADC0FFEE0DDF00D00000000DEADBABE"
+
+    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.delete_snapshot", Mock())
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_delete_snapshot_succeeds(self, a_enter):
+        a_enter.return_value = self.mediator
+        context = utils.FakeContext()
+
+        self.servicer.DeleteSnapshot(self.request, context)
+
+        self.assertEqual(context.code, grpc.StatusCode.OK)
+
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__", Mock())
+    def test_delete_snapshot_with_wrong_secrets(self, a_enter):
+        a_enter.return_value = self.mediator
+        context = utils.FakeContext()
+
+        self.request.secrets = {"password": "pass", "management_address": "mg"}
+        self.servicer.DeleteSnapshot(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "username is missing in secrets")
+        self.assertTrue("secret" in context.details)
+
+        self.request.secrets = {"username": "user", "management_address": "mg"}
+        self.servicer.DeleteSnapshot(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "password is missing in secrets")
+        self.assertTrue("secret" in context.details)
+
+        self.request.secrets = {"username": "user", "password": "pass"}
+        self.servicer.DeleteSnapshot(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "mgmt address is missing in secrets")
+        self.assertTrue("secret" in context.details)
+
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__", Mock())
+    def test_delete_snapshot_with_array_connection_exception(self, a_enter):
+        a_enter.side_effect = [Exception("a_enter error")]
+        context = utils.FakeContext()
+
+        self.servicer.DeleteSnapshot(self.request, context)
+
+        self.assertEqual(context.code, grpc.StatusCode.INTERNAL, "array connection internal error")
+        self.assertTrue("a_enter error" in context.details)
+
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__", Mock())
+    def test_delete_snapshot_invalid_snapshot_id(self, a_enter):
+        a_enter.return_value = self.mediator
+        context = utils.FakeContext()
+        self.request.snapshot_id = "wrong_id"
+        self.servicer.DeleteSnapshot(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.OK)
+
+
 class TestControllerServerCreateVolume(AbstractControllerTest):
 
     def get_create_object_method(self):
