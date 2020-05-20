@@ -383,6 +383,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         # TODO: CSI-1339
         raise NotImplementedError
 
+    def delete_snapshot(self, snapshot_id):
+        # TODO: will need to implement
+        raise NotImplementedError
+
     def get_iscsi_targets_by_iqn(self):
         return {}
 

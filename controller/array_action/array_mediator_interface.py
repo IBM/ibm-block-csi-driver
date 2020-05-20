@@ -232,6 +232,20 @@ class ArrayMediator(ABC):
         """
         raise NotImplementedError
 
+    @abc.abstractmethod
+    def delete_snapshot(self, snapshot_id):
+        """
+        This function should delete a snapshot in the storage system.
+        Args:
+            snapshot_id : wwn of the snapshot to delete
+        Returns:
+            None
+        Raises:
+            SnapshotNotFound
+            PermissionDenied
+        """
+        raise NotImplementedError
+
     @abstractmethod
     def get_iscsi_targets_by_iqn(self):
         """

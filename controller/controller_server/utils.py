@@ -1,7 +1,7 @@
 from controller.common.csi_logger import get_stdout_logger
 import controller.controller_server.config as config
 from controller.csi_general import csi_pb2
-from controller.controller_server.errors import ValidationException
+from controller.controller_server.errors import ValidationException, ObjectIdError
 import controller.controller_server.messages as messages
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.errors import HostNotFoundError, VolumeNotFoundError, UnsupportedConnectivityTypeError
@@ -136,6 +136,16 @@ def validate_create_snapshot_request(request):
     logger.debug("request validation finished.")
 
 
+def validate_delete_snapshot_request(request):
+    logger.debug("validating delete snapshot request")
+    if not request.snapshot_id:
+        raise ValidationException(messages.name_should_not_be_empty_message)
+    logger.debug("validating secrets")
+    if request.secrets:
+        validate_secret(request.secrets)
+    logger.debug("request validation finished.")
+
+
 def generate_csi_create_volume_response(new_vol):
     logger.debug("creating volume response for vol : {0}".format(new_vol))
 
@@ -218,8 +228,7 @@ def _get_object_id_info(full_object_id, object_type):
     logger.debug("getting {0} info for id : {1}".format(object_type, full_object_id))
     splitted_object_id = full_object_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)
     if len(splitted_object_id) != 2:
-        # TODO - add other exception
-        raise VolumeNotFoundError(full_object_id)
+        raise ObjectIdError(full_object_id)
 
     array_type, object_id = splitted_object_id
     logger.debug("volume id : {0}, array type :{1}".format(object_id, array_type))
