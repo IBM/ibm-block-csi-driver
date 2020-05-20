@@ -222,7 +222,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             try:
                 array_type, vol_id = utils.get_volume_id_info(request.volume_id)
-            except ObjectIdError  as ex:
+            except ObjectIdError as ex:
                 logger.warning("volume id is invalid. error : {}".format(ex))
                 return csi_pb2.DeleteVolumeResponse()
 
@@ -458,7 +458,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
             try:
                 array_type, snapshot_id = utils.get_snapshot_id_info(request.snapshot_id)
-            except ObjectIdError  as ex:
+            except ObjectIdError as ex:
                 logger.warning("volume id is invalid. error : {}".format(ex))
                 return csi_pb2.DeleteVolumeResponse()
 
