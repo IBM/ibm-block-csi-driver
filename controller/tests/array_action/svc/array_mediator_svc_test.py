@@ -236,7 +236,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             CLIFailureError("CMMVC5753E")]
 
         with self.assertRaises(CLIFailureError):
-            self.svc.get_snapshot("snap")
+            self.svc.get_snapshot("test_snap")
 
     def test_get_snapshot_success(self):
         target_cli_vol = self._get_mapped_target_cli_vol()
@@ -244,7 +244,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         fcmap = Munch({'source_vdisk_name': 'source_vol'})
         self.svc.client.svcinfo.lsfcmap.return_value = self._mock_cli_object(fcmap)
 
-        self.svc.get_snapshot("snap")
+        self.svc.get_snapshot("test_snap")
 
     def _prepare_mocks_for_create_snapshot(self):
         self.svc.client.svctask.mkvolume.return_value = Mock()
@@ -280,7 +280,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             CLIFailureError("Failed")]
 
         with self.assertRaises(CLIFailureError):
-            self.svc.create_snapshot("snap", "source_vol")
+            self.svc.create_snapshot("test_snap", "source_vol")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_create_snapshot_start_fcmap_error(self, mock_warning):
