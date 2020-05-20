@@ -232,7 +232,7 @@ class ArrayMediator(ABC):
         """
         raise NotImplementedError
 
-    @abc.abstractmethod
+    @abstractmethod
     def delete_snapshot(self, snapshot_id):
         """
         This function should delete a snapshot in the storage system.
