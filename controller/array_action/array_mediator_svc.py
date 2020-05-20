@@ -1,4 +1,5 @@
 from collections import defaultdict
+from io import StringIO
 
 from pysvc import errors as svc_errors
 from pysvc.unified.client import connect
@@ -8,11 +9,9 @@ import controller.array_action.config as config
 import controller.array_action.errors as controller_errors
 from controller.array_action.array_action_types import Volume, Host
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
+from controller.array_action.svc_cli_result_reader import SVCListResultsReader
 from controller.array_action.utils import classproperty, bytes_to_string
 from controller.common.csi_logger import get_stdout_logger
-from controller.array_action.svc_cli_result_reader import SVCListResultsReader
-
-from io import StringIO
 
 array_connections_dict = {}
 logger = get_stdout_logger()

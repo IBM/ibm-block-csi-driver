@@ -1,5 +1,5 @@
-from controller.common.csi_logger import get_stdout_logger
 import controller.array_action.errors as controller_errors
+from controller.common.csi_logger import get_stdout_logger
 
 logger = get_stdout_logger()
 

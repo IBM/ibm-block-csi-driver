@@ -1,15 +1,16 @@
 import unittest
+
+from mock import patch, Mock
 from munch import Munch
-from mock import patch, Mock, MagicMock
+from pysvc import errors as svc_errors
+from pysvc.unified.response import CLIFailureError
+
+import controller.array_action.config as config
+import controller.array_action.errors as array_errors
 from controller.array_action.array_mediator_svc import SVCArrayMediator, build_kwargs_from_capabilities, \
     HOST_ID_PARAM, HOST_NAME_PARAM, HOST_ISCSI_NAMES_PARAM, HOST_WWPNS_PARAM
 from controller.array_action.svc_cli_result_reader import SVCListResultsElement
-import controller.array_action.errors as array_errors
-from pysvc.unified.response import CLIFailureError
-from pysvc import errors as svc_errors
-import controller.array_action.config as config
 from controller.common.node_info import Initiators
-import encodings
 
 EMPTY_BYTES = b''
 

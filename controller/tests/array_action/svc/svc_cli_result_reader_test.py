@@ -1,6 +1,7 @@
-from controller.array_action.svc_cli_result_reader import SVCListResultsReader
-from controller.array_action import errors
 import unittest
+
+from controller.array_action import errors
+from controller.array_action.svc_cli_result_reader import SVCListResultsReader
 
 host_1 = "\n".join(("id 1", "name host_1", "WWPN wwpn1", "protocol fc", "WWPN wwpn2"))
 host_2 = "\n".join(("id 2", "name host_2", "", "   ", "iscsi", "status   not active"))
