@@ -8,6 +8,7 @@ import yaml
 from retry import retry
 
 import controller.array_action.errors as controller_errors
+from controller.controller_server.errors import ObjectIdError
 import controller.controller_server.config as config
 import controller.controller_server.utils as utils
 from controller.array_action.array_connection_manager import ArrayConnectionManager
@@ -221,7 +222,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             try:
                 array_type, vol_id = utils.get_volume_id_info(request.volume_id)
-            except controller_errors.VolumeNotFoundError as ex:
+            except ObjectIdError  as ex:
                 logger.warning("volume id is invalid. error : {}".format(ex))
                 return csi_pb2.DeleteVolumeResponse()
 
@@ -455,7 +456,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         try:
             utils.validate_delete_snapshot_request(request)
             user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
-            array_type, snapshot_id = utils.get_snapshot_id_info(request.snapshot_id)
+            try:
+                array_type, snapshot_id = utils.get_snapshot_id_info(request.snapshot_id)
+            except ObjectIdError  as ex:
+                logger.warning("volume id is invalid. error : {}".format(ex))
+                return csi_pb2.DeleteVolumeResponse()
 
             with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
                 logger.debug(array_mediator)
