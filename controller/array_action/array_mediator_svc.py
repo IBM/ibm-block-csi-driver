@@ -310,8 +310,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if detailed_hosts_list_errors:
             logger.error("Errors returned from getting detailed hosts list: {0}".format(detailed_hosts_list_errors))
 
+        return self._get_detailed_hosts_by_raw_output*detailed_hosts_list_output
+
+    def _get_detailed_hosts_by_raw_output(self, detailed_hosts_list_raw_output):
         logger.debug("Reading detailed hosts list commands batch response")
-        hosts_reader = SVCListResultsReader(detailed_hosts_list_output)
+        hosts_reader = SVCListResultsReader(detailed_hosts_list_raw_output)
         res = []
         for host_details in hosts_reader:
             host_id = host_details.get(HOST_ID_PARAM)
