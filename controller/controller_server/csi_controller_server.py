@@ -302,7 +302,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return csi_pb2.ControllerPublishVolumeResponse()
 
         except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError,
-                controller_errors.BadNodeIdError, controller_errors.NoIscsiTargetsFoundError) as ex:
+                controller_errors.BadNodeIdError, controller_errors.NoIscsiTargetsFoundError, ObjectIdError) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)
