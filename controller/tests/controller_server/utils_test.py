@@ -7,6 +7,7 @@ from controller.controller_server.errors import ValidationException
 from controller.array_action.errors import HostNotFoundError
 from controller.controller_server.errors import ObjectIdError
 
+
 class TestUtils(unittest.TestCase):
 
     def setUp(self):
