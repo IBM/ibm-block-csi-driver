@@ -357,12 +357,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
                           config.FC_CONNECTIVITY_TYPE], connectivity_type)
 
     def _get_host_as_dictionary(self, id, name, iscsi_names_list, wwpns_list):
-        res = {}
-        res[HOST_ID_PARAM] = id
-        res[HOST_NAME_PARAM] = name
-        if iscsi_names_list is not None:
+        res = {HOST_ID_PARAM: id, HOST_NAME_PARAM: name}
+        if iscsi_names_list:
             res[HOST_ISCSI_NAMES_PARAM] = iscsi_names_list
-        if wwpns_list is not None:
+        if wwpns_list:
             res[HOST_WWPNS_PARAM] = wwpns_list
         return res
 

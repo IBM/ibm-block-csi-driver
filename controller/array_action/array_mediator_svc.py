@@ -27,8 +27,7 @@ VOL_NOT_FOUND = 'CMMVC8957E'
 POOL_NOT_MATCH_VOL_CAPABILITIES = 'CMMVC9292E'
 NOT_REDUCTION_POOL = 'CMMVC9301E'
 
-LIST_HOSTS_CMD = "lshost"
-LIST_CMDS_SEPARATOR = ";"
+LIST_HOSTS_CMD_FORMAT = 'lshost {HOST_ID};'
 HOST_ID_PARAM = 'id'
 HOST_NAME_PARAM = 'name'
 HOST_ISCSI_NAMES_PARAM = 'iscsi_name'
@@ -329,20 +328,17 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         writer = StringIO()
         for host in host_list:
             host_id = host.get(HOST_ID_PARAM)
-            writer.write(LIST_HOSTS_CMD)
-            writer.write(" ")
-            writer.write(host_id)
-            writer.write(LIST_CMDS_SEPARATOR)
+            writer.write(LIST_HOSTS_CMD_FORMAT.format(HOST_ID=host_id))
         return writer.getvalue()
 
     def _send_raw_cli_command(self, cmd):
         output_as_bytes, errors_as_bytes = self.client.send_raw_command(cmd)
         output_as_str = bytes_to_string(output_as_bytes)
         errors_as_str = bytes_to_string(errors_as_bytes)
-        formatted_errors_as_str = self._get_formatted_hosts_list_error_msg(errors_as_str)
+        formatted_errors_as_str = self._truncate_error_msg(errors_as_str)
         return output_as_str, formatted_errors_as_str
 
-    def _get_formatted_hosts_list_error_msg(self, detailed_host_list_errors):
+    def _truncate_error_msg(self, detailed_host_list_errors):
         if len(detailed_host_list_errors) <= HOSTS_LIST_ERR_MSG_MAX_LENGTH:
             return detailed_host_list_errors
         return "{0} ...".format(detailed_host_list_errors[HOSTS_LIST_ERR_MSG_MAX_LENGTH])

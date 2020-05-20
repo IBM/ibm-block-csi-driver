@@ -37,7 +37,7 @@ class SVCListResultsReader:
                     self._next_object_id = param_value
                 else:
                     raise controller_errors.InvalidCliResponseError(
-                        "First element is {0}. Expected {1}".format(line, ID_PARAM_NAME))
+                        "First element is {0}. Expected param {1}".format(line, ID_PARAM_NAME))
 
     def __iter__(self):
         return self
