@@ -12,7 +12,7 @@ class TestSVCListReader(unittest.TestCase):
 
     def test_single_host_success(self):
         hosts_reader = SVCListResultsReader(host_1)
-        hosts_list = [host for host in hosts_reader]
+        hosts_list = list(hosts_reader)
         self.assertEqual(len(hosts_list), 1)
         self._assert_host_1(hosts_list[0])
 
@@ -21,19 +21,19 @@ class TestSVCListReader(unittest.TestCase):
         hosts_raw_input = "\n".join((host_1, "\n  \n", host_2, host_3, "  "))
         assert_methods = [self._assert_host_1, self._assert_host_2, self._assert_host_3]
         hosts_reader = SVCListResultsReader(hosts_raw_input)
-        hosts_list = [host for host in hosts_reader]
+        hosts_list = list(hosts_reader)
         self.assertEqual(len(hosts_list), hosts_count)
         for i in range(hosts_count):
             assert_methods[i](hosts_list[i])
 
     def test_no_hosts_empty_input(self):
         hosts_reader = SVCListResultsReader("")
-        hosts_list = [host for host in hosts_reader]
+        hosts_list = list(hosts_reader)
         self.assertFalse(hosts_list)
 
     def test_no_hosts_whitespace_input(self):
         hosts_reader = SVCListResultsReader("\n\n\n")
-        hosts_list = [host for host in hosts_reader]
+        hosts_list = list(hosts_reader)
         self.assertFalse(hosts_list)
 
     def test_illegal_input(self):
