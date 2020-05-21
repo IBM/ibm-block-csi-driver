@@ -1,14 +1,15 @@
 import os.path
 import time
-from concurrent import futures
 from optparse import OptionParser
 
 import grpc
 import yaml
+from concurrent import futures
 
 import controller.array_action.errors as controller_errors
 import controller.controller_server.config as config
 import controller.controller_server.utils as utils
+from controller.array_action import messages
 from controller.array_action.array_connection_manager import ArrayConnectionManager
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
@@ -18,7 +19,6 @@ from controller.common.utils import set_current_thread_name
 from controller.controller_server.errors import ValidationException
 from controller.csi_general import csi_pb2
 from controller.csi_general import csi_pb2_grpc
-from controller.array_action import messages
 
 logger = None  # is set in ControllerServicer::__init__
 

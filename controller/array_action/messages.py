@@ -52,3 +52,5 @@ SnapshotNameBelongsToVolumeError_message = "Snapshot not found. Volume with the 
                                                          Name : {0} , array : {1}"
 
 SnapshotWrongVolumeError_message = "Snapshot {0} exists but it is of Volume {1} and not {2}"
+
+InvalidCliResponseError_message = "Invalid CLI response. Details : {0}"
