@@ -1,11 +1,12 @@
-from controller.common.csi_logger import get_stdout_logger
+from google.protobuf.timestamp_pb2 import Timestamp
+
 import controller.controller_server.config as config
-from controller.csi_general import csi_pb2
-from controller.controller_server.errors import ValidationException, ObjectIdError
 import controller.controller_server.messages as messages
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
-from controller.array_action.errors import HostNotFoundError, VolumeNotFoundError, UnsupportedConnectivityTypeError
-from google.protobuf.timestamp_pb2 import Timestamp
+from controller.array_action.errors import HostNotFoundError
+from controller.common.csi_logger import get_stdout_logger
+from controller.controller_server.errors import ValidationException, ObjectIdError
+from controller.csi_general import csi_pb2
 
 logger = get_stdout_logger()
 
