@@ -35,14 +35,16 @@ HOST_ISCSI_NAMES_PARAM = 'iscsi_name'
 HOST_WWPNS_PARAM = 'WWPN'
 HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
 
-CLI_OBJECT_KIND_VOLUME = 'Volume'
-CLI_OBJECT_KIND_FCMAP = 'FlashCopy Mapping'
+CLI_OBJECT_TYPE_VOLUME = 'Volume'
+CLI_OBJECT_TYPE_FCMAP = 'FlashCopy Mapping'
+
+YES = 'yes'
 
 
 def is_warning_message(ex):
     """ Return True if the exception message is warning """
-    info_separated_by_quotation = str(ex).split('"')
-    message = info_separated_by_quotation[1]
+    info_seperated_by_quotation = str(ex).split('"')
+    message = info_seperated_by_quotation[1]
     word_in_message = message.split()
     message_tag = word_in_message[0]
     if message_tag[-1] == 'W':
@@ -73,13 +75,13 @@ def build_kwargs_from_capabilities(capabilities, pool_name, volume_name,
     return cli_kwargs
 
 
-def get_capabilities_from_cli_volume(cli_volume):
+def get_cli_volume_capabilities(cli_volume):
     capability = config.CAPABILITY_THICK
-    if cli_volume.se_copy == 'yes':
+    if cli_volume.se_copy == YES:
         capability = config.CAPABILITY_THIN
-    if cli_volume.compressed_copy == 'yes':
+    if cli_volume.compressed_copy == YES:
         capability = config.CAPABILITY_COMPRESSED
-    if cli_volume.deduplicated_copy == 'yes':
+    if cli_volume.deduplicated_copy == YES:
         capability = config.CAPABILITY_DEDUPLICATED
     return {config.CAPABILITIES_SPACEEFFICIENCY: capability}
 
@@ -171,25 +173,26 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                         is_ready=True,
                         array_type=self.array_type)
 
-    def _get_client_list_method(self, cli_object_kind):
+    def _get_client_list_method(self, cli_object_type):
         svcinfo = self.client.svcinfo
-        list_methods_by_kind = {
-            CLI_OBJECT_KIND_VOLUME: lambda obj_id: svcinfo.lsvdisk(bytes=True, object_id=obj_id),
-            CLI_OBJECT_KIND_FCMAP: lambda obj_id: svcinfo.lsfcmap(object_id=obj_id)
-        }
-        return list_methods_by_kind[cli_object_kind]
+        if cli_object_type == CLI_OBJECT_TYPE_VOLUME:
+            return lambda obj_id: svcinfo.lsvdisk(bytes=True, object_id=obj_id)
+        if cli_object_type == CLI_OBJECT_TYPE_FCMAP:
+            return lambda obj_id: svcinfo.lsfcmap(object_id=obj_id)
+        raise ValueError("No list method for cli object type: {}".format(cli_object_type))
 
-    def _get_cli_object(self, object_name_or_id, cli_object_kind, not_exist_err=True):
-        logger.debug("Get {0} : {1}".format(cli_object_kind, object_name_or_id))
+    def _get_cli_object(self, object_name_or_id, cli_object_type, not_exist_err=True):
+        """ Return a cli object. if not_exist_err is True and object doesn't exist, raise error """
+        logger.debug("Get {0} : {1}".format(cli_object_type, object_name_or_id))
         cli_object = None
-        list_method = self._get_client_list_method(cli_object_kind)
+        list_method = self._get_client_list_method(cli_object_type)
         try:
             cli_object = list_method(object_name_or_id).as_single_element
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 if (OBJ_NOT_FOUND in ex.my_message or
                         NAME_NOT_MEET in ex.my_message):
-                    logger.info("{} not found".format(cli_object_kind))
+                    logger.info("{} not found".format(cli_object_type))
                     if not_exist_err:
                         raise ex
         except Exception as ex:
@@ -197,19 +200,19 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise ex
         return cli_object
 
-    def _get_cli_object_if_exists(self, object_name_or_id, cli_object_kind):
-        cli_object = self._get_cli_object(object_name_or_id, cli_object_kind, not_exist_err=False)
-        logger.debug("cli {0} returned : {1}".format(cli_object_kind, cli_object))
+    def _get_cli_object_if_exists(self, object_name_or_id, cli_object_type):
+        cli_object = self._get_cli_object(object_name_or_id, cli_object_type, not_exist_err=False)
+        logger.debug("cli {0} returned : {1}".format(cli_object_type, cli_object))
         return cli_object
 
     def _get_fcmap(self, fcmap_name_or_id):
-        return self._get_cli_object(fcmap_name_or_id, CLI_OBJECT_KIND_FCMAP)
+        return self._get_cli_object(fcmap_name_or_id, CLI_OBJECT_TYPE_FCMAP)
 
     def _get_cli_volume_if_exists(self, volume_name_or_id):
-        return self._get_cli_object_if_exists(volume_name_or_id, CLI_OBJECT_KIND_VOLUME)
+        return self._get_cli_object_if_exists(volume_name_or_id, CLI_OBJECT_TYPE_VOLUME)
 
     def _get_cli_volume(self, volume_name_or_id):
-        cli_volume = self._get_cli_object_if_exists(volume_name_or_id, CLI_OBJECT_KIND_VOLUME)
+        cli_volume = self._get_cli_object_if_exists(volume_name_or_id, CLI_OBJECT_TYPE_VOLUME)
         if not cli_volume:
             raise controller_errors.VolumeNotFoundError(volume_name_or_id)
         return cli_volume
@@ -291,7 +294,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         cli_volume = self._create_cli_volume(name, size_in_bytes, capabilities, pool)
         return self._generate_volume_response(cli_volume)
 
-    def _delete_volume(self, volume_name, not_exist_err=True):
+    def _delete_volume_by_name(self, volume_name, not_exist_err=True):
         logger.info("deleting volume with name : {0}".format(volume_name))
         try:
             self.client.svctask.rmvolume(vdisk_id=volume_name)
@@ -310,7 +313,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
         volume_name = self._get_vol_by_wwn(volume_id)
-        self._delete_volume(volume_name)
+        self._delete_volume_by_name(volume_name)
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
     def get_snapshot(self, snapshot_name):
@@ -328,7 +331,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.info("creating target cli volume '{0}' from source volume '{1}'".format(target_volume_name,
                                                                                        source_volume_name))
         source_cli_volume = self._get_cli_volume(source_volume_name)
-        capabilities = get_capabilities_from_cli_volume(source_cli_volume)
+        capabilities = get_cli_volume_capabilities(source_cli_volume)
         size_in_bytes = int(source_cli_volume.capacity)
         pool = source_cli_volume.mdisk_grp_name
         self._create_cli_volume(target_volume_name, size_in_bytes, capabilities, pool)
@@ -376,20 +379,17 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if target_cli_volume and target_cli_volume.FC_id:
             self._delete_unstarted_fcmap(target_cli_volume.FC_id)
         if target_cli_volume:
-            self._delete_volume(target_volume_name, not_exist_err=False)
-
-    def _create_snapshot(self, target_volume_name, source_volume_name):
-        self._create_similar_volume(target_volume_name, source_volume_name)
-        try:
-            return self._create_and_start_fcmap(source_volume_name, target_volume_name)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.error("Failed to create snapshot '{0}': {1}".format(target_volume_name, ex))
-            self._delete_target_volume_if_exist(target_volume_name)
-            raise ex
+            self._delete_volume_by_name(target_volume_name, not_exist_err=False)
 
     def create_snapshot(self, name, volume_name):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
-        target_cli_volume = self._create_snapshot(name, source_volume_name=volume_name)
+        self._create_similar_volume(name, volume_name)
+        try:
+            target_cli_volume = self._create_and_start_fcmap(volume_name, name)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            logger.error("Failed to create snapshot '{0}': {1}".format(name, ex))
+            self._delete_target_volume_if_exist(name)
+            raise ex
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
         return self._generate_snapshot_response(target_cli_volume, volume_name)
 
