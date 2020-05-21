@@ -33,13 +33,13 @@ pipeline {
     }
     post {
         always {
-            sh 'ls -la build/reports/'
-            junit 'build/reports/*.xml'
-            // cobertura coberturaReportFile: 'build/reports/*.xml'   ## TODO need to run cobertura but it has an issue "No such DSL method"
-            archiveArtifacts 'build/reports/images_url'
             script {
                 manager.addShortText("${env.GIT_BRANCH}")
             }
+            sh 'ls -la build/reports/'
+            junit 'build/reports/*.xml'
+            // cobertura coberturaReportFile: 'build/reports/*.xml'   ## TODO: CSI-103 need to run cobertura but it has an issue "No such DSL method"
+            archiveArtifacts 'build/reports/images_url'
         }
 
         failure {
