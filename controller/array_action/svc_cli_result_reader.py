@@ -12,8 +12,10 @@ class SVCListResultsReader:
     Each object in response is translated to SVCListResultsElement.
     Input is received as string which represents '\n'-separated list of returned lines from output.
     Line with param 'id' (e.g. 'id 1') is recognized as first line of object ans used as separator between objects
-    (e.g. in input "id 1\nname n3\nid 2\nname n2" first object starts with line 'id 1' and ends with 'id 2')
+    (e.g. in input "id 1\nname n3<new line>id 2<new line>name n2" first object starts with line 'id 1'
+    and ends with 'id 2')
     """
+
     def __init__(self, hosts_raw_list_as_string):
         self._hosts_raw_list = hosts_raw_list_as_string.splitlines()
         self._current_index = 0
@@ -79,6 +81,7 @@ class SVCListResultsElement:
     """
     Single parsed object returned from SVC list command
     """
+
     def __init__(self):
         self._dict = {}
 
