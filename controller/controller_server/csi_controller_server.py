@@ -149,9 +149,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             src_snapshot_name = src_snapshot.snapshot_name
             src_snapshot_capacity = src_snapshot.capacity_bytes
             logger.debug("Copy snapshot {0} data to volume {1}.".format(src_snapshot_id, vol_name))
-            array_mediator.copy_volume_from_snapshot(vol_name, src_snapshot_name, src_snapshot_capacity,
-                                                     min_vol_size)
-            logger.debug("Copy Volume frm Snapshot finished")
+            array_mediator.copy_volume_from_snapshot(vol_name, src_snapshot_name, src_snapshot_capacity, min_vol_size)
+            logger.debug("Copy volume from snapshot finished")
         except controller_errors.VolumeNotFoundError as ex:
             logger.error("Volume not found while copying snapshot data to volume")
             logger.exception(ex)
