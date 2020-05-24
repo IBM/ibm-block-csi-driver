@@ -202,7 +202,7 @@ class RESTClient(object):
             lunid=int_to_scsilun(lunid)
         )
 
-    def create_flashcopy(self, volume_pairs, options=[]):
+    def create_flashcopy(self, volume_pairs, options=None):
         """
         :param volume_pairs: [{'source_volume': 0000,'target_volume': 1100},..]
         :param options: ['record_changes', 'persistent', ...]
