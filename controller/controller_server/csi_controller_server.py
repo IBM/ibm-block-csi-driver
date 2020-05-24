@@ -160,8 +160,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.exception(ex)
             try:
                 self._rollback_create_volume_from_snapshot(array_mediator, vol.id)
-            except Exception:
-                pass
+            except Exception as rollback_ex:
+                logger.exception(rollback_ex)
             raise ex
         return vol
 
@@ -175,12 +175,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         This function should create a snapshot from volume in the storage system.
         Args:
             vol                : volume fetched or created in CreateVolume
-            src_snapshot_id    : id of snapshot we should copy to vol or None if volume shhuld not be copied
+            src_snapshot_id    : id of snapshot we should copy to vol or None if volume should not be copied
             context            : CreateVolume response context
         Returns:
-            if volume exists and is copy of specified snapshot - set context status to OK ad return CreateVolumeResponse
-            if volume is copy of another source - set context status to INTERNAL ad return CreateVolumeResponse
-            In any other case return null
+            If volume exists and is a copy of specified snapshot - set context status to OK
+            and return CreateVolumeResponse.
+            If volume is a copy of another source - set context status to INTERNAL and return CreateVolumeResponse.
+            In any other case return None.
         """
         vol_name = vol.volume_name
         vol_copy_src_object_id = vol.copy_src_object_id
@@ -194,13 +195,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         else:
             logger.debug(
                 "Volume {0} exists but it is not copy of Snapshot {1}.".format(vol_name, src_snapshot_id))
-            context.set_details("Volume was already exists but created but from different source.")
+            context.set_details("Volume already exists but was created but from a different source.")
             context.set_code(grpc.StatusCode.INTERNAL)
             return csi_pb2.CreateVolumeResponse()
 
     def _get_src_snapshot_id(self, request):
         source = request.volume_content_source
-        logger.info(source)
         res = None
         if source and source.HasField(config.VOLUME_SOURCE_SNAPSHOT):
             source_snapshot = source.snapshot
