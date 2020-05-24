@@ -185,7 +185,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             vol_id=self._generate_volume_scsi_identifier(res.id),
             vol_name=res.name,
             array_address=self.service_address,
-            copy_src_object_id=None,  # TODO: CSI-1026
+            copy_src_object_id=None,  # TODO: CSI-1338
             pool_name=res.pool,
             array_type=self.array_type
         )

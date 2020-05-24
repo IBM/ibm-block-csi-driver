@@ -231,7 +231,6 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         return array_snapshot
 
     def get_snapshot_by_id(self, snapshot_id):
-        cli_snapshot = None
         try:
             cli_snapshot = self.client.cmd.vol_list(wwn=snapshot_id).as_single_element
         except xcli_errors.IllegalValueForArgumentError as ex:
