@@ -1,3 +1,11 @@
+import encodings
+UTF_8 = encodings.utf_8.getregentry().name
+
+
+def bytes_to_string(input_as_bytes):
+    return input_as_bytes.decode(UTF_8) if input_as_bytes else ""
+
+
 class classproperty(object):
 
     def __init__(self, function):

@@ -17,3 +17,11 @@ class Snapshot:
         self.volume_name = volume_name
         self.is_ready = is_ready
         self.array_type = array_type
+
+
+class Host:
+    def __init__(self, host_id, host_name, iscsi_names, wwns):
+        self.id = host_id
+        self.name = host_name
+        self.iscsi_names = iscsi_names
+        self.wwns = wwns

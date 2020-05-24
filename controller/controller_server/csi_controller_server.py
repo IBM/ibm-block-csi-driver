@@ -1,14 +1,15 @@
 import os.path
 import time
-from concurrent import futures
 from optparse import OptionParser
 
 import grpc
 import yaml
+from concurrent import futures
 
 import controller.array_action.errors as controller_errors
 import controller.controller_server.config as config
 import controller.controller_server.utils as utils
+from controller.array_action import messages
 from controller.array_action.array_connection_manager import ArrayConnectionManager
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
@@ -18,7 +19,6 @@ from controller.common.utils import set_current_thread_name
 from controller.controller_server.errors import ValidationException
 from controller.csi_general import csi_pb2
 from controller.csi_general import csi_pb2_grpc
-from controller.array_action import messages
 
 logger = None  # is set in ControllerServicer::__init__
 
@@ -273,12 +273,16 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.debug("Idempotent case. volume is already unmapped.")
             return csi_pb2.ControllerUnpublishVolumeResponse()
 
+        except controller_errors.VolumeNotFoundError as ex:
+            logger.debug("Idempotent case. volume is already deleted.")
+            return csi_pb2.ControllerUnpublishVolumeResponse()
+
         except controller_errors.PermissionDeniedError as ex:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
             context.set_details(ex)
             return csi_pb2.ControllerPublishVolumeResponse()
 
-        except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError) as ex:
+        except controller_errors.HostNotFoundError as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)
