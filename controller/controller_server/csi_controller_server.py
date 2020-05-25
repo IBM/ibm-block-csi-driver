@@ -324,6 +324,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
         try:
             _, vol_id = utils.get_volume_id_info(source_volume_id)
+            array_type = detect_array_type(array_addresses)
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
                 # TODO: CSI-1358 - remove try/except
