@@ -235,18 +235,18 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             try:
                 # get the volume before creating again, to make sure it is not existing,
                 # because volume name is not unique in ds8k.
-                vol = self.get_volume(
+                volume = self.get_volume(
                     name,
                     volume_context={config.CONTEXT_POOL: pool_id},
                     volume_prefix=volume_prefix
                 )
                 logger.info("Found volume {}".format(name))
-                return vol
+                return volume
             except array_errors.VolumeNotFoundError:
-                vol = self.client.create_volume(**cli_kwargs)
+                volume = self.client.create_volume(**cli_kwargs)
 
                 logger.info("finished creating volume {}".format(name))
-                return self._generate_volume_response(self.client.get_volume(vol.id))
+                return self._generate_volume_response(self.client.get_volume(volume.id))
         except exceptions.NotFound as ex:
             if ERROR_CODE_RESOURCE_NOT_EXISTS in str(ex.message).upper():
                 raise array_errors.PoolDoesNotExist(pool_id, self.identifier)
@@ -316,10 +316,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 else:
                     raise ex
 
-        for vol in volume_candidates:
-            if vol.name == shorten_volume_name(name, volume_prefix):
-                logger.debug("Found volume: {}".format(vol))
-                return self._generate_volume_response(vol)
+        for volume in volume_candidates:
+            if volume.name == shorten_volume_name(name, volume_prefix):
+                logger.debug("Found volume: {}".format(volume))
+                return self._generate_volume_response(volume)
 
         raise array_errors.VolumeNotFoundError(name)
 
@@ -393,13 +393,22 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except exceptions.ClientException as ex:
             raise array_errors.UnMappingError(volume_id, host_name, ex.details)
 
-    def _get_api_volume_by_name(self, volume_name, not_exist_err=True):
+    def _get_pools(self):
+
         try:
             pools = self.client.get_pools()
-        except exceptions.NotFound:
-            raise array_errors.PoolDoesNotExist('',
-                                                self.identifier)
+        except exceptions.ClientException as ex:
+            logger.error(
+                "Failed to get pools, reason is: {}".format(
+                    ex.details
+                )
+            )
+            raise ex
+        return pools
 
+    def _get_api_volume_by_name(self, volume_name, not_exist_err=True):
+
+        pools = self._get_pools()
         volume_candidates = []
 
         for pool in pools:
@@ -410,10 +419,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                     if ERROR_CODE_RESOURCE_NOT_EXISTS in str(ex.message).upper():
                         raise array_errors.VolumeNotFoundError(volume_name)
 
-        for vol in volume_candidates:
-            if vol.name == shorten_volume_name(volume_name, prefix=''):
-                logger.debug("Found volume: {}".format(vol))
-                return vol
+        for volume in volume_candidates:
+            if volume.name == shorten_volume_name(volume_name, prefix=''):
+                logger.debug("Found volume: {}".format(volume))
+                return volume
 
     def _get_volume_by_name(self, volume_name):
         api_volume = self._get_api_volume_by_name(volume_name)
