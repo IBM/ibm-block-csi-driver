@@ -10,6 +10,7 @@ from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIV
 from controller.array_action.utils import classproperty
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.utils import string_to_array
+from controller.common import settings
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -23,7 +24,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     @classproperty
     def array_type(self):
-        return 'A9000'
+        return settings.ARRAY_TYPE_XIV
 
     @classproperty
     def port(self):
@@ -62,6 +63,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         self.password = password
         self.endpoint = endpoint
         self.client = None
+        self._identifier = None
 
         logger.debug("in init")
         self._connect()
@@ -83,6 +85,26 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def disconnect(self):
         if self.client and self.client.is_connected():
             self.client.close()
+
+    @property
+    def identifier(self):
+        if self._identifier is None:
+            self._identifier = self.get_fully_qualified_serial()
+        return self._identifier
+
+    def get_fully_qualified_serial(self):
+        config = self.client.cmd.config_get().as_dict('name')
+        machine_type = config['machine_type'].value
+        machine_model = config['machine_model'].value
+        machine_serial = config['machine_serial_number'].value
+        return '{type}-{model}-{serial}'.format(
+            type=machine_type,
+            model=machine_model,
+            serial=machine_serial
+        )
+
+    def is_active(self):
+        return True
 
     def _convert_size_blocks_to_bytes(self, size_in_blocks):
         return int(size_in_blocks) * self.BLOCK_SIZE_IN_BYTES

@@ -68,7 +68,7 @@ def shorten_volume_name(name, prefix):
     if not prefix:
         return hash_string(name)[:MAX_VOLUME_LENGTH]
     else:
-        name_without_prefix = str(name).split(prefix+settings.NAME_PREFIX_SEPARATOR, 2)[1]
+        name_without_prefix = str(name).split(prefix + settings.NAME_PREFIX_SEPARATOR, 2)[1]
         hashed = hash_string(name_without_prefix)
         return (prefix + settings.NAME_PREFIX_SEPARATOR + hashed)[:MAX_VOLUME_LENGTH]
 
@@ -78,7 +78,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     @classproperty
     def array_type(self):
-        return 'DS8K'
+        return settings.ARRAY_TYPE_DS8K
 
     @classproperty
     def port(self):
@@ -150,12 +150,15 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 'Failed to connect to DS8K array {}, reason is {}'.format(
                     self.service_address,
                     e.details
-                    )
                 )
+            )
             raise ConnectionError()
 
     def disconnect(self):
         pass
+
+    def is_active(self):
+        return True
 
     def get_system_info(self):
         return self.client.get_system()
@@ -213,27 +216,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 'capacity_in_bytes': size_in_bytes,
                 'pool_id': pool_id,
                 'tp': self.get_se_capability_value(capabilities),
-
             })
-            logger.debug(
-                "Start to create volume with parameters: {}".format(cli_kwargs)
-            )
-
-            try:
-                # get the volume before creating again, to make sure it is not existing,
-                # because volume name is not unique in ds8k.
-                vol = self.get_volume(
-                    name,
-                    volume_context={config.CONTEXT_POOL: pool_id},
-                    volume_prefix=volume_prefix
-                )
-                logger.info("Found volume {}".format(name))
-                return vol
-            except array_errors.VolumeNotFoundError:
-                vol = self.client.create_volume(**cli_kwargs)
-
-                logger.info("finished creating volume {}".format(name))
-                return self._generate_volume_response(self.client.get_volume(vol.id))
+            logger.debug("Start to create volume with parameters: {}".format(cli_kwargs))
+            vol = self.client.create_volume(**cli_kwargs)
+            logger.info("finished creating volume {}".format(name))
+            return self._generate_volume_response(self.client.get_volume(vol.id))
         except exceptions.NotFound as ex:
             if ERROR_CODE_RESOURCE_NOT_EXISTS in str(ex.message).upper():
                 raise array_errors.PoolDoesNotExist(pool_id, self.identifier)
