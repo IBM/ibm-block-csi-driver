@@ -394,7 +394,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     def create_volume_returns_error(self, a_enter, create_volume, array_type, return_code, err):
         a_enter.return_value = self.mediator
         create_volume.side_effect = [err]
-
+        array_type.return_value = "a9k"
         context = utils.FakeContext()
         res = self.servicer.CreateVolume(self.request, context)
         msg = str(err)
