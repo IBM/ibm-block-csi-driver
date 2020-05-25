@@ -70,9 +70,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         try:
             # TODO : pass multiple array addresses
             array_type = detect_array_type(array_addresses)
-            with get_agent(user, password, array_addresses, array_type).get_mediator() \
-                    if array_type == settings.ARRAY_TYPE_DS8K \
-                    else ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
+            with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
                 # TODO: CSI-1358 - remove try/except
                 try:
@@ -150,10 +148,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.warning("volume id is invalid. error : {}".format(ex))
                 return csi_pb2.DeleteVolumeResponse()
 
-            with get_agent(user, password, array_addresses, array_type).get_mediator() \
-                    if array_type == settings.ARRAY_TYPE_DS8K \
-                    else ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
-
+            with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
 
                 try:
@@ -200,9 +195,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.debug("node name for this publish operation is : {0}".format(node_name))
 
             user, password, array_addresses = utils.get_array_connection_info_from_secret(request.secrets)
-            with get_agent(user, password, array_addresses, array_type).get_mediator() \
-                    if array_type == settings.ARRAY_TYPE_DS8K \
-                    else ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
+            with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 lun, connectivity_type, array_initiators = array_mediator.map_volume_by_initiators(vol_id,
                                                                                                    initiators)
             logger.info("finished ControllerPublishVolume")
@@ -270,9 +263,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             user, password, array_addresses = utils.get_array_connection_info_from_secret(request.secrets)
 
-            with get_agent(user, password, array_addresses, array_type).get_mediator() \
-                    if array_type == settings.ARRAY_TYPE_DS8K \
-                    else ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
+            with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 array_mediator.unmap_volume_by_initiators(vol_id, initiators)
 
             logger.info("finished ControllerUnpublishVolume")
@@ -333,7 +324,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
         try:
             _, vol_id = utils.get_volume_id_info(source_volume_id)
-            with ArrayConnectionManager(user, password, array_addresses) as array_mediator:
+            with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
                 # TODO: CSI-1358 - remove try/except
                 try:
