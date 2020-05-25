@@ -96,7 +96,7 @@ def get_agents():
 
 def clear_agents():
     with lock:
-        agents = [v for v in _array_agents.values()]
+        agents = list(_array_agents.values())
         _array_agents.clear()
         try:
             while True:

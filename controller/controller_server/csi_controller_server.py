@@ -69,8 +69,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         try:
             # TODO : pass multiple array addresses
-           array_type = detect_array_type(array_addresses)
-           with get_agent(user, password, array_addresses, array_type).get_mediator() \
+            array_type = detect_array_type(array_addresses)
+            with get_agent(user, password, array_addresses, array_type).get_mediator() \
                     if array_type == settings.ARRAY_TYPE_DS8K \
                     else ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
                 logger.debug(array_mediator)

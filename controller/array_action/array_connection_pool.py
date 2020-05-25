@@ -33,11 +33,8 @@ class ConnectionPool(object):
                 self.current_size -= 1
 
     def create(self):
-        try:
-            logger.debug("Creating a new connection for endpoint {}".format(self.endpoint_key))
-            return self.med_class(self.username, self.password, self.endpoints)
-        except Exception:
-            raise
+        logger.debug("Creating a new connection for endpoint {}".format(self.endpoint_key))
+        return self.med_class(self.username, self.password, self.endpoints)
 
     def get(self, block=True, timeout=None):
         """
