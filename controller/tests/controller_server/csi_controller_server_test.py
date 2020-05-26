@@ -590,7 +590,7 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.request.volume_capability = caps
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_publish_volume_success(self, enter):
+    def test_publish_volume_success(self, storage_agent):
         storage_agent.return_value = self.storage_agent
 
         context = utils.FakeContext()
@@ -731,7 +731,7 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.mediator.get_array_fc_wwns = Mock()
         self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4",
                                                         "500143806626bae2"]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
 
         res = self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -776,7 +776,7 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.assertEqual(context.code, grpc.StatusCode.PERMISSION_DENIED)
 
         self.mediator.map_volume.side_effect = [array_errors.VolumeNotFoundError("vol")]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
@@ -786,14 +786,14 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
         self.mediator.map_volume.side_effect = [array_errors.MappingError("", "", "")]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
 
     @patch.object(XIVArrayMediator, "MAX_LUN_NUMBER", 3)
     @patch.object(XIVArrayMediator, "MIN_LUN_NUMBER", 1)
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_publish_volume_map_volume_lun_already_in_use(self, enter):
+    def test_publish_volume_map_volume_lun_already_in_use(self, storage_agent):
         context = utils.FakeContext()
 
         self.mediator.map_volume.side_effect = [array_errors.LunAlreadyInUseError("", ""), 2]
@@ -809,7 +809,7 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["fc"]
         self.mediator.get_array_fc_wwns = Mock()
         self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
         res = self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '2')
@@ -818,7 +818,7 @@ class TestControllerServerPublishVolume(unittest.TestCase):
 
         self.mediator.map_volume.side_effect = [array_errors.LunAlreadyInUseError("", ""),
                                                 array_errors.LunAlreadyInUseError("", ""), 2]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '2')
@@ -827,7 +827,7 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.mediator.map_volume.side_effect = [
                                                    array_errors.LunAlreadyInUseError("", "")] * (
                                                        self.mediator.max_lun_retries + 1)
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.RESOURCE_EXHAUSTED)
 
