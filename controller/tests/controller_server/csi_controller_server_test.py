@@ -867,6 +867,9 @@ class TestControllerServerUnPublishVolume(unittest.TestCase):
         self.mediator.unmap_volume = Mock()
         self.mediator.unmap_volume.return_value = None
 
+        self.storage_agent = MagicMock()
+        self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
+
         self.servicer = ControllerServicer(self.fqdn)
 
         self.request = Mock()
