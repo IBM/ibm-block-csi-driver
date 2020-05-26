@@ -55,7 +55,7 @@ class TestControllerServerCreateVolume(unittest.TestCase):
         self.assertEqual(res, csi_pb2.CreateVolumeResponse())
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
-    @patch("controller.array_action.storage_agent.get_agent")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_succeeds(self, get_agent, array_type):
         agent = Mock()
         agent.get_mediator = Mock()
