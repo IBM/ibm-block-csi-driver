@@ -207,12 +207,12 @@ class RESTClient(object):
         :param volume_pairs: [{'source_volume': 0000,'target_volume': 1100},..]
         :param options: ['record_changes', 'persistent', ...]
         """
-        return self._client.create_cs_flashcopy(volume_pairs, options)
+        return self._client.create_cs_flashcopy(volume_pairs, options)[0]
 
     def delete_flashcopy(self, flashcopy_id):
         return self._client.delete_cs_flashcopy(flashcopy_id)
 
-    def get_flashcipies(self, fcid=None):
+    def get_flashcopies(self, fcid=None):
         return self._client.get_cs_flashcopies(fcid)
 
     def _get_attach_or_create_host_port(self, host_name, wwpn):

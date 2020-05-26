@@ -1,3 +1,4 @@
+import copy
 import unittest
 from munch import Munch
 from mock import patch, NonCallableMagicMock
@@ -42,6 +43,16 @@ class TestArrayMediatorDS8K(unittest.TestCase):
              "id": "0001",
              "name": "test_name",
              "pool": "p0",
+             "tp": "ese",
+             "flashcopy": ""
+             }
+        )
+
+        self.flashcopy_response = Munch(
+            {"source_volume": {"id": "0000"},
+             "target_volume": {"id": "0001"},
+             "id": "0000:0001",
+             "state": "valid"
              }
         )
 
@@ -91,13 +102,13 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.get_volumes_by_pool.return_value = [
             self.volume_response,
         ]
-        vol = self.array.get_volume(
+        volume = self.array.get_volume(
             self.volume_response.name,
             volume_context={
                 config.CONTEXT_POOL: self.volume_response.pool
             }
         )
-        self.assertEqual(vol.volume_name, self.volume_response.name)
+        self.assertEqual(volume.volume_name, self.volume_response.name)
 
     def test_get_volume_with_long_name(self):
         volume_name = "it is a very long name, more than 16 characters"
@@ -105,13 +116,13 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         volume_res = self.volume_response
         volume_res.name = short_name
         self.client_mock.get_volumes_by_pool.return_value = [volume_res, ]
-        vol = self.array.get_volume(
+        volume = self.array.get_volume(
             volume_name,
             volume_context={
                 config.CONTEXT_POOL: self.volume_response.pool
             }
         )
-        self.assertEqual(vol.volume_name, short_name)
+        self.assertEqual(volume.volume_name, short_name)
 
     def test_get_volume_with_pool_context_not_found(self):
         self.client_mock.get_volumes_by_pool.return_value = [
@@ -145,7 +156,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             capabilities = {}
             tp = 'none'
         pool_id = self.volume_response.pool
-        vol = self.array.create_volume(
+        volume = self.array.create_volume(
             name, size_in_bytes, capabilities, pool_id,
         )
         self.client_mock.create_volume.assert_called_once_with(
@@ -154,17 +165,17 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             tp=tp,
             name='test_name',
         )
-        self.assertEqual(vol.volume_name, self.volume_response.name)
+        self.assertEqual(volume.volume_name, self.volume_response.name)
 
     def test_create_volume_return_existing(self):
         self.client_mock.get_volumes_by_pool.return_value = [
             self.volume_response,
         ]
         pool_id = self.volume_response.pool
-        vol = self.array.create_volume(
+        volume = self.array.create_volume(
             self.volume_response.name, "1", {}, pool_id,
         )
-        self.assertEqual(vol.volume_name, self.volume_response.name)
+        self.assertEqual(volume.volume_name, self.volume_response.name)
 
     def test_create_volume_with_long_name_succeeded(self):
         volume_name = "it is a very long name, more than 16 characters"
@@ -177,7 +188,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         capabilities = {}
         tp = 'none'
         pool_id = volume_res.pool
-        vol = self.array.create_volume(
+        volume = self.array.create_volume(
             volume_name, size_in_bytes, capabilities, pool_id,
         )
         self.client_mock.create_volume.assert_called_once_with(
@@ -186,7 +197,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             tp=tp,
             name=short_name,
         )
-        self.assertEqual(vol.volume_name, short_name)
+        self.assertEqual(volume.volume_name, short_name)
 
     def test_create_volume_failed_with_ClientException(self):
         self.client_mock.create_volume.side_effect = ClientException("500")
@@ -387,3 +398,102 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             self.array.get_host_by_host_identifiers(
                 Initiators('', ["new_wwpn", "another_wwpn"])
             )
+
+####################################################################################################
+
+    def test_get_snapshot_not_exist_return_none(self):
+        self.client_mock.get_snapshot.side_effect = [ClientError("400", "BE7A002D")]
+
+        snapshot = self.array.get_snapshot("fake_name")
+
+        self.assertIsNone(snapshot)
+
+    def test_get_snapshot_has_no_fcmap_raise_error(self):
+        self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
+        self.client_mock.get_volumes_by_pool.return_value = [self.volume_response]
+
+        with self.assertRaises(array_errors.SnapshotNameBelongsToVolumeError):
+            self.array.get_snapshot("test_name")
+
+    def _get_mapped_target_vol(self):
+        volume = self.volume_response
+        volume.flashcopy = self.flashcopy_response
+        return volume
+
+    def test_get_snapshot_get_fcmap_not_exist_raise_error(self):
+        target_vol = self._get_mapped_target_vol()
+        self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
+        self.client_mock.get_volumes_by_pool.return_value = [target_vol]
+        self.client_mock.get_flashcopies.side_effect = NotFound("404", message="BE7A0001")
+
+        with self.assertRaises(NotFound):
+            self.array.get_snapshot("test_name")
+
+    def test_get_snapshot_success(self):
+        target_vol = self._get_mapped_target_vol()
+        self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
+        self.client_mock.get_volumes_by_pool.return_value = [target_vol]
+        self.client_mock.get_flashcopies.return_value = self.flashcopy_response
+
+        self.array.get_snapshot("test_name")
+
+    # def _prepare_mocks_for_create_snapshot(self):
+    #     self.svc.client.svctask.mkvolume.return_value = Mock()
+    #     self.svc.client.svctask.mkfcmap.return_value = Mock()
+    #
+    #     source_vol_to_copy_from = self._get_source_cli_vol()
+    #     target_vol_after_creation = self._get_mapless_target_cli_vol()
+    #     target_vol_after_mapping = self._get_mapped_target_cli_vol()
+    #     target_vol_for_rollback = self._get_mapped_target_cli_vol()
+    #     vols_to_return = [source_vol_to_copy_from, target_vol_after_creation,
+    #                       target_vol_after_mapping, target_vol_for_rollback]
+    #     return_values = map(self._mock_cli_object, vols_to_return)
+    #     self.svc.client.svcinfo.lsvdisk.side_effect = return_values
+    #
+    #     self.svc.client.svctask.startfcmap.return_value = Mock()
+    #
+    def test_create_snapshot_create_volume_error(self):
+        self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
+        self.client_mock.get_volumes_by_pool.return_value = [self.volume_response]
+
+        self.client_mock.create_volume.side_effect = ClientException("500")
+
+        with self.assertRaises(array_errors.VolumeCreationError):
+            self.array.create_snapshot("snap_name", "test_name")
+
+    def test_create_snapshot_create_fcmap_error(self):
+        self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
+        self.client_mock.get_volumes_by_pool.return_value = [self.volume_response]
+        volume = copy.deepcopy(self.volume_response)
+        volume.id = "0001"
+        volume.name = "target_vol"
+        self.client_mock.create_volume.return_value = volume
+        self.client_mock.get_volume.return_value = volume
+        self.client_mock.create_flashcopy.side_effect = ClientException("500")
+
+        with self.assertRaises(array_errors.FlashcopyCreationError):
+            self.array.create_snapshot("target_vol", "test_name")
+
+    # def test_create_snapshot_start_fcmap_error(self):
+    #     self._prepare_mocks_for_create_snapshot()
+    #     mock_warning.return_value = False
+    #     self.svc.client.svctask.startfcmap.side_effect = [
+    #         CLIFailureError("Failed")]
+    #
+    #     with self.assertRaises(CLIFailureError):
+    #         self.svc.create_snapshot("test_snap", "source_vol")
+    #
+    def test_create_snapshot_success(self):
+        self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
+        self.client_mock.get_volumes_by_pool.return_value = [self.volume_response]
+        volume = copy.deepcopy(self.volume_response)
+        volume.id = "0001"
+        volume.name = "target_vol"
+        self.client_mock.create_volume.return_value = volume
+        self.client_mock.get_volume.return_value = volume
+        self.client_mock.create_flashcopy.return_value = self.flashcopy_response
+        self.client_mock.get_flashcopies.return_value = self.flashcopy_response
+        snapshot = self.array.create_snapshot("target_vol", "test_name")
+
+        self.assertEqual(snapshot.snapshot_name, volume.name)
+        self.assertEqual(snapshot.id, self.array._generate_volume_scsi_identifier(volume.id))

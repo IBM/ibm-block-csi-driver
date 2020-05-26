@@ -31,7 +31,8 @@ class CredentialsError(BaseArrayActionException):
 class UnsupportedStorageVersionError(BaseArrayActionException):
 
     def __init__(self, version, supported_version):
-        self.message = messages.UnsupportedStorageVersionError_message.format(version, supported_version)  # noqa
+        self.message = messages.UnsupportedStorageVersionError_message.format(version,
+                                                                              supported_version)  # noqa
 
 
 # =============================================================================
@@ -64,7 +65,8 @@ class IllegalObjectName(BaseArrayActionException):
 class PoolDoesNotMatchCapabilities(BaseArrayActionException):
 
     def __init__(self, pool, capabilities, error):
-        self.message = messages.PoolDoesNotMatchCapabilities_message.format(pool, capabilities, error)
+        self.message = messages.PoolDoesNotMatchCapabilities_message.format(pool, capabilities,
+                                                                            error)
 
 
 class StorageClassCapabilityNotSupported(BaseArrayActionException):
@@ -179,3 +181,9 @@ class InvalidCliResponseError(BaseArrayActionException):
 
     def __init__(self, details):
         self.message = messages.InvalidCliResponseError_message.format(details)
+
+
+class FlashcopyCreationError(BaseArrayActionException):
+
+    def __init__(self, name):
+        self.message = messages.FlashcopyCreationError_message.format(name)
