@@ -88,6 +88,9 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.mediator.get_snapshot = Mock()
         self.mediator.get_snapshot.return_value = None
 
+        self.storage_agent = MagicMock()
+        self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
+
         self.servicer = ControllerServicer(self.fqdn)
 
         self.request = Mock()
@@ -97,15 +100,14 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.request.name = snap_name
         self.request.source_volume_id = "A9000:12345678"
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_empty_name(self, a_enter):
         self._test_create_object_with_empty_name(a_enter)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_create_snapshot_succeeds(self, a_exit, a_enter, array_type):
-        a_enter.return_value = self.mediator
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_snapshot_succeeds(self, storage_agent, array_type):
+        storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
         self.mediator.create_snapshot = Mock()
         self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, "snap", "wwn",
@@ -119,11 +121,10 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.mediator.get_snapshot.assert_called_once_with(snap_name)
         self.mediator.create_snapshot.assert_called_once_with(snap_name, snap_vol_name)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_create_snapshot_belongs_to_wrong_volume(self, a_exit, a_enter, array_type):
-        a_enter.return_value = self.mediator
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_snapshot_belongs_to_wrong_volume(self, storage_agent, array_type):
+        storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
         self.mediator.create_snapshot = Mock()
         self.mediator.get_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, snap_name, "wwn",
@@ -135,26 +136,25 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.servicer.CreateSnapshot(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.ALREADY_EXISTS)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_create_snapshot_with_wrong_secrets(self, a_enter):
-        self._test_create_object_with_wrong_secrets(a_enter)
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_snapshot_with_wrong_secrets(self, storage_agent):
+        self._test_create_object_with_wrong_secrets(storage_agent)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_create_snapshot_with_array_connection_exception(self, a_enter, array_type):
-        self._test_create_object_with_array_connection_exception(a_enter)
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_snapshot_with_array_connection_exception(self, storage_agent, array_type):
+        self._test_create_object_with_array_connection_exception(storage_agent)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_create_snapshot_with_get_array_type_exception(self, a_enter, a_exit, array_type):
-        self._test_create_object_with_get_array_type_exception(a_enter, array_type)
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_snapshot_with_get_array_type_exception(self, storage_agent, array_type):
+        self._test_create_object_with_get_array_type_exception(storage_agent, array_type)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.get_snapshot")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_create_snapshot_get_snapshot_exception(self, a_enter, get_snapshot, array_type):
-        a_enter.return_value = self.mediator
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_snapshot_get_snapshot_exception(self, storage_agent, get_snapshot, array_type):
+        storage_agent.return_value = self.storage_agent
         self.mediator.get_snapshot.side_effect = [Exception("error")]
         context = utils.FakeContext()
         self.servicer.CreateSnapshot(self.request, context)
@@ -162,11 +162,12 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.assertTrue("error" in context.details)
         self.mediator.get_snapshot.assert_called_once_with(snap_name)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.get_snapshot")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_create_snapshot_with_get_snapshot_illegal_object_name_exception(self, a_enter, get_snapshot, array_type):
-        a_enter.return_value = self.mediator
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_snapshot_with_get_snapshot_illegal_object_name_exception(self, storage_agent, get_snapshot,
+                                                                             array_type):
+        storage_agent.return_value = self.storage_agent
         self.mediator.get_snapshot.side_effect = [array_errors.IllegalObjectName("snap")]
         context = utils.FakeContext()
         self.servicer.CreateSnapshot(self.request, context)
@@ -176,11 +177,10 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.assertTrue(msg in context.details)
         self.mediator.get_snapshot.assert_called_once_with(snap_name)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_create_snapshot_with_get_snapshot_name_too_long_exception(self, a_exit, a_enter, array_type):
-        a_enter.return_value = self.mediator
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_snapshot_with_get_snapshot_name_too_long_exception(self, storage_agent, array_type):
+        storage_agent.return_value = self.storage_agent
         self.mediator.get_volume_name = Mock()
         self.mediator.get_volume_name.return_value = snap_vol_name
         self.mediator.max_snapshot_name_length = 63
@@ -189,11 +189,11 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.servicer.CreateSnapshot(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.create_snapshot")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def create_snapshot_returns_error(self, a_enter, create_snapshot, array_type, return_code, err):
-        a_enter.return_value = self.mediator
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def create_snapshot_returns_error(self, storage_agent, create_snapshot, array_type, return_code, err):
+        storage_agent.return_value = self.storage_agent
 
         self.mediator.get_volume_name = Mock()
         self.mediator.get_volume_name.return_value = snap_vol_name
@@ -223,11 +223,10 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     def test_create_snapshot_with_other_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INTERNAL, err=Exception("error"))
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_create_snapshot_with_name_prefix(self, a_exit, a_enter, array_type):
-        a_enter.return_value = self.mediator
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_snapshot_with_name_prefix(self, storage_agent, array_type):
+        storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
         self.mediator.get_volume_name = Mock()
         self.mediator.get_volume_name.return_value = "snap_vol"
@@ -368,7 +367,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.get_volume")
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_volume_with_get_volume_illegal_object_name_exception(self, storage_agent, array_type):
+    def test_create_volume_with_get_volume_illegal_object_name_exception(self, storage_agent, get_volume, array_type):
         storage_agent.return_value = self.storage_agent
         self.mediator.get_volume.side_effect = [array_errors.IllegalObjectName("vol")]
         context = utils.FakeContext()
@@ -465,9 +464,12 @@ class TestControllerServerDeleteVolume(unittest.TestCase):
     def setUp(self, connect):
         self.fqdn = "fqdn"
         self.mediator = XIVArrayMediator("user", "password", self.fqdn)
-        self.mediator.client = Mock()
+        self.storage_agent = MagicMock()
 
         self.mediator.get_volume = Mock()
+
+        self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
+        self.mediator.client = Mock()
 
         self.servicer = ControllerServicer(self.fqdn)
 
@@ -478,10 +480,9 @@ class TestControllerServerDeleteVolume(unittest.TestCase):
 
         self.request.volume_id = "xiv:vol-id"
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_delete_volume_with_wrong_secrets(self, a_enter, a_exit):
-        a_enter.return_value = self.mediator
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_delete_volume_with_wrong_secrets(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
 
         self.request.secrets = {"password": "pass", "management_address": "mg"}
@@ -499,28 +500,26 @@ class TestControllerServerDeleteVolume(unittest.TestCase):
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "mgmt address is missing in secrets")
         self.assertTrue("secret" in context.details)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_delete_volume_invalid_volume_id(self, a_enter, a_exit):
-        a_enter.return_value = self.mediator
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_delete_volume_invalid_volume_id(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
         self.request.volume_id = "wrong_id"
         res = self.servicer.DeleteVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    def test_delete_volume_with_array_connection_exception(self, a_enter, a_exit):
-        a_enter.side_effect = [Exception("a_enter error")]
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_delete_volume_with_array_connection_exception(self, storage_agent):
+        storage_agent.side_effect = [Exception("a_enter error")]
         context = utils.FakeContext()
         res = self.servicer.DeleteVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL, "array connection internal error")
         self.assertTrue("a_enter error" in context.details)
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.delete_volume")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def delete_volume_returns_error(self, a_enter, delete_volume, error, return_code):
-        a_enter.return_value = self.mediator
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def delete_volume_returns_error(self, storage_agent, delete_volume, error, return_code):
+        storage_agent.return_value = self.storage_agent
         delete_volume.side_effect = [error]
         context = utils.FakeContext()
         res = self.servicer.DeleteVolume(self.request, context)
@@ -536,9 +535,9 @@ class TestControllerServerDeleteVolume(unittest.TestCase):
         self.delete_volume_returns_error(error=Exception("error"), return_code=grpc.StatusCode.INTERNAL)
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.delete_volume")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_delete_volume_succeeds(self, a_enter, delete_volume):
-        a_enter.return_value = self.mediator
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_delete_volume_succeeds(self, storage_agent, delete_volume):
+        storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
         res = self.servicer.DeleteVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -564,6 +563,9 @@ class TestControllerServerPublishVolume(unittest.TestCase):
 
         self.mediator.get_iscsi_targets_by_iqn = Mock()
         self.mediator.get_iscsi_targets_by_iqn.return_value = {"iqn1": ["1.1.1.1", "2.2.2.2"], "iqn2": ["[::1]"]}
+
+        self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
+        self.mediator.client = Mock()
 
         self.servicer = ControllerServicer(self.fqdn)
 
