@@ -94,9 +94,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         volume_context=request.parameters,
                         volume_prefix=volume_prefix,
                     )
+
                 except controller_errors.VolumeNotFoundError:
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
+
+                    array_mediator.validate_supported_capabilities(capabilities)
                     vol = array_mediator.create_volume(volume_full_name, size, capabilities, pool, volume_prefix)
 
                 else:
