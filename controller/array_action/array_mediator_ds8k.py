@@ -216,7 +216,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 'capacity_in_bytes': size_in_bytes,
                 'pool_id': pool_id,
                 'tp': self.get_se_capability_value(capabilities),
-                
+
             })
             logger.debug(
                 "Start to create volume with parameters: {}".format(cli_kwargs)
