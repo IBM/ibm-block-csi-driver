@@ -86,8 +86,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     size = array_mediator.minimal_volume_size_in_bytes
                     logger.debug("requested size is 0 so the default size will be used : {0} ".format(
                         size))
-
-                array_mediator.validate_supported_capabilities(capabilities)
                 try:
                     vol = array_mediator.get_volume(
                         volume_full_name,
