@@ -7,7 +7,7 @@ from mock import patch, Mock, call
 import controller.array_action.errors as array_errors
 import controller.controller_server.errors as controller_errors
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
-from controller.controller_server.config import PARAMETERS_PREFIX
+from controller.controller_server.config import PARAMETERS_VOLUME_NAME_PREFIX
 from controller.controller_server.csi_controller_server import ControllerServicer
 from controller.controller_server.test_settings import vol_name
 from controller.csi_general import csi_pb2
@@ -231,7 +231,7 @@ class TestControllerServerCreateVolume(unittest.TestCase):
         context = utils.FakeContext()
 
         self.request.name = "some_name"
-        self.request.parameters[PARAMETERS_PREFIX] = "prefix"
+        self.request.parameters[PARAMETERS_VOLUME_NAME_PREFIX] = "prefix"
         self.mediator.create_volume = Mock()
         self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn", "xiv")
         array_type.return_value = "a9k"
