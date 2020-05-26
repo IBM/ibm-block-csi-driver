@@ -468,8 +468,10 @@ class TestControllerServerDeleteVolume(unittest.TestCase):
 
         self.mediator.get_volume = Mock()
 
-        self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
         self.mediator.client = Mock()
+
+        self.storage_agent = MagicMock()
+        self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
 
         self.servicer = ControllerServicer(self.fqdn)
 
@@ -564,8 +566,10 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.mediator.get_iscsi_targets_by_iqn = Mock()
         self.mediator.get_iscsi_targets_by_iqn.return_value = {"iqn1": ["1.1.1.1", "2.2.2.2"], "iqn2": ["[::1]"]}
 
-        self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
         self.mediator.client = Mock()
+
+        self.storage_agent = MagicMock()
+        self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
 
         self.servicer = ControllerServicer(self.fqdn)
 
@@ -585,9 +589,9 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         caps.access_mode.mode = access_types.SINGLE_NODE_WRITER
         self.request.volume_capability = caps
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_publish_volume_success(self, enter):
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
 
         context = utils.FakeContext()
         self.servicer.ControllerPublishVolume(self.request, context)
@@ -615,30 +619,30 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_publish_volume_get_host_by_host_identifiers_exception(self, enter):
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_publish_volume_get_host_by_host_identifiers_exception(self, storage_agent):
         context = utils.FakeContext()
 
         self.mediator.get_host_by_host_identifiers = Mock()
         self.mediator.get_host_by_host_identifiers.side_effect = [array_errors.MultipleHostsFoundError("", "")]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
 
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertTrue("Multiple hosts" in context.details)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
 
         self.mediator.get_host_by_host_identifiers.side_effect = [array_errors.HostNotFoundError("")]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
 
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_publish_volume_get_volume_mappings_one_map_for_existing_host(self, enter):
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_publish_volume_get_volume_mappings_one_map_for_existing_host(self, storage_agent):
         context = utils.FakeContext()
         self.mediator.get_volume_mappings = Mock()
         self.mediator.get_volume_mappings.return_value = {self.hostname: 2}
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
 
         res = self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -646,13 +650,13 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '2')
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "iscsi")
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_publish_volume_with_connectivity_type_fc(self, enter):
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_publish_volume_with_connectivity_type_fc(self, storage_agent):
         context = utils.FakeContext()
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi", "fc"]
         self.mediator.get_array_fc_wwns = Mock()
         self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
 
         res = self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -661,13 +665,13 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "fc")
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_ARRAY_FC_INITIATORS"], "500143802426baf4")
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_publish_volume_with_connectivity_type_iscsi(self, enter):
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_publish_volume_with_connectivity_type_iscsi(self, storage_agent):
         context = utils.FakeContext()
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi"]
         self.mediator.get_array_fc_wwns = Mock()
         self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
 
         res = self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -682,12 +686,12 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.assertEqual(res.publish_context["iqn2"],
                          "[::1]")
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_publish_volume_with_node_id_only_has_iqns(self, enter):
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_publish_volume_with_node_id_only_has_iqns(self, storage_agent):
         context = utils.FakeContext()
         self.request.node_id = "hostname;iqn.1994-05.com.redhat:686358c930fe;"
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi"]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
 
         res = self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -702,15 +706,15 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.assertEqual(res.publish_context["iqn2"],
                          "[::1]")
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_publish_volume_with_node_id_only_has_wwns(self, enter):
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_publish_volume_with_node_id_only_has_wwns(self, storage_agent):
         context = utils.FakeContext()
         self.request.node_id = "hostname;;500143802426baf4"
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["fc"]
         self.mediator.get_array_fc_wwns = Mock()
         self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
         self.mediator.get_iscsi_targets_by_iqn.return_value = {}
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
 
         res = self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -739,35 +743,35 @@ class TestControllerServerPublishVolume(unittest.TestCase):
             res.publish_context["PUBLISH_CONTEXT_ARRAY_FC_INITIATORS"],
             "500143802426baf4,500143806626bae2")
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_publish_volume_get_volume_mappings_one_map_for_other_host(self, enter):
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_publish_volume_get_volume_mappings_one_map_for_other_host(self, storage_agent):
         context = utils.FakeContext()
         self.mediator.get_volume_mappings = Mock()
         self.mediator.get_volume_mappings.return_value = {"other-hostname": 3}
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
 
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.FAILED_PRECONDITION)
         self.assertTrue("Volume is already mapped" in context.details)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_publish_volume_get_volume_mappings_more_then_one_mapping(self, enter):
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_publish_volume_get_volume_mappings_more_then_one_mapping(self, storage_agent):
         context = utils.FakeContext()
         self.mediator.get_volume_mappings = Mock()
         self.mediator.get_volume_mappings.return_value = {"other-hostname": 3, self.hostname: 4}
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
 
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.FAILED_PRECONDITION)
         self.assertTrue("Volume is already mapped" in context.details)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_publish_volume_map_volume_excpetions(self, enter):
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_publish_volume_map_volume_excpetions(self, storage_agent):
         context = utils.FakeContext()
 
         self.mediator.map_volume.side_effect = [array_errors.PermissionDeniedError("msg")]
 
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.PERMISSION_DENIED)
 
@@ -777,7 +781,7 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
         self.mediator.map_volume.side_effect = [array_errors.HostNotFoundError("host")]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
@@ -788,12 +792,12 @@ class TestControllerServerPublishVolume(unittest.TestCase):
 
     @patch.object(XIVArrayMediator, "MAX_LUN_NUMBER", 3)
     @patch.object(XIVArrayMediator, "MIN_LUN_NUMBER", 1)
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_publish_volume_map_volume_lun_already_in_use(self, enter):
         context = utils.FakeContext()
 
         self.mediator.map_volume.side_effect = [array_errors.LunAlreadyInUseError("", ""), 2]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
         res = self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '2')
@@ -827,23 +831,23 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.RESOURCE_EXHAUSTED)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_publish_volume_get_iscsi_targets_by_iqn_excpetions(self, enter):
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_publish_volume_get_iscsi_targets_by_iqn_excpetions(self, storage_agent):
         context = utils.FakeContext()
         self.mediator.get_iscsi_targets_by_iqn.side_effect = [array_errors.NoIscsiTargetsFoundError("some_endpoint")]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
 
         self.servicer.ControllerPublishVolume(self.request, context)
 
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
     @patch("controller.array_action.array_mediator_abstract.ArrayMediatorAbstract.map_volume_by_initiators")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_map_volume_by_initiators_exceptions(self, enter, map_volume_by_initiators):
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_map_volume_by_initiators_exceptions(self, storage_agent, map_volume_by_initiators):
         context = utils.FakeContext()
         map_volume_by_initiators.side_effect = [
             array_errors.UnsupportedConnectivityTypeError("usb")]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
         self.servicer.ControllerPublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
 
@@ -872,9 +876,9 @@ class TestControllerServerUnPublishVolume(unittest.TestCase):
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
         self.request.volume_context = {}
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_unpublish_volume_success(self, enter):
-        enter.return_value = self.mediator
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_unpublish_volume_success(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
         self.servicer.ControllerUnpublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -901,54 +905,54 @@ class TestControllerServerUnPublishVolume(unittest.TestCase):
         self.servicer.ControllerUnpublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_unpublish_volume_get_host_by_host_identifiers_exception(self, enter):
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_unpublish_volume_get_host_by_host_identifiers_exception(self, storage_agent):
         context = utils.FakeContext()
 
         self.mediator.get_host_by_host_identifiers = Mock()
         self.mediator.get_host_by_host_identifiers.side_effect = [array_errors.MultipleHostsFoundError("", "")]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
 
         self.servicer.ControllerUnpublishVolume(self.request, context)
         self.assertTrue("Multiple hosts" in context.details)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
 
         self.mediator.get_host_by_host_identifiers.side_effect = [array_errors.HostNotFoundError("")]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
 
         self.servicer.ControllerUnpublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_unpublish_volume_unmap_volume_excpetions(self, enter):
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_unpublish_volume_unmap_volume_excpetions(self, storage_agent):
         context = utils.FakeContext()
 
         self.mediator.unmap_volume.side_effect = [array_errors.PermissionDeniedError("msg")]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
         self.servicer.ControllerUnpublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.PERMISSION_DENIED)
 
         context = utils.FakeContext()
         self.mediator.unmap_volume.side_effect = [array_errors.HostNotFoundError("host")]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
         self.servicer.ControllerUnpublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
 
         context = utils.FakeContext()
         self.mediator.unmap_volume.side_effect = [array_errors.UnMappingError("", "", "")]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
         self.servicer.ControllerUnpublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
 
         context = utils.FakeContext()
         self.mediator.unmap_volume.side_effect = [array_errors.VolumeNotFoundError("vol")]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
         self.servicer.ControllerUnpublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
 
         context = utils.FakeContext()
         self.mediator.unmap_volume.side_effect = [array_errors.VolumeAlreadyUnmappedError("")]
-        enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
         self.servicer.ControllerUnpublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
 
