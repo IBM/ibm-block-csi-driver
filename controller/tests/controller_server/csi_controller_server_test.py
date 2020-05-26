@@ -2,7 +2,7 @@ import unittest
 
 # from unittest import mock as umock
 import grpc
-from mock import patch, Mock, call
+from mock import patch, Mock, call, MagicMock
 
 import controller.array_action.errors as array_errors
 import controller.controller_server.errors as controller_errors
@@ -57,7 +57,7 @@ class TestControllerServerCreateVolume(unittest.TestCase):
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_succeeds(self, get_agent, array_type):
-        # agent = Mock()
+        agent = MagicMock()
         # agent.get_mediator = Mock()
         # agent.get_mediator.return_value = Mock()
         # agent.get_mediator.__enter__ = Mock()
@@ -68,9 +68,9 @@ class TestControllerServerCreateVolume(unittest.TestCase):
         # enter_mock.return_value = self.mediator
         # agent.get_mediator = Mock()
         # agent.get_mediator.return_value.__enter__ = enter_mock
-        # get_agent.get_mediator.return_value.__enter__.return_value = self.mediator
-        get_agent.get_mediator.return_value = self.mediator
-        # get_agent.return_value = agent
+        agent.get_mediator.return_value.__enter__.return_value = self.mediator
+        # get_agent.get_mediator.return_value = self.mediator
+        get_agent.return_value = agent
 
         context = utils.FakeContext()
 
