@@ -107,13 +107,13 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_succeeds(self, storage_agent, array_type):
+        storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
         self.mediator.create_snapshot = Mock()
         self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, "snap", "wwn",
                                                                                                "snap_vol", "xiv")
         self.mediator.get_volume_name = Mock()
         self.mediator.get_volume_name.return_value = snap_vol_name
-        storage_agent.return_value = self.storage_agent
         array_type.return_value = "a9k"
         self.servicer.CreateSnapshot(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
