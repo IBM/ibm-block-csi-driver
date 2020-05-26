@@ -25,6 +25,9 @@ class TestControllerServerCreateVolume(unittest.TestCase):
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.side_effect = [array_errors.VolumeNotFoundError("vol")]
 
+        self.agent_mock = MagicMock()
+        self.agent_mock.get_mediator.return_value.__enter__.return_value = self.mediator
+
         self.servicer = ControllerServicer(self.fqdn)
 
         self.request = Mock()
@@ -57,7 +60,7 @@ class TestControllerServerCreateVolume(unittest.TestCase):
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_succeeds(self, get_agent, array_type):
-        agent = MagicMock()
+        # agent = MagicMock()
         # agent.get_mediator = Mock()
         # agent.get_mediator.return_value = Mock()
         # agent.get_mediator.__enter__ = Mock()
@@ -68,9 +71,9 @@ class TestControllerServerCreateVolume(unittest.TestCase):
         # enter_mock.return_value = self.mediator
         # agent.get_mediator = Mock()
         # agent.get_mediator.return_value.__enter__ = enter_mock
-        agent.get_mediator.return_value.__enter__.return_value = self.mediator
         # get_agent.get_mediator.return_value = self.mediator
-        get_agent.return_value = agent
+        # agent.get_mediator.return_value.__enter__.return_value = self.mediator
+        get_agent.return_value = self.agent_mock
 
         context = utils.FakeContext()
 
