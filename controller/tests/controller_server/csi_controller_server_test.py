@@ -60,9 +60,9 @@ class TestControllerServerCreateVolume(unittest.TestCase):
         agent = Mock()
         agent.get_mediator = Mock()
         agent.get_mediator.return_value = Mock()
-        agent.get_mediator.__enter__ = Mock()
-        agent.get_mediator.__enter__.return_value = self.mediator
-        agent.__enter__ = Mock()
+        # agent.get_mediator.__enter__ = Mock()
+        # agent.get_mediator.__enter__.return_value = self.mediator
+        # agent.__enter__ = Mock()
         agent.__enter__.return_value = self.mediator
         get_agent.return_value = agent
 
