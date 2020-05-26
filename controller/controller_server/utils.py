@@ -33,9 +33,9 @@ def _get_object_id(obj):
 def validate_secret(secret):
     logger.debug("validating secrets")
     if secret:
-        if config.SECRET_USERNAME_PARAMETER not in secret or \
-                config.SECRET_PASSWORD_PARAMETER not in secret or \
-                config.SECRET_ARRAY_PARAMETER not in secret:
+        if not (config.SECRET_USERNAME_PARAMETER in secret and
+                config.SECRET_PASSWORD_PARAMETER in secret and
+                config.SECRET_ARRAY_PARAMETER in secret):
             raise ValidationException(messages.invalid_secret_message)
 
     else:
