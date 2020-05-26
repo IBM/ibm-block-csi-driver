@@ -56,10 +56,12 @@ class TestControllerServerCreateVolume(unittest.TestCase):
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.array_action.storage_agent.get_agent")
-    def test_create_volume_succeeds(self, agent, array_type):
+    def test_create_volume_succeeds(self, get_agent, array_type):
+        agent = Mock()
         agent.get_mediator = Mock()
         agent.get_mediator.return_value = self.mediator
         context = utils.FakeContext()
+        get_agent.return_value = agent
 
         self.mediator.create_volume = Mock()
         self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn", "xiv")
