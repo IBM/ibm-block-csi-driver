@@ -4,7 +4,9 @@ from optparse import OptionParser
 
 import grpc
 import yaml
-from retry import retryfrom concurrent import futures
+from concurrent import futures
+from retry import retry
+
 import controller.array_action.errors as controller_errors
 import controller.controller_server.config as config
 import controller.controller_server.utils as utils
