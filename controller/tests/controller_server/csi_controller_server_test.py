@@ -1078,12 +1078,6 @@ class TestControllerServerUnPublishVolume(unittest.TestCase):
         self.assertEqual(context.code, grpc.StatusCode.PERMISSION_DENIED)
 
         context = utils.FakeContext()
-        self.mediator.unmap_volume.side_effect = [array_errors.VolumeNotFoundError("vol")]
-        enter.return_value = self.mediator
-        self.servicer.ControllerUnpublishVolume(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.NOT_FOUND)
-
-        context = utils.FakeContext()
         self.mediator.unmap_volume.side_effect = [array_errors.HostNotFoundError("host")]
         enter.return_value = self.mediator
         self.servicer.ControllerUnpublishVolume(self.request, context)
@@ -1094,6 +1088,12 @@ class TestControllerServerUnPublishVolume(unittest.TestCase):
         enter.return_value = self.mediator
         self.servicer.ControllerUnpublishVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
+
+        context = utils.FakeContext()
+        self.mediator.unmap_volume.side_effect = [array_errors.VolumeNotFoundError("vol")]
+        enter.return_value = self.mediator
+        self.servicer.ControllerUnpublishVolume(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.OK)
 
         context = utils.FakeContext()
         self.mediator.unmap_volume.side_effect = [array_errors.VolumeAlreadyUnmappedError("")]

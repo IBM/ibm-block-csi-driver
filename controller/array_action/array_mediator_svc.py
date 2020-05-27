@@ -1,4 +1,5 @@
 from collections import defaultdict
+from io import StringIO
 
 from pysvc import errors as svc_errors
 from pysvc.unified.client import connect
@@ -6,9 +7,10 @@ from pysvc.unified.response import CLIFailureError
 
 import controller.array_action.config as config
 import controller.array_action.errors as controller_errors
-from controller.array_action.array_action_types import Volume
+from controller.array_action.array_action_types import Volume, Host
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
-from controller.array_action.utils import classproperty
+from controller.array_action.svc_cli_result_reader import SVCListResultsReader
+from controller.array_action.utils import classproperty, bytes_to_string
 from controller.common.csi_logger import get_stdout_logger
 
 array_connections_dict = {}
@@ -23,6 +25,13 @@ OBJ_ALREADY_EXIST = 'CMMVC6035E'
 VOL_NOT_FOUND = 'CMMVC8957E'
 POOL_NOT_MATCH_VOL_CAPABILITIES = 'CMMVC9292E'
 NOT_REDUCTION_POOL = 'CMMVC9301E'
+
+LIST_HOSTS_CMD_FORMAT = 'lshost {HOST_ID};'
+HOST_ID_PARAM = 'id'
+HOST_NAME_PARAM = 'name'
+HOST_ISCSI_NAMES_PARAM = 'iscsi_name'
+HOST_WWPNS_PARAM = 'WWPN'
+HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
 
 
 def is_warning_message(ex):
@@ -267,24 +276,16 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         raise NotImplementedError
 
     def get_host_by_host_identifiers(self, initiators):
-        logger.debug("Getting host id for initiators : {0}".format(initiators))
-        host_list = self.client.svcinfo.lshost()
+        logger.debug("Getting host name for initiators : {0}".format(initiators))
+        detailed_hosts_list = self._get_detailed_hosts_list()
         iscsi_host, fc_host = None, None
-        for host in host_list:
-            host_detail = self.client.svcinfo.lshost(
-                object_id=host.get('id', '')).as_single_element
-            iscsi_names = host_detail.get('iscsi_name', '')
-            wwns_value = host_detail.get('WWPN', [])
-            if not isinstance(wwns_value, list):
-                wwns_value = [wwns_value, ]
-            if not isinstance(iscsi_names, list):
-                iscsi_names = [] if len(iscsi_names) == 0 else [iscsi_names]
-            if initiators.is_array_iscsi_iqns_match(iscsi_names):
-                iscsi_host = host_detail.get('name', '')
+        for host in detailed_hosts_list:
+            if initiators.is_array_iscsi_iqns_match(host.iscsi_names):
+                iscsi_host = host.name
                 logger.debug("found iscsi iqn in list : {0} for host : "
                              "{1}".format(initiators.iscsi_iqn, iscsi_host))
-            if initiators.is_array_wwns_match(wwns_value):
-                fc_host = host_detail.get('name', '')
+            if initiators.is_array_wwns_match(host.wwns):
+                fc_host = host.name
                 logger.debug("found fc wwns in list : {0} for host : "
                              "{1}".format(initiators.fc_wwns, fc_host))
         if iscsi_host and fc_host:
@@ -302,6 +303,53 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         else:
             logger.debug("can not found host by using initiators: {0} ".format(initiators))
             raise controller_errors.HostNotFoundError(initiators)
+
+    def _get_detailed_hosts_list(self):
+        logger.debug("Getting detailed hosts list on array {0}".format(self.endpoint))
+        hosts_list = self.client.svcinfo.lshost()
+        if not hosts_list:
+            return []
+
+        # get all hosts details by sending a single batch of commands, in which each command is per host
+        detailed_hosts_list_cmd = self._get_detailed_hosts_list_cmd(hosts_list)
+        logger.debug("Sending getting detailed hosts list commands batch")
+        detailed_hosts_list_output, detailed_hosts_list_errors = self._send_raw_cli_command(detailed_hosts_list_cmd)
+        if detailed_hosts_list_errors:
+            logger.error("Errors returned from getting detailed hosts list: {0}".format(detailed_hosts_list_errors))
+
+        return self._get_detailed_hosts_by_raw_output(detailed_hosts_list_output)
+
+    def _get_detailed_hosts_by_raw_output(self, detailed_hosts_list_raw_output):
+        logger.debug("Reading detailed hosts list commands batch response")
+        hosts_reader = SVCListResultsReader(detailed_hosts_list_raw_output)
+        res = []
+        for host_details in hosts_reader:
+            host_id = host_details.get(HOST_ID_PARAM)
+            host_name = host_details.get(HOST_NAME_PARAM)
+            iscsi_names = host_details.get_as_list(HOST_ISCSI_NAMES_PARAM)
+            wwns = host_details.get_as_list(HOST_WWPNS_PARAM)
+            host = Host(host_id, host_name, iscsi_names, wwns)
+            res.append(host)
+        return res
+
+    def _get_detailed_hosts_list_cmd(self, host_list):
+        writer = StringIO()
+        for host in host_list:
+            host_id = host.get(HOST_ID_PARAM)
+            writer.write(LIST_HOSTS_CMD_FORMAT.format(HOST_ID=host_id))
+        return writer.getvalue()
+
+    def _send_raw_cli_command(self, cmd):
+        output_as_bytes, errors_as_bytes = self.client.send_raw_command(cmd)
+        output_as_str = bytes_to_string(output_as_bytes)
+        errors_as_str = bytes_to_string(errors_as_bytes)
+        formatted_errors_as_str = self._truncate_error_msg(errors_as_str)
+        return output_as_str, formatted_errors_as_str
+
+    def _truncate_error_msg(self, detailed_host_list_errors):
+        if len(detailed_host_list_errors) <= HOSTS_LIST_ERR_MSG_MAX_LENGTH:
+            return detailed_host_list_errors
+        return "{0} ...".format(detailed_host_list_errors[HOSTS_LIST_ERR_MSG_MAX_LENGTH])
 
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume id : "

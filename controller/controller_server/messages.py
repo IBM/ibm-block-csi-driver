@@ -1,6 +1,6 @@
 ValidationException_message = "Validation error has occurred : {0}"
 
-VolumeIdError_message = "Wrong volume id format : {0}"
+ObjectIdError_message = "Wrong {0} id format : {1}"
 
 more_then_one_mapping_message = "Volume is already mapped to a different host : {0}"
 
