@@ -18,12 +18,10 @@ LOGIN_PORT_STATE_ONLINE = 'online'
 
 logger = get_stdout_logger()
 
-
 # response error codes
 ERROR_CODE_INVALID_CREDENTIALS = 'BE7A002D'
 ERROR_CODE_RESOURCE_NOT_EXISTS = 'BE7A0001'
 ERROR_CODE_VOLUME_NOT_FOUND_FOR_MAPPING = 'BE586015'
-
 
 MAX_VOLUME_LENGTH = 16
 
@@ -68,7 +66,7 @@ def shorten_volume_name(name, prefix):
     if not prefix:
         return hash_string(name)[:MAX_VOLUME_LENGTH]
     else:
-        name_without_prefix = str(name).split(prefix+settings.NAME_PREFIX_SEPARATOR, 2)[1]
+        name_without_prefix = str(name).split(prefix + settings.NAME_PREFIX_SEPARATOR, 2)[1]
         hashed = hash_string(name_without_prefix)
         return (prefix + settings.NAME_PREFIX_SEPARATOR + hashed)[:MAX_VOLUME_LENGTH]
 
@@ -150,8 +148,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 'Failed to connect to DS8K array {}, reason is {}'.format(
                     self.service_address,
                     e.details
-                    )
                 )
+            )
             raise ConnectionError()
 
     def disconnect(self):
@@ -257,7 +255,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             )
             raise array_errors.VolumeCreationError(name)
 
-    def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes, min_vol_size_in_bytes):
+    def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
+                                              min_vol_size_in_bytes):
         # TODO:	CSI-1338
         raise NotImplementedError
 

@@ -481,7 +481,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.copy_to_existing_volume_from_snapshot = Mock()
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
-        self.mediator.copy_to_existing_volume_from_snapshot.assert_called_once_with(vol_name, snap_name, snap_capacity_bytes,
+        self.mediator.copy_to_existing_volume_from_snapshot.assert_called_once_with(vol_name, snap_name,
+                                                                                    snap_capacity_bytes,
                                                                                     self.capacity_bytes)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")

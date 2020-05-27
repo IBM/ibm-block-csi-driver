@@ -122,23 +122,24 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
     def test_copy_to_existing_volume_from_snapshot_failed_illegal_name(self):
         self._test_copy_to_existing_volume_from_snapshot_error(xcli_errors.IllegalNameForObjectError("", "", ""),
-                                                   array_errors.IllegalObjectName)
+                                                               array_errors.IllegalObjectName)
 
     def test_copy_to_existing_volume_from_snapshot_failed_volume_not_dound(self):
         self._test_copy_to_existing_volume_from_snapshot_error(xcli_errors.VolumeBadNameError("", "", ""),
-                                                   array_errors.VolumeNotFoundError)
+                                                               array_errors.VolumeNotFoundError)
 
     def test_copy_to_existing_volume_from_snapshot_failed_snapshot_not_fpund(self):
         self._test_copy_to_existing_volume_from_snapshot_error(xcli_errors.SourceVolumeBadNameError("", "", ""),
-                                                   array_errors.SnapshotNotFoundError)
+                                                               array_errors.SnapshotNotFoundError)
 
     def test_copy_to_existing_volume_from_snapshot_failed_volume_not_fpund(self):
         self._test_copy_to_existing_volume_from_snapshot_error(xcli_errors.TargetVolumeBadNameError("", "", ""),
-                                                   array_errors.VolumeNotFoundError)
+                                                               array_errors.VolumeNotFoundError)
 
     def test_copy_to_existing_volume_from_snapshot_failed_permission_denied(self):
-        self._test_copy_to_existing_volume_from_snapshot_error(xcli_errors.OperationForbiddenForUserCategoryError("", "", ""),
-                                                   array_errors.PermissionDeniedError)
+        self._test_copy_to_existing_volume_from_snapshot_error(
+            xcli_errors.OperationForbiddenForUserCategoryError("", "", ""),
+            array_errors.PermissionDeniedError)
 
     def _test_copy_to_existing_volume_from_snapshot_error(self, xcli_exception, expected_array_exception):
         self.mediator.client.cmd.vol_copy.side_effect = [xcli_exception]
