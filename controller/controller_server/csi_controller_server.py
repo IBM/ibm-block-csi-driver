@@ -114,7 +114,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return copy_source_res
 
                 if src_snapshot_id:
-                    self._copy_volume_from_snapshot(vol, src_snapshot_id, size, array_mediator)
+                    self._copy_to_existing_volume_from_snapshot(vol, src_snapshot_id, size, array_mediator)
                     vol.copy_src_object_id = src_snapshot_id
                 logger.debug("generating create volume response")
                 res = utils.generate_csi_create_volume_response(vol)
@@ -141,7 +141,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateVolumeResponse()
 
-    def _copy_volume_from_snapshot(self, vol, src_snapshot_id, min_vol_size, array_mediator):
+    def _copy_to_existing_volume_from_snapshot(self, vol, src_snapshot_id, min_vol_size, array_mediator):
         vol_name = vol.volume_name
         try:
             src_snapshot = array_mediator.get_snapshot_by_id(src_snapshot_id)
@@ -150,7 +150,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             src_snapshot_name = src_snapshot.snapshot_name
             src_snapshot_capacity = src_snapshot.capacity_bytes
             logger.debug("Copy snapshot {0} data to volume {1}.".format(src_snapshot_id, vol_name))
-            array_mediator.copy_volume_from_snapshot(vol_name, src_snapshot_name, src_snapshot_capacity, min_vol_size)
+            array_mediator.copy_to_existing_volume_from_snapshot(vol_name, src_snapshot_name, src_snapshot_capacity, min_vol_size)
             logger.debug("Copy volume from snapshot finished")
         except controller_errors.VolumeNotFoundError as ex:
             logger.error("Volume not found while copying snapshot data to volume")
@@ -171,11 +171,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.debug("Rollback copy volume from snapshot. Deleting volume {0}".format(vol_id))
         array_mediator.delete_volume(vol_id)
 
-    def _handle_existing_vol_src_snap(self, vol, src_snapshot_id, context):
+    def _handle_existing_vol_src_snap(self, volume, src_snapshot_id, context):
         """
         This function should create a snapshot from volume in the storage system.
         Args:
-            vol                : volume fetched or created in CreateVolume
+            volume             : volume fetched or created in CreateVolume
             src_snapshot_id    : id of snapshot we should copy to vol or None if volume should not be copied
             context            : CreateVolume response context
         Returns:
@@ -184,8 +184,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             If volume is a copy of another source - set context status to INTERNAL and return CreateVolumeResponse.
             In any other case return None.
         """
-        vol_name = vol.volume_name
-        vol_copy_src_object_id = vol.copy_src_object_id
+        vol_name = volume.volume_name
+        vol_copy_src_object_id = volume.copy_src_object_id
         if not src_snapshot_id or not vol_copy_src_object_id:
             return None
         if vol_copy_src_object_id == src_snapshot_id:

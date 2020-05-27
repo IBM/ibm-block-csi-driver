@@ -137,14 +137,13 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         logger.info("Finished validate_supported_capabilities")
 
     def _convert_size_bytes_to_blocks(self, size_in_bytes):
-        """:rtype: float"""
-        return float(size_in_bytes) / self.BLOCK_SIZE_IN_BYTES
+        return int(size_in_bytes / self.BLOCK_SIZE_IN_BYTES)
 
     def create_volume(self, name, size_in_bytes, capabilities, pool, volume_prefix=""):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with capabilities : {}".format(
             name, size_in_bytes, pool, capabilities))
 
-        size_in_blocks = int(self._convert_size_bytes_to_blocks(size_in_bytes))
+        size_in_blocks = self._convert_size_bytes_to_blocks(size_in_bytes)
 
         try:
             cli_volume = self.client.cmd.vol_create(vol=name, size_blocks=size_in_blocks,
@@ -164,7 +163,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
-    def copy_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes, min_vol_size_in_bytes):
+    def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes, min_vol_size_in_bytes):
         logger.debug(
             "Copy snapshot {0} data to volume {1}. Snapshot capacity {2}. Minimal requested volume capacity {3}".format(
                 name, src_snap_name, src_snap_capacity_in_bytes, min_vol_size_in_bytes))
@@ -174,7 +173,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.debug("Copying Snapshot {0} data to volume {1}.".format(name, src_snap_name))
             self.client.cmd.vol_copy(vol_src=src_snap_name, vol_trg=name)
             if min_vol_size_in_bytes > src_snap_capacity_in_bytes:
-                min_vol_size_in_blocks = int(self._convert_size_bytes_to_blocks(min_vol_size_in_bytes))
+                min_vol_size_in_blocks = self._convert_size_bytes_to_blocks(min_vol_size_in_bytes)
                 logger.debug(
                     "Increasing volume {0} size to {1} blocks.".format(name, min_vol_size_in_blocks))
                 self.client.cmd.vol_resize(vol=name, size_in_blocks=min_vol_size_in_blocks)

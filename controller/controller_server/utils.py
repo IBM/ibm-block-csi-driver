@@ -84,7 +84,7 @@ def validate_create_volume_source(request):
             if not source_snapshot_id:
                 raise ValidationException(messages.volume_src_snapshot_id_is_missing)
         elif source.HasField(config.VOLUME_SOURCE_VOLUME):
-            raise ValidationException(messages.create_vol_from_vol_unsupported_message)
+            raise ValidationException(messages.volume_cloning_not_supported_message)
 
 
 def validate_create_volume_request(request):

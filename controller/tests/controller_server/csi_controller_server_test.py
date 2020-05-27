@@ -478,11 +478,11 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
                                                                                                   snap_name,
                                                                                                   snapshot_id, vol_name,
                                                                                                   "a9k")
-        self.mediator.copy_volume_from_snapshot = Mock()
+        self.mediator.copy_to_existing_volume_from_snapshot = Mock()
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
-        self.mediator.copy_volume_from_snapshot.assert_called_once_with(vol_name, snap_name, snap_capacity_bytes,
-                                                                        self.capacity_bytes)
+        self.mediator.copy_to_existing_volume_from_snapshot.assert_called_once_with(vol_name, snap_name, snap_capacity_bytes,
+                                                                                    self.capacity_bytes)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
@@ -498,8 +498,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
-        self.mediator.copy_volume_from_snapshot = Mock()
-        self.mediator.copy_volume_from_snapshot.assert_not_called()
+        self.mediator.copy_to_existing_volume_from_snapshot = Mock()
+        self.mediator.copy_to_existing_volume_from_snapshot.assert_not_called()
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
@@ -516,7 +516,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.get_snapshot_by_id.return_value = utils.get_mock_mediator_response_snapshot(1000, snap_name,
                                                                                                   "wwn", vol_name,
                                                                                                   "a9k")
-        self.mediator.copy_volume_from_snapshot = Mock()
+        self.mediator.copy_to_existing_volume_from_snapshot = Mock()
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
@@ -590,8 +590,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.get_snapshot_by_id.return_value = utils.get_mock_mediator_response_snapshot(1000, snap_name,
                                                                                                   vol_id, vol_name,
                                                                                                   "a9k")
-        self.mediator.copy_volume_from_snapshot = Mock()
-        self.mediator.copy_volume_from_snapshot.side_effect = [array_exception]
+        self.mediator.copy_to_existing_volume_from_snapshot = Mock()
+        self.mediator.copy_to_existing_volume_from_snapshot.side_effect = [array_exception]
         a_exit.side_effect = [array_exception]
         self.mediator.delete_volume = Mock()
         array_type.return_value = "a9k"
