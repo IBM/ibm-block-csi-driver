@@ -174,7 +174,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def _handle_existing_vol_src_snap(self, volume, src_snapshot_id, context):
         """
-        This function should create a snapshot from volume in the storage system.
         Args:
             volume             : volume fetched or created in CreateVolume
             src_snapshot_id    : id of snapshot we should copy to vol or None if volume should not be copied
@@ -191,13 +190,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return None
         if vol_copy_src_object_id == src_snapshot_id:
             logger.debug(
-                "Volume {0} exists and it is copy of Snapshot {1}.".format(vol_name, src_snapshot_id))
+                "Volume {0} exists and it is a copy of snapshot {1}.".format(vol_name, src_snapshot_id))
             context.set_code(grpc.StatusCode.OK)
             return csi_pb2.CreateVolumeResponse()
         else:
             logger.debug(
-                "Volume {0} exists but it is not copy of Snapshot {1}.".format(vol_name, src_snapshot_id))
-            context.set_details("Volume already exists but was created but from a different source.")
+                "Volume {0} exists but it is not a copy of snapshot {1}.".format(vol_name, src_snapshot_id))
+            context.set_details("Volume already exists but it was created but from a different source.")
             context.set_code(grpc.StatusCode.INTERNAL)
             return csi_pb2.CreateVolumeResponse()
 

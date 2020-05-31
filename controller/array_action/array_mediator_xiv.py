@@ -126,7 +126,11 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         return array_vol
 
     def get_volume_name(self, volume_id):
-        return self._get_vol_by_wwn(volume_id)
+        try:
+            return self._get_vol_by_wwn(volume_id)
+        except xcli_errors.IllegalNameForObjectError as ex:
+            logger.exception(ex)
+            raise controller_errors.IllegalObjectName(ex.status)
 
     def validate_supported_capabilities(self, capabilities):
         logger.info("validate_supported_capabilities for capabilities : {0}".format(capabilities))
