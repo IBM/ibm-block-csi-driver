@@ -4,7 +4,8 @@ from munch import Munch
 from mock import patch, NonCallableMagicMock
 from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
 from controller.array_action.array_mediator_ds8k import shorten_volume_name
-from controller.array_action.array_mediator_ds8k import LOGIN_PORT_WWPN, LOGIN_PORT_STATE, LOGIN_PORT_STATE_ONLINE
+from controller.array_action.array_mediator_ds8k import LOGIN_PORT_WWPN, LOGIN_PORT_STATE, \
+    LOGIN_PORT_STATE_ONLINE
 from pyds8k.exceptions import ClientError, ClientException, NotFound
 from controller.common import settings
 import controller.array_action.errors as array_errors
@@ -318,7 +319,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             })
         ]
         self.array.unmap_volume(scsi_id, host_name)
-        self.client_mock.unmap_volume_from_host.assert_called_once_with(host_name=host_name, lunid=lunid)
+        self.client_mock.unmap_volume_from_host.assert_called_once_with(host_name=host_name,
+                                                                        lunid=lunid)
 
     def test_get_array_fc_wwns_failed_with_ClientException(self):
         self.client_mock.get_host.side_effect = ClientException("500")
@@ -399,8 +401,6 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                 Initiators('', ["new_wwpn", "another_wwpn"])
             )
 
-####################################################################################################
-
     def test_get_snapshot_not_exist_return_none(self):
         self.client_mock.get_snapshot.side_effect = [ClientError("400", "BE7A002D")]
 
@@ -417,7 +417,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def _get_mapped_target_vol(self):
         volume = self.volume_response
-        volume.flashcopy = self.flashcopy_response
+        volume.flashcopy = [self.flashcopy_response]
         return volume
 
     def test_get_snapshot_get_fcmap_not_exist_raise_error(self):

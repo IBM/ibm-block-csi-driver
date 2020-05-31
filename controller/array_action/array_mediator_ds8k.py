@@ -468,7 +468,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             logger.error("FlashCopy Mapping not found for target volume: {}".format(snapshot_name))
             raise array_errors.SnapshotNameBelongsToVolumeError(candidate_api_volume.name,
                                                                 self.service_address)
-        fcmap = self._get_flashcopy(candidate_api_volume.flashcopy.id)
+        fcmap = self._get_flashcopy(candidate_api_volume.flashcopy[0].id)
         return self._generate_snapshot_response(candidate_api_volume, fcmap.source_volume['id'])
 
     def _create_similar_volume(self, target_volume_name, source_volume_name):
