@@ -196,7 +196,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         else:
             logger.debug(
                 "Volume {0} exists but it is not a copy of snapshot {1}.".format(vol_name, src_snapshot_id))
-            context.set_details("Volume already exists but it was created but from a different source.")
+            context.set_details("Volume already exists but it was created from a different source.")
             context.set_code(grpc.StatusCode.INTERNAL)
             return csi_pb2.CreateVolumeResponse()
 
