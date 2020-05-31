@@ -412,7 +412,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
         for pool in pools:
             try:
-                volume_candidates.append(self.client.get_volumes_by_pool(pool.id))
+                volume_candidates.extend(self.client.get_volumes_by_pool(pool.id))
             except exceptions.NotFound as ex:
                 if not_exist_err:
                     if ERROR_CODE_RESOURCE_NOT_EXISTS in str(ex.message).upper():
