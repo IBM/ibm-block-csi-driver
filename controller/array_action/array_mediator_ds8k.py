@@ -73,11 +73,11 @@ def shorten_volume_name(name, prefix):
         return (prefix + settings.NAME_PREFIX_SEPARATOR + hashed)[:MAX_VOLUME_LENGTH]
 
 
-def get_capabilities_from_api_volume(api_volume):
-    capability = config.CAPABILITY_THICK
-    if api_volume.tp == 'ese':
-        capability = config.CAPABILITY_THIN
-    return {config.CAPABILITIES_SPACEEFFICIENCY: capability}
+# def get_capabilities_from_api_volume(api_volume):
+#     capability = config.CAPABILITY_THICK
+#     if api_volume.tp == 'ese':
+#         capability = config.CAPABILITY_THIN
+#     return {config.CAPABILITIES_SPACEEFFICIENCY: capability}
 
 
 def flashcopy_request_volume_pair_parser(source_volume_id, target_volume_id):
@@ -476,7 +476,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             "creating target api volume '{0}' from source volume '{1}'".format(target_volume_name,
                                                                                source_volume_name))
         source_api_volume = self._get_api_volume_by_name(source_volume_name)
-        capabilities = get_capabilities_from_api_volume(source_api_volume)
+        capabilities = {config.CAPABILITIES_SPACEEFFICIENCY: None}
         size_in_bytes = int(source_api_volume.cap)
         pool = source_api_volume.pool
         return self.create_volume(target_volume_name, size_in_bytes, capabilities, pool)
@@ -498,8 +498,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                     ex.message).upper():
                 raise array_errors.VolumeNotFoundError
             else:
-                raise array_errors.FlashcopyCreationError('{}:{}'.format(source_volume.id,
-                                                                         target_volume.id))
+                raise array_errors.FlashcopyCreationError('{}:{}'.format(source_volume_id,
+                                                                         target_volume_id))
         if not self.validate_flashcopy(api_flashcopy.id):
             # #TODO Delete flashcopy
             raise array_errors.FlashcopyCreationError(api_flashcopy.id)
