@@ -495,7 +495,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 raise array_errors.FlashcopyCreationError('{}:{}'.format(source_volume.id,
                                                                          target_volume.id))
         if not self.validate_flashcopy(api_flashcopy.id):
-            #TODO Delete flashcopy
+            # #TODO Delete flashcopy
             raise array_errors.FlashcopyCreationError(api_flashcopy.id)
         return self._get_api_volume_by_id(target_volume.id)
 
