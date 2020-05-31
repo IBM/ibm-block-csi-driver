@@ -581,4 +581,4 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def validate_flashcopy(self, flashcopy_id):
         api_flashcopy = self._get_flashcopy(flashcopy_id)
-        return api_flashcopy.state is 'valid'
+        return api_flashcopy.state == 'valid'
