@@ -86,6 +86,10 @@ def flashcopy_request_volume_pair_parser(source_volume_id, target_volume_id):
              }]
 
 
+def guid_to_ds8k_request_id(volume_id):
+    return volume_id[-4:]
+
+
 class DS8KArrayMediator(ArrayMediatorAbstract):
     SUPPORTED_FROM_VERSION = '7.5.1'
 
@@ -323,8 +327,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def get_volume_name(self, volume_id):
         logger.debug("Searching for volume with id: {0}".format(volume_id))
+        volume_id = guid_to_ds8k_request_id(volume_id)
         try:
-            api_volume = self.client.get_volume(volume_id[-4:])
+            api_volume = self.client.get_volume(volume_id)
         except exceptions.NotFound:
             raise array_errors.VolumeNotFoundError(volume_id)
 
@@ -480,7 +485,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.info(
             "creating FlashCopy Mapping from '{0}' to '{1}'".format(source_volume.volume_name,
                                                                     target_volume.volume_name))
-        volume_pair = flashcopy_request_volume_pair_parser(source_volume.id, target_volume.id)
+        source_volume_id = guid_to_ds8k_request_id(source_volume.id)
+        target_volume_id = guid_to_ds8k_request_id(target_volume.id)
+        volume_pair = flashcopy_request_volume_pair_parser(source_volume_id, target_volume_id)
         try:
             api_flashcopy = self.client.create_flashcopy(volume_pairs=volume_pair,
                                                          options=["persistent"])
