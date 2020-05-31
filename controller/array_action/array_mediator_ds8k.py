@@ -469,7 +469,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise array_errors.SnapshotNameBelongsToVolumeError(candidate_api_volume.name,
                                                                 self.service_address)
         fcmap = self._get_flashcopy(candidate_api_volume.flashcopy[0].id)
-        return self._generate_snapshot_response(candidate_api_volume, fcmap.source_volume['id'])
+        source_volume_name = self.get_volume_name(fcmap.source_volume['id'])
+        return self._generate_snapshot_response(candidate_api_volume, source_volume_name)
 
     def _create_similar_volume(self, target_volume_name, source_volume_name):
         logger.info(
