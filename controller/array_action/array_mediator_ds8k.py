@@ -392,7 +392,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise array_errors.UnMappingError(volume_id, host_name, ex.details)
 
     def _get_pools(self):
-
+        logger.info("Getting pools")
         try:
             pools = self.client.get_pools()
         except exceptions.ClientException as ex:
@@ -402,16 +402,17 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 )
             )
             raise ex
+        logger.info("Pools found: {}".format(pools))
         return pools
 
     def _get_api_volume_by_name(self, volume_name, not_exist_err=True):
-
+        logger.info("Getting volume {}".format(volume_name))
         pools = self._get_pools()
         volume_candidates = []
 
         for pool in pools:
             try:
-                volume_candidates = self.client.get_volumes_by_pool(pool.id)
+                volume_candidates.append(self.client.get_volumes_by_pool(pool.id))
             except exceptions.NotFound as ex:
                 if not_exist_err:
                     if ERROR_CODE_RESOURCE_NOT_EXISTS in str(ex.message).upper():
