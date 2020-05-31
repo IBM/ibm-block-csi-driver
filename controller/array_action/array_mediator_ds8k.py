@@ -439,9 +439,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except exceptions.NotFound:
             raise array_errors.VolumeNotFoundError(volume_id)
 
-    def _get_volume_by_id(self, volume_id):
-        api_volume = self._get_api_volume_by_id(volume_id)
-        return self._generate_volume_response(api_volume)
+    # def _get_volume_by_id(self, volume_id):
+    #     api_volume = self._get_api_volume_by_id(volume_id)
+    #     return self._generate_volume_response(api_volume)
 
     def _get_api_volume_by_name_if_exists(self, vol_name):
         return self._get_api_volume_by_name(vol_name, not_exist_err=False)
@@ -503,7 +503,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         if not self.validate_flashcopy(api_flashcopy.id):
             # #TODO Delete flashcopy
             raise array_errors.FlashcopyCreationError(api_flashcopy.id)
-        return self._get_api_volume_by_id(target_volume.id)
+        return self._get_api_volume_by_id(target_volume_id)
 
     def _delete_target_volume_if_exist(self, target_volume_name):
         target_api_volume = self._get_api_volume_by_name_if_exists(target_volume_name)
