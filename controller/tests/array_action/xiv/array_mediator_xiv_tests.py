@@ -91,7 +91,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(Exception):
             self.mediator.create_volume("vol", 10, [], "pool1")
 
-    def test_copy_volume_from_snapshot_succeeds_with_resize(self):
+    def test_copy_to_existing_volume_from_snapshot_succeeds_with_resize(self):
         vol_name = "vol"
         src_snap_name = "snap"
         src_snap_capacity_in_bytes = 500
