@@ -324,7 +324,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def get_volume_name(self, volume_id):
         logger.debug("Searching for volume with id: {0}".format(volume_id))
         try:
-            api_volume = self.client.get_volume(volume_id)
+            api_volume = self.client.get_volume(volume_id[:-4])
         except exceptions.NotFound:
             raise array_errors.VolumeNotFoundError(volume_id)
 
