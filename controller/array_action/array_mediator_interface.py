@@ -55,7 +55,8 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def copy_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes, min_vol_size_in_bytes):
+    def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
+                                              min_vol_size_in_bytes):
         """
         This function should create a volume from snapshot in the storage system.
 
@@ -211,7 +212,7 @@ class ArrayMediator(ABC):
         Returns:
            Snapshot
         Raises:
-            SnapshotNameBelongsToVolumeError
+            SnapshotIdBelongsToVolumeError
         """
         raise NotImplementedError
 

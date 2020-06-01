@@ -1,11 +1,13 @@
 import unittest
+
 from mock import patch, Mock
-from controller.csi_general import csi_pb2
-from controller.controller_server.csi_controller_server import ControllerServicer
+
 import controller.controller_server.utils as utils
-from controller.controller_server.errors import ValidationException
 from controller.array_action.errors import HostNotFoundError
+from controller.controller_server.csi_controller_server import ControllerServicer
 from controller.controller_server.errors import ObjectIdError
+from controller.controller_server.errors import ValidationException
+from controller.csi_general import csi_pb2
 
 
 class TestUtils(unittest.TestCase):

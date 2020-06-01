@@ -114,7 +114,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return copy_source_res
 
                 if src_snapshot_id:
-                    self._copy_volume_from_snapshot(vol, src_snapshot_id, size, array_mediator)
+                    self._copy_to_existing_volume_from_snapshot(vol, src_snapshot_id, size, array_mediator)
                     vol.copy_src_object_id = src_snapshot_id
                 logger.debug("generating create volume response")
                 res = utils.generate_csi_create_volume_response(vol)
@@ -141,7 +141,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateVolumeResponse()
 
-    def _copy_volume_from_snapshot(self, vol, src_snapshot_id, min_vol_size, array_mediator):
+    def _copy_to_existing_volume_from_snapshot(self, vol, src_snapshot_id, min_vol_size, array_mediator):
         vol_name = vol.volume_name
         try:
             src_snapshot = array_mediator.get_snapshot_by_id(src_snapshot_id)
@@ -150,20 +150,16 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             src_snapshot_name = src_snapshot.snapshot_name
             src_snapshot_capacity = src_snapshot.capacity_bytes
             logger.debug("Copy snapshot {0} data to volume {1}.".format(src_snapshot_id, vol_name))
-            array_mediator.copy_volume_from_snapshot(vol_name, src_snapshot_name, src_snapshot_capacity,
-                                                     min_vol_size)
-            logger.debug("Copy Volume frm Snapshot finished")
+            array_mediator.copy_to_existing_volume_from_snapshot(vol_name, src_snapshot_name, src_snapshot_capacity,
+                                                                 min_vol_size)
+            logger.debug("Copy volume from snapshot finished")
         except controller_errors.VolumeNotFoundError as ex:
             logger.error("Volume not found while copying snapshot data to volume")
             logger.exception(ex)
             raise ex
         except Exception as ex:
             logger.error("Exception raised while copying snapshot data to volume")
-            logger.exception(ex)
-            try:
-                self._rollback_create_volume_from_snapshot(array_mediator, vol.id)
-            except Exception:
-                pass
+            self._rollback_create_volume_from_snapshot(array_mediator, vol.id)
             raise ex
         return vol
 
@@ -172,37 +168,36 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.debug("Rollback copy volume from snapshot. Deleting volume {0}".format(vol_id))
         array_mediator.delete_volume(vol_id)
 
-    def _handle_existing_vol_src_snap(self, vol, src_snapshot_id, context):
+    def _handle_existing_vol_src_snap(self, volume, src_snapshot_id, context):
         """
-        This function should create a snapshot from volume in the storage system.
         Args:
-            vol                : volume fetched or created in CreateVolume
-            src_snapshot_id    : id of snapshot we should copy to vol or None if volume shhuld not be copied
+            volume             : volume fetched or created in CreateVolume
+            src_snapshot_id    : id of snapshot we should copy to vol or None if volume should not be copied
             context            : CreateVolume response context
         Returns:
-            if volume exists and is copy of specified snapshot - set context status to OK ad return CreateVolumeResponse
-            if volume is copy of another source - set context status to INTERNAL ad return CreateVolumeResponse
-            In any other case return null
+            If volume exists and is a copy of specified snapshot - set context status to OK
+            and return CreateVolumeResponse.
+            If volume is a copy of another source - set context status to INTERNAL and return CreateVolumeResponse.
+            In any other case return None.
         """
-        vol_name = vol.volume_name
-        vol_copy_src_object_id = vol.copy_src_object_id
+        vol_name = volume.volume_name
+        vol_copy_src_object_id = volume.copy_src_object_id
         if not src_snapshot_id or not vol_copy_src_object_id:
             return None
         if vol_copy_src_object_id == src_snapshot_id:
             logger.debug(
-                "Volume {0} exists and it is copy of Snapshot {1}.".format(vol_name, src_snapshot_id))
+                "Volume {0} exists and it is a copy of snapshot {1}.".format(vol_name, src_snapshot_id))
             context.set_code(grpc.StatusCode.OK)
             return csi_pb2.CreateVolumeResponse()
         else:
             logger.debug(
-                "Volume {0} exists but it is not copy of Snapshot {1}.".format(vol_name, src_snapshot_id))
-            context.set_details("Volume was already exists but created but from different source.")
+                "Volume {0} exists but it is not a copy of snapshot {1}.".format(vol_name, src_snapshot_id))
+            context.set_details("Volume already exists but it was created from a different source.")
             context.set_code(grpc.StatusCode.INTERNAL)
             return csi_pb2.CreateVolumeResponse()
 
     def _get_src_snapshot_id(self, request):
         source = request.volume_content_source
-        logger.info(source)
         res = None
         if source and source.HasField(config.VOLUME_SOURCE_SNAPSHOT):
             source_snapshot = source.snapshot
@@ -352,12 +347,16 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.debug("Idempotent case. volume is already unmapped.")
             return csi_pb2.ControllerUnpublishVolumeResponse()
 
+        except controller_errors.VolumeNotFoundError as ex:
+            logger.debug("Idempotent case. volume is already deleted.")
+            return csi_pb2.ControllerUnpublishVolumeResponse()
+
         except controller_errors.PermissionDeniedError as ex:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
             context.set_details(ex)
             return csi_pb2.ControllerPublishVolumeResponse()
 
-        except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError) as ex:
+        except controller_errors.HostNotFoundError as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)

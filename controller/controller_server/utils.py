@@ -82,10 +82,9 @@ def validate_create_volume_source(request):
             logger.info("Source snapshot specified: {0}".format(source_snapshot))
             source_snapshot_id = source_snapshot.snapshot_id
             if not source_snapshot_id:
-                logger.error("Volume source snapshot has no id specified")
-                raise ValidationException(messages.params_are_missing_message)
+                raise ValidationException(messages.volume_src_snapshot_id_is_missing)
         elif source.HasField(config.VOLUME_SOURCE_VOLUME):
-            raise ValidationException(messages.create_vol_from_vol_unsupported_message)
+            raise ValidationException(messages.volume_cloning_not_supported_message)
 
 
 def validate_create_volume_request(request):

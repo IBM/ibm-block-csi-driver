@@ -197,3 +197,9 @@ class SnapshotAlreadyExists(BaseArrayActionException):
 
     def __init__(self, snapshot, array):
         self.message = messages.SnapshotAlreadyExistsError_message.format(snapshot, array)
+
+
+class InvalidCliResponseError(BaseArrayActionException):
+
+    def __init__(self, details):
+        self.message = messages.InvalidCliResponseError_message.format(details)
