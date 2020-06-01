@@ -159,11 +159,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             raise ex
         except Exception as ex:
             logger.error("Exception raised while copying snapshot data to volume")
-            logger.exception(ex)
-            try:
-                self._rollback_create_volume_from_snapshot(array_mediator, vol.id)
-            except Exception as rollback_ex:
-                logger.exception(rollback_ex)
+            self._rollback_create_volume_from_snapshot(array_mediator, vol.id)
             raise ex
         return vol
 
