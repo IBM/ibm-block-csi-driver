@@ -63,4 +63,6 @@ SnapshotWrongVolumeError_message = "Snapshot {0} exists but it is of Volume {1} 
 
 FlashcopyCreationError_message = 'Failed to create flashcopy {}'
 
+FlashcopyDeletionError_message = 'Failed to delete flashcopy {}'
+
 InvalidCliResponseError_message = "Invalid CLI response. Details : {0}"

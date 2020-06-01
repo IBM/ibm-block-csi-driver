@@ -493,7 +493,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 raise array_errors.FlashcopyCreationError('{}:{}'.format(source_volume_id,
                                                                          target_volume_id))
         if not self.validate_flashcopy(api_flashcopy.id):
-            # #TODO Delete flashcopy CSI-1340
+            self._delete_flashcopy(api_flashcopy.id)
             raise array_errors.FlashcopyCreationError(api_flashcopy.id)
         return self._get_api_volume_by_id(target_volume_id)
 
@@ -535,6 +535,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                     ex.details
                 )
             )
+            raise array_errors.FlashcopyDeletionError(flascopy_id)
 
     def delete_snapshot(self, snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))

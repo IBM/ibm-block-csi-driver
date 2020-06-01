@@ -473,3 +473,47 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
         self.assertEqual(snapshot.snapshot_name, volume.name)
         self.assertEqual(snapshot.id, self.array._generate_volume_scsi_identifier(volume.id))
+
+    def test_create_snapshot_not_valid(self):
+        volume = self._prepare_mocks_for_create_snapshot()
+        self.client_mock.create_volume.return_value = volume
+        self.client_mock.get_volume.return_value = volume
+        flashcopy_response = copy.deepcopy(self.flashcopy_response)
+        flashcopy_response.state = "invalid"
+        self.client_mock.create_flashcopy.return_value = flashcopy_response
+        with self.assertRaises(array_errors.FlashcopyCreationError):
+            self.array.create_snapshot("target_vol", "test_name")
+
+    def test_delete_snapshot(self):
+        scsi_id = "6005076306FFD3010000000000000001"
+        self.array.delete_snapshot(scsi_id)
+        self.client_mock.delete_volume.assert_called_once_with(volume_id=scsi_id[-4:])
+
+    def test_delete_snapshot_called_delete_flashcopy(self):
+        mapped_volume = self._get_mapped_target_vol()
+        self.client_mock.get_volume.return_value = mapped_volume
+        self.array.delete_snapshot("test_id")
+        flashcopy_id = mapped_volume.flashcopy[0].id
+        self.client_mock.delete_flashcopy.assert_called_once_with(flashcopy_id)
+
+    def test_delete_flashcopy_error(self):
+        self.client_mock.get_volume.return_value = self.volume_response
+        with self.assertRaises(array_errors.SnapshotNameBelongsToVolumeError):
+            self.array.delete_snapshot("fake_name")
+
+    def test_delete_flashcopy_failed_with_ClientException(self):
+        self.client_mock.delete_flashcopy.side_effect = ClientException("500")
+        mapped_volume = self._get_mapped_target_vol()
+        self.client_mock.get_volume.return_value = mapped_volume
+        with self.assertRaises(array_errors.FlashcopyDeletionError):
+            self.array.delete_snapshot("fake_name")
+
+    def test_delete_snapshot_failed_with_ClientException(self):
+        self.client_mock.delete_volume.side_effect = ClientException("500")
+        with self.assertRaises(array_errors.VolumeDeletionError):
+            self.array.delete_snapshot("fake_name")
+
+    def test_delete_snapshot_failed_with_NotFound(self):
+        self.client_mock.delete_volume.side_effect = NotFound("404")
+        with self.assertRaises(array_errors.VolumeNotFoundError):
+            self.array.delete_snapshot("fake_name")

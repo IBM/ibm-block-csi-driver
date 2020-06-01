@@ -211,3 +211,9 @@ class FlashcopyCreationError(BaseArrayActionException):
 
     def __init__(self, name):
         self.message = messages.FlashcopyCreationError_message.format(name)
+
+
+class FlashcopyDeletionError(BaseArrayActionException):
+
+    def __init__(self, name):
+        self.message = messages.FlashcopyDeletionError_message.format(name)
