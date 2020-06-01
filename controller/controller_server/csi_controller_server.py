@@ -468,7 +468,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 except controller_errors.SnapshotNotFoundError as ex:
                     logger.debug("Snapshot was not found during deletion: {0}".format(ex))
-                
+
         except controller_errors.SnapshotNotFoundError:
             logger.debug("snapshot was not found during deletion: {0}".format(ex))
             context.set_code(grpc.StatusCode.OK)
