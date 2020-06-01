@@ -463,7 +463,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
                 logger.debug(array_mediator)
-                array_mediator.delete_snapshot(snapshot_id)
+                try:
+                    array_mediator.delete_snapshot(snapshot_id)
+
+                except controller_errors.SnapshotNotFoundError as ex:
+                    logger.debug("Snapshot was not found during deletion: {0}".format(ex))
+                
         except controller_errors.SnapshotNotFoundError:
             logger.debug("snapshot was not found during deletion: {0}".format(ex))
             context.set_code(grpc.StatusCode.OK)
