@@ -146,6 +146,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             cli_volume.name,
             self.endpoint,
             cli_volume.mdisk_grp_name,
+            None,  # TODO: CSI-1026 - src object
             self.array_type)
 
     def get_volume(self, volume_name, volume_context=None, volume_prefix=""):
@@ -239,6 +240,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise ex
 
+    def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
+                                              min_vol_size_in_bytes):
+        # TODO:	CSI-1026
+        raise NotImplementedError
+
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
         vol_name = self._get_vol_by_wwn(volume_id)
@@ -260,6 +266,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def get_snapshot(self, snapshot_name):
         # TODO: CSI-1024
+        pass
+
+    def get_snapshot_by_id(self, src_snapshot_id):
+        # TODO:	CSI-1026
         raise NotImplementedError
 
     def create_snapshot(self, name, volume_name):

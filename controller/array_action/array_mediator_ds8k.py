@@ -193,6 +193,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             vol_id=self._generate_volume_scsi_identifier(res.id),
             vol_name=res.name,
             array_address=self.service_address,
+            copy_src_object_id=None,  # TODO: CSI-1338
             pool_name=res.pool,
             array_type=self.array_type
         )
@@ -263,6 +264,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 )
             )
             raise array_errors.VolumeCreationError(name)
+
+    def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
+                                              min_vol_size_in_bytes):
+        # TODO:	CSI-1338
+        raise NotImplementedError
 
     def _delete_volume(self, volume_id, not_exist_err=True):
         logger.info("Deleting volume {}".format(volume_id))
@@ -509,6 +515,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             logger.error("Failed to create snapshot '{0}': {1}".format(target_volume_name, ex))
             self._delete_target_volume_if_exist(target_volume_name)
             raise ex
+
+    def get_snapshot_by_id(self, src_snapshot_id):
+        # TODO:	CSI-1338
+        raise NotImplementedError
 
     def create_snapshot(self, name, volume_name):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(name, volume_name))

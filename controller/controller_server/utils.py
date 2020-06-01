@@ -3,9 +3,9 @@ from google.protobuf.timestamp_pb2 import Timestamp
 import controller.controller_server.config as config
 import controller.controller_server.messages as messages
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
-from controller.array_action.errors import HostNotFoundError, VolumeNotFoundError
+from controller.array_action.errors import HostNotFoundError
 from controller.common.csi_logger import get_stdout_logger
-from controller.controller_server.errors import ValidationException
+from controller.controller_server.errors import ValidationException, ObjectIdError
 from controller.csi_general import csi_pb2
 
 logger = get_stdout_logger()
@@ -73,6 +73,20 @@ def validate_csi_volume_capabilties(capabilities):
     logger.debug("finished validating csi volume capabilities.")
 
 
+def validate_create_volume_source(request):
+    source = request.volume_content_source
+    if source:
+        logger.info(source)
+        if source.HasField(config.VOLUME_SOURCE_SNAPSHOT):
+            source_snapshot = source.snapshot
+            logger.info("Source snapshot specified: {0}".format(source_snapshot))
+            source_snapshot_id = source_snapshot.snapshot_id
+            if not source_snapshot_id:
+                raise ValidationException(messages.volume_src_snapshot_id_is_missing)
+        elif source.HasField(config.VOLUME_SOURCE_VOLUME):
+            raise ValidationException(messages.volume_cloning_not_supported_message)
+
+
 def validate_create_volume_request(request):
     logger.debug("validating create volume request")
 
@@ -105,6 +119,9 @@ def validate_create_volume_request(request):
     else:
         raise ValidationException(messages.params_are_missing_message)
 
+    logger.debug("validating volume copy source")
+    validate_create_volume_source(request)
+
     logger.debug("request validation finished.")
 
 
@@ -128,10 +145,15 @@ def generate_csi_create_volume_response(new_vol):
                    "pool_name": new_vol.pool_name,
                    "storage_type": new_vol.array_type
                    }
+    content_source = None
+    if new_vol.copy_src_object_id:
+        snapshot_source = csi_pb2.VolumeContentSource.SnapshotSource(snapshot_id=new_vol.copy_src_object_id)
+        content_source = csi_pb2.VolumeContentSource(snapshot=snapshot_source)
 
     res = csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(
         capacity_bytes=new_vol.capacity_bytes,
         volume_id=get_vol_id(new_vol),
+        content_source=content_source,
         volume_context=vol_context))
 
     logger.debug("finished creating volume response : {0}".format(res))
@@ -185,14 +207,22 @@ def validate_publish_volume_request(request):
 
 
 def get_volume_id_info(volume_id):
-    logger.debug("getting volume info for vol id : {0}".format(volume_id))
-    split_vol = volume_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)
-    if len(split_vol) != 2:
-        raise VolumeNotFoundError(volume_id)
+    return _get_object_id_info(volume_id, config.OBJECT_TYPE_NAME_VOLUME)
 
-    array_type, vol_id = split_vol
-    logger.debug("volume id : {0}, array type :{1}".format(vol_id, array_type))
-    return array_type, vol_id
+
+def get_snapshot_id_info(snapshot_id):
+    return _get_object_id_info(snapshot_id, config.OBJECT_TYPE_NAME_SNAPSHOT)
+
+
+def _get_object_id_info(full_object_id, object_type):
+    logger.debug("getting {0} info for id : {1}".format(object_type, full_object_id))
+    splitted_object_id = full_object_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)
+    if len(splitted_object_id) != 2:
+        raise ObjectIdError(object_type, full_object_id)
+
+    array_type, object_id = splitted_object_id
+    logger.debug("volume id : {0}, array type :{1}".format(object_id, array_type))
+    return array_type, object_id
 
 
 def get_node_id_info(node_id):

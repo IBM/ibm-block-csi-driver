@@ -6,6 +6,9 @@ StorageManagementIPsNotSupportError_message = "Invalid Management IP for SVC : {
 
 VolumeNotFoundError_message = "Volume was not found : {0} "
 
+VolumeNameBelongsToSnapshotError_message = "Volume not found. Snapshot with the same id exists. \
+                                                         Name : {0} , array : {1}"
+
 PoolDoesNotMatchCapabilities_message = "Pool : {0} does not match the following capabilities : {1} . error : {2}"
 
 StorageClassCapabilityNotSupported_message = "Storage class capability is not supported : {0} "
@@ -46,10 +49,15 @@ NoIscsiTargetsFoundError_message = "Could not find iSCSI targets for endpoint: {
 
 UnsupportedConnectivityTypeError_message = "Unsupported connectivity type: {0}"
 
+SnapshotNotFoundError_message = "Snapshot was not found : {0} "
+
 SnapshotAlreadyExistsError_message = "Snapshot already exists : {0} , array : {1}"
 
 SnapshotNameBelongsToVolumeError_message = "Snapshot not found. Volume with the same name exists. \
                                                          Name : {0} , array : {1}"
+
+SnapshotIdBelongsToVolumeError_message = "Snapshot not found. Volume with the same id exists. \
+                                                         Id : {0} , array : {1}"
 
 SnapshotWrongVolumeError_message = "Snapshot {0} exists but it is of Volume {1} and not {2}"
 
