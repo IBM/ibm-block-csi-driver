@@ -276,6 +276,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         # TODO: CSI-1024
         raise NotImplementedError
 
+    def delete_snapshot(self, snapshot_id):
+        # TODO: will need to implement
+        raise NotImplementedError
+
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host name for initiators : {0}".format(initiators))
         detailed_hosts_list = self._get_detailed_hosts_list()

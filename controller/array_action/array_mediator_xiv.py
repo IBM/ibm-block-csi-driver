@@ -267,6 +267,25 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.PermissionDeniedError(
                 "create snapshot {0} from volume {1}".format(name, volume_name))
 
+    def delete_snapshot(self, snapshot_id):
+        logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
+        try:
+            snapshot_name = self._get_vol_by_wwn(snapshot_id)
+        except controller_errors.VolumeNotFoundError:
+            raise controller_errors.SnapshotNotFoundError(snapshot_id)
+
+        try:
+            self.client.cmd.snapshot_delete(snapshot=snapshot_name)
+        except xcli_errors.VolumeBadNameError as ex:
+            logger.exception(ex)
+            raise controller_errors.SnapshotNotFoundError(snapshot_name)
+
+        except xcli_errors.OperationForbiddenForUserCategoryError as ex:
+            logger.exception(ex)
+            raise controller_errors.PermissionDeniedError("delete snapshot : {0}".format(snapshot_name))
+
+        logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
+
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host id for initiators : {0}".format(initiators))
         matching_hosts_set = set()

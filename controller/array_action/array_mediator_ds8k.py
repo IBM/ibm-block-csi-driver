@@ -526,6 +526,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
         return self._generate_snapshot_response(target_api_volume, volume_name)
 
+    def delete_snapshot(self, snapshot_id):
+        # TODO: will need to implement
+        raise NotImplementedError
+
     def get_iscsi_targets_by_iqn(self):
         return {}
 

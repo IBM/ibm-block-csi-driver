@@ -449,9 +449,50 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return csi_pb2.CreateSnapshotResponse()
 
     def DeleteSnapshot(self, request, context):
-        # TODO: CSI-752
+        set_current_thread_name(request.snapshot_id)
         logger.info("Delete snapshot")
-        return csi_pb2.DeleteSnapshotResponse()
+        secrets = request.secrets
+        try:
+            utils.validate_delete_snapshot_request(request)
+            user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
+            try:
+                array_type, snapshot_id = utils.get_snapshot_id_info(request.snapshot_id)
+            except ObjectIdError as ex:
+                logger.warning("volume id is invalid. error : {}".format(ex))
+                return csi_pb2.DeleteVolumeResponse()
+
+            with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
+                logger.debug(array_mediator)
+                try:
+                    array_mediator.delete_snapshot(snapshot_id)
+
+                except controller_errors.SnapshotNotFoundError as ex:
+                    logger.debug("Snapshot was not found during deletion: {0}".format(ex))
+
+        except controller_errors.SnapshotNotFoundError:
+            logger.debug("snapshot was not found during deletion: {0}".format(ex))
+            context.set_code(grpc.StatusCode.OK)
+            return csi_pb2.DeleteSnapshotResponse()
+        except controller_errors.PermissionDeniedError as ex:
+            context.set_code(grpc.StatusCode.PERMISSION_DENIED)
+            context.set_details(ex)
+            return csi_pb2.DeleteSnapshotResponse()
+        except ValidationException as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            return csi_pb2.DeleteSnapshotResponse()
+        except Exception as ex:
+            logger.debug("an internal exception occurred")
+            logger.exception(ex)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details('an internal exception occurred : {}'.format(ex))
+            return csi_pb2.DeleteSnapshotResponse()
+
+        logger.debug("generating delete snapshot response")
+        res = csi_pb2.DeleteSnapshotResponse()
+        logger.info("finished DeleteSnapshot")
+        return res
 
     def GetCapacity(self, request, context):
         logger.info("GetCapacity")

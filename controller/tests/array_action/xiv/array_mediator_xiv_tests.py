@@ -234,6 +234,28 @@ class TestArrayMediatorXIV(unittest.TestCase):
         xcli_snap.as_single_element = utils.get_mock_xiv_snapshot(snap_capacity, snap_name, snap_wwn, snap_vol_name)
         return xcli_snap
 
+    def test_delete_snapshot_return_volume_not_found(self):
+        ret = Mock()
+        ret.as_single_element = None
+        self.mediator.client.cmd.vol_list.return_value = ret
+        with self.assertRaises(array_errors.SnapshotNotFoundError):
+            self.mediator.delete_snapshot("snap-wwn")
+
+    def test_delete_snapshot_return_bad_name_error(self):
+        self.mediator.client.cmd.snapshot_delete.side_effect = [xcli_errors.VolumeBadNameError("", "snap", "")]
+        with self.assertRaises(array_errors.SnapshotNotFoundError):
+            self.mediator.delete_snapshot("snap-wwn")
+
+    def test_delete_snapshot_fails_on_permissions(self):
+        self.mediator.client.cmd.snapshot_delete.side_effect = [
+            xcli_errors.OperationForbiddenForUserCategoryError("", "snap", "")]
+        with self.assertRaises(array_errors.PermissionDeniedError):
+            self.mediator.delete_snapshot("snap-wwn")
+
+    def test_delete_snapshot_succeeds(self):
+        self.mediator.client.cmd.snapshot_delete = Mock()
+        self.mediator.delete_snapshot("snap-wwn")
+
     def test_property(self):
         self.assertEqual(XIVArrayMediator.port, 7778)
 
