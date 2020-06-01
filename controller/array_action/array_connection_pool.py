@@ -54,7 +54,7 @@ class ConnectionPool(object):
         # if there is a free and active item in the channel, return it directly.
         logger.debug("+++++++++++++++++ get connection")
         while True:
-            logger.debug("+++++++++++++++++ get c - while. Size: {0} M: [1}".format(self.current_size, self.max_size))
+            logger.debug("+++++++++++++++++ get c - while. Size: {0} M: {1}".format(self.current_size, self.max_size))
             try:
                 item = self.channel.get(block=False)
                 if item.is_active():
@@ -96,7 +96,7 @@ class ConnectionPool(object):
         Put an item back into the pool, when done.  This may cause the putting thread to block.
         """
         logger.debug(
-            "+++++++++++++++++ put connection. Size: {0} Max size : [1}".format(self.current_size, self.max_size))
+            "+++++++++++++++++ put connection. Size: {0} Max size : {1}".format(self.current_size, self.max_size))
         if self.current_size > self.max_size:
             with self.lock:
                 self.current_size -= 1
