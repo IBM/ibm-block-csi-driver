@@ -79,10 +79,6 @@ def flashcopy_request_volume_pair_parser(source_volume_id, target_volume_id):
              }]
 
 
-def guid_to_ds8k_request_id(volume_id):
-    return volume_id[-4:]
-
-
 class DS8KArrayMediator(ArrayMediatorAbstract):
     SUPPORTED_FROM_VERSION = '7.5.1'
 
@@ -326,7 +322,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def get_volume_name(self, volume_id):
         logger.debug("Searching for volume with id: {0}".format(volume_id))
-        volume_id = guid_to_ds8k_request_id(volume_id)
+        volume_id = get_volume_id_from_scsi_identifier(volume_id)
         try:
             api_volume = self.client.get_volume(volume_id)
         except exceptions.NotFound:
@@ -481,8 +477,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.info(
             "creating FlashCopy Mapping from '{0}' to '{1}'".format(source_volume.volume_name,
                                                                     target_volume.volume_name))
-        source_volume_id = guid_to_ds8k_request_id(source_volume.id)
-        target_volume_id = guid_to_ds8k_request_id(target_volume.id)
+        source_volume_id = get_volume_id_from_scsi_identifier(source_volume.id)
+        target_volume_id = get_volume_id_from_scsi_identifier(target_volume.id)
         volume_pair = flashcopy_request_volume_pair_parser(source_volume_id, target_volume_id)
         try:
             api_flashcopy = self.client.create_flashcopy(volume_pairs=volume_pair,
@@ -526,9 +522,32 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
         return self._generate_snapshot_response(target_api_volume, volume_name)
 
+    def _delete_flashcopy(self, flascopy_id):
+        try:
+            self.client.delete_flashcopy(flascopy_id)
+        except exceptions.NotFound:
+            raise array_errors.VolumeNotFoundError(flascopy_id)
+        except exceptions.ClientException as ex:
+            logger.error(
+                "Failed to delete flascopy {} on array {}, reason is: {}".format(
+                    flascopy_id,
+                    self.identifier,
+                    ex.details
+                )
+            )
+
     def delete_snapshot(self, snapshot_id):
-        # TODO: will need to implement
-        raise NotImplementedError
+        logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
+        volume_id = get_volume_id_from_scsi_identifier(snapshot_id)
+        api_volume = self._get_api_volume_by_id(volume_id)
+        if not api_volume.flashcopy:
+            logger.error("FlashCopy Mapping not found for target volume: {}".format(api_volume.name))
+            raise array_errors.SnapshotNameBelongsToVolumeError(api_volume.name,
+                                                                self.service_address)
+        flashcopy_id = api_volume.flashcopy[0].id
+        self._delete_flashcopy(flashcopy_id)
+        self.delete_volume(volume_id)
+        logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
 
     def get_iscsi_targets_by_iqn(self):
         return {}
