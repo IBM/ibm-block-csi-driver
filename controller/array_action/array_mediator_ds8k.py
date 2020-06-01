@@ -73,13 +73,6 @@ def shorten_volume_name(name, prefix):
         return (prefix + settings.NAME_PREFIX_SEPARATOR + hashed)[:MAX_VOLUME_LENGTH]
 
 
-# def get_capabilities_from_api_volume(api_volume):
-#     capability = config.CAPABILITY_THICK
-#     if api_volume.tp == 'ese':
-#         capability = config.CAPABILITY_THIN
-#     return {config.CAPABILITIES_SPACEEFFICIENCY: capability}
-
-
 def flashcopy_request_volume_pair_parser(source_volume_id, target_volume_id):
     return [{"source_volume": source_volume_id,
              "target_volume": target_volume_id
@@ -439,10 +432,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except exceptions.NotFound:
             raise array_errors.VolumeNotFoundError(volume_id)
 
-    # def _get_volume_by_id(self, volume_id):
-    #     api_volume = self._get_api_volume_by_id(volume_id)
-    #     return self._generate_volume_response(api_volume)
-
     def _get_api_volume_by_name_if_exists(self, vol_name):
         return self._get_api_volume_by_name(vol_name, not_exist_err=False)
 
@@ -502,7 +491,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 raise array_errors.FlashcopyCreationError('{}:{}'.format(source_volume_id,
                                                                          target_volume_id))
         if not self.validate_flashcopy(api_flashcopy.id):
-            # #TODO Delete flashcopy
+            # #TODO Delete flashcopy CSI-1340
             raise array_errors.FlashcopyCreationError(api_flashcopy.id)
         return self._get_api_volume_by_id(target_volume_id)
 

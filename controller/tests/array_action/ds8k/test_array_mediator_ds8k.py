@@ -1,15 +1,17 @@
-import copy
 import unittest
-from munch import Munch
+
+import copy
 from mock import patch, NonCallableMagicMock
-from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
-from controller.array_action.array_mediator_ds8k import shorten_volume_name
-from controller.array_action.array_mediator_ds8k import LOGIN_PORT_WWPN, LOGIN_PORT_STATE, \
-    LOGIN_PORT_STATE_ONLINE
+from munch import Munch
 from pyds8k.exceptions import ClientError, ClientException, NotFound
-from controller.common import settings
+
 import controller.array_action.errors as array_errors
 from controller.array_action import config
+from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
+from controller.array_action.array_mediator_ds8k import LOGIN_PORT_WWPN, LOGIN_PORT_STATE, \
+    LOGIN_PORT_STATE_ONLINE
+from controller.array_action.array_mediator_ds8k import shorten_volume_name
+from controller.common import settings
 from controller.common.node_info import Initiators
 
 
@@ -437,36 +439,23 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
         self.array.get_snapshot("test_name")
 
-    # def _prepare_mocks_for_create_snapshot(self):
-    #     self.svc.client.svctask.mkvolume.return_value = Mock()
-    #     self.svc.client.svctask.mkfcmap.return_value = Mock()
-    #
-    #     source_vol_to_copy_from = self._get_source_cli_vol()
-    #     target_vol_after_creation = self._get_mapless_target_cli_vol()
-    #     target_vol_after_mapping = self._get_mapped_target_cli_vol()
-    #     target_vol_for_rollback = self._get_mapped_target_cli_vol()
-    #     vols_to_return = [source_vol_to_copy_from, target_vol_after_creation,
-    #                       target_vol_after_mapping, target_vol_for_rollback]
-    #     return_values = map(self._mock_cli_object, vols_to_return)
-    #     self.svc.client.svcinfo.lsvdisk.side_effect = return_values
-    #
-    #     self.svc.client.svctask.startfcmap.return_value = Mock()
-    #
-    def test_create_snapshot_create_volume_error(self):
+    def _prepare_mocks_for_create_snapshot(self):
         self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
         self.client_mock.get_volumes_by_pool.return_value = [self.volume_response]
+        volume = copy.deepcopy(self.volume_response)
+        volume.id = "0001"
+        volume.name = "target_vol"
+        return volume
 
+    def test_create_snapshot_create_volume_error(self):
+        self._prepare_mocks_for_create_snapshot()
         self.client_mock.create_volume.side_effect = ClientException("500")
 
         with self.assertRaises(array_errors.VolumeCreationError):
             self.array.create_snapshot("snap_name", "test_name")
 
     def test_create_snapshot_create_fcmap_error(self):
-        self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
-        self.client_mock.get_volumes_by_pool.return_value = [self.volume_response]
-        volume = copy.deepcopy(self.volume_response)
-        volume.id = "0001"
-        volume.name = "target_vol"
+        volume = self._prepare_mocks_for_create_snapshot()
         self.client_mock.create_volume.return_value = volume
         self.client_mock.get_volume.return_value = volume
         self.client_mock.create_flashcopy.side_effect = ClientException("500")
@@ -474,21 +463,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.FlashcopyCreationError):
             self.array.create_snapshot("target_vol", "test_name")
 
-    # def test_create_snapshot_start_fcmap_error(self):
-    #     self._prepare_mocks_for_create_snapshot()
-    #     mock_warning.return_value = False
-    #     self.svc.client.svctask.startfcmap.side_effect = [
-    #         CLIFailureError("Failed")]
-    #
-    #     with self.assertRaises(CLIFailureError):
-    #         self.svc.create_snapshot("test_snap", "source_vol")
-    #
     def test_create_snapshot_success(self):
-        self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
-        self.client_mock.get_volumes_by_pool.return_value = [self.volume_response]
-        volume = copy.deepcopy(self.volume_response)
-        volume.id = "0001"
-        volume.name = "target_vol"
+        volume = self._prepare_mocks_for_create_snapshot()
         self.client_mock.create_volume.return_value = volume
         self.client_mock.get_volume.return_value = volume
         self.client_mock.create_flashcopy.return_value = self.flashcopy_response
