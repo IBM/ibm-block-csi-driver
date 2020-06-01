@@ -54,9 +54,7 @@ class ConnectionPool(object):
         # if there is a free and active item in the channel, return it directly.
         logger.debug("+++++++++++++++++ get connection")
         while True:
-            logger.debug(
-                "+++++++++++++++++ get connection - while true. Size: {0} Max size : [1}".format(self.current_size,
-                                                                                                 self.max_size))
+            logger.debug("+++++++++++++++++ get c - while. Size: {0} M: [1}".format(self.current_size, self.max_size))
             try:
                 item = self.channel.get(block=False)
                 if item.is_active():
