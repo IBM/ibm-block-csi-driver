@@ -408,16 +408,16 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def _get_api_volume_by_name(self, volume_name):
         logger.info("Getting volume {}".format(volume_name))
         pools = self._get_pools()
-        volume_candidates = []
 
         for pool in pools:
+            volume_candidates = []
             volume_candidates.extend(self.client.get_volumes_by_pool(pool.id))
 
-        for volume in volume_candidates:
-            logger.info("Checking volume: {}".format(volume.name))
-            if volume.name == shorten_volume_name(volume_name, prefix=''):
-                logger.debug("Found volume: {}".format(volume))
-                return volume
+            for volume in volume_candidates:
+                logger.info("Checking volume: {}".format(volume.name))
+                if volume.name == shorten_volume_name(volume_name, prefix=''):
+                    logger.debug("Found volume: {}".format(volume))
+                    return volume
         return None
 
     def _get_volume_by_name(self, volume_name):
