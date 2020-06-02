@@ -295,7 +295,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise array_errors.VolumeNotFoundError(name)
 
         api_volume = self._get_api_volume_by_name(volume_name=name,
-                                                  pool=volume_context[config.CONTEXT_POOL])
+                                                  pool_id=volume_context[config.CONTEXT_POOL])
 
         if api_volume:
             return self._generate_volume_response(api_volume)
@@ -387,12 +387,12 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.info("Pools found: {}".format(pools))
         return pools
 
-    def _get_api_volume_by_name(self, volume_name, pool=None):
+    def _get_api_volume_by_name(self, volume_name, pool_id=None):
         logger.info("Getting volume {}".format(volume_name))
-        if not pool:
+        if not pool_id:
             pools = self._get_pools()
         else:
-            pools = [Munch({"id": pool})]
+            pools = [Munch({"id": pool_id})]
 
         volume_candidates = []
 
