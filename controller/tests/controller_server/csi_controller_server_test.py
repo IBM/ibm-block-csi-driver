@@ -761,7 +761,6 @@ class TestControllerServerDeleteVolume(unittest.TestCase):
         a_enter.return_value = self.mediator
         context = utils.FakeContext()
         self.mediator.is_volume_has_snapshots.return_value = True
-        self.request.volume_id = "wrong_id"
         self.servicer.DeleteVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.FAILED_PRECONDITION)
 
