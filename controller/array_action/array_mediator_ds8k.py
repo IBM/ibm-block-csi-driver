@@ -1,5 +1,6 @@
 import base58
 from hashlib import sha1
+from munch import Munch
 from packaging.version import parse
 from pyds8k import exceptions
 from pyds8k.resources.ds8k.v1.common import attr_names
@@ -71,12 +72,6 @@ def shorten_volume_name(name, prefix):
         name_without_prefix = str(name).split(prefix + settings.NAME_PREFIX_SEPARATOR, 2)[1]
         hashed = hash_string(name_without_prefix)
         return (prefix + settings.NAME_PREFIX_SEPARATOR + hashed)[:MAX_VOLUME_LENGTH]
-
-
-def flashcopy_request_volume_pair_parser(source_volume_id, target_volume_id):
-    return [{"source_volume": source_volume_id,
-             "target_volume": target_volume_id
-             }]
 
 
 class DS8KArrayMediator(ArrayMediatorAbstract):
@@ -299,24 +294,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             )
             raise array_errors.VolumeNotFoundError(name)
 
-        volume_candidates = []
+        api_volume = self._get_api_volume_by_name(volume_name=name,
+                                                  pool=volume_context[config.CONTEXT_POOL])
 
-        if config.CONTEXT_POOL in volume_context:
-            try:
-                volume_candidates = self.client.get_volumes_by_pool(
-                    volume_context[config.CONTEXT_POOL]
-                )
-            except exceptions.NotFound as ex:
-                if ERROR_CODE_RESOURCE_NOT_EXISTS in str(ex.message).upper():
-                    raise array_errors.PoolDoesNotExist(volume_context[config.CONTEXT_POOL],
-                                                        self.identifier)
-                else:
-                    raise ex
-
-        for volume in volume_candidates:
-            if volume.name == shorten_volume_name(name, volume_prefix):
-                logger.debug("Found volume: {}".format(volume))
-                return self._generate_volume_response(volume)
+        if api_volume:
+            return self._generate_volume_response(api_volume)
 
         raise array_errors.VolumeNotFoundError(name)
 
@@ -405,19 +387,29 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.info("Pools found: {}".format(pools))
         return pools
 
-    def _get_api_volume_by_name(self, volume_name):
+    def _get_api_volume_by_name(self, volume_name, pool=None):
         logger.info("Getting volume {}".format(volume_name))
-        pools = self._get_pools()
+        if not pool:
+            pools = self._get_pools()
+        else:
+            pools = [Munch({"id": pool})]
+
         volume_candidates = []
 
         for pool in pools:
-            volume_candidates.extend(self.client.get_volumes_by_pool(pool.id))
-
-        for volume in volume_candidates:
-            logger.info("Checking volume: {}".format(volume.name))
-            if volume.name == shorten_volume_name(volume_name, prefix=''):
-                logger.debug("Found volume: {}".format(volume))
-                return volume
+            try:
+                volume_candidates.extend(self.client.get_volumes_by_pool(pool.id))
+            except exceptions.NotFound as ex:
+                if ERROR_CODE_RESOURCE_NOT_EXISTS in str(ex.message).upper():
+                    raise array_errors.PoolDoesNotExist(pool,
+                                                        self.identifier)
+                else:
+                    raise ex
+            for volume in volume_candidates:
+                logger.info("Checking volume: {}".format(volume.name))
+                if volume.name == shorten_volume_name(volume_name, prefix=''):
+                    logger.debug("Found volume: {}".format(volume))
+                    return volume
         return None
 
     def _get_volume_by_name(self, volume_name):
@@ -445,16 +437,17 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def get_snapshot(self, snapshot_name):
         logger.debug("Get snapshot : {}".format(snapshot_name))
-        candidate_api_volume = self._get_api_volume_by_name(snapshot_name)
-        if not candidate_api_volume:
+        target_api_volume = self._get_api_volume_by_name(snapshot_name)
+        if not target_api_volume:
             return None
-        if not candidate_api_volume.flashcopy:
-            logger.error("FlashCopy Mapping not found for target volume: {}".format(snapshot_name))
-            raise array_errors.SnapshotNameBelongsToVolumeError(candidate_api_volume.name,
+        if not target_api_volume.flashcopy:
+            logger.error(
+                "FlashCopy relationship not found for target volume: {}".format(snapshot_name))
+            raise array_errors.SnapshotNameBelongsToVolumeError(target_api_volume.name,
                                                                 self.service_address)
-        fcmap = self._get_flashcopy(candidate_api_volume.flashcopy[0].id)
-        source_volume_name = self.get_volume_name(fcmap.source_volume['id'])
-        return self._generate_snapshot_response(candidate_api_volume, source_volume_name)
+        fcrel = self._get_flashcopy(target_api_volume.flashcopy[0].id)
+        source_volume_name = self.get_volume_name(fcrel.source_volume['id'])
+        return self._generate_snapshot_response(target_api_volume, source_volume_name)
 
     def _create_similar_volume(self, target_volume_name, source_volume_name):
         logger.info(
@@ -470,13 +463,13 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def _create_flashcopy(self, source_volume, target_volume):
         logger.info(
-            "creating FlashCopy Mapping from '{0}' to '{1}'".format(source_volume.volume_name,
-                                                                    target_volume.volume_name))
+            "creating FlashCopy relationship from '{0}' to '{1}'".format(source_volume.volume_name,
+                                                                         target_volume.volume_name))
         source_volume_id = get_volume_id_from_scsi_identifier(source_volume.id)
         target_volume_id = get_volume_id_from_scsi_identifier(target_volume.id)
-        volume_pair = flashcopy_request_volume_pair_parser(source_volume_id, target_volume_id)
         try:
-            api_flashcopy = self.client.create_flashcopy(volume_pairs=volume_pair,
+            api_flashcopy = self.client.create_flashcopy(source_volume_id=source_volume_id,
+                                                         target_volume_id=target_volume_id,
                                                          options=["persistent"])
         except (exceptions.ClientError, exceptions.ClientException) as ex:
             if ERROR_CODE_ALREADY_FLASHCOPY in str(ex.message).upper():
@@ -493,7 +486,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return self._get_api_volume_by_id(target_volume_id)
 
     def _delete_target_volume_if_exist(self, target_volume_name):
-        target_api_volume = self._get_volume_by_name(target_volume_name)
+        target_api_volume = self._get_api_volume_by_name(target_volume_name)
         if target_api_volume:
             self._delete_volume(target_volume_name, not_exist_err=False)
 
