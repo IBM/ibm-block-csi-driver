@@ -132,6 +132,14 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.IllegalObjectName(ex.status)
 
+    def is_volume_has_snapshots(self, volume_id):
+        try:
+            volume_name = self._get_vol_by_wwn(volume_id)
+            return self.client.cmd.snapshot_list(vol=volume_name).as_list
+        except xcli_errors.IllegalNameForObjectError as ex:
+            logger.exception(ex)
+            raise controller_errors.IllegalObjectName(ex.status)
+
     def validate_supported_capabilities(self, capabilities):
         logger.info("validate_supported_capabilities for capabilities : {0}".format(capabilities))
         # for a9k there should be no capabilities

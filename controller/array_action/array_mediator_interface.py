@@ -130,6 +130,18 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def is_volume_has_snapshots(self, volume_id):
+        """
+        Args:
+           volume_id : volume id
+        Returns:
+           Is volume has snapshots
+        Raises:
+            VolumeNotFound
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def get_volume_mappings(self, volume_id):
         """
         This function return volume mappings.

@@ -226,6 +226,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.debug(array_mediator)
 
                 try:
+                    if array_mediator.is_volume_has_snapshots(vol_id):
+                        context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+                        context.set_details("Volume cannot be deleted because it has snapshots")
+                        return csi_pb2.DeleteVolumeResponse()
+
                     array_mediator.delete_volume(vol_id)
 
                 except controller_errors.VolumeNotFoundError as ex:
