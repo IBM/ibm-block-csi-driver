@@ -229,8 +229,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug("+++++++++++++++++++++++ check if volume has snapshot")
                     if array_mediator.is_volume_has_snapshots(vol_id):
                         logger.debug("+++++++++++++++++++++++ volume has snapshot")
-                        context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+                        # context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+                        context.set_code(grpc.StatusCode.INTERNAL)
                         context.set_details("Volume cannot be deleted because it has snapshots")
+                        logger.debug("+++++++++++++++++++++++ volume has snapshot - return")
                         return csi_pb2.DeleteVolumeResponse()
 
                     logger.debug("+++++++++++++++++++++++ delete volume")
