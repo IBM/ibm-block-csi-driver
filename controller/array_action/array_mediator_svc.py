@@ -353,11 +353,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                                  " for source '{0}' and target '{1}'").format(source_volume_name,
                                                                               target_volume_name))
                 else:
-                    pass
+                    raise ex
 
     def get_snapshot_by_id(self, src_snapshot_id):
+        pass
         # TODO:	CSI-1026
-        raise ex
 
     def _start_fcmap(self, fcmap_id):
         logger.info("starting FlashCopy Mapping '{0}'".format(fcmap_id))
