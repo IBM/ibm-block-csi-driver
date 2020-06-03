@@ -4,6 +4,7 @@ from io import StringIO
 from pysvc import errors as svc_errors
 from pysvc.unified.client import connect
 from pysvc.unified.response import CLIFailureError
+from retry import retry
 
 import controller.array_action.config as config
 import controller.array_action.errors as controller_errors
@@ -384,6 +385,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             if not is_warning_message(ex.my_message):
                 logger.warning("Failed to delete fcmap '{0}': {1}".format(fcmap_id, ex))
 
+    @retry(svc_errors.StorageArrayClientException, tries=5, delay=1)
     def _delete_target_volume_if_exist(self, target_volume_name):
         target_cli_volume = self._get_cli_volume_if_exists(target_volume_name)
         if target_cli_volume and target_cli_volume.FC_id:
