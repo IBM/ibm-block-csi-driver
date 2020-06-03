@@ -139,6 +139,7 @@ class ArrayMediator(ABC):
            Is volume has snapshots
         Raises:
             VolumeNotFound
+            IllegalObjectName
         """
         raise NotImplementedError
 
