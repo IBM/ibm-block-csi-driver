@@ -176,7 +176,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def is_volume_has_snapshots(self, volume_id):
         volume_name = self._get_vol_by_wwn(volume_id)
-        return self.client.svcinfo.lsfcmap(source_vdisk_name=volume_name)
+        filter_value = 'source_vdisk_name={0}'.format(volume_name)
+        return self.client.svcinfo.lsfcmap(filtervalue=filter_value)
 
     def validate_supported_capabilities(self, capabilities):
         logger.debug("validate_supported_capabilities for "
