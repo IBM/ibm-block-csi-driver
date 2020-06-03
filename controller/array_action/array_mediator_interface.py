@@ -126,6 +126,7 @@ class ArrayMediator(ABC):
            volume name
         Raises:
             VolumeNotFound
+            IllegalObjectID
         """
         raise NotImplementedError
 
