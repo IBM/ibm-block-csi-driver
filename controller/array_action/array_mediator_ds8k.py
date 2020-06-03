@@ -455,7 +455,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         source_api_volume = self._get_api_volume_by_name(source_volume_name)
         if not source_api_volume:
             raise array_errors.VolumeNotFoundError(source_volume_name)
-        capabilities = {config.CAPABILITIES_SPACEEFFICIENCY: None}
+        capabilities = {config.CAPABILITIES_SPACEEFFICIENCY: source_api_volume.tp}
         size_in_bytes = int(source_api_volume.cap)
         pool = source_api_volume.pool
         return self.create_volume(target_volume_name, size_in_bytes, capabilities, pool)
@@ -500,8 +500,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     def get_snapshot_by_id(self, src_snapshot_id):
-        # TODO:	CSI-1338
-        raise NotImplementedError
+        api_snapshot = self._get_api_volume_by_id(src_snapshot_id)
+        flashcopy = self._get_flashcopy(api_snapshot.snapshot[0].id)
+        api_source_volume = self._get_api_volume_by_id(flashcopy.source_volume.id)
+        source_volume_name = api_source_volume.name
+        return self._generate_snapshot_response(api_snapshot, source_volume_name)
 
     def create_snapshot(self, name, volume_name):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
