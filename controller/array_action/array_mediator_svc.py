@@ -345,7 +345,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def _create_fcmap(self, source_volume_name, target_volume_name):
         logger.info("creating FlashCopy Mapping from '{0}' to '{1}'".format(source_volume_name, target_volume_name))
         try:
-            self.client.svctask.mkfcmap(source=source_volume_name, target=target_volume_name)
+            self.client.svctask.mkfcmap(source=source_volume_name, target=target_volume_name, copyrate=0)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 if FCMAP_ALREADY_EXIST in ex.my_message:
