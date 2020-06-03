@@ -313,7 +313,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def is_volume_has_snapshots(self, volume_id):
         api_volume = self._get_api_volume_by_id(volume_id)
-        return api_volume.flashcopy
+        return bool(api_volume.flashcopy)
 
     def _get_api_volume_by_id(self, volume_id):
         try:
