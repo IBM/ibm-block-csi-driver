@@ -136,7 +136,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         try:
             volume_name = self._get_vol_by_wwn(volume_id)
             return bool(self.client.cmd.snapshot_list(vol=volume_name).as_list)
-        except xcli_errors.IllegalNameForObjectError as ex:
+        except xcli_errors.IllegalValueForArgumentError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectID(ex.status)
 
