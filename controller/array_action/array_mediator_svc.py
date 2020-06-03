@@ -174,6 +174,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         # TODO: CSI-1024
         pass
 
+    def is_volume_has_snapshots(self, volume_id):
+        volume_name = self._get_vol_by_wwn(volume_id)
+        filter_value = 'source_vdisk_name={0}'.format(volume_name)
+        return bool(self.client.svcinfo.lsfcmap(filtervalue=filter_value).as_list)
+
     def validate_supported_capabilities(self, capabilities):
         logger.debug("validate_supported_capabilities for "
                      "capabilities : {0}".format(capabilities))
