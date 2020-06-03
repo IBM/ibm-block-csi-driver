@@ -162,6 +162,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             cli_volume.name,
             self.endpoint,
             cli_volume.mdisk_grp_name,
+            None,  # TODO: CSI-1026 - src object
             self.array_type)
 
     def _generate_snapshot_response(self, cli_snapshot, source_volume_name):
@@ -290,6 +291,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise ex
 
+    def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
+                                              min_vol_size_in_bytes):
+        # TODO:	CSI-1026
+        raise NotImplementedError
+
     def create_volume(self, name, size_in_bytes, capabilities, pool, volume_prefix=""):
         cli_volume = self._create_cli_volume(name, size_in_bytes, capabilities, pool)
         return self._generate_volume_response(cli_volume)
@@ -347,7 +353,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                                  " for source '{0}' and target '{1}'").format(source_volume_name,
                                                                               target_volume_name))
                 else:
-                    raise ex
+                    pass
+
+    def get_snapshot_by_id(self, src_snapshot_id):
+        # TODO:	CSI-1026
+        raise ex
 
     def _start_fcmap(self, fcmap_id):
         logger.info("starting FlashCopy Mapping '{0}'".format(fcmap_id))
@@ -392,6 +402,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise ex
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
         return self._generate_snapshot_response(target_cli_volume, volume_name)
+
+    def delete_snapshot(self, snapshot_id):
+        # TODO: will need to implement
+        raise NotImplementedError
 
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host name for initiators : {0}".format(initiators))

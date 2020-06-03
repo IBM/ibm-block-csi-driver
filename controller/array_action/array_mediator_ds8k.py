@@ -18,12 +18,10 @@ LOGIN_PORT_STATE_ONLINE = 'online'
 
 logger = get_stdout_logger()
 
-
 # response error codes
 ERROR_CODE_INVALID_CREDENTIALS = 'BE7A002D'
 ERROR_CODE_RESOURCE_NOT_EXISTS = 'BE7A0001'
 ERROR_CODE_VOLUME_NOT_FOUND_FOR_MAPPING = 'BE586015'
-
 
 MAX_VOLUME_LENGTH = 16
 
@@ -68,7 +66,7 @@ def shorten_volume_name(name, prefix):
     if not prefix:
         return hash_string(name)[:MAX_VOLUME_LENGTH]
     else:
-        name_without_prefix = str(name).split(prefix+settings.NAME_PREFIX_SEPARATOR, 2)[1]
+        name_without_prefix = str(name).split(prefix + settings.NAME_PREFIX_SEPARATOR, 2)[1]
         hashed = hash_string(name_without_prefix)
         return (prefix + settings.NAME_PREFIX_SEPARATOR + hashed)[:MAX_VOLUME_LENGTH]
 
@@ -150,8 +148,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 'Failed to connect to DS8K array {}, reason is {}'.format(
                     self.service_address,
                     e.details
-                    )
                 )
+            )
             raise ConnectionError()
 
     def disconnect(self):
@@ -185,6 +183,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             vol_id=self._generate_volume_scsi_identifier(res.id),
             vol_name=res.name,
             array_address=self.service_address,
+            copy_src_object_id=None,  # TODO: CSI-1338
             pool_name=res.pool,
             array_type=self.array_type
         )
@@ -255,6 +254,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 )
             )
             raise array_errors.VolumeCreationError(name)
+
+    def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
+                                              min_vol_size_in_bytes):
+        # TODO:	CSI-1338
+        raise NotImplementedError
 
     def delete_volume(self, volume_id):
         logger.info("Deleting volume {}".format(volume_id))
@@ -368,10 +372,18 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def get_snapshot(self, snapshot_name):
         # TODO: CSI-1339
+        pass
+
+    def get_snapshot_by_id(self, src_snapshot_id):
+        # TODO:	CSI-1338
         raise NotImplementedError
 
     def create_snapshot(self, name, volume_name):
         # TODO: CSI-1339
+        raise NotImplementedError
+
+    def delete_snapshot(self, snapshot_id):
+        # TODO: will need to implement
         raise NotImplementedError
 
     def get_iscsi_targets_by_iqn(self):

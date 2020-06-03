@@ -7,6 +7,7 @@ def get_mock_xiv_volume(size, name, wwn):
     vol.wwn = wwn
     vol.name = name
     vol.pool_name = "vol-name"
+    vol.master_name = ""
     return vol
 
 

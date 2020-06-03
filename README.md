@@ -216,7 +216,7 @@ spec:
           claimName: demo-pvc-file-system
 
 #      nodeSelector:
-#        kubernetes.io/hostname: NODESELECTOR
+#        kubernetes.io/hostname: HOSTNAME
       
 
 $> kubectl create -f demo-statefulset-file-system.yml

@@ -105,7 +105,7 @@ Source:
     Driver:            block.csi.ibm.com
     VolumeHandle:      SVC:60050760718106998000000000000543
     ReadOnly:          false
-    VolumeAttributes:      array_address=baremetal10-cluster.xiv.ibm.com
+    VolumeAttributes:      array_address=<IP>
                            pool_name=csi_svcPool
                            storage.kubernetes.io/csiProvisionerIdentity=1585146948772-8081-
                            block.csi.ibm.com
@@ -154,7 +154,7 @@ spec:
           claimName: demo-pvc-file-system
 
 #      nodeSelector:
-#        kubernetes.io/hostname: NODESELECTOR
+#        kubernetes.io/hostname: HOSTNAME
       
 
 $> kubectl create -f demo-statefulset-file-system.yml
