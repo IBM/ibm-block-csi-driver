@@ -4,7 +4,7 @@
 
 ## Driver Usage Details
 This section shows how to:
-- Create k8s secret `svc-secret` for the storage system.
+- Create k8s secret `svc-array` for the storage system.
 - Create storage class `gold`.
 - Create PVC `demo-pvc-file-system`from the storage class `gold` and show some details on the created PVC and PV.
 - Create StatefulSet application `demo-statefulset-file-system` and observe the mountpoint \ multipath device that was created by the driver. 

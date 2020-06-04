@@ -31,5 +31,5 @@ spec:
           claimName: demo-pvc-raw-block
 
 #      nodeSelector:
-#        kubernetes.io/hostname: NODESELECTOR
+#        kubernetes.io/hostname: HOSTNAME
       
