@@ -301,7 +301,7 @@ parameters:
 #### 3. Apply the storage class:
 
 ```bash
-$ kubectl apply -f demo-storageclass-gold.yaml
+$ kubectl apply -f demo-storageclass-gold-pvc.yaml
 storageclass.storage.k8s.io/gold created
 ```
 
