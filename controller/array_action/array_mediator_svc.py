@@ -390,13 +390,16 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             if not is_warning_message(ex.my_message):
                 logger.warning("Failed to delete fcmap '{0}': {1}".format(fcmap_id, ex))
 
-    @retry(svc_errors.StorageArrayClientException, tries=5, delay=1)
-    def _delete_target_volume_if_exist(self, target_volume_name):
-        target_cli_volume = self._get_cli_volume_if_exists(target_volume_name)
+    def _delete_target_volume_if_exist(self, target_cli_volume):
         if target_cli_volume and target_cli_volume.FC_id:
             self._delete_unstarted_fcmap(target_cli_volume.FC_id)
         if target_cli_volume:
-            self._delete_volume_by_name(target_volume_name, not_exist_err=False)
+            self._delete_volume_by_name(target_cli_volume.name, not_exist_err=False)
+
+    @retry(svc_errors.StorageArrayClientException, tries=5, delay=1)
+    def _delete_target_volume_by_name_if_exist(self, target_volume_name):
+        target_cli_volume = self._get_cli_volume_if_exists(target_volume_name)
+        self._delete_target_volume_if_exist(target_cli_volume)
 
     def create_snapshot(self, name, volume_name):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
@@ -405,14 +408,18 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             target_cli_volume = self._create_and_start_fcmap(volume_name, name)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.error("Failed to create snapshot '{0}': {1}".format(name, ex))
-            self._delete_target_volume_if_exist(name)
+            self._delete_target_volume_by_name_if_exist(name)
             raise ex
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
         return self._generate_snapshot_response(target_cli_volume, volume_name)
 
     def delete_snapshot(self, snapshot_id):
-        # TODO: will need to implement
-        raise NotImplementedError
+        logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
+        target_cli_volume = self._get_cli_volume_if_exists(snapshot_id)
+        if not target_cli_volume or not target_cli_volume.FC_id:
+            raise controller_errors.SnapshotNotFoundError(snapshot_id)
+        self._delete_target_volume_if_exist(target_cli_volume)
+        logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
 
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host name for initiators : {0}".format(initiators))
