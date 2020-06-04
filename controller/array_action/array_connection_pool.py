@@ -81,10 +81,14 @@ class ConnectionPool(object):
         # If there is no free items, and current_size is not full, create a new item.
         logger.debug("+++++++++++++++++ get connection - create new. Size: {0}".format(self.current_size))
         if self.current_size < self.max_size:
-            created = self.create()
+            logger.debug(
+                "+++++++++++++++++ get connection - new created. Before lock Size: {0}".format(self.current_size))
             with self.lock:
                 self.current_size += 1
-            logger.debug("+++++++++++++++++ get connection - new created")
+            logger.debug(
+                "+++++++++++++++++ get connection - new created. After lock Size: {0}".format(self.current_size))
+            created = self.create()
+            logger.debug("+++++++++++++++++ get connection - new created. Size: {0}".format(self.current_size))
             return created
 
         logger.debug("+++++++++++++++++ get connection - wait with timeout")
