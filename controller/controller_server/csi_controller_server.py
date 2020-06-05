@@ -71,48 +71,51 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             # TODO : pass multiple array addresses
             array_type = detect_array_type(array_addresses)
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
-                logger.debug(array_mediator)
-                # TODO: CSI-1358 - remove try/except
                 try:
-                    volume_full_name, volume_prefix = self._get_volume_name_and_prefix(request, array_mediator)
-                except controller_errors.IllegalObjectName as ex:
-                    context.set_details(ex.message)
-                    context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                    return csi_pb2.CreateSnapshotResponse()
+                    logger.debug(array_mediator)
+                    # TODO: CSI-1358 - remove try/except
+                    try:
+                        volume_full_name, volume_prefix = self._get_volume_name_and_prefix(request, array_mediator)
+                    except controller_errors.IllegalObjectName as ex:
+                        context.set_details(ex.message)
+                        context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                        return csi_pb2.CreateSnapshotResponse()
 
-                size = request.capacity_range.required_bytes
+                    size = request.capacity_range.required_bytes
 
-                if size == 0:
-                    size = array_mediator.minimal_volume_size_in_bytes
-                    logger.debug("requested size is 0 so the default size will be used : {0} ".format(
-                        size))
-                try:
-                    vol = array_mediator.get_volume(
-                        volume_full_name,
-                        volume_context=request.parameters,
-                        volume_prefix=volume_prefix,
-                    )
+                    if size == 0:
+                        size = array_mediator.minimal_volume_size_in_bytes
+                        logger.debug("requested size is 0 so the default size will be used : {0} ".format(
+                            size))
+                    try:
+                        vol = array_mediator.get_volume(
+                            volume_full_name,
+                            volume_context=request.parameters,
+                            volume_prefix=volume_prefix,
+                        )
 
-                except controller_errors.VolumeNotFoundError:
-                    logger.debug(
-                        "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
+                    except controller_errors.VolumeNotFoundError:
+                        logger.debug(
+                            "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
-                    array_mediator.validate_supported_capabilities(capabilities)
-                    vol = array_mediator.create_volume(volume_full_name, size, capabilities, pool, volume_prefix)
+                        array_mediator.validate_supported_capabilities(capabilities)
+                        vol = array_mediator.create_volume(volume_full_name, size, capabilities, pool, volume_prefix)
 
-                else:
-                    logger.debug("volume found : {}".format(vol))
+                    else:
+                        logger.debug("volume found : {}".format(vol))
 
-                    if not (vol.capacity_bytes == request.capacity_range.required_bytes):
-                        context.set_details("Volume was already created with different size.")
-                        context.set_code(grpc.StatusCode.ALREADY_EXISTS)
-                        return csi_pb2.CreateVolumeResponse()
+                        if not (vol.capacity_bytes == request.capacity_range.required_bytes):
+                            context.set_details("Volume was already created with different size.")
+                            context.set_code(grpc.StatusCode.ALREADY_EXISTS)
+                            return csi_pb2.CreateVolumeResponse()
 
-                logger.debug("generating create volume response")
-                res = utils.generate_csi_create_volume_response(vol)
-                logger.info("finished create volume")
-                return res
-
+                    logger.debug("generating create volume response")
+                    res = utils.generate_csi_create_volume_response(vol)
+                    logger.info("finished create volume")
+                    return res
+                except Exception as ex:
+                    logger.error("++++++++++++++ an internal exception occurred")
+                    logger.exception(ex)
         except (controller_errors.IllegalObjectName, controller_errors.StorageClassCapabilityNotSupported,
                 controller_errors.PoolDoesNotExist, controller_errors.PoolDoesNotMatchCapabilities) as ex:
             context.set_details(ex.message)

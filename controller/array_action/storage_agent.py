@@ -147,6 +147,7 @@ class StorageAgent(object):
         Get an object out of the pool, for use with with-statement.
         """
         try:
+            logger.info("++++++++++++ agent.__enter__")
             med = self.conn_pool.get(timeout=timeout)
         except Empty:
             raise array_errors.NoConnectionAvailableException(", ".join(self.endpoint_key))
@@ -154,4 +155,5 @@ class StorageAgent(object):
         try:
             yield med
         finally:
+            logger.info("++++++++++++ agent.__exit__")
             self.conn_pool.put(med)
