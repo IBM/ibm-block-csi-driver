@@ -255,15 +255,21 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return size_in_bytes - ret + 512
         return size_in_bytes
 
-    def _get_vol_by_wwn(self, volume_id):
+    def _get_volume_name_by_wwn_if_exist(self, volume_id):
         filter_value = 'vdisk_UID=' + volume_id
         vol_by_wwn = self.client.svcinfo.lsvdisk(
             filtervalue=filter_value).as_single_element
         if not vol_by_wwn:
-            raise controller_errors.VolumeNotFoundError(volume_id)
-
+            return None
+        
         vol_name = vol_by_wwn.name
         logger.debug("found volume name : {0}".format(vol_name))
+        return vol_name
+
+    def _get_vol_by_wwn(self, volume_id):
+        vol_name = self._get_volume_name_by_wwn_if_exist(volume_id)
+        if not vol_name:
+            raise controller_errors.VolumeNotFoundError(volume_id)
         return vol_name
 
     def _create_cli_volume(self, name, size_in_bytes, capabilities, pool):
@@ -415,9 +421,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def delete_snapshot(self, snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
-        target_cli_volume = self._get_cli_volume_if_exists(snapshot_id)
-        if not target_cli_volume or not target_cli_volume.FC_id:
+        snapshot_name = self._get_volume_name_by_wwn_if_exist(snapshot_id)
+        if not snapshot_name:
             raise controller_errors.SnapshotNotFoundError(snapshot_id)
+        target_cli_volume = self._get_cli_volume_if_exists(snapshot_name)
+        if not target_cli_volume or not target_cli_volume.FC_id:
+            raise controller_errors.SnapshotNotFoundError(snapshot_name)
         self._delete_target_volume_if_exist(target_cli_volume)
         logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
 

@@ -220,8 +220,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def _prepare_lsvdisk_to_return_mapless_target_volume(self):
         mapless_target_cli_vol = self._get_mapless_target_cli_vol()
-        mapless_target_cli_vol_mock = Mock(as_single_element=mapless_target_cli_vol)
+        mapless_target_cli_vol_mock = self._mock_cli_object(mapless_target_cli_vol)
         self.svc.client.svcinfo.lsvdisk.return_value = mapless_target_cli_vol_mock
+
+    def _prepare_lsvdisk_to_return_none(self):
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(None)
 
     def _prepare_mocks_for_get_snapshot(self):
         target_cli_vol = self._get_mapped_target_cli_vol()
@@ -314,9 +317,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(snapshot.array_type, 'SVC')
         self.assertEqual(snapshot.id, 'snap_id')
 
-    @patch("controller.array_action.array_mediator_svc.is_warning_message")
-    def test_delete_snapshot_no_volume_raise_snapshot_not_found(self, mock_warning):
-        self._prepare_lsvdisk_to_raise_not_found_error(mock_warning)
+    def test_delete_snapshot_no_volume_raise_snapshot_not_found(self):
+        self._prepare_lsvdisk_to_return_none()
 
         with self.assertRaises(array_errors.SnapshotNotFoundError):
             self.svc.delete_snapshot("test_snap")
