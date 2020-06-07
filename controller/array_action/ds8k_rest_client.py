@@ -214,7 +214,7 @@ class RESTClient(object):
         return self._client.delete_cs_flashcopy(flashcopy_id)
 
     def get_flashcopies(self, fcid=None):
-        return Munch.fromDict(self._client.get_cs_flashcopies(fcid))
+        return self._client.get_cs_flashcopies(fcid)
 
     def _get_attach_or_create_host_port(self, host_name, wwpn):
         try:

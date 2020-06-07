@@ -435,7 +435,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         target_vol = self._get_volume_with_flashcopy_relationship()
         self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
         self.client_mock.get_volumes_by_pool.return_value = [target_vol]
-        self.client_mock.get_flashcopies.return_value = Munch.fromDict(self.flashcopy_response)
+        self.client_mock.get_flashcopies.return_value = self.flashcopy_response
 
         volume = self.array.get_snapshot("test_name")
         self.assertEqual(volume.snapshot_name, target_vol.name)
