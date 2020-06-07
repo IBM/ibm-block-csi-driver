@@ -97,7 +97,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     @classproperty
     def max_connections(self):
         # max for rest api is 128.
-        return 5
+        return 50
 
     @classproperty
     def max_snapshot_name_length(self):
