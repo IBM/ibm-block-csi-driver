@@ -4,6 +4,7 @@ from munch import Munch
 from packaging.version import parse
 from pyds8k import exceptions
 from pyds8k.resources.ds8k.v1.common import attr_names
+from retry import retry
 
 import controller.array_action.errors as array_errors
 from controller.array_action import config
@@ -445,7 +446,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise array_errors.SnapshotNameBelongsToVolumeError(target_api_volume.name,
                                                                 self.service_address)
         fcrel = self._get_flashcopy(target_api_volume.flashcopy[0].id)
-        source_volume_name = self.get_volume_name(fcrel.source_volume['id'])
+        source_volume_name = self.get_volume_name(fcrel.source_volume.id)
         return self._generate_snapshot_response(target_api_volume, source_volume_name)
 
     def _create_similar_volume(self, target_volume_name, source_volume_name):
@@ -472,10 +473,12 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                                                          options=["persistent"])
         except (exceptions.ClientError, exceptions.ClientException) as ex:
             if ERROR_CODE_ALREADY_FLASHCOPY in str(ex.message).upper():
-                raise array_errors.SnapshotAlreadyExists
+                raise array_errors.SnapshotAlreadyExists(target_volume.volume_name,
+                                                         self.service_address)
             elif ERROR_CODE_VOLUME_NOT_FOUND_OR_ALREADY_PART_OF_CS_RELATIONSHIP in str(
                     ex.message).upper():
-                raise array_errors.VolumeNotFoundError
+                raise array_errors.VolumeNotFoundError('{} or {}'.format(source_volume_id,
+                                                                         target_volume_id))
             else:
                 raise array_errors.FlashcopyCreationError('{}:{}'.format(source_volume_id,
                                                                          target_volume_id))
@@ -484,6 +487,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise array_errors.FlashcopyCreationError(api_flashcopy.id)
         return self._get_api_volume_by_id(target_volume_id)
 
+    @retry(Exception, tries=11, delay=1)
     def _delete_target_volume_if_exist(self, target_volume_name):
         target_api_volume = self._get_api_volume_by_name(target_volume_name)
         if target_api_volume:

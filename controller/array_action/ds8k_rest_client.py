@@ -1,7 +1,7 @@
 from pyds8k.client.ds8k.v1.client import Client
 from pyds8k.exceptions import NotFound
 from controller.common.csi_logger import get_stdout_logger
-
+from munch import Munch
 logger = get_stdout_logger()
 
 
@@ -214,7 +214,7 @@ class RESTClient(object):
         return self._client.delete_cs_flashcopy(flashcopy_id)
 
     def get_flashcopies(self, fcid=None):
-        return self._client.get_cs_flashcopies(fcid)
+        return Munch.fromDict(self._client.get_cs_flashcopies(fcid))
 
     def _get_attach_or_create_host_port(self, host_name, wwpn):
         try:
