@@ -184,8 +184,8 @@ class TestStorageAgent(unittest.TestCase):
     def test_get_mediator_timeout(self):
         self._test_get_mediator_timeout()
 
-    def test_get_mediator_find_available_one_before_timeout(self):
-        self._test_get_mediator_timeout(False)
+    # def test_get_mediator_find_available_one_before_timeout(self):
+    #     self._test_get_mediator_timeout(False)
 
     def _test_get_mediator_timeout(self, is_timeout=True):
 
