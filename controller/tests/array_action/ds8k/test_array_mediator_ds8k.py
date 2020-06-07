@@ -461,7 +461,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.get_volume.return_value = volume
         self.client_mock.create_flashcopy.side_effect = ClientException("500")
 
-        with self.assertRaises(array_errors.FlashcopyCreationError):
+        with self.assertRaises(Exception):
             self.array.create_snapshot("target_vol", "test_name")
 
     def test_create_snapshot_create_vol_not_found(self):
