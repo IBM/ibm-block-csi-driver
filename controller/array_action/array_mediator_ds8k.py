@@ -447,7 +447,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise array_errors.SnapshotNameBelongsToVolumeError(target_api_volume.name,
                                                                 self.service_address)
         fcrel = self._get_flashcopy(target_api_volume.flashcopy[0].id)
-        source_volume_name = self.get_volume_name(fcrel.source_volume['id'])
+        source_volume_name = self.get_volume_name(fcrel.source_volume.id)
         return self._generate_snapshot_response(target_api_volume, source_volume_name)
 
     def _create_similar_volume(self, target_volume_name, source_volume_name):
@@ -455,7 +455,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             "creating target api volume '{0}' from source volume '{1}'".format(target_volume_name,
                                                                                source_volume_name))
         source_api_volume = self._get_api_volume_by_name(source_volume_name)
-        if not source_volume_name:
+        if not source_api_volume:
             raise array_errors.VolumeNotFoundError(source_volume_name)
         capabilities = {config.CAPABILITIES_SPACEEFFICIENCY: None}
         size_in_bytes = int(source_api_volume.cap)
@@ -474,10 +474,12 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                                                          options=["persistent"])
         except (exceptions.ClientError, exceptions.ClientException) as ex:
             if ERROR_CODE_ALREADY_FLASHCOPY in str(ex.message).upper():
-                raise array_errors.SnapshotAlreadyExists
+                raise array_errors.SnapshotAlreadyExists(target_volume.volume_name,
+                                                         self.service_address)
             elif ERROR_CODE_VOLUME_NOT_FOUND_OR_ALREADY_PART_OF_CS_RELATIONSHIP in str(
                     ex.message).upper():
-                raise array_errors.VolumeNotFoundError
+                raise array_errors.VolumeNotFoundError('{} or {}'.format(source_volume_id,
+                                                                         target_volume_id))
             else:
                 raise array_errors.FlashcopyCreationError('{}:{}'.format(source_volume_id,
                                                                          target_volume_id))

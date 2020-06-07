@@ -435,9 +435,10 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         target_vol = self._get_mapped_target_vol()
         self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
         self.client_mock.get_volumes_by_pool.return_value = [target_vol]
-        self.client_mock.get_flashcopies.return_value = self.flashcopy_response
+        self.client_mock.get_flashcopies.return_value = Munch.fromDict(self.flashcopy_response)
 
-        self.array.get_snapshot("test_name")
+        volume = self.array.get_snapshot("test_name")
+        self.assertEqual(volume.snapshot_name, target_vol.name)
 
     def _prepare_mocks_for_create_snapshot(self):
         self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
@@ -461,6 +462,25 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.create_flashcopy.side_effect = ClientException("500")
 
         with self.assertRaises(array_errors.FlashcopyCreationError):
+            self.array.create_snapshot("target_vol", "test_name")
+
+    def test_create_snapshot_create_vol_not_found(self):
+        volume = self._prepare_mocks_for_create_snapshot()
+        self.client_mock.create_volume.return_value = volume
+        self.client_mock.get_volume.return_value = volume
+        self.client_mock.create_flashcopy.side_effect = ClientException("500", message="00000013")
+
+        with self.assertRaises(array_errors.VolumeNotFoundError):
+            self.array.create_snapshot("target_vol", "test_name")
+
+    def test_create_snapshot_create_already_exist(self):
+        volume = self._prepare_mocks_for_create_snapshot()
+        self.client_mock.create_volume.return_value = volume
+        self.client_mock.get_volume.return_value = volume
+        self.client_mock.create_flashcopy.side_effect = ClientException("500",
+                                                                        message="000000AE")
+
+        with self.assertRaises(array_errors.SnapshotAlreadyExists):
             self.array.create_snapshot("target_vol", "test_name")
 
     def test_create_snapshot_success(self):
