@@ -501,7 +501,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         flashcopy_response = copy.deepcopy(self.flashcopy_response)
         flashcopy_response.state = "invalid"
         self.client_mock.create_flashcopy.return_value = flashcopy_response
-        with self.assertRaises(array_errors.FlashcopyCreationError):
+        with self.assertRaises(ValueError):
             self.array.create_snapshot("target_vol", "test_name")
 
     def test_delete_snapshot(self):
@@ -525,7 +525,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.delete_flashcopy.side_effect = ClientException("500")
         mapped_volume = self._get_volume_with_flashcopy_relationship()
         self.client_mock.get_volume.return_value = mapped_volume
-        with self.assertRaises(array_errors.FlashcopyDeletionError):
+        with self.assertRaises(ClientException):
             self.array.delete_snapshot("fake_name")
 
     def test_delete_snapshot_failed_with_ClientException(self):

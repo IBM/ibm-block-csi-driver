@@ -483,8 +483,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 raise ex
         if not self.validate_flashcopy(api_flashcopy.id):
             self._delete_flashcopy(api_flashcopy.id)
-            raise array_errors.FlashcopyCreationError(api_flashcopy.id)
             logger.info("Flashcopy is not in a valid state")
+            raise ValueError
         return self._get_api_volume_by_id(target_volume_id)
 
     @retry(Exception, tries=11, delay=1)
@@ -526,7 +526,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                     ex.details
                 )
             )
-            raise array_errors.FlashcopyDeletionError(flascopy_id)
+            raise ex
 
     def delete_snapshot(self, snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
