@@ -481,11 +481,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 raise array_errors.VolumeNotFoundError('{} or {}'.format(source_volume_id,
                                                                          target_volume_id))
             else:
-                raise array_errors.FlashcopyCreationError('{}:{}'.format(source_volume_id,
-                                                                         target_volume_id))
+                raise ex
         if not self.validate_flashcopy(api_flashcopy.id):
             # #TODO Delete flashcopy CSI-1340
-            raise array_errors.FlashcopyCreationError(api_flashcopy.id)
+            logger.info("Flashcopy is not in a valid state")
         return self._get_api_volume_by_id(target_volume_id)
 
     @retry(Exception, tries=11, delay=1)

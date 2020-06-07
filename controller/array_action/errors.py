@@ -205,9 +205,3 @@ class InvalidCliResponseError(BaseArrayActionException):
 
     def __init__(self, details):
         self.message = messages.InvalidCliResponseError_message.format(details)
-
-
-class FlashcopyCreationError(BaseArrayActionException):
-
-    def __init__(self, name):
-        self.message = messages.FlashcopyCreationError_message.format(name)
