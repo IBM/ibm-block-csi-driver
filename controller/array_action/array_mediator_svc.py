@@ -261,7 +261,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             filtervalue=filter_value).as_single_element
         if not vol_by_wwn:
             return None
-        
+
         vol_name = vol_by_wwn.name
         logger.debug("found volume name : {0}".format(vol_name))
         return vol_name
