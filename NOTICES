@@ -5,7 +5,7 @@ This file details additional third party software license agreements
 and third party notices and information that are required 
 to be reproduced for the following programs:
    
-IBM Block Storage CSI Driver version 1.1.0
+IBM Block Storage CSI Driver version 1.2.0
 
 
 
@@ -170,7 +170,7 @@ Version 7
 
 ===========================================================================
 END OF TERMS AND CONDITIONS FOR SEPARATELY LICENSED CODE for IBM Block 
-Storage CSI Driver version 1.1.0
+Storage CSI Driver version 1.2.0
 ===========================================================================
 
 
@@ -1171,6 +1171,6 @@ END OF yaml version 2.2.2 NOTICES AND INFORMATION
 
 ===========================================================================
 END OF NOTICES AND INFORMATION FOR IBM Block Storage CSI
-Driver Version 1.1.0 Third Party Licenses and Notices 
+Driver Version 1.2.0 Third Party Licenses and Notices
 ===========================================================================
 
