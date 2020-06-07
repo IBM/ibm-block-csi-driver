@@ -417,13 +417,13 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.SnapshotNameBelongsToVolumeError):
             self.array.get_snapshot("test_name")
 
-    def _get_mapped_target_vol(self):
+    def _get_volume_with_flashcopy_relationship(self):
         volume = self.volume_response
         volume.flashcopy = [self.flashcopy_response]
         return volume
 
     def test_get_snapshot_get_fcmap_not_exist_raise_error(self):
-        target_vol = self._get_mapped_target_vol()
+        target_vol = self._get_volume_with_flashcopy_relationship()
         self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
         self.client_mock.get_volumes_by_pool.return_value = [target_vol]
         self.client_mock.get_flashcopies.side_effect = NotFound("404", message="BE7A0001")
@@ -432,7 +432,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             self.array.get_snapshot("test_name")
 
     def test_get_snapshot_success(self):
-        target_vol = self._get_mapped_target_vol()
+        target_vol = self._get_volume_with_flashcopy_relationship()
         self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
         self.client_mock.get_volumes_by_pool.return_value = [target_vol]
         self.client_mock.get_flashcopies.return_value = Munch.fromDict(self.flashcopy_response)
