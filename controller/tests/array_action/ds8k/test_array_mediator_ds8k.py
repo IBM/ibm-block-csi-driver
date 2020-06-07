@@ -534,6 +534,6 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             self.array.delete_snapshot("fake_name")
 
     def test_delete_snapshot_failed_with_NotFound(self):
-        self.client_mock.delete_volume.side_effect = NotFound("404")
-        with self.assertRaises(array_errors.VolumeNotFoundError):
+        self.client_mock.get_volume.side_effect = NotFound("404")
+        with self.assertRaises(array_errors.SnapshotNotFoundError):
             self.array.delete_snapshot("fake_name")

@@ -416,11 +416,12 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         api_volume = self._get_api_volume_by_name(volume_name)
         return self._generate_volume_response(api_volume)
 
-    def _get_api_volume_by_id(self, volume_id):
+    def _get_api_volume_by_id(self, volume_id, not_exist_err=True):
         try:
             return self.client.get_volume(volume_id)
         except exceptions.NotFound:
-            raise array_errors.VolumeNotFoundError(volume_id)
+            if not_exist_err:
+                raise array_errors.VolumeNotFoundError(volume_id)
 
     def _get_flashcopy(self, fc_id, not_exist_err=True):
         logger.info("Getting flashcopy {}".format(fc_id))
@@ -531,7 +532,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def delete_snapshot(self, snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
         volume_id = get_volume_id_from_scsi_identifier(snapshot_id)
-        api_volume = self._get_api_volume_by_id(volume_id)
+        api_volume = self._get_api_volume_by_id(volume_id, not_exist_err=False)
+        if not api_volume:
+            raise array_errors.SnapshotNotFoundError(snapshot_id)
         if not api_volume.flashcopy:
             logger.error(
                 "FlashCopy Mapping not found for target volume: {}".format(api_volume.name))
