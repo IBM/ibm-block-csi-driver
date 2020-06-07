@@ -410,7 +410,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
         self.assertIsNone(snapshot)
 
-    def test_get_snapshot_has_no_fcmap_raise_error(self):
+    def test_get_snapshot_has_no_fcrel_raise_error(self):
         self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
         self.client_mock.get_volumes_by_pool.return_value = [self.volume_response]
 
@@ -422,7 +422,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         volume.flashcopy = [self.flashcopy_response]
         return volume
 
-    def test_get_snapshot_get_fcmap_not_exist_raise_error(self):
+    def test_get_snapshot_get_fcrel_not_exist_raise_error(self):
         target_vol = self._get_volume_with_flashcopy_relationship()
         self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
         self.client_mock.get_volumes_by_pool.return_value = [target_vol]
@@ -455,7 +455,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.VolumeCreationError):
             self.array.create_snapshot("snap_name", "test_name")
 
-    def test_create_snapshot_create_fcmap_error(self):
+    def test_create_snapshot_create_fcrel_error(self):
         volume = self._prepare_mocks_for_create_snapshot()
         self.client_mock.create_volume.return_value = volume
         self.client_mock.get_volume.return_value = volume
