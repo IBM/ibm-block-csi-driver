@@ -96,7 +96,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                     except controller_errors.VolumeNotFoundError:
                         logger.debug(
-                            "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
+                            "volume was not found. creating a new volume with parameters: {0}".format(
+                                request.parameters))
 
                         array_mediator.validate_supported_capabilities(capabilities)
                         vol = array_mediator.create_volume(volume_full_name, size, capabilities, pool, volume_prefix)
@@ -116,6 +117,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 except Exception as ex:
                     logger.error("++++++++++++++ an internal exception occurred")
                     logger.exception(ex)
+                    raise ex
         except (controller_errors.IllegalObjectName, controller_errors.StorageClassCapabilityNotSupported,
                 controller_errors.PoolDoesNotExist, controller_errors.PoolDoesNotMatchCapabilities) as ex:
             context.set_details(ex.message)
