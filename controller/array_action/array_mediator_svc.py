@@ -388,17 +388,31 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._start_fcmap(target_cli_volume.FC_id)
         return target_cli_volume
 
-    def _delete_unstarted_fcmap(self, fcmap_id):
+    def _delete_fcmap(self, fcmap_id, force=False):
         logger.info("deleting fcmap with id : {0}".format(fcmap_id))
         try:
-            self.client.svctask.rmfcmap(object_id=fcmap_id)
+            self.client.svctask.rmfcmap(object_id=fcmap_id, force=force)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 logger.warning("Failed to delete fcmap '{0}': {1}".format(fcmap_id, ex))
 
+    def _stop_fcmap(self, fcmap_id):
+        logger.info("stopping fcmap with id : {0}".format(fcmap_id))
+        try:
+            self.client.svctask.stopfcmap(object_id=fcmap_id)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if not is_warning_message(ex.my_message):
+                logger.warning("Failed to stop fcmap '{0}': {1}".format(fcmap_id, ex))
+
+    def _delete_snapshot(self, target_cli_volume):
+        fcmap_id = target_cli_volume.FC_id
+        self._stop_fcmap(fcmap_id)
+        self._delete_fcmap(fcmap_id, force=True)
+        self._delete_volume_by_name(target_cli_volume.name)
+
     def _delete_target_volume_if_exist(self, target_cli_volume):
         if target_cli_volume and target_cli_volume.FC_id:
-            self._delete_unstarted_fcmap(target_cli_volume.FC_id)
+            self._delete_fcmap(target_cli_volume.FC_id)
         if target_cli_volume:
             self._delete_volume_by_name(target_cli_volume.name, not_exist_err=False)
 
@@ -427,7 +441,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         target_cli_volume = self._get_cli_volume_if_exists(snapshot_name)
         if not target_cli_volume or not target_cli_volume.FC_id:
             raise controller_errors.SnapshotNotFoundError(snapshot_name)
-        self._delete_target_volume_if_exist(target_cli_volume)
+        self._delete_snapshot(target_cli_volume)
         logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
 
     def get_host_by_host_identifiers(self, initiators):

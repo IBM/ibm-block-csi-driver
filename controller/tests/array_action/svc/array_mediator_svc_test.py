@@ -341,7 +341,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.delete_snapshot("test_snap")
 
-        self.svc.client.svctask.rmfcmap.assert_called_once_with(object_id="test_fc_id")
+        self.svc.client.svctask.rmfcmap.assert_called_once_with(object_id="test_fc_id", force=True)
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_delete_snapshot_rmvolume_error(self, mock_warning):
