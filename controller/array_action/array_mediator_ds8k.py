@@ -537,7 +537,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise array_errors.SnapshotNotFoundError(snapshot_id)
         if not api_volume.flashcopy:
             logger.error(
-                "FlashCopy Mapping not found for target volume: {}".format(api_volume.name))
+                "FlashCopy relationship not found for target volume: {}".format(api_volume.name))
             raise array_errors.SnapshotNameBelongsToVolumeError(api_volume.name,
                                                                 self.service_address)
         flashcopy_id = api_volume.flashcopy[0].id
