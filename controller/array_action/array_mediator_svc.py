@@ -255,15 +255,21 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return size_in_bytes - ret + 512
         return size_in_bytes
 
-    def _get_vol_by_wwn(self, volume_id):
+    def _get_volume_name_by_wwn_if_exist(self, volume_id):
         filter_value = 'vdisk_UID=' + volume_id
         vol_by_wwn = self.client.svcinfo.lsvdisk(
             filtervalue=filter_value).as_single_element
         if not vol_by_wwn:
-            raise controller_errors.VolumeNotFoundError(volume_id)
+            return None
 
         vol_name = vol_by_wwn.name
         logger.debug("found volume name : {0}".format(vol_name))
+        return vol_name
+
+    def _get_vol_by_wwn(self, volume_id):
+        vol_name = self._get_volume_name_by_wwn_if_exist(volume_id)
+        if not vol_name:
+            raise controller_errors.VolumeNotFoundError(volume_id)
         return vol_name
 
     def _create_cli_volume(self, name, size_in_bytes, capabilities, pool):
@@ -382,21 +388,38 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._start_fcmap(target_cli_volume.FC_id)
         return target_cli_volume
 
-    def _delete_unstarted_fcmap(self, fcmap_id):
+    def _delete_fcmap(self, fcmap_id, force=False):
         logger.info("deleting fcmap with id : {0}".format(fcmap_id))
         try:
-            self.client.svctask.rmfcmap(object_id=fcmap_id)
+            self.client.svctask.rmfcmap(object_id=fcmap_id, force=force)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 logger.warning("Failed to delete fcmap '{0}': {1}".format(fcmap_id, ex))
 
-    @retry(svc_errors.StorageArrayClientException, tries=5, delay=1)
-    def _delete_target_volume_if_exist(self, target_volume_name):
-        target_cli_volume = self._get_cli_volume_if_exists(target_volume_name)
+    def _stop_fcmap(self, fcmap_id):
+        logger.info("stopping fcmap with id : {0}".format(fcmap_id))
+        try:
+            self.client.svctask.stopfcmap(object_id=fcmap_id)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if not is_warning_message(ex.my_message):
+                logger.warning("Failed to stop fcmap '{0}': {1}".format(fcmap_id, ex))
+
+    def _delete_snapshot(self, target_cli_volume):
+        fcmap_id = target_cli_volume.FC_id
+        self._stop_fcmap(fcmap_id)
+        self._delete_fcmap(fcmap_id, force=True)
+        self._delete_volume_by_name(target_cli_volume.name)
+
+    def _delete_target_volume_if_exist(self, target_cli_volume):
         if target_cli_volume and target_cli_volume.FC_id:
-            self._delete_unstarted_fcmap(target_cli_volume.FC_id)
+            self._delete_fcmap(target_cli_volume.FC_id)
         if target_cli_volume:
-            self._delete_volume_by_name(target_volume_name, not_exist_err=False)
+            self._delete_volume_by_name(target_cli_volume.name, not_exist_err=False)
+
+    @retry(svc_errors.StorageArrayClientException, tries=5, delay=1)
+    def _delete_target_volume_by_name_if_exist(self, target_volume_name):
+        target_cli_volume = self._get_cli_volume_if_exists(target_volume_name)
+        self._delete_target_volume_if_exist(target_cli_volume)
 
     def create_snapshot(self, name, volume_name):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
@@ -405,14 +428,21 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             target_cli_volume = self._create_and_start_fcmap(volume_name, name)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.error("Failed to create snapshot '{0}': {1}".format(name, ex))
-            self._delete_target_volume_if_exist(name)
+            self._delete_target_volume_by_name_if_exist(name)
             raise ex
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
         return self._generate_snapshot_response(target_cli_volume, volume_name)
 
     def delete_snapshot(self, snapshot_id):
-        # TODO: will need to implement
-        raise NotImplementedError
+        logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
+        snapshot_name = self._get_volume_name_by_wwn_if_exist(snapshot_id)
+        if not snapshot_name:
+            raise controller_errors.SnapshotNotFoundError(snapshot_id)
+        target_cli_volume = self._get_cli_volume_if_exists(snapshot_name)
+        if not target_cli_volume or not target_cli_volume.FC_id:
+            raise controller_errors.SnapshotNotFoundError(snapshot_name)
+        self._delete_snapshot(target_cli_volume)
+        logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
 
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host name for initiators : {0}".format(initiators))
