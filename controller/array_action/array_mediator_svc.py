@@ -140,7 +140,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.StorageManagementIPsNotSupportError(
                 endpoint)
         self.endpoint = endpoint[0]
-
+        self._identifier = None
+        
         logger.debug("in init")
         self._connect()
 
