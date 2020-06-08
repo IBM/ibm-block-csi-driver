@@ -12,7 +12,6 @@ import controller.controller_server.config as config
 import controller.controller_server.utils as utils
 from controller.array_action import messages
 from controller.array_action.storage_agent import get_agent, detect_array_type
-from controller.array_action.array_connection_manager import ArrayConnectionManager
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.csi_logger import set_log_level
@@ -470,7 +469,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.warning("volume id is invalid. error : {}".format(ex))
                 return csi_pb2.DeleteVolumeResponse()
 
-            with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
+            array_type = detect_array_type(array_addresses)
+            with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
                 try:
                     array_mediator.delete_snapshot(snapshot_id)
