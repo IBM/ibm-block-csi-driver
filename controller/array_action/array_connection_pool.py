@@ -87,7 +87,10 @@ class ConnectionPool(object):
                 self.current_size += 1
             logger.debug(
                 "+++++++++++++++++ get connection - new created. After lock Size: {0}".format(self.current_size))
-            created = self.create()
+            try:
+                created = self.create()
+            except Exception:
+                self.current_size -= 1
             logger.debug("+++++++++++++++++ get connection - new created. Size: {0}".format(self.current_size))
             return created
 
