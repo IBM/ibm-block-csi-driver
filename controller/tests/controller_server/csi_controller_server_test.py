@@ -291,7 +291,7 @@ class TestControllerServerDeleteSnapshot(unittest.TestCase):
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_delete_snapshot_with_array_connection_exception(self, storage_agent, connection_type):
+    def test_delete_snapshot_with_array_connection_exception(self, storage_agent, array_type):
         storage_agent.side_effect = [Exception("a_enter error")]
         context = utils.FakeContext()
         array_type.return_value = "a9k"
