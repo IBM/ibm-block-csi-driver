@@ -249,6 +249,8 @@ class TestControllerServerDeleteSnapshot(unittest.TestCase):
         self.mediator.client = Mock()
         self.mediator.get_snapshot = Mock()
         self.mediator.get_snapshot.return_value = None
+        self.storage_agent = MagicMock()
+        self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
         self.servicer = ControllerServicer(self.fqdn)
         self.request = Mock()
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
@@ -256,19 +258,18 @@ class TestControllerServerDeleteSnapshot(unittest.TestCase):
         self.request.snapshot_id = "A9000:BADC0FFEE0DDF00D00000000DEADBABE"
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.delete_snapshot", Mock())
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_delete_snapshot_succeeds(self, a_enter):
-        a_enter.return_value = self.mediator
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_delete_snapshot_succeeds(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
 
         self.servicer.DeleteSnapshot(self.request, context)
 
         self.assertEqual(context.code, grpc.StatusCode.OK)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__", Mock())
-    def test_delete_snapshot_with_wrong_secrets(self, a_enter):
-        a_enter.return_value = self.mediator
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_delete_snapshot_with_wrong_secrets(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
 
         self.request.secrets = {"password": "pass", "management_address": "mg"}
@@ -286,10 +287,9 @@ class TestControllerServerDeleteSnapshot(unittest.TestCase):
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "mgmt address is missing in secrets")
         self.assertTrue("secret" in context.details)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__", Mock())
-    def test_delete_snapshot_with_array_connection_exception(self, a_enter):
-        a_enter.side_effect = [Exception("a_enter error")]
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_delete_snapshot_with_array_connection_exception(self, storage_agent):
+        storage_agent.side_effect = [Exception("a_enter error")]
         context = utils.FakeContext()
 
         self.servicer.DeleteSnapshot(self.request, context)
@@ -297,10 +297,9 @@ class TestControllerServerDeleteSnapshot(unittest.TestCase):
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL, "array connection internal error")
         self.assertTrue("a_enter error" in context.details)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__", Mock())
-    def test_delete_snapshot_invalid_snapshot_id(self, a_enter):
-        a_enter.return_value = self.mediator
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_delete_snapshot_invalid_snapshot_id(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
         self.request.snapshot_id = "wrong_id"
         self.servicer.DeleteSnapshot(self.request, context)
@@ -754,9 +753,9 @@ class TestControllerServerDeleteVolume(unittest.TestCase):
     def test_delete_volume_with_delete_volume_other_exception(self):
         self.delete_volume_returns_error(error=Exception("error"), return_code=grpc.StatusCode.INTERNAL)
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_delete_volume_has_snapshots(self, a_enter):
-        a_enter.return_value = self.mediator
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_delete_volume_has_snapshots(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
         self.mediator.is_volume_has_snapshots.return_value = True
         self.servicer.DeleteVolume(self.request, context)
