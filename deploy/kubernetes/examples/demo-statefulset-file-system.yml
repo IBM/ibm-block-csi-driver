@@ -31,5 +31,5 @@ spec:
           claimName: demo-pvc-file-system
 
 #      nodeSelector:
-#        kubernetes.io/hostname: NODESELECTOR
+#        kubernetes.io/hostname: HOSTNAME
       

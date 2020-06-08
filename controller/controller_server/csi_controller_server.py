@@ -5,6 +5,7 @@ from optparse import OptionParser
 import grpc
 import yaml
 from concurrent import futures
+from retry import retry
 
 import controller.array_action.errors as controller_errors
 import controller.controller_server.config as config
@@ -17,6 +18,7 @@ from controller.common.csi_logger import get_stdout_logger
 from controller.common.csi_logger import set_log_level
 from controller.common.node_info import NodeIdInfo
 from controller.common.utils import set_current_thread_name
+from controller.controller_server.errors import ObjectIdError
 from controller.controller_server.errors import ValidationException
 from controller.csi_general import csi_pb2
 from controller.csi_general import csi_pb2_grpc
@@ -57,6 +59,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         volume_name = request.name
         logger.debug("volume name : {}".format(volume_name))
 
+        src_snapshot_id = self._get_src_snapshot_id(request)
+        logger.debug("Source snapshot id : {}".format(src_snapshot_id))
+
         secrets = request.secrets
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
 
@@ -71,53 +76,53 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             # TODO : pass multiple array addresses
             array_type = detect_array_type(array_addresses)
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
+                logger.debug(array_mediator)
+                # TODO: CSI-1358 - remove try/except
                 try:
-                    logger.debug(array_mediator)
-                    # TODO: CSI-1358 - remove try/except
-                    try:
-                        volume_full_name, volume_prefix = self._get_volume_name_and_prefix(request, array_mediator)
-                    except controller_errors.IllegalObjectName as ex:
-                        context.set_details(ex.message)
-                        context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                        return csi_pb2.CreateSnapshotResponse()
+                    volume_full_name, volume_prefix = self._get_volume_name_and_prefix(request, array_mediator)
+                except controller_errors.IllegalObjectName as ex:
+                    context.set_details(ex.message)
+                    context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                    return csi_pb2.CreateSnapshotResponse()
 
-                    size = request.capacity_range.required_bytes
+                size = request.capacity_range.required_bytes
 
-                    if size == 0:
-                        size = array_mediator.minimal_volume_size_in_bytes
-                        logger.debug("requested size is 0 so the default size will be used : {0} ".format(
-                            size))
-                    try:
-                        vol = array_mediator.get_volume(
-                            volume_full_name,
-                            volume_context=request.parameters,
-                            volume_prefix=volume_prefix,
-                        )
+                if size == 0:
+                    size = array_mediator.minimal_volume_size_in_bytes
+                    logger.debug("requested size is 0 so the default size will be used : {0} ".format(
+                        size))
+                try:
+                    vol = array_mediator.get_volume(
+                        volume_full_name,
+                        volume_context=request.parameters,
+                        volume_prefix=volume_prefix,
+                    )
+                except controller_errors.VolumeNotFoundError:
+                    logger.debug(
+                        "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
-                    except controller_errors.VolumeNotFoundError:
-                        logger.debug(
-                            "volume was not found. creating a new volume with parameters: {0}".format(
-                                request.parameters))
+                    array_mediator.validate_supported_capabilities(capabilities)
+                    vol = array_mediator.create_volume(volume_full_name, size, capabilities, pool, volume_prefix)
+                else:
+                    logger.debug("volume found : {}".format(vol))
 
-                        array_mediator.validate_supported_capabilities(capabilities)
-                        vol = array_mediator.create_volume(volume_full_name, size, capabilities, pool, volume_prefix)
+                    if not src_snapshot_id and vol.capacity_bytes != request.capacity_range.required_bytes:
+                        context.set_details("Volume was already created with different size.")
+                        context.set_code(grpc.StatusCode.ALREADY_EXISTS)
+                        return csi_pb2.CreateVolumeResponse()
 
-                    else:
-                        logger.debug("volume found : {}".format(vol))
+                    copy_source_res = self._handle_existing_vol_src_snap(vol, src_snapshot_id, context)
+                    if copy_source_res:
+                        return copy_source_res
 
-                        if not (vol.capacity_bytes == request.capacity_range.required_bytes):
-                            context.set_details("Volume was already created with different size.")
-                            context.set_code(grpc.StatusCode.ALREADY_EXISTS)
-                            return csi_pb2.CreateVolumeResponse()
+                if src_snapshot_id:
+                    self._copy_to_existing_volume_from_snapshot(vol, src_snapshot_id, size, array_mediator)
+                    vol.copy_src_object_id = src_snapshot_id
+                logger.debug("generating create volume response")
+                res = utils.generate_csi_create_volume_response(vol)
+                logger.info("finished create volume")
+                return res
 
-                    logger.debug("generating create volume response")
-                    res = utils.generate_csi_create_volume_response(vol)
-                    logger.info("finished create volume")
-                    return res
-                except Exception as ex:
-                    logger.error("++++++++++++++ an internal exception occurred")
-                    logger.exception(ex)
-                    raise ex
         except (controller_errors.IllegalObjectName, controller_errors.StorageClassCapabilityNotSupported,
                 controller_errors.PoolDoesNotExist, controller_errors.PoolDoesNotMatchCapabilities) as ex:
             context.set_details(ex.message)
@@ -138,6 +143,70 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateVolumeResponse()
 
+    def _copy_to_existing_volume_from_snapshot(self, vol, src_snapshot_id, min_vol_size, array_mediator):
+        vol_name = vol.volume_name
+        try:
+            src_snapshot = array_mediator.get_snapshot_by_id(src_snapshot_id)
+            if not src_snapshot:
+                raise controller_errors.SnapshotNotFoundError(src_snapshot_id)
+            src_snapshot_name = src_snapshot.snapshot_name
+            src_snapshot_capacity = src_snapshot.capacity_bytes
+            logger.debug("Copy snapshot {0} data to volume {1}.".format(src_snapshot_id, vol_name))
+            array_mediator.copy_to_existing_volume_from_snapshot(vol_name, src_snapshot_name, src_snapshot_capacity,
+                                                                 min_vol_size)
+            logger.debug("Copy volume from snapshot finished")
+        except controller_errors.VolumeNotFoundError as ex:
+            logger.error("Volume not found while copying snapshot data to volume")
+            logger.exception(ex)
+            raise ex
+        except Exception as ex:
+            logger.error("Exception raised while copying snapshot data to volume")
+            self._rollback_create_volume_from_snapshot(array_mediator, vol.id)
+            raise ex
+        return vol
+
+    @retry(Exception, tries=5, delay=1)
+    def _rollback_create_volume_from_snapshot(self, array_mediator, vol_id):
+        logger.debug("Rollback copy volume from snapshot. Deleting volume {0}".format(vol_id))
+        array_mediator.delete_volume(vol_id)
+
+    def _handle_existing_vol_src_snap(self, volume, src_snapshot_id, context):
+        """
+        Args:
+            volume             : volume fetched or created in CreateVolume
+            src_snapshot_id    : id of snapshot we should copy to vol or None if volume should not be copied
+            context            : CreateVolume response context
+        Returns:
+            If volume exists and is a copy of specified snapshot - set context status to OK
+            and return CreateVolumeResponse.
+            If volume is a copy of another source - set context status to INTERNAL and return CreateVolumeResponse.
+            In any other case return None.
+        """
+        vol_name = volume.volume_name
+        vol_copy_src_object_id = volume.copy_src_object_id
+        if not src_snapshot_id or not vol_copy_src_object_id:
+            return None
+        if vol_copy_src_object_id == src_snapshot_id:
+            logger.debug(
+                "Volume {0} exists and it is a copy of snapshot {1}.".format(vol_name, src_snapshot_id))
+            context.set_code(grpc.StatusCode.OK)
+            return csi_pb2.CreateVolumeResponse()
+        else:
+            logger.debug(
+                "Volume {0} exists but it is not a copy of snapshot {1}.".format(vol_name, src_snapshot_id))
+            context.set_details("Volume already exists but it was created from a different source.")
+            context.set_code(grpc.StatusCode.INTERNAL)
+            return csi_pb2.CreateVolumeResponse()
+
+    def _get_src_snapshot_id(self, request):
+        source = request.volume_content_source
+        res = None
+        if source and source.HasField(config.VOLUME_SOURCE_SNAPSHOT):
+            source_snapshot = source.snapshot
+            logger.info(source)
+            _, res = utils.get_snapshot_id_info(source_snapshot.snapshot_id)
+        return res
+
     def DeleteVolume(self, request, context):
         set_current_thread_name(request.volume_id)
         logger.info("DeleteVolume")
@@ -150,7 +219,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             try:
                 array_type, vol_id = utils.get_volume_id_info(request.volume_id)
-            except controller_errors.VolumeNotFoundError as ex:
+            except ObjectIdError as ex:
                 logger.warning("volume id is invalid. error : {}".format(ex))
                 return csi_pb2.DeleteVolumeResponse()
 
@@ -158,6 +227,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.debug(array_mediator)
 
                 try:
+                    if array_mediator.is_volume_has_snapshots(vol_id):
+                        logger.debug("volume {0} has snapshots".format(vol_id))
+                        context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+                        context.set_details("Volume cannot be deleted because it has snapshots")
+                        return csi_pb2.DeleteVolumeResponse()
+
+                    logger.debug("Deleting volume {0}".format(vol_id))
                     array_mediator.delete_volume(vol_id)
 
                 except controller_errors.VolumeNotFoundError as ex:
@@ -229,7 +305,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return csi_pb2.ControllerPublishVolumeResponse()
 
         except (controller_errors.HostNotFoundError, controller_errors.VolumeNotFoundError,
-                controller_errors.BadNodeIdError, controller_errors.NoIscsiTargetsFoundError) as ex:
+                controller_errors.BadNodeIdError, controller_errors.NoIscsiTargetsFoundError, ObjectIdError) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)
@@ -382,9 +458,50 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return csi_pb2.CreateSnapshotResponse()
 
     def DeleteSnapshot(self, request, context):
-        # TODO: CSI-752
+        set_current_thread_name(request.snapshot_id)
         logger.info("Delete snapshot")
-        return csi_pb2.DeleteSnapshotResponse()
+        secrets = request.secrets
+        try:
+            utils.validate_delete_snapshot_request(request)
+            user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
+            try:
+                array_type, snapshot_id = utils.get_snapshot_id_info(request.snapshot_id)
+            except ObjectIdError as ex:
+                logger.warning("volume id is invalid. error : {}".format(ex))
+                return csi_pb2.DeleteVolumeResponse()
+
+            with ArrayConnectionManager(user, password, array_addresses, array_type) as array_mediator:
+                logger.debug(array_mediator)
+                try:
+                    array_mediator.delete_snapshot(snapshot_id)
+
+                except controller_errors.SnapshotNotFoundError as ex:
+                    logger.debug("Snapshot was not found during deletion: {0}".format(ex))
+
+        except controller_errors.SnapshotNotFoundError:
+            logger.debug("snapshot was not found during deletion: {0}".format(ex))
+            context.set_code(grpc.StatusCode.OK)
+            return csi_pb2.DeleteSnapshotResponse()
+        except controller_errors.PermissionDeniedError as ex:
+            context.set_code(grpc.StatusCode.PERMISSION_DENIED)
+            context.set_details(ex)
+            return csi_pb2.DeleteSnapshotResponse()
+        except ValidationException as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            return csi_pb2.DeleteSnapshotResponse()
+        except Exception as ex:
+            logger.debug("an internal exception occurred")
+            logger.exception(ex)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details('an internal exception occurred : {}'.format(ex))
+            return csi_pb2.DeleteSnapshotResponse()
+
+        logger.debug("generating delete snapshot response")
+        res = csi_pb2.DeleteSnapshotResponse()
+        logger.info("finished DeleteSnapshot")
+        return res
 
     def GetCapacity(self, request, context):
         logger.info("GetCapacity")

@@ -184,6 +184,178 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.rmvolume = Mock()
         self.svc.delete_volume("vol")
 
+    @staticmethod
+    def _mock_cli_object(cli_object):
+        return Mock(as_single_element=cli_object)
+
+    @staticmethod
+    def _get_source_cli_vol():
+        return Munch({'vdisk_UID': 'vol_id',
+                      'name': 'source_vol',
+                      'capacity': '1024',
+                      'mdisk_grp_name': 'pool_name',
+                      'FC_id': '',
+                      'se_copy': 'yes',
+                      'deduplicated_copy': 'no',
+                      'compressed_copy': 'no'
+                      })
+
+    @classmethod
+    def _get_mapless_target_cli_vol(cls):
+        target_cli_vol = cls._get_source_cli_vol()
+        target_cli_vol.vdisk_UID = 'snap_id'
+        target_cli_vol.name = 'test_snap'
+        return target_cli_vol
+
+    @classmethod
+    def _get_mapped_target_cli_vol(cls):
+        target_cli_vol = cls._get_mapless_target_cli_vol()
+        target_cli_vol.FC_id = 'test_fc_id'
+        return target_cli_vol
+
+    def _prepare_lsvdisk_to_raise_not_found_error(self, mock_warning):
+        mock_warning.return_value = False
+        self.svc.client.svcinfo.lsvdisk.side_effect = [
+            CLIFailureError("CMMVC5753E")]
+
+    def _prepare_lsvdisk_to_return_mapless_target_volume(self):
+        mapless_target_cli_vol = self._get_mapless_target_cli_vol()
+        mapless_target_cli_vol_mock = self._mock_cli_object(mapless_target_cli_vol)
+        self.svc.client.svcinfo.lsvdisk.return_value = mapless_target_cli_vol_mock
+
+    def _prepare_lsvdisk_to_return_none(self):
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(None)
+
+    def _prepare_mocks_for_get_snapshot(self):
+        target_cli_vol = self._get_mapped_target_cli_vol()
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(target_cli_vol)
+        fcmap = Munch({'source_vdisk_name': 'source_vol'})
+        self.svc.client.svcinfo.lsfcmap.return_value = self._mock_cli_object(fcmap)
+
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def test_get_snapshot_not_exist_return_none(self, mock_warning):
+        self._prepare_lsvdisk_to_raise_not_found_error(mock_warning)
+
+        snapshot = self.svc.get_snapshot("test_snap")
+
+        self.assertIsNone(snapshot)
+
+    def test_get_snapshot_has_no_fc_id_raise_error(self):
+        self._prepare_lsvdisk_to_return_mapless_target_volume()
+
+        with self.assertRaises(array_errors.SnapshotNameBelongsToVolumeError):
+            self.svc.get_snapshot("test_snap")
+
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def test_get_snapshot_get_fcmap_not_exist_raise_error(self, mock_warning):
+        target_cli_vol = self._get_mapped_target_cli_vol()
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(target_cli_vol)
+        mock_warning.return_value = False
+        self.svc.client.svcinfo.lsfcmap.side_effect = [
+            CLIFailureError("CMMVC5753E")]
+
+        with self.assertRaises(CLIFailureError):
+            self.svc.get_snapshot("test_snap")
+
+    def test_get_snapshot_success(self):
+        self._prepare_mocks_for_get_snapshot()
+
+        self.svc.get_snapshot("test_snap")
+
+    def _prepare_mocks_for_create_snapshot(self):
+        self.svc.client.svctask.mkvolume.return_value = Mock()
+        self.svc.client.svctask.mkfcmap.return_value = Mock()
+
+        source_vol_to_copy_from = self._get_source_cli_vol()
+        target_vol_after_creation = self._get_mapless_target_cli_vol()
+        target_vol_after_mapping = self._get_mapped_target_cli_vol()
+        target_vol_for_rollback = self._get_mapped_target_cli_vol()
+        vols_to_return = [source_vol_to_copy_from, target_vol_after_creation,
+                          target_vol_after_mapping, target_vol_for_rollback]
+        return_values = map(self._mock_cli_object, vols_to_return)
+        self.svc.client.svcinfo.lsvdisk.side_effect = return_values
+
+        self.svc.client.svctask.startfcmap.return_value = Mock()
+
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def test_create_snapshot_create_volume_error(self, mock_warning):
+        source_cli_vol = self._get_source_cli_vol()
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(source_cli_vol)
+        mock_warning.return_value = False
+        self.svc.client.svctask.mkvolume.side_effect = [
+            CLIFailureError("Failed")]
+
+        with self.assertRaises(CLIFailureError):
+            self.svc.create_snapshot("test_snap", "source_vol")
+
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def test_create_snapshot_create_fcmap_error(self, mock_warning):
+        self._prepare_mocks_for_create_snapshot()
+        mock_warning.return_value = False
+        self.svc.client.svctask.mkfcmap.side_effect = [
+            CLIFailureError("Failed")]
+
+        with self.assertRaises(CLIFailureError):
+            self.svc.create_snapshot("test_snap", "source_vol")
+
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def test_create_snapshot_start_fcmap_error(self, mock_warning):
+        self._prepare_mocks_for_create_snapshot()
+        mock_warning.return_value = False
+        self.svc.client.svctask.startfcmap.side_effect = [
+            CLIFailureError("Failed")]
+
+        with self.assertRaises(CLIFailureError):
+            self.svc.create_snapshot("test_snap", "source_vol")
+
+    def test_create_snapshot_success(self):
+        self._prepare_mocks_for_create_snapshot()
+
+        snapshot = self.svc.create_snapshot("test_snap", "source_vol")
+
+        self.assertEqual(snapshot.capacity_bytes, 1024)
+        self.assertEqual(snapshot.array_type, 'SVC')
+        self.assertEqual(snapshot.id, 'snap_id')
+
+    def test_delete_snapshot_no_volume_raise_snapshot_not_found(self):
+        self._prepare_lsvdisk_to_return_none()
+
+        with self.assertRaises(array_errors.SnapshotNotFoundError):
+            self.svc.delete_snapshot("test_snap")
+
+    def test_delete_snapshot_no_fc_id_raise_snapshot_not_found(self):
+        self._prepare_lsvdisk_to_return_mapless_target_volume()
+
+        with self.assertRaises(array_errors.SnapshotNotFoundError):
+            self.svc.delete_snapshot("test_snap")
+
+    def test_delete_snapshot_call_rmvolume(self):
+        self._prepare_mocks_for_get_snapshot()
+
+        self.svc.delete_snapshot("test_snap")
+
+        self.svc.client.svctask.rmvolume.assert_called_once_with(vdisk_id="test_snap")
+
+    def test_delete_snapshot_call_rmfcmap(self):
+        self._prepare_mocks_for_get_snapshot()
+
+        self.svc.delete_snapshot("test_snap")
+
+        self.svc.client.svctask.rmfcmap.assert_called_once_with(object_id="test_fc_id", force=True)
+
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def test_delete_snapshot_rmvolume_error(self, mock_warning):
+        self._prepare_mocks_for_get_snapshot()
+        mock_warning.return_value = False
+        self.svc.client.svctask.rmvolume.side_effect = [
+            CLIFailureError("Failed")]
+
+        with self.assertRaises(CLIFailureError):
+            self.svc.delete_snapshot("test_snap")
+
+    def test_delete_snapshot_success(self):
+        self.svc.delete_snapshot("test_snap")
+
     def test_validate_supported_capabilities_raise_error(self):
         capabilities_a = {"SpaceEfficiency": "Test"}
         with self.assertRaises(

@@ -43,6 +43,12 @@ class VolumeNotFoundError(BaseArrayActionException):
         self.message = messages.VolumeNotFoundError_message.format(name)
 
 
+class VolumeNameBelongsToSnapshotError(BaseArrayActionException):
+
+    def __init__(self, volume, array):
+        self.message = messages.VolumeNameBelongsToSnapshotError_message.format(volume, array)
+
+
 class VolumeCreationError(BaseArrayActionException):
 
     def __init__(self, name):
@@ -56,6 +62,12 @@ class VolumeDeletionError(BaseArrayActionException):
 
 
 class IllegalObjectName(BaseArrayActionException):
+
+    def __init__(self, msg):
+        self.message = "{0}".format(msg)
+
+
+class IllegalObjectID(BaseArrayActionException):
 
     def __init__(self, msg):
         self.message = "{0}".format(msg)
@@ -163,10 +175,22 @@ class UnsupportedConnectivityTypeError(BaseArrayActionException):
         self.message = messages.UnsupportedConnectivityTypeError_message.format(connectivity_type)
 
 
+class SnapshotNotFoundError(BaseArrayActionException):
+
+    def __init__(self, name):
+        self.message = messages.SnapshotNotFoundError_message.format(name)
+
+
 class SnapshotNameBelongsToVolumeError(BaseArrayActionException):
 
     def __init__(self, snapshot, array):
         self.message = messages.SnapshotNameBelongsToVolumeError_message.format(snapshot, array)
+
+
+class SnapshotIdBelongsToVolumeError(BaseArrayActionException):
+
+    def __init__(self, snapshot, array):
+        self.message = messages.SnapshotIdBelongsToVolumeError_message.format(snapshot, array)
 
 
 class SnapshotAlreadyExists(BaseArrayActionException):
