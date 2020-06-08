@@ -265,7 +265,7 @@ class TestControllerServerDeleteSnapshot(unittest.TestCase):
         context = utils.FakeContext()
         array_type.return_value = "a9k"
         self.mediator.delete_snapshot = Mock()
-        
+
         self.servicer.DeleteSnapshot(self.request, context)
 
         self.assertEqual(context.code, grpc.StatusCode.OK)
