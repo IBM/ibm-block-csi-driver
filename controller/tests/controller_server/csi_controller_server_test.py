@@ -646,7 +646,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
                                                                                                   "a9k")
         self.mediator.copy_to_existing_volume_from_snapshot = Mock()
         self.mediator.copy_to_existing_volume_from_snapshot.side_effect = [array_exception]
-        self.storage_agent.get_mediator.return_value.__exit__..side_effect = [array_exception]
+        self.storage_agent.get_mediator.return_value.__exit__.side_effect = [array_exception]
         self.mediator.delete_volume = Mock()
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, context)
