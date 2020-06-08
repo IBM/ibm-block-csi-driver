@@ -256,10 +256,24 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             )
             raise array_errors.VolumeCreationError(name)
 
+    def _extend_volume(self, volume_id, new_size_in_bytes):
+        try:
+            self.client.extend_volume(volume_id=volume_id,
+                                      new_size_in_bytes=new_size_in_bytes)
+        except exceptions.NotFound:
+            raise array_errors.VolumeNotFoundError(volume_id)
+
     def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
                                               min_vol_size_in_bytes):
-        # TODO:	CSI-1338
-        raise NotImplementedError
+        logger.debug(
+            "Copy snapshot {0} data to volume {1}. Snapshot capacity {2}. Minimal requested volume capacity {3}".format(
+                name, src_snap_name, src_snap_capacity_in_bytes, min_vol_size_in_bytes))
+        api_new_volume = self._get_api_volume_by_name(name)
+        api_snapshot = self.get_snapshot(src_snap_name)
+        if min_vol_size_in_bytes < src_snap_capacity_in_bytes:
+            self._extend_volume(volume_id=api_new_volume.id,
+                                new_size_in_bytes=src_snap_capacity_in_bytes)
+        self._create_flashcopy(source_volume_id=api_snapshot.id, target_volume_id=api_new_volume.id)
 
     def _delete_volume(self, volume_id, not_exist_err=True):
         logger.info("Deleting volume {}".format(volume_id))
@@ -455,21 +469,22 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         source_api_volume = self._get_api_volume_by_name(source_volume_name)
         if not source_api_volume:
             raise array_errors.VolumeNotFoundError(source_volume_name)
-        capabilities = {config.CAPABILITIES_SPACEEFFICIENCY: source_api_volume.tp}
+        capabilities = {config.CAPABILITIES_SPACEEFFICIENCY: None}
         size_in_bytes = int(source_api_volume.cap)
         pool = source_api_volume.pool
         return self.create_volume(target_volume_name, size_in_bytes, capabilities, pool)
 
-    def _create_flashcopy(self, source_volume, target_volume):
+    def _create_flashcopy(self, source_volume_id, target_volume_id, options=[]):
         logger.info(
-            "creating FlashCopy relationship from '{0}' to '{1}'".format(source_volume.volume_name,
-                                                                         target_volume.volume_name))
-        source_volume_id = get_volume_id_from_scsi_identifier(source_volume.id)
-        target_volume_id = get_volume_id_from_scsi_identifier(target_volume.id)
+            "creating FlashCopy relationship from '{0}' to '{1}'".format(source_volume_id,
+                                                                         target_volume_id))
+        source_volume_id = get_volume_id_from_scsi_identifier(source_volume_id)
+        target_volume_id = get_volume_id_from_scsi_identifier(target_volume_id)
+        options.append("permit_space_efficient_target")
         try:
             api_flashcopy = self.client.create_flashcopy(source_volume_id=source_volume_id,
                                                          target_volume_id=target_volume_id,
-                                                         options=["persistent"])
+                                                         options=options)
         except (exceptions.ClientError, exceptions.ClientException) as ex:
             if ERROR_CODE_ALREADY_FLASHCOPY in str(ex.message).upper():
                 raise array_errors.SnapshotAlreadyExists
@@ -492,8 +507,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def _create_snapshot(self, target_volume_name, source_volume_name):
         target_volume = self._create_similar_volume(target_volume_name, source_volume_name)
         source_volume = self._get_volume_by_name(source_volume_name)
+        options = ["no_background_copy", "persistent"]
         try:
-            return self._create_flashcopy(source_volume, target_volume)
+            return self._create_flashcopy(source_volume.id, target_volume.id, options)
         except (array_errors.VolumeNotFoundError, array_errors.SnapshotAlreadyExists) as ex:
             logger.error("Failed to create snapshot '{0}': {1}".format(target_volume_name, ex))
             self._delete_target_volume_if_exist(target_volume_name)
