@@ -258,10 +258,12 @@ class TestControllerServerDeleteSnapshot(unittest.TestCase):
         self.request.snapshot_id = "A9000:BADC0FFEE0DDF00D00000000DEADBABE"
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.delete_snapshot", Mock())
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_delete_snapshot_succeeds(self, storage_agent):
+    def test_delete_snapshot_succeeds(self, storage_agent, array_type):
         storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
+        array_type.return_value = "a9k"
 
         self.servicer.DeleteSnapshot(self.request, context)
 
