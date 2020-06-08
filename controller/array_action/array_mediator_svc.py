@@ -7,6 +7,7 @@ from pysvc.unified.response import CLIFailureError
 from retry import retry
 
 import controller.array_action.config as config
+from controller.common import settings
 import controller.array_action.errors as controller_errors
 from controller.array_action.array_action_types import Volume, Snapshot, Host
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
@@ -95,7 +96,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     @classproperty
     def array_type(self):
-        return 'SVC'
+        return settings.ARRAY_TYPE_SVC
 
     @classproperty
     def port(self):
@@ -155,6 +156,21 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def disconnect(self):
         if self.client:
             self.client.close()
+
+    def get_system_info(self):
+        for cluster in self.client.svcinfo.lssystem():
+            if cluster['location'] == 'local':
+                return cluster
+
+    @property
+    def identifier(self):
+        if self._identifier is None:
+            cluster = self.get_system_info()
+            self._identifier = cluster['id_alias']
+        return self._identifier
+
+    def is_active(self):
+        return self.client.transport.transport.get_transport().is_active()
 
     def _generate_volume_response(self, cli_volume):
         return Volume(
