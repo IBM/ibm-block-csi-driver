@@ -257,13 +257,13 @@ class TestControllerServerDeleteSnapshot(unittest.TestCase):
         self.request.parameters = {}
         self.request.snapshot_id = "A9000:BADC0FFEE0DDF00D00000000DEADBABE"
 
-    # @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.delete_snapshot", Mock())
+    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.delete_snapshot", Mock())
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_delete_snapshot_succeeds(self, storage_agent, array_type):
         storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
-        self.mediator.delete_snapshot = Mock()
+        # self.mediator.delete_snapshot = Mock()
         array_type.return_value = "a9k"
         self.servicer.DeleteSnapshot(self.request, context)
 
@@ -289,11 +289,12 @@ class TestControllerServerDeleteSnapshot(unittest.TestCase):
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "mgmt address is missing in secrets")
         self.assertTrue("secret" in context.details)
 
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_delete_snapshot_with_array_connection_exception(self, storage_agent):
+    def test_delete_snapshot_with_array_connection_exception(self, storage_agent, connection_type):
         storage_agent.side_effect = [Exception("a_enter error")]
         context = utils.FakeContext()
-
+        array_type.return_value = "a9k"
         self.servicer.DeleteSnapshot(self.request, context)
 
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL, "array connection internal error")
