@@ -524,10 +524,9 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.create_volume.assert_called_once_with(self.request.name, 1 * 1024 * 1024 * 1024, {}, "pool1", "")
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_create_volume_from_snapshot_success(self, a_enter, a_exit, array_type):
-        a_enter.return_value = self.mediator
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_from_snapshot_success(self, storage_agent, array_type):
+        storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
         snapshot_id = "wwn1"
         snap_capacity_bytes = 100
@@ -548,10 +547,9 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
                                                                                     self.capacity_bytes)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_create_volume_from_snapshot_idempotent(self, a_enter, a_exit, array_type):
-        a_enter.return_value = self.mediator
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_from_snapshot_idempotent(self, storage_agent, array_type):
+        storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
         snap_id = "wwn1"
         self.request.volume_content_source = self._get_snapshot_source(snap_id)
@@ -565,10 +563,9 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.copy_to_existing_volume_from_snapshot.assert_not_called()
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_create_volume_from_snapshot_volume_without_source(self, a_enter, a_exit, array_type):
-        a_enter.return_value = self.mediator
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_from_snapshot_volume_without_source(self, storage_agent, array_type):
+        storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
         snap_id = "wwn1"
         vol_src_id = "wwn3"
@@ -585,10 +582,9 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.assertEqual(context.code, grpc.StatusCode.OK)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_create_volume_from_snapshot_error_other_source(self, a_enter, a_exit, array_type):
-        a_enter.return_value = self.mediator
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_from_snapshot_error_other_source(self, storage_agent, array_type):
+        storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
         snap_id = "wwn1"
         vol_src_id = "wwn3"
@@ -601,48 +597,43 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_create_volume_from_snapshot_src_snapshot_not_found(self, a_enter, a_exit, array_type):
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_from_snapshot_src_snapshot_not_found(self, storage_agent, array_type):
         array_exception = array_errors.SnapshotNotFoundError("")
-        self._test_create_volume_from_snapshot_error(a_enter, a_exit, array_type, array_exception,
+        self._test_create_volume_from_snapshot_error(storage_agent, array_type, array_exception,
                                                      grpc.StatusCode.INTERNAL)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_create_volume_from_snapshot_target_volume_not_found(self, a_enter, a_exit, array_type):
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_from_snapshot_target_volume_not_found(self, storage_agent, array_type):
         array_exception = array_errors.VolumeNotFoundError("")
-        self._test_create_volume_from_snapshot_error(a_enter, a_exit, array_type, array_exception,
+        self._test_create_volume_from_snapshot_error(storage_agent, array_type, array_exception,
                                                      grpc.StatusCode.INTERNAL, rollback_called=False)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_create_volume_from_snapshot_illegal_object_name(self, a_enter, a_exit, array_type):
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_from_snapshot_illegal_object_name(self, storage_agent, array_type):
         array_exception = array_errors.IllegalObjectName("")
-        self._test_create_volume_from_snapshot_error(a_enter, a_exit, array_type, array_exception,
+        self._test_create_volume_from_snapshot_error(storage_agent, array_type, array_exception,
                                                      grpc.StatusCode.INVALID_ARGUMENT)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_create_volume_from_snapshot_permission_denied(self, a_enter, a_exit, array_type):
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_from_snapshot_permission_denied(self, storage_agent, array_type):
         array_exception = array_errors.PermissionDeniedError("")
-        self._test_create_volume_from_snapshot_error(a_enter, a_exit, array_type, array_exception,
+        self._test_create_volume_from_snapshot_error(storage_agent, array_type, array_exception,
                                                      grpc.StatusCode.PERMISSION_DENIED)
 
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.detect_array_type")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__exit__")
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
-    def test_create_volume_from_snapshot_general_error(self, a_enter, a_exit, array_type):
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_from_snapshot_general_error(self, storage_agent, array_type):
         array_exception = Exception("")
-        self._test_create_volume_from_snapshot_error(a_enter, a_exit, array_type, array_exception,
+        self._test_create_volume_from_snapshot_error(storage_agent, array_type, array_exception,
                                                      grpc.StatusCode.INTERNAL)
 
-    def _test_create_volume_from_snapshot_error(self, a_enter, a_exit, array_type, array_exception, return_code,
+    def _test_create_volume_from_snapshot_error(self, storage_agent, array_type, array_exception, return_code,
                                                 rollback_called=True):
-        a_enter.return_value = self.mediator
+        storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
         snap_id = "wwn1"
         vol_id = "wwn2"
@@ -655,7 +646,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
                                                                                                   "a9k")
         self.mediator.copy_to_existing_volume_from_snapshot = Mock()
         self.mediator.copy_to_existing_volume_from_snapshot.side_effect = [array_exception]
-        a_exit.side_effect = [array_exception]
+        self.storage_agent.get_mediator.return_value.__exit__..side_effect = [array_exception]
         self.mediator.delete_volume = Mock()
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, context)
