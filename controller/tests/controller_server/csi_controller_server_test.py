@@ -263,9 +263,8 @@ class TestControllerServerDeleteSnapshot(unittest.TestCase):
     def test_delete_snapshot_succeeds(self, storage_agent, array_type):
         storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
-        array_type.return_value = "a9k"
         self.mediator.delete_snapshot = Mock()
-
+        array_type.return_value = "a9k"
         self.servicer.DeleteSnapshot(self.request, context)
 
         self.assertEqual(context.code, grpc.StatusCode.OK)
