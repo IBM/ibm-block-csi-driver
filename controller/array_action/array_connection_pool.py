@@ -81,7 +81,7 @@ class ConnectionPool(object):
         # If there is no free items, and current_size is not full, create a new item.
         logger.debug("+++++++++++++++++ get connection - create new. Size: {0}".format(self.current_size))
         with self.lock:
-            is_full = self.current_size < self.max_size
+            is_full = self.current_size >= self.max_size
             if not is_full:
                 self.current_size += 1
 
@@ -95,7 +95,8 @@ class ConnectionPool(object):
             except Exception as ex:
                 logger.error("Failed to create array connection")
                 logger.exception(ex)
-                self.current_size -= 1
+                with self.lock:
+                    self.current_size -= 1
                 raise ex
             logger.debug("+++++++++++++++++ get connection - new created. Size: {0}".format(self.current_size))
             return created
