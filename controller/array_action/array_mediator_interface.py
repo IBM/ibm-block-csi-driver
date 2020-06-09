@@ -315,6 +315,14 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def is_active(self):
+        """
+        This function will return True if the storage connection is still active.
+
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def validate_supported_capabilities(self, capabilities):
         """
         This function will check if the capabilities passed to the create volume are valid
@@ -327,6 +335,14 @@ class ArrayMediator(ABC):
 
         Raises:
             CapabilityNotSupported
+        """
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def identifier(self):
+        """
+        The storage system identifier.
         """
         raise NotImplementedError
 
