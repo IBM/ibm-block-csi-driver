@@ -116,13 +116,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return 10
 
     def __init__(self, user, password, endpoint):
-        logger.debug("+++++++++++++++ init ds8k mediator")
         self.user = user
         self.service_address = \
             endpoint[0] if isinstance(endpoint, list) else endpoint
         self.password = password
 
-        logger.debug("+++++++++++++++ init ds8k mediator - before connect")
         self._connect()
 
     def _connect(self):
@@ -132,9 +130,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                                      password=self.password,
                                      )
 
-            logger.debug("+++++++++++++ before get_system_info")
             self.system_info = self.get_system_info()
-            logger.debug("+++++++++++++ after get_system_info")
 
             if parse(self.version) < parse(self.SUPPORTED_FROM_VERSION):
                 raise array_errors.UnsupportedStorageVersionError(

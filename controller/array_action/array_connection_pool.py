@@ -52,16 +52,12 @@ class ConnectionPool(object):
         """
 
         # if there is a free and active item in the channel, return it directly.
-        logger.debug("+++++++++++++++++ get connection")
         while True:
-            logger.debug("+++++++++++++++++ get c - while. Size: {0} M: {1}".format(self.current_size, self.max_size))
             try:
                 item = self.channel.get(block=False)
                 if item.is_active():
-                    logger.debug("+++++++++++++++++ get connection - item is active")
                     return item
                 else:
-                    logger.debug("+++++++++++++++++ get connection - item not active")
                     with self.lock:
                         self.current_size -= 1
                     try:
@@ -75,21 +71,15 @@ class ConnectionPool(object):
                         )
                         del item
             except Empty:
-                logger.debug("+++++++++++++++++ get connection - Empty")
                 break
 
         # If there is no free items, and current_size is not full, create a new item.
-        logger.debug("+++++++++++++++++ get connection - create new. Size: {0}".format(self.current_size))
         with self.lock:
             is_full = self.current_size >= self.max_size
             if not is_full:
                 self.current_size += 1
 
         if not is_full:
-            logger.debug(
-                "+++++++++++++++++ get connection - new created. Before lock Size: {0}".format(self.current_size))
-            logger.debug(
-                "+++++++++++++++++ get connection - new created. After lock Size: {0}".format(self.current_size))
             try:
                 created = self.create()
             except Exception as ex:
@@ -98,10 +88,8 @@ class ConnectionPool(object):
                 with self.lock:
                     self.current_size -= 1
                 raise ex
-            logger.debug("+++++++++++++++++ get connection - new created. Size: {0}".format(self.current_size))
             return created
 
-        logger.debug("+++++++++++++++++ get connection - wait with timeout")
         # If current_size is full, waiting for an available one.
         return self.channel.get(block, timeout)
 
@@ -109,8 +97,6 @@ class ConnectionPool(object):
         """
         Put an item back into the pool, when done.  This may cause the putting thread to block.
         """
-        logger.debug(
-            "+++++++++++++++++ put connection. Size: {0} Max size : {1}".format(self.current_size, self.max_size))
         with self.lock:
             discard = self.current_size > self.max_size
             if discard:
@@ -118,16 +104,12 @@ class ConnectionPool(object):
 
         if not discard:
             try:
-                logger.debug("+++++++++++++++++ put connection - before put")
                 self.channel.put(item, block=False)
-                logger.debug("+++++++++++++++++ put connection - after put")
                 return
             except Full:
-                logger.debug("+++++++++++++++++ put connection - full")
                 discard = True
 
         if discard:
-            logger.debug("+++++++++++++++++ put connection - discard")
             try:
                 item.disconnect()
             except Exception as ex:
