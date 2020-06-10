@@ -302,8 +302,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_create_snapshot_start_fcmap_error(self, mock_warning):
         self._prepare_mocks_for_create_snapshot()
         mock_warning.return_value = False
-        self.svc.client.svctask.startfcmap.side_effect = [
-            CLIFailureError("Failed")]
+        self.svc.client.svctask.startfcmap.side_effect = [CLIFailureError("Failed") for _ in range(100)]
 
         with self.assertRaises(CLIFailureError):
             self.svc.create_snapshot("test_snap", "source_vol")
