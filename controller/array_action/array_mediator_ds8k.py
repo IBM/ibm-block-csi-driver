@@ -315,6 +315,14 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.debug("found volume name : {0}".format(vol_name))
         return vol_name
 
+    def is_volume_has_snapshots(self, volume_id):
+        array_volume_id = get_volume_id_from_scsi_identifier(volume_id)
+        try:
+            array_volume = self.client.get_volume(array_volume_id)
+            return bool(array_volume.flashcopy)
+        except exceptions.NotFound:
+            raise array_errors.VolumeNotFoundError(volume_id)
+
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume {}".format(volume_id))
         volume_id = get_volume_id_from_scsi_identifier(volume_id)

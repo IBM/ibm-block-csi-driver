@@ -686,6 +686,8 @@ class TestControllerServerDeleteVolume(unittest.TestCase):
         self.mediator.client = Mock()
 
         self.mediator.get_volume = Mock()
+        self.mediator.is_volume_has_snapshots = Mock()
+        self.mediator.is_volume_has_snapshots.return_value = False
 
         self.servicer = ControllerServicer(self.fqdn)
 
@@ -752,6 +754,14 @@ class TestControllerServerDeleteVolume(unittest.TestCase):
 
     def test_delete_volume_with_delete_volume_other_exception(self):
         self.delete_volume_returns_error(error=Exception("error"), return_code=grpc.StatusCode.INTERNAL)
+
+    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
+    def test_delete_volume_has_snapshots(self, a_enter):
+        a_enter.return_value = self.mediator
+        context = utils.FakeContext()
+        self.mediator.is_volume_has_snapshots.return_value = True
+        self.servicer.DeleteVolume(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.FAILED_PRECONDITION)
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.delete_volume")
     @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.__enter__")
