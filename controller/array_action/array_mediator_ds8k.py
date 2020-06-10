@@ -476,12 +476,14 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         pool = source_api_volume.pool
         return self.create_volume(target_volume_name, size_in_bytes, capabilities, pool)
 
-    def _create_flashcopy(self, source_volume_id, target_volume_id, options=[]):
+    def _create_flashcopy(self, source_volume_id, target_volume_id, options=None):
         logger.info(
             "creating FlashCopy relationship from '{0}' to '{1}'".format(source_volume_id,
                                                                          target_volume_id))
         source_volume_id = get_volume_id_from_scsi_identifier(source_volume_id)
         target_volume_id = get_volume_id_from_scsi_identifier(target_volume_id)
+        if not options:
+            options = []
         options.append("permit_space_efficient_target")
         try:
             api_flashcopy = self.client.create_flashcopy(source_volume_id=source_volume_id,
