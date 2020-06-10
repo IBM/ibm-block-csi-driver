@@ -537,3 +537,39 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.get_volume.side_effect = NotFound("404")
         with self.assertRaises(array_errors.SnapshotNotFoundError):
             self.array.delete_snapshot("fake_name")
+
+    def _prepare_mocks_for_copy_to_existing_volume(self):
+        volume = copy.deepcopy(self.volume_response)
+        self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
+        self.client_mock.get_volumes_by_pool.side_effect = [[volume], [Munch(
+            {"cap": "1073741824",
+             "id": "0002",
+             "name": "snap_name",
+             "pool": "p0",
+             "tp": "ese",
+             "flashcopy": [self.flashcopy_response]
+             }
+        )]]
+        self.client_mock.get_flashcopies.return_value = self.flashcopy_response
+        return volume
+
+    def test_extend_volume(self):
+        volume = self._prepare_mocks_for_copy_to_existing_volume()
+        self.array.copy_to_existing_volume_from_snapshot("test_name", "snap_name", 3, 2)
+        self.client_mock.extend_volume.assert_called_once_with(volume_id=volume.id,
+                                                               new_size_in_bytes=3)
+
+    def test_extend_volume_not_found(self):
+        self._prepare_mocks_for_copy_to_existing_volume()
+        self.client_mock.extend_volume.side_effect = NotFound("404")
+        with self.assertRaises(array_errors.VolumeNotFoundError):
+            self.array.copy_to_existing_volume_from_snapshot("test_name", "snap_name", 3, 2)
+
+    def test_copy_to_existing_volume_flashcopy(self):
+        volume = self._prepare_mocks_for_copy_to_existing_volume()
+        self.array.copy_to_existing_volume_from_snapshot("test_name", "snap_name", 3, 2)
+        self.client_mock.create_flashcopy.assert_called_once_with(source_volume_id="0002",
+                                                                  target_volume_id=volume.id,
+                                                                  options=[
+                                                                      'permit_space_efficient_target'
+                                                                  ])
