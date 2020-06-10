@@ -80,7 +80,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     @classproperty
     def array_type(self):
-        return 'DS8K'
+        return settings.ARRAY_TYPE_DS8K
 
     @classproperty
     def port(self):
@@ -156,6 +156,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def disconnect(self):
         pass
+
+    def is_active(self):
+        return True
 
     def get_system_info(self):
         return self.client.get_system()

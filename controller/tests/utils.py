@@ -23,6 +23,7 @@ def get_mock_mediator_response_snapshot(capacity, name, wwn, volume_name, array_
     snapshot.volume_name = volume_name
     snapshot.array_address = "arr1"
     snapshot.array_type = array_type
+    snapshot.is_ready = True
 
     return snapshot
 

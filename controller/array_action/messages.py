@@ -1,4 +1,4 @@
-NoConnectionAvailableException_message = "No connection available to endpoint : {0}"
+NoConnectionAvailableException_message = "Currently no connection is available to endpoint: {0}"
 
 CredentialsError_message = "Credential error has occurred while connecting to endpoint : {0} "
 
