@@ -31,7 +31,8 @@ class CredentialsError(BaseArrayActionException):
 class UnsupportedStorageVersionError(BaseArrayActionException):
 
     def __init__(self, version, supported_version):
-        self.message = messages.UnsupportedStorageVersionError_message.format(version, supported_version)  # noqa
+        self.message = messages.UnsupportedStorageVersionError_message.format(version,
+                                                                              supported_version)  # noqa
 
 
 # =============================================================================
@@ -76,7 +77,8 @@ class IllegalObjectID(BaseArrayActionException):
 class PoolDoesNotMatchCapabilities(BaseArrayActionException):
 
     def __init__(self, pool, capabilities, error):
-        self.message = messages.PoolDoesNotMatchCapabilities_message.format(pool, capabilities, error)
+        self.message = messages.PoolDoesNotMatchCapabilities_message.format(pool, capabilities,
+                                                                            error)
 
 
 class StorageClassCapabilityNotSupported(BaseArrayActionException):
