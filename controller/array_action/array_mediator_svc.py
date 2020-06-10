@@ -180,7 +180,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             cli_volume.name,
             self.endpoint,
             cli_volume.mdisk_grp_name,
-            None,  # TODO: CSI-1026 - src object
+            None,
             self.array_type)
 
     def _generate_snapshot_response(self, cli_snapshot, source_volume_name):
