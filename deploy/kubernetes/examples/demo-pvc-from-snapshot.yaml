@@ -1,0 +1,20 @@
+#########################################
+# PVC example for IBM Block CSI Driver.
+#########################################
+
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: demo-pvc-from-snapshot
+spec:
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: gold
+  dataSource:
+    name: demo-snapshot
+    kind: VolumeSnapshot
+    apiGroup: snapshot.storage.k8s.io
