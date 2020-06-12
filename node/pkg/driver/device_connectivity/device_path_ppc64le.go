@@ -1,4 +1,4 @@
 package device_connectivity
 
-// for PowerPC, no FC subsystem is needed
-const fcSubsystem = ""
+// for PowerPC, no FC subsystem prefix is needed
+const fcSubsystemPrefix = ""
