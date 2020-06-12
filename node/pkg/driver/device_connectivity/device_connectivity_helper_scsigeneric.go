@@ -166,7 +166,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 		}
 	}
 	if connectivityType == ConnectionTypeISCSI {
-		subsystemPrefix = "ip*"
+		subsystemPrefix = "ip*-"
 	}
 
 	var targetPath = fmt.Sprintf("/dev/disk/by-path/%s", subsystemPrefix)
@@ -228,7 +228,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 func (r OsDeviceConnectivityHelperScsiGeneric) waitForMpath(targetPath string, connectivityType string, arrayIdentifier string, lunId int, volumeId string,
 	resChannel chan<- *WaitForMpathResult) {
 	lunIdStr := convertIntToScsilun(lunId)
-	dp := strings.Join([]string{targetPath, connectivityType, arrayIdentifier, "lun", lunIdStr}, "-")
+	dp := targetPath + strings.Join([]string{connectivityType, arrayIdentifier, "lun", lunIdStr}, "-")
 	logger.Infof("waitForMpath: Get the mpath devices related to connectivityType=%s initiator=%s and lunID=%d : {%v}", connectivityType, arrayIdentifier, lunId, dp)
 	dps, exists, e := r.Helper.WaitForPathToExist(dp, WaitForMpathRetries, WaitForMpathWaitIntervalSec)
 	if e != nil {

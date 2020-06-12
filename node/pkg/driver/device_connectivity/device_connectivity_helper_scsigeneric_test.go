@@ -63,7 +63,6 @@ func getFcPath(fileNameSuffix string) string {
 		fileNamePrefix = "ccw-*-"
 	}
 	var fileName = fileNamePrefix + "fc" + fileNameSuffix
-	println(fmt.Sprintf("TEST FC PATH: %s", path.Join(byPathDir, fileName)))
 	return path.Join(byPathDir, fileName)
 }
 
