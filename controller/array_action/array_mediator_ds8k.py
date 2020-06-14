@@ -158,7 +158,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         pass
 
     def is_active(self):
-        return True
+        return self.client.is_valid()
 
     def get_system_info(self):
         return self.client.get_system()
