@@ -336,7 +336,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         array_volume_id = get_volume_id_from_scsi_identifier(volume_id)
         try:
             array_volume = self.client.get_volume(array_volume_id)
-            return bool(array_volume.flashcopy)
+            flash_copies = array_volume.flashcopy
+            for fc in flash_copies:
+                if fc.sourcevolume == array_volume_id:
+                    return True
+            return False
         except exceptions.NotFound:
             raise array_errors.VolumeNotFoundError(volume_id)
 
