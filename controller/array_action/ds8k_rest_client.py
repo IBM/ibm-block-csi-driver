@@ -74,6 +74,16 @@ class RESTClient(object):
 
         self._client = Client(**client_kwargs)
 
+    def is_valid(self):
+        try:
+            # Send command to check if client is still valid. IO enclosures is chosen since it is fast.
+            self._client.get_io_enclosures()
+            return True
+        except Exception as ex:
+            logger.info("The client is not valid")
+            logger.exception(ex)
+            return False
+
     def get_system(self):
         return self._client.get_systems()[0]
 
