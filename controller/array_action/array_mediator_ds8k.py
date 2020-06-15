@@ -54,6 +54,14 @@ def get_volume_id_from_scsi_identifier(scsi_id):
     return scsi_id[-4:]
 
 
+def get_source_volume_id_if_exists(api_volume):
+    fc_source = [flashcopy.sourcevolume for flashcopy in api_volume.flashcopy if
+                 flashcopy.targetvolume == api_volume.id]
+    if len(fc_source) != 1:
+        return None
+    return fc_source[0]
+
+
 def is_flashcopy_source(volume_id, volume_flashcopy):
     array_volume_id = get_volume_id_from_scsi_identifier(volume_id)
     return volume_flashcopy.sourcevolume == array_volume_id
@@ -191,14 +199,15 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def _generate_volume_scsi_identifier(self, volume_id):
         return '6{}000000000000{}'.format(self.wwnn[1:], volume_id)
 
-    def _generate_volume_response(self, res):
+    def _generate_volume_response(self, api_volume):
+        source_volume_id = get_source_volume_id_if_exists(api_volume)
         return Volume(
-            vol_size_bytes=int(res.cap),
-            vol_id=self._generate_volume_scsi_identifier(res.id),
-            vol_name=res.name,
+            vol_size_bytes=int(api_volume.cap),
+            vol_id=self._generate_volume_scsi_identifier(api_volume.id),
+            vol_name=api_volume.name,
             array_address=self.service_address,
-            copy_src_object_id=None,  # TODO: CSI-1338
-            pool_name=res.pool,
+            copy_src_object_id=source_volume_id,
+            pool_name=api_volume.pool,
             array_type=self.array_type
         )
 
@@ -656,7 +665,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return api_flashcopy.state == 'valid'
 
     def _check_snapshot_use_status(self, snapshot_id, flashcopy_list):
-
         for flashcopy in flashcopy_list:
             logger.info("Deleting flashcopy: {}".format(flashcopy))
             if flashcopy.sourcevolume == snapshot_id:
