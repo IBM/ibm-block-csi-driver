@@ -356,7 +356,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 return True
         return False
 
-
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume {}".format(volume_id))
         volume_id = get_volume_id_from_scsi_identifier(volume_id)
@@ -656,13 +655,13 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         api_flashcopy = self._get_flashcopy(flashcopy_id)
         return api_flashcopy.state == 'valid'
 
-    def _delete_snapshot_flashcopies(self,snapshot_id, flashcopy_list):
+    def _delete_snapshot_flashcopies(self, snapshot_id, flashcopy_list):
 
         for flashcopy in flashcopy_list:
             if flashcopy.sourcevolume == snapshot_id:
                 fc = self._get_flashcopy(flashcopy.id)
                 if fc.out_of_sync_tracks != '0':
-                    raise ???
+                    raise array_errors.VolumeInUse(snapshot_id)
 
         for flashcopy in flashcopy_list:
             self._delete_flashcopy(flashcopy.id)

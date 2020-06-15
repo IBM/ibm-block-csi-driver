@@ -205,3 +205,9 @@ class InvalidCliResponseError(BaseArrayActionException):
 
     def __init__(self, details):
         self.message = messages.InvalidCliResponseError_message.format(details)
+
+
+class VolumeInUse(BaseArrayActionException):
+
+    def __init__(self, volume):
+        self.message = messages.VolumeInUse_massage.format(volume)
