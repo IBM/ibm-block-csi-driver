@@ -40,7 +40,12 @@ HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
 CLI_OBJECT_TYPE_VOLUME = 'Volume'
 CLI_OBJECT_TYPE_FCMAP = 'FlashCopy Mapping'
 
+FCMAP_STATUS_DONE = 'idle_or_copied'
+
 YES = 'yes'
+
+ENDPOINT_TYPE_SOURCE = 'source'
+ENDPOINT_TYPE_TARGET = 'target'
 
 
 def is_warning_message(ex):
@@ -174,13 +179,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return self.client.transport.transport.get_transport().is_active()
 
     def _generate_volume_response(self, cli_volume):
+        source_volume_wwn = self._get_source_volume_wwn_if_exists(cli_volume)
         return Volume(
             int(cli_volume.capacity),
             cli_volume.vdisk_UID,
             cli_volume.name,
             self.endpoint,
             cli_volume.mdisk_grp_name,
-            None,
+            source_volume_wwn,
             self.array_type)
 
     def _generate_snapshot_response(self, cli_snapshot, source_volume_name):
@@ -236,6 +242,19 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.VolumeNotFoundError(volume_name_or_id)
         return cli_volume
 
+    def _get_fcmap_as_target_if_exists(self, volume_name):
+        fcmaps_as_target = self._get_fcmaps(volume_name, ENDPOINT_TYPE_TARGET)
+        if len(fcmaps_as_target) != 1:
+            return None
+        return fcmaps_as_target[0]
+
+    def _get_source_volume_wwn_if_exists(self, target_cli_volume):
+        fcmap = self._get_fcmap_as_target_if_exists(target_cli_volume.name)
+        if not fcmap:
+            return None
+        source_volume_name = fcmap.source_vdisk_name
+        return self._get_wwn_by_volume_name_if_exists(source_volume_name)
+
     def get_volume(self, volume_name, volume_context=None, volume_prefix=""):
         cli_volume = self._get_cli_volume(volume_name)
         return self._generate_volume_response(cli_volume)
@@ -243,10 +262,18 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def get_volume_name(self, volume_id):
         return self._get_vol_by_wwn(volume_id)
 
+    def _get_fcmaps(self, volume_name, endpoint_type):
+        """
+        Args:
+            endpoint_type : 'source' or 'target'
+        """
+        filter_value = '{0}_vdisk_name={1}'.format(endpoint_type, volume_name)
+        return self.client.svcinfo.lsfcmap(filtervalue=filter_value).as_list
+
     def is_volume_has_snapshots(self, volume_id):
         volume_name = self._get_vol_by_wwn(volume_id)
-        filter_value = 'source_vdisk_name={0}'.format(volume_name)
-        return bool(self.client.svcinfo.lsfcmap(filtervalue=filter_value).as_list)
+        fcmaps = self._get_fcmaps(volume_name, ENDPOINT_TYPE_SOURCE)
+        return bool(fcmaps)
 
     def validate_supported_capabilities(self, capabilities):
         logger.debug("validate_supported_capabilities for "
@@ -272,7 +299,16 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return size_in_bytes - ret + 512
         return size_in_bytes
 
-    def _get_volume_name_by_wwn_if_exist(self, volume_id):
+    def _get_wwn_by_volume_name_if_exists(self, volume_name):
+        cli_volume = self._get_cli_volume_if_exists(volume_name)
+        if not cli_volume:
+            return None
+
+        wwn = cli_volume.vdisk_UID
+        logger.debug("found wwn : {0}".format(wwn))
+        return wwn
+
+    def _get_volume_name_by_wwn_if_exists(self, volume_id):
         filter_value = 'vdisk_UID=' + volume_id
         vol_by_wwn = self.client.svcinfo.lsvdisk(
             filtervalue=filter_value).as_single_element
@@ -284,7 +320,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return vol_name
 
     def _get_vol_by_wwn(self, volume_id):
-        vol_name = self._get_volume_name_by_wwn_if_exist(volume_id)
+        vol_name = self._get_volume_name_by_wwn_if_exists(volume_id)
         if not vol_name:
             raise controller_errors.VolumeNotFoundError(volume_id)
         return vol_name
@@ -322,13 +358,13 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     @retry(svc_errors.StorageArrayClientException, tries=5, delay=1)
     def _rollback_copy_to_target_volume(self, target_volume_name):
-        self._delete_unstarted_fcmap_if_exist(target_volume_name)
+        self._delete_unstarted_fcmap_if_exists(target_volume_name)
 
     def _copy_to_target_volume(self, target_volume_name, source_volume_name):
-        logger.debug("creating a point-in-time copy of volume {0} data in volume {1}.".format(source_volume_name,
-                                                                                              target_volume_name))
+        logger.debug("copying volume {0} data to volume {1}.".format(source_volume_name,
+                                                                     target_volume_name))
         try:
-            return self._create_and_start_fcmap(source_volume_name, target_volume_name)
+            return self._create_and_start_fcmap(source_volume_name, target_volume_name, is_copy=True)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.error("Failed to copy to '{0}': {1}".format(target_volume_name, ex))
             logger.info("rolling back copy to '{0}'".format(target_volume_name))
@@ -337,11 +373,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
                                               min_vol_size_in_bytes):
-        target_cli_volume = self._copy_to_target_volume(name, src_snap_name)
-        self._stop_and_delete_fcmap(target_cli_volume.FC_id)
+        self._copy_to_target_volume(name, src_snap_name)
 
     def create_volume(self, name, size_in_bytes, capabilities, pool, volume_prefix=""):
         cli_volume = self._create_cli_volume(name, size_in_bytes, capabilities, pool)
+
         return self._generate_volume_response(cli_volume)
 
     def _delete_volume_by_name(self, volume_name, not_exist_err=True):
@@ -363,6 +399,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
         volume_name = self._get_vol_by_wwn(volume_id)
+        fcmap = self._get_fcmap_as_target_if_exists(volume_name)
+        if fcmap:
+            self._stop_and_delete_fcmap(fcmap.id)
         self._delete_volume_by_name(volume_name)
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
@@ -393,10 +432,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         pool = source_cli_volume.mdisk_grp_name
         self._create_cli_volume(target_volume_name, size_in_bytes, capabilities, pool)
 
-    def _create_fcmap(self, source_volume_name, target_volume_name):
+    def _create_fcmap(self, source_volume_name, target_volume_name, is_copy):
         logger.info("creating FlashCopy Mapping from '{0}' to '{1}'".format(source_volume_name, target_volume_name))
+        mkfcmap_kwargs = {} if is_copy else {'copyrate': 0}
         try:
-            self.client.svctask.mkfcmap(source=source_volume_name, target=target_volume_name, copyrate=0)
+            self.client.svctask.mkfcmap(source=source_volume_name, target=target_volume_name, **mkfcmap_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 if FCMAP_ALREADY_EXIST in ex.my_message:
@@ -417,8 +457,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 else:
                     raise ex
 
-    def _create_and_start_fcmap(self, source_volume_name, target_volume_name):
-        self._create_fcmap(source_volume_name, target_volume_name)
+    def _create_and_start_fcmap(self, source_volume_name, target_volume_name, is_copy):
+        self._create_fcmap(source_volume_name, target_volume_name, is_copy)
         target_cli_volume = self._get_cli_volume(target_volume_name)
         self._start_fcmap(target_cli_volume.FC_id)
         return target_cli_volume
@@ -443,29 +483,45 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._stop_fcmap(fcmap_id)
         self._delete_fcmap(fcmap_id, force=True)
 
-    def _delete_snapshot(self, target_cli_volume):
-        self._stop_and_delete_fcmap(target_cli_volume.FC_id)
-        self._delete_volume_by_name(target_cli_volume.name)
+    def _delete_all_fcmaps_as_source_if_exist(self, snapshot_name):
+        snapshot_as_source_fcmaps = self._get_fcmaps(snapshot_name, ENDPOINT_TYPE_SOURCE)
+        unfinished_fcmaps = [fcmap.name for fcmap in snapshot_as_source_fcmaps
+                             if fcmap.status != FCMAP_STATUS_DONE]
+        if unfinished_fcmaps:
+            raise controller_errors.SnapshotIsStillInUseError(snapshot_name, unfinished_fcmaps)
+        for fcmap in snapshot_as_source_fcmaps:
+            self._delete_fcmap(fcmap.id, force=False)
 
-    def _delete_unstarted_fcmap_if_exist(self, target_volume_name):
+    def _delete_snapshot(self, cli_volume):
+        fcmap_id = cli_volume.FC_id
+        snapshot_name = cli_volume.name
+        if fcmap_id == 'many':
+            self._delete_all_fcmaps_as_source_if_exist(snapshot_name)
+        fcmap = self._get_fcmap_as_target_if_exists(snapshot_name)
+        if not fcmap:
+            raise controller_errors.SnapshotNotFoundError(snapshot_name)
+        self._stop_and_delete_fcmap(fcmap.id)
+        self._delete_volume_by_name(snapshot_name)
+
+    def _delete_unstarted_fcmap_if_exists(self, target_volume_name):
         target_cli_volume = self._get_cli_volume_if_exists(target_volume_name)
         if target_cli_volume and target_cli_volume.FC_id:
             self._delete_fcmap(target_cli_volume.FC_id, force=False)
         return target_cli_volume
 
-    def _delete_target_volume_if_exist(self, target_cli_volume):
+    def _delete_target_volume_if_exists(self, target_cli_volume):
         if target_cli_volume:
             self._delete_volume_by_name(target_cli_volume.name, not_exist_err=False)
 
     @retry(svc_errors.StorageArrayClientException, tries=5, delay=1)
     def _rollback_create_snapshot(self, target_volume_name):
-        target_cli_volume = self._delete_unstarted_fcmap_if_exist(target_volume_name)
-        self._delete_target_volume_if_exist(target_cli_volume)
+        target_cli_volume = self._delete_unstarted_fcmap_if_exists(target_volume_name)
+        self._delete_target_volume_if_exists(target_cli_volume)
 
     def _create_snapshot(self, target_volume_name, source_volume_name):
         try:
             self._create_similar_volume(source_volume_name, target_volume_name)
-            return self._create_and_start_fcmap(source_volume_name, target_volume_name)
+            return self._create_and_start_fcmap(source_volume_name, target_volume_name, is_copy=False)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.error("Failed to create snapshot '{0}': {1}".format(target_volume_name, ex))
             logger.info("rolling back create snapshot '{0}'".format(target_volume_name))
@@ -480,13 +536,13 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def delete_snapshot(self, snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
-        snapshot_name = self._get_volume_name_by_wwn_if_exist(snapshot_id)
+        snapshot_name = self._get_volume_name_by_wwn_if_exists(snapshot_id)
         if not snapshot_name:
             raise controller_errors.SnapshotNotFoundError(snapshot_id)
-        target_cli_volume = self._get_cli_volume_if_exists(snapshot_name)
-        if not target_cli_volume or not target_cli_volume.FC_id:
+        cli_volume = self._get_cli_volume_if_exists(snapshot_name)
+        if not cli_volume or not cli_volume.FC_id:
             raise controller_errors.SnapshotNotFoundError(snapshot_name)
-        self._delete_snapshot(target_cli_volume)
+        self._delete_snapshot(cli_volume)
         logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
 
     def get_host_by_host_identifiers(self, initiators):
