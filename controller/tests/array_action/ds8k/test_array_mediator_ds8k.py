@@ -7,7 +7,8 @@ from pyds8k.exceptions import ClientError, ClientException, NotFound
 
 import controller.array_action.errors as array_errors
 from controller.array_action import config
-from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
+from controller.array_action.array_mediator_ds8k import DS8KArrayMediator, FC_PERSISTENT_OPTION, \
+    FC_PERMIT_SPACE_EFFICIENT_TARGET
 from controller.array_action.array_mediator_ds8k import LOGIN_PORT_WWPN, LOGIN_PORT_STATE, \
     LOGIN_PORT_STATE_ONLINE
 from controller.array_action.array_mediator_ds8k import shorten_volume_name
@@ -419,7 +420,9 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def _get_volume_with_flashcopy_relationship(self):
         volume = self.volume_response
-        volume.flashcopy = [self.flashcopy_response]
+        volume.flashcopy = [Munch({"sourcevolume": "0000",
+                                   "targetvolume": "0001",
+                                   "id": "0000:0001"})]
         return volume
 
     def test_get_snapshot_get_fcrel_not_exist_raise_error(self):
@@ -570,6 +573,6 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.array.copy_to_existing_volume_from_snapshot("test_name", "snap_name", 3, 2)
         self.client_mock.create_flashcopy.assert_called_once_with(source_volume_id="0002",
                                                                   target_volume_id=volume.id,
-                                                                  options=[
-                                                                      'permit_space_efficient_target'
-                                                                  ])
+                                                                  options=[FC_PERSISTENT_OPTION,
+                                                                           FC_PERMIT_SPACE_EFFICIENT_TARGET
+                                                                           ])
