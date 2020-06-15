@@ -263,6 +263,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return self._get_vol_by_wwn(volume_id)
 
     def _get_fcmaps(self, volume_name, endpoint_type):
+        """
+        Args:
+            endpoint_type : 'source' or 'target'
+        """
         filter_value = '{0}_vdisk_name={1}'.format(endpoint_type, volume_name)
         return self.client.svcinfo.lsfcmap(filtervalue=filter_value).as_list
 
