@@ -144,7 +144,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except (exceptions.ClientError, exceptions.Unauthorized) as e:
             # BE7A002D=Authentication has failed because the user name and
             # password combination that you have entered is not valid.
-            if ERROR_CODE_INVALID_CREDENTIALS or KNOWN_ERROR_CODE_INVALID_CREDENTIALS in str(e.message).upper():
+            if ERROR_CODE_INVALID_CREDENTIALS or KNOWN_ERROR_CODE_INVALID_CREDENTIALS in str(
+                    e.message).upper():
                 raise array_errors.CredentialsError(self.service_address)
             else:
                 raise ConnectionError()
@@ -434,7 +435,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 volume_candidates.extend(self.client.get_volumes_by_pool(pool.id))
             except (exceptions.NotFound, exceptions.InternalServerError) as ex:
                 if ERROR_CODE_RESOURCE_NOT_EXISTS or INCORRECT_ID in str(ex.message).upper():
-                    raise array_errors.PoolDoesNotExist(pool, self.identifier)
+                    raise array_errors.PoolDoesNotExist(pool.id, self.identifier)
                 else:
                     raise ex
             for volume in volume_candidates:
