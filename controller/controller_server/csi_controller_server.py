@@ -102,6 +102,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                     array_mediator.validate_supported_capabilities(capabilities)
                     vol = array_mediator.create_volume(volume_full_name, size, capabilities, pool, volume_prefix)
+                except controller_errors.PoolDoesNotExist as ex:
+                    context.set_details(ex.message)
+                    context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                    return csi_pb2.CreateVolumeResponse()
                 else:
                     logger.debug("volume found : {}".format(vol))
 
