@@ -155,10 +155,10 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 	}
 	var devicePaths []string
 	var errStrings []string
-	var targetPath string
+	var subsystemPrefix string
 
 	if connectivityType == ConnectionTypeFC {
-		targetPath = fmt.Sprintf("/dev/disk/by-path/%s*", fcSubsystem)
+		subsystemPrefix = fcSubsystemPrefix
 		// In host, the path like this: /dev/disk/by-path/pci-0000:13:00.0-fc-0x500507680b25c0aa-lun-0
 		// So add prefix "0x" for the arrayIdentifiers
 		for index, wwn := range arrayIdentifiers {
@@ -166,8 +166,10 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 		}
 	}
 	if connectivityType == ConnectionTypeISCSI {
-		targetPath = "/dev/disk/by-path/ip*"
+		subsystemPrefix = "ip*-"
 	}
+
+	var targetPath = fmt.Sprintf("/dev/disk/by-path/%s", subsystemPrefix)
 
 	logger.Debugf("GetMpathDevice: Start concurrent multipath devices search for volume : [%s]", volumeId)
 	mpathResChannel := make(chan *WaitForMpathResult)
@@ -226,7 +228,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 func (r OsDeviceConnectivityHelperScsiGeneric) waitForMpath(targetPath string, connectivityType string, arrayIdentifier string, lunId int, volumeId string,
 	resChannel chan<- *WaitForMpathResult) {
 	lunIdStr := convertIntToScsilun(lunId)
-	dp := strings.Join([]string{targetPath, connectivityType, arrayIdentifier, "lun", lunIdStr}, "-")
+	dp := targetPath + strings.Join([]string{connectivityType, arrayIdentifier, "lun", lunIdStr}, "-")
 	logger.Infof("waitForMpath: Get the mpath devices related to connectivityType=%s initiator=%s and lunID=%d : {%v}", connectivityType, arrayIdentifier, lunId, dp)
 	dps, exists, e := r.Helper.WaitForPathToExist(dp, WaitForMpathRetries, WaitForMpathWaitIntervalSec)
 	if e != nil {
