@@ -414,15 +414,15 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_get_snapshot_has_no_fcrel_raise_error(self):
         self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
         self.client_mock.get_volumes_by_pool.return_value = [self.volume_response]
-
+        self.client_mock.get_flashcopies_by_volume.return_value = []
         with self.assertRaises(array_errors.SnapshotNameBelongsToVolumeError):
             self.array.get_snapshot("test_name")
 
     def _get_volume_with_flashcopy_relationship(self):
         volume = self.volume_response
-        volume.flashcopy = [Munch({"sourcevolume": "0000",
-                                   "targetvolume": "0001",
-                                   "id": "0000:0001"})]
+        self.client_mock.get_flashcopies_by_volume.return_value = [Munch({"sourcevolume": "0000",
+                                                                          "targetvolume": "0001",
+                                                                          "id": "0000:0001"})]
         return volume
 
     def test_get_snapshot_get_fcrel_not_exist_raise_error(self):
@@ -521,6 +521,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_delete_flashcopy_error(self):
         self.client_mock.get_volume.return_value = self.volume_response
+        self.client_mock.get_flashcopies_by_volume.return_value = []
         with self.assertRaises(array_errors.SnapshotNameBelongsToVolumeError):
             self.array.delete_snapshot("fake_name")
 
