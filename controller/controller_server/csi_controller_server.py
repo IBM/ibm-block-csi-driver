@@ -567,7 +567,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def _get_object_name_and_prefix(self, request, max_name_prefix_length, max_name_length, object_type,
                                     prefix_param_name):
-        name = request.name
+        full_name = name = request.name
         prefix = ""
         if request.parameters and (prefix_param_name in request.parameters):
             prefix = request.parameters[prefix_param_name]
@@ -579,16 +579,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         max_name_prefix_length
                     )
                 )
-            name = settings.NAME_PREFIX_SEPARATOR.join((prefix, name))
-        if len(name) > max_name_length:
-            raise controller_errors.IllegalObjectName(
-                "The {} name '{}' is too long, max allowed length is {}".format(
-                    object_type,
-                    name,
-                    max_name_length
-                )
-            )
-        return name, prefix
+            full_name = settings.NAME_PREFIX_SEPARATOR.join((prefix, name))
+        if len(full_name) > max_name_length:
+            hashed_name = utils.hash_string(name)
+            full_name = settings.NAME_PREFIX_SEPARATOR.join((prefix, hashed_name))
+        return full_name[:max_name_length], prefix
 
     def GetPluginCapabilities(self, request, context):
         logger.info("GetPluginCapabilities")
