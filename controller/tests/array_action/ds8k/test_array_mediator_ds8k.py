@@ -46,7 +46,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             {"cap": "1073741824",
              "id": "0001",
              "name": "test_name",
-             "pool": "p0",
+             "pool": "fake_pool",
              "tp": "ese",
              "flashcopy": ""
              }
@@ -407,16 +407,19 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_get_snapshot_not_exist_return_none(self):
         self.client_mock.get_snapshot.side_effect = [ClientError("400", "BE7A002D")]
 
-        snapshot = self.array.get_snapshot("fake_name")
+        snapshot = self.array.get_snapshot("fake_name", volume_context={
+                config.CONTEXT_POOL: self.volume_response.pool
+            })
 
         self.assertIsNone(snapshot)
 
     def test_get_snapshot_has_no_fcrel_raise_error(self):
-        self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
         self.client_mock.get_volumes_by_pool.return_value = [self.volume_response]
         self.client_mock.get_flashcopies_by_volume.return_value = []
         with self.assertRaises(array_errors.SnapshotNameBelongsToVolumeError):
-            self.array.get_snapshot("test_name")
+            self.array.get_snapshot("test_name", volume_context={
+                config.CONTEXT_POOL: self.volume_response.pool
+            })
 
     def _get_volume_with_flashcopy_relationship(self):
         volume = self.volume_response
@@ -427,24 +430,25 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_get_snapshot_get_fcrel_not_exist_raise_error(self):
         target_vol = self._get_volume_with_flashcopy_relationship()
-        self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
         self.client_mock.get_volumes_by_pool.return_value = [target_vol]
         self.client_mock.get_flashcopies.side_effect = NotFound("404", message="BE7A0001")
 
         with self.assertRaises(NotFound):
-            self.array.get_snapshot("test_name")
+            self.array.get_snapshot("test_name", volume_context={
+                config.CONTEXT_POOL: self.volume_response.pool
+            })
 
     def test_get_snapshot_success(self):
         target_vol = self._get_volume_with_flashcopy_relationship()
-        self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
         self.client_mock.get_volumes_by_pool.return_value = [target_vol]
         self.client_mock.get_flashcopies.return_value = self.flashcopy_response
 
-        volume = self.array.get_snapshot("test_name")
+        volume = self.array.get_snapshot("test_name", volume_context={
+                config.CONTEXT_POOL: self.volume_response.pool
+            })
         self.assertEqual(volume.snapshot_name, target_vol.name)
 
     def _prepare_mocks_for_create_snapshot(self):
-        self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
         self.client_mock.get_volumes_by_pool.return_value = [self.volume_response]
         volume = copy.deepcopy(self.volume_response)
         volume.id = "0001"
@@ -456,7 +460,9 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.create_volume.side_effect = ClientException("500")
 
         with self.assertRaises(array_errors.VolumeCreationError):
-            self.array.create_snapshot("snap_name", "test_name")
+            self.array.create_snapshot("snap_name", "test_name", volume_context={
+                config.CONTEXT_POOL: self.volume_response.pool
+            })
 
     def test_create_snapshot_create_fcrel_error(self):
         volume = self._prepare_mocks_for_create_snapshot()
@@ -465,7 +471,9 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.create_flashcopy.side_effect = ClientException("500")
 
         with self.assertRaises(Exception):
-            self.array.create_snapshot("target_vol", "test_name")
+            self.array.create_snapshot("target_vol", "test_name", volume_context={
+                config.CONTEXT_POOL: self.volume_response.pool
+            })
 
     def test_create_snapshot_create_vol_not_found(self):
         volume = self._prepare_mocks_for_create_snapshot()
@@ -474,9 +482,11 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.create_flashcopy.side_effect = ClientException("500", message="00000013")
 
         with self.assertRaises(array_errors.VolumeNotFoundError):
-            self.array.create_snapshot("target_vol", "test_name")
+            self.array.create_snapshot("target_vol", "test_name", volume_context={
+                config.CONTEXT_POOL: self.volume_response.pool
+            })
 
-    def test_create_snapshot_create_already_exist(self):
+    def test_create_snapshot_already_exist(self):
         volume = self._prepare_mocks_for_create_snapshot()
         self.client_mock.create_volume.return_value = volume
         self.client_mock.get_volume.return_value = volume
@@ -484,7 +494,9 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                                                                         message="000000AE")
 
         with self.assertRaises(array_errors.SnapshotAlreadyExists):
-            self.array.create_snapshot("target_vol", "test_name")
+            self.array.create_snapshot("target_vol", "test_name", volume_context={
+                config.CONTEXT_POOL: self.volume_response.pool
+            })
 
     def test_create_snapshot_success(self):
         volume = self._prepare_mocks_for_create_snapshot()
@@ -492,7 +504,9 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.get_volume.return_value = volume
         self.client_mock.create_flashcopy.return_value = self.flashcopy_response
         self.client_mock.get_flashcopies.return_value = self.flashcopy_response
-        snapshot = self.array.create_snapshot("target_vol", "test_name")
+        snapshot = self.array.create_snapshot("target_vol", "test_name", volume_context={
+                config.CONTEXT_POOL: self.volume_response.pool
+            })
 
         self.assertEqual(snapshot.snapshot_name, volume.name)
         self.assertEqual(snapshot.id, self.array._generate_volume_scsi_identifier(volume.id))
@@ -505,7 +519,9 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         flashcopy_response.state = "invalid"
         self.client_mock.create_flashcopy.return_value = flashcopy_response
         with self.assertRaises(ValueError):
-            self.array.create_snapshot("target_vol", "test_name")
+            self.array.create_snapshot("target_vol", "test_name", volume_context={
+                config.CONTEXT_POOL: self.volume_response.pool
+            })
 
     def test_delete_snapshot(self):
         scsi_id = "6005076306FFD3010000000000000001"
@@ -549,7 +565,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             {"cap": "1073741824",
              "id": "0002",
              "name": "snap_name",
-             "pool": "p0",
+             "pool": "fake_pool",
              "tp": "ese",
              "flashcopy": [self.flashcopy_response]
              }
@@ -559,7 +575,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_extend_volume(self):
         volume = self._prepare_mocks_for_copy_to_existing_volume()
-        self.array.copy_to_existing_volume_from_snapshot("test_name", "snap_name", 3, 2)
+        self.array.copy_to_existing_volume_from_snapshot("test_name", "snap_name", 3, 2, "fake_pool")
         self.client_mock.extend_volume.assert_called_once_with(volume_id=volume.id,
                                                                new_size_in_bytes=3)
 
@@ -567,11 +583,11 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self._prepare_mocks_for_copy_to_existing_volume()
         self.client_mock.extend_volume.side_effect = NotFound("404")
         with self.assertRaises(array_errors.VolumeNotFoundError):
-            self.array.copy_to_existing_volume_from_snapshot("test_name", "snap_name", 3, 2)
+            self.array.copy_to_existing_volume_from_snapshot("test_name", "snap_name", 3, 2, "fake_pool")
 
     def test_copy_to_existing_volume_flashcopy(self):
         volume = self._prepare_mocks_for_copy_to_existing_volume()
-        self.array.copy_to_existing_volume_from_snapshot("test_name", "snap_name", 3, 2)
+        self.array.copy_to_existing_volume_from_snapshot("test_name", "snap_name", 3, 2, "fake_pool")
         self.client_mock.create_flashcopy.assert_called_once_with(source_volume_id="0002",
                                                                   target_volume_id=volume.id,
                                                                   options=[FC_PERSISTENT_OPTION,

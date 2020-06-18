@@ -336,7 +336,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
-                                              min_vol_size_in_bytes):
+                                              min_vol_size_in_bytes, pool=None):
         target_cli_volume = self._copy_to_target_volume(name, src_snap_name)
         self._stop_and_delete_fcmap(target_cli_volume.FC_id)
 
@@ -366,7 +366,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._delete_volume_by_name(volume_name)
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
-    def get_snapshot(self, snapshot_name):
+    def get_snapshot(self, snapshot_name, volume_context=None):
         logger.debug("Get snapshot : {}".format(snapshot_name))
         target_cli_volume = self._get_cli_volume_if_exists(snapshot_name)
         if not target_cli_volume:
@@ -472,7 +472,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self._rollback_create_snapshot(target_volume_name)
             raise ex
 
-    def create_snapshot(self, name, volume_name):
+    def create_snapshot(self, name, volume_name, volume_context=None):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
         target_cli_volume = self._create_snapshot(name, volume_name)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(name, volume_name))

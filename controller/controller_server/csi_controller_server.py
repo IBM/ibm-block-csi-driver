@@ -115,7 +115,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return copy_source_res
 
                 if src_snapshot_id:
-                    self._copy_to_existing_volume_from_snapshot(vol, src_snapshot_id, size, array_mediator)
+                    self._copy_to_existing_volume_from_snapshot(vol, src_snapshot_id, size, array_mediator, pool)
                     vol.copy_src_object_id = src_snapshot_id
                 logger.debug("generating create volume response")
                 res = utils.generate_csi_create_volume_response(vol)
@@ -142,7 +142,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateVolumeResponse()
 
-    def _copy_to_existing_volume_from_snapshot(self, vol, src_snapshot_id, min_vol_size, array_mediator):
+    def _copy_to_existing_volume_from_snapshot(self, vol, src_snapshot_id, min_vol_size, array_mediator, pool):
         vol_name = vol.volume_name
         try:
             src_snapshot = array_mediator.get_snapshot_by_id(src_snapshot_id)
@@ -152,7 +152,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             src_snapshot_capacity = src_snapshot.capacity_bytes
             logger.debug("Copy snapshot {0} data to volume {1}.".format(src_snapshot_id, vol_name))
             array_mediator.copy_to_existing_volume_from_snapshot(vol_name, src_snapshot_name, src_snapshot_capacity,
-                                                                 min_vol_size)
+                                                                 min_vol_size, pool)
             logger.debug("Copy volume from snapshot finished")
         except controller_errors.VolumeNotFoundError as ex:
             logger.error("Volume not found while copying snapshot data to volume")
@@ -418,7 +418,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 volume_name = array_mediator.get_volume_name(vol_id)
                 logger.info("Snapshot name : {}. Volume name : {}".format(snapshot_name, volume_name))
-                snapshot = array_mediator.get_snapshot(snapshot_name)
+                snapshot = array_mediator.get_snapshot(
+                    snapshot_name,
+                    volume_context=request.parameters
+                )
 
                 if snapshot:
                     if snapshot.volume_name != volume_name:
@@ -431,7 +434,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug(
                         "Snapshot doesn't exist. Creating a new snapshot {0} from volume {1}".format(snapshot_name,
                                                                                                      volume_name))
-                    snapshot = array_mediator.create_snapshot(snapshot_name, volume_name)
+                    snapshot = array_mediator.create_snapshot(snapshot_name, volume_name, request.parameters)
 
                 logger.debug("generating create snapshot response")
                 res = utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
