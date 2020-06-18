@@ -445,7 +445,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise array_errors.VolumeNotFoundError(volume_id)
 
     def _get_api_volume_by_name(self, volume_name, pool_id):
-        logger.info("Getting volume {}".format(volume_name))
+        logger.info("Getting volume {} in pool {}".format(volume_name, pool_id))
         if not pool_id:
             pools = self._get_pools()
         else:
@@ -492,7 +492,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     def get_snapshot(self, snapshot_name, volume_context=None):
-        logger.debug("Get snapshot : {}".format(snapshot_name))
+        logger.debug("Get snapshot : {} with context: {}".format(snapshot_name, volume_context))
         if not volume_context:
             logger.error(
                 "volume_context is not specified, can not get volumes from storage."
