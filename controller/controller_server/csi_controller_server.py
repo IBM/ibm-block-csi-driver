@@ -54,6 +54,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateVolumeResponse()
+        except ObjectIdError as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.NOT_FOUND)
+            return csi_pb2.CreateVolumeResponse()
 
         volume_name = request.name
         logger.debug("volume name : {}".format(volume_name))
