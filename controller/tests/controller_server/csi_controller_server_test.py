@@ -238,7 +238,8 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         array_type.return_value = "a9k"
         self.servicer.CreateSnapshot(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
-        self.mediator.create_snapshot.assert_called_once_with("prefix_some_name", "snap_vol", {'snapshot_name_prefix': 'prefix'})
+        self.mediator.create_snapshot.assert_called_once_with("prefix_some_name", "snap_vol",
+                                                              {'snapshot_name_prefix': 'prefix'})
 
 
 class TestControllerServerDeleteSnapshot(unittest.TestCase):
