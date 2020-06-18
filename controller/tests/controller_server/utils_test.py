@@ -84,7 +84,7 @@ class TestUtils(unittest.TestCase):
         request = Mock()
         snapshot_source = Mock()
         request.volume_content_source = snapshot_source
-        snapshot_source.snapshot_id = "snap_id"
+        snapshot_source.snapshot.snapshot_id = "A9000:snap_id"
         is_snapshot_source = True
         snapshot_source.HasField.side_effect = [is_snapshot_source]
         utils.validate_create_volume_source(request)
@@ -164,6 +164,7 @@ class TestUtils(unittest.TestCase):
             self.assertTrue("parameters" in ex.message)
 
         request.parameters = {"pool": "pool1", "SpaceEfficiency": "thin "}
+        request.volume_content_source = None
 
         utils.validate_create_volume_request(request)
 
