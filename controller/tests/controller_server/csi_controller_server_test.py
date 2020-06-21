@@ -104,17 +104,22 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     def test_create_snapshot_with_empty_name(self, a_enter):
         self._test_create_object_with_empty_name(a_enter)
 
-    @patch("controller.controller_server.csi_controller_server.detect_array_type")
-    @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_snapshot_succeeds(self, storage_agent, array_type):
+    def _prepare_create_snapshot_mocks(self, storage_agent, array_type):
         storage_agent.return_value = self.storage_agent
-        context = utils.FakeContext()
+
         self.mediator.create_snapshot = Mock()
         self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, "snap", "wwn",
                                                                                                "snap_vol", "xiv")
         self.mediator.get_volume_name = Mock()
         self.mediator.get_volume_name.return_value = snap_vol_name
         array_type.return_value = "a9k"
+
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_snapshot_succeeds(self, storage_agent, array_type):
+        self._prepare_create_snapshot_mocks(storage_agent, array_type)
+        context = utils.FakeContext()
+
         self.servicer.CreateSnapshot(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.mediator.get_snapshot.assert_called_once_with(snap_name)
@@ -178,15 +183,13 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_snapshot_with_get_snapshot_name_too_long_exception(self, storage_agent, array_type):
-        storage_agent.return_value = self.storage_agent
-        self.mediator.get_volume_name = Mock()
-        self.mediator.get_volume_name.return_value = snap_vol_name
+    def test_create_snapshot_with_get_snapshot_name_too_long_success(self, storage_agent, array_type):
+        self._prepare_create_snapshot_mocks(storage_agent, array_type)
         self.mediator.max_snapshot_name_length = 63
         context = utils.FakeContext()
         self.request.name = "a" * 128
         self.servicer.CreateSnapshot(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
+        self.assertEqual(context.code, grpc.StatusCode.OK)
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.create_snapshot")
@@ -354,16 +357,20 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     def test_create_volume_with_empty_name(self, storage_agent):
         self._test_create_object_with_empty_name(storage_agent)
 
-    @patch("controller.controller_server.csi_controller_server.detect_array_type")
-    @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_volume_succeeds(self, storage_agent, array_type):
+    def _prepare_create_volume_mocks(self, storage_agent, array_type):
         storage_agent.return_value = self.storage_agent
-        context = utils.FakeContext()
 
         self.mediator.create_volume = Mock()
         self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn", "xiv")
         array_type.return_value = "a9k"
-        res = self.servicer.CreateVolume(self.request, context)
+
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_succeeds(self, storage_agent, array_type):
+        self._prepare_create_volume_mocks(storage_agent, array_type)
+        context = utils.FakeContext()
+
+        self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
         self.mediator.get_volume.assert_called_once_with(vol_name, volume_context={'pool': 'pool1'}, volume_prefix="")
         self.mediator.create_volume.assert_called_once_with(vol_name, 10, {}, 'pool1', "")
@@ -450,13 +457,13 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_volume_with_get_volume_name_too_long_exception(self, storage_agent, array_type):
-        storage_agent.return_value = self.storage_agent
+    def test_create_volume_with_get_volume_name_too_long_success(self, storage_agent, array_type):
+        self._prepare_create_volume_mocks(storage_agent, array_type)
         self.mediator.max_volume_name_length = 63
         context = utils.FakeContext()
         self.request.name = "a" * 128
         self.servicer.CreateVolume(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
+        self.assertEqual(context.code, grpc.StatusCode.OK)
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.create_volume")

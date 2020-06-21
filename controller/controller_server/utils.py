@@ -1,3 +1,6 @@
+from hashlib import sha1
+
+import base58
 from google.protobuf.timestamp_pb2 import Timestamp
 
 import controller.controller_server.config as config
@@ -309,3 +312,7 @@ def get_current_timestamp():
     res = Timestamp()
     res.GetCurrentTime()
     return res
+
+
+def hash_string(string):
+    return base58.b58encode(sha1(string.encode()).digest()).decode()
