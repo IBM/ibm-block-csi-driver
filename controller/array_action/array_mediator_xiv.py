@@ -112,9 +112,8 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def _generate_volume_response(self, cli_volume):
         # vol_copy_type and copy_master_wwn were added in a9k. In xiv they didn't exist
-        copy_src_object_wwn = cli_volume.copy_master_wwn if hasattr(cli_volume, "vol_copy_type") and \
-                                                            cli_volume.vol_copy_type == "Copy" \
-            else None
+        is_copy = hasattr(cli_volume, "vol_copy_type") and cli_volume.vol_copy_type == "Copy"
+        copy_src_object_wwn = cli_volume.copy_master_wwn if is_copy else None
         return Volume(self._convert_size_blocks_to_bytes(cli_volume.capacity),
                       cli_volume.wwn,
                       cli_volume.name,
