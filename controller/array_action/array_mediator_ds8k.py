@@ -453,7 +453,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
         for pool in pools:
             volume_candidates = []
-
             try:
                 volume_candidates.extend(self.client.get_volumes_by_pool(pool.id))
             except exceptions.NotFound as ex:
@@ -684,4 +683,4 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             if flashcopy.sourcevolume == snapshot_id:
                 fc = self._get_flashcopy(flashcopy.id)
                 if fc.out_of_sync_tracks != '0':
-                    raise array_errors.VolumeInUse(snapshot_id)
+                    raise array_errors.SnapshotIsStillInUseError(snapshot_id, fc.targetvolume)
