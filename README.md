@@ -10,7 +10,6 @@ Supported container platforms:
   - Kubernetes v1.17
 
 Supported IBM storage systems:
-  - IBM FlashSystem 9100
   - IBM Spectrum Virtualize Family (including IBM Flash family members built with IBM Spectrum Virtualize (FlashSystem 5010, 5030, 5100, 7200, 9100, 9200, 9200R) and IBM SAN Volume Controller (SVC) models SV2, SA2)
   - IBM FlashSystem A9000/R
   - IBM DS8880
@@ -18,7 +17,7 @@ Supported IBM storage systems:
 
 Supported operating systems:
   - RHEL 7.x (x86 architecture)
-  - RHCOS (x86 and IBM Z architecture)
+  - RHCOS (x86, IBM Z, and IBM PowerPC architecture)
 
 Full documentation can be found on the [IBM Knowledge Center](https://www.ibm.com/support/knowledgecenter/SSRQ8T).
 
@@ -145,10 +144,18 @@ systemctl status multipathd
 multipath -ll
 ```
 
-#### 3. Configure storage system connectivity
-3.1. Define the hostname of each Kubernetes node on the relevant storage systems with the valid WWPN(for Fibre Channel) or IQN(for iSCSI) of the node.
+#### 3. Enable support for volume Snapshots on your Kubernetes Cluster.
+##### 3.1 Install the Snapshot CRDs, once per cluster.
+Use the 'kubectl create -f config/crd' command to create each of the yaml files located in https://github.com/kubernetes-csi/external-snapshotter/tree/master/config/crd.
+Apply each of the yamls, using the 'kubectl apply - f' command.
+##### 3.2 Install the Common Snapshot Controller, once per cluster.
+Use the 'kubectl create -f deploy/kubernetes/snapshot-controller' command to create each of the yaml files located in https://github.com/kubernetes-csi/external-snapshotter/tree/master/deploy/kubernetes/snapshot-controller.
+Apply each of the yamls, using the 'kubectl apply -f' command.
 
-3.2. For Fibre Channel, configure the relevant zoning from the storage to the host.
+#### 4. Configure storage system connectivity
+##### 4.1. Define the hostname of each Kubernetes node on the relevant storage systems with the valid WWPN(for Fibre Channel) or IQN(for iSCSI) of the node.
+
+##### 4.2. For Fibre Channel, configure the relevant zoning from the storage to the host.
 
 
 <br/>
