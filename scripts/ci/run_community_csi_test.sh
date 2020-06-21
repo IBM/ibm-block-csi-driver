@@ -8,6 +8,9 @@ echo "controller logs : ${CONTROLLER_LOGS}"
 echo `pwd`
 sleep 2
 mkdir -p build/reports && chmod 777 build/reports
+set +e
 ./scripts/ci/run_csi_test_client.sh csi-sanity-test `pwd`/build/reports/
 
+docker logs csi-controller > "${CONTROLLER_LOGS}_controller_run.log"
+docker logs csi-node > "${CONTROLLER_LOGS}_node_run.log"
 docker kill csi-controller

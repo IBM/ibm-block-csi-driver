@@ -198,7 +198,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
     def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
-                                              min_vol_size_in_bytes):
+                                              min_vol_size_in_bytes, pool=None):
         logger.debug(
             "Copy snapshot {0} data to volume {1}. Snapshot capacity {2}. Minimal requested volume capacity {3}".format(
                 name, src_snap_name, src_snap_capacity_in_bytes, min_vol_size_in_bytes))
@@ -211,7 +211,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                 min_vol_size_in_blocks = self._convert_size_bytes_to_blocks(min_vol_size_in_bytes)
                 logger.debug(
                     "Increasing volume {0} size to {1} blocks.".format(name, min_vol_size_in_blocks))
-                self.client.cmd.vol_resize(vol=name, size_in_blocks=min_vol_size_in_blocks)
+                self.client.cmd.vol_resize(vol=name, size_blocks=min_vol_size_in_blocks)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectName(ex.status)
@@ -250,7 +250,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
-    def get_snapshot(self, snapshot_name):
+    def get_snapshot(self, snapshot_name, volume_context=None):
         logger.debug("Get snapshot : {}".format(snapshot_name))
         try:
             cli_snapshot = self.client.cmd.vol_list(vol=snapshot_name).as_single_element
@@ -276,7 +276,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.SnapshotIdBelongsToVolumeError(snapshot_id, self.endpoint)
         return self._generate_snapshot_response(cli_snapshot)
 
-    def create_snapshot(self, name, volume_name):
+    def create_snapshot(self, name, volume_name, volume_context=None):
         logger.info("creating snapshot {0} from volume {1}".format(name, volume_name))
 
         try:

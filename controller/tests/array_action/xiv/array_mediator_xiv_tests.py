@@ -104,7 +104,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         vol_size_in_blocks = int(self.mediator._convert_size_bytes_to_blocks(min_vol_size_in_bytes))
         self.mediator.client.cmd.vol_format.assert_called_once_with(vol=vol_name)
         self.mediator.client.cmd.vol_copy.assert_called_once_with(vol_src=src_snap_name, vol_trg=vol_name)
-        self.mediator.client.cmd.vol_resize.assert_called_once_with(vol=vol_name, size_in_blocks=vol_size_in_blocks)
+        self.mediator.client.cmd.vol_resize.assert_called_once_with(vol=vol_name, size_blocks=vol_size_in_blocks)
 
     def test_copy_to_existing_volume_from_snapshot_succeeds_without_resize(self):
         vol_name = "vol"

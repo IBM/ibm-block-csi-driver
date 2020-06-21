@@ -56,7 +56,7 @@ class ArrayMediator(ABC):
 
     @abstractmethod
     def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
-                                              min_vol_size_in_bytes):
+                                              min_vol_size_in_bytes, pool=None):
         """
         This function should create a volume from snapshot in the storage system.
 
@@ -66,6 +66,7 @@ class ArrayMediator(ABC):
             src_snap_capacity_in_bytes   : capacity of snapshot to create from
             min_vol_size_in_bytes        : if snapshot capacity is lower than this value vol will
                                            be increased to this value
+            pool: pool of the volume and snapshot to find them more efficiently.
 
         Returns:
             Volume
@@ -203,11 +204,12 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_snapshot(self, snapshot_name):
+    def get_snapshot(self, snapshot_name, volume_context=None):
         """
         This function return snapshot info about the snapshot.
         Args:
             snapshot_name : name of the snapshot in the storage system
+            volume_context: context of the volume to find the snapshot more efficiently.
         Returns:
            Snapshot
         Raises:
@@ -231,12 +233,13 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_snapshot(self, name, volume_name):
+    def create_snapshot(self, name, volume_name, volume_context=None):
         """
         This function should create a snapshot from volume in the storage system.
         Args:
             name           : name of the snapshot to be created in the storage system
             volume_name    : name of the volume to be created from
+            volume_context: context of the volume to find the snapshot more efficiently.
         Returns:
             Snapshot
         Raises:

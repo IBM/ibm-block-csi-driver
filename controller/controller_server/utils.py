@@ -1,3 +1,6 @@
+from hashlib import sha1
+
+import base58
 from google.protobuf.timestamp_pb2 import Timestamp
 
 import controller.controller_server.config as config
@@ -83,6 +86,8 @@ def validate_create_volume_source(request):
             source_snapshot_id = source_snapshot.snapshot_id
             if not source_snapshot_id:
                 raise ValidationException(messages.volume_src_snapshot_id_is_missing)
+            if config.PARAMETERS_OBJECT_ID_DELIMITER not in source_snapshot_id:
+                raise ObjectIdError(config.OBJECT_TYPE_NAME_SNAPSHOT, source_snapshot_id)
         elif source.HasField(config.VOLUME_SOURCE_VOLUME):
             raise ValidationException(messages.volume_cloning_not_supported_message)
 
@@ -307,3 +312,7 @@ def get_current_timestamp():
     res = Timestamp()
     res.GetCurrentTime()
     return res
+
+
+def hash_string(string):
+    return base58.b58encode(sha1(string.encode()).digest()).decode()
