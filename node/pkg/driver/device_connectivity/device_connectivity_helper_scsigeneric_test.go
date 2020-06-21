@@ -55,11 +55,14 @@ func NewOsDeviceConnectivityHelperScsiGenericForTest(
 const byPathDir = "/dev/disk/by-path"
 
 func getFcPath(fileNameSuffix string) string {
-	var fileNamePrefix = "pci"
-	if runtime.GOARCH == "s390x" {
-		fileNamePrefix = "ccw"
+	var fileNamePrefix = ""
+	if runtime.GOARCH == "amd64" {
+		fileNamePrefix = "pci-*-"
 	}
-	var fileName = fileNamePrefix + fileNameSuffix
+	if runtime.GOARCH == "s390x" {
+		fileNamePrefix = "ccw-*-"
+	}
+	var fileName = fileNamePrefix + "fc" + fileNameSuffix
 	return path.Join(byPathDir, fileName)
 }
 
@@ -339,14 +342,14 @@ func TestGetMpathDevice(t *testing.T) {
 			arrayIdentifiers: []string{"X"},
 			waitForPathToExistReturns: []WaitForPathToExistReturn{
 				WaitForPathToExistReturn{
-					devicePaths: []string{getFcPath("-fc-ID1-lun-1")},
+					devicePaths: []string{getFcPath("-ID1-lun-1")},
 					exists:      true,
 					err:         nil,
 				},
 			},
 			getMultipathDiskReturns: []GetMultipathDiskReturn{
 				GetMultipathDiskReturn{
-					pathParam: getFcPath("-fc-ID1-lun-1"),
+					pathParam: getFcPath("-ID1-lun-1"),
 					path:      "",
 					err:       fmt.Errorf("error"),
 				},
@@ -361,19 +364,19 @@ func TestGetMpathDevice(t *testing.T) {
 			arrayIdentifiers: []string{"X"},
 			waitForPathToExistReturns: []WaitForPathToExistReturn{
 				WaitForPathToExistReturn{
-					devicePaths: []string{getFcPath("-fc-ID1-lun1"), getFcPath("-fc-ID1-lun1___2")},
+					devicePaths: []string{getFcPath("-ID1-lun1"), getFcPath("-ID1-lun1___2")},
 					exists:      true,
 					err:         nil,
 				},
 			},
 			getMultipathDiskReturns: []GetMultipathDiskReturn{
 				GetMultipathDiskReturn{
-					pathParam: getFcPath("-fc-ID1-lun1"),
+					pathParam: getFcPath("-ID1-lun1"),
 					path:      "dm-1",
 					err:       nil,
 				},
 				GetMultipathDiskReturn{
-					pathParam: getFcPath("-fc-ID1-lun1___2"),
+					pathParam: getFcPath("-ID1-lun1___2"),
 					path:      "dm-2", // The main point, look like multipath crazy and give to the same vol but different path a different md device, which is wrong case - so we check it.
 					err:       nil,
 				},
@@ -388,19 +391,19 @@ func TestGetMpathDevice(t *testing.T) {
 			arrayIdentifiers: []string{"X"},
 			waitForPathToExistReturns: []WaitForPathToExistReturn{
 				WaitForPathToExistReturn{
-					devicePaths: []string{getFcPath("-fc-ID1-lun1"), getFcPath("-fc-ID1-lun1___2")},
+					devicePaths: []string{getFcPath("-ID1-lun1"), getFcPath("-ID1-lun1___2")},
 					exists:      true,
 					err:         nil,
 				},
 			},
 			getMultipathDiskReturns: []GetMultipathDiskReturn{
 				GetMultipathDiskReturn{
-					pathParam: getFcPath("-fc-ID1-lun1"),
+					pathParam: getFcPath("-ID1-lun1"),
 					path:      "dm-1",
 					err:       nil,
 				},
 				GetMultipathDiskReturn{
-					pathParam: getFcPath("-fc-ID1-lun1___2"),
+					pathParam: getFcPath("-ID1-lun1___2"),
 					path:      "dm-1", // the same because there are 2 paths to the storage, so we should find 2 sd devices that point to the same dm device
 					err:       nil,
 				},
@@ -415,24 +418,24 @@ func TestGetMpathDevice(t *testing.T) {
 			arrayIdentifiers: []string{"X", "Y"},
 			waitForPathToExistReturns: []WaitForPathToExistReturn{
 				WaitForPathToExistReturn{
-					devicePaths: []string{getFcPath("-fc-0xX-lun1")},
+					devicePaths: []string{getFcPath("-0xX-lun1")},
 					exists:      true,
 					err:         nil,
 				},
 				WaitForPathToExistReturn{
-					devicePaths: []string{getFcPath("-fc-0xY-lun2")},
+					devicePaths: []string{getFcPath("-0xY-lun2")},
 					exists:      true,
 					err:         nil,
 				},
 			},
 			getMultipathDiskReturns: []GetMultipathDiskReturn{
 				GetMultipathDiskReturn{
-					pathParam: getFcPath("-fc-0xX-lun1"),
+					pathParam: getFcPath("-0xX-lun1"),
 					path:      "dm-1",
 					err:       nil,
 				},
 				GetMultipathDiskReturn{
-					pathParam: getFcPath("-fc-0xY-lun2"),
+					pathParam: getFcPath("-0xY-lun2"),
 					path:      "dm-1",
 					err:       nil,
 				},
@@ -475,7 +478,7 @@ func TestGetMpathDevice(t *testing.T) {
 
 			for index, r := range tc.waitForPathToExistReturns {
 				array_inititor := "0x" + strings.ToLower(string(tc.arrayIdentifiers[index]))
-				path := strings.Join([]string{getFcPath("*"), device_connectivity.ConnectionTypeFC, array_inititor, "lun", strconv.Itoa(lunId)}, "-")
+				path := strings.Join([]string{getFcPath(""), array_inititor, "lun", strconv.Itoa(lunId)}, "-")
 				fake_helper.EXPECT().WaitForPathToExist(path, device_connectivity.WaitForMpathRetries, device_connectivity.WaitForMpathWaitIntervalSec).Return(
 					r.devicePaths,
 					r.exists,
@@ -549,7 +552,7 @@ func TestHelperWaitForPathToExist(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
-			devicePath := []string{getFcPath("-fc-ARRAYWWN-lun-LUNID"), "/dev/disk/by-path/ip-ARRAYIP-iscsi-ARRAYIQN-lun-LUNID"}
+			devicePath := []string{getFcPath("-ARRAYWWN-lun-LUNID"), "/dev/disk/by-path/ip-ARRAYIP-iscsi-ARRAYIQN-lun-LUNID"}
 			for _, dp := range devicePath {
 				fake_executer.EXPECT().FilepathGlob(dp).Return(tc.fpaths, tc.globReturnErr)
 				helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fake_executer)
@@ -663,7 +666,7 @@ func TestHelperGetMultipathDisk(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
-			path := []string{getFcPath("-fc-wwn:5"), "/dev/disk/by-path/ip-ARRAYIP-iscsi-ARRAYIQN-lun-LUNID"}
+			path := []string{getFcPath("-wwn:5"), "/dev/disk/by-path/ip-ARRAYIP-iscsi-ARRAYIQN-lun-LUNID"}
 
 			for _, dp := range path {
 				fake_executer.EXPECT().OsReadlink(dp).Return(tc.osReadLinkReturnPath, tc.osReadLinkReturnExc)

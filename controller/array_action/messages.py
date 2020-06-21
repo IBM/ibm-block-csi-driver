@@ -61,6 +61,8 @@ SnapshotIdBelongsToVolumeError_message = "Snapshot not found. Volume with the sa
 
 SnapshotWrongVolumeError_message = "Snapshot {0} exists but it is of Volume {1} and not {2}"
 
+SnapshotIsStillInUseError_message = "Snapshot {0} is still in use by {1}"
+
 InvalidCliResponseError_message = "Invalid CLI response. Details : {0}"
 
 VolumeInUse_massage = "Volume {0} in use"

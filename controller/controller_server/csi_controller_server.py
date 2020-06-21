@@ -486,6 +486,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.debug("snapshot was not found during deletion: {0}".format(ex))
             context.set_code(grpc.StatusCode.OK)
             return csi_pb2.DeleteSnapshotResponse()
+        except controller_errors.SnapshotIsStillInUseError:
+            logger.info("could not delete snapshot while in use: {0}".format(ex))
+            context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+            context.set_details(ex)
+            return csi_pb2.DeleteSnapshotResponse()
         except controller_errors.PermissionDeniedError as ex:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
             context.set_details(ex)
