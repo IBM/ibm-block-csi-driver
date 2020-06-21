@@ -211,7 +211,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                 min_vol_size_in_blocks = self._convert_size_bytes_to_blocks(min_vol_size_in_bytes)
                 logger.debug(
                     "Increasing volume {0} size to {1} blocks.".format(name, min_vol_size_in_blocks))
-                self.client.cmd.vol_resize(vol=name, size_in_blocks=min_vol_size_in_blocks)
+                self.client.cmd.vol_resize(vol=name, size_blocks=min_vol_size_in_blocks)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectName(ex.status)
