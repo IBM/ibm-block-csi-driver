@@ -3,6 +3,6 @@ kind: VolumeSnapshot
 metadata:
   name: demo-snapshot
 spec:
-  volumeSsnapshotClassName: demo-snapshotclass
+  volumeSnapshotClassName: demo-snapshotclass
   source:
     persistentVolumeClaimName: demo-pvc-file-system
