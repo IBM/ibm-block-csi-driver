@@ -55,11 +55,11 @@ def get_volume_id_from_scsi_identifier(scsi_id):
 
 
 def get_source_volume_id_if_exists(api_volume):
-    fc_source = [flashcopy.sourcevolume for flashcopy in api_volume.flashcopy if
-                 flashcopy.targetvolume == api_volume.id]
-    if len(fc_source) != 1:
+    flashcopy_rel_sources = [flashcopy.sourcevolume for flashcopy in api_volume.flashcopy
+                             if flashcopy.targetvolume == api_volume.id]
+    if len(flashcopy_rel_sources) != 1:
         return None
-    return fc_source[0]
+    return flashcopy_rel_sources[0]
 
 
 def is_flashcopy_source(volume_id, volume_flashcopy):
@@ -360,8 +360,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         array_volume_id = get_volume_id_from_scsi_identifier(volume_id)
         array_volume = self._get_api_volume_by_id(array_volume_id)
         flash_copies = array_volume.flashcopy
-        for fc in flash_copies:
-            if fc.sourcevolume == array_volume_id:
+        for flashcopy in flash_copies:
+            if flashcopy.sourcevolume == array_volume_id:
                 return True
         return False
 
@@ -477,13 +477,13 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             if not_exist_err:
                 raise array_errors.VolumeNotFoundError(volume_id)
 
-    def _get_flashcopy(self, fc_id, not_exist_err=True):
-        logger.info("Getting flashcopy {}".format(fc_id))
+    def _get_flashcopy(self, flashcopy_id, not_exist_err=True):
+        logger.info("Getting flashcopy {}".format(flashcopy_id))
         try:
-            return self.client.get_flashcopies(fc_id)
+            return self.client.get_flashcopies(flashcopy_id)
         except exceptions.NotFound as ex:
             if ERROR_CODE_RESOURCE_NOT_EXISTS in str(ex.message).upper():
-                logger.info("{} not found".format(fc_id))
+                logger.info("{} not found".format(flashcopy_id))
                 if not_exist_err:
                     raise ex
         except Exception as ex:
@@ -506,8 +506,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 "FlashCopy relationship not found for target volume: {}".format(snapshot_name))
             raise array_errors.SnapshotNameBelongsToVolumeError(target_api_volume.name,
                                                                 self.service_address)
-        fcrel = self._get_flashcopy(target_api_volume.flashcopy[0].id)
-        source_volume_name = self.get_volume_name(fcrel.source_volume['id'])
+        flashcopy_rel = self._get_flashcopy(target_api_volume.flashcopy[0].id)
+        source_volume_name = self.get_volume_name(flashcopy_rel.source_volume['id'])
         return self._generate_snapshot_response(target_api_volume, source_volume_name)
 
     def _create_similar_volume(self, target_volume_name, source_volume_name, pool_id):
@@ -681,6 +681,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         for flashcopy in flashcopy_list:
             logger.info("Deleting flashcopy: {}".format(flashcopy))
             if flashcopy.sourcevolume == snapshot_id:
-                fc = self._get_flashcopy(flashcopy.id)
-                if fc.out_of_sync_tracks != '0':
-                    raise array_errors.SnapshotIsStillInUseError(snapshot_id, fc.targetvolume)
+                flashcopy_rel = self._get_flashcopy(flashcopy.id)
+                if flashcopy_rel.out_of_sync_tracks != '0':
+                    raise array_errors.SnapshotIsStillInUseError(snapshot_id, flashcopy_rel.targetvolume)
