@@ -43,7 +43,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         with open(path, 'r') as yamlfile:
             self.cfg = yaml.safe_load(yamlfile)  # TODO: add the following when possible : Loader=yaml.FullLoader)
 
-    def CreateVolume(self, request, context):
+    # TODO: CSI-1358 remove "# pylint: disable=too-many-branches"
+    def CreateVolume(self, request, context):  # pylint: disable=too-many-branches
         set_current_thread_name(request.name)
         logger.info("create volume")
         try:
@@ -53,6 +54,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            return csi_pb2.CreateVolumeResponse()
+        except ObjectIdError as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.NOT_FOUND)
             return csi_pb2.CreateVolumeResponse()
 
         volume_name = request.name
