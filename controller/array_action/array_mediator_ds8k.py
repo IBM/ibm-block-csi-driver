@@ -23,7 +23,10 @@ logger = get_stdout_logger()
 
 # response error codes
 ERROR_CODE_INVALID_CREDENTIALS = 'BE7A002D'
+KNOWN_ERROR_CODE_INVALID_CREDENTIALS = 'BE7A0029'
 ERROR_CODE_RESOURCE_NOT_EXISTS = 'BE7A0001'
+INCORRECT_ID = 'BE7A0005'
+NO_TOKEN_IS_SPECIFIED = 'BE7A001A'
 ERROR_CODE_VOLUME_NOT_FOUND_FOR_MAPPING = 'BE586015'
 ERROR_CODE_ALREADY_FLASHCOPY = '000000AE'
 ERROR_CODE_VOLUME_NOT_FOUND_OR_ALREADY_PART_OF_CS_RELATIONSHIP = '00000013'
@@ -155,10 +158,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 raise array_errors.UnsupportedStorageVersionError(
                     self.version, self.SUPPORTED_FROM_VERSION
                 )
-        except exceptions.ClientError as e:
+        except (exceptions.ClientError, exceptions.Unauthorized) as e:
             # BE7A002D=Authentication has failed because the user name and
             # password combination that you have entered is not valid.
-            if ERROR_CODE_INVALID_CREDENTIALS in str(e.message).upper():
+            if ERROR_CODE_INVALID_CREDENTIALS or KNOWN_ERROR_CODE_INVALID_CREDENTIALS in str(
+                    e.message).upper():
                 raise array_errors.CredentialsError(self.service_address)
             else:
                 raise ConnectionError()
@@ -256,8 +260,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
                 logger.info("finished creating volume {}".format(name))
                 return self._generate_volume_response(self.client.get_volume(volume.id))
-        except exceptions.NotFound as ex:
-            if ERROR_CODE_RESOURCE_NOT_EXISTS in str(ex.message).upper():
+        except (exceptions.NotFound, exceptions.InternalServerError) as ex:
+            if ERROR_CODE_RESOURCE_NOT_EXISTS or INCORRECT_ID in str(ex.message).upper():
                 raise array_errors.PoolDoesNotExist(pool_id, self.identifier)
             else:
                 logger.error(
@@ -455,9 +459,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             volume_candidates = []
             try:
                 volume_candidates.extend(self.client.get_volumes_by_pool(pool.id))
-            except exceptions.NotFound as ex:
-                if ERROR_CODE_RESOURCE_NOT_EXISTS in str(ex.message).upper():
-                    raise array_errors.PoolDoesNotExist(pool, self.identifier)
+            except (exceptions.NotFound, exceptions.InternalServerError) as ex:
+                if ERROR_CODE_RESOURCE_NOT_EXISTS or INCORRECT_ID in str(ex.message).upper():
+                    raise array_errors.PoolDoesNotExist(pool.id, self.identifier)
                 else:
                     raise ex
             for volume in volume_candidates:
