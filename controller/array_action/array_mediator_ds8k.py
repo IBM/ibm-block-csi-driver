@@ -29,9 +29,9 @@ ERROR_CODE_ALREADY_FLASHCOPY = '000000AE'
 ERROR_CODE_VOLUME_NOT_FOUND_OR_ALREADY_PART_OF_CS_RELATIONSHIP = '00000013'
 MAX_VOLUME_LENGTH = 16
 
-FC_PERSISTENT_OPTION = "persistent"
-FC_NO_BACKGROUND_COPY_OPTION = "no_background_copy"
-FC_PERMIT_SPACE_EFFICIENT_TARGET = "permit_space_efficient_target"
+FLASHCOPY_PERSISTENT_OPTION = "persistent"
+FLASHCOPY_NO_BACKGROUND_COPY_OPTION = "no_background_copy"
+FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET = "permit_space_efficient_target"
 
 
 def parse_version(bundle):
@@ -295,7 +295,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         if min_vol_size_in_bytes < src_snap_capacity_in_bytes:
             self._extend_volume(volume_id=api_new_volume.id,
                                 new_size_in_bytes=src_snap_capacity_in_bytes)
-        options = [FC_PERSISTENT_OPTION]
+        options = [FLASHCOPY_PERSISTENT_OPTION]
         self._create_flashcopy(source_volume_id=api_snapshot.id, target_volume_id=api_new_volume.id,
                                options=options)
 
@@ -530,7 +530,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         target_volume_id = get_volume_id_from_scsi_identifier(target_volume_id)
         if not options:
             options = []
-        options.append(FC_PERMIT_SPACE_EFFICIENT_TARGET)
+        options.append(FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET)
         try:
             api_flashcopy = self.client.create_flashcopy(source_volume_id=source_volume_id,
                                                          target_volume_id=target_volume_id,
@@ -558,7 +558,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def _create_snapshot(self, target_volume_name, pool_id, source_volume_name):
         target_volume = self._create_similar_volume(target_volume_name, source_volume_name, pool_id)
         source_volume = self.get_volume(source_volume_name, volume_context={config.CONTEXT_POOL: pool_id})
-        options = [FC_NO_BACKGROUND_COPY_OPTION, FC_PERSISTENT_OPTION]
+        options = [FLASHCOPY_NO_BACKGROUND_COPY_OPTION, FLASHCOPY_PERSISTENT_OPTION]
         try:
             return self._create_flashcopy(source_volume.id, target_volume.id, options)
         except (array_errors.VolumeNotFoundError, array_errors.SnapshotAlreadyExists) as ex:
