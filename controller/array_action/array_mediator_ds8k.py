@@ -569,10 +569,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def get_snapshot_by_id(self, src_snapshot_id):
         src_snapshot_id = get_volume_id_from_scsi_identifier(src_snapshot_id)
         api_snapshot = self._get_api_volume_by_id(src_snapshot_id)
-        flashcopy = self._get_flashcopy(api_snapshot.snapshot[0].id)
-        api_source_volume = self._get_api_volume_by_id(flashcopy.source_volume.id)
-        source_volume_name = api_source_volume.name
-        return self._generate_snapshot_response(api_snapshot, source_volume_name)
+        src_volume_id = get_source_volume_id_if_exists(api_snapshot)
+        api_source_volume = self._get_api_volume_by_id(src_volume_id)
+        return self._generate_snapshot_response(api_snapshot, api_source_volume.name)
 
     def create_snapshot(self, name, volume_name, volume_context=None):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
