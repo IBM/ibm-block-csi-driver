@@ -37,9 +37,6 @@ HOST_ISCSI_NAMES_PARAM = 'iscsi_name'
 HOST_WWPNS_PARAM = 'WWPN'
 HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
 
-CLI_OBJECT_TYPE_VOLUME = 'Volume'
-CLI_OBJECT_TYPE_FCMAP = 'FlashCopy Mapping'
-
 FCMAP_STATUS_DONE = 'idle_or_copied'
 
 YES = 'yes'
@@ -198,48 +195,26 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                         is_ready=True,
                         array_type=self.array_type)
 
-    def _get_client_list_method(self, cli_object_type):
-        svcinfo = self.client.svcinfo
-        if cli_object_type == CLI_OBJECT_TYPE_VOLUME:
-            return lambda obj_id: svcinfo.lsvdisk(bytes=True, object_id=obj_id)
-        if cli_object_type == CLI_OBJECT_TYPE_FCMAP:
-            return lambda obj_id: svcinfo.lsfcmap(object_id=obj_id)
-        raise ValueError("No list method for cli object type: {}".format(cli_object_type))
-
-    def _get_cli_object(self, object_name_or_id, cli_object_type, not_exist_err=True):
-        """ Return a cli object. if not_exist_err is True and object doesn't exist, raise error """
-        logger.debug("Get {0} : {1}".format(cli_object_type, object_name_or_id))
-        cli_object = None
-        list_method = self._get_client_list_method(cli_object_type)
+    def _get_cli_volume(self, volume_name_or_id, not_exist_err=True):
         try:
-            cli_object = list_method(object_name_or_id).as_single_element
+            cli_volume = self.client.svcinfo.lsvdisk(bytes=True, object_id=volume_name_or_id).as_single_element
+            if not cli_volume and not_exist_err:
+                raise controller_errors.VolumeNotFoundError(volume_name_or_id)
+            return cli_volume
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 if (OBJ_NOT_FOUND in ex.my_message or
                         NAME_NOT_MEET in ex.my_message):
-                    logger.info("{} not found".format(cli_object_type))
+                    logger.info("volume not found")
                     if not_exist_err:
-                        raise ex
+                        raise controller_errors.VolumeNotFoundError(volume_name_or_id)
         except Exception as ex:
             logger.exception(ex)
             raise ex
-        return cli_object
-
-    def _get_cli_object_if_exists(self, object_name_or_id, cli_object_type):
-        cli_object = self._get_cli_object(object_name_or_id, cli_object_type, not_exist_err=False)
-        logger.debug("cli {0} returned : {1}".format(cli_object_type, cli_object))
-        return cli_object
-
-    def _get_fcmap(self, fcmap_name_or_id):
-        return self._get_cli_object(fcmap_name_or_id, CLI_OBJECT_TYPE_FCMAP)
 
     def _get_cli_volume_if_exists(self, volume_name_or_id):
-        return self._get_cli_object_if_exists(volume_name_or_id, CLI_OBJECT_TYPE_VOLUME)
-
-    def _get_cli_volume(self, volume_name_or_id):
-        cli_volume = self._get_cli_object_if_exists(volume_name_or_id, CLI_OBJECT_TYPE_VOLUME)
-        if not cli_volume:
-            raise controller_errors.VolumeNotFoundError(volume_name_or_id)
+        cli_volume = self._get_cli_volume(volume_name_or_id, not_exist_err=False)
+        logger.debug("cli volume returned : {}".format(cli_volume))
         return cli_volume
 
     def _get_fcmap_as_target_if_exists(self, volume_name):
@@ -413,7 +388,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if not target_cli_volume.FC_id:
             logger.error("FlashCopy Mapping not found for target volume: {}".format(snapshot_name))
             raise controller_errors.SnapshotNameBelongsToVolumeError(target_cli_volume.name, self.endpoint)
-        fcmap = self._get_fcmap(target_cli_volume.FC_id)
+        fcmap = self._get_fcmap_as_target_if_exists(target_cli_volume.FC_id)
         return self._generate_snapshot_response(target_cli_volume, fcmap.source_vdisk_name)
 
     def get_snapshot_by_id(self, src_snapshot_id):
