@@ -138,6 +138,8 @@ def validate_create_snapshot_request(request):
     logger.debug("validating secrets")
     if request.secrets:
         validate_secret(request.secrets)
+    if not request.source_volume_id:
+        raise ValidationException(messages.snapshot_src_volume_id_is_missing)
     logger.debug("request validation finished.")
 
 
