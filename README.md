@@ -17,7 +17,7 @@ Supported IBM storage systems:
 
 Supported operating systems:
   - RHEL 7.x (x86 architecture)
-  - RHCOS (x86, IBM Z, and IBM PowerPC architecture)
+  - RHCOS (x86, IBM Z, and IBM PowerPC architectures)
 
 Full documentation can be found on the [IBM Knowledge Center](https://www.ibm.com/support/knowledgecenter/SSRQ8T).
 
@@ -153,7 +153,7 @@ Use the 'kubectl create -f deploy/kubernetes/snapshot-controller' command to cre
 Apply each of the yamls, using the 'kubectl apply -f' command.
 
 #### 4. Configure storage system connectivity
-##### 4.1. Define the hostname of each Kubernetes node on the relevant storage systems with the valid WWPN(for Fibre Channel) or IQN(for iSCSI) of the node.
+##### 4.1. Define the hostname of each Kubernetes node on the relevant storage systems with the valid WWPN (for Fibre Channel) or IQN (for iSCSI) of the node.
 
 ##### 4.2. For Fibre Channel, configure the relevant zoning from the storage to the host.
 
