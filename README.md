@@ -19,7 +19,7 @@ Supported operating systems:
   - RHEL 7.x (x86 architecture)
   - RHCOS (x86, IBM Z, and IBM PowerPC architectures)
 
-Full documentation can be found on the [IBM Knowledge Center](https://www.ibm.com/support/knowledgecenter/SSRQ8T).
+Full documentation can be found on the [IBM Knowledge Center] (https://www.ibm.com/support/knowledgecenter/SSRQ8T).
 
 <br/>
 <br/>
@@ -167,7 +167,7 @@ curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/master/deploy/
 ```
 
 #### 2. (Optional): If required, update the image fields in the ibm-block-csi-operator.yaml.
-
+**Note**: Updating the namespace to a user-defined namespace may be necessary in order to ensure consistency and avoid trouble installing the operator.
 
 #### 3. Create a namespace.
 
