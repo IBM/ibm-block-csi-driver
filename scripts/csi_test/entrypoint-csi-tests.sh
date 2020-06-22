@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 
 echo "JUNIT OUTPUT"
 echo ${JUNIT_OUTPUT} ${SECRET_FILE} ${PARAM_FILE} ${ENDPOINT} ${TESTS_TO_RUN_FILE}
