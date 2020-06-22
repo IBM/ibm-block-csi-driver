@@ -17,6 +17,6 @@ echo "TESTT ${STORAGE_ARRAYS}  ${USERNAME}  ${PASSWORD}"
 sed -i -e "s/POOL_NAME/${POOL_NAME}/g" ${PARAM_FILE}
 
 # get tests to run
-TESTS=`cat ${TESTS_TO_RUN_FILE}| awk '{$1=$1};1' |tr ' ' "|"`
+TESTS=`cat ${TESTS_TO_RUN_FILE}| awk '{$1=$1};1' |tr [:space:] "|"`
 
 /usr/local/go/src/github.com/kubernetes-csi/csi-test/cmd/csi-sanity/csi-sanity  --csi.endpoint ${ENDPOINT} --csi.controllerendpoint ${ENDPOINT_CONTROLLER} --csi.secrets ${SECRET_FILE} --csi.testvolumeparameters ${PARAM_FILE}  --csi.junitfile ${JUNIT_OUTPUT} --ginkgo.focus ${TESTS}
