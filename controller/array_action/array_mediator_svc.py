@@ -388,7 +388,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if not target_cli_volume.FC_id:
             logger.error("FlashCopy Mapping not found for target volume: {}".format(snapshot_name))
             raise controller_errors.SnapshotNameBelongsToVolumeError(target_cli_volume.name, self.endpoint)
-        fcmap = self._get_fcmap_as_target_if_exists(target_cli_volume.FC_id)
+        fcmap = self._get_fcmap_as_target_if_exists(target_cli_volume.name)
+        if not fcmap:
+            raise controller_errors.SnapshotNameBelongsToVolumeError(target_cli_volume.name, self.endpoint)
         return self._generate_snapshot_response(target_cli_volume, fcmap.source_vdisk_name)
 
     def get_snapshot_by_id(self, src_snapshot_id):
