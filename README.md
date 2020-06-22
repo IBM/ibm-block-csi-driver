@@ -144,18 +144,10 @@ systemctl status multipathd
 multipath -ll
 ```
 
-#### 3. Enable support for volume Snapshots on your Kubernetes Cluster.
-##### 3.1 Install the Snapshot CRDs, once per cluster.
-Use the 'kubectl create -f config/crd' command to create each of the yaml files located in https://github.com/kubernetes-csi/external-snapshotter/tree/master/config/crd.
-Apply each of the yamls, using the 'kubectl apply - f' command.
-##### 3.2 Install the Common Snapshot Controller, once per cluster.
-Use the 'kubectl create -f deploy/kubernetes/snapshot-controller' command to create each of the yaml files located in https://github.com/kubernetes-csi/external-snapshotter/tree/master/deploy/kubernetes/snapshot-controller.
-Apply each of the yamls, using the 'kubectl apply -f' command.
+#### 3. Configure storage system connectivity
+##### 3.1. Define the hostname of each Kubernetes node on the relevant storage systems with the valid WWPN (for Fibre Channel) or IQN (for iSCSI) of the node.
 
-#### 4. Configure storage system connectivity
-##### 4.1. Define the hostname of each Kubernetes node on the relevant storage systems with the valid WWPN (for Fibre Channel) or IQN (for iSCSI) of the node.
-
-##### 4.2. For Fibre Channel, configure the relevant zoning from the storage to the host.
+##### 3.2. For Fibre Channel, configure the relevant zoning from the storage to the host.
 
 
 <br/>
