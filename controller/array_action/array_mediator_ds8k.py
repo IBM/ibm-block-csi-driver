@@ -413,7 +413,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             lunid = None
             for mapping in mappings:
                 if mapping.volume == array_volume_id:
-                    lunid = mapping.lunid
+                    lunid = mapping.id
                     break
             if lunid is not None:
                 self.client.unmap_volume_from_host(

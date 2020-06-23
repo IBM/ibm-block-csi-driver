@@ -209,7 +209,7 @@ class RESTClient(object):
     def unmap_volume_from_host(self, host_name, lunid):
         return self._client.unmap_volume_from_host(
             host_name=host_name,
-            lunid=int_to_scsilun(lunid)
+            lunid=lunid
         )
 
     def create_flashcopy(self, source_volume_id, target_volume_id, options=None):
