@@ -583,8 +583,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             logger.error(
                 "volume_context is not specified, can not get volumes from storage."
             )
+        full_name = shorten_volume_name(name, prefix="")
         pool = volume_context[config.CONTEXT_POOL]
-        target_api_volume = self._create_snapshot(name, pool, source_volume_name=volume_name)
+        target_api_volume = self._create_snapshot(full_name, pool, source_volume_name=volume_name)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
         return self._generate_snapshot_response(target_api_volume, volume_name)
 
