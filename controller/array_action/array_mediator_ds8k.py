@@ -95,6 +95,13 @@ def shorten_volume_name(name, prefix):
         return (prefix + settings.NAME_PREFIX_SEPARATOR + hashed)[:MAX_VOLUME_LENGTH]
 
 
+def shorten_snapshot_name(name):
+    prefix = name.split(settings.NAME_PREFIX_SEPARATOR)[0]
+    if prefix != name:
+        return shorten_volume_name(name, prefix)
+    return shorten_volume_name(name, prefix="")
+
+
 class DS8KArrayMediator(ArrayMediatorAbstract):
     SUPPORTED_FROM_VERSION = '7.5.1'
 
@@ -583,8 +590,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             logger.error(
                 "volume_context is not specified, can not get volumes from storage."
             )
+        full_name = shorten_snapshot_name(name)
         pool = volume_context[config.CONTEXT_POOL]
-        target_api_volume = self._create_snapshot(name, pool, source_volume_name=volume_name)
+        target_api_volume = self._create_snapshot(full_name, pool, source_volume_name=volume_name)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
         return self._generate_snapshot_response(target_api_volume, volume_name)
 
