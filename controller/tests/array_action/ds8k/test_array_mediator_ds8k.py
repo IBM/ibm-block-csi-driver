@@ -308,7 +308,6 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.get_host_mappings.return_value = [
             Munch({
                 "volume": volume_id,
-                "lunid": lunid,
                 "id": lunid
             })
         ]
@@ -324,7 +323,6 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.get_host_mappings.return_value = [
             Munch({
                 "volume": volume_id,
-                "lunid": lunid,
                 "id": lunid
             })
         ]
