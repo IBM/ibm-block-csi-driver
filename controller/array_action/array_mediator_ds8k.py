@@ -96,7 +96,7 @@ def shorten_volume_name(name, prefix):
 
 
 def shorten_snapshot_name(name):
-    prefix = name.split(settings.NAME_PREFIX_SEPARATOR, 2)[0]
+    prefix = name.split(settings.NAME_PREFIX_SEPARATOR)[0]
     if prefix != name:
         return shorten_volume_name(name, prefix)
     return shorten_volume_name(name, prefix="")
