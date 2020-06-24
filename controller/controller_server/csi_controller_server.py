@@ -397,7 +397,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def CreateSnapshot(self, request, context):
         set_current_thread_name(request.name)
-        logger.info("Create snapshot with the request: {}".format(request))
+        logger.info("Create snapshot")
         try:
             utils.validate_create_snapshot_request(request)
         except ValidationException as ex:
