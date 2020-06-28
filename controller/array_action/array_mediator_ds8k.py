@@ -30,7 +30,6 @@ NO_TOKEN_IS_SPECIFIED = 'BE7A001A'
 ERROR_CODE_VOLUME_NOT_FOUND_FOR_MAPPING = 'BE586015'
 ERROR_CODE_ALREADY_FLASHCOPY = '000000AE'
 ERROR_CODE_VOLUME_NOT_FOUND_OR_ALREADY_PART_OF_CS_RELATIONSHIP = '00000013'
-MAX_VOLUME_LENGTH = 16
 
 FLASHCOPY_PERSISTENT_OPTION = "persistent"
 FLASHCOPY_NO_BACKGROUND_COPY_OPTION = "no_background_copy"
@@ -74,27 +73,6 @@ def hash_string(string):
     return base58.b58encode(sha1(string.encode()).digest()).decode()
 
 
-#
-def shorten_volume_name(name, prefix):
-    """
-    shorten volume name to 16 characters if it is too long.
-
-    :param name: the origin name with prefix
-    :param prefix: the prefix of the name
-    :return: a short name with the origin prefix
-    """
-
-    if len(name) <= MAX_VOLUME_LENGTH:
-        return name
-
-    if not prefix:
-        return hash_string(name)[:MAX_VOLUME_LENGTH]
-    else:
-        name_without_prefix = str(name).split(prefix + settings.NAME_PREFIX_SEPARATOR, 2)[1]
-        hashed = hash_string(name_without_prefix)
-        return (prefix + settings.NAME_PREFIX_SEPARATOR + hashed)[:MAX_VOLUME_LENGTH]
-
-
 class DS8KArrayMediator(ArrayMediatorAbstract):
     SUPPORTED_FROM_VERSION = '7.5.1'
 
@@ -108,9 +86,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     @classproperty
     def max_volume_name_length(self):
-        # the max length is 16 on storage side, it is too short, use shorten_volume_name to workaround it.
-        # so 63 here is just a soft limit, to make sure the volume name won't be very long.
-        return 63
+        return 16
 
     @classproperty
     def max_volume_prefix_length(self):
@@ -235,7 +211,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         try:
             cli_kwargs = {}
             cli_kwargs.update({
-                'name': shorten_volume_name(name, volume_prefix),
+                'name': name,
                 'capacity_in_bytes': size_in_bytes,
                 'pool_id': pool_id,
                 'tp': self.get_se_capability_value(capabilities),
@@ -466,7 +442,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                     raise ex
             for volume in volume_candidates:
                 logger.info("Checking volume: {}".format(volume.name))
-                if volume.name == shorten_volume_name(volume_name, prefix=''):
+                if volume.name == volume_name:
                     logger.debug("Found volume: {}".format(volume))
                     volume.flashcopy = self.get_flashcopies_by_volume(volume.id)
                     return volume
