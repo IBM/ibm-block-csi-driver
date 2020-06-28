@@ -11,8 +11,6 @@ from controller.array_action.array_mediator_ds8k import DS8KArrayMediator, FLASH
     FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET
 from controller.array_action.array_mediator_ds8k import LOGIN_PORT_WWPN, LOGIN_PORT_STATE, \
     LOGIN_PORT_STATE_ONLINE
-from controller.array_action.array_mediator_ds8k import shorten_volume_name
-from controller.common import settings
 from controller.common.node_info import Initiators
 
 
@@ -62,18 +60,6 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
         self.array = DS8KArrayMediator("user", "password", self.endpoint)
 
-    def test_shorten_volume_name(self):
-        test_prefix = "test"
-        test_name = "it is a very very long volume name"
-        full_name = test_prefix + settings.NAME_PREFIX_SEPARATOR + test_name
-        new_name = shorten_volume_name(full_name, test_prefix)
-
-        # new name length should be 16
-        self.assertEqual(len(new_name), 16)
-
-        # the volume prefix should not be changed.
-        self.assertTrue(new_name.startswith(test_prefix + settings.NAME_PREFIX_SEPARATOR))
-
     def test_connect_with_incorrect_credentials(self):
         self.client_mock.get_system.side_effect = \
             ClientError("400", "BE7A002D")
@@ -113,20 +99,6 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             }
         )
         self.assertEqual(volume.volume_name, self.volume_response.name)
-
-    def test_get_volume_with_long_name(self):
-        volume_name = "it is a very long name, more than 16 characters"
-        short_name = shorten_volume_name(volume_name, "")
-        volume_res = self.volume_response
-        volume_res.name = short_name
-        self.client_mock.get_volumes_by_pool.return_value = [volume_res, ]
-        volume = self.array.get_volume(
-            volume_name,
-            volume_context={
-                config.CONTEXT_POOL: self.volume_response.pool
-            }
-        )
-        self.assertEqual(volume.volume_name, short_name)
 
     def test_get_volume_with_pool_context_not_found(self):
         self.client_mock.get_volumes_by_pool.return_value = [
@@ -180,28 +152,6 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             self.volume_response.name, "1", {}, pool_id,
         )
         self.assertEqual(volume.volume_name, self.volume_response.name)
-
-    def test_create_volume_with_long_name_succeeded(self):
-        volume_name = "it is a very long name, more than 16 characters"
-        short_name = shorten_volume_name(volume_name, "")
-        volume_res = self.volume_response
-        volume_res.name = short_name
-        self.client_mock.create_volume.return_value = volume_res
-        self.client_mock.get_volume.return_value = volume_res
-        size_in_bytes = volume_res.cap
-        capabilities = {}
-        tp = 'none'
-        pool_id = volume_res.pool
-        volume = self.array.create_volume(
-            volume_name, size_in_bytes, capabilities, pool_id,
-        )
-        self.client_mock.create_volume.assert_called_once_with(
-            pool_id=pool_id,
-            capacity_in_bytes=self.volume_response.cap,
-            tp=tp,
-            name=short_name,
-        )
-        self.assertEqual(volume.volume_name, short_name)
 
     def test_create_volume_failed_with_ClientException(self):
         self.client_mock.create_volume.side_effect = ClientException("500")
@@ -413,8 +363,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.get_snapshot.side_effect = [ClientError("400", "BE7A002D")]
 
         snapshot = self.array.get_snapshot("fake_name", volume_context={
-                config.CONTEXT_POOL: self.volume_response.pool
-            })
+            config.CONTEXT_POOL: self.volume_response.pool
+        })
 
         self.assertIsNone(snapshot)
 
@@ -449,8 +399,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.get_flashcopies.return_value = self.flashcopy_response
 
         volume = self.array.get_snapshot("test_name", volume_context={
-                config.CONTEXT_POOL: self.volume_response.pool
-            })
+            config.CONTEXT_POOL: self.volume_response.pool
+        })
         self.assertEqual(volume.snapshot_name, target_vol.name)
 
     def _prepare_mocks_for_create_snapshot(self):
@@ -510,8 +460,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.create_flashcopy.return_value = self.flashcopy_response
         self.client_mock.get_flashcopies.return_value = self.flashcopy_response
         snapshot = self.array.create_snapshot("target_vol", "test_name", volume_context={
-                config.CONTEXT_POOL: self.volume_response.pool
-            })
+            config.CONTEXT_POOL: self.volume_response.pool
+        })
 
         self.assertEqual(snapshot.snapshot_name, volume.name)
         self.assertEqual(snapshot.id, self.array._generate_volume_scsi_identifier(volume.id))
