@@ -590,11 +590,16 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         max_name_prefix_length
                     )
                 )
-            full_name = settings.NAME_PREFIX_SEPARATOR.join((prefix, name))
+            full_name = self._join_object_prefix_with_name(prefix, name)
         if len(full_name) > max_name_length:
             hashed_name = utils.hash_string(name)
-            full_name = settings.NAME_PREFIX_SEPARATOR.join((prefix, hashed_name))
+            full_name = self._join_object_prefix_with_name(prefix, hashed_name)
         return full_name[:max_name_length], prefix
+
+    def _join_object_prefix_with_name(self, prefix, name):
+        if prefix:
+            return settings.NAME_PREFIX_SEPARATOR.join((prefix, name))
+        return name
 
     def GetPluginCapabilities(self, request, context):
         logger.info("GetPluginCapabilities")
