@@ -1,7 +1,7 @@
 from pyds8k.client.ds8k.v1.client import Client
 from pyds8k.exceptions import NotFound
 from controller.common.csi_logger import get_stdout_logger
-
+from munch import Munch
 logger = get_stdout_logger()
 
 
@@ -74,6 +74,16 @@ class RESTClient(object):
 
         self._client = Client(**client_kwargs)
 
+    def is_valid(self):
+        try:
+            # Send command to check if client is still valid. IO enclosures is chosen since it is fast.
+            self._client.get_io_enclosures()
+            return True
+        except Exception as ex:
+            logger.info("The client is not valid")
+            logger.exception(ex)
+            return False
+
     def get_system(self):
         return self._client.get_systems()[0]
 
@@ -117,9 +127,6 @@ class RESTClient(object):
     def get_volumes_by_pool(self, pool_id):
         return self._client.get_volumes_by_pool(pool_id)
 
-    def get_flashcopies(self):
-        return self._client.get_flashcopies()
-
     def get_flashcopies_by_volume(self, volume_id):
         return self._client.get_flashcopies_by_volume(volume_id)
 
@@ -129,14 +136,8 @@ class RESTClient(object):
     def get_volumes_by_lss(self, lss_number):
         return self._client.get_volumes_by_lss(lss_number)
 
-    def get_fcports(self):
-        return self._client.get_ioports()
-
     def get_host_mappings(self, host_name):
         return self._client.get_mappings_by_host(host_name)
-
-    def get_ioports_by_host(self, host_name):
-        return self._client.get_ioports_by_host(host_name)
 
     def get_user(self):
         return self._client.get_users(user_name=self.user)
@@ -208,8 +209,22 @@ class RESTClient(object):
     def unmap_volume_from_host(self, host_name, lunid):
         return self._client.unmap_volume_from_host(
             host_name=host_name,
-            lunid=int_to_scsilun(lunid)
+            lunid=lunid
         )
+
+    def create_flashcopy(self, source_volume_id, target_volume_id, options=None):
+        return self._client.create_cs_flashcopy(
+            volume_pairs=[{"source_volume": source_volume_id,
+                           "target_volume": target_volume_id
+                           }],
+            options=options
+        )[0]
+
+    def delete_flashcopy(self, flashcopy_id):
+        return self._client.delete_cs_flashcopy(flashcopy_id)
+
+    def get_flashcopies(self, fcid=None):
+        return self._client.get_cs_flashcopies(fcid)
 
     def _get_attach_or_create_host_port(self, host_name, wwpn):
         try:

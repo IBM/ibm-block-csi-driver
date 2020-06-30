@@ -50,14 +50,24 @@ type OsDeviceConnectivityHelperScsiGeneric struct {
 	MutexMultipathF *sync.Mutex
 }
 
+type WaitForMpathResult struct {
+	devicesPaths []string
+	err          error
+}
+
 var (
 	TimeOutMultipathFlashCmd = 4 * 1000
 )
 
 const (
-	DevPath             = "/dev"
-	ConnectionTypeISCSI = "iscsi"
-	ConnectionTypeFC    = "fc"
+	DevPath                     = "/dev"
+	ConnectionTypeISCSI         = "iscsi"
+	ConnectionTypeFC            = "fc"
+	WaitForMpathRetries         = 5
+	WaitForMpathWaitIntervalSec = 1
+	FC_HOST_SYSFS_PATH          = "/sys/class/fc_remote_ports/rport-*/port_name"
+	IscsiHostRexExPath          = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
+	GetMpahDevErrorsSep         = ","
 )
 
 func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperScsiGenericInterface {
@@ -145,11 +155,10 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 	}
 	var devicePaths []string
 	var errStrings []string
-	var targetPath string
-	lunIdStr := convertIntToScsilun(lunId)
+	var subsystemPrefix string
 
 	if connectivityType == ConnectionTypeFC {
-		targetPath = fmt.Sprintf("/dev/disk/by-path/%s*", fcSubsystem)
+		subsystemPrefix = fcSubsystemPrefix
 		// In host, the path like this: /dev/disk/by-path/pci-0000:13:00.0-fc-0x500507680b25c0aa-lun-0
 		// So add prefix "0x" for the arrayIdentifiers
 		for index, wwn := range arrayIdentifiers {
@@ -157,26 +166,29 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 		}
 	}
 	if connectivityType == ConnectionTypeISCSI {
-		targetPath = "/dev/disk/by-path/ip*"
+		subsystemPrefix = "ip*-"
 	}
 
+	var targetPath = fmt.Sprintf("/dev/disk/by-path/%s", subsystemPrefix)
+
+	logger.Debugf("GetMpathDevice: Start concurrent multipath devices search for volume : [%s]", volumeId)
+	mpathResChannel := make(chan *WaitForMpathResult)
 	for _, arrayIdentifier := range arrayIdentifiers {
-		dp := strings.Join([]string{targetPath, connectivityType, arrayIdentifier, "lun", lunIdStr}, "-")
-		logger.Infof("GetMpathDevice: Get the mpath devices related to connectivityType=%s initiator=%s and lunID=%d : {%v}", connectivityType, arrayIdentifier, lunId, dp)
-		dps, exists, e := r.Helper.WaitForPathToExist(dp, 5, 1)
-		if e != nil {
-			logger.Errorf("GetMpathDevice: No device found error : %v ", e.Error())
-			errStrings = append(errStrings, e.Error())
-		} else if !exists {
-			e := &MultipleDeviceNotFoundForLunError{volumeId, lunId, []string{arrayIdentifier}}
-			logger.Errorf(e.Error())
-			errStrings = append(errStrings, e.Error())
-		}
-		devicePaths = append(devicePaths, dps...)
+		go r.waitForMpath(targetPath, connectivityType, arrayIdentifier, lunId, volumeId, mpathResChannel)
 	}
+
+	for i := 1; i <= len(arrayIdentifiers); i++ {
+		mpathRes := <-mpathResChannel
+		devicePaths = append(devicePaths, mpathRes.devicesPaths...)
+		if mpathRes.err != nil {
+			errStrings = append(errStrings, mpathRes.err.Error())
+		}
+	}
+	close(mpathResChannel)
+	logger.Debugf("GetMpathDevice: Finished concurrent multipath devices search for volume : [%s]", volumeId)
 
 	if len(devicePaths) == 0 && len(errStrings) != 0 {
-		err := errors.New(strings.Join(errStrings, ","))
+		err := errors.New(strings.Join(errStrings, GetMpahDevErrorsSep))
 		return "", err
 	}
 
@@ -211,6 +223,22 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 		break // because its a single value in the map(1 mpath device, if not it should fail above), so just take the first
 	}
 	return md, nil
+}
+
+func (r OsDeviceConnectivityHelperScsiGeneric) waitForMpath(targetPath string, connectivityType string, arrayIdentifier string, lunId int, volumeId string,
+	resChannel chan<- *WaitForMpathResult) {
+	lunIdStr := convertIntToScsilun(lunId)
+	dp := targetPath + strings.Join([]string{connectivityType, arrayIdentifier, "lun", lunIdStr}, "-")
+	logger.Infof("waitForMpath: Get the mpath devices related to connectivityType=%s initiator=%s and lunID=%d : {%v}", connectivityType, arrayIdentifier, lunId, dp)
+	dps, exists, e := r.Helper.WaitForPathToExist(dp, WaitForMpathRetries, WaitForMpathWaitIntervalSec)
+	if e != nil {
+		logger.Errorf("waitForMpath: No device found error : %v ", e.Error())
+	} else if !exists {
+		e = &MultipathDeviceNotFoundForLunError{volumeId, lunId, []string{arrayIdentifier}}
+		logger.Errorf(e.Error())
+	}
+	res := &WaitForMpathResult{devicesPaths: dps, err: e}
+	resChannel <- res
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice string) error {
@@ -403,11 +431,6 @@ func (o OsDeviceConnectivityHelperGeneric) GetMultipathDisk(path string) (string
 	logger.Errorf(err.Error())
 	return "", err
 }
-
-const (
-	FC_HOST_SYSFS_PATH = "/sys/class/fc_remote_ports/rport-*/port_name"
-	IscsiHostRexExPath = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
-)
 
 func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error) {
 	/*

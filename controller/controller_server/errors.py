@@ -13,7 +13,7 @@ class ValidationException(BaseControllerServerException):
         self.message = messages.ValidationException_message.format(msg)
 
 
-class VolumeIdError(BaseControllerServerException):
+class ObjectIdError(BaseControllerServerException):
 
-    def __init__(self, id):
-        self.message = messages.VolumeIdError_message.format(id)
+    def __init__(self, object_type, object_id):
+        self.message = messages.ObjectIdError_message.format(object_type, object_id)

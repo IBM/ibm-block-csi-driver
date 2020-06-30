@@ -3,3 +3,5 @@ CreateVolume
 DeleteVolume
 NodeGetCapabilities
 NodeGetInfo
+CreateSnapshot
+DeleteSnapshot

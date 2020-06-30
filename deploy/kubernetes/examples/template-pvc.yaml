@@ -9,9 +9,13 @@ metadata:
   name: <NAME>
 spec:
   # volumeMode: <VOLUME_MODE> # Optional. values Filesystem\Block. The default is Filesystem.
-  storageClassName: <STORAGE_CLASS_NAME>
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
       storage: <STORAGE_SIZE_VALUE>
+  storageClassName: <STORAGE_CLASS_NAME>
+  # dataSource:               # Optional. If creating volume from snapshot
+  #  name: <SOURCE_SNAPSHOT_NAME>
+  #  kind: VolumeSnapshot
+  #  apiGroup: snapshot.storage.k8s.io

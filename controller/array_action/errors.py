@@ -31,7 +31,8 @@ class CredentialsError(BaseArrayActionException):
 class UnsupportedStorageVersionError(BaseArrayActionException):
 
     def __init__(self, version, supported_version):
-        self.message = messages.UnsupportedStorageVersionError_message.format(version, supported_version)  # noqa
+        self.message = messages.UnsupportedStorageVersionError_message.format(version,
+                                                                              supported_version)  # noqa
 
 
 # =============================================================================
@@ -41,6 +42,12 @@ class VolumeNotFoundError(BaseArrayActionException):
 
     def __init__(self, name):
         self.message = messages.VolumeNotFoundError_message.format(name)
+
+
+class VolumeNameBelongsToSnapshotError(BaseArrayActionException):
+
+    def __init__(self, volume, array):
+        self.message = messages.VolumeNameBelongsToSnapshotError_message.format(volume, array)
 
 
 class VolumeCreationError(BaseArrayActionException):
@@ -61,10 +68,17 @@ class IllegalObjectName(BaseArrayActionException):
         self.message = "{0}".format(msg)
 
 
+class IllegalObjectID(BaseArrayActionException):
+
+    def __init__(self, msg):
+        self.message = "{0}".format(msg)
+
+
 class PoolDoesNotMatchCapabilities(BaseArrayActionException):
 
     def __init__(self, pool, capabilities, error):
-        self.message = messages.PoolDoesNotMatchCapabilities_message.format(pool, capabilities, error)
+        self.message = messages.PoolDoesNotMatchCapabilities_message.format(pool, capabilities,
+                                                                            error)
 
 
 class StorageClassCapabilityNotSupported(BaseArrayActionException):
@@ -161,3 +175,39 @@ class UnsupportedConnectivityTypeError(BaseArrayActionException):
 
     def __init__(self, connectivity_type):
         self.message = messages.UnsupportedConnectivityTypeError_message.format(connectivity_type)
+
+
+class SnapshotNotFoundError(BaseArrayActionException):
+
+    def __init__(self, name):
+        self.message = messages.SnapshotNotFoundError_message.format(name)
+
+
+class SnapshotNameBelongsToVolumeError(BaseArrayActionException):
+
+    def __init__(self, snapshot, array):
+        self.message = messages.SnapshotNameBelongsToVolumeError_message.format(snapshot, array)
+
+
+class SnapshotIdBelongsToVolumeError(BaseArrayActionException):
+
+    def __init__(self, snapshot, array):
+        self.message = messages.SnapshotIdBelongsToVolumeError_message.format(snapshot, array)
+
+
+class SnapshotAlreadyExists(BaseArrayActionException):
+
+    def __init__(self, snapshot, array):
+        self.message = messages.SnapshotAlreadyExistsError_message.format(snapshot, array)
+
+
+class SnapshotIsStillInUseError(BaseArrayActionException):
+
+    def __init__(self, snapshot, used_by):
+        self.message = messages.SnapshotIsStillInUseError_message.format(snapshot, used_by)
+
+
+class InvalidCliResponseError(BaseArrayActionException):
+
+    def __init__(self, details):
+        self.message = messages.InvalidCliResponseError_message.format(details)

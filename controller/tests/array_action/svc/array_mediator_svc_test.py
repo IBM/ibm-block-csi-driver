@@ -1,14 +1,18 @@
 import unittest
-from munch import Munch
+
 from mock import patch, Mock
-from controller.array_action.array_mediator_svc import SVCArrayMediator
-from controller.array_action.array_mediator_svc import \
-    build_kwargs_from_capabilities
-import controller.array_action.errors as array_errors
-from pysvc.unified.response import CLIFailureError
+from munch import Munch
 from pysvc import errors as svc_errors
+from pysvc.unified.response import CLIFailureError
+
 import controller.array_action.config as config
+import controller.array_action.errors as array_errors
+from controller.array_action.array_mediator_svc import SVCArrayMediator, build_kwargs_from_capabilities, \
+    HOST_ID_PARAM, HOST_NAME_PARAM, HOST_ISCSI_NAMES_PARAM, HOST_WWPNS_PARAM
+from controller.array_action.svc_cli_result_reader import SVCListResultsElement
 from controller.common.node_info import Initiators
+
+EMPTY_BYTES = b''
 
 
 class TestArrayMediatorSVC(unittest.TestCase):
@@ -24,6 +28,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsnode.return_value = [node]
         port = Munch({'node_id': '1', 'IP_address': '1.1.1.1', 'IP_address_6': None})
         self.svc.client.svcinfo.lsportip.return_value = [port]
+        fcmaps = [Munch({'source_vdisk_name': 'source_name', 'id': 'test_fc_id'})]
+        self.svc.client.svcinfo.lsfcmap.return_value = Mock(as_list=fcmaps)
 
     @patch(
         "controller.array_action.array_mediator_svc.SVCArrayMediator._connect")
@@ -180,6 +186,176 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.rmvolume = Mock()
         self.svc.delete_volume("vol")
 
+    @staticmethod
+    def _mock_cli_object(cli_object):
+        return Mock(as_single_element=cli_object)
+
+    @staticmethod
+    def _get_source_cli_vol():
+        return Munch({'vdisk_UID': 'vol_id',
+                      'name': 'source_vol',
+                      'capacity': '1024',
+                      'mdisk_grp_name': 'pool_name',
+                      'FC_id': '',
+                      'se_copy': 'yes',
+                      'deduplicated_copy': 'no',
+                      'compressed_copy': 'no'
+                      })
+
+    @classmethod
+    def _get_mapless_target_cli_vol(cls):
+        target_cli_vol = cls._get_source_cli_vol()
+        target_cli_vol.vdisk_UID = 'snap_id'
+        target_cli_vol.name = 'test_snap'
+        return target_cli_vol
+
+    @classmethod
+    def _get_mapped_target_cli_vol(cls):
+        target_cli_vol = cls._get_mapless_target_cli_vol()
+        target_cli_vol.FC_id = 'test_fc_id'
+        return target_cli_vol
+
+    def _prepare_lsvdisk_to_raise_not_found_error(self, mock_warning):
+        mock_warning.return_value = False
+        self.svc.client.svcinfo.lsvdisk.side_effect = [
+            CLIFailureError("CMMVC5753E")]
+
+    def _prepare_lsvdisk_to_return_mapless_target_volume(self):
+        mapless_target_cli_vol = self._get_mapless_target_cli_vol()
+        mapless_target_cli_vol_mock = self._mock_cli_object(mapless_target_cli_vol)
+        self.svc.client.svcinfo.lsvdisk.return_value = mapless_target_cli_vol_mock
+
+    def _prepare_lsvdisk_to_return_none(self):
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(None)
+
+    def _prepare_mocks_for_get_snapshot(self):
+        target_cli_vol = self._get_mapped_target_cli_vol()
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(target_cli_vol)
+
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def test_get_snapshot_not_exist_return_none(self, mock_warning):
+        self._prepare_lsvdisk_to_raise_not_found_error(mock_warning)
+
+        snapshot = self.svc.get_snapshot("test_snap")
+
+        self.assertIsNone(snapshot)
+
+    def test_get_snapshot_has_no_fc_id_raise_error(self):
+        self._prepare_lsvdisk_to_return_mapless_target_volume()
+
+        with self.assertRaises(array_errors.SnapshotNameBelongsToVolumeError):
+            self.svc.get_snapshot("test_snap")
+
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def test_get_snapshot_get_fcmap_not_exist_raise_error(self, mock_warning):
+        target_cli_vol = self._get_mapped_target_cli_vol()
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(target_cli_vol)
+        mock_warning.return_value = False
+        self.svc.client.svcinfo.lsfcmap.side_effect = [
+            CLIFailureError("CMMVC5753E")]
+
+        with self.assertRaises(CLIFailureError):
+            self.svc.get_snapshot("test_snap")
+
+    def test_get_snapshot_success(self):
+        self._prepare_mocks_for_get_snapshot()
+
+        self.svc.get_snapshot("test_snap")
+
+    def _prepare_mocks_for_create_snapshot(self):
+        self.svc.client.svctask.mkvolume.return_value = Mock()
+        self.svc.client.svctask.mkfcmap.return_value = Mock()
+
+        source_vol_to_copy_from = self._get_source_cli_vol()
+        target_vol_after_creation = self._get_mapless_target_cli_vol()
+        target_vol_after_mapping = self._get_mapped_target_cli_vol()
+        target_vol_for_rollback = self._get_mapped_target_cli_vol()
+        vols_to_return = [source_vol_to_copy_from, target_vol_after_creation,
+                          target_vol_after_mapping, target_vol_for_rollback]
+        return_values = map(self._mock_cli_object, vols_to_return)
+        self.svc.client.svcinfo.lsvdisk.side_effect = return_values
+
+        self.svc.client.svctask.startfcmap.return_value = Mock()
+
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def test_create_snapshot_create_volume_error(self, mock_warning):
+        source_cli_vol = self._get_source_cli_vol()
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(source_cli_vol)
+        mock_warning.return_value = False
+        self.svc.client.svctask.mkvolume.side_effect = [
+            CLIFailureError("Failed")]
+
+        with self.assertRaises(CLIFailureError):
+            self.svc.create_snapshot("test_snap", "source_vol")
+
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def test_create_snapshot_create_fcmap_error(self, mock_warning):
+        self._prepare_mocks_for_create_snapshot()
+        mock_warning.return_value = False
+        self.svc.client.svctask.mkfcmap.side_effect = [
+            CLIFailureError("Failed")]
+
+        with self.assertRaises(CLIFailureError):
+            self.svc.create_snapshot("test_snap", "source_vol")
+
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def test_create_snapshot_start_fcmap_error(self, mock_warning):
+        self._prepare_mocks_for_create_snapshot()
+        mock_warning.return_value = False
+        self.svc.client.svctask.startfcmap.side_effect = [
+            CLIFailureError("Failed")]
+
+        with self.assertRaises(CLIFailureError):
+            self.svc.create_snapshot("test_snap", "source_vol")
+
+    def test_create_snapshot_success(self):
+        self._prepare_mocks_for_create_snapshot()
+
+        snapshot = self.svc.create_snapshot("test_snap", "source_vol")
+
+        self.assertEqual(snapshot.capacity_bytes, 1024)
+        self.assertEqual(snapshot.array_type, 'SVC')
+        self.assertEqual(snapshot.id, 'snap_id')
+
+    def test_delete_snapshot_no_volume_raise_snapshot_not_found(self):
+        self._prepare_lsvdisk_to_return_none()
+
+        with self.assertRaises(array_errors.SnapshotNotFoundError):
+            self.svc.delete_snapshot("test_snap")
+
+    def test_delete_snapshot_no_fc_id_raise_snapshot_not_found(self):
+        self._prepare_lsvdisk_to_return_mapless_target_volume()
+
+        with self.assertRaises(array_errors.SnapshotNotFoundError):
+            self.svc.delete_snapshot("test_snap")
+
+    def test_delete_snapshot_call_rmvolume(self):
+        self._prepare_mocks_for_get_snapshot()
+
+        self.svc.delete_snapshot("test_snap")
+
+        self.svc.client.svctask.rmvolume.assert_called_once_with(vdisk_id="test_snap")
+
+    def test_delete_snapshot_call_rmfcmap(self):
+        self._prepare_mocks_for_get_snapshot()
+
+        self.svc.delete_snapshot("test_snap")
+
+        self.svc.client.svctask.rmfcmap.assert_called_once_with(object_id="test_fc_id", force=True)
+
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def test_delete_snapshot_rmvolume_error(self, mock_warning):
+        self._prepare_mocks_for_get_snapshot()
+        mock_warning.return_value = False
+        self.svc.client.svctask.rmvolume.side_effect = [
+            CLIFailureError("Failed")]
+
+        with self.assertRaises(CLIFailureError):
+            self.svc.delete_snapshot("test_snap")
+
+    def test_delete_snapshot_success(self):
+        self.svc.delete_snapshot("test_snap")
+
     def test_validate_supported_capabilities_raise_error(self):
         capabilities_a = {"SpaceEfficiency": "Test"}
         with self.assertRaises(
@@ -227,165 +403,159 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(SVCArrayMediator.port, 22)
         self.assertEqual(SVCArrayMediator.minimal_volume_size_in_bytes, 512)
         self.assertEqual(SVCArrayMediator.array_type, 'SVC')
-        self.assertEqual(SVCArrayMediator.max_vol_name_length, 63)
+        self.assertEqual(SVCArrayMediator.max_volume_name_length, 63)
         self.assertEqual(SVCArrayMediator.max_connections, 2)
         self.assertEqual(SVCArrayMediator.max_lun_retries, 10)
 
-    def test_get_host_by_identifiers_returns_host_not_found(self):
-        host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
-                                  'iscsi_name': 'iqn.test.1'})
-        host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_1',
-                                  'iscsi_name': 'iqn.test.2'})
-        host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
-                                  'iscsi_name': 'iqn.test.3'})
-        ret1 = [host_munch_ret_1, host_munch_ret_2]
-        ret2 = Munch(as_single_element=host_munch_ret_3)
-
-        self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret2]
+    @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
+    def test_get_host_by_identifiers_returns_host_not_found(self, result_reader_iter):
+        host_1 = self._get_host_as_dictionary('host_id_1', 'test_host_1', ['iqn.test.1'], [])
+        host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', ['iqn.test.2'], [])
+        host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', ['iqn.test.3'], [])
+        hosts = [host_1, host_2, host_3]
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
+        self.svc.client.send_raw_command = Mock()
+        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
+        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
         with self.assertRaises(array_errors.HostNotFoundError):
             self.svc.get_host_by_host_identifiers(Initiators('Test_iqn', ['Test_wwn']))
 
-    def test_get_host_by_identifier_return_host_not_found_when_no_hosts_exist(
-            self):
-        host_munch_ret_1 = Munch({})
-        host_munch_ret_2 = Munch({})
-        host_munch_ret_3 = Munch({})
-        ret1 = [host_munch_ret_1, host_munch_ret_2]
-        ret2 = Munch(as_single_element=host_munch_ret_3)
-
-        self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret2]
+    def test_get_host_by_identifier_return_host_not_found_when_no_hosts_exist(self):
+        hosts = []
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
         with self.assertRaises(array_errors.HostNotFoundError):
             self.svc.get_host_by_host_identifiers(Initiators('Test_iqn', ['Test_wwn']))
 
-    def test_get_host_by_identifiers_raise_multiplehostsfounderror(self):
-        host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
-                                  'iscsi_name': 'iqn.test.1'})
-        host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_2',
-                                  'iscsi_name': 'iqn.test.3'})
-        host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
-                                  'WWPN': ['Test_wwn']})
-        ret1 = [host_munch_ret_1, host_munch_ret_2]
-        ret2 = Munch(as_single_element=host_munch_ret_2)
-        ret3 = Munch(as_single_element=host_munch_ret_3)
-        self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
+    @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
+    def test_get_host_by_identifiers_raise_multiplehostsfounderror(self, result_reader_iter):
+        host_1 = self._get_host_as_dictionary('host_id_1', 'test_host_1', ['iqn.test.1'], [])
+        host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', ['iqn.test.3'], [])
+        host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', [], ['Test_wwn'])
+        hosts = [host_1, host_2, host_3]
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
+        self.svc.client.send_raw_command = Mock()
+        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
+        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
         with self.assertRaises(array_errors.MultipleHostsFoundError):
             self.svc.get_host_by_host_identifiers(Initiators('iqn.test.3', ['Test_wwn']))
 
-    def test_get_host_by_identifiers_return_iscsi_host(self):
-        host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
-                                  'WWPN': ['abc1']})
-        host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_3',
-                                  'iscsi_name': ['iqn.test.2'],
-                                  'WWPN': ['abc3']})
-        host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
-                                  'WWPN': ['abc3'],
-                                  'iscsi_name': 'iqn.test.3'})
-        ret1 = [host_munch_ret_1, host_munch_ret_2]
-        ret2 = Munch(as_single_element=host_munch_ret_2)
-        ret3 = Munch(as_single_element=host_munch_ret_3)
-        self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
+    @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
+    def test_get_host_by_identifiers_return_iscsi_host(self, result_reader_iter):
+        host_1 = self._get_host_as_dictionary('host_id_1', 'test_host_1', [], ['abc1'])
+        host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', ['iqn.test.2'], ['abc3'])
+        host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', ['iqn.test.3'], ['abc3'])
+        hosts = [host_1, host_2, host_3]
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
+        self.svc.client.send_raw_command = Mock()
+        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
+        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
         host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
             'iqn.test.2', ['abcd3']))
-        self.assertEqual('test_host_3', host)
+        self.assertEqual('test_host_2', host)
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_type)
 
-    def test_get_host_by_identifiers_return_iscsi_host_with_string_iqn(self):
-        host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
-                                  'WWPN': ['abc1']})
-        host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_3',
-                                  'iscsi_name': 'iqn.test.2',
-                                  'WWPN': ['abc3']})
-        host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
-                                  'WWPN': ['abc3'],
-                                  'iscsi_name': 'iqn.test.3'})
-        ret1 = [host_munch_ret_1, host_munch_ret_2]
-        ret2 = Munch(as_single_element=host_munch_ret_2)
-        ret3 = Munch(as_single_element=host_munch_ret_3)
-        self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
+    @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
+    def test_get_host_by_identifiers_return_iscsi_host_with_list_iqn(self, result_reader_iter):
+        host_1 = self._get_host_as_dictionary('host_id_1', 'test_host_1', [], ['abc1'])
+        host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', ['iqn.test.2', 'iqn.test.22'], ['abc3'])
+        host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', ['iqn.test.3'], ['abc3'])
+        hosts = [host_1, host_2, host_3]
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
+        self.svc.client.send_raw_command = Mock()
+        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
+        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
         host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
             'iqn.test.2', ['abcd3']))
-        self.assertEqual('test_host_3', host)
+        self.assertEqual('test_host_2', host)
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_type)
 
-    def test_get_host_by_identifiers_return_iscsi_host_with_list_iqn(self):
-        host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
-                                  'WWPN': ['abc1']})
-        host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_3',
-                                  'iscsi_name': ['iqn.test.2', 'iqn.test.22'],
-                                  'WWPN': ['abc3']})
-        host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
-                                  'WWPN': ['abc3'],
-                                  'iscsi_name': 'iqn.test.3'})
-        ret1 = [host_munch_ret_1, host_munch_ret_2]
-        ret2 = Munch(as_single_element=host_munch_ret_2)
-        ret3 = Munch(as_single_element=host_munch_ret_3)
-        self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
-        host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
-            'iqn.test.2', ['abcd3']))
-        self.assertEqual('test_host_3', host)
-        self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_type)
-
-    def test_get_host_by_identifiers_return_fc_host(self):
-        host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
-                                  'WWPN': ['abc1']})
-        host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_3',
-                                  'iscsi_name': '',
-                                  'WWPN': 'abc3'})
-        host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
-                                  'WWPN': ['abc1', 'abc3'],
-                                  'iscsi_name': 'iqn.test.3'})
-        ret1 = [host_munch_ret_1, host_munch_ret_2]
-        ret2 = Munch(as_single_element=host_munch_ret_2)
-        ret3 = Munch(as_single_element=host_munch_ret_3)
-        self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
+    @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
+    def test_get_host_by_identifiers_return_fc_host(self, result_reader_iter):
+        host_1 = self._get_host_as_dictionary('host_id_1', 'test_host_1', [], ['abc1'])
+        host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', [''], ['abc2'])
+        host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', ['iqn.test.3'], ['abc1', 'abc3'])
+        hosts = [host_1, host_2, host_3]
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
+        self.svc.client.send_raw_command = Mock()
+        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
+        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
         host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
             'iqn.test.6', ['abc3', 'ABC1']))
         self.assertEqual('test_host_3', host)
         self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_type)
 
-        self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
+        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
         host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
             'iqn.test.6', ['abc3']))
         self.assertEqual('test_host_3', host)
         self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_type)
 
-    def test_get_host_by_identifiers_with_wrong_fc_iscsi_raise_not_found(self):
-        host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
-                                  'WWPN': ['abc1']})
-        host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_3',
-                                  'iscsi_name': 'iqn.test.2',
-                                  'WWPN': ['abc3']})
-        host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
-                                  'WWPN': ['abc1', 'abc3'],
-                                  'iscsi_name': 'iqn.test.3'})
-        ret1 = [host_munch_ret_1, host_munch_ret_2]
-        ret2 = Munch(as_single_element=host_munch_ret_2)
-        ret3 = Munch(as_single_element=host_munch_ret_3)
-        self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
+    @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
+    def test_get_host_by_identifiers_with_wrong_fc_iscsi_raise_not_found(self, result_reader_iter):
+        host_1 = self._get_host_as_dictionary('host_id_1', 'test_host_1', [], ['abc1'])
+        host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', ['iqn.test.2'], ['abc3'])
+        host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', ['iqn.test.3'], ['abc3'])
+        hosts = [host_1, host_2, host_3]
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
+        self.svc.client.send_raw_command = Mock()
+        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
+        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
         with self.assertRaises(array_errors.HostNotFoundError):
             self.svc.get_host_by_host_identifiers(Initiators('', []))
-        self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
+        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
         with self.assertRaises(array_errors.HostNotFoundError):
             self.svc.get_host_by_host_identifiers(Initiators('123', ['a', 'b']))
 
-    def test_get_host_by_identifiers_return_iscsi_and_fc_all_support(self):
-        host_munch_ret_1 = Munch({'id': 'host_id_1', 'name': 'test_host_1',
-                                  'WWPN': ['abc1']})
-        host_munch_ret_2 = Munch({'id': 'host_id_2', 'name': 'test_host_3',
-                                  'iscsi_name': 'iqn.test.6',
-                                  'WWPN': ['abcd3']})
-        host_munch_ret_3 = Munch({'id': 'host_id_3', 'name': 'test_host_3',
-                                  'WWPN': ['abc3'],
-                                  'iscsi_name': 'iqn.test.2'})
-        ret1 = [host_munch_ret_1, host_munch_ret_2]
-        ret2 = Munch(as_single_element=host_munch_ret_2)
-        ret3 = Munch(as_single_element=host_munch_ret_3)
-        self.svc.client.svcinfo.lshost.side_effect = [ret1, ret2, ret3]
-        host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
-            'iqn.test.2', ['ABC3']))
+    @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
+    def test_get_host_by_identifiers_return_iscsi_and_fc_all_support(self, result_reader_iter):
+        host_1 = self._get_host_as_dictionary('host_id_1', 'test_host_1', [], ['abc1'])
+        host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', ['iqn.test.6'], ['abcd3'])
+        host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', ['iqn.test.2'], ['abc3'])
+        hosts = [host_1, host_2, host_3]
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
+        self.svc.client.send_raw_command = Mock()
+        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
+        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
+        host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators('iqn.test.2', ['ABC3']))
         self.assertEqual('test_host_3', host)
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE,
                           config.FC_CONNECTIVITY_TYPE], connectivity_type)
+
+    def _get_host_as_dictionary(self, id, name, iscsi_names_list, wwpns_list):
+        res = {HOST_ID_PARAM: id, HOST_NAME_PARAM: name}
+        if iscsi_names_list:
+            res[HOST_ISCSI_NAMES_PARAM] = iscsi_names_list
+        if wwpns_list:
+            res[HOST_WWPNS_PARAM] = wwpns_list
+        return res
+
+    def _get_hosts_list_result(self, hosts_dict):
+        return [Munch(host_dict) for host_dict in hosts_dict]
+
+    def _get_detailed_hosts_list_result(self, hosts_dict):
+        detailed_hosts_list = []
+        for host_dict in hosts_dict:
+            current_element = SVCListResultsElement()
+            current_element.add(HOST_ID_PARAM, host_dict.get(HOST_ID_PARAM))
+            current_element.add(HOST_NAME_PARAM, host_dict.get(HOST_NAME_PARAM))
+            iscsi_names_list = host_dict.get(HOST_ISCSI_NAMES_PARAM)
+            if iscsi_names_list:
+                for iscsi_name in iscsi_names_list:
+                    current_element.add(HOST_ISCSI_NAMES_PARAM, iscsi_name)
+            wwpns_list = host_dict.get(HOST_WWPNS_PARAM)
+            if wwpns_list:
+                for wwpn in wwpns_list:
+                    current_element.add(HOST_WWPNS_PARAM, wwpn)
+            detailed_hosts_list.append(current_element)
+        return iter(detailed_hosts_list)
 
     def test_get_volume_mappings_empty_mapping_list(self):
         self.svc.client.svcinfo.lsvdiskhostmap.return_value = []

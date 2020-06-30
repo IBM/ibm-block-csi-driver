@@ -7,7 +7,18 @@ def get_mock_xiv_volume(size, name, wwn):
     vol.wwn = wwn
     vol.name = name
     vol.pool_name = "vol-name"
+    vol.master_name = ""
     return vol
+
+
+def get_mock_xiv_snapshot(capacity, name, wwn, vol_name):
+    snap = Mock()
+    snap.capacity = capacity
+    snap.name = name
+    snap.wwn = wwn
+    snap.master_name = vol_name
+    snap.pool_name = "pool_name"
+    return snap
 
 
 def get_mock_xiv_host(name, iscsi_ports, fc_ports):
