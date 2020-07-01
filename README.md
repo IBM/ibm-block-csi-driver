@@ -407,7 +407,7 @@ No resources found.
 
 ## Upgrading
 
-In order to upgrade the CSI operator and driver from a previous version, uninstall the existing driver and then install the newer version.
+In order to upgrade the CSI operator and driver from a previous version, uninstall the existing operator and driver, and then install the newer version.
 
 ## Uninstalling
 
