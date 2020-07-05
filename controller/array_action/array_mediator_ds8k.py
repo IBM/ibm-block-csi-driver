@@ -1,5 +1,3 @@
-import base58
-from hashlib import sha1
 from munch import Munch
 from packaging.version import parse
 from pyds8k import exceptions
