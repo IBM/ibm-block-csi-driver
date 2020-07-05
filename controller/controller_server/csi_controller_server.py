@@ -84,7 +84,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.debug(array_mediator)
                 # TODO: CSI-1358 - remove try/except
                 try:
-                    volume_full_name, volume_prefix = self._get_volume_name_and_prefix(request, array_mediator)
+                    volume_full_name = self._get_volume_name_and_prefix(request, array_mediator)
                 except controller_errors.IllegalObjectName as ex:
                     context.set_details(ex.message)
                     context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
@@ -99,15 +99,14 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 try:
                     vol = array_mediator.get_volume(
                         volume_full_name,
-                        volume_context=request.parameters,
-                        volume_prefix=volume_prefix,
+                        volume_context=request.parameters
                     )
                 except controller_errors.VolumeNotFoundError:
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
                     array_mediator.validate_supported_capabilities(capabilities)
-                    vol = array_mediator.create_volume(volume_full_name, size, capabilities, pool, volume_prefix)
+                    vol = array_mediator.create_volume(volume_full_name, size, capabilities, pool)
                 else:
                     logger.debug("volume found : {}".format(vol))
 
@@ -570,10 +569,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                 config.PARAMETERS_VOLUME_NAME_PREFIX)
 
     def _get_snapshot_name(self, request, array_mediator):
-        name, _ = self._get_object_name_and_prefix(request, array_mediator.max_snapshot_prefix_length,
-                                                   array_mediator.max_snapshot_name_length,
-                                                   config.OBJECT_TYPE_NAME_SNAPSHOT,
-                                                   config.PARAMETERS_SNAPSHOT_NAME_PREFIX)
+        name = self._get_object_name_and_prefix(request, array_mediator.max_snapshot_prefix_length,
+                                                array_mediator.max_snapshot_name_length,
+                                                config.OBJECT_TYPE_NAME_SNAPSHOT,
+                                                config.PARAMETERS_SNAPSHOT_NAME_PREFIX)
         return name
 
     def _get_object_name_and_prefix(self, request, max_name_prefix_length, max_name_length, object_type,
@@ -594,7 +593,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         if len(full_name) > max_name_length:
             hashed_name = utils.hash_string(name)
             full_name = self._join_object_prefix_with_name(prefix, hashed_name)
-        return full_name[:max_name_length], prefix
+        return full_name[:max_name_length]
 
     def _join_object_prefix_with_name(self, prefix, name):
         if prefix:

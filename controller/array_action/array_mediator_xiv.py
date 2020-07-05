@@ -131,7 +131,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                         is_ready=True,
                         array_type=self.array_type)
 
-    def get_volume(self, volume_name, volume_context=None, volume_prefix=""):
+    def get_volume(self, volume_name, volume_context=None):
         logger.debug("Get volume : {}".format(volume_name))
         try:
             cli_volume = self.client.cmd.vol_list(vol=volume_name).as_single_element
@@ -175,7 +175,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def _convert_size_bytes_to_blocks(self, size_in_bytes):
         return int(size_in_bytes / self.BLOCK_SIZE_IN_BYTES)
 
-    def create_volume(self, name, size_in_bytes, capabilities, pool, volume_prefix=""):
+    def create_volume(self, name, size_in_bytes, capabilities, pool):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with capabilities : {}".format(
             name, size_in_bytes, pool, capabilities))
 
