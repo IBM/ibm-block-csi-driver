@@ -230,7 +230,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         source_volume_name = fcmap.source_vdisk_name
         return self._get_wwn_by_volume_name_if_exists(source_volume_name)
 
-    def get_volume(self, volume_name, volume_context=None, volume_prefix=""):
+    def get_volume(self, volume_name, pool_id=None, volume_prefix=""):
         cli_volume = self._get_cli_volume(volume_name)
         return self._generate_volume_response(cli_volume)
 
@@ -380,7 +380,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._delete_volume_by_name(volume_name)
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
-    def get_snapshot(self, snapshot_name, volume_context=None):
+    def get_snapshot(self, snapshot_name, pool_id=None):
         logger.debug("Get snapshot : {}".format(snapshot_name))
         target_cli_volume = self._get_cli_volume_if_exists(snapshot_name)
         if not target_cli_volume:
@@ -505,7 +505,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self._rollback_create_snapshot(target_volume_name)
             raise ex
 
-    def create_snapshot(self, name, volume_name, volume_context=None):
+    def create_snapshot(self, name, volume_name, pool_id=None):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
         target_cli_volume = self._create_snapshot(name, volume_name)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(name, volume_name))

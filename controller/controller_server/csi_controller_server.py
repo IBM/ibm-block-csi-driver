@@ -99,7 +99,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 try:
                     vol = array_mediator.get_volume(
                         volume_full_name,
-                        volume_context=request.parameters,
+                        pool_id=pool,
                         volume_prefix=volume_prefix,
                     )
                 except controller_errors.VolumeNotFoundError:
@@ -407,6 +407,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateSnapshotResponse()
 
+        pool = None
+        if config.PARAMETERS_POOL in request.parameters:
+            pool = request.parameters[config.PARAMETERS_POOL]
         source_volume_id = request.source_volume_id
         logger.info("Snapshot base name : {}. Source volume id : {}".format(request.name, source_volume_id))
         secrets = request.secrets
@@ -428,7 +431,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.info("Snapshot name : {}. Volume name : {}".format(snapshot_name, volume_name))
                 snapshot = array_mediator.get_snapshot(
                     snapshot_name,
-                    volume_context=request.parameters
+                    pool_id=pool
                 )
 
                 if snapshot:
@@ -442,7 +445,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug(
                         "Snapshot doesn't exist. Creating a new snapshot {0} from volume {1}".format(snapshot_name,
                                                                                                      volume_name))
-                    snapshot = array_mediator.create_snapshot(snapshot_name, volume_name, request.parameters)
+                    snapshot = array_mediator.create_snapshot(snapshot_name, volume_name, pool)
 
                 logger.debug("generating create snapshot response")
                 res = utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
