@@ -404,7 +404,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except exceptions.ClientException as ex:
             raise array_errors.UnMappingError(volume_id, host_name, ex.details)
 
-
     def get_flashcopies_by_volume(self, volume_id):
         try:
             return self.client.get_flashcopies_by_volume(volume_id)
