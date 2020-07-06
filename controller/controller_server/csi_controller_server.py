@@ -84,7 +84,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.debug(array_mediator)
                 # TODO: CSI-1358 - remove try/except
                 try:
-                    volume_full_name = self._get_volume_name_and_prefix(request, array_mediator)
+                    volume_full_name = self._get_volume_name(request, array_mediator)
                 except controller_errors.IllegalObjectName as ex:
                     context.set_details(ex.message)
                     context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
@@ -562,7 +562,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.info("finished GetPluginInfo")
         return csi_pb2.GetPluginInfoResponse(name=name, vendor_version=version)
 
-    def _get_volume_name_and_prefix(self, request, array_mediator):
+    def _get_volume_name(self, request, array_mediator):
         return self._get_object_full_name(request, array_mediator.max_volume_prefix_length,
                                           array_mediator.max_volume_name_length,
                                           config.OBJECT_TYPE_NAME_VOLUME,
