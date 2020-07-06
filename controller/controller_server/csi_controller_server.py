@@ -439,8 +439,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return csi_pb2.CreateSnapshotResponse()
                 else:
                     logger.debug(
-                        "Snapshot doesn't exist. Creating a new snapshot {0} from volume {1}".format(snapshot_final_name,
-                                                                                                     volume_name))
+                        "Snapshot doesn't exist. Creating a new snapshot {0} from volume {1}".format(
+                            snapshot_final_name,
+                            volume_name))
                     snapshot = array_mediator.create_snapshot(snapshot_final_name, volume_name, request.parameters)
 
                 logger.debug("generating create snapshot response")
