@@ -407,9 +407,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateSnapshotResponse()
 
-        pool = None
-        if config.PARAMETERS_POOL in request.parameters:
-            pool = request.parameters[config.PARAMETERS_POOL]
+        pool = request.parameters.get(config.PARAMETERS_POOL)
         source_volume_id = request.source_volume_id
         logger.info("Snapshot base name : {}. Source volume id : {}".format(request.name, source_volume_id))
         secrets = request.secrets
