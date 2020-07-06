@@ -648,7 +648,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def _check_snapshot_use_status(self, snapshot_id, flashcopies):
         for flashcopy in flashcopies:
-            logger.info("Deleting flashcopy: {}".format(flashcopy))
             if flashcopy.sourcevolume == snapshot_id:
                 flashcopy_obj = self._get_flashcopy(flashcopy.id)
                 if flashcopy_obj.out_of_sync_tracks != '0':
