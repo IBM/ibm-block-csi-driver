@@ -563,20 +563,20 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         return csi_pb2.GetPluginInfoResponse(name=name, vendor_version=version)
 
     def _get_volume_name_and_prefix(self, request, array_mediator):
-        return self._get_object_name_and_prefix(request, array_mediator.max_volume_prefix_length,
-                                                array_mediator.max_volume_name_length,
-                                                config.OBJECT_TYPE_NAME_VOLUME,
-                                                config.PARAMETERS_VOLUME_NAME_PREFIX)
+        return self._get_object_full_name(request, array_mediator.max_volume_prefix_length,
+                                          array_mediator.max_volume_name_length,
+                                          config.OBJECT_TYPE_NAME_VOLUME,
+                                          config.PARAMETERS_VOLUME_NAME_PREFIX)
 
     def _get_snapshot_name(self, request, array_mediator):
-        name = self._get_object_name_and_prefix(request, array_mediator.max_snapshot_prefix_length,
-                                                array_mediator.max_snapshot_name_length,
-                                                config.OBJECT_TYPE_NAME_SNAPSHOT,
-                                                config.PARAMETERS_SNAPSHOT_NAME_PREFIX)
+        name = self._get_object_full_name(request, array_mediator.max_snapshot_prefix_length,
+                                          array_mediator.max_snapshot_name_length,
+                                          config.OBJECT_TYPE_NAME_SNAPSHOT,
+                                          config.PARAMETERS_SNAPSHOT_NAME_PREFIX)
         return name
 
-    def _get_object_name_and_prefix(self, request, max_name_prefix_length, max_name_length, object_type,
-                                    prefix_param_name):
+    def _get_object_full_name(self, request, max_name_prefix_length, max_name_length, object_type,
+                              prefix_param_name):
         full_name = name = request.name
         prefix = ""
         if request.parameters and (prefix_param_name in request.parameters):
