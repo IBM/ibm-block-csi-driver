@@ -577,7 +577,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def _get_object_final_name(self, request, max_name_prefix_length, max_name_length, object_type,
                                prefix_param_name):
-        final_name = name = request.name
+        full_name = name = request.name
         prefix = ""
         if request.parameters and (prefix_param_name in request.parameters):
             prefix = request.parameters[prefix_param_name]
@@ -589,11 +589,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         max_name_prefix_length
                     )
                 )
-            final_name = self._join_object_prefix_with_name(prefix, name)
-        if len(final_name) > max_name_length:
+            full_name = self._join_object_prefix_with_name(prefix, name)
+        if len(full_name) > max_name_length:
             hashed_name = utils.hash_string(name)
-            final_name = self._join_object_prefix_with_name(prefix, hashed_name)
-        return final_name[:max_name_length]
+            full_name = self._join_object_prefix_with_name(prefix, hashed_name)
+        return full_name[:max_name_length]
 
     def _join_object_prefix_with_name(self, prefix, name):
         if prefix:
