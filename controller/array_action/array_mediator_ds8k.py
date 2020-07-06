@@ -309,7 +309,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.info("Finished deleting volume {}".format(volume_id))
 
     def get_volume(self, name, pool_id=None, volume_prefix=""):
-        logger.debug("Getting volume {} under context {}".format(name, pool_id))
+        logger.debug("Getting volume {} in pool {}".format(name, pool_id))
         if not pool_id:
             logger.error(
                 "pool_id is not specified, can not get volumes from storage."
