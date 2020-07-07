@@ -1,5 +1,3 @@
-import base58
-from hashlib import sha1
 from munch import Munch
 from packaging.version import parse
 from pyds8k import exceptions
@@ -67,10 +65,6 @@ def get_source_volume_id_if_exists(api_volume):
 def is_flashcopy_source(volume_id, volume_flashcopy):
     array_volume_id = get_volume_id_from_scsi_identifier(volume_id)
     return volume_flashcopy.sourcevolume == array_volume_id
-
-
-def hash_string(string):
-    return base58.b58encode(sha1(string.encode()).digest()).decode()
 
 
 class DS8KArrayMediator(ArrayMediatorAbstract):
@@ -200,7 +194,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 return "ese"
         return "none"
 
-    def create_volume(self, name, size_in_bytes, capabilities, pool_id, volume_prefix=""):
+    def create_volume(self, name, size_in_bytes, capabilities, pool_id):
         logger.info(
             "Creating volume with name: {}, size: {}, in pool: {}, "
             "with capabilities: {}".format(
@@ -226,8 +220,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 # because volume name is not unique in ds8k.
                 volume = self.get_volume(
                     name,
-                    volume_context={config.CONTEXT_POOL: pool_id},
-                    volume_prefix=volume_prefix
+                    volume_context={config.CONTEXT_POOL: pool_id}
                 )
                 logger.info("Found volume {}".format(name))
                 return volume
@@ -308,7 +301,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         self._delete_volume(volume_id)
         logger.info("Finished deleting volume {}".format(volume_id))
 
-    def get_volume(self, name, volume_context=None, volume_prefix=""):
+    def get_volume(self, name, volume_context=None):
         logger.debug("Getting volume {} under context {}".format(name, volume_context))
         if not volume_context:
             logger.error(

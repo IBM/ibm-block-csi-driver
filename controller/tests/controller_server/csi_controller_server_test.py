@@ -373,8 +373,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
         self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
-        self.mediator.get_volume.assert_called_once_with(vol_name, volume_context={'pool': 'pool1'}, volume_prefix="")
-        self.mediator.create_volume.assert_called_once_with(vol_name, 10, {}, 'pool1', "")
+        self.mediator.get_volume.assert_called_once_with(vol_name, volume_context={'pool': 'pool1'})
+        self.mediator.create_volume.assert_called_once_with(vol_name, 10, {}, 'pool1')
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_wrong_secrets(self, a_enter):
@@ -440,7 +440,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         res = self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
         self.assertTrue("error" in context.details)
-        self.mediator.get_volume.assert_called_once_with(vol_name, volume_context={'pool': 'pool1'}, volume_prefix="")
+        self.mediator.get_volume.assert_called_once_with(vol_name, volume_context={'pool': 'pool1'})
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.get_volume")
@@ -454,7 +454,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertTrue(msg in context.details)
-        self.mediator.get_volume.assert_called_once_with(vol_name, volume_context={'pool': 'pool1'}, volume_prefix="")
+        self.mediator.get_volume.assert_called_once_with(vol_name, volume_context={'pool': 'pool1'})
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -479,8 +479,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
         self.assertEqual(context.code, return_code)
         self.assertTrue(msg in context.details)
-        self.mediator.get_volume.assert_called_once_with(vol_name, volume_context={'pool': 'pool1'}, volume_prefix="")
-        self.mediator.create_volume.assert_called_once_with(vol_name, self.capacity_bytes, {}, self.pool, "")
+        self.mediator.get_volume.assert_called_once_with(vol_name, volume_context={'pool': 'pool1'})
+        self.mediator.create_volume.assert_called_once_with(vol_name, self.capacity_bytes, {}, self.pool)
 
     def test_create_volume_with_illegal_object_name_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
@@ -519,7 +519,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         array_type.return_value = "a9k"
         res = self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
-        self.mediator.create_volume.assert_called_once_with("prefix_some_name", 10, {}, "pool1", "prefix")
+        self.mediator.create_volume.assert_called_once_with("prefix_some_name", 10, {}, "pool1")
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -533,7 +533,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         array_type.return_value = "a9k"
         res = self.servicer.CreateVolume(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.OK)
-        self.mediator.create_volume.assert_called_once_with(self.request.name, 1 * 1024 * 1024 * 1024, {}, "pool1", "")
+        self.mediator.create_volume.assert_called_once_with(self.request.name, 1 * 1024 * 1024 * 1024, {}, "pool1")
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
