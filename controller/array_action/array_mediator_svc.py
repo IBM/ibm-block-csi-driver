@@ -230,7 +230,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         source_volume_name = fcmap.source_vdisk_name
         return self._get_wwn_by_volume_name_if_exists(source_volume_name)
 
-    def get_volume(self, volume_name, pool_id=None, volume_prefix=""):
+    def get_volume(self, volume_name, pool_id=None):
         cli_volume = self._get_cli_volume(volume_name)
         return self._generate_volume_response(cli_volume)
 
@@ -350,7 +350,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                                               min_vol_size_in_bytes, pool=None):
         self._copy_to_target_volume(name, src_snap_name)
 
-    def create_volume(self, name, size_in_bytes, capabilities, pool, volume_prefix=""):
+    def create_volume(self, name, size_in_bytes, capabilities, pool):
         cli_volume = self._create_cli_volume(name, size_in_bytes, capabilities, pool)
 
         return self._generate_volume_response(cli_volume)
