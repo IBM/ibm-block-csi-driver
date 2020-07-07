@@ -3,6 +3,7 @@ from packaging.version import parse
 from pyds8k import exceptions
 from pyds8k.resources.ds8k.v1.common import attr_names
 from retry import retry
+from pyds8k.resources.ds8k.v1.common import types as ds8k_types
 
 import controller.array_action.errors as array_errors
 from controller.array_action import config
@@ -29,9 +30,9 @@ ERROR_CODE_VOLUME_NOT_FOUND_FOR_MAPPING = 'BE586015'
 ERROR_CODE_ALREADY_FLASHCOPY = '000000AE'
 ERROR_CODE_VOLUME_NOT_FOUND_OR_ALREADY_PART_OF_CS_RELATIONSHIP = '00000013'
 
-FLASHCOPY_PERSISTENT_OPTION = "persistent"
-FLASHCOPY_NO_BACKGROUND_COPY_OPTION = "no_background_copy"
-FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET = "permit_space_efficient_target"
+FLASHCOPY_PERSISTENT_OPTION = ds8k_types.DS8K_OPTION_PER
+FLASHCOPY_NO_BACKGROUND_COPY_OPTION = ds8k_types.DS8K_OPTION_NBC
+FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET = ds8k_types.DS8K_OPTION_PSET
 
 
 def parse_version(bundle):
