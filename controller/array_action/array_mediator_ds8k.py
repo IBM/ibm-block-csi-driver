@@ -307,7 +307,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             logger.error(
                 "pool_id is not specified, can not get volumes from storage."
             )
-            raise array_errors.VolumeNotFoundError(name)
+            raise ValueError
 
         api_volume = self._get_api_volume_by_name(volume_name=name,
                                                   pool_id=pool_id)
@@ -409,7 +409,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             logger.error(
                 "pool_id is not specified, can not get volumes from storage."
             )
-            raise array_errors.VolumeNotFoundError(volume_name)
+            raise ValueError
         else:
             pools = [Munch({"id": pool_id})]
 
@@ -439,7 +439,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             if not_exist_err:
                 raise array_errors.VolumeNotFoundError(volume_id)
 
-    def _get_flashcopy(self, flashcopy_id, not_exist_err=True):
+    def _get_flashcopy_process(self, flashcopy_id, not_exist_err=True):
         logger.info("Getting flashcopy {}".format(flashcopy_id))
         try:
             return self.client.get_flashcopies(flashcopy_id)
@@ -458,7 +458,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             logger.error(
                 "pool is not specified, can not get volumes from storage."
             )
-            raise array_errors.VolumeNotFoundError(snapshot_name)
+            raise ValueError
         target_api_volume = self._get_api_volume_by_name(volume_name=snapshot_name,
                                                          pool_id=pool_id)
         if not target_api_volume:
@@ -468,8 +468,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 "FlashCopy relationship not found for target volume: {}".format(snapshot_name))
             raise array_errors.SnapshotNameBelongsToVolumeError(target_api_volume.name,
                                                                 self.service_address)
-        flashcopy_rel = self._get_flashcopy(target_api_volume.flashcopy[0].id)
-        source_volume_name = self.get_volume_name(flashcopy_rel.source_volume['id'])
+        flashcopy_process = self._get_flashcopy_process(target_api_volume.flashcopy[0].id)
+        source_volume_name = self.get_volume_name(flashcopy_process.source_volume['id'])
         return self._generate_snapshot_response(target_api_volume, source_volume_name)
 
     def _create_similar_volume(self, target_volume_name, source_volume_name, pool_id):
@@ -541,7 +541,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             logger.error(
                 "pool is not specified, can not get volumes from storage."
             )
-            raise array_errors.SnapshotNotFoundError(name)
+            raise ValueError
         target_api_volume = self._create_snapshot(name, pool_id, source_volume_name=volume_name)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
         return self._generate_snapshot_response(target_api_volume, volume_name)
@@ -636,12 +636,12 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                         array_type=self.array_type)
 
     def validate_flashcopy(self, flashcopy_id):
-        api_flashcopy = self._get_flashcopy(flashcopy_id)
-        return api_flashcopy.state == 'valid'
+        flashcopy_process = self._get_flashcopy_process(flashcopy_id)
+        return flashcopy_process.state == 'valid'
 
     def _check_snapshot_use_status(self, snapshot_id, flashcopies):
         for flashcopy in flashcopies:
             if flashcopy.sourcevolume == snapshot_id:
-                flashcopy_obj = self._get_flashcopy(flashcopy.id)
-                if flashcopy_obj.out_of_sync_tracks != '0':
-                    raise array_errors.SnapshotIsStillInUseError(snapshot_id, flashcopy_obj.targetvolume)
+                flashcopy_process = self._get_flashcopy_process(flashcopy.id)
+                if flashcopy_process.out_of_sync_tracks != '0':
+                    raise array_errors.SnapshotIsStillInUseError(snapshot_id, flashcopy_process.targetvolume)
