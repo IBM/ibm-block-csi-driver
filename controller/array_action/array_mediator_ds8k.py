@@ -204,7 +204,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 return "ese"
         return "none"
 
-    def _create_volume(self, name, size_in_bytes, capabilities, pool_id):
+    def _create_api_volume(self, name, size_in_bytes, capabilities, pool_id):
         logger.info(
             "Creating volume with name: {}, size: {}, in pool: {}, "
             "with capabilities: {}".format(
@@ -263,7 +263,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise array_errors.VolumeCreationError(name)
 
     def create_volume(self, vol_name, size_in_bytes, capabilities, pool):
-        api_volume = self._create_volume(vol_name, size_in_bytes, capabilities, pool)
+        api_volume = self._create_api_volume(vol_name, size_in_bytes, capabilities, pool)
         return self._generate_volume_response(api_volume)
 
     def _extend_volume(self, volume_id, new_size_in_bytes):
@@ -493,17 +493,14 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         source_volume_name = self.get_volume_name(flashcopy_process.source_volume['id'])
         return self._generate_snapshot_response(target_api_volume, source_volume_name)
 
-    def _create_similar_volume(self, target_volume_name, source_volume_name, pool_id):
+    def _create_similar_volume(self, target_volume_name, source_api_volume):
         logger.info(
             "creating target api volume '{0}' from source volume '{1}'".format(target_volume_name,
-                                                                               source_volume_name))
-        source_api_volume = self._get_api_volume_by_name(source_volume_name, pool_id=pool_id)
-        if not source_api_volume:
-            raise array_errors.VolumeNotFoundError(source_volume_name)
+                                                                               source_api_volume.name))
         capabilities = {config.CAPABILITIES_SPACEEFFICIENCY: source_api_volume.tp}
         size_in_bytes = int(source_api_volume.cap)
         pool = source_api_volume.pool
-        return self._create_volume(target_volume_name, size_in_bytes, capabilities, pool)
+        return self._create_api_volume(target_volume_name, size_in_bytes, capabilities, pool)
 
     def _create_flashcopy(self, source_volume_id, target_volume_id, options=None):
         logger.info(
@@ -538,8 +535,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         self._delete_volume(target_volume_id, not_exist_err=False)
 
     def _create_snapshot(self, target_volume_name, pool_id, source_volume_name):
-        target_volume = self._create_similar_volume(target_volume_name, source_volume_name, pool_id)
         source_volume = self._get_api_volume_by_name(source_volume_name, pool_id=pool_id)
+        if source_volume is None:
+            raise array_errors.VolumeNotFoundError(source_volume_name)
+        target_volume = self._create_similar_volume(target_volume_name, source_volume)
         options = [FLASHCOPY_NO_BACKGROUND_COPY_OPTION, FLASHCOPY_PERSISTENT_OPTION]
         logger.debug("source_volume= {}, target_volume= {}".format(source_volume, target_volume))
         try:
