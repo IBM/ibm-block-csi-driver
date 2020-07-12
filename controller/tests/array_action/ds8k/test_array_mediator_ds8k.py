@@ -8,7 +8,7 @@ from pyds8k.exceptions import ClientError, ClientException, NotFound
 import controller.array_action.errors as array_errors
 from controller.array_action import config
 from controller.array_action.array_mediator_ds8k import DS8KArrayMediator, FLASHCOPY_PERSISTENT_OPTION, \
-    FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET
+    FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET_OPTION
 from controller.array_action.array_mediator_ds8k import LOGIN_PORT_WWPN, LOGIN_PORT_STATE, \
     LOGIN_PORT_STATE_ONLINE
 from controller.common.node_info import Initiators
@@ -543,8 +543,9 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_copy_to_existing_volume_flashcopy(self):
         volume = self._prepare_mocks_for_copy_to_existing_volume()
         self.array.copy_to_existing_volume_from_snapshot("test_name", "snap_name", 3, 2, "fake_pool")
-        self.client_mock.create_flashcopy.assert_called_once_with(source_volume_id="0002",
-                                                                  target_volume_id=volume.id,
-                                                                  options=[FLASHCOPY_PERSISTENT_OPTION,
-                                                                           FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET
-                                                                           ])
+        self.client_mock.create_flashcopy.assert_called_once_with(
+            source_volume_id="0002",
+            target_volume_id=volume.id,
+            options=[FLASHCOPY_PERSISTENT_OPTION,
+                     FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET_OPTION
+                     ])
