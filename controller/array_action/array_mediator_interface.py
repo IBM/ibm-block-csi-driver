@@ -75,7 +75,7 @@ class ArrayMediator(ABC):
             SnapshotNotFoundError
             IllegalObjectName
             PermissionDenied
-            PoolIsRequired
+            PoolParameterIsMissing
         """
         raise NotImplementedError
 
@@ -113,7 +113,7 @@ class ArrayMediator(ABC):
             VolumeNotFound
             IllegalObjectName
             PermissionDenied
-            PoolIsRequired
+            PoolParameterIsMissing
         """
         raise NotImplementedError
 
@@ -216,7 +216,7 @@ class ArrayMediator(ABC):
             SnapshotNameBelongsToVolumeError
             IllegalObjectName
             PermissionDenied
-            PoolIsRequired
+            PoolParameterIsMissing
         """
         raise NotImplementedError
 
@@ -248,7 +248,7 @@ class ArrayMediator(ABC):
             VolumeNotFound
             IllegalObjectName
             PermissionDenied
-            PoolIsRequired
+            PoolParameterIsMissing
         """
         raise NotImplementedError
 

@@ -99,7 +99,7 @@ class PoolDoesNotExist(BaseArrayActionException):
         self.message = messages.PoolDoesNotExist_message.format(pool, array)
 
 
-class PoolIsRequired(BaseArrayActionException):
+class PoolParameterIsMissing(BaseArrayActionException):
 
     def __init__(self, array_type):
         self.message = messages.PoolIsRequired.format(array_type)

@@ -14,7 +14,7 @@ from controller.array_action.utils import classproperty
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 
-ARRAY_TYPE = "DS8K"
+
 LOGIN_PORT_WWPN = attr_names.IOPORT_WWPN
 LOGIN_PORT_STATE = attr_names.IOPORT_STATUS
 LOGIN_PORT_STATE_ONLINE = 'online'
@@ -305,11 +305,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def get_volume(self, name, pool_id=None):
         logger.debug("Getting volume {} in pool {}".format(name, pool_id))
-        if not pool_id:
+        if pool_id is None:
             logger.error(
                 "pool_id is not specified, can not get volumes from storage."
             )
-            raise array_errors.PoolIsRequired(ARRAY_TYPE)
+            raise array_errors.PoolParameterIsMissing(self.array_type)
 
         api_volume = self._get_api_volume_by_name(volume_name=name,
                                                   pool_id=pool_id)
@@ -407,11 +407,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def _get_api_volume_by_name(self, volume_name, pool_id):
         logger.info("Getting volume {} in pool {}".format(volume_name, pool_id))
-        if not pool_id:
+        if pool_id is None:
             logger.error(
                 "pool_id is not specified, can not get volumes from storage."
             )
-            raise array_errors.PoolIsRequired(ARRAY_TYPE)
+            raise array_errors.PoolParameterIsMissing(self.array_type)
         else:
             pools = [Munch({"id": pool_id})]
 
@@ -456,11 +456,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def get_snapshot(self, snapshot_name, pool_id=None):
         logger.debug("Get snapshot : {} in pool: {}".format(snapshot_name, pool_id))
-        if not pool_id:
+        if pool_id is None:
             logger.error(
                 "pool is not specified, can not get volumes from storage."
             )
-            raise array_errors.PoolIsRequired(ARRAY_TYPE)
+            raise array_errors.PoolParameterIsMissing(self.array_type)
         target_api_volume = self._get_api_volume_by_name(volume_name=snapshot_name,
                                                          pool_id=pool_id)
         if not target_api_volume:
@@ -539,11 +539,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def create_snapshot(self, name, volume_name, pool_id=None):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
-        if not pool_id:
+        if pool_id is None:
             logger.error(
                 "pool is not specified, can not get volumes from storage."
             )
-            raise array_errors.PoolIsRequired(ARRAY_TYPE)
+            raise array_errors.PoolParameterIsMissing(self.array_type)
         target_api_volume = self._create_snapshot(name, pool_id, source_volume_name=volume_name)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
         return self._generate_snapshot_response(target_api_volume, volume_name)

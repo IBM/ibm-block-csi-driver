@@ -129,7 +129,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         except (controller_errors.IllegalObjectName, controller_errors.StorageClassCapabilityNotSupported,
                 controller_errors.PoolDoesNotExist, controller_errors.PoolDoesNotMatchCapabilities,
-                controller_errors.PoolIsRequired) as ex:
+                controller_errors.PoolParameterIsMissing) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
@@ -451,7 +451,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.info("finished create snapshot")
                 return res
         except (controller_errors.IllegalObjectName, controller_errors.VolumeNotFoundError,
-                controller_errors.PoolIsRequired) as ex:
+                controller_errors.PoolParameterIsMissing) as ex:
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateSnapshotResponse()

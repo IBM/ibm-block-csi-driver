@@ -85,7 +85,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             )
 
     def test_get_volume_with_no_pool(self):
-        with self.assertRaises(array_errors.PoolIsRequired):
+        with self.assertRaises(array_errors.PoolParameterIsMissing):
             self.array.get_volume("fake_name")
 
     def test_get_volume_with_pool_context(self):
