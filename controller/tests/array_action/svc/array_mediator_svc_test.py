@@ -1,6 +1,6 @@
 import unittest
 
-from mock import patch, Mock
+from mock import call, patch, Mock
 from munch import Munch
 from pysvc import errors as svc_errors
 from pysvc.unified.response import CLIFailureError
@@ -262,6 +262,20 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.get_snapshot("test_snap")
 
+    def test_get_snapshot_by_id_has_no_fcmap_id_raise_error(self):
+        self._prepare_lsvdisk_to_return_mapless_target_volume()
+
+        with self.assertRaises(array_errors.SnapshotIdBelongsToVolumeError):
+            self.svc.get_snapshot_by_id("snap_id")
+
+    def test_get_snapshot_by_id_success(self):
+        self._prepare_mocks_for_get_snapshot()
+
+        self.svc.get_snapshot_by_id("snap_id")
+
+        self.svc.client.svcinfo.lsvdisk.assert_has_calls([call(filtervalue="vdisk_UID=snap_id"),
+                                                          call(bytes=True, object_id="test_snap")])
+
     def _prepare_mocks_for_create_snapshot(self):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         self.svc.client.svctask.mkfcmap.return_value = Mock()
@@ -323,7 +337,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.SnapshotNotFoundError):
             self.svc.delete_snapshot("test_snap")
 
-    def test_delete_snapshot_no_fc_id_raise_snapshot_not_found(self):
+    def test_delete_snapshot_no_fcmap_id_raise_snapshot_not_found(self):
         self._prepare_lsvdisk_to_return_mapless_target_volume()
 
         with self.assertRaises(array_errors.SnapshotNotFoundError):
