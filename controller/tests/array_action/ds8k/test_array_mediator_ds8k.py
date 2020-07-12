@@ -546,5 +546,5 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.create_flashcopy.assert_called_once_with(source_volume_id="0002",
                                                                   target_volume_id=volume.id,
                                                                   options=[FLASHCOPY_PERSISTENT_OPTION,
-                                                                           FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET_OPTION
+                                                                        FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET_OPTION
                                                                            ])
