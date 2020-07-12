@@ -530,7 +530,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def _create_snapshot(self, target_volume_name, pool_id, source_volume_name):
         target_volume = self._create_similar_volume(target_volume_name, source_volume_name, pool_id)
-        source_volume = self.get_volume(source_volume_name, volume_context={config.CONTEXT_POOL: pool_id})
+        source_volume = self._get_api_volume_by_name(source_volume_name, pool_id=pool_id)
         options = [FLASHCOPY_NO_BACKGROUND_COPY_OPTION, FLASHCOPY_PERSISTENT_OPTION]
         try:
             return self._create_flashcopy(source_volume.id, target_volume.id, options)
