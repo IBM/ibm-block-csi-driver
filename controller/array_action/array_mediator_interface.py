@@ -55,7 +55,7 @@ class ArrayMediator(ABC):
 
     @abstractmethod
     def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
-                                              min_vol_size_in_bytes, pool=None):
+                                              min_vol_size_in_bytes, pool_id=None):
         """
         This function should create a volume from snapshot in the storage system.
 
@@ -65,7 +65,7 @@ class ArrayMediator(ABC):
             src_snap_capacity_in_bytes   : capacity of snapshot to create from
             min_vol_size_in_bytes        : if snapshot capacity is lower than this value vol will
                                            be increased to this value
-            pool: pool of the volume and snapshot to find them more efficiently.
+            pool_id: pool of the volume and snapshot to find them more efficiently.
 
         Returns:
             Volume
@@ -75,6 +75,7 @@ class ArrayMediator(ABC):
             SnapshotNotFoundError
             IllegalObjectName
             PermissionDenied
+            PoolIsRequired
         """
         raise NotImplementedError
 
@@ -84,7 +85,7 @@ class ArrayMediator(ABC):
         This function should delete a volume in the storage system.
 
         Args:
-            vol_id : wwn of the volume to delete
+            volume_id : wwn of the volume to delete
 
         Returns:
             None
@@ -112,6 +113,7 @@ class ArrayMediator(ABC):
             VolumeNotFound
             IllegalObjectName
             PermissionDenied
+            PoolIsRequired
         """
         raise NotImplementedError
 
@@ -214,6 +216,7 @@ class ArrayMediator(ABC):
             SnapshotNameBelongsToVolumeError
             IllegalObjectName
             PermissionDenied
+            PoolIsRequired
         """
         raise NotImplementedError
 
@@ -245,6 +248,7 @@ class ArrayMediator(ABC):
             VolumeNotFound
             IllegalObjectName
             PermissionDenied
+            PoolIsRequired
         """
         raise NotImplementedError
 

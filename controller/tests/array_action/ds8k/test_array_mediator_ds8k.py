@@ -84,8 +84,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                 {config.CAPABILITIES_SPACEEFFICIENCY: "fake"}
             )
 
-    def test_get_volume_with_no_context(self):
-        with self.assertRaises(ValueError):
+    def test_get_volume_with_no_pool(self):
+        with self.assertRaises(array_errors.PoolIsRequired):
             self.array.get_volume("fake_name")
 
     def test_get_volume_with_pool_context(self):

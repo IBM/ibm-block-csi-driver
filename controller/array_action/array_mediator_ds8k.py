@@ -14,6 +14,7 @@ from controller.array_action.utils import classproperty
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 
+ARRAY_TYPE = "DS8K"
 LOGIN_PORT_WWPN = attr_names.IOPORT_WWPN
 LOGIN_PORT_STATE = attr_names.IOPORT_STATUS
 LOGIN_PORT_STATE_ONLINE = 'online'
@@ -308,7 +309,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             logger.error(
                 "pool_id is not specified, can not get volumes from storage."
             )
-            raise ValueError
+            raise array_errors.PoolIsRequired(ARRAY_TYPE)
 
         api_volume = self._get_api_volume_by_name(volume_name=name,
                                                   pool_id=pool_id)
@@ -410,7 +411,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             logger.error(
                 "pool_id is not specified, can not get volumes from storage."
             )
-            raise ValueError
+            raise array_errors.PoolIsRequired(ARRAY_TYPE)
         else:
             pools = [Munch({"id": pool_id})]
 
@@ -459,7 +460,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             logger.error(
                 "pool is not specified, can not get volumes from storage."
             )
-            raise ValueError
+            raise array_errors.PoolIsRequired(ARRAY_TYPE)
         target_api_volume = self._get_api_volume_by_name(volume_name=snapshot_name,
                                                          pool_id=pool_id)
         if not target_api_volume:
@@ -542,7 +543,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             logger.error(
                 "pool is not specified, can not get volumes from storage."
             )
-            raise ValueError
+            raise array_errors.PoolIsRequired(ARRAY_TYPE)
         target_api_volume = self._create_snapshot(name, pool_id, source_volume_name=volume_name)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
         return self._generate_snapshot_response(target_api_volume, volume_name)

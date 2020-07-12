@@ -347,7 +347,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
-                                              min_vol_size_in_bytes, pool=None):
+                                              min_vol_size_in_bytes, pool_id=None):
         self._copy_to_target_volume(name, src_snap_name)
 
     def create_volume(self, name, size_in_bytes, capabilities, pool):
