@@ -102,7 +102,7 @@ class PoolDoesNotExist(BaseArrayActionException):
 class PoolParameterIsMissing(BaseArrayActionException):
 
     def __init__(self, array_type):
-        self.message = messages.PoolIsRequired.format(array_type)
+        self.message = messages.PoolParameterIsMissing.format(array_type)
 
 
 class FailedToFindStorageSystemType(BaseArrayActionException):

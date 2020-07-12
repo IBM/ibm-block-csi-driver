@@ -17,7 +17,7 @@ VolumeAlreadyExists_message = "Volume already exists : {0} , array : {1}"
 
 PoolDoesNotExist_message = "Pool does not exist: {0} , array : {1}"
 
-PoolIsRequired = "pool parameter is mandatory in {0}"
+PoolParameterIsMissing = "Pool parameter is mandatory in {0}"
 
 FailedToFindStorageSystemType_message = "Could not identify the type for endpoint: {0} "
 
