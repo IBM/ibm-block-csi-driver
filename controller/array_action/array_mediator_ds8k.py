@@ -54,7 +54,6 @@ def parse_version(bundle):
 
 def get_volume_id_from_scsi_identifier(func):
     def wrapper(self, *args, **kwargs):
-        logger.debug("arg: {}, kwargs: {}".format(args, kwargs))
         if args:
             args = (args[0][-4:],) + args[1:]
         elif kwargs:
@@ -231,7 +230,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 name,
                 pool_id=pool_id
             )
-            logger.debug("api_volume: {}".format(api_volume))
             logger.info("Found volume {}".format(name))
             if api_volume is not None:
                 return api_volume
