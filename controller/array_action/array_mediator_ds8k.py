@@ -530,7 +530,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return self._get_api_volume_by_id(target_volume_id)
 
     @retry(Exception, tries=11, delay=1)
-    @get_volume_id_from_scsi_identifier
     def _delete_target_volume_if_exist(self, target_volume_id):
         self._delete_volume(target_volume_id, not_exist_err=False)
 
@@ -538,14 +537,13 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         source_volume = self._get_api_volume_by_name(source_volume_name, pool_id=pool_id)
         if source_volume is None:
             raise array_errors.VolumeNotFoundError(source_volume_name)
-        target_volume = self._create_similar_volume(target_volume_name, source_volume)
+        target_api_volume = self._create_similar_volume(target_volume_name, source_volume)
         options = [FLASHCOPY_NO_BACKGROUND_COPY_OPTION, FLASHCOPY_PERSISTENT_OPTION]
-        logger.debug("source_volume= {}, target_volume= {}".format(source_volume, target_volume))
         try:
-            return self._create_flashcopy(source_volume.id, target_volume.id, options)
+            return self._create_flashcopy(source_volume.id, target_api_volume.id, options)
         except (array_errors.VolumeNotFoundError, array_errors.SnapshotAlreadyExists) as ex:
             logger.error("Failed to create snapshot '{0}': {1}".format(target_volume_name, ex))
-            self._delete_target_volume_if_exist(target_volume.id)
+            self._delete_target_volume_if_exist(target_api_volume.id)
             raise ex
 
     @get_volume_id_from_scsi_identifier
