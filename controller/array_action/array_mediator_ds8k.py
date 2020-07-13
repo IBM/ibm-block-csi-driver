@@ -14,7 +14,6 @@ from controller.array_action.utils import classproperty
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 
-
 LOGIN_PORT_WWPN = attr_names.IOPORT_WWPN
 LOGIN_PORT_STATE = attr_names.IOPORT_STATUS
 LOGIN_PORT_STATE_ONLINE = 'online'
@@ -402,8 +401,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def get_flashcopies_by_volume(self, volume_id):
         try:
             return self.client.get_flashcopies_by_volume(volume_id)
-        except exceptions.NotFound:
-            raise array_errors.VolumeNotFoundError(volume_id)
+        except exceptions.InternalServerError as ex:
+            raise ex
 
     def _get_api_volume_by_name(self, volume_name, pool_id):
         logger.info("Getting volume {} in pool {}".format(volume_name, pool_id))
@@ -412,24 +411,21 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 "pool_id is not specified, can not get volumes from storage."
             )
             raise array_errors.PoolParameterIsMissing(self.array_type)
-        else:
-            pools = [Munch({"id": pool_id})]
 
-        for pool in pools:
-            volume_candidates = []
-            try:
-                volume_candidates.extend(self.client.get_volumes_by_pool(pool.id))
-            except (exceptions.NotFound, exceptions.InternalServerError) as ex:
-                if ERROR_CODE_RESOURCE_NOT_EXISTS or INCORRECT_ID in str(ex.message).upper():
-                    raise array_errors.PoolDoesNotExist(pool.id, self.identifier)
-                else:
-                    raise ex
-            for volume in volume_candidates:
-                logger.info("Checking volume: {}".format(volume.name))
-                if volume.name == volume_name:
-                    logger.debug("Found volume: {}".format(volume))
-                    volume.flashcopy = self.get_flashcopies_by_volume(volume.id)
-                    return volume
+        volume_candidates = []
+        try:
+            volume_candidates.extend(self.client.get_volumes_by_pool(pool_id))
+        except (exceptions.NotFound, exceptions.InternalServerError) as ex:
+            if ERROR_CODE_RESOURCE_NOT_EXISTS or INCORRECT_ID in str(ex.message).upper():
+                raise array_errors.PoolDoesNotExist(pool_id, self.identifier)
+            else:
+                raise ex
+        for volume in volume_candidates:
+            logger.info("Checking volume: {}".format(volume.name))
+            if volume.name == volume_name:
+                logger.debug("Found volume: {}".format(volume))
+                volume.flashcopy = self.get_flashcopies_by_volume(volume.id)
+                return volume
         return None
 
     def _get_api_volume_by_id(self, volume_id, not_exist_err=True):
@@ -461,18 +457,18 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 "pool is not specified, can not get volumes from storage."
             )
             raise array_errors.PoolParameterIsMissing(self.array_type)
-        target_api_volume = self._get_api_volume_by_name(volume_name=snapshot_name,
-                                                         pool_id=pool_id)
-        if not target_api_volume:
+        api_snapshot = self._get_api_volume_by_name(volume_name=snapshot_name,
+                                                    pool_id=pool_id)
+        if not api_snapshot:
             return None
-        if not target_api_volume.flashcopy:
+        if not api_snapshot.flashcopy:
             logger.error(
                 "FlashCopy relationship not found for target volume: {}".format(snapshot_name))
-            raise array_errors.SnapshotNameBelongsToVolumeError(target_api_volume.name,
+            raise array_errors.SnapshotNameBelongsToVolumeError(api_snapshot.name,
                                                                 self.service_address)
-        flashcopy_process = self._get_flashcopy_process(target_api_volume.flashcopy[0].id)
-        source_volume_name = self.get_volume_name(flashcopy_process.source_volume['id'])
-        return self._generate_snapshot_response(target_api_volume, source_volume_name)
+        source_volume_id = get_source_volume_id_if_exists(api_snapshot)
+        source_volume_name = self.get_volume_name(source_volume_id)
+        return self._generate_snapshot_response(api_snapshot, source_volume_name)
 
     def _create_similar_volume(self, target_volume_name, source_volume_name, pool_id):
         logger.info(
@@ -509,9 +505,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                                                                          target_volume_id))
             else:
                 raise ex
-        if not self.validate_flashcopy(api_flashcopy.id):
+        flashcopy_state = self.get_flashcopy_state(api_flashcopy.id)
+        if not flashcopy_state == 'valid':
             self._delete_flashcopy(api_flashcopy.id)
-            logger.info("Flashcopy is not in a valid state")
+            logger.info("Flashcopy state is not correct. expected: 'valid' , got: '{}'.".format(flashcopy_state))
             raise ValueError
         return self._get_api_volume_by_id(target_volume_id)
 
@@ -637,9 +634,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                         is_ready=True,
                         array_type=self.array_type)
 
-    def validate_flashcopy(self, flashcopy_id):
+    def get_flashcopy_state(self, flashcopy_id):
         flashcopy_process = self._get_flashcopy_process(flashcopy_id)
-        return flashcopy_process.state == 'valid'
+        return flashcopy_process.state
 
     def _check_snapshot_use_status(self, snapshot_id, flashcopies):
         for flashcopy in flashcopies:

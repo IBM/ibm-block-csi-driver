@@ -51,9 +51,17 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         )
 
         self.flashcopy_response = Munch(
-            {"source_volume": {"id": "0000"},
-             "target_volume": {"id": "0001"},
-             "id": "0000:0001",
+            {"sourcevolume": {"id": "0001"},
+             "targetvolume": {"id": "0002"},
+             "id": "0001:0002",
+             "state": "valid"
+             }
+        )
+
+        self.flashcopy_from_volume_response = Munch(
+            {"sourcevolume": "0001",
+             "targetvolume": "0002",
+             "id": "0001:0002",
              "state": "valid"
              }
         )
@@ -378,9 +386,9 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_get_snapshot_get_fcrel_not_exist_raise_error(self):
         target_vol = self._get_volume_with_flashcopy_relationship()
         self.client_mock.get_volumes_by_pool.return_value = [target_vol]
-        self.client_mock.get_flashcopies.side_effect = NotFound("404", message="BE7A0001")
+        self.client_mock.get_flashcopies_by_volume.return_value = []
 
-        with self.assertRaises(NotFound):
+        with self.assertRaises(array_errors.SnapshotNameBelongsToVolumeError):
             self.array.get_snapshot("test_name", pool_id=self.volume_response.pool)
 
     def test_get_snapshot_success(self):
@@ -461,9 +469,9 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_delete_snapshot_called_delete_flashcopy(self):
         volume_with_flashcopy_rel = self._get_volume_with_flashcopy_relationship()
-        self.client_mock.get_volume.return_value = volume_with_flashcopy_rel 
+        self.client_mock.get_volume.return_value = volume_with_flashcopy_rel
         self.array.delete_snapshot("test_id")
-        flashcopy_id = volume_with_flashcopy_rel .flashcopy[0].id
+        flashcopy_id = volume_with_flashcopy_rel.flashcopy[0].id
         self.client_mock.delete_flashcopy.assert_called_once_with(flashcopy_id)
 
     def test_delete_flashcopy_failed_with_ClientException(self):
@@ -485,17 +493,20 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def _prepare_mocks_for_copy_to_existing_volume(self):
         volume = copy.deepcopy(self.volume_response)
-        self.client_mock.get_pools.return_value = [Munch({'id': 'P0'})]
         self.client_mock.get_volumes_by_pool.side_effect = [[volume], [Munch(
             {"cap": "1073741824",
              "id": "0002",
              "name": "snap_name",
              "pool": "fake_pool",
              "tp": "ese",
-             "flashcopy": [self.flashcopy_response]
+             "flashcopy": []
              }
         )]]
-        self.client_mock.get_flashcopies.return_value = self.flashcopy_response
+        self.client_mock.get_volume.return_value = volume
+        self.client_mock.get_flashcopies_by_volume.side_effect = \
+            [[], [self.flashcopy_from_volume_response], [self.flashcopy_from_volume_response]]
+        self.client_mock.get_flashcopies.return_value = self.flashcopy_from_volume_response
+        self.client_mock.create_flashcopy.return_value = self.flashcopy_response
         return volume
 
     def test_extend_volume(self):
