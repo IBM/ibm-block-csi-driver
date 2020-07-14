@@ -71,11 +71,6 @@ def get_source_volume_id_if_exists(api_volume):
     return flashcopy_rel_sources[0]
 
 
-@get_volume_id_from_scsi_identifier
-def is_flashcopy_source(volume_id, volume_flashcopy):
-    return volume_flashcopy.sourcevolume == volume_id
-
-
 class DS8KArrayMediator(ArrayMediatorAbstract):
     SUPPORTED_FROM_VERSION = '7.5.1'
 
