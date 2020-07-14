@@ -1,3 +1,4 @@
+from decorator import decorator
 from munch import Munch
 from packaging.version import parse
 from pyds8k import exceptions
@@ -13,7 +14,6 @@ from controller.array_action.ds8k_rest_client import RESTClient, scsilun_to_int
 from controller.array_action.utils import classproperty
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
-
 
 LOGIN_PORT_WWPN = attr_names.IOPORT_WWPN
 LOGIN_PORT_STATE = attr_names.IOPORT_STATUS
@@ -52,15 +52,31 @@ def parse_version(bundle):
     return '.'.join([v1[-1], v2[0], v2[1]])
 
 
-def get_volume_id_from_scsi_identifier(func):
-    def wrapper(self, *args, **kwargs):
-        if args:
-            args = (args[0][-4:],) + args[1:]
-        elif kwargs:
-            kwargs[list(kwargs.keys())[0]] = kwargs[list(kwargs.keys())[0]][-4:]
+def scsi_id_to_volume_id(scsi_id):
+    return scsi_id[-4:]
+
+
+def try_convert_first_arg(converter, args):
+    if args:
+        converted = converter(args[0])
+        return (converted,) + args[1:]
+    return ()
+
+
+def try_convert_arg_by_name(converter, name, kwargs):
+    if name in kwargs:
+        kwargs[name] = converter(kwargs[name])
+
+
+def convert_from_scsi_id(scsi_id_param_name):
+    @decorator
+    def convert_to_object_id(func, self, *args, **kwargs):
+        args = try_convert_first_arg(scsi_id_to_volume_id, args)
+        if not args:
+            try_convert_arg_by_name(scsi_id_to_volume_id, scsi_id_param_name, kwargs)
         return func(self, *args, **kwargs)
 
-    return wrapper
+    return convert_to_object_id
 
 
 def get_source_volume_id_if_exists(api_volume):
@@ -300,7 +316,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             )
             raise array_errors.VolumeDeletionError(volume_id)
 
-    @get_volume_id_from_scsi_identifier
+    @convert_from_scsi_id('volume_id')
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
         api_volume = self._get_api_volume_by_id(volume_id)
@@ -325,7 +341,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
         raise array_errors.VolumeNotFoundError(name)
 
-    @get_volume_id_from_scsi_identifier
+    @convert_from_scsi_id('volume_id')
     def get_volume_name(self, volume_id):
         logger.debug("Searching for volume with id: {0}".format(volume_id))
         try:
@@ -337,7 +353,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.debug("found volume name : {0}".format(vol_name))
         return vol_name
 
-    @get_volume_id_from_scsi_identifier
+    @convert_from_scsi_id('volume_id')
     def is_volume_has_snapshots(self, volume_id):
         array_volume = self._get_api_volume_by_id(volume_id)
         flash_copies = array_volume.flashcopy
@@ -346,7 +362,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 return True
         return False
 
-    @get_volume_id_from_scsi_identifier
+    @convert_from_scsi_id('volume_id')
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume {}".format(volume_id))
         try:
@@ -365,7 +381,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             )
             raise ex
 
-    @get_volume_id_from_scsi_identifier
+    @convert_from_scsi_id('volume_id')
     def map_volume(self, volume_id, host_name):
         logger.debug("Mapping volume {} to host {}".format(volume_id, host_name))
         try:
@@ -382,7 +398,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             else:
                 raise array_errors.MappingError(volume_id, host_name, ex.details)
 
-    @get_volume_id_from_scsi_identifier
+    @convert_from_scsi_id('volume_id')
     def unmap_volume(self, volume_id, host_name):
         logger.debug("Unmapping volume {} from host {}".format(volume_id, host_name))
         try:
@@ -539,7 +555,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             self._delete_target_volume_if_exist(target_api_volume.id)
             raise ex
 
-    @get_volume_id_from_scsi_identifier
+    @convert_from_scsi_id('src_snapshot_id')
     def get_snapshot_by_id(self, src_snapshot_id):
         api_snapshot = self._get_api_volume_by_id(src_snapshot_id)
         src_volume_id = get_source_volume_id_if_exists(api_snapshot)
@@ -572,7 +588,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             )
             raise ex
 
-    @get_volume_id_from_scsi_identifier
+    @convert_from_scsi_id('snapshot_id')
     def delete_snapshot(self, snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
         api_volume = self._get_api_volume_by_id(snapshot_id, not_exist_err=False)
