@@ -33,6 +33,7 @@ ERROR_CODE_VOLUME_NOT_FOUND_OR_ALREADY_PART_OF_CS_RELATIONSHIP = '00000013'
 FLASHCOPY_PERSISTENT_OPTION = ds8k_types.DS8K_OPTION_PER
 FLASHCOPY_NO_BACKGROUND_COPY_OPTION = ds8k_types.DS8K_OPTION_NBC
 FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET_OPTION = ds8k_types.DS8K_OPTION_PSET
+FLASHCOPY_STATE_VALID = 'valid'
 
 
 def parse_version(bundle):
@@ -419,10 +420,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise array_errors.UnMappingError(volume_id, host_name, ex.details)
 
     def get_flashcopies_by_volume(self, volume_id):
-        try:
-            return self.client.get_flashcopies_by_volume(volume_id)
-        except exceptions.InternalServerError as ex:
-            raise ex
+        return self.client.get_flashcopies_by_volume(volume_id)
 
     def _get_api_volume_by_name(self, volume_name, pool_id):
         logger.info("Getting volume {} in pool {}".format(volume_name, pool_id))
@@ -432,8 +430,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             )
             raise array_errors.PoolParameterIsMissing(self.array_type)
 
-        volume_candidates = []
         try:
+            volume_candidates = []
             volume_candidates.extend(self.client.get_volumes_by_pool(pool_id))
         except (exceptions.NotFound, exceptions.InternalServerError) as ex:
             if ERROR_CODE_RESOURCE_NOT_EXISTS or INCORRECT_ID in str(ex.message).upper():
@@ -527,10 +525,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             else:
                 raise ex
         flashcopy_state = self.get_flashcopy_state(api_flashcopy.id)
-        if not flashcopy_state == 'valid':
+        if not flashcopy_state == FLASHCOPY_STATE_VALID:
             self._delete_flashcopy(api_flashcopy.id)
-            logger.info("Flashcopy state is not correct. expected: 'valid' , got: '{}'.".format(flashcopy_state))
-            raise ValueError
+            raise ValueError("Flashcopy state is not correct. expected: {} , got: '{}'.".format(FLASHCOPY_STATE_VALID,
+                                                                                                flashcopy_state))
         return self._get_api_volume_by_id(target_volume_id)
 
     @retry(Exception, tries=11, delay=1)
@@ -568,15 +566,13 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
         return self._generate_snapshot_response(target_api_volume, volume_name)
 
-    def _delete_flashcopy(self, flascopy_id):
+    def _delete_flashcopy(self, flashcopy_id):
         try:
-            self.client.delete_flashcopy(flascopy_id)
-        except exceptions.NotFound:
-            raise array_errors.VolumeNotFoundError(flascopy_id)
+            self.client.delete_flashcopy(flashcopy_id)
         except exceptions.ClientException as ex:
             logger.error(
                 "Failed to delete flascopy {} on array {}, reason is: {}".format(
-                    flascopy_id,
+                    flashcopy_id,
                     self.identifier,
                     ex.details
                 )
