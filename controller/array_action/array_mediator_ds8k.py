@@ -62,6 +62,14 @@ def try_convert_first_arg(converter, args):
     return ()
 
 
+def is_snapshot(api_volume):
+    flashcopies = api_volume.flashcopy
+    for flashcopy in flashcopies:
+        if flashcopy.targetvolume == api_volume.id:
+            return True
+    return False
+
+
 @decorator
 def convert_scsi_id_to_array_id(mediator_method, self, *args):
     args = try_convert_first_arg(scsi_id_to_volume_id, args)
@@ -76,7 +84,6 @@ def get_source_volume_id_if_exists(api_volume):
     return flashcopy_rel_sources[0]
 
 
-# noinspection PyArgumentList
 class DS8KArrayMediator(ArrayMediatorAbstract):
     SUPPORTED_FROM_VERSION = '7.5.1'
 
@@ -463,13 +470,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise ex
 
-    def is_snapshot(self, api_snapshot):
-        flashcopies = api_snapshot.flashcopy
-        for flashcopy in flashcopies:
-            if flashcopy.targetvolume == api_snapshot.id:
-                return True
-        return False
-
     def _get_snapshot(self, snapshot_name, pool_id=None):
         logger.debug("Get snapshot : {} in pool: {}".format(snapshot_name, pool_id))
         if pool_id is None:
@@ -481,7 +481,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                                                     pool_id=pool_id)
         if not api_snapshot:
             return None
-        if not self.is_snapshot(api_snapshot):
+        if not is_snapshot(api_snapshot):
             logger.error(
                 "FlashCopy relationship not found for target volume: {}".format(snapshot_name))
             raise array_errors.SnapshotNameBelongsToVolumeError(api_snapshot.name,
