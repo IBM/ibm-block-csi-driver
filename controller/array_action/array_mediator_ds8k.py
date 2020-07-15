@@ -1,4 +1,3 @@
-from munch import Munch
 from packaging.version import parse
 from pyds8k import exceptions
 from pyds8k.resources.ds8k.v1.common import attr_names
