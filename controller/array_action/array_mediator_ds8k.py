@@ -491,7 +491,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         source_volume_name = self.get_volume_name(source_volume_id)
         return self._generate_snapshot_response(api_snapshot, source_volume_name)
 
-
     def _create_similar_volume(self, target_volume_name, source_api_volume):
         logger.info(
             "creating target api volume '{0}' from source volume '{1}'".format(target_volume_name,
