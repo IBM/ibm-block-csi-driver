@@ -385,9 +385,15 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def ValidateVolumeCapabilities(self, request, context):
         logger.info("ValidateVolumeCapabilities")
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        try:
+            utils.validate_csi_volume_capabilties(request.volume_capabilities)
+        except ValidationException as ex:
+            logger.error("failed request validation")
+            logger.exception(ex)
+            context.set_details(ex.message)
+            return csi_pb2.ValidateVolumeCapabilitiesResponse()
         logger.info("finished ValidateVolumeCapabilities")
-        return csi_pb2.ValidateVolumeCapabilitiesResponse()
+        return csi_pb2.ValidateVolumeCapabilitiesResponse(request.volume_capabilities)
 
     def ListVolumes(self, request, context):
         logger.info("ListVolumes")
