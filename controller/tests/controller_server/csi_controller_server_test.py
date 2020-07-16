@@ -1156,6 +1156,16 @@ class TestControllerServerUnPublishVolume(unittest.TestCase):
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_unpublish_volume_unmap_volume_excpetions(self, storage_agent):
+        self.mediator.unmap_volume.side_effect = [array_errors.VolumeNotFoundError("vol")]
+        storage_agent.return_value = self.storage_agent
+        self.servicer.ControllerUnpublishVolume(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+
+        self.mediator.unmap_volume.side_effect = [array_errors.VolumeAlreadyUnmappedError("")]
+        storage_agent.return_value = self.storage_agent
+        self.servicer.ControllerUnpublishVolume(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+
         self.mediator.unmap_volume.side_effect = [array_errors.PermissionDeniedError("msg")]
         storage_agent.return_value = self.storage_agent
         self.servicer.ControllerUnpublishVolume(self.request, self.context)
@@ -1170,16 +1180,6 @@ class TestControllerServerUnPublishVolume(unittest.TestCase):
         storage_agent.return_value = self.storage_agent
         self.servicer.ControllerUnpublishVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
-
-        self.mediator.unmap_volume.side_effect = [array_errors.VolumeNotFoundError("vol")]
-        storage_agent.return_value = self.storage_agent
-        self.servicer.ControllerUnpublishVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.OK)
-
-        self.mediator.unmap_volume.side_effect = [array_errors.VolumeAlreadyUnmappedError("")]
-        storage_agent.return_value = self.storage_agent
-        self.servicer.ControllerUnpublishVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
 
 class TestControllerServerGetCapabilities(unittest.TestCase):
