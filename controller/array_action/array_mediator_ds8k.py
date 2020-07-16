@@ -326,18 +326,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def get_volume(self, name, pool_id=None):
         logger.debug("Getting volume {} in pool {}".format(name, pool_id))
-        if pool_id is None:
-            logger.error(
-                "pool_id is not specified, can not get volumes from storage."
-            )
-            raise array_errors.PoolParameterIsMissing(self.array_type)
-
         api_volume = self._get_api_volume_by_name(volume_name=name,
                                                   pool_id=pool_id)
-
         if api_volume:
             return self._generate_volume_response(api_volume)
-
         raise array_errors.VolumeNotFoundError(name)
 
     @convert_scsi_id_to_array_id
@@ -423,6 +415,15 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def get_flashcopies_by_volume(self, volume_id):
         return self.client.get_flashcopies_by_volume(volume_id)
 
+    def _get_api_volume_from_volumes(self, volume_candidates, volume_name):
+        for volume in volume_candidates:
+            logger.info("Checking volume: {}".format(volume.name))
+            if volume.name == volume_name:
+                logger.debug("Found volume: {}".format(volume))
+                volume.flashcopy = self.get_flashcopies_by_volume(volume.id)
+                return volume
+        return None
+
     def _get_api_volume_by_name(self, volume_name, pool_id):
         logger.info("Getting volume {} in pool {}".format(volume_name, pool_id))
         if pool_id is None:
@@ -439,13 +440,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 raise array_errors.PoolDoesNotExist(pool_id, self.identifier)
             else:
                 raise ex
-        for volume in volume_candidates:
-            logger.info("Checking volume: {}".format(volume.name))
-            if volume.name == volume_name:
-                logger.debug("Found volume: {}".format(volume))
-                volume.flashcopy = self.get_flashcopies_by_volume(volume.id)
-                return volume
-        return None
+
+        return self._get_api_volume_from_volumes(volume_candidates, volume_name)
 
     def _get_api_volume_by_id(self, volume_id, not_exist_err=True):
         try:
@@ -471,11 +467,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def _get_snapshot(self, snapshot_name, pool_id=None):
         logger.debug("Get snapshot : {} in pool: {}".format(snapshot_name, pool_id))
-        if pool_id is None:
-            logger.error(
-                "pool is not specified, can not get volumes from storage."
-            )
-            raise array_errors.PoolParameterIsMissing(self.array_type)
         api_snapshot = self._get_api_volume_by_name(volume_name=snapshot_name,
                                                     pool_id=pool_id)
         if not api_snapshot:
@@ -528,8 +519,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         flashcopy_state = self.get_flashcopy_state(api_flashcopy.id)
         if not flashcopy_state == FLASHCOPY_STATE_VALID:
             self._delete_flashcopy(api_flashcopy.id)
-            raise ValueError("Flashcopy state is not correct. expected: {} , got: '{}'.".format(FLASHCOPY_STATE_VALID,
-                                                                                                flashcopy_state))
+            raise ValueError("Flashcopy state is not correct. expected: '{}' , got: '{}'.".format(FLASHCOPY_STATE_VALID,
+                                                                                                  flashcopy_state))
         return self._get_api_volume_by_id(target_volume_id)
 
     @retry(Exception, tries=11, delay=1)
@@ -558,11 +549,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def create_snapshot(self, name, volume_name, pool_id=None):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
-        if pool_id is None:
-            logger.error(
-                "pool is not specified, can not get volumes from storage."
-            )
-            raise array_errors.PoolParameterIsMissing(self.array_type)
         target_api_volume = self._create_snapshot(name, pool_id, source_volume_name=volume_name)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
         return self._generate_snapshot_response(target_api_volume, volume_name)
@@ -572,7 +558,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             self.client.delete_flashcopy(flashcopy_id)
         except exceptions.ClientException as ex:
             logger.error(
-                "Failed to delete flascopy {} on array {}, reason is: {}".format(
+                "Failed to delete flashcopy {} on array {}, reason is: {}".format(
                     flashcopy_id,
                     self.identifier,
                     ex.details
