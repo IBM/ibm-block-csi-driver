@@ -187,6 +187,37 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.VolumeNotFoundError):
             self.array.delete_volume("fake_name")
 
+    def test_delete_volume_with_source_and_target_flashcopies_failed(self):
+        self.client_mock.get_volume.return_value = copy.deepcopy(self.volume_response)
+        self.client_mock.get_flashcopies_by_volume.return_value = [
+            Munch({"sourcevolume": "0001",
+                   "targetvolume": "0002",
+                   "id": "0001:0002",
+                   "state": "valid"
+                   }),
+            Munch({"sourcevolume": "0003",
+                   "targetvolume": "0001",
+                   "id": "0003:0001",
+                   "state": "valid"
+                   })]
+        self.client_mock.delete_volume.side_effect = ClientException("500")
+        with self.assertRaises(array_errors.VolumeDeletionError):
+            self.array.delete_volume("0001")
+        self.client_mock.delete_flashcopy.assert_called_once_with("0003:0001")
+
+
+    def test_delete_volume_with_source_flashcopy_success(self):
+        self.client_mock.get_volume.return_value = copy.deepcopy(self.volume_response)
+        self.client_mock.get_flashcopies_by_volume.return_value = [
+            Munch({"sourcevolume": "0003",
+                   "targetvolume": "0001",
+                   "id": "0003:0001",
+                   "state": "valid"
+                   })]
+        self.array.delete_volume("0001")
+        self.client_mock.delete_flashcopy.assert_called_once_with("0003:0001")
+        self.client_mock.delete_volume.assert_called_once_with(volume_id="0001")
+
     def test_get_volume_mappings_failed_with_ClientException(self):
         self.client_mock.get_hosts.side_effect = ClientException("500")
         with self.assertRaises(ClientException):

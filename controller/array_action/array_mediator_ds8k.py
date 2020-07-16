@@ -319,7 +319,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.info("Deleting volume with id : {0}".format(volume_id))
         api_volume = self._get_api_volume_by_id(volume_id)
         for flashcopy in api_volume.flashcopy:
-            self._delete_flashcopy(flashcopy.id)
+            if flashcopy.targetvolume == volume_id:
+                self._delete_flashcopy(flashcopy.id)
         self._delete_volume(volume_id)
         logger.info("Finished deleting volume {}".format(volume_id))
 
@@ -591,7 +592,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise array_errors.SnapshotNameBelongsToVolumeError(api_volume.name,
                                                                 self.service_address)
         self._check_snapshot_use_status(snapshot_id, api_volume.flashcopy)
-        self.delete_volume(snapshot_id)
+        for flashcopy in api_volume.flashcopy:
+            self._delete_flashcopy(flashcopy.id)
+        self._delete_volume(snapshot_id)
         logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
 
     def get_iscsi_targets_by_iqn(self):
