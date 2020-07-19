@@ -385,15 +385,26 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def ValidateVolumeCapabilities(self, request, context):
         logger.info("ValidateVolumeCapabilities")
+        utils.validate_create_volume_request(request)
+        secrets = request.secrets
+        user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
+        volume_id = request.volume_id
         try:
-            utils.validate_csi_volume_capabilties(request.volume_capabilities)
-        except ValidationException as ex:
-            logger.error("failed request validation")
+            # TODO : pass multiple array addresses
+            array_type = detect_array_type(array_addresses)
+            with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
+                logger.debug(array_mediator)
+                volume = array_mediator.get_volume_by_id(volume_id=volume_id)
+                utils.validate_volume_context_match_volume(request.volume_context, volume)
+        except controller_errors.VolumeNotFoundError as ex:
             logger.exception(ex)
             context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.NOT_FOUND)
             return csi_pb2.ValidateVolumeCapabilitiesResponse()
         logger.info("finished ValidateVolumeCapabilities")
-        return csi_pb2.ValidateVolumeCapabilitiesResponse(request.volume_capabilities)
+        return utils.generate_csi_validate_volume_capabilities_response(request.volume_context,
+                                                                        request.volume_capabilities,
+                                                                        request.parameters)
 
     def ListVolumes(self, request, context):
         logger.info("ListVolumes")

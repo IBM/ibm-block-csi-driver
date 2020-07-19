@@ -347,6 +347,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return vol_name
 
     @convert_from_scsi_id()
+    def get_volume_by_id(self, volume_id):
+        api_volume = self._get_api_volume_by_id(volume_id)
+        return self._generate_volume_response(api_volume)
+
+    @convert_from_scsi_id()
     def is_volume_has_snapshots(self, volume_id):
         array_volume = self._get_api_volume_by_id(volume_id)
         flash_copies = array_volume.flashcopy

@@ -154,6 +154,36 @@ def validate_delete_snapshot_request(request):
     logger.debug("request validation finished.")
 
 
+def validate_validate_volume_capabilities_request(request):
+    logger.debug("validating validate_volume_capabilities volume request")
+
+    logger.debug("validating volume id")
+    if not request.volume_id:
+        raise ValidationException(messages.name_should_not_be_empty_message)
+
+    logger.debug("validating volume capabilities")
+    validate_csi_volume_capabilties(request.volume_capabilities)
+
+    logger.debug("validating secrets")
+    if request.secrets:
+        validate_secret(request.secrets)
+
+    logger.debug("validating volume_context")
+    if not request.volume_context:
+        raise ValidationException(messages.volume_context_missing_message)
+
+    logger.debug("request validation finished.")
+
+
+def validate_volume_context_match_volume(volume_context, vol):
+    if not (volume_context.volume_name == vol.volume_name and
+            volume_context.array_address == ",".join(
+                vol.array_address if isinstance(vol.array_address, list) else [vol.array_address]) and
+            volume_context.pool_name == vol.pool_name and
+            volume_context.storage_type == vol.array_type):
+        raise ValidationException(messages.invalid_secret_message)
+
+
 def generate_csi_create_volume_response(new_vol):
     logger.debug("creating volume response for vol : {0}".format(new_vol))
 
@@ -189,6 +219,18 @@ def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
         ready_to_use=new_snapshot.is_ready))
 
     logger.debug("finished creating snapshot response : {0}".format(res))
+    return res
+
+
+def generate_csi_validate_volume_capabilities_response(vol_context, volume_capabilities, parameters):
+    logger.debug("validate volume capabilities response for vol : {0}".format(vol_context.volume_name))
+
+    res = csi_pb2.ValidateVolumeCapabilitiesResponse(confirmed=csi_pb2.ValidateVolumeCapabilitiesResponse.Confirmed(
+        volume_context=vol_context,
+        volume_capabilities=volume_capabilities,
+        parameters=parameters))
+
+    logger.debug("finished creating validate volume capabilities response : {0}".format(res))
     return res
 
 
