@@ -5,3 +5,4 @@ NodeGetCapabilities
 NodeGetInfo
 CreateSnapshot
 DeleteSnapshot
+ValidateVolumeCapabilities
