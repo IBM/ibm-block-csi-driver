@@ -425,6 +425,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
                     return csi_pb2.ValidateVolumeCapabilitiesResponse()
                 logger.info("finished ValidateVolumeCapabilities")
+        else:
+            context.set_code(grpc.StatusCode.NOT_FOUND)
+            return csi_pb2.ValidateVolumeCapabilitiesResponse()
         return utils.generate_csi_validate_volume_capabilities_response(request.volume_context,
                                                                         request.volume_capabilities,
                                                                         request.parameters)
