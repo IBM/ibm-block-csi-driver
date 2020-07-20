@@ -389,7 +389,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def ValidateVolumeCapabilities(self, request, context):
         logger.info("ValidateVolumeCapabilities")
-        utils.validate_create_volume_request(request)
+        try:
+            utils.validate_create_volume_request(request)
+        except ValidationException as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            return csi_pb2.ValidateVolumeCapabilitiesResponse()
         secrets = request.secrets
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
         volume_id = request.volume_id
