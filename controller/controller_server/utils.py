@@ -170,11 +170,11 @@ def validate_validate_volume_capabilities_request(request):
 
 
 def validate_volume_context_match_volume(volume_context, vol):
-    if not (volume_context.volume_name == vol.volume_name and
-            volume_context.array_address == ",".join(
+    if not (volume_context["volume_name"] == vol.volume_name and
+            volume_context["array_address"] == ",".join(
                 vol.array_address if isinstance(vol.array_address, list) else [vol.array_address]) and
-            volume_context.pool_name == vol.pool_name and
-            volume_context.storage_type == vol.array_type):
+            volume_context["pool_name"] == vol.pool_name and
+            volume_context["storage_type"] == vol.array_type):
         raise ValidationException(messages.invalid_secret_message)
 
 
@@ -216,11 +216,11 @@ def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
     return res
 
 
-def generate_csi_validate_volume_capabilities_response(vol_context, volume_capabilities, parameters):
-    logger.debug("validate volume capabilities response for vol : {0}".format(vol_context.volume_name))
+def generate_csi_validate_volume_capabilities_response(volume_context, volume_capabilities, parameters):
+    logger.debug("validate volume capabilities response for vol : {0}".format(volume_context["volume_name"]))
 
     res = csi_pb2.ValidateVolumeCapabilitiesResponse(confirmed=csi_pb2.ValidateVolumeCapabilitiesResponse.Confirmed(
-        volume_context=vol_context,
+        volume_context=volume_context,
         volume_capabilities=volume_capabilities,
         parameters=parameters))
 
