@@ -1,3 +1,4 @@
+ValidateVolumeCapabilities
 ControllerGetCapabilities
 CreateVolume
 DeleteVolume
@@ -5,4 +6,4 @@ NodeGetCapabilities
 NodeGetInfo
 CreateSnapshot
 DeleteSnapshot
-ValidateVolumeCapabilities
+
