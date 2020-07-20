@@ -390,7 +390,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def ValidateVolumeCapabilities(self, request, context):
         logger.info("ValidateVolumeCapabilities")
         try:
-            utils.validate_create_volume_request(request)
+            utils.validate_validate_volume_capabilities_request(request)
         except ValidationException as ex:
             logger.exception(ex)
             context.set_details(ex.message)

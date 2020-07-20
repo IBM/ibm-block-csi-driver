@@ -162,6 +162,8 @@ def validate_validate_volume_capabilities_request(request):
         raise ValidationException(messages.name_should_not_be_empty_message)
 
     logger.debug("validating volume capabilities")
+    if not request.volume_capabilities:
+        raise ValidationException(messages.capabilities_not_set_message)
     validate_csi_volume_capabilties(request.volume_capabilities)
 
     logger.debug("validating secrets")
