@@ -134,6 +134,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateVolumeResponse()
+        except controller_errors.SnapshotNotFoundError as ex:
+            context.set_code(grpc.StatusCode.NOT_FOUND)
+            context.set_details(ex)
+            return csi_pb2.CreateVolumeResponse()
         except controller_errors.PermissionDeniedError as ex:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
             context.set_details(ex)

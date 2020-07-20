@@ -539,7 +539,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         snapshot_id = "wwn1"
         snap_capacity_bytes = 100
         array_type.return_value = "a9k"
-        self.request.volume_content_source = self._get_snapshot_source(snapshot_id)
+        self.request.volume_content_source = self._get_source_snapshot(snapshot_id)
         self.mediator.create_volume = Mock()
         self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, vol_name, "wwn2", "a9k")
         self.mediator.get_snapshot_by_id = Mock()
@@ -560,7 +560,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     def test_create_volume_from_snapshot_idempotent(self, storage_agent, array_type):
         storage_agent.return_value = self.storage_agent
         snap_id = "wwn1"
-        self.request.volume_content_source = self._get_snapshot_source(snap_id)
+        self.request.volume_content_source = self._get_source_snapshot(snap_id)
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, vol_name, "wwn2", "a9k",
                                                                                         copy_src_object_id=snap_id)
@@ -575,7 +575,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     def test_create_volume_from_snapshot_volume_without_source(self, storage_agent, array_type):
         storage_agent.return_value = self.storage_agent
         snap_id = "wwn1"
-        self.request.volume_content_source = self._get_snapshot_source(snap_id)
+        self.request.volume_content_source = self._get_source_snapshot(snap_id)
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
         self.mediator.get_snapshot_by_id = Mock()
@@ -593,7 +593,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         storage_agent.return_value = self.storage_agent
         snap_id = "wwn1"
         vol_src_id = "wwn3"
-        self.request.volume_content_source = self._get_snapshot_source(snap_id)
+        self.request.volume_content_source = self._get_source_snapshot(snap_id)
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k",
                                                                                         copy_src_object_id=vol_src_id)
@@ -606,7 +606,17 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     def test_create_volume_from_snapshot_src_snapshot_not_found(self, storage_agent, array_type):
         array_exception = array_errors.SnapshotNotFoundError("")
         self._test_create_volume_from_snapshot_error(storage_agent, array_type, array_exception,
-                                                     grpc.StatusCode.INTERNAL)
+                                                     grpc.StatusCode.NOT_FOUND)
+
+    def test_create_volume_from_snapshot_src_snapshot_invalid(self):
+        volume_content_source = self._get_source_snapshot('snap_id')
+        volume_content_source.snapshot.snapshot_id = 'invalid_snap_id'
+        self.request.volume_content_source = volume_content_source
+
+        self.servicer.CreateVolume(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
+        self.assertTrue("invalid_snap_id" in self.context.details)
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -641,7 +651,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         storage_agent.return_value = self.storage_agent
         snap_id = "wwn1"
         vol_id = "wwn2"
-        self.request.volume_content_source = self._get_snapshot_source(snap_id)
+        self.request.volume_content_source = self._get_source_snapshot(snap_id)
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
         self.mediator.get_snapshot_by_id = Mock()
@@ -658,7 +668,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
             self.mediator.delete_volume.assert_called_with(vol_id)
         self.assertEqual(self.context.code, return_code)
 
-    def _get_snapshot_source(self, snapshot_id):
+    @staticmethod
+    def _get_source_snapshot(snapshot_id):
         source = Mock()
         snapshot = Mock()
         source.snapshot = snapshot
