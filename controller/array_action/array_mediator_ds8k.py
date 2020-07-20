@@ -577,7 +577,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 "FlashCopy relationship not found for target volume: {}".format(api_volume.name))
             raise array_errors.SnapshotNameBelongsToVolumeError(api_volume.name,
                                                                 self.service_address)
-        self._check_snapshot_use_status(snapshot_id, api_volume.flashcopy)
+        self._assert_snapshot_is_not_in_use(snapshot_id, api_volume.flashcopy)
         for flashcopy in api_volume.flashcopy:
             self._delete_flashcopy(flashcopy.id)
         self._delete_volume(snapshot_id)
@@ -646,7 +646,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         flashcopy_process = self._get_flashcopy_process(flashcopy_id)
         return flashcopy_process.state
 
-    def _check_snapshot_use_status(self, snapshot_id, flashcopies):
+    def _assert_snapshot_is_not_in_use(self, snapshot_id, flashcopies):
         for flashcopy in flashcopies:
             if flashcopy.sourcevolume == snapshot_id:
                 flashcopy_process = self._get_flashcopy_process(flashcopy.id)
