@@ -396,6 +396,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.ValidateVolumeCapabilitiesResponse()
+        except ObjectIdError as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.PERMISSION_DENIED)
+            return csi_pb2.ValidateVolumeCapabilitiesResponse()
         secrets = request.secrets
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
         volume_id = request.volume_id

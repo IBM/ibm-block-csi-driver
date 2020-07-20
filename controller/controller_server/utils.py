@@ -172,7 +172,7 @@ def validate_validate_volume_capabilities_request(request):
 
     logger.debug("validating volume_context")
     if not request.volume_context:
-        raise ValidationException(messages.volume_context_missing_message)
+        raise ObjectIdError(messages.volume_context_missing_message)
 
     logger.debug("request validation finished.")
 
