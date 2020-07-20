@@ -405,12 +405,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
                 volume = array_mediator.get_volume_by_id(volume_id=volume_id)
-                utils.validate_volume_context_match_volume(request.volume_context, volume)
         except controller_errors.VolumeNotFoundError as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)
             return csi_pb2.ValidateVolumeCapabilitiesResponse()
+        try:
+            utils.validate_volume_context_match_volume(request.volume_context, volume)
         except ValidationException as ex:
             logger.exception(ex)
             context.set_details(ex.message)
