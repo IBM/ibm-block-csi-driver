@@ -396,34 +396,36 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.ValidateVolumeCapabilitiesResponse()
-        secrets = request.secrets
-        user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
-        volume_id = request.volume_id
-        try:
-            # TODO : pass multiple array addresses
-            array_type = detect_array_type(array_addresses)
-            with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
-                logger.debug(array_mediator)
-                # TODO: CSI-1358 - remove try/except
+        if request.secrets:
+            secrets = request.secrets
+            user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
+            volume_id = request.volume_id
+            try:
+                # TODO : pass multiple array addresses
+                array_type = detect_array_type(array_addresses)
+                with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
+                    logger.debug(array_mediator)
+                    # TODO: CSI-1358 - remove try/except
+                    try:
+                        volume = array_mediator.get_volume_by_id(volume_id=volume_id)
+                    except controller_errors.VolumeNotFoundError as ex:
+                        context.set_details(ex.message)
+                        context.set_code(grpc.StatusCode.NOT_FOUND)
+                        return csi_pb2.ValidateVolumeCapabilitiesResponse()
+            except controller_errors.VolumeNotFoundError as ex:
+                logger.exception(ex)
+                context.set_details(ex.message)
+                context.set_code(grpc.StatusCode.NOT_FOUND)
+                return csi_pb2.ValidateVolumeCapabilitiesResponse()
+            if request.volume_context:
                 try:
-                    volume = array_mediator.get_volume_by_id(volume_id=volume_id)
-                except controller_errors.VolumeNotFoundError as ex:
+                    utils.validate_volume_context_match_volume(request.volume_context, volume)
+                except ValidationException as ex:
+                    logger.exception(ex)
                     context.set_details(ex.message)
-                    context.set_code(grpc.StatusCode.NOT_FOUND)
+                    context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
                     return csi_pb2.ValidateVolumeCapabilitiesResponse()
-        except controller_errors.VolumeNotFoundError as ex:
-            logger.exception(ex)
-            context.set_details(ex.message)
-            context.set_code(grpc.StatusCode.NOT_FOUND)
-            return csi_pb2.ValidateVolumeCapabilitiesResponse()
-        try:
-            utils.validate_volume_context_match_volume(request.volume_context, volume)
-        except ValidationException as ex:
-            logger.exception(ex)
-            context.set_details(ex.message)
-            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-            return csi_pb2.ValidateVolumeCapabilitiesResponse()
-        logger.info("finished ValidateVolumeCapabilities")
+                logger.info("finished ValidateVolumeCapabilities")
         return utils.generate_csi_validate_volume_capabilities_response(request.volume_context,
                                                                         request.volume_capabilities,
                                                                         request.parameters)
