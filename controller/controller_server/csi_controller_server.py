@@ -399,10 +399,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         if request.secrets:
             secrets = request.secrets
             user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
-            volume_id = request.volume_id
             try:
                 # TODO : pass multiple array addresses
-                array_type = detect_array_type(array_addresses)
+                array_type, volume_id = utils.get_volume_id_info(request.volume_id)
                 with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                     logger.debug(array_mediator)
                     # TODO: CSI-1358 - remove try/except
