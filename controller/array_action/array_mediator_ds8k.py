@@ -412,15 +412,12 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except exceptions.ClientException as ex:
             raise array_errors.UnMappingError(volume_id, host_name, ex.details)
 
-    def get_flashcopies_by_volume(self, volume_id):
-        return self.client.get_flashcopies_by_volume(volume_id)
-
     def _get_api_volume_from_volumes(self, volume_candidates, volume_name):
         for volume in volume_candidates:
             logger.info("Checking volume: {}".format(volume.name))
             if volume.name == volume_name:
                 logger.debug("Found volume: {}".format(volume))
-                volume.flashcopy = self.get_flashcopies_by_volume(volume.id)
+                volume.flashcopy = self.client.get_flashcopies_by_volume(volume.id)
                 return volume
         return None
 
@@ -446,7 +443,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def _get_api_volume_by_id(self, volume_id, not_exist_err=True):
         try:
             volume = self.client.get_volume(volume_id)
-            volume.flashcopy = self.get_flashcopies_by_volume(volume.id)
+            volume.flashcopy = self.client.get_flashcopies_by_volume(volume.id)
             return volume
         except exceptions.NotFound:
             if not_exist_err:
