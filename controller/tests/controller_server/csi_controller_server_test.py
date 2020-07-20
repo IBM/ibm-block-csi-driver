@@ -160,7 +160,6 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
 
-
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_wrong_secrets(self, storage_agent):
         self._test_create_object_with_wrong_secrets(storage_agent)
