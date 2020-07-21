@@ -176,7 +176,7 @@ def validate_validate_volume_capabilities_request(request):
 
 
 def validate_volume_context_match_volume(volume_context, vol):
-    logger.debug("validating volume_context is matching in volume")
+    logger.debug("validate volume capabilities response for vol : is matching in volume")
 
     if not (volume_context[config.VOLUME_CONTEXT_VOLUME_NAME_PARAMETER] == vol.volume_name and
             volume_context[config.VOLUME_CONTEXT_ARRAY_PARAMETER] == ",".join(

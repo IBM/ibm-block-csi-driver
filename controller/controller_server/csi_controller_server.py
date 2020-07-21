@@ -407,7 +407,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     context.set_details(ex.message)
                     context.set_code(grpc.StatusCode.NOT_FOUND)
                     return csi_pb2.ValidateVolumeCapabilitiesResponse()
-
+            logger.info("volume_context type: {}".format(type(request.volume_context)))
             if request.volume_context:
                 utils.validate_volume_context_match_volume(request.volume_context, volume)
             logger.info("finished ValidateVolumeCapabilities")
