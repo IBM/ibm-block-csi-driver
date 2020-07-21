@@ -429,7 +429,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return utils.generate_csi_validate_volume_capabilities_response(request.volume_context,
                                                                             request.volume_capabilities,
                                                                             request.parameters)
-        except controller_errors.VolumeNotFoundError as ex:
+        except (controller_errors.VolumeNotFoundError, ObjectIdError) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)

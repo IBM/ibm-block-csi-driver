@@ -84,12 +84,16 @@ def validate_create_volume_source(request):
             source_snapshot = source.snapshot
             logger.info("Source snapshot specified: {0}".format(source_snapshot))
             source_snapshot_id = source_snapshot.snapshot_id
-            if not source_snapshot_id:
-                raise ValidationException(messages.volume_src_snapshot_id_is_missing)
-            if config.PARAMETERS_OBJECT_ID_DELIMITER not in source_snapshot_id:
-                raise ObjectIdError(config.OBJECT_TYPE_NAME_SNAPSHOT, source_snapshot_id)
+            validate_volume_id(source_snapshot_id)
         elif source.HasField(config.VOLUME_SOURCE_VOLUME):
             raise ValidationException(messages.volume_cloning_not_supported_message)
+
+
+def validate_volume_id(volume_id):
+    if not volume_id:
+        raise ValidationException(messages.volume_src_snapshot_id_is_missing)
+    if config.PARAMETERS_OBJECT_ID_DELIMITER not in volume_id:
+        raise ObjectIdError(config.OBJECT_TYPE_NAME_SNAPSHOT, volume_id)
 
 
 def validate_create_volume_request(request):
@@ -158,8 +162,7 @@ def validate_validate_volume_capabilities_request(request):
     logger.debug("validating validate_volume_capabilities volume request")
 
     logger.debug("validating volume id")
-    if not request.volume_id:
-        raise ValidationException(messages.name_should_not_be_empty_message)
+    validate_volume_id(request.volume_id)
 
     logger.debug("validating volume capabilities")
     if not request.volume_capabilities:
