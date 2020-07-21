@@ -1,10 +1,10 @@
-import os.path
 import time
-from optparse import OptionParser
+from concurrent import futures
 
 import grpc
+import os.path
 import yaml
-from concurrent import futures
+from optparse import OptionParser
 from retry import retry
 
 import controller.array_action.errors as controller_errors

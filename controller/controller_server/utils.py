@@ -1,7 +1,6 @@
-from hashlib import sha1
-
 import base58
 from google.protobuf.timestamp_pb2 import Timestamp
+from hashlib import sha1
 
 import controller.controller_server.config as config
 import controller.controller_server.messages as messages
