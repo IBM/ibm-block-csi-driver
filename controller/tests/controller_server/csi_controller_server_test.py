@@ -6,6 +6,7 @@ import grpc
 from mock import patch, Mock, MagicMock, call
 
 import controller.array_action.errors as array_errors
+import controller.controller_server.config as config
 import controller.controller_server.errors as controller_errors
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.controller_server.config import PARAMETERS_VOLUME_NAME_PREFIX, PARAMETERS_SNAPSHOT_NAME_PREFIX
@@ -1262,3 +1263,103 @@ class TestIdentityServer(unittest.TestCase):
         request = Mock()
         context = Mock()
         self.servicer.Probe(request, context)
+
+
+class TestControllerServerValidateVolumeCapabilities(AbstractControllerTest):
+
+    def get_create_object_response_method(self):
+        return csi_pb2.ValidateVolumeCapabilitiesResponse
+
+    def get_create_object_method(self):
+        return self.servicer.ValidateVolumeCapabilities
+
+    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
+    def setUp(self, connect):
+        self.fqdn = "fqdn"
+        self.hostname = "hostname"
+        self.mediator = XIVArrayMediator("user", "password", self.fqdn)
+        self.mediator.client = Mock()
+
+        self.mediator.get_volume_by_id = Mock()
+        self.mediator.get_volume_by_id.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
+
+        self.storage_agent = MagicMock()
+        self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
+
+        self.servicer = ControllerServicer(self.fqdn)
+
+        self.request = Mock()
+        arr_type = XIVArrayMediator.array_type
+        self.request.volume_id = "{}:wwn1".format(arr_type)
+        self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
+        self.request.parameters = {}
+        self.request.volume_context = {}
+        access_types = csi_pb2.VolumeCapability.AccessMode
+        caps = csi_pb2.VolumeCapability(
+            mount=csi_pb2.VolumeCapability.MountVolume(fs_type="ext4"),
+            access_mode=csi_pb2.VolumeCapability.AccessMode(mode=access_types.SINGLE_NODE_WRITER))
+        self.request.volume_capabilities = [caps]
+
+        self.context = utils.FakeContext()
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_validate_volume_cap_success(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+
+        self.servicer.ValidateVolumeCapabilities(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_validate_volume_cap_with_empty_id(self, storage_agent):
+        self.request.volume_id = ""
+        self._test_create_object_with_empty_name(storage_agent)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_validate_volume_cap_with_wrong_secrets(self, storage_agent):
+        self._test_create_object_with_wrong_secrets(storage_agent)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_validate_volume_cap_with_unsupported_capabilities(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+        self.request.volume_capabilities[0].access_mode.mode = 999
+        res = self.get_create_object_method()(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
+        self.assertTrue("unsupported access mode" in self.context.details)
+        self.assertEqual(res, self.get_create_object_response_method()())
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_validate_volume_cap_with_no_capabilities(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+        self.request.volume_capabilities = {}
+        res = self.get_create_object_method()(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
+        self.assertTrue("not set" in self.context.details)
+        self.assertEqual(res, self.get_create_object_response_method()())
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_validate_volume_cap_with_bad_id(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+        self.request.volume_id = "wwn1"
+        res = self.get_create_object_method()(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
+        self.assertTrue("id format" in self.context.details)
+        self.assertEqual(res, self.get_create_object_response_method()())
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_validate_volume_cap_with_vol_not_found(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+        self.mediator.get_volume_by_id.side_effect = [array_errors.VolumeNotFoundError("vol")]
+        res = self.get_create_object_method()(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
+        self.assertTrue("vol" in self.context.details)
+        self.assertEqual(res, self.get_create_object_response_method()())
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_validation_with_vol_context_not_match(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+        self.request.volume_context = {config.VOLUME_CONTEXT_VOLUME_NAME_PARAMETER: "fake"}
+        res = self.get_create_object_method()(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
+        self.assertTrue("volume context" in self.context.details)
+        self.assertEqual(res, self.get_create_object_response_method()())

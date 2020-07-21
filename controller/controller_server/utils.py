@@ -187,7 +187,7 @@ def validate_volume_context_match_volume(volume_context, vol):
                 vol.array_address if isinstance(vol.array_address, list) else [vol.array_address]) and
             volume_context[config.VOLUME_CONTEXT_POOL_PARAMETER] == vol.pool_name and
             volume_context[config.VOLUME_CONTEXT_STORAGE_TYPE_PARAMETER] == vol.array_type):
-        raise ValidationException(messages.invalid_secret_message)
+        raise ValidationException(messages.volume_context_not_match_volume_message)
     logger.debug("volume_context validation finished.")
 
 
