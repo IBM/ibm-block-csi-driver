@@ -161,7 +161,11 @@ def validate_validate_volume_capabilities_request(request):
     logger.debug("validating validate_volume_capabilities volume request")
 
     logger.debug("validating volume id")
-    validate_volume_id(request.volume_id)
+    volume_id = request.volume_id
+    if not request.volume_id:
+        raise ValidationException(messages.name_should_not_be_empty_message)
+    if config.PARAMETERS_OBJECT_ID_DELIMITER not in volume_id:
+        raise ObjectIdError(config.OBJECT_TYPE_ID_VOLUME, volume_id)
 
     logger.debug("validating volume capabilities")
     if not request.volume_capabilities:
@@ -176,7 +180,7 @@ def validate_validate_volume_capabilities_request(request):
 
 
 def validate_volume_context_match_volume(volume_context, vol):
-    logger.debug("validate volume capabilities response for vol : is matching in volume")
+    logger.debug("validate volume_context is matching volume")
 
     if not (volume_context[config.VOLUME_CONTEXT_VOLUME_NAME_PARAMETER] == vol.volume_name and
             volume_context[config.VOLUME_CONTEXT_ARRAY_PARAMETER] == ",".join(
@@ -226,8 +230,7 @@ def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
 
 
 def generate_csi_validate_volume_capabilities_response(volume_context, volume_capabilities, parameters):
-    logger.debug("validate volume capabilities response for vol : {0}".format(
-        volume_context[config.VOLUME_CONTEXT_VOLUME_NAME_PARAMETER]))
+    logger.debug("creating volume capabilities response")
 
     res = csi_pb2.ValidateVolumeCapabilitiesResponse(confirmed=csi_pb2.ValidateVolumeCapabilitiesResponse.Confirmed(
         volume_context=volume_context,

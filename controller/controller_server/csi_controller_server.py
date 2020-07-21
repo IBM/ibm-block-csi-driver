@@ -388,6 +388,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return csi_pb2.ControllerUnpublishVolumeResponse()
 
     def ValidateVolumeCapabilities(self, request, context):
+        set_current_thread_name(request.volume_id)
         logger.info("ValidateVolumeCapabilities")
         try:
 
@@ -407,7 +408,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     context.set_details(ex.message)
                     context.set_code(grpc.StatusCode.NOT_FOUND)
                     return csi_pb2.ValidateVolumeCapabilitiesResponse()
-            
+
             if request.volume_context:
                 utils.validate_volume_context_match_volume(request.volume_context, volume)
             logger.info("finished ValidateVolumeCapabilities")
