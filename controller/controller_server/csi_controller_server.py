@@ -390,19 +390,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def ValidateVolumeCapabilities(self, request, context):
         logger.info("ValidateVolumeCapabilities")
         try:
-            try:
-                utils.validate_validate_volume_capabilities_request(request)
-            except ValidationException as ex:
-                logger.exception(ex)
-                context.set_details(ex.message)
-                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                return csi_pb2.ValidateVolumeCapabilitiesResponse()
+
+            utils.validate_validate_volume_capabilities_request(request)
 
             secrets = request.secrets
-            if not secrets:
-                context.set_code(grpc.StatusCode.NOT_FOUND)
-                return csi_pb2.ValidateVolumeCapabilitiesResponse()
-
             user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
 
             # TODO : pass multiple array addresses
@@ -433,6 +424,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)
+            return csi_pb2.ValidateVolumeCapabilitiesResponse()
+        except ValidationException as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.ValidateVolumeCapabilitiesResponse()
 
     def ListVolumes(self, request, context):

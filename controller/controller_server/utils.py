@@ -169,6 +169,10 @@ def validate_validate_volume_capabilities_request(request):
         raise ValidationException(messages.capabilities_not_set_message)
     validate_csi_volume_capabilties(request.volume_capabilities)
 
+    logger.debug("validating secrets")
+    if request.secrets:
+        validate_secret(request.secrets)
+
     logger.debug("request validation finished.")
 
 
