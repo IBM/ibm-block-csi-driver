@@ -177,22 +177,25 @@ def validate_validate_volume_capabilities_request(request):
 
 
 def validate_volume_context_match_volume(volume_context, vol):
-    if not (volume_context["volume_name"] == vol.volume_name and
-            volume_context["array_address"] == ",".join(
+    logger.debug("validating volume_context is matching in volume")
+
+    if not (volume_context[config.VOLUME_CONTEXT_VOLUME_NAME_PARAMETER] == vol.volume_name and
+            volume_context[config.VOLUME_CONTEXT_ARRAY_PARAMETER] == ",".join(
                 vol.array_address if isinstance(vol.array_address, list) else [vol.array_address]) and
-            volume_context["pool_name"] == vol.pool_name and
-            volume_context["storage_type"] == vol.array_type):
+            volume_context[config.VOLUME_CONTEXT_POOL_PARAMETER] == vol.pool_name and
+            volume_context[config.VOLUME_CONTEXT_STORAGE_TYPE_PARAMETER] == vol.array_type):
         raise ValidationException(messages.invalid_secret_message)
+    logger.debug("volume_context validation finished.")
 
 
 def generate_csi_create_volume_response(new_vol):
     logger.debug("creating volume response for vol : {0}".format(new_vol))
 
-    vol_context = {"volume_name": new_vol.volume_name,
-                   "array_address": ",".join(
+    vol_context = {config.VOLUME_CONTEXT_VOLUME_NAME_PARAMETER: new_vol.volume_name,
+                   config.VOLUME_CONTEXT_ARRAY_PARAMETER: ",".join(
                        new_vol.array_address if isinstance(new_vol.array_address, list) else [new_vol.array_address]),
-                   "pool_name": new_vol.pool_name,
-                   "storage_type": new_vol.array_type
+                   config.VOLUME_CONTEXT_POOL_PARAMETER: new_vol.pool_name,
+                   config.VOLUME_CONTEXT_STORAGE_TYPE_PARAMETER: new_vol.array_type
                    }
     content_source = None
     if new_vol.copy_src_object_id:
@@ -224,7 +227,8 @@ def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
 
 
 def generate_csi_validate_volume_capabilities_response(volume_context, volume_capabilities, parameters):
-    logger.debug("validate volume capabilities response for vol : {0}".format(volume_context["volume_name"]))
+    logger.debug("validate volume capabilities response for vol : {0}".format(
+        volume_context[config.VOLUME_CONTEXT_VOLUME_NAME_PARAMETER]))
 
     res = csi_pb2.ValidateVolumeCapabilitiesResponse(confirmed=csi_pb2.ValidateVolumeCapabilitiesResponse.Confirmed(
         volume_context=volume_context,

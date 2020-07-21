@@ -409,14 +409,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     return csi_pb2.ValidateVolumeCapabilitiesResponse()
 
             if request.volume_context:
-                try:
-                    utils.validate_volume_context_match_volume(request.volume_context, volume)
-                except ValidationException as ex:
-                    logger.exception(ex)
-                    context.set_details(ex.message)
-                    context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                    return csi_pb2.ValidateVolumeCapabilitiesResponse()
-                logger.info("finished ValidateVolumeCapabilities")
+                utils.validate_volume_context_match_volume(request.volume_context, volume)
+            logger.info("finished ValidateVolumeCapabilities")
             return utils.generate_csi_validate_volume_capabilities_response(request.volume_context,
                                                                             request.volume_capabilities,
                                                                             request.parameters)
