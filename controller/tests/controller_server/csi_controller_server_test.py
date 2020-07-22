@@ -1294,10 +1294,7 @@ class TestControllerServerValidateVolumeCapabilities(AbstractControllerTest):
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
         self.request.parameters = {}
         self.request.volume_context = {}
-        access_types = csi_pb2.VolumeCapability.AccessMode
-        caps = csi_pb2.VolumeCapability(
-            mount=csi_pb2.VolumeCapability.MountVolume(fs_type="ext4"),
-            access_mode=csi_pb2.VolumeCapability.AccessMode(mode=access_types.SINGLE_NODE_WRITER))
+        caps = utils.get_mock_csi_pb2_volume_capability_object()
         self.request.volume_capabilities = [caps]
 
         self.context = utils.FakeContext()
