@@ -1294,7 +1294,7 @@ class TestControllerServerValidateVolumeCapabilities(AbstractControllerTest):
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
         self.request.parameters = {}
         self.request.volume_context = {}
-        caps = utils.get_mock_csi_pb2_volume_capability_object()
+        caps = utils.get_mock_volume_capability_object()
         self.request.volume_capabilities = [caps]
 
         self.context = utils.FakeContext()
@@ -1309,8 +1309,12 @@ class TestControllerServerValidateVolumeCapabilities(AbstractControllerTest):
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_cap_with_empty_id(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
         self.request.volume_id = ""
-        self._test_create_object_with_empty_name(storage_agent)
+        res = self.get_create_object_method()(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
+        self.assertTrue("volume id" in self.context.details)
+        self.assertEqual(res, self.get_create_object_response_method()(message=self.context.details))
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_cap_with_wrong_secrets(self, storage_agent):
@@ -1323,7 +1327,7 @@ class TestControllerServerValidateVolumeCapabilities(AbstractControllerTest):
         res = self.get_create_object_method()(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertTrue("unsupported access mode" in self.context.details)
-        self.assertEqual(res, self.get_create_object_response_method()())
+        self.assertEqual(res, self.get_create_object_response_method()(message=self.context.details))
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_cap_with_no_capabilities(self, storage_agent):
@@ -1332,7 +1336,7 @@ class TestControllerServerValidateVolumeCapabilities(AbstractControllerTest):
         res = self.get_create_object_method()(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertTrue("not set" in self.context.details)
-        self.assertEqual(res, self.get_create_object_response_method()())
+        self.assertEqual(res, self.get_create_object_response_method()(message=self.context.details))
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_cap_with_bad_id(self, storage_agent):
@@ -1341,7 +1345,7 @@ class TestControllerServerValidateVolumeCapabilities(AbstractControllerTest):
         res = self.get_create_object_method()(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
         self.assertTrue("id format" in self.context.details)
-        self.assertEqual(res, self.get_create_object_response_method()())
+        self.assertEqual(res, self.get_create_object_response_method()(message=self.context.details))
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_cap_with_vol_not_found(self, storage_agent):
@@ -1350,7 +1354,7 @@ class TestControllerServerValidateVolumeCapabilities(AbstractControllerTest):
         res = self.get_create_object_method()(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
         self.assertTrue("vol" in self.context.details)
-        self.assertEqual(res, self.get_create_object_response_method()())
+        self.assertEqual(res, self.get_create_object_response_method()(message=self.context.details))
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validation_with_vol_context_not_match(self, storage_agent):
@@ -1359,4 +1363,4 @@ class TestControllerServerValidateVolumeCapabilities(AbstractControllerTest):
         res = self.get_create_object_method()(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertTrue("volume context" in self.context.details)
-        self.assertEqual(res, self.get_create_object_response_method()())
+        self.assertEqual(res, self.get_create_object_response_method()(message=self.context.details))

@@ -413,12 +413,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)
-            return csi_pb2.ValidateVolumeCapabilitiesResponse()
+            return csi_pb2.ValidateVolumeCapabilitiesResponse(message=ex.message)
         except ValidationException as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-            return csi_pb2.ValidateVolumeCapabilitiesResponse()
+            return csi_pb2.ValidateVolumeCapabilitiesResponse(message=ex.message)
 
     def ListVolumes(self, request, context):
         logger.info("ListVolumes")

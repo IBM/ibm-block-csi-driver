@@ -146,7 +146,7 @@ def validate_create_snapshot_request(request):
 def validate_delete_snapshot_request(request):
     logger.debug("validating delete snapshot request")
     if not request.snapshot_id:
-        raise ValidationException(messages.name_should_not_be_empty_message)
+        raise ValidationException(messages.snapshot_id_should_not_be_empty_message)
     logger.debug("validating secrets")
     if request.secrets:
         validate_secret(request.secrets)
@@ -159,9 +159,9 @@ def validate_validate_volume_capabilities_request(request):
     logger.debug("validating volume id")
     volume_id = request.volume_id
     if not request.volume_id:
-        raise ValidationException(messages.name_should_not_be_empty_message)
+        raise ValidationException(messages.volume_id_should_not_be_empty_message)
     if config.PARAMETERS_OBJECT_ID_DELIMITER not in volume_id:
-        raise ObjectIdError(config.OBJECT_TYPE_ID_VOLUME, volume_id)
+        raise ObjectIdError(config.OBJECT_TYPE_NAME_VOLUME, volume_id)
 
     logger.debug("validating volume capabilities")
     if not request.volume_capabilities:
@@ -177,9 +177,9 @@ def validate_validate_volume_capabilities_request(request):
 
 def validate_volume_context_match_volume(volume_context, volume):
     logger.debug("validate volume_context is matching volume")
-    validated_volume_context = _get_context_from_volume(volume)
+    context_from_existing_volume = _get_context_from_volume(volume)
 
-    if not volume_context == validated_volume_context:
+    if volume_context != context_from_existing_volume:
         raise ValidationException(messages.volume_context_not_match_volume_message)
     logger.debug("volume_context validation finished.")
 
