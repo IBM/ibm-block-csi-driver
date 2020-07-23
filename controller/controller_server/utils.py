@@ -175,14 +175,11 @@ def validate_validate_volume_capabilities_request(request):
     logger.debug("request validation finished.")
 
 
-def validate_volume_context_match_volume(volume_context, vol):
+def validate_volume_context_match_volume(volume_context, volume):
     logger.debug("validate volume_context is matching volume")
+    validated_volume_context = _get_context_from_volume(volume)
 
-    if not (volume_context[config.VOLUME_CONTEXT_VOLUME_NAME_PARAMETER] == vol.volume_name and
-            volume_context[config.VOLUME_CONTEXT_ARRAY_PARAMETER] == ",".join(
-                vol.array_address if isinstance(vol.array_address, list) else [vol.array_address]) and
-            volume_context[config.VOLUME_CONTEXT_POOL_PARAMETER] == vol.pool_name and
-            volume_context[config.VOLUME_CONTEXT_STORAGE_TYPE_PARAMETER] == vol.array_type):
+    if not volume_context == validated_volume_context:
         raise ValidationException(messages.volume_context_not_match_volume_message)
     logger.debug("volume_context validation finished.")
 
@@ -190,12 +187,8 @@ def validate_volume_context_match_volume(volume_context, vol):
 def generate_csi_create_volume_response(new_vol):
     logger.debug("creating volume response for vol : {0}".format(new_vol))
 
-    vol_context = {config.VOLUME_CONTEXT_VOLUME_NAME_PARAMETER: new_vol.volume_name,
-                   config.VOLUME_CONTEXT_ARRAY_PARAMETER: ",".join(
-                       new_vol.array_address if isinstance(new_vol.array_address, list) else [new_vol.array_address]),
-                   config.VOLUME_CONTEXT_POOL_PARAMETER: new_vol.pool_name,
-                   config.VOLUME_CONTEXT_STORAGE_TYPE_PARAMETER: new_vol.array_type
-                   }
+    vol_context = _get_context_from_volume(new_vol)
+
     content_source = None
     if new_vol.copy_src_object_id:
         snapshot_source = csi_pb2.VolumeContentSource.SnapshotSource(snapshot_id=new_vol.copy_src_object_id)
@@ -275,6 +268,15 @@ def get_volume_id_info(volume_id):
 
 def get_snapshot_id_info(snapshot_id):
     return _get_object_id_info(snapshot_id, config.OBJECT_TYPE_NAME_SNAPSHOT)
+
+
+def _get_context_from_volume(volume):
+    return {config.VOLUME_CONTEXT_VOLUME_NAME_PARAMETER: volume.volume_name,
+            config.VOLUME_CONTEXT_ARRAY_PARAMETER: ",".join(
+                volume.array_address if isinstance(volume.array_address, list) else [volume.array_address]),
+            config.VOLUME_CONTEXT_POOL_PARAMETER: volume.pool_name,
+            config.VOLUME_CONTEXT_STORAGE_TYPE_PARAMETER: volume.array_type
+            }
 
 
 def _get_object_id_info(full_object_id, object_type):
