@@ -7,7 +7,6 @@ more_then_one_mapping_message = "Volume is already mapped to a different host : 
 # validation error messages
 invalid_secret_message = "invalid secret was passed"
 secret_missing_message = 'secret is missing'
-volume_context_missing_message = 'volume_context is missing'
 capabilities_not_set_message = "capabilities were not set"
 unsupported_fs_type_message = "unsupported fs_type : {}"
 unsupported_volume_access_type_message = "unsupported volume access type"
