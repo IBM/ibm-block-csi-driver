@@ -142,6 +142,24 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
 
+    def test_create_snapshot_no_source_volume(self):
+        self.request.source_volume_id = None
+
+        self.servicer.CreateSnapshot(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
+
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_snapshot_source_volume_not_found(self, storage_agent, array_type):
+        storage_agent.return_value = self.storage_agent
+        self.mediator.get_volume_name = Mock()
+        self.mediator.get_volume_name.side_effect = array_errors.VolumeNotFoundError("vol_id")
+
+        self.servicer.CreateSnapshot(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
+
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_wrong_secrets(self, storage_agent):
         self._test_create_object_with_wrong_secrets(storage_agent)

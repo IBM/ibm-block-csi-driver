@@ -454,10 +454,14 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 res = utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
                 logger.info("finished create snapshot")
                 return res
-        except (controller_errors.IllegalObjectName, controller_errors.VolumeNotFoundError,
+        except (controller_errors.IllegalObjectName,
                 controller_errors.PoolParameterIsMissing) as ex:
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            return csi_pb2.CreateSnapshotResponse()
+        except controller_errors.VolumeNotFoundError as ex:
+            context.set_code(grpc.StatusCode.NOT_FOUND)
+            context.set_details(ex)
             return csi_pb2.CreateSnapshotResponse()
         except controller_errors.PermissionDeniedError as ex:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
