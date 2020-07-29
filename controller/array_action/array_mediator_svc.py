@@ -470,13 +470,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self._delete_fcmap(fcmap.id, force=False)
 
     def _delete_snapshot(self, cli_volume):
-        fcmap_id = cli_volume.FC_id
         snapshot_name = cli_volume.name
-        if fcmap_id == 'many':
-            self._delete_all_fcmaps_as_source_if_exist(snapshot_name)
         fcmap = self._get_fcmap_as_target_if_exists(snapshot_name)
         if not fcmap:
             raise controller_errors.SnapshotNotFoundError(snapshot_name)
+
+        fcmap_id = cli_volume.FC_id
+        if fcmap_id == 'many':
+            self._delete_all_fcmaps_as_source_if_exist(snapshot_name)
         self._stop_and_delete_fcmap(fcmap.id)
         self._delete_volume_by_name(snapshot_name)
 
