@@ -19,7 +19,7 @@ kind: Secret
 apiVersion: v1
 metadata:
   name: svc-array
-  namespace: kube-system
+  namespace: default 
 type: Opaque
 stringData:
   management_address: <ADDRESS_1,ADDRESS_2> # Array management addresses
@@ -42,7 +42,7 @@ parameters:
   pool: gold
 
   csi.storage.k8s.io/provisioner-secret-name: svc-array
-  csi.storage.k8s.io/provisioner-secret-namespace: kube-system
+  csi.storage.k8s.io/provisioner-secret-namespace: default 
   csi.storage.k8s.io/controller-publish-secret-name: svc-array
   csi.storage.k8s.io/controller-publish-secret-namespace: kube-systen
 
@@ -288,7 +288,7 @@ No resources found.
 ## Troubleshooting
 ```
 ###### View the CSI pods, daemonset and statefulset:
-$> kubectl get all -n kube-system  -l csi
+$> kubectl get all -n default   -l csi
 NAME                             READY   STATUS    RESTARTS   AGE
 pod/ibm-block-csi-controller-0   5/5     Running   0          9m36s
 pod/ibm-block-csi-node-jvmvh     3/3     Running   0          9m36s
@@ -301,13 +301,13 @@ NAME                                        READY   AGE
 statefulset.apps/ibm-block-csi-controller   1/1     9m36s
 
 ###### If pod/ibm-block-csi-controller-0 Status is not Running, troubleshoot by running the following:
-$> kubectl describe -n kube-system pod/ibm-block-csi-controller-0
+$> kubectl describe -n default  pod/ibm-block-csi-controller-0
 
 ###### View the CSI controller logs
-$> kubectl log -f -n kube-system ibm-block-csi-controller-0 -c ibm-block-csi-controller
+$> kubectl log -f -n default  ibm-block-csi-controller-0 -c ibm-block-csi-controller
 
 ###### View the CSI daemonset node logs
-$> kubectl log -f -n kube-system ibm-block-csi-node-<PODID> -c ibm-block-csi-node
+$> kubectl log -f -n default  ibm-block-csi-node-<PODID> -c ibm-block-csi-node
 ```
 
 Additional driver details:
@@ -333,7 +333,7 @@ Spec:
 Events:                       <none>
 
 
-$> kubectl get -n kube-system  csidriver,sa,clusterrole,clusterrolebinding,statefulset,pod,daemonset | grep ibm-block-csi
+$> kubectl get -n default   csidriver,sa,clusterrole,clusterrolebinding,statefulset,pod,daemonset | grep ibm-block-csi
 csidriver.storage.k8s.io/block.csi.ibm.com   2019-06-02T09:30:36Z
 serviceaccount/ibm-block-csi-controller-sa          1         2m16s
 clusterrole.rbac.authorization.k8s.io/ibm-block-csi-cluster-driver-registrar-role                            2m16s
