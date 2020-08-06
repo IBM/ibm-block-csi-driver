@@ -150,7 +150,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] that relates to lunId=%d and arrayIdentifiers=%s", volumeId, lunId, arrayIdentifiers)
 
 	volumUuid := strings.Split(volumeId, ":")[1]
-	arg := "show maps format \"%d %w\" | grep " + volumUuid
+	arg := "show maps format \"%d %w\" | grep " + strings.ToLower(volumUuid)
 	devicesOut, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathFlashCmd, "multipathd", []string{arg})
 	if err != nil {
 		return "", err
