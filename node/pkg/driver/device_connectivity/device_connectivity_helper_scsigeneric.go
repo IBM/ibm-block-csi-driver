@@ -146,20 +146,23 @@ func convertIntToScsilun(lunId int) string {
 	}
 }
 
+func (r OsDeviceConnectivityHelperScsiGeneric) multipathdCmd(args ...string) (string, error) {
+	out, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathFlashCmd, "multipathd", args)
+	return string(out), err
+}
+
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string, connectivityType string) (string, error) {
 	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] that relates to lunId=%d and arrayIdentifiers=%s", volumeId, lunId, arrayIdentifiers)
 
 	volumUuid := strings.Split(volumeId, ":")[1]
-	arg := "show maps "
+	//arg := "show maps "
 	//"format \\\"%d %w\\\""
 	//"| grep " + strings.ToLower(volumUuid)
-	r.MutexMultipathF.Lock()
-	devicesOut, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathFlashCmd, "multipathd", []string{arg})
-	r.MutexMultipathF.Unlock()
+	devices, err := r.multipathdCmd("show", "maps", "format", " \"%d", " %w\"")
+	//, "| grep ", strings.ToLower(volumUuid)
 	if err != nil {
 		return "", err
 	}
-	devices := string(devicesOut)
 	devicesList := strings.Split(devices, "\n")
 	for _, device := range devicesList {
 		dm := strings.Fields(device)[0]
