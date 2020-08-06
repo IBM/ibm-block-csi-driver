@@ -44,7 +44,7 @@ parameters:
   csi.storage.k8s.io/provisioner-secret-name: svc-array
   csi.storage.k8s.io/provisioner-secret-namespace: default 
   csi.storage.k8s.io/controller-publish-secret-name: svc-array
-  csi.storage.k8s.io/controller-publish-secret-namespace: kube-systen
+  csi.storage.k8s.io/controller-publish-secret-namespace: default
 
   csi.storage.k8s.io/fstype: xfs   # Optional. values ext4\xfs. The default is ext4.
   volume_name_prefix: demo         # Optional.
