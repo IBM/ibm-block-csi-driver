@@ -149,6 +149,18 @@ func convertIntToScsilun(lunId int) string {
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string, connectivityType string) (string, error) {
 	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] that relates to lunId=%d and arrayIdentifiers=%s", volumeId, lunId, arrayIdentifiers)
 
+	volumUuid := strings.Split(volumeId, ":")[1]
+	devicesOut, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathFlashCmd, "multipathd", []string{"show maps", "format \"%d %w\"", "| grep ", volumUuid})
+	if err != nil {
+		return "", err
+	}
+	devices := string(devicesOut)
+	devicesList := strings.Split(devices, "\n")
+	for _, device := range devicesList {
+		dm := strings.Fields(device)[0]
+		logger.Infof("GetMpathDevice: dm found: %s", dm)
+	}
+	logger.Infof("GetMpathDevice: dm found: %s", volumUuid)
 	if len(arrayIdentifiers) == 0 {
 		e := &ErrorNotFoundArrayIdentifiers{lunId}
 		return "", e

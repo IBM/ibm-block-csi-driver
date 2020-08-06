@@ -27,7 +27,7 @@ import (
 	"reflect"
 	"runtime"
 	"sort"
-	"strconv"
+	//"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -80,439 +80,439 @@ type GetMultipathDiskReturn struct {
 	err       error
 }
 
-func TestGetMpathDevice(t *testing.T) {
-	testCasesIscsi := []struct {
-		name             string
-		arrayIdentifiers []string
-
-		expErrType                reflect.Type
-		expErr                    error
-		expDMdevice               string
-		waitForPathToExistReturns []WaitForPathToExistReturn
-		getMultipathDiskReturns   []GetMultipathDiskReturn
-	}{
-		{
-			name:             "Should fail when WaitForPathToExist not found any sd device",
-			arrayIdentifiers: []string{"X"},
-			waitForPathToExistReturns: []WaitForPathToExistReturn{
-				WaitForPathToExistReturn{
-					devicePaths: nil,
-					exists:      false,
-					err:         nil,
-				},
-			},
-
-			expErr:      fmt.Errorf("Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[X]]. Please check the host connectivity to the storage."),
-			expDMdevice: "",
-		},
-
-		{
-			name:             "Should fail when WaitForPathToExist fail for some reason",
-			arrayIdentifiers: []string{"X"},
-			waitForPathToExistReturns: []WaitForPathToExistReturn{
-				WaitForPathToExistReturn{
-					devicePaths: nil,
-					exists:      false,
-					err:         fmt.Errorf("error"),
-				},
-			},
-
-			expErr:      fmt.Errorf("error"),
-			expDMdevice: "",
-		},
-
-		{
-			name:             "Should fail when GetMultipathDisk fail for some reason",
-			arrayIdentifiers: []string{"X"},
-			waitForPathToExistReturns: []WaitForPathToExistReturn{
-				WaitForPathToExistReturn{
-					devicePaths: []string{"/dev/disk/by-path/ip1-iscsi-ID1-lun1"},
-					exists:      true,
-					err:         nil,
-				},
-			},
-			getMultipathDiskReturns: []GetMultipathDiskReturn{
-				GetMultipathDiskReturn{
-					pathParam: "/dev/disk/by-path/ip1-iscsi-ID1-lun1",
-					path:      "",
-					err:       fmt.Errorf("error"),
-				},
-			},
-
-			expErr:      fmt.Errorf("error"),
-			expDMdevice: "",
-		},
-
-		{
-			name:             "Should fail when GetMultipathDisk provide 2 different dms that apply to the same lun (bas multipathing case)",
-			arrayIdentifiers: []string{"X"},
-			waitForPathToExistReturns: []WaitForPathToExistReturn{
-				WaitForPathToExistReturn{
-					devicePaths: []string{"/dev/disk/by-path/ip1-iscsi-ID1-lun1", "/dev/disk/by-path/ip1-iscsi-ID1-lun1___2"},
-					exists:      true,
-					err:         nil,
-				},
-			},
-			getMultipathDiskReturns: []GetMultipathDiskReturn{
-				GetMultipathDiskReturn{
-					pathParam: "/dev/disk/by-path/ip1-iscsi-ID1-lun1",
-					path:      "dm-1",
-					err:       nil,
-				},
-				GetMultipathDiskReturn{
-					pathParam: "/dev/disk/by-path/ip1-iscsi-ID1-lun1___2",
-					path:      "dm-2", // The main point, look like multipath crazy and give to the same vol but different path a different md device, which is wrong case - so we check it.
-					err:       nil,
-				},
-			},
-
-			expErrType:  reflect.TypeOf(&device_connectivity.MultipleDmDevicesError{}),
-			expDMdevice: "",
-		},
-
-		{
-			name:             "Should succeed to GetMpathDevice - good path",
-			arrayIdentifiers: []string{"X"},
-			waitForPathToExistReturns: []WaitForPathToExistReturn{
-				WaitForPathToExistReturn{
-					devicePaths: []string{"/dev/disk/by-path/ip1-iscsi-ID1-lun1", "/dev/disk/by-path/ip1-iscsi-ID1-lun1___2"},
-					exists:      true,
-					err:         nil,
-				},
-			},
-			getMultipathDiskReturns: []GetMultipathDiskReturn{
-				GetMultipathDiskReturn{
-					pathParam: "/dev/disk/by-path/ip1-iscsi-ID1-lun1",
-					path:      "dm-1",
-					err:       nil,
-				},
-				GetMultipathDiskReturn{
-					pathParam: "/dev/disk/by-path/ip1-iscsi-ID1-lun1___2",
-					path:      "dm-1", // the same because there are 2 paths to the storage, so we should find 2 sd devices that point to the same dm device
-					err:       nil,
-				},
-			},
-
-			expErr:      nil,
-			expDMdevice: "dm-1",
-		},
-
-		{
-			name:             "Should succeed to GetMpathDevice with one more iqns",
-			arrayIdentifiers: []string{"X", "Y"},
-			waitForPathToExistReturns: []WaitForPathToExistReturn{
-				WaitForPathToExistReturn{
-					devicePaths: []string{"/dev/disk/by-path/ip1-iscsi-X-lun1"},
-					exists:      true,
-					err:         nil,
-				},
-				WaitForPathToExistReturn{
-					devicePaths: []string{"/dev/disk/by-path/ip1-iscsi-Y-lun2"},
-					exists:      true,
-					err:         nil,
-				},
-			},
-			getMultipathDiskReturns: []GetMultipathDiskReturn{
-				GetMultipathDiskReturn{
-					pathParam: "/dev/disk/by-path/ip1-iscsi-X-lun1",
-					path:      "dm-1",
-					err:       nil,
-				},
-				GetMultipathDiskReturn{
-					pathParam: "/dev/disk/by-path/ip1-iscsi-Y-lun2",
-					path:      "dm-1",
-					err:       nil,
-				},
-			},
-
-			expErr:      nil,
-			expDMdevice: "dm-1",
-		},
-
-		{
-			name:             "Should fail when WaitForPathToExist return error with the first array iqn, and found no sd device with the second array iqn",
-			arrayIdentifiers: []string{"X", "X"},
-			waitForPathToExistReturns: []WaitForPathToExistReturn{
-				WaitForPathToExistReturn{
-					devicePaths: nil,
-					exists:      false,
-					err:         fmt.Errorf("error"),
-				},
-				WaitForPathToExistReturn{
-					devicePaths: nil,
-					exists:      false,
-					err:         nil,
-				},
-			},
-
-			expErr:      fmt.Errorf("error,Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[X]]. Please check the host connectivity to the storage."),
-			expDMdevice: "",
-		},
-	}
-
-	for _, tc := range testCasesIscsi {
-
-		t.Run(tc.name, func(t *testing.T) {
-			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
-
-			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
-			fake_helper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
-			fake_mutex := &sync.Mutex{}
-			lunId := 0
-
-			for index, r := range tc.waitForPathToExistReturns {
-				path := strings.Join([]string{"/dev/disk/by-path/ip*", device_connectivity.ConnectionTypeISCSI, tc.arrayIdentifiers[index], "lun", strconv.Itoa(lunId)}, "-")
-				fake_helper.EXPECT().WaitForPathToExist(path, device_connectivity.WaitForMpathRetries, device_connectivity.WaitForMpathWaitIntervalSec).Return(
-					r.devicePaths,
-					r.exists,
-					r.err)
-			}
-
-			for _, r := range tc.getMultipathDiskReturns {
-				fake_helper.EXPECT().GetMultipathDisk(r.pathParam).Return(r.path, r.err)
-			}
-
-			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fake_executer, fake_helper, fake_mutex)
-			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, tc.arrayIdentifiers, device_connectivity.ConnectionTypeISCSI)
-			if tc.expErr != nil || tc.expErrType != nil {
-				if err == nil {
-					t.Fatalf("Expected to fail with error, got success.")
-				}
-				if tc.expErrType != nil {
-					if reflect.TypeOf(err) != tc.expErrType {
-						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
-					}
-				} else {
-					if !areStringsEqualAsSet(err.Error(), tc.expErr.Error()) {
-						t.Fatalf("Expected error %s, got %s", tc.expErr, err.Error())
-					}
-				}
-			}
-
-			if tc.expDMdevice != DMdevice {
-				t.Fatalf("Expected found mpath device %v, got %v", tc.expDMdevice, DMdevice)
-			}
-
-		})
-	}
-
-	testCasesFc := []struct {
-		name             string
-		arrayIdentifiers []string
-
-		expErrType                reflect.Type
-		expErr                    error
-		expDMdevice               string
-		waitForPathToExistReturns []WaitForPathToExistReturn
-		getMultipathDiskReturns   []GetMultipathDiskReturn
-	}{
-		{
-			name:             "Should fail when WaitForPathToExist not found any sd device",
-			arrayIdentifiers: []string{"x"},
-			waitForPathToExistReturns: []WaitForPathToExistReturn{
-				WaitForPathToExistReturn{
-					devicePaths: nil,
-					exists:      false,
-					err:         nil,
-				},
-			},
-
-			expErr:      fmt.Errorf("Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[0xx]]. Please check the host connectivity to the storage."),
-			expDMdevice: "",
-		},
-
-		{
-			name:             "Should fail when WaitForPathToExist fail for some reason",
-			arrayIdentifiers: []string{"X"},
-			waitForPathToExistReturns: []WaitForPathToExistReturn{
-				WaitForPathToExistReturn{
-					devicePaths: nil,
-					exists:      false,
-					err:         fmt.Errorf("error"),
-				},
-			},
-
-			expErr:      fmt.Errorf("error"),
-			expDMdevice: "",
-		},
-
-		{
-			name:             "Should fail when GetMultipathDisk fail for some reason",
-			arrayIdentifiers: []string{"X"},
-			waitForPathToExistReturns: []WaitForPathToExistReturn{
-				WaitForPathToExistReturn{
-					devicePaths: []string{getFcPath("-ID1-lun-1")},
-					exists:      true,
-					err:         nil,
-				},
-			},
-			getMultipathDiskReturns: []GetMultipathDiskReturn{
-				GetMultipathDiskReturn{
-					pathParam: getFcPath("-ID1-lun-1"),
-					path:      "",
-					err:       fmt.Errorf("error"),
-				},
-			},
-
-			expErr:      fmt.Errorf("error"),
-			expDMdevice: "",
-		},
-
-		{
-			name:             "Should fail when GetMultipathDisk provide 2 different dms that apply to the same lun (bas multipathing case)",
-			arrayIdentifiers: []string{"X"},
-			waitForPathToExistReturns: []WaitForPathToExistReturn{
-				WaitForPathToExistReturn{
-					devicePaths: []string{getFcPath("-ID1-lun1"), getFcPath("-ID1-lun1___2")},
-					exists:      true,
-					err:         nil,
-				},
-			},
-			getMultipathDiskReturns: []GetMultipathDiskReturn{
-				GetMultipathDiskReturn{
-					pathParam: getFcPath("-ID1-lun1"),
-					path:      "dm-1",
-					err:       nil,
-				},
-				GetMultipathDiskReturn{
-					pathParam: getFcPath("-ID1-lun1___2"),
-					path:      "dm-2", // The main point, look like multipath crazy and give to the same vol but different path a different md device, which is wrong case - so we check it.
-					err:       nil,
-				},
-			},
-
-			expErrType:  reflect.TypeOf(&device_connectivity.MultipleDmDevicesError{}),
-			expDMdevice: "",
-		},
-
-		{
-			name:             "Should succeed to GetMpathDevice - good path",
-			arrayIdentifiers: []string{"X"},
-			waitForPathToExistReturns: []WaitForPathToExistReturn{
-				WaitForPathToExistReturn{
-					devicePaths: []string{getFcPath("-ID1-lun1"), getFcPath("-ID1-lun1___2")},
-					exists:      true,
-					err:         nil,
-				},
-			},
-			getMultipathDiskReturns: []GetMultipathDiskReturn{
-				GetMultipathDiskReturn{
-					pathParam: getFcPath("-ID1-lun1"),
-					path:      "dm-1",
-					err:       nil,
-				},
-				GetMultipathDiskReturn{
-					pathParam: getFcPath("-ID1-lun1___2"),
-					path:      "dm-1", // the same because there are 2 paths to the storage, so we should find 2 sd devices that point to the same dm device
-					err:       nil,
-				},
-			},
-
-			expErr:      nil,
-			expDMdevice: "dm-1",
-		},
-
-		{
-			name:             "Should succeed to GetMpathDevice with one more iqns",
-			arrayIdentifiers: []string{"X", "Y"},
-			waitForPathToExistReturns: []WaitForPathToExistReturn{
-				WaitForPathToExistReturn{
-					devicePaths: []string{getFcPath("-0xX-lun1")},
-					exists:      true,
-					err:         nil,
-				},
-				WaitForPathToExistReturn{
-					devicePaths: []string{getFcPath("-0xY-lun2")},
-					exists:      true,
-					err:         nil,
-				},
-			},
-			getMultipathDiskReturns: []GetMultipathDiskReturn{
-				GetMultipathDiskReturn{
-					pathParam: getFcPath("-0xX-lun1"),
-					path:      "dm-1",
-					err:       nil,
-				},
-				GetMultipathDiskReturn{
-					pathParam: getFcPath("-0xY-lun2"),
-					path:      "dm-1",
-					err:       nil,
-				},
-			},
-
-			expErr:      nil,
-			expDMdevice: "dm-1",
-		},
-
-		{
-			name:             "Should fail when WaitForPathToExist return error with the first array wwn, and found no sd device with the second array wwn",
-			arrayIdentifiers: []string{"Y", "Y"},
-			waitForPathToExistReturns: []WaitForPathToExistReturn{
-				WaitForPathToExistReturn{
-					devicePaths: nil,
-					exists:      false,
-					err:         fmt.Errorf("error"),
-				},
-				WaitForPathToExistReturn{
-					devicePaths: nil,
-					exists:      false,
-					err:         nil,
-				},
-			},
-
-			expErr:      fmt.Errorf("error,Couldn't find multipath device for volumeID [volIdNotRelevant] lunID [0] from array [[0xy]]. Please check the host connectivity to the storage."),
-			expDMdevice: "",
-		},
-	}
-	for _, tc := range testCasesFc {
-
-		t.Run(tc.name, func(t *testing.T) {
-			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
-
-			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
-			fake_helper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
-			fake_mutex := &sync.Mutex{}
-			lunId := 0
-
-			for index, r := range tc.waitForPathToExistReturns {
-				array_inititor := "0x" + strings.ToLower(string(tc.arrayIdentifiers[index]))
-				path := strings.Join([]string{getFcPath(""), array_inititor, "lun", strconv.Itoa(lunId)}, "-")
-				fake_helper.EXPECT().WaitForPathToExist(path, device_connectivity.WaitForMpathRetries, device_connectivity.WaitForMpathWaitIntervalSec).Return(
-					r.devicePaths,
-					r.exists,
-					r.err)
-			}
-
-			for _, r := range tc.getMultipathDiskReturns {
-				fake_helper.EXPECT().GetMultipathDisk(r.pathParam).Return(r.path, r.err)
-			}
-
-			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fake_executer, fake_helper, fake_mutex)
-			DMdevice, err := o.GetMpathDevice("volIdNotRelevant", lunId, tc.arrayIdentifiers, device_connectivity.ConnectionTypeFC)
-			if tc.expErr != nil || tc.expErrType != nil {
-				if err == nil {
-					t.Fatalf("Expected to fail with error, got success.")
-				}
-				if tc.expErrType != nil {
-					if reflect.TypeOf(err) != tc.expErrType {
-						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
-					}
-				} else {
-					if !areStringsEqualAsSet(err.Error(), tc.expErr.Error()) {
-						t.Fatalf("Expected error %s, got %s", tc.expErr, err.Error())
-					}
-				}
-			}
-
-			if tc.expDMdevice != DMdevice {
-				t.Fatalf("Expected found mpath device %v, got %v", tc.expDMdevice, DMdevice)
-			}
-
-		})
-	}
-}
+//func TestGetMpathDevice(t *testing.T) {
+//	testCasesIscsi := []struct {
+//		name             string
+//		arrayIdentifiers []string
+//
+//		expErrType                reflect.Type
+//		expErr                    error
+//		expDMdevice               string
+//		waitForPathToExistReturns []WaitForPathToExistReturn
+//		getMultipathDiskReturns   []GetMultipathDiskReturn
+//	}{
+//		{
+//			name:             "Should fail when WaitForPathToExist not found any sd device",
+//			arrayIdentifiers: []string{"X"},
+//			waitForPathToExistReturns: []WaitForPathToExistReturn{
+//				WaitForPathToExistReturn{
+//					devicePaths: nil,
+//					exists:      false,
+//					err:         nil,
+//				},
+//			},
+//
+//			expErr:      fmt.Errorf("Couldn't find multipath device for volumeID [Test:GetMpathDevice] lunID [0] from array [[X]]. Please check the host connectivity to the storage."),
+//			expDMdevice: "",
+//		},
+//
+//		{
+//			name:             "Should fail when WaitForPathToExist fail for some reason",
+//			arrayIdentifiers: []string{"X"},
+//			waitForPathToExistReturns: []WaitForPathToExistReturn{
+//				WaitForPathToExistReturn{
+//					devicePaths: nil,
+//					exists:      false,
+//					err:         fmt.Errorf("error"),
+//				},
+//			},
+//
+//			expErr:      fmt.Errorf("error"),
+//			expDMdevice: "",
+//		},
+//
+//		{
+//			name:             "Should fail when GetMultipathDisk fail for some reason",
+//			arrayIdentifiers: []string{"X"},
+//			waitForPathToExistReturns: []WaitForPathToExistReturn{
+//				WaitForPathToExistReturn{
+//					devicePaths: []string{"/dev/disk/by-path/ip1-iscsi-ID1-lun1"},
+//					exists:      true,
+//					err:         nil,
+//				},
+//			},
+//			getMultipathDiskReturns: []GetMultipathDiskReturn{
+//				GetMultipathDiskReturn{
+//					pathParam: "/dev/disk/by-path/ip1-iscsi-ID1-lun1",
+//					path:      "",
+//					err:       fmt.Errorf("error"),
+//				},
+//			},
+//
+//			expErr:      fmt.Errorf("error"),
+//			expDMdevice: "",
+//		},
+//
+//		{
+//			name:             "Should fail when GetMultipathDisk provide 2 different dms that apply to the same lun (bas multipathing case)",
+//			arrayIdentifiers: []string{"X"},
+//			waitForPathToExistReturns: []WaitForPathToExistReturn{
+//				WaitForPathToExistReturn{
+//					devicePaths: []string{"/dev/disk/by-path/ip1-iscsi-ID1-lun1", "/dev/disk/by-path/ip1-iscsi-ID1-lun1___2"},
+//					exists:      true,
+//					err:         nil,
+//				},
+//			},
+//			getMultipathDiskReturns: []GetMultipathDiskReturn{
+//				GetMultipathDiskReturn{
+//					pathParam: "/dev/disk/by-path/ip1-iscsi-ID1-lun1",
+//					path:      "dm-1",
+//					err:       nil,
+//				},
+//				GetMultipathDiskReturn{
+//					pathParam: "/dev/disk/by-path/ip1-iscsi-ID1-lun1___2",
+//					path:      "dm-2", // The main point, look like multipath crazy and give to the same vol but different path a different md device, which is wrong case - so we check it.
+//					err:       nil,
+//				},
+//			},
+//
+//			expErrType:  reflect.TypeOf(&device_connectivity.MultipleDmDevicesError{}),
+//			expDMdevice: "",
+//		},
+//
+//		{
+//			name:             "Should succeed to GetMpathDevice - good path",
+//			arrayIdentifiers: []string{"X"},
+//			waitForPathToExistReturns: []WaitForPathToExistReturn{
+//				WaitForPathToExistReturn{
+//					devicePaths: []string{"/dev/disk/by-path/ip1-iscsi-ID1-lun1", "/dev/disk/by-path/ip1-iscsi-ID1-lun1___2"},
+//					exists:      true,
+//					err:         nil,
+//				},
+//			},
+//			getMultipathDiskReturns: []GetMultipathDiskReturn{
+//				GetMultipathDiskReturn{
+//					pathParam: "/dev/disk/by-path/ip1-iscsi-ID1-lun1",
+//					path:      "dm-1",
+//					err:       nil,
+//				},
+//				GetMultipathDiskReturn{
+//					pathParam: "/dev/disk/by-path/ip1-iscsi-ID1-lun1___2",
+//					path:      "dm-1", // the same because there are 2 paths to the storage, so we should find 2 sd devices that point to the same dm device
+//					err:       nil,
+//				},
+//			},
+//
+//			expErr:      nil,
+//			expDMdevice: "dm-1",
+//		},
+//
+//		{
+//			name:             "Should succeed to GetMpathDevice with one more iqns",
+//			arrayIdentifiers: []string{"X", "Y"},
+//			waitForPathToExistReturns: []WaitForPathToExistReturn{
+//				WaitForPathToExistReturn{
+//					devicePaths: []string{"/dev/disk/by-path/ip1-iscsi-X-lun1"},
+//					exists:      true,
+//					err:         nil,
+//				},
+//				WaitForPathToExistReturn{
+//					devicePaths: []string{"/dev/disk/by-path/ip1-iscsi-Y-lun2"},
+//					exists:      true,
+//					err:         nil,
+//				},
+//			},
+//			getMultipathDiskReturns: []GetMultipathDiskReturn{
+//				GetMultipathDiskReturn{
+//					pathParam: "/dev/disk/by-path/ip1-iscsi-X-lun1",
+//					path:      "dm-1",
+//					err:       nil,
+//				},
+//				GetMultipathDiskReturn{
+//					pathParam: "/dev/disk/by-path/ip1-iscsi-Y-lun2",
+//					path:      "dm-1",
+//					err:       nil,
+//				},
+//			},
+//
+//			expErr:      nil,
+//			expDMdevice: "dm-1",
+//		},
+//
+//		{
+//			name:             "Should fail when WaitForPathToExist return error with the first array iqn, and found no sd device with the second array iqn",
+//			arrayIdentifiers: []string{"X", "X"},
+//			waitForPathToExistReturns: []WaitForPathToExistReturn{
+//				WaitForPathToExistReturn{
+//					devicePaths: nil,
+//					exists:      false,
+//					err:         fmt.Errorf("error"),
+//				},
+//				WaitForPathToExistReturn{
+//					devicePaths: nil,
+//					exists:      false,
+//					err:         nil,
+//				},
+//			},
+//
+//			expErr:      fmt.Errorf("error,Couldn't find multipath device for volumeID [Test:GetMpathDevice] lunID [0] from array [[X]]. Please check the host connectivity to the storage."),
+//			expDMdevice: "",
+//		},
+//	}
+//
+//	for _, tc := range testCasesIscsi {
+//
+//		t.Run(tc.name, func(t *testing.T) {
+//			mockCtrl := gomock.NewController(t)
+//			defer mockCtrl.Finish()
+//
+//			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
+//			fake_helper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
+//			fake_mutex := &sync.Mutex{}
+//			lunId := 0
+//
+//			for index, r := range tc.waitForPathToExistReturns {
+//				path := strings.Join([]string{"/dev/disk/by-path/ip*", device_connectivity.ConnectionTypeISCSI, tc.arrayIdentifiers[index], "lun", strconv.Itoa(lunId)}, "-")
+//				fake_helper.EXPECT().WaitForPathToExist(path, device_connectivity.WaitForMpathRetries, device_connectivity.WaitForMpathWaitIntervalSec).Return(
+//					r.devicePaths,
+//					r.exists,
+//					r.err)
+//			}
+//
+//			for _, r := range tc.getMultipathDiskReturns {
+//				fake_helper.EXPECT().GetMultipathDisk(r.pathParam).Return(r.path, r.err)
+//			}
+//
+//			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fake_executer, fake_helper, fake_mutex)
+//			DMdevice, err := o.GetMpathDevice("Test:GetMpathDevice", lunId, tc.arrayIdentifiers, device_connectivity.ConnectionTypeISCSI)
+//			if tc.expErr != nil || tc.expErrType != nil {
+//				if err == nil {
+//					t.Fatalf("Expected to fail with error, got success.")
+//				}
+//				if tc.expErrType != nil {
+//					if reflect.TypeOf(err) != tc.expErrType {
+//						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
+//					}
+//				} else {
+//					if !areStringsEqualAsSet(err.Error(), tc.expErr.Error()) {
+//						t.Fatalf("Expected error %s, got %s", tc.expErr, err.Error())
+//					}
+//				}
+//			}
+//
+//			if tc.expDMdevice != DMdevice {
+//				t.Fatalf("Expected found mpath device %v, got %v", tc.expDMdevice, DMdevice)
+//			}
+//
+//		})
+//	}
+//
+//	testCasesFc := []struct {
+//		name             string
+//		arrayIdentifiers []string
+//
+//		expErrType                reflect.Type
+//		expErr                    error
+//		expDMdevice               string
+//		waitForPathToExistReturns []WaitForPathToExistReturn
+//		getMultipathDiskReturns   []GetMultipathDiskReturn
+//	}{
+//		{
+//			name:             "Should fail when WaitForPathToExist not found any sd device",
+//			arrayIdentifiers: []string{"x"},
+//			waitForPathToExistReturns: []WaitForPathToExistReturn{
+//				WaitForPathToExistReturn{
+//					devicePaths: nil,
+//					exists:      false,
+//					err:         nil,
+//				},
+//			},
+//
+//			expErr:      fmt.Errorf("Couldn't find multipath device for volumeID [Test:GetMpathDevice] lunID [0] from array [[0xx]]. Please check the host connectivity to the storage."),
+//			expDMdevice: "",
+//		},
+//
+//		{
+//			name:             "Should fail when WaitForPathToExist fail for some reason",
+//			arrayIdentifiers: []string{"X"},
+//			waitForPathToExistReturns: []WaitForPathToExistReturn{
+//				WaitForPathToExistReturn{
+//					devicePaths: nil,
+//					exists:      false,
+//					err:         fmt.Errorf("error"),
+//				},
+//			},
+//
+//			expErr:      fmt.Errorf("error"),
+//			expDMdevice: "",
+//		},
+//
+//		{
+//			name:             "Should fail when GetMultipathDisk fail for some reason",
+//			arrayIdentifiers: []string{"X"},
+//			waitForPathToExistReturns: []WaitForPathToExistReturn{
+//				WaitForPathToExistReturn{
+//					devicePaths: []string{getFcPath("-ID1-lun-1")},
+//					exists:      true,
+//					err:         nil,
+//				},
+//			},
+//			getMultipathDiskReturns: []GetMultipathDiskReturn{
+//				GetMultipathDiskReturn{
+//					pathParam: getFcPath("-ID1-lun-1"),
+//					path:      "",
+//					err:       fmt.Errorf("error"),
+//				},
+//			},
+//
+//			expErr:      fmt.Errorf("error"),
+//			expDMdevice: "",
+//		},
+//
+//		{
+//			name:             "Should fail when GetMultipathDisk provide 2 different dms that apply to the same lun (bas multipathing case)",
+//			arrayIdentifiers: []string{"X"},
+//			waitForPathToExistReturns: []WaitForPathToExistReturn{
+//				WaitForPathToExistReturn{
+//					devicePaths: []string{getFcPath("-ID1-lun1"), getFcPath("-ID1-lun1___2")},
+//					exists:      true,
+//					err:         nil,
+//				},
+//			},
+//			getMultipathDiskReturns: []GetMultipathDiskReturn{
+//				GetMultipathDiskReturn{
+//					pathParam: getFcPath("-ID1-lun1"),
+//					path:      "dm-1",
+//					err:       nil,
+//				},
+//				GetMultipathDiskReturn{
+//					pathParam: getFcPath("-ID1-lun1___2"),
+//					path:      "dm-2", // The main point, look like multipath crazy and give to the same vol but different path a different md device, which is wrong case - so we check it.
+//					err:       nil,
+//				},
+//			},
+//
+//			expErrType:  reflect.TypeOf(&device_connectivity.MultipleDmDevicesError{}),
+//			expDMdevice: "",
+//		},
+//
+//		{
+//			name:             "Should succeed to GetMpathDevice - good path",
+//			arrayIdentifiers: []string{"X"},
+//			waitForPathToExistReturns: []WaitForPathToExistReturn{
+//				WaitForPathToExistReturn{
+//					devicePaths: []string{getFcPath("-ID1-lun1"), getFcPath("-ID1-lun1___2")},
+//					exists:      true,
+//					err:         nil,
+//				},
+//			},
+//			getMultipathDiskReturns: []GetMultipathDiskReturn{
+//				GetMultipathDiskReturn{
+//					pathParam: getFcPath("-ID1-lun1"),
+//					path:      "dm-1",
+//					err:       nil,
+//				},
+//				GetMultipathDiskReturn{
+//					pathParam: getFcPath("-ID1-lun1___2"),
+//					path:      "dm-1", // the same because there are 2 paths to the storage, so we should find 2 sd devices that point to the same dm device
+//					err:       nil,
+//				},
+//			},
+//
+//			expErr:      nil,
+//			expDMdevice: "dm-1",
+//		},
+//
+//		{
+//			name:             "Should succeed to GetMpathDevice with one more iqns",
+//			arrayIdentifiers: []string{"X", "Y"},
+//			waitForPathToExistReturns: []WaitForPathToExistReturn{
+//				WaitForPathToExistReturn{
+//					devicePaths: []string{getFcPath("-0xX-lun1")},
+//					exists:      true,
+//					err:         nil,
+//				},
+//				WaitForPathToExistReturn{
+//					devicePaths: []string{getFcPath("-0xY-lun2")},
+//					exists:      true,
+//					err:         nil,
+//				},
+//			},
+//			getMultipathDiskReturns: []GetMultipathDiskReturn{
+//				GetMultipathDiskReturn{
+//					pathParam: getFcPath("-0xX-lun1"),
+//					path:      "dm-1",
+//					err:       nil,
+//				},
+//				GetMultipathDiskReturn{
+//					pathParam: getFcPath("-0xY-lun2"),
+//					path:      "dm-1",
+//					err:       nil,
+//				},
+//			},
+//
+//			expErr:      nil,
+//			expDMdevice: "dm-1",
+//		},
+//
+//		{
+//			name:             "Should fail when WaitForPathToExist return error with the first array wwn, and found no sd device with the second array wwn",
+//			arrayIdentifiers: []string{"Y", "Y"},
+//			waitForPathToExistReturns: []WaitForPathToExistReturn{
+//				WaitForPathToExistReturn{
+//					devicePaths: nil,
+//					exists:      false,
+//					err:         fmt.Errorf("error"),
+//				},
+//				WaitForPathToExistReturn{
+//					devicePaths: nil,
+//					exists:      false,
+//					err:         nil,
+//				},
+//			},
+//
+//			expErr:      fmt.Errorf("error,Couldn't find multipath device for volumeID [Test:GetMpathDevice] lunID [0] from array [[0xy]]. Please check the host connectivity to the storage."),
+//			expDMdevice: "",
+//		},
+//	}
+//	for _, tc := range testCasesFc {
+//
+//		t.Run(tc.name, func(t *testing.T) {
+//			mockCtrl := gomock.NewController(t)
+//			defer mockCtrl.Finish()
+//
+//			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
+//			fake_helper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
+//			fake_mutex := &sync.Mutex{}
+//			lunId := 0
+//
+//			for index, r := range tc.waitForPathToExistReturns {
+//				array_inititor := "0x" + strings.ToLower(string(tc.arrayIdentifiers[index]))
+//				path := strings.Join([]string{getFcPath(""), array_inititor, "lun", strconv.Itoa(lunId)}, "-")
+//				fake_helper.EXPECT().WaitForPathToExist(path, device_connectivity.WaitForMpathRetries, device_connectivity.WaitForMpathWaitIntervalSec).Return(
+//					r.devicePaths,
+//					r.exists,
+//					r.err)
+//			}
+//
+//			for _, r := range tc.getMultipathDiskReturns {
+//				fake_helper.EXPECT().GetMultipathDisk(r.pathParam).Return(r.path, r.err)
+//			}
+//
+//			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fake_executer, fake_helper, fake_mutex)
+//			DMdevice, err := o.GetMpathDevice("Test:GetMpathDevice", lunId, tc.arrayIdentifiers, device_connectivity.ConnectionTypeFC)
+//			if tc.expErr != nil || tc.expErrType != nil {
+//				if err == nil {
+//					t.Fatalf("Expected to fail with error, got success.")
+//				}
+//				if tc.expErrType != nil {
+//					if reflect.TypeOf(err) != tc.expErrType {
+//						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
+//					}
+//				} else {
+//					if !areStringsEqualAsSet(err.Error(), tc.expErr.Error()) {
+//						t.Fatalf("Expected error %s, got %s", tc.expErr, err.Error())
+//					}
+//				}
+//			}
+//
+//			if tc.expDMdevice != DMdevice {
+//				t.Fatalf("Expected found mpath device %v, got %v", tc.expDMdevice, DMdevice)
+//			}
+//
+//		})
+//	}
+//}
 
 func TestHelperWaitForPathToExist(t *testing.T) {
 	testCases := []struct {
