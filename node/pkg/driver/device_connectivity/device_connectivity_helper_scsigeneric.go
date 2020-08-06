@@ -152,7 +152,9 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 	volumUuid := strings.Split(volumeId, ":")[1]
 	arg := "show maps format \\\"%d %w\\\""
 	//"| grep " + strings.ToLower(volumUuid)
+	r.MutexMultipathF.Lock()
 	devicesOut, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathFlashCmd, "multipathd", []string{arg})
+	r.MutexMultipathF.Unlock()
 	if err != nil {
 		return "", err
 	}
