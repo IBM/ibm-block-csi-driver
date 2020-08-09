@@ -158,7 +158,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 	//arg := "show maps "
 	//"format \\\"%d %w\\\""
 	//"| grep " + strings.ToLower(volumUuid)
-	devices, err := r.multipathdCmd("show", "maps")
+	devices, err := r.multipathdCmd("show", "maps", "format", "\"%d %w\"")
 	//, "| grep ", strings.ToLower(volumUuid)
 	if err != nil {
 		return "", err
