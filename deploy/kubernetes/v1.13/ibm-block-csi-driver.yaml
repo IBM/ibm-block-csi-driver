@@ -27,7 +27,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: ibm-block-csi-controller-sa
-  namespace: default
+  namespace: kube-system
   labels:
     product: ibm-block-csi-driver
     csi: ibm
@@ -87,7 +87,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: ibm-block-csi-controller-sa
-    namespace: default
+    namespace: kube-system
 roleRef:
   kind: ClusterRole
   name: ibm-block-csi-external-provisioner-role
@@ -128,7 +128,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: ibm-block-csi-controller-sa
-    namespace: default
+    namespace: kube-system
 roleRef:
   kind: ClusterRole
   name: ibm-block-csi-external-attacher-role
@@ -165,7 +165,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: ibm-block-csi-controller-sa
-    namespace: default
+    namespace: kube-system
 roleRef:
   kind: ClusterRole
   name: ibm-block-csi-cluster-driver-registrar-role
@@ -221,7 +221,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: ibm-block-csi-controller-sa
-    namespace: default
+    namespace: kube-system
 roleRef:
   kind: ClusterRole
   name: ibm-block-csi-external-snapshotter-role
@@ -234,7 +234,7 @@ kind: StatefulSet
 apiVersion: apps/v1
 metadata:
   name: ibm-block-csi-controller
-  namespace: default
+  namespace: kube-system
   labels:
     product: ibm-block-csi-driver
     csi: ibm
@@ -365,7 +365,7 @@ kind: DaemonSet
 apiVersion: apps/v1
 metadata:
   name: ibm-block-csi-node
-  namespace: default
+  namespace: kube-system
   labels:
     product: ibm-block-csi-driver
     csi: ibm
