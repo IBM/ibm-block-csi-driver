@@ -165,7 +165,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 	}
 	devicesList := strings.Split(devices, "\n")
 	for _, device := range devicesList {
-		dm := strings.Fields(device)[0]
+		dm := strings.Split(device, ",")[0]
 		logger.Infof("GetMpathDevice: dm found: %s", dm)
 	}
 	logger.Infof("GetMpathDevice: dm found: %s", volumUuid)
