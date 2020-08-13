@@ -148,7 +148,6 @@ func convertIntToScsilun(lunId int) string {
 
 func (r OsDeviceConnectivityHelperScsiGeneric) multipathdCmd(volumeUuid string, args ...string) (string, error) {
 	dms, _, err := r.Helper.WaitForDmToExist(args, volumeUuid, WaitForMpathRetries, WaitForMpathWaitIntervalSec)
-	logger.Infof("multipathdCmd: out: %s", dms)
 	return dms, err
 }
 
@@ -161,21 +160,19 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 	//"format \\\"%d %w\\\""
 	//"| grep " + strings.ToLower(volumeUuid)
 	devices, err := r.multipathdCmd(volumeUuidLower, "show", "maps", "raw", "format", "\"", "%d,%w", "\"")
-	logger.Infof("GetMpathDevice: output: %s", devices)
 	//, "| grep ", strings.ToLower(volumeUuid)
 	if err != nil {
 		return "", err
 	}
 	devicesList := strings.Fields(devices)
-	logger.Infof("GetMpathDevice: output as list: %s", devicesList)
 	for _, device := range devicesList {
 		dmWwn := strings.Split(device, ",")
-		if dmWwn[1] == volumeUuidLower {
+		if strings.Contains(dmWwn[1], volumeUuidLower) {
 			logger.Infof("GetMpathDevice: dm found: %s for volume %s", dmWwn[0], dmWwn[1])
 		}
 
 	}
-	logger.Infof("GetMpathDevice: dm found: %s", volumeUuid)
+
 	if len(arrayIdentifiers) == 0 {
 		e := &ErrorNotFoundArrayIdentifiers{lunId}
 		return "", e
@@ -249,6 +246,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 	for md = range devicePathTosysfs {
 		break // because its a single value in the map(1 mpath device, if not it should fail above), so just take the first
 	}
+	logger.Infof("GetMpathDevice: the format of the output string: %s", md)
 	return md, nil
 }
 
