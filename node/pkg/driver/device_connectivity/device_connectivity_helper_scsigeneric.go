@@ -146,25 +146,23 @@ func convertIntToScsilun(lunId int) string {
 	}
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) multipathdCmd(args ...string) (string, error) {
-
-	out, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathFlashCmd, "multipathd", args)
-	logger.Infof("multipathdCmd: out: %s", out)
-
-	logger.Infof("multipathdCmd: Unlock successfully")
-	return string(out), err
+func (r OsDeviceConnectivityHelperScsiGeneric) multipathdCmd(volumeUuid string, args ...string) (string, error) {
+	dms, _, err := r.Helper.WaitForDmToExist(args, volumeUuid, WaitForMpathRetries, WaitForMpathWaitIntervalSec)
+	logger.Infof("multipathdCmd: out: %s", dms)
+	return dms, err
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string, connectivityType string) (string, error) {
 	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] that relates to lunId=%d and arrayIdentifiers=%s", volumeId, lunId, arrayIdentifiers)
 
-	volumUuid := strings.Split(volumeId, ":")[1]
+	volumeUuid := strings.Split(volumeId, ":")[1]
+	volumeUuidLower := strings.ToLower(volumeUuid)
 	//arg := "show maps "
 	//"format \\\"%d %w\\\""
-	//"| grep " + strings.ToLower(volumUuid)
-	devices, err := r.multipathdCmd("show", "maps", "raw", "format", "\"", "%d,%w", "\"")
+	//"| grep " + strings.ToLower(volumeUuid)
+	devices, err := r.multipathdCmd(volumeUuidLower, "show", "maps", "raw", "format", "\"", "%d,%w", "\"")
 	logger.Infof("GetMpathDevice: output: %s", devices)
-	//, "| grep ", strings.ToLower(volumUuid)
+	//, "| grep ", strings.ToLower(volumeUuid)
 	if err != nil {
 		return "", err
 	}
@@ -172,12 +170,12 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 	logger.Infof("GetMpathDevice: output as list: %s", devicesList)
 	for _, device := range devicesList {
 		dmWwn := strings.Split(device, ",")
-		if dmWwn[1] == strings.ToLower(volumUuid) {
+		if dmWwn[1] == volumeUuidLower {
 			logger.Infof("GetMpathDevice: dm found: %s for volume %s", dmWwn[0], dmWwn[1])
 		}
 
 	}
-	logger.Infof("GetMpathDevice: dm found: %s", volumUuid)
+	logger.Infof("GetMpathDevice: dm found: %s", volumeUuid)
 	if len(arrayIdentifiers) == 0 {
 		e := &ErrorNotFoundArrayIdentifiers{lunId}
 		return "", e
@@ -346,6 +344,7 @@ type OsDeviceConnectivityHelperInterface interface {
 	WaitForPathToExist(devicePath string, maxRetries int, intervalSeconds int) ([]string, bool, error)
 	GetMultipathDisk(path string) (string, error)
 	GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error)
+	WaitForDmToExist(args []string, volumeUuid string, maxRetries int, intervalSeconds int) (string, bool, error)
 }
 
 type OsDeviceConnectivityHelperGeneric struct {
@@ -354,6 +353,35 @@ type OsDeviceConnectivityHelperGeneric struct {
 
 func NewOsDeviceConnectivityHelperGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperInterface {
 	return &OsDeviceConnectivityHelperGeneric{executer: executer}
+}
+func (o OsDeviceConnectivityHelperGeneric) WaitForDmToExist(args []string, volumeUuid string, maxRetries int, intervalSeconds int) (string, bool, error) {
+	/*
+				Description:
+					Try to find all the files
+					iSCSI -> /dev/disk/by-path/ip*-iscsi-<Array-WWN>-lun-<LUN-ID>
+		            FC   -> /dev/disk/by-path/pci-*-fc-<Array-WWN>-lun-<LUN-ID>
+					If not find then try again maxRetries.
+	*/
+
+	var err error
+	for i := 0; i < maxRetries; i++ {
+		err = nil
+		out, err := o.executer.ExecuteWithTimeout(TimeOutMultipathFlashCmd, "multipathd", args)
+		if err != nil {
+			return "", false, err
+		}
+		dms := string(out)
+		logger.Debugf("Dms : {%v}", dms)
+
+		if !strings.Contains(dms, volumeUuid) {
+			err = os.ErrNotExist
+		} else {
+			return dms, true, nil
+		}
+
+		time.Sleep(time.Second * time.Duration(intervalSeconds))
+	}
+	return "", false, err
 }
 
 func (o OsDeviceConnectivityHelperGeneric) WaitForPathToExist(devicePath string, maxRetries int, intervalSeconds int) ([]string, bool, error) {
