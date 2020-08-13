@@ -161,15 +161,18 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 	//arg := "show maps "
 	//"format \\\"%d %w\\\""
 	//"| grep " + strings.ToLower(volumUuid)
-	devices, err := r.multipathdCmd("show", "maps", "raw", "format", "\"", "%d,%w", "\"", "|grep "+strings.ToLower(volumUuid))
+	devices, err := r.multipathdCmd("show", "maps", "raw", "format", "\"", "%d,%w", "\"")
 	//, "| grep ", strings.ToLower(volumUuid)
 	if err != nil {
 		return "", err
 	}
 	devicesList := strings.Split(devices, "\n")
 	for _, device := range devicesList {
-		dm := strings.Split(device, ",")[0]
-		logger.Infof("GetMpathDevice: dm found: %s", dm)
+		dmWwn := strings.Split(device, ",")
+		if dmWwn[1] == strings.ToLower(volumUuid){
+			logger.Infof("GetMpathDevice: dm found: %s for volume %s", dmWwn[0], dmWwn[1])
+		}
+
 	}
 	logger.Infof("GetMpathDevice: dm found: %s", volumUuid)
 	if len(arrayIdentifiers) == 0 {
