@@ -156,94 +156,94 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 
 	volumeUuid := strings.Split(volumeId, ":")[1]
 	volumeUuidLower := strings.ToLower(volumeUuid)
-	//arg := "show maps "
-	//"format \\\"%d %w\\\""
-	//"| grep " + strings.ToLower(volumeUuid)
+
 	devices, err := r.multipathdCmd(volumeUuidLower, "show", "maps", "raw", "format", "\"", "%d,%w", "\"")
-	//, "| grep ", strings.ToLower(volumeUuid)
 	if err != nil {
 		return "", err
 	}
+	dms := make(map[string]bool)
 	devicesList := strings.Fields(devices)
 	for _, device := range devicesList {
 		dmWwn := strings.Split(device, ",")
 		if strings.Contains(dmWwn[1], volumeUuidLower) {
-			logger.Infof("GetMpathDevice: dm found: %s for volume %s", dmWwn[0], dmWwn[1])
+			dmPath := filepath.Join(DevPath, filepath.Base(dmWwn[0]))
+			dms[dmPath] = true
+			logger.Infof("GetMpathDevice: dm found: %s for volume %s", dmPath, dmWwn[1])
 		}
 
 	}
 
-	if len(arrayIdentifiers) == 0 {
-		e := &ErrorNotFoundArrayIdentifiers{lunId}
-		return "", e
-	}
-	var devicePaths []string
-	var errStrings []string
-	var subsystemPrefix string
+	//if len(arrayIdentifiers) == 0 {
+	//	e := &ErrorNotFoundArrayIdentifiers{lunId}
+	//	return "", e
+	//}
+	//var devicePaths []string
+	//var errStrings []string
+	//var subsystemPrefix string
+	//
+	//if connectivityType == ConnectionTypeFC {
+	//	subsystemPrefix = fcSubsystemPrefix
+	//	// In host, the path like this: /dev/disk/by-path/pci-0000:13:00.0-fc-0x500507680b25c0aa-lun-0
+	//	// So add prefix "0x" for the arrayIdentifiers
+	//	for index, wwn := range arrayIdentifiers {
+	//		arrayIdentifiers[index] = "0x" + strings.ToLower(wwn)
+	//	}
+	//}
+	//if connectivityType == ConnectionTypeISCSI {
+	//	subsystemPrefix = "ip*-"
+	//}
+	//
+	//var targetPath = fmt.Sprintf("/dev/disk/by-path/%s", subsystemPrefix)
+	//
+	//logger.Debugf("GetMpathDevice: Start concurrent multipath devices search for volume : [%s]", volumeId)
+	//mpathResChannel := make(chan *WaitForMpathResult)
+	//for _, arrayIdentifier := range arrayIdentifiers {
+	//	go r.waitForMpath(targetPath, connectivityType, arrayIdentifier, lunId, volumeId, mpathResChannel)
+	//}
+	//
+	//for i := 1; i <= len(arrayIdentifiers); i++ {
+	//	mpathRes := <-mpathResChannel
+	//	devicePaths = append(devicePaths, mpathRes.devicesPaths...)
+	//	if mpathRes.err != nil {
+	//		errStrings = append(errStrings, mpathRes.err.Error())
+	//	}
+	//}
+	//close(mpathResChannel)
+	//logger.Debugf("GetMpathDevice: Finished concurrent multipath devices search for volume : [%s]", volumeId)
+	//
+	//if len(devicePaths) == 0 && len(errStrings) != 0 {
+	//	err := errors.New(strings.Join(errStrings, GetMpahDevErrorsSep))
+	//	return "", err
+	//}
+	//
+	//devicePathTosysfs := make(map[string]bool)
+	//// Looping over the physical devices of the volume - /dev/sdX and store all the dm devices inside map.
+	//for _, path := range devicePaths {
+	//	if path != "" { // since it may return empty items
+	//		mappedDevicePath, err := r.Helper.GetMultipathDisk(path)
+	//		if err != nil {
+	//			return "", err
+	//		}
+	//
+	//		if mappedDevicePath != "" {
+	//			devicePathTosysfs[mappedDevicePath] = true // map it in order to save uniq dm devices
+	//		}
+	//
+	//	}
+	//}
+	//
+	//var mps string
+	//for key := range devicePathTosysfs {
+	//	mps += ", " + key
+	//}
+	//logger.Infof("GetMpathDevice: Found multipath devices: [%s] that relats to lunId=%d and arrayIdentifiers=%s", mps, lunId, arrayIdentifiers)
 
-	if connectivityType == ConnectionTypeFC {
-		subsystemPrefix = fcSubsystemPrefix
-		// In host, the path like this: /dev/disk/by-path/pci-0000:13:00.0-fc-0x500507680b25c0aa-lun-0
-		// So add prefix "0x" for the arrayIdentifiers
-		for index, wwn := range arrayIdentifiers {
-			arrayIdentifiers[index] = "0x" + strings.ToLower(wwn)
-		}
-	}
-	if connectivityType == ConnectionTypeISCSI {
-		subsystemPrefix = "ip*-"
-	}
-
-	var targetPath = fmt.Sprintf("/dev/disk/by-path/%s", subsystemPrefix)
-
-	logger.Debugf("GetMpathDevice: Start concurrent multipath devices search for volume : [%s]", volumeId)
-	mpathResChannel := make(chan *WaitForMpathResult)
-	for _, arrayIdentifier := range arrayIdentifiers {
-		go r.waitForMpath(targetPath, connectivityType, arrayIdentifier, lunId, volumeId, mpathResChannel)
-	}
-
-	for i := 1; i <= len(arrayIdentifiers); i++ {
-		mpathRes := <-mpathResChannel
-		devicePaths = append(devicePaths, mpathRes.devicesPaths...)
-		if mpathRes.err != nil {
-			errStrings = append(errStrings, mpathRes.err.Error())
-		}
-	}
-	close(mpathResChannel)
-	logger.Debugf("GetMpathDevice: Finished concurrent multipath devices search for volume : [%s]", volumeId)
-
-	if len(devicePaths) == 0 && len(errStrings) != 0 {
-		err := errors.New(strings.Join(errStrings, GetMpahDevErrorsSep))
-		return "", err
-	}
-
-	devicePathTosysfs := make(map[string]bool)
-	// Looping over the physical devices of the volume - /dev/sdX and store all the dm devices inside map.
-	for _, path := range devicePaths {
-		if path != "" { // since it may return empty items
-			mappedDevicePath, err := r.Helper.GetMultipathDisk(path)
-			if err != nil {
-				return "", err
-			}
-
-			if mappedDevicePath != "" {
-				devicePathTosysfs[mappedDevicePath] = true // map it in order to save uniq dm devices
-			}
-
-		}
-	}
-
-	var mps string
-	for key := range devicePathTosysfs {
-		mps += ", " + key
-	}
-	logger.Infof("GetMpathDevice: Found multipath devices: [%s] that relats to lunId=%d and arrayIdentifiers=%s", mps, lunId, arrayIdentifiers)
-
-	if len(devicePathTosysfs) > 1 {
-		return "", &MultipleDmDevicesError{volumeId, lunId, arrayIdentifiers, devicePathTosysfs}
+	if len(dms) > 1 {
+		return "", &MultipleDmDevicesError{volumeId, lunId, arrayIdentifiers, dms}
 	}
 
 	var md string
-	for md = range devicePathTosysfs {
+	for md = range dms {
 		break // because its a single value in the map(1 mpath device, if not it should fail above), so just take the first
 	}
 	logger.Infof("GetMpathDevice: the format of the output string: %s", md)
@@ -369,8 +369,6 @@ func (o OsDeviceConnectivityHelperGeneric) WaitForDmToExist(args []string, volum
 			return "", false, err
 		}
 		dms := string(out)
-		logger.Debugf("Dms : {%v}", dms)
-
 		if !strings.Contains(dms, volumeUuid) {
 			err = os.ErrNotExist
 		} else {
