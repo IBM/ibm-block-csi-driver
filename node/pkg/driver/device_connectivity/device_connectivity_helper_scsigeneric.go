@@ -169,7 +169,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string, l
 	devicesList := strings.Split(devices, "\n")
 	for _, device := range devicesList {
 		dmWwn := strings.Split(device, ",")
-		if dmWwn[1] == strings.ToLower(volumUuid){
+		if dmWwn[1] == strings.ToLower(volumUuid) {
 			logger.Infof("GetMpathDevice: dm found: %s for volume %s", dmWwn[0], dmWwn[1])
 		}
 
