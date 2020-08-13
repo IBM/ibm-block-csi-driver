@@ -149,8 +149,9 @@ func convertIntToScsilun(lunId int) string {
 func (r OsDeviceConnectivityHelperScsiGeneric) multipathdCmd(args ...string) (string, error) {
 	r.MutexMultipathF.Lock()
 	out, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathFlashCmd, "multipathd", args)
+	logger.Infof("multipathdCmd: out: %s", out)
 	r.MutexMultipathF.Unlock()
-
+	logger.Infof("multipathdCmd: Unlock successfully")
 	return string(out), err
 }
 
