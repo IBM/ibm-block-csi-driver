@@ -155,18 +155,11 @@ func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifiers []s
 	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers)
 }
 
-func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string, lunId int, arrayIdentifiers []string) (string, error) {
+func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string) (string, error) {
 	/*
-			   Description:
-				   1. Find all the files "/dev/disk/by-path/ip-<ARRAY-IP>-iscsi-<IQN storage>-lun-<LUN-ID> -> ../../sd<X>
-		 	          Note: <ARRAY-IP> Instead of setting here the IP we just search for * on that.
-		 	       2. Get the sd<X> devices.
-		 	       3. Search '/sys/block/dm-*\/slaves/*' and get the <DM device name>. For example dm-3 below:
-		 	          /sys/block/dm-3/slaves/sdb -> ../../../../platform/host41/session9/target41:0:0/41:0:0:13/block/sdb
-
-			   Return Value: "dm-X" of the volumeID by using the LunID and the arrayIqn.
+	   Return Value: "dm-X" of the volumeID.
 	*/
-	return r.HelperScsiGeneric.GetMpathDevice(volumeId, lunId, arrayIdentifiers, ConnectionTypeISCSI)
+	return r.HelperScsiGeneric.GetMpathDevice(volumeId)
 }
 
 func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(mpathDevice string) error {

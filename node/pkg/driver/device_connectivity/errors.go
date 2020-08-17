@@ -6,8 +6,6 @@ import (
 
 type MultipleDmDevicesError struct {
 	VolumeId            string
-	LunId               int
-	ArrayIqns           []string
 	MultipathDevicesMap map[string]bool
 }
 
@@ -16,17 +14,15 @@ func (e *MultipleDmDevicesError) Error() string {
 	for key := range e.MultipathDevicesMap {
 		mps += ", " + key
 	}
-	return fmt.Sprintf("Detected more then one multipath devices (%s) for single volume (%s) with lunID %d from array target iqn %v", mps, e.VolumeId, e.LunId, e.ArrayIqns)
+	return fmt.Sprintf("Detected more then one multipath devices (%s) for single volume (%s)", mps, e.VolumeId)
 }
 
-type MultipathDeviceNotFoundForLunError struct {
-	VolumeId  string
-	LunId     int
-	ArrayIqns []string
+type MultipathDeviceNotFoundForVolumeError struct {
+	VolumeId string
 }
 
-func (e *MultipathDeviceNotFoundForLunError) Error() string {
-	return fmt.Sprintf("Couldn't find multipath device for volumeID [%s] lunID [%d] from array [%s]. Please check the host connectivity to the storage.", e.VolumeId, e.LunId, e.ArrayIqns)
+func (e *MultipathDeviceNotFoundForVolumeError) Error() string {
+	return fmt.Sprintf("Couldn't find multipath device for volumeID [%s]. Please check the host connectivity to the storage.", e.VolumeId)
 }
 
 type ConnectivityIdentifierStorageTargetNotFoundError struct {
