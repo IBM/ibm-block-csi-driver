@@ -1,15 +1,17 @@
 import unittest
-from threading import Thread
 from queue import Queue
+from threading import Thread
 from time import sleep
-from controller.array_action.storage_agent import StorageAgent, get_agent, clear_agents, get_agents, detect_array_type
-from munch import Munch
+
 from mock import patch, NonCallableMagicMock, Mock
-from controller.array_action.errors import FailedToFindStorageSystemType
-from controller.array_action.array_mediator_xiv import XIVArrayMediator
-from controller.array_action.array_mediator_svc import SVCArrayMediator
-from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
+from munch import Munch
+
 import controller.array_action.errors as array_errors
+from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
+from controller.array_action.array_mediator_svc import SVCArrayMediator
+from controller.array_action.array_mediator_xiv import XIVArrayMediator
+from controller.array_action.errors import FailedToFindStorageSystemType
+from controller.array_action.storage_agent import StorageAgent, get_agent, clear_agents, get_agents, detect_array_type
 
 
 def _fake_socket_connect_test(host, port):
