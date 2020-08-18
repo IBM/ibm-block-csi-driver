@@ -583,12 +583,9 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, vol_name, "wwn2", "a9k",
                                                                                         copy_src_object_id=snap_id)
         array_type.return_value = "a9k"
-        self.mediator.copy_to_existing_volume_from_snapshot = Mock()
-
-        response = self.servicer.CreateVolume(self.request, self.context)
-
+        self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.assertEqual(response.volume.content_source.snapshot.snapshot_id, snap_id)
+        self.mediator.copy_to_existing_volume_from_snapshot = Mock()
         self.mediator.copy_to_existing_volume_from_snapshot.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
