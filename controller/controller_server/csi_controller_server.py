@@ -1,10 +1,10 @@
 import os.path
 import time
+from concurrent import futures
 from optparse import OptionParser
 
 import grpc
 import yaml
-from concurrent import futures
 from retry import retry
 
 import controller.array_action.errors as controller_errors
@@ -200,7 +200,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.debug(
                 "Volume {0} exists and it is a copy of snapshot {1}.".format(vol_name, src_snapshot_id))
             context.set_code(grpc.StatusCode.OK)
-            return csi_pb2.CreateVolumeResponse()
+            return utils.generate_csi_create_volume_response(volume)
         else:
             logger.debug(
                 "Volume {0} exists but it is not a copy of snapshot {1}.".format(vol_name, src_snapshot_id))

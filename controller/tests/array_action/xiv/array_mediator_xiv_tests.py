@@ -1,6 +1,7 @@
 import unittest
 
 from mock import patch, Mock
+from pyxcli import errors as xcli_errors
 
 import controller.array_action.errors as array_errors
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
@@ -8,7 +9,6 @@ from controller.array_action.config import FC_CONNECTIVITY_TYPE
 from controller.array_action.config import ISCSI_CONNECTIVITY_TYPE
 from controller.common.node_info import Initiators
 from controller.tests.array_action.xiv import utils
-from pyxcli import errors as xcli_errors
 
 
 class TestArrayMediatorXIV(unittest.TestCase):
