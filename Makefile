@@ -66,7 +66,7 @@ test-xunit:
 test-xunit-in-container:
     # Run make test-xunit inside csi node container for testing (to avoid go and other testing utils on your laptop).
 	docker build -f Dockerfile-csi-node.test -t csi-node-unitests .
-	docker run --rm -t -v $(CURDIR)/build/reports/:/go/src/github.com/ibm/ibm-block-csi-driver/build/reports:z csi-node-unitests
+	docker run --rm -t -v $(CURDIR)/build/reports/:/go/src/github.com/ibm/ibm-block-csi-driver/build/reports/ csi-node-unitests
 
 
 .PHONY: gofmt
