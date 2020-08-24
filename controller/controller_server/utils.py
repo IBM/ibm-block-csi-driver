@@ -1,4 +1,4 @@
-from hashlib import sha1
+from hashlib import sha256
 
 import base58
 from google.protobuf.timestamp_pb2 import Timestamp
@@ -318,4 +318,4 @@ def get_current_timestamp():
 
 
 def hash_string(string):
-    return base58.b58encode(sha1(string.encode()).digest()).decode()
+    return base58.b58encode(sha256(string.encode()).digest()).decode()
