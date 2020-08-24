@@ -56,7 +56,8 @@ type WaitForMpathResult struct {
 }
 
 var (
-	TimeOutMultipathFlashCmd = 4 * 1000
+	TimeOutForCmd = 4 * 1000
+	DmSepKye      = ","
 )
 
 const (
@@ -134,22 +135,23 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	volumeUuid := strings.Split(volumeId, ":")[1]
 	volumeUuidLower := strings.ToLower(volumeUuid)
 
-	devices, err := r.Helper.WaitForDmToExist(volumeUuidLower, WaitForMpathRetries, WaitForMpathWaitIntervalSec)
+	mpathdOutput, err := r.Helper.WaitForDmToExist(volumeUuidLower, WaitForMpathRetries, WaitForMpathWaitIntervalSec)
 
 	if err != nil {
 		return "", err
 	}
-	if devices == "" {
+	if mpathdOutput == "" {
 		return "", &MultipathDeviceNotFoundForVolumeError{volumeId}
 	}
 	dms := make(map[string]bool)
-	devicesList := strings.Fields(devices)
-	for _, device := range devicesList {
-		dmWwn := strings.Split(device, ",")
-		if strings.Contains(dmWwn[1], volumeUuidLower) {
-			dmPath := filepath.Join(DevPath, filepath.Base(dmWwn[0]))
+	outputLines := strings.Fields(mpathdOutput)
+	for _, device := range outputLines {
+		lineParts := strings.Split(device, DmSepKye)
+		dm, uuid := lineParts[0], lineParts[1]
+		if strings.Contains(uuid, volumeUuidLower) {
+			dmPath := filepath.Join(DevPath, filepath.Base(dm))
 			dms[dmPath] = true
-			logger.Infof("GetMpathDevice: DM found: %s for volume %s", dmPath, dmWwn[1])
+			logger.Infof("GetMpathDevice: DM found: %s for volume %s", dmPath, uuid)
 		}
 
 	}
@@ -174,7 +176,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice 
 	logger.Debugf("Try to acquire lock for running the command multipath -f {%v} (to avoid concurrent multipath commands)", mpathDevice)
 	r.MutexMultipathF.Lock()
 	logger.Debugf("Acquired lock for multipath -f command")
-	_, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathFlashCmd, "multipath", []string{"-f", fullDevice})
+	_, err := r.Executer.ExecuteWithTimeout(TimeOutForCmd, "multipath", []string{"-f", fullDevice})
 	r.MutexMultipathF.Unlock()
 
 	if err != nil {
@@ -250,18 +252,12 @@ func NewOsDeviceConnectivityHelperGeneric(executer executer.ExecuterInterface) O
 	return &OsDeviceConnectivityHelperGeneric{executer: executer}
 }
 func (o OsDeviceConnectivityHelperGeneric) WaitForDmToExist(volumeUuid string, maxRetries int, intervalSeconds int) (string, error) {
-	/*
-				Description:
-					Try to find all the files
-					iSCSI -> /dev/disk/by-path/ip*-iscsi-<Array-WWN>-lun-<LUN-ID>
-		            FC   -> /dev/disk/by-path/pci-*-fc-<Array-WWN>-lun-<LUN-ID>
-					If not find then try again maxRetries.
-	*/
-	args := []string{"show", "maps", "raw", "format", "\"", "%d,%w", "\""}
+
+	args := []string{"show", "maps", "raw", "format", "\"", "%d" + DmSepKye + "%w", "\""}
 	var err error
 	for i := 0; i < maxRetries; i++ {
 		err = nil
-		out, err := o.executer.ExecuteWithTimeout(TimeOutMultipathFlashCmd, "multipathd", args)
+		out, err := o.executer.ExecuteWithTimeout(TimeOutForCmd, "multipathd", args)
 		if err != nil {
 			return "", err
 		}

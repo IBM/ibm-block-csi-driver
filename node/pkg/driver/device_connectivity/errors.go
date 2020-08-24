@@ -14,7 +14,7 @@ func (e *MultipleDmDevicesError) Error() string {
 	for key := range e.MultipathDevicesMap {
 		mps += ", " + key
 	}
-	return fmt.Sprintf("Detected more then one multipath devices (%s) for single volume (%s)", mps, e.VolumeId)
+	return fmt.Sprintf("Detected more than one multipath device (%s) for single volume (%s)", mps, e.VolumeId)
 }
 
 type MultipathDeviceNotFoundForVolumeError struct {

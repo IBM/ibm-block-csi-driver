@@ -51,8 +51,8 @@ func areStringsEqualAsSet(str1, str2 string) bool {
 }
 
 type WaitForDmToExistReturn struct {
-	dmMaps string
-	err    error
+	mpathdOutput string
+	err          error
 }
 
 func TestGetMpathDevice(t *testing.T) {
@@ -64,11 +64,11 @@ func TestGetMpathDevice(t *testing.T) {
 		waitForDmToExistReturn []WaitForDmToExistReturn
 	}{
 		{
-			name: "Should fail when WaitForDmToExist not found any dm device",
+			name: "Should fail when WaitForDmToExist did not found any dm device",
 			waitForDmToExistReturn: []WaitForDmToExistReturn{
 				WaitForDmToExistReturn{
-					dmMaps: "",
-					err:    nil,
+					mpathdOutput: "",
+					err:          nil,
 				},
 			},
 
@@ -77,11 +77,11 @@ func TestGetMpathDevice(t *testing.T) {
 		},
 
 		{
-			name: "Should fail when WaitForDmToExist found more then 1 device for volume",
+			name: "Should fail when WaitForDmToExist found more than 1 dm for volume",
 			waitForDmToExistReturn: []WaitForDmToExistReturn{
 				WaitForDmToExistReturn{
-					dmMaps: "dm-1,getmpathdevice\ndm-2,otherdevice\ndm-3,getmpathdevice",
-					err:    nil,
+					mpathdOutput: "dm-1,600fakevolumeuuid000000000111\ndm-2,otheruuid\ndm-3,600fakevolumeuuid000000000111",
+					err:          nil,
 				},
 			},
 
@@ -93,8 +93,8 @@ func TestGetMpathDevice(t *testing.T) {
 			name: "Should succeed to GetMpathDevice",
 			waitForDmToExistReturn: []WaitForDmToExistReturn{
 				WaitForDmToExistReturn{
-					dmMaps: "dm-1,getmpathdevice\ndm-2,otherdevice\ndm-3,otherdevice2",
-					err:    nil,
+					mpathdOutput: "dm-1,600fakevolumeuuid000000000111\ndm-2,otheruuid\ndm-3,otheruuid2",
+					err:          nil,
 				},
 			},
 
@@ -115,13 +115,13 @@ func TestGetMpathDevice(t *testing.T) {
 
 			for _, r := range tc.waitForDmToExistReturn {
 
-				fake_helper.EXPECT().WaitForDmToExist("getmpathdevice", device_connectivity.WaitForMpathRetries, device_connectivity.WaitForMpathWaitIntervalSec).Return(
-					r.dmMaps,
+				fake_helper.EXPECT().WaitForDmToExist("600fakevolumeuuid000000000111", device_connectivity.WaitForMpathRetries, device_connectivity.WaitForMpathWaitIntervalSec).Return(
+					r.mpathdOutput,
 					r.err)
 			}
 
 			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fake_executer, fake_helper, fake_mutex)
-			DMdevice, err := o.GetMpathDevice("Test:GetMpathDevice")
+			DMdevice, err := o.GetMpathDevice("Test:600FAKEVOLUMEUUID000000000111")
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")
@@ -140,7 +140,7 @@ func TestGetMpathDevice(t *testing.T) {
 				DMdevice = filepath.Base(DMdevice)
 			}
 			if tc.expDMdevice != DMdevice {
-				t.Fatalf("Expected found device manager %v, got %v", tc.expDMdevice, DMdevice)
+				t.Fatalf("Expected found device mapper  %v, got %v", tc.expDMdevice, DMdevice)
 			}
 
 		})
@@ -150,28 +150,28 @@ func TestGetMpathDevice(t *testing.T) {
 
 func TestHelperWaitForDmToExist(t *testing.T) {
 	testCases := []struct {
-		name          string
-		devices       string
-		expErr        error
-		globReturnErr error
+		name         string
+		devices      string
+		expErr       error
+		cmdReturnErr error
 	}{
 		{
-			name:          "Should fail when Glob return error",
-			devices:       "",
-			globReturnErr: fmt.Errorf("error"),
-			expErr:        fmt.Errorf("error"),
+			name:         "Should fail when cmd return error",
+			devices:      "",
+			cmdReturnErr: fmt.Errorf("error"),
+			expErr:       fmt.Errorf("error"),
 		},
 		{
-			name:          "Should return empty string when Glob succeed but with no paths",
-			devices:       "",
-			globReturnErr: nil,
-			expErr:        nil,
+			name:         "Should return empty string when cmd succeed but with no paths",
+			devices:      "",
+			cmdReturnErr: nil,
+			expErr:       nil,
 		},
 		{
-			name:          "Should succeed",
-			devices:       "a,volumeUuid, a,b",
-			globReturnErr: nil,
-			expErr:        nil,
+			name:         "Should succeed",
+			devices:      "dm-1,volumeUuid\ndm-2,otherUuid",
+			cmdReturnErr: nil,
+			expErr:       nil,
 		},
 	}
 
@@ -184,7 +184,7 @@ func TestHelperWaitForDmToExist(t *testing.T) {
 			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
 			volumeUuid := "volumeUuid"
 			args := []string{"show", "maps", "raw", "format", "\"", "%d,%w", "\""}
-			fake_executer.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathFlashCmd, "multipathd", args).Return([]byte(tc.devices), tc.globReturnErr)
+			fake_executer.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutForCmd, "multipathd", args).Return([]byte(tc.devices), tc.cmdReturnErr)
 			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fake_executer)
 			devices, err := helperGeneric.WaitForDmToExist(volumeUuid, 1, 1)
 			if err != nil {
@@ -193,7 +193,7 @@ func TestHelperWaitForDmToExist(t *testing.T) {
 				}
 			}
 			if tc.devices != devices {
-				t.Fatalf("Expected found device manager %v, got %v", tc.devices, devices)
+				t.Fatalf("Expected found device mapper  %v, got %v", tc.devices, devices)
 			}
 
 		})
@@ -367,25 +367,25 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 		ioutilReadFileReturns []ioutilReadFileReturn
 		arrayIdentifier       string
 
-		expErrType        reflect.Type
-		expErr            error
-		expHostList       []int
-		globReturnMatches []string
-		globReturnErr     error
+		expErrType       reflect.Type
+		expErr           error
+		expHostList      []int
+		cmdReturnMatches []string
+		cmdReturnErr     error
 	}{
 		{
-			name:              "Should fail when FilepathGlob return error",
-			arrayIdentifier:   "fakeWWN",
-			globReturnMatches: nil,
-			globReturnErr:     fmt.Errorf("error"),
-			expErr:            fmt.Errorf("error"),
-			expHostList:       nil,
+			name:             "Should fail when FilepathGlob return error",
+			arrayIdentifier:  "fakeWWN",
+			cmdReturnMatches: nil,
+			cmdReturnErr:     fmt.Errorf("error"),
+			expErr:           fmt.Errorf("error"),
+			expHostList:      nil,
 		},
 		{
-			name:              "Should fail when FilepathGlob return without any hosts target files at all",
-			arrayIdentifier:   "fakeWWN",
-			globReturnMatches: nil,
-			globReturnErr:     nil,
+			name:             "Should fail when FilepathGlob return without any hosts target files at all",
+			arrayIdentifier:  "fakeWWN",
+			cmdReturnMatches: nil,
+			cmdReturnErr:     nil,
 
 			expErrType:  reflect.TypeOf(&device_connectivity.ConnectivityIdentifierStorageTargetNotFoundError{}),
 			expHostList: nil,
@@ -405,11 +405,11 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 				},
 			},
 			arrayIdentifier: "fakeWWN",
-			globReturnMatches: []string{
+			cmdReturnMatches: []string{
 				"/sys/class/fc_remote_ports/rport-3:0-0/port_name",
 				"/sys/class/fc_remote_ports/rport-4:0-0/port_name",
 			},
-			globReturnErr: nil,
+			cmdReturnErr: nil,
 
 			expErrType:  reflect.TypeOf(&device_connectivity.ConnectivityIdentifierStorageTargetNotFoundError{}),
 			expHostList: nil,
@@ -441,13 +441,13 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 			},
 			arrayIdentifier: "fakeWWN",
 
-			globReturnMatches: []string{
+			cmdReturnMatches: []string{
 				"/sys/class/fc_remote_ports/rport-33:0-0/port_name",
 				"/sys/class/fc_remote_ports/rport-34:0-0/port_name",
 				"/sys/class/fc_remote_ports/rport-35:0-0/port_name",
 				"/sys/class/fc_remote_ports/rport-36:0-0/port_name",
 			},
-			globReturnErr: nil,
+			cmdReturnErr: nil,
 
 			expErrType:  nil,
 			expHostList: []int{33, 34},
@@ -469,11 +469,11 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 			},
 			arrayIdentifier: "fakeWWN",
 
-			globReturnMatches: []string{
+			cmdReturnMatches: []string{
 				"/sys/class/fc_remote_ports/rport-5:0-0/port_name",
 				"/sys/class/fc_remote_ports/rport-6:0-0/port_name",
 			},
-			globReturnErr: nil,
+			cmdReturnErr: nil,
 
 			expErrType:  nil,
 			expHostList: []int{5, 6},
@@ -488,7 +488,7 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 
 			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
 
-			fake_executer.EXPECT().FilepathGlob(device_connectivity.FC_HOST_SYSFS_PATH).Return(tc.globReturnMatches, tc.globReturnErr)
+			fake_executer.EXPECT().FilepathGlob(device_connectivity.FC_HOST_SYSFS_PATH).Return(tc.cmdReturnMatches, tc.cmdReturnErr)
 
 			var mcalls []*gomock.Call
 			for _, r := range tc.ioutilReadFileReturns {
