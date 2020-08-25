@@ -22,7 +22,6 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/mocks"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
-	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
@@ -55,16 +54,22 @@ type WaitForDmToExistReturn struct {
 	err          error
 }
 
+type GetWwnByScsiInqReturn struct {
+	wwn string
+	err error
+}
+
 func TestGetMpathDevice(t *testing.T) {
 	testCases := []struct {
 		name                   string
 		expErrType             reflect.Type
 		expErr                 error
-		expDMdevice            string
+		expDMPath              string
 		waitForDmToExistReturn []WaitForDmToExistReturn
+		getWwnByScsiInqReturn  []GetWwnByScsiInqReturn
 	}{
 		{
-			name: "Should fail when WaitForDmToExist did not found any dm device",
+			name: "Should fail when WaitForDmToExist did not find any dm device",
 			waitForDmToExistReturn: []WaitForDmToExistReturn{
 				WaitForDmToExistReturn{
 					mpathdOutput: "",
@@ -72,12 +77,12 @@ func TestGetMpathDevice(t *testing.T) {
 				},
 			},
 
-			expErrType:  reflect.TypeOf(&device_connectivity.MultipathDeviceNotFoundForVolumeError{}),
-			expDMdevice: "",
+			expErrType: reflect.TypeOf(&device_connectivity.MultipathDeviceNotFoundForVolumeError{}),
+			expDMPath:  "",
 		},
 
 		{
-			name: "Should fail when WaitForDmToExist found more than 1 dm for volume",
+			name: "Should fail when WaitForDmToExist find more than 1 dm for volume",
 			waitForDmToExistReturn: []WaitForDmToExistReturn{
 				WaitForDmToExistReturn{
 					mpathdOutput: "dm-1,600fakevolumeuuid000000000111\ndm-2,otheruuid\ndm-3,600fakevolumeuuid000000000111",
@@ -85,8 +90,27 @@ func TestGetMpathDevice(t *testing.T) {
 				},
 			},
 
-			expErrType:  reflect.TypeOf(&device_connectivity.MultipleDmDevicesError{}),
-			expDMdevice: "",
+			expErrType: reflect.TypeOf(&device_connectivity.MultipleDmDevicesError{}),
+			expDMPath:  "",
+		},
+
+		{
+			name: "Should fail on dm validation via GetWwnByScsiInq",
+			waitForDmToExistReturn: []WaitForDmToExistReturn{
+				WaitForDmToExistReturn{
+					mpathdOutput: "dm-1,600fakevolumeuuid000000000111",
+					err:          nil,
+				},
+			},
+			getWwnByScsiInqReturn: []GetWwnByScsiInqReturn{
+				GetWwnByScsiInqReturn{
+					wwn: "otheruuid",
+					err: nil,
+				},
+			},
+
+			expErrType: reflect.TypeOf(&device_connectivity.ErrorWrongDeviceFound{}),
+			expDMPath:  "",
 		},
 
 		{
@@ -97,9 +121,15 @@ func TestGetMpathDevice(t *testing.T) {
 					err:          nil,
 				},
 			},
+			getWwnByScsiInqReturn: []GetWwnByScsiInqReturn{
+				GetWwnByScsiInqReturn{
+					wwn: "600fakevolumeuuid000000000111",
+					err: nil,
+				},
+			},
 
-			expErr:      nil,
-			expDMdevice: "dm-1",
+			expErr:    nil,
+			expDMPath: "/dev/dm-1",
 		},
 	}
 
@@ -120,8 +150,15 @@ func TestGetMpathDevice(t *testing.T) {
 					r.err)
 			}
 
+			for _, r := range tc.getWwnByScsiInqReturn {
+
+				fake_helper.EXPECT().GetWwnByScsiInq("/dev/dm-1").Return(
+					r.wwn,
+					r.err)
+			}
+
 			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fake_executer, fake_helper, fake_mutex)
-			DMdevice, err := o.GetMpathDevice("Test:600FAKEVOLUMEUUID000000000111")
+			DMPath, err := o.GetMpathDevice("Test:600FAKEVOLUMEUUID000000000111")
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")
@@ -136,11 +173,9 @@ func TestGetMpathDevice(t *testing.T) {
 					}
 				}
 			}
-			if DMdevice != "" {
-				DMdevice = filepath.Base(DMdevice)
-			}
-			if tc.expDMdevice != DMdevice {
-				t.Fatalf("Expected found device mapper  %v, got %v", tc.expDMdevice, DMdevice)
+
+			if tc.expDMPath != DMPath {
+				t.Fatalf("Expected found device mapper  %v, got %v", tc.expDMPath, DMPath)
 			}
 
 		})
@@ -162,7 +197,7 @@ func TestHelperWaitForDmToExist(t *testing.T) {
 			expErr:       fmt.Errorf("error"),
 		},
 		{
-			name:         "Should return empty string when cmd succeed but with no paths",
+			name:         "Should return empty string when cmd succeed but with no dm.uuid pairs",
 			devices:      "",
 			cmdReturnErr: nil,
 			expErr:       nil,
@@ -184,7 +219,7 @@ func TestHelperWaitForDmToExist(t *testing.T) {
 			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
 			volumeUuid := "volumeUuid"
 			args := []string{"show", "maps", "raw", "format", "\"", "%d,%w", "\""}
-			fake_executer.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutForCmd, "multipathd", args).Return([]byte(tc.devices), tc.cmdReturnErr)
+			fake_executer.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathCmd, "multipathd", args).Return([]byte(tc.devices), tc.cmdReturnErr)
 			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fake_executer)
 			devices, err := helperGeneric.WaitForDmToExist(volumeUuid, 1, 1)
 			if err != nil {
@@ -194,6 +229,97 @@ func TestHelperWaitForDmToExist(t *testing.T) {
 			}
 			if tc.devices != devices {
 				t.Fatalf("Expected found device mapper  %v, got %v", tc.devices, devices)
+			}
+
+		})
+	}
+}
+
+func TestHelperGetWwnByScsiInq(t *testing.T) {
+	testCases := []struct {
+		name            string
+		cmdReturn       []byte
+		expErr          error
+		wwn             string
+		cmdReturnErr    error
+		sgInqExecutable error
+		expErrType      reflect.Type
+	}{
+		{
+			name:            "Should fail when sg_Inq is not executable",
+			cmdReturn:       []byte(""),
+			wwn:             "",
+			cmdReturnErr:    nil,
+			expErr:          fmt.Errorf("error"),
+			sgInqExecutable: fmt.Errorf("error"),
+		},
+		{
+			name:            "Should fail when cmd return error",
+			cmdReturn:       []byte(""),
+			wwn:             "",
+			cmdReturnErr:    fmt.Errorf("error"),
+			expErr:          fmt.Errorf("error"),
+			sgInqExecutable: nil,
+		},
+		{
+			name:            "Should return error when wwn line not matching the expected pattern",
+			cmdReturn:       []byte("Vendor Specific Identifier Extension: 0xcea5f6\n\t\t\t  [600fakevolumeuuid000000000111]"),
+			wwn:             "",
+			cmdReturnErr:    nil,
+			expErrType:      reflect.TypeOf(&device_connectivity.ErrorNoRegexWwnMatchInScsiInq{}),
+			sgInqExecutable: nil,
+		},
+		{
+			name:            "Should fail when no device found",
+			cmdReturn:       []byte(""),
+			wwn:             "",
+			cmdReturnErr:    nil,
+			expErrType:      reflect.TypeOf(&device_connectivity.MultipathDeviceNotFoundForVolumeError{}),
+			sgInqExecutable: nil,
+		},
+		{
+			name:            "Should succeed",
+			cmdReturn:       []byte("Vendor Specific Identifier Extension: 0xcea5f6\n\t\t\t  [0x600fakevolumeuuid000000000111]"),
+			wwn:             "600FAKEVOLUMEUUID000000000111",
+			cmdReturnErr:    nil,
+			expErr:          nil,
+			sgInqExecutable: nil,
+		},
+	}
+	sgInqCmd := "sg_inq"
+	device := "/dev/dm-1"
+	for _, tc := range testCases {
+
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
+			args := []string{"-p", "0x83", device}
+			fake_executer.EXPECT().IsExecutable(sgInqCmd).Return(tc.sgInqExecutable)
+
+			if tc.sgInqExecutable == nil {
+				fake_executer.EXPECT().ExecuteWithTimeout(3000, sgInqCmd, args).Return(tc.cmdReturn, tc.cmdReturnErr)
+			}
+
+			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fake_executer)
+			wwn, err := helperGeneric.GetWwnByScsiInq(device)
+			if tc.expErr != nil || tc.expErrType != nil {
+				if err == nil {
+					t.Fatalf("Expected to fail with error, got success.")
+				}
+				if tc.expErrType != nil {
+					if reflect.TypeOf(err) != tc.expErrType {
+						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
+					}
+				} else {
+					if !areStringsEqualAsSet(err.Error(), tc.expErr.Error()) {
+						t.Fatalf("Expected error %s, got %s", tc.expErr, err.Error())
+					}
+				}
+			}
+			if strings.ToLower(tc.wwn) != wwn {
+				t.Fatalf("Expected wwn  %v, got %v", wwn, tc.wwn)
 			}
 
 		})

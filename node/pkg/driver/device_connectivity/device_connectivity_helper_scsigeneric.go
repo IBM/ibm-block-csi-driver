@@ -17,6 +17,7 @@
 package device_connectivity
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
 	"os"
@@ -56,8 +57,8 @@ type WaitForMpathResult struct {
 }
 
 var (
-	TimeOutForCmd = 4 * 1000
-	DmSepKye      = ","
+	TimeOutMultipathCmd = 4 * 1000
+	MpathdSeparator     = ","
 )
 
 const (
@@ -144,16 +145,16 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 		return "", &MultipathDeviceNotFoundForVolumeError{volumeId}
 	}
 	dms := make(map[string]bool)
-	outputLines := strings.Fields(mpathdOutput)
-	for _, device := range outputLines {
-		lineParts := strings.Split(device, DmSepKye)
+	scanner := bufio.NewScanner(strings.NewReader(mpathdOutput))
+	for scanner.Scan() {
+		deviceLine := scanner.Text()
+		lineParts := strings.Split(deviceLine, MpathdSeparator)
 		dm, uuid := lineParts[0], lineParts[1]
 		if strings.Contains(uuid, volumeUuidLower) {
 			dmPath := filepath.Join(DevPath, filepath.Base(dm))
 			dms[dmPath] = true
 			logger.Infof("GetMpathDevice: DM found: %s for volume %s", dmPath, uuid)
 		}
-
 	}
 
 	if len(dms) > 1 {
@@ -163,6 +164,16 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	var md string
 	for md = range dms {
 		break // because its a single value in the map(1 mpath device, if not it should fail above), so just take the first
+	}
+
+	SqInqWwn, err := r.Helper.GetWwnByScsiInq(md)
+	if err != nil {
+		return "", err
+	}
+
+	if strings.ToLower(SqInqWwn) != volumeUuidLower {
+		// To make sure we found the right WWN, if not raise error instead of using wrong mpath
+		return "", &ErrorWrongDeviceFound{md, volumeUuidLower, SqInqWwn}
 	}
 	return md, nil
 }
@@ -176,7 +187,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice 
 	logger.Debugf("Try to acquire lock for running the command multipath -f {%v} (to avoid concurrent multipath commands)", mpathDevice)
 	r.MutexMultipathF.Lock()
 	logger.Debugf("Acquired lock for multipath -f command")
-	_, err := r.Executer.ExecuteWithTimeout(TimeOutForCmd, "multipath", []string{"-f", fullDevice})
+	_, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathCmd, "multipath", []string{"-f", fullDevice})
 	r.MutexMultipathF.Unlock()
 
 	if err != nil {
@@ -242,6 +253,7 @@ type OsDeviceConnectivityHelperInterface interface {
 	*/
 	GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error)
 	WaitForDmToExist(volumeUuid string, maxRetries int, intervalSeconds int) (string, error)
+	GetWwnByScsiInq(dev string) (string, error)
 }
 
 type OsDeviceConnectivityHelperGeneric struct {
@@ -253,11 +265,11 @@ func NewOsDeviceConnectivityHelperGeneric(executer executer.ExecuterInterface) O
 }
 func (o OsDeviceConnectivityHelperGeneric) WaitForDmToExist(volumeUuid string, maxRetries int, intervalSeconds int) (string, error) {
 
-	args := []string{"show", "maps", "raw", "format", "\"", "%d" + DmSepKye + "%w", "\""}
+	args := []string{"show", "maps", "raw", "format", "\"", "%d" + MpathdSeparator + "%w", "\""}
 	var err error
 	for i := 0; i < maxRetries; i++ {
 		err = nil
-		out, err := o.executer.ExecuteWithTimeout(TimeOutForCmd, "multipathd", args)
+		out, err := o.executer.ExecuteWithTimeout(TimeOutMultipathCmd, "multipathd", args)
 		if err != nil {
 			return "", err
 		}
@@ -345,4 +357,90 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 
 	return HostIDs, nil
 
+}
+
+func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, error) {
+	/* scsi inq example
+	$> sg_inq -p 0x83 /dev/mapper/mpathhe
+		VPD INQUIRY: Device Identification page
+		  Designation descriptor number 1, descriptor length: 20
+			designator_type: NAA,  code_set: Binary
+			associated with the addressed logical unit
+			  NAA 6, IEEE Company_id: 0x1738
+			  Vendor Specific Identifier: 0xcfc9035eb
+			  Vendor Specific Identifier Extension: 0xcea5f6
+			  [0x6001738cfc9035eb0000000000ceaaaa]
+		  Designation descriptor number 2, descriptor length: 52
+			designator_type: T10 vendor identification,  code_set: ASCII
+			associated with the addressed logical unit
+			  vendor id: IBM
+			  vendor specific: 2810XIV          60035EB0000000000CEAAAA
+		  Designation descriptor number 3, descriptor length: 43
+			designator_type: vendor specific [0x0],  code_set: ASCII
+			associated with the addressed logical unit
+			  vendor specific: vol=u_k8s_longevity_ibm-ubiquity-db
+		  Designation descriptor number 4, descriptor length: 37
+			designator_type: vendor specific [0x0],  code_set: ASCII
+			associated with the addressed logical unit
+			  vendor specific: host=k8s-acceptance-v18-node1
+		  Designation descriptor number 5, descriptor length: 8
+			designator_type: Target port group,  code_set: Binary
+			associated with the target port
+			  Target port group: 0x0
+		  Designation descriptor number 6, descriptor length: 8
+			designator_type: Relative target port,  code_set: Binary
+			associated with the target port
+			  Relative target port: 0xd22
+	*/
+	sgInqCmd := "sg_inq"
+
+	if err := o.executer.IsExecutable(sgInqCmd); err != nil {
+		return "", err
+	}
+
+	args := []string{"-p", "0x83", dev}
+	// add timeout in case the call never comes back.
+	logger.Debugf("Calling [%s] with timeout", sgInqCmd)
+	outputBytes, err := o.executer.ExecuteWithTimeout(3000, sgInqCmd, args)
+	if err != nil {
+		return "", err
+	}
+	wwnRegex := "(?i)" + `\[0x(.*?)\]`
+	wwnRegexCompiled, err := regexp.Compile(wwnRegex)
+
+	if err != nil {
+		return "", err
+	}
+	/*
+	   sg_inq on device NAA6 returns "Vendor Specific Identifier Extension"
+	   sg_inq on device EUI-64 returns "Vendor Specific Extension Identifier".
+	*/
+	pattern := "(?i)" + "Vendor Specific (Identifier Extension|Extension Identifier):"
+	scanner := bufio.NewScanner(strings.NewReader(string(outputBytes[:])))
+	regex, err := regexp.Compile(pattern)
+	if err != nil {
+		return "", err
+	}
+	wwn := ""
+	found := false
+	for scanner.Scan() {
+		line := scanner.Text()
+		if found {
+			matches := wwnRegexCompiled.FindStringSubmatch(line)
+			if len(matches) != 2 {
+				logger.Debugf("wrong line, too many matches in sg_inq output : %#v", matches)
+				return "", &ErrorNoRegexWwnMatchInScsiInq{dev, line}
+			}
+			wwn = matches[1]
+			logger.Debugf("Found the expected Wwn [%s] in sg_inq.", wwn)
+			return wwn, nil
+		}
+		if regex.MatchString(line) {
+			found = true
+			// its one line after "Vendor Specific Identifier Extension:" line which should contain the WWN
+			continue
+		}
+
+	}
+	return "", &MultipathDeviceNotFoundForVolumeError{wwn}
 }

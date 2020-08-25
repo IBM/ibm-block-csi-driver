@@ -58,3 +58,25 @@ type ErrorNotFoundArrayIdentifiers struct {
 func (e *ErrorNotFoundArrayIdentifiers) Error() string {
 	return fmt.Sprintf("Couldn't find arrayIdentifiers found for lunId: {%d}", e.lunId)
 }
+
+type ErrorNoRegexWwnMatchInScsiInq struct {
+	dev  string
+	line string
+}
+
+func (e *ErrorNoRegexWwnMatchInScsiInq) Error() string {
+	return fmt.Sprintf("Could not find wwn pattern in sg_inq of mpath devive: [%s] in line Vendor Specific "+
+		"Identifier Extension: [%s]", e.dev, e.line)
+}
+
+type ErrorWrongDeviceFound struct {
+	devPath    string
+	reqVolName string
+	volName    string
+}
+
+func (e *ErrorWrongDeviceFound) Error() string {
+	return fmt.Sprintf("Multipath device [%s] was found as WWN [%s] via multipath -ll command, "+
+		"BUT sg_inq identify this device as a different WWN: [%s]. Check your multipathd.", e.devPath,
+		e.reqVolName, e.volName)
+}
