@@ -365,7 +365,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(array_errors.HostNotFoundError):
             self.mediator._get_next_available_lun("host")
 
-    def test_get_next_available_with_no_host_mappings(self):
+    def test_get_next_available_lun_with_no_host_mappings(self):
         res = Mock()
         res.as_list = []
         self.mediator.client.cmd.mapping_list.return_value = res
@@ -376,8 +376,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
     @patch.object(XIVArrayMediator, "MAX_LUN_NUMBER", 3)
     @patch.object(XIVArrayMediator, "MIN_LUN_NUMBER", 1)
     def test_get_next_available_lun_success(self):
-        mapping1 = utils.get_mock_xiv_host_mapping(1)
-        mapping2 = utils.get_mock_xiv_host_mapping(3)
+        mapping1 = utils.get_mock_xiv_host_mapping("1")
+        mapping2 = utils.get_mock_xiv_host_mapping("3")
         res = Mock()
         res.as_list = [mapping1, mapping2]
         self.mediator.client.cmd.mapping_list.return_value = res
@@ -387,9 +387,9 @@ class TestArrayMediatorXIV(unittest.TestCase):
     @patch.object(XIVArrayMediator, "MAX_LUN_NUMBER", 3)
     @patch.object(XIVArrayMediator, "MIN_LUN_NUMBER", 1)
     def test_get_next_available_lun_no_available_lun(self):
-        mapping1 = utils.get_mock_xiv_host_mapping(1)
-        mapping2 = utils.get_mock_xiv_host_mapping(3)
-        mapping3 = utils.get_mock_xiv_host_mapping(2)
+        mapping1 = utils.get_mock_xiv_host_mapping("1")
+        mapping2 = utils.get_mock_xiv_host_mapping("3")
+        mapping3 = utils.get_mock_xiv_host_mapping("2")
         res = Mock()
         res.as_list = [mapping1, mapping2, mapping3]
         self.mediator.client.cmd.mapping_list.return_value = res
@@ -406,9 +406,9 @@ class TestArrayMediatorXIV(unittest.TestCase):
     @patch.object(XIVArrayMediator, "MAX_LUN_NUMBER", 3)
     @patch.object(XIVArrayMediator, "MIN_LUN_NUMBER", 1)
     def test_map_volume_no_availabe_lun(self):
-        mapping1 = utils.get_mock_xiv_host_mapping(1)
-        mapping2 = utils.get_mock_xiv_host_mapping(3)
-        mapping3 = utils.get_mock_xiv_host_mapping(2)
+        mapping1 = utils.get_mock_xiv_host_mapping("1")
+        mapping2 = utils.get_mock_xiv_host_mapping("3")
+        mapping3 = utils.get_mock_xiv_host_mapping("2")
         res = Mock()
         res.as_list = [mapping1, mapping2, mapping3]
         self.mediator.client.cmd.mapping_list.return_value = res

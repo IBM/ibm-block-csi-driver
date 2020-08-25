@@ -361,7 +361,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.HostNotFoundError(host_name)
 
-        luns_in_use = set([host_mapping.lun for host_mapping in host_mapping_list])
+        luns_in_use = set([int(host_mapping.lun) for host_mapping in host_mapping_list])
         logger.debug("luns in use : {0}".format(luns_in_use))
 
         # try to use random lun number just in case there are many calls at the same time to reduce re-tries
