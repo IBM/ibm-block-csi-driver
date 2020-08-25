@@ -493,25 +493,25 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 		ioutilReadFileReturns []ioutilReadFileReturn
 		arrayIdentifier       string
 
-		expErrType       reflect.Type
-		expErr           error
-		expHostList      []int
-		cmdReturnMatches []string
-		cmdReturnErr     error
+		expErrType        reflect.Type
+		expErr            error
+		expHostList       []int
+		globReturnMatches []string
+		globReturnErr     error
 	}{
 		{
-			name:             "Should fail when FilepathGlob return error",
-			arrayIdentifier:  "fakeWWN",
-			cmdReturnMatches: nil,
-			cmdReturnErr:     fmt.Errorf("error"),
-			expErr:           fmt.Errorf("error"),
-			expHostList:      nil,
+			name:              "Should fail when FilepathGlob return error",
+			arrayIdentifier:   "fakeWWN",
+			globReturnMatches: nil,
+			globReturnErr:     fmt.Errorf("error"),
+			expErr:            fmt.Errorf("error"),
+			expHostList:       nil,
 		},
 		{
-			name:             "Should fail when FilepathGlob return without any hosts target files at all",
-			arrayIdentifier:  "fakeWWN",
-			cmdReturnMatches: nil,
-			cmdReturnErr:     nil,
+			name:              "Should fail when FilepathGlob return without any hosts target files at all",
+			arrayIdentifier:   "fakeWWN",
+			globReturnMatches: nil,
+			globReturnErr:     nil,
 
 			expErrType:  reflect.TypeOf(&device_connectivity.ConnectivityIdentifierStorageTargetNotFoundError{}),
 			expHostList: nil,
@@ -531,11 +531,11 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 				},
 			},
 			arrayIdentifier: "fakeWWN",
-			cmdReturnMatches: []string{
+			globReturnMatches: []string{
 				"/sys/class/fc_remote_ports/rport-3:0-0/port_name",
 				"/sys/class/fc_remote_ports/rport-4:0-0/port_name",
 			},
-			cmdReturnErr: nil,
+			globReturnErr: nil,
 
 			expErrType:  reflect.TypeOf(&device_connectivity.ConnectivityIdentifierStorageTargetNotFoundError{}),
 			expHostList: nil,
@@ -567,13 +567,13 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 			},
 			arrayIdentifier: "fakeWWN",
 
-			cmdReturnMatches: []string{
+			globReturnMatches: []string{
 				"/sys/class/fc_remote_ports/rport-33:0-0/port_name",
 				"/sys/class/fc_remote_ports/rport-34:0-0/port_name",
 				"/sys/class/fc_remote_ports/rport-35:0-0/port_name",
 				"/sys/class/fc_remote_ports/rport-36:0-0/port_name",
 			},
-			cmdReturnErr: nil,
+			globReturnErr: nil,
 
 			expErrType:  nil,
 			expHostList: []int{33, 34},
@@ -595,11 +595,11 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 			},
 			arrayIdentifier: "fakeWWN",
 
-			cmdReturnMatches: []string{
+			globReturnMatches: []string{
 				"/sys/class/fc_remote_ports/rport-5:0-0/port_name",
 				"/sys/class/fc_remote_ports/rport-6:0-0/port_name",
 			},
-			cmdReturnErr: nil,
+			globReturnErr: nil,
 
 			expErrType:  nil,
 			expHostList: []int{5, 6},
@@ -614,7 +614,7 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 
 			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
 
-			fake_executer.EXPECT().FilepathGlob(device_connectivity.FC_HOST_SYSFS_PATH).Return(tc.cmdReturnMatches, tc.cmdReturnErr)
+			fake_executer.EXPECT().FilepathGlob(device_connectivity.FC_HOST_SYSFS_PATH).Return(tc.globReturnMatches, tc.globReturnErr)
 
 			var mcalls []*gomock.Call
 			for _, r := range tc.ioutilReadFileReturns {
