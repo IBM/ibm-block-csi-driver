@@ -4,14 +4,13 @@ from pyxcli import errors as xcli_errors
 from pyxcli.client import XCLIClient
 
 import controller.array_action.errors as controller_errors
-import controller.array_action.messages as controller_error_messages
 from controller.array_action.array_action_types import Volume, Snapshot
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.utils import classproperty
+from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.utils import string_to_array
-from controller.common import settings
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -362,7 +361,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.HostNotFoundError(host_name)
 
-        luns_in_use = set([host_mapping.lun for host_mapping in host_mapping_list])
+        luns_in_use = set([int(host_mapping.lun) for host_mapping in host_mapping_list])
         logger.debug("luns in use : {0}".format(luns_in_use))
 
         # try to use random lun number just in case there are many calls at the same time to reduce re-tries
