@@ -57,8 +57,8 @@ type WaitForMpathResult struct {
 }
 
 var (
-	TimeOutMultipathCmd = 4 * 1000
-	MpathdSeparator     = ","
+	TimeOutMultipathCmd  = 60 * 1000
+	TimeOutMultipathdCmd = 10 * 1000
 )
 
 const (
@@ -70,6 +70,9 @@ const (
 	FC_HOST_SYSFS_PATH          = "/sys/class/fc_remote_ports/rport-*/port_name"
 	IscsiHostRexExPath          = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
 	GetMpahDevErrorsSep         = ","
+	MpathdSeparator             = ","
+	multipathdCmd               = "multipathd"
+	multipathCmd                = "multipath"
 )
 
 func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperScsiGenericInterface {
@@ -136,46 +139,40 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	volumeUuid := strings.Split(volumeId, ":")[1]
 	volumeUuidLower := strings.ToLower(volumeUuid)
 
-	mpathdOutput, err := r.Helper.WaitForDmToExist(volumeUuidLower, WaitForMpathRetries, WaitForMpathWaitIntervalSec)
+	dmPath, _ := r.Helper.GetDmsPath(volumeUuidLower)
+
+	if dmPath != "" {
+		SqInqWwn, _ := r.Helper.GetWwnByScsiInq(dmPath)
+
+		if strings.ToLower(SqInqWwn) == volumeUuidLower {
+			return dmPath, nil
+		}
+	}
+
+	if err := r.Helper.ReloadMultipath(); err != nil {
+		return "", err
+	}
+
+	dmPath, err := r.Helper.GetDmsPath(volumeUuidLower)
 
 	if err != nil {
 		return "", err
 	}
-	if mpathdOutput == "" {
+
+	if dmPath == "" {
 		return "", &MultipathDeviceNotFoundForVolumeError{volumeId}
 	}
-	dms := make(map[string]bool)
-	scanner := bufio.NewScanner(strings.NewReader(mpathdOutput))
-	for scanner.Scan() {
-		deviceLine := scanner.Text()
-		lineParts := strings.Split(deviceLine, MpathdSeparator)
-		dm, uuid := lineParts[0], lineParts[1]
-		if strings.Contains(uuid, volumeUuidLower) {
-			dmPath := filepath.Join(DevPath, filepath.Base(dm))
-			dms[dmPath] = true
-			logger.Infof("GetMpathDevice: DM found: %s for volume %s", dmPath, uuid)
-		}
-	}
 
-	if len(dms) > 1 {
-		return "", &MultipleDmDevicesError{volumeId, dms}
-	}
-
-	var md string
-	for md = range dms {
-		break // because its a single value in the map(1 mpath device, if not it should fail above), so just take the first
-	}
-
-	SqInqWwn, err := r.Helper.GetWwnByScsiInq(md)
+	SqInqWwn, err := r.Helper.GetWwnByScsiInq(dmPath)
 	if err != nil {
 		return "", err
 	}
 
 	if strings.ToLower(SqInqWwn) != volumeUuidLower {
 		// To make sure we found the right WWN, if not raise error instead of using wrong mpath
-		return "", &ErrorWrongDeviceFound{md, volumeUuidLower, SqInqWwn}
+		return "", &ErrorWrongDeviceFound{dmPath, volumeUuidLower, SqInqWwn}
 	}
-	return md, nil
+	return dmPath, nil
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice string) error {
@@ -253,7 +250,9 @@ type OsDeviceConnectivityHelperInterface interface {
 	*/
 	GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error)
 	WaitForDmToExist(volumeUuid string, maxRetries int, intervalSeconds int) (string, error)
+	GetDmsPath(volumeId string) (string, error)
 	GetWwnByScsiInq(dev string) (string, error)
+	ReloadMultipath() error
 }
 
 type OsDeviceConnectivityHelperGeneric struct {
@@ -269,7 +268,7 @@ func (o OsDeviceConnectivityHelperGeneric) WaitForDmToExist(volumeUuid string, m
 	var err error
 	for i := 0; i < maxRetries; i++ {
 		err = nil
-		out, err := o.executer.ExecuteWithTimeout(TimeOutMultipathCmd, "multipathd", args)
+		out, err := o.executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
 		if err != nil {
 			return "", err
 		}
@@ -443,4 +442,62 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 
 	}
 	return "", &MultipathDeviceNotFoundForVolumeError{wwn}
+}
+
+func (o OsDeviceConnectivityHelperGeneric) ReloadMultipath() error {
+	logger.Infof("ReloadMultipath: reload start")
+	if err := o.executer.IsExecutable(multipathCmd); err != nil {
+		return err
+	}
+
+	args := []string{}
+	_, err := o.executer.ExecuteWithTimeout(TimeOutMultipathCmd, multipathCmd, args)
+	if err != nil {
+		return err
+	}
+
+	args = []string{"-r"}
+	_, err = o.executer.ExecuteWithTimeout(TimeOutMultipathCmd, multipathCmd, args)
+	if err != nil {
+		return err
+	}
+	logger.Infof("ReloadMultipath: reload finished successfully")
+	return nil
+}
+func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeId string) (string, error) {
+	volumeUuidLower := strings.ToLower(volumeId)
+
+	mpathdOutput, err := o.WaitForDmToExist(volumeUuidLower, WaitForMpathRetries, WaitForMpathWaitIntervalSec)
+
+	if err != nil {
+		return "", err
+	}
+
+	if mpathdOutput == "" {
+		return "", &MultipathDeviceNotFoundForVolumeError{volumeId}
+	}
+
+	dms := make(map[string]bool)
+	scanner := bufio.NewScanner(strings.NewReader(mpathdOutput))
+	for scanner.Scan() {
+		deviceLine := scanner.Text()
+		lineParts := strings.Split(deviceLine, MpathdSeparator)
+		dm, uuid := lineParts[0], lineParts[1]
+		if strings.Contains(uuid, volumeUuidLower) {
+			dmPath := filepath.Join(DevPath, filepath.Base(dm))
+			dms[dmPath] = true
+			logger.Infof("GetMpathDevice: DM found: %s for volume %s", dmPath, uuid)
+		}
+	}
+
+	if len(dms) > 1 {
+		return "", &MultipleDmDevicesError{volumeId, dms}
+	}
+
+	var md string
+	for md = range dms {
+		break // because its a single value in the map(1 mpath device, if not it should fail above), so just take the first
+	}
+
+	return md, nil
 }
