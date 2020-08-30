@@ -208,8 +208,8 @@ class TestStorageAgent(unittest.TestCase):
                 with get_agent("test", "test", ["ds8k_host", ]).get_mediator(timeout=timeout):
                     in_q.put(True)
 
-        # max_size for ds8k is 10
-        for _ in range(10):
+        # max_size for ds8k is 5
+        for _ in range(5):
             t = Thread(target=blocking_action)
             t.start()
 
