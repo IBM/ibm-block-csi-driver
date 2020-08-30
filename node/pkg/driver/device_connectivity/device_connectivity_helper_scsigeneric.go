@@ -249,39 +249,21 @@ type OsDeviceConnectivityHelperInterface interface {
 		Mainly for writting clean unit testing, so we can Mock this interface in order to unit test OsDeviceConnectivityHelperGeneric logic.
 	*/
 	GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error)
-	WaitForDmToExist(volumeUuid string, maxRetries int, intervalSeconds int) (string, error)
 	GetDmsPath(volumeId string) (string, error)
 	GetWwnByScsiInq(dev string) (string, error)
 	ReloadMultipath() error
 }
 
 type OsDeviceConnectivityHelperGeneric struct {
-	executer executer.ExecuterInterface
+	Executer executer.ExecuterInterface
+	Helper   GetDmsPathHelperInterface
 }
 
 func NewOsDeviceConnectivityHelperGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperInterface {
-	return &OsDeviceConnectivityHelperGeneric{executer: executer}
-}
-func (o OsDeviceConnectivityHelperGeneric) WaitForDmToExist(volumeUuid string, maxRetries int, intervalSeconds int) (string, error) {
-
-	args := []string{"show", "maps", "raw", "format", "\"", "%d" + MpathdSeparator + "%w", "\""}
-	var err error
-	for i := 0; i < maxRetries; i++ {
-		err = nil
-		out, err := o.executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
-		if err != nil {
-			return "", err
-		}
-		dms := string(out)
-		if !strings.Contains(dms, volumeUuid) {
-			err = os.ErrNotExist
-		} else {
-			return dms, nil
-		}
-
-		time.Sleep(time.Second * time.Duration(intervalSeconds))
+	return &OsDeviceConnectivityHelperGeneric{
+		Executer: executer,
+		Helper:   NewGetDmsPathHelperGeneric(executer),
 	}
-	return "", err
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error) {
@@ -307,7 +289,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 	}
 
 	var HostIDs []int
-	matches, err := o.executer.FilepathGlob(targetFilePath)
+	matches, err := o.Executer.FilepathGlob(targetFilePath)
 	if err != nil {
 		logger.Errorf("Error while Glob targetFilePath : {%v}. err : {%v}", targetFilePath, err)
 		return nil, err
@@ -318,7 +300,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 	re := regexp.MustCompile(regexpValue)
 	for _, targetPath := range matches {
 		logger.Debugf("Check if targetname path (%s) is relevant for storage target (%s).", targetPath, arrayIdentifier)
-		targetName, err := o.executer.IoutilReadFile(targetPath)
+		targetName, err := o.Executer.IoutilReadFile(targetPath)
 		if err != nil {
 			logger.Warningf("Could not read target name from file : {%v}, error : {%v}", targetPath, err)
 			continue
@@ -393,14 +375,14 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 	*/
 	sgInqCmd := "sg_inq"
 
-	if err := o.executer.IsExecutable(sgInqCmd); err != nil {
+	if err := o.Executer.IsExecutable(sgInqCmd); err != nil {
 		return "", err
 	}
 
 	args := []string{"-p", "0x83", dev}
 	// add timeout in case the call never comes back.
 	logger.Debugf("Calling [%s] with timeout", sgInqCmd)
-	outputBytes, err := o.executer.ExecuteWithTimeout(3000, sgInqCmd, args)
+	outputBytes, err := o.Executer.ExecuteWithTimeout(3000, sgInqCmd, args)
 	if err != nil {
 		return "", err
 	}
@@ -446,18 +428,18 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 
 func (o OsDeviceConnectivityHelperGeneric) ReloadMultipath() error {
 	logger.Infof("ReloadMultipath: reload start")
-	if err := o.executer.IsExecutable(multipathCmd); err != nil {
+	if err := o.Executer.IsExecutable(multipathCmd); err != nil {
 		return err
 	}
 
 	args := []string{}
-	_, err := o.executer.ExecuteWithTimeout(TimeOutMultipathCmd, multipathCmd, args)
+	_, err := o.Executer.ExecuteWithTimeout(TimeOutMultipathCmd, multipathCmd, args)
 	if err != nil {
 		return err
 	}
 
 	args = []string{"-r"}
-	_, err = o.executer.ExecuteWithTimeout(TimeOutMultipathCmd, multipathCmd, args)
+	_, err = o.Executer.ExecuteWithTimeout(TimeOutMultipathCmd, multipathCmd, args)
 	if err != nil {
 		return err
 	}
@@ -467,7 +449,7 @@ func (o OsDeviceConnectivityHelperGeneric) ReloadMultipath() error {
 func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeId string) (string, error) {
 	volumeUuidLower := strings.ToLower(volumeId)
 
-	mpathdOutput, err := o.WaitForDmToExist(volumeUuidLower, WaitForMpathRetries, WaitForMpathWaitIntervalSec)
+	mpathdOutput, err := o.Helper.WaitForDmToExist(volumeUuidLower, WaitForMpathRetries, WaitForMpathWaitIntervalSec)
 
 	if err != nil {
 		return "", err
@@ -500,4 +482,40 @@ func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeId string) (string, 
 	}
 
 	return md, nil
+}
+
+//go:generate mockgen -destination=../../../mocks/mock_GetDmsPathHelperInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity GetDmsPathHelperInterface
+
+type GetDmsPathHelperInterface interface {
+	WaitForDmToExist(volumeUuid string, maxRetries int, intervalSeconds int) (string, error)
+}
+
+type GetDmsPathHelperGeneric struct {
+	executer executer.ExecuterInterface
+}
+
+func NewGetDmsPathHelperGeneric(executer executer.ExecuterInterface) GetDmsPathHelperInterface {
+	return &GetDmsPathHelperGeneric{executer: executer}
+}
+
+func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeUuid string, maxRetries int, intervalSeconds int) (string, error) {
+
+	args := []string{"show", "maps", "raw", "format", "\"", "%d" + MpathdSeparator + "%w", "\""}
+	var err error
+	for i := 0; i < maxRetries; i++ {
+		err = nil
+		out, err := o.executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
+		if err != nil {
+			return "", err
+		}
+		dms := string(out)
+		if !strings.Contains(dms, volumeUuid) {
+			err = os.ErrNotExist
+		} else {
+			return dms, nil
+		}
+
+		time.Sleep(time.Second * time.Duration(intervalSeconds))
+	}
+	return "", err
 }
