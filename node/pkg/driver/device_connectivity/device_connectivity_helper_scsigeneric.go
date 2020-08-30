@@ -484,7 +484,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeId string) (string, 
 		lineParts := strings.Split(deviceLine, MpathdSeparator)
 		dm, uuid := lineParts[0], lineParts[1]
 		if strings.Contains(uuid, volumeUuidLower) {
-			dmPath := filepath.Join(DevPath, filepath.Base(dm))
+			dmPath := filepath.Join(DevPath, filepath.Base(strings.TrimSpace(dm)))
 			dms[dmPath] = true
 			logger.Infof("GetMpathDevice: DM found: %s for volume %s", dmPath, uuid)
 		}
