@@ -140,7 +140,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	device, err := osDeviceConnectivity.GetMpathDevice(volId, lun, arrayInitiators)
+	device, err := osDeviceConnectivity.GetMpathDevice(volId)
 	logger.Debugf("Discovered device : {%v}", device)
 	if err != nil {
 		logger.Errorf("Error while discovring the device : {%v}", err.Error())
