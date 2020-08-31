@@ -290,7 +290,7 @@ func TestGetDmsPath(t *testing.T) {
 		},
 
 		{
-			name: "Should fail when WaitForDmToExist find more than 1 dm for volume",
+			name: "Should fail when WaitForDmToExist found more than 1 dm for volume",
 			waitForDmToExistReturn: []WaitForDmToExistReturn{
 				WaitForDmToExistReturn{
 					out: "dm-1,600fakevolumeuuid000000000111\ndm-2,otheruuid\ndm-3,600fakevolumeuuid000000000111",
