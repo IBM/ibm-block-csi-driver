@@ -9,7 +9,6 @@ NodePublishVolume
 NodeUnpublishVolume
 NodeStageVolume
 NodeUnstageVolume
-ControllerPublishVolume
 GetPluginCapabilities
 GetPluginInfo
 Probe
