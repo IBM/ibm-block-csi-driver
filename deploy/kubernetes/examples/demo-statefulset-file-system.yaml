@@ -1,29 +1,27 @@
-apiVersion: "apps/v1"
-kind: Deployment
+kind: StatefulSet
+apiVersion: apps/v1
 metadata:
-  name: sanity-deployment
+  name: demo-statefulset-file-system
 spec:
   selector:
     matchLabels:
-      app: sanity-deployment
+      app: demo-statefulset
+  serviceName: demo-statefulset
   replicas: 1
   template:
     metadata:
       labels:
-        app: sanity-deployment
+        app: demo-statefulset
     spec:
       containers:
-      - name: container1
+      - name: demo-container
         image: registry.access.redhat.com/ubi8/ubi:latest
         command: [ "/bin/sh", "-c", "--" ]
         args: [ "while true; do sleep 30; done;" ]
         volumeMounts:
-          - name: sanity-pvc
+          - name: demo-volume-file-system
             mountPath: "/data"
       volumes:
-      - name: sanity-pvc
+      - name: demo-volume-file-system
         persistentVolumeClaim:
-          claimName: sanity-pvc
-
-#      nodeSelector:
-#        kubernetes.io/hostname: NODESELECTOR
+          claimName: demo-pvc-file-system

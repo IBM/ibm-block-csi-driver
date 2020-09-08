@@ -5,6 +5,6 @@ metadata:
 driver: block.csi.ibm.com
 deletionPolicy: Delete
 parameters:
-  csi.storage.k8s.io/snapshotter-secret-name: a9000-array1
+  csi.storage.k8s.io/snapshotter-secret-name: demo-secret
   csi.storage.k8s.io/snapshotter-secret-namespace: default
-  snapshot_name_prefix: demo
+  snapshot_name_prefix: demoSnapshot   # Optional.
