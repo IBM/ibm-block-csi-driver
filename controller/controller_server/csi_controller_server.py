@@ -500,11 +500,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 except controller_errors.SnapshotNotFoundError as ex:
                     logger.debug("Snapshot was not found during deletion: {0}".format(ex))
 
-        except controller_errors.SnapshotNotFoundError:
+        except controller_errors.SnapshotNotFoundError as ex:
             logger.debug("snapshot was not found during deletion: {0}".format(ex))
             context.set_code(grpc.StatusCode.OK)
             return csi_pb2.DeleteSnapshotResponse()
-        except controller_errors.SnapshotIsStillInUseError:
+        except controller_errors.SnapshotIsStillInUseError as ex:
             logger.info("could not delete snapshot while in use: {0}".format(ex))
             context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
             context.set_details(ex)
