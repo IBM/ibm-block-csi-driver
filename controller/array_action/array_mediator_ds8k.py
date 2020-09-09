@@ -294,6 +294,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         self._create_flashcopy(source_volume_id=api_snapshot.id, target_volume_id=api_new_volume.id,
                                options=options)
 
+    def copy_to_existing_volume_from_volume(self, name, src_vol_name, src_vol_capacity_in_bytes,
+                                            min_vol_size_in_bytes, pool_id=None):
+        pass
+
     def _delete_volume(self, volume_id, not_exist_err=True):
         logger.info("Deleting volume {}".format(volume_id))
         try:

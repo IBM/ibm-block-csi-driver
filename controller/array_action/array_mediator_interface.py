@@ -80,6 +80,31 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def copy_to_existing_volume_from_volume(self, name, src_vol_name, src_vol_capacity_in_bytes,
+                                            min_vol_size_in_bytes, pool_id=None):
+        """
+        This function should copy a source-volume data to a target-volume in the storage system.
+
+        Args:
+            name                            : name of the volume to be created in the storage system
+            src_vol_name                    : name of volume to create from
+            src_vol_capacity_in_bytes       : capacity of source volume to create from
+            min_vol_size_in_bytes           : if source volume capacity is lower than this value vol will
+                                              be increased to this value
+            pool_id                         : pool of the volume and source volume to find them more efficiently.
+
+        Returns:
+            Volume
+
+        Raises:
+            VolumeNotFoundError
+            IllegalObjectName
+            PermissionDenied
+            PoolParameterIsMissing
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def delete_volume(self, volume_id):
         """
         This function should delete a volume in the storage system.

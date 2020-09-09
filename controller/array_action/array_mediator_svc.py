@@ -350,6 +350,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                                               min_vol_size_in_bytes, pool_id=None):
         self._copy_to_target_volume(name, src_snap_name)
 
+    def copy_to_existing_volume_from_volume(self, name, src_vol_name, src_vol_capacity_in_bytes,
+                                            min_vol_size_in_bytes, pool_id=None):
+        pass
+
     def create_volume(self, name, size_in_bytes, capabilities, pool):
         cli_volume = self._create_cli_volume(name, size_in_bytes, capabilities, pool)
 
@@ -363,7 +367,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             if not is_warning_message(ex.my_message):
                 logger.warning("Failed to delete volume {}".format(volume_name))
                 if (OBJ_NOT_FOUND in ex.my_message
-                   or VOL_NOT_FOUND in ex.my_message) and not_exist_err:
+                    or VOL_NOT_FOUND in ex.my_message) and not_exist_err:
                     raise controller_errors.VolumeNotFoundError(volume_name)
                 else:
                     raise ex

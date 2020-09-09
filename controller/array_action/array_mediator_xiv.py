@@ -226,6 +226,10 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
+    def copy_to_existing_volume_from_volume(self, name, src_vol_name, src_vol_capacity_in_bytes,
+                                            min_vol_size_in_bytes, pool_id=None):
+        pass
+
     def _get_vol_by_wwn(self, volume_id):
         vol_by_wwn = self.client.cmd.vol_list(wwn=volume_id).as_single_element
         if not vol_by_wwn:
