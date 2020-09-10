@@ -6,7 +6,7 @@ def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_src_obje
     vol = Mock()
     vol.capacity_bytes = size
     vol.id = wwn
-    vol.volume_name = name
+    vol.name = name
     vol.array_address = "arr1"
     vol.pool_name = "pool1"
     vol.array_type = array_type
@@ -19,7 +19,7 @@ def get_mock_mediator_response_snapshot(capacity, name, wwn, volume_name, array_
     snapshot = Mock()
     snapshot.capacity_bytes = capacity
     snapshot.id = wwn
-    snapshot.snapshot_name = name
+    snapshot.name = name
     snapshot.volume_name = volume_name
     snapshot.array_address = "arr1"
     snapshot.array_type = array_type

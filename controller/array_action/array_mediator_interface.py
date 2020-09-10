@@ -246,13 +246,14 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_snapshot_by_id(self, snapshot_id):
+    def get_object_by_id(self, object_id, object_type):
         """
-        This function return snapshot info about the snapshot.
+        This function return info about volume or snapshot.
         Args:
-            snapshot_id : id of the snapshot in the storage system
+            object_id   : id of the object in the storage system
+            object_type : volume or snapshot
         Returns:
-           Snapshot
+           Snapshot or Volume
         Raises:
             SnapshotIdBelongsToVolumeError
         """

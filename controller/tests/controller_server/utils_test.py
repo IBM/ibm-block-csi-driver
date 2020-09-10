@@ -1,6 +1,6 @@
 import unittest
 
-from mock import patch, Mock
+from mock import patch, Mock, MagicMock
 
 import controller.controller_server.utils as utils
 from controller.array_action.errors import HostNotFoundError
@@ -73,31 +73,23 @@ class TestUtils(unittest.TestCase):
 
     def test_validate_create_volume_source_empty(self):
         request = Mock()
-        source = Mock()
+        source = MagicMock(spec=[])
         request.volume_content_source = source
-        is_snapshot_source = False
-        is_volume_source = False
-        source.HasField.side_effect = [is_snapshot_source, is_volume_source]
         utils.validate_create_volume_source(request)
 
     def test_validate_create_volume_source_snapshot(self):
         request = Mock()
-        snapshot_source = Mock()
+        snapshot_source = MagicMock(spec=["snapshot"])
         request.volume_content_source = snapshot_source
         snapshot_source.snapshot.snapshot_id = "A9000:snap_id"
-        is_snapshot_source = True
-        snapshot_source.HasField.side_effect = [is_snapshot_source]
         utils.validate_create_volume_source(request)
 
     def test_validate_create_volume_source_volume(self):
         request = Mock()
-        volume_source = Mock()
-        is_snapshot_source = False
-        is_volume_source = True
-        volume_source.HasField.side_effect = [is_snapshot_source, is_volume_source]
+        volume_source = MagicMock(spec=["volume"])
         request.volume_content_source = volume_source
-        with self.assertRaises(ValidationException):
-            utils.validate_create_volume_source(request)
+        volume_source.volume.volume_id = "A9000:vol_id"
+        utils.validate_create_volume_source(request)
 
     def test_validate_raw_block_volume_capabilities(self):
         caps = Mock()
@@ -185,7 +177,7 @@ class TestUtils(unittest.TestCase):
     @patch("controller.controller_server.utils.get_vol_id")
     def test_get_create_volume_response(self, get_vol_id):
         new_vol = Mock()
-        new_vol.volume_name = "name"
+        new_vol.name = "name"
         new_vol.array_address = ["fqdn1", "fqdn2"]
 
         new_vol.pool_name = "pool"
@@ -206,7 +198,7 @@ class TestUtils(unittest.TestCase):
     @patch("controller.controller_server.utils.get_vol_id")
     def test_get_create_volume_response_with_single_IP(self, get_vol_id):
         new_vol = Mock()
-        new_vol.volume_name = "name"
+        new_vol.name = "name"
         new_vol.array_address = "9.1.1.1"
 
         new_vol.pool_name = "pool"
@@ -223,7 +215,7 @@ class TestUtils(unittest.TestCase):
     @patch("controller.controller_server.utils.get_vol_id")
     def test_get_create_volume_response_with_Multiple_IP(self, get_vol_id):
         new_vol = Mock()
-        new_vol.volume_name = "name"
+        new_vol.name = "name"
         new_vol.array_address = ["9.1.1.1", "9.1.1.2"]
 
         new_vol.pool_name = "pool"

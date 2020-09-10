@@ -4,7 +4,7 @@ CredentialsError_message = "Credential error has occurred while connecting to en
 
 StorageManagementIPsNotSupportError_message = "Invalid Management IP for SVC : {0} "
 
-VolumeNotFoundError_message = "Volume was not found : {0} "
+ObjectNotFoundError_message = "Object was not found : {0} "
 
 VolumeNameBelongsToSnapshotError_message = "Volume not found. Snapshot with the same id exists. \
                                                          Name : {0} , array : {1}"

@@ -38,10 +38,10 @@ class UnsupportedStorageVersionError(BaseArrayActionException):
 # =============================================================================
 # Volume errors
 # =============================================================================
-class VolumeNotFoundError(BaseArrayActionException):
+class ObjectNotFoundError(BaseArrayActionException):
 
     def __init__(self, name):
-        self.message = messages.VolumeNotFoundError_message.format(name)
+        self.message = messages.ObjectNotFoundError_message.format(name)
 
 
 class VolumeNameBelongsToSnapshotError(BaseArrayActionException):
@@ -181,12 +181,6 @@ class UnsupportedConnectivityTypeError(BaseArrayActionException):
 
     def __init__(self, connectivity_type):
         self.message = messages.UnsupportedConnectivityTypeError_message.format(connectivity_type)
-
-
-class SnapshotNotFoundError(BaseArrayActionException):
-
-    def __init__(self, name):
-        self.message = messages.SnapshotNotFoundError_message.format(name)
 
 
 class SnapshotNameBelongsToVolumeError(BaseArrayActionException):
