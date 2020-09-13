@@ -295,8 +295,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _get_cli_volume_by_wwn_if_exist(self, volume_id):
         filter_value = 'vdisk_UID=' + volume_id
-        cli_volume = self.client.svcinfo.lsvdisk(
-            filtervalue=filter_value).as_single_element
+        cli_volume = self.client.svcinfo.lsvdisk(bytes=True, filtervalue=filter_value).as_single_element
         if not cli_volume:
             return None
         return cli_volume
@@ -382,7 +381,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             if not is_warning_message(ex.my_message):
                 logger.warning("Failed to delete volume {}".format(volume_name))
                 if (OBJ_NOT_FOUND in ex.my_message
-                   or VOL_NOT_FOUND in ex.my_message) and not_exist_err:
+                    or VOL_NOT_FOUND in ex.my_message) and not_exist_err:
                     raise controller_errors.ObjectNotFoundError(volume_name)
                 else:
                     raise ex
