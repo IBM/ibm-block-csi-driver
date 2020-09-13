@@ -233,7 +233,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             logger.error("FlashCopy Mapping not found for target volume: {}".format(cli_volume.name))
             return None
         fcmap = self._get_fcmap_as_target_if_exists(cli_volume.name)
-        if not fcmap or fcmap.copy_rate != 0:
+        if not fcmap or fcmap.copy_rate != "0":
             return None
         return fcmap
 
@@ -264,7 +264,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         volume_name = self._get_volume_name_by_wwn(volume_id)
         fcmaps = self._get_fcmaps_as_source_if_exists(volume_name)
         for fcmap in fcmaps:
-            logger.debug("copy_rate is {0}".format(type(fcmap.copy_rate)))
             if fcmap.copy_rate == "0":
                 return True
         return False
@@ -405,7 +404,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self._stop_and_delete_fcmap(fcmap.id)
         fcmaps = self._get_fcmaps_as_source_if_exists(volume_name)
         for fcmap in fcmaps:
-            if fcmap.copy_rate != 0:
+            if fcmap.copy_rate != "0":
                 self._stop_and_delete_fcmap(fcmap.id)
         self._delete_volume_by_name(volume_name)
         logger.info("Finished volume deletion. id : {0}".format(volume_id))

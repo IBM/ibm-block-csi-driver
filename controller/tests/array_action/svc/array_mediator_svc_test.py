@@ -28,7 +28,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsnode.return_value = [node]
         port = Munch({'node_id': '1', 'IP_address': '1.1.1.1', 'IP_address_6': None})
         self.svc.client.svcinfo.lsportip.return_value = [port]
-        fcmaps = [Munch({'source_vdisk_name': 'source_name', 'id': 'test_fc_id', 'copy_rate': 0})]
+        fcmaps = [Munch({'source_vdisk_name': 'source_name', 'id': 'test_fc_id', 'copy_rate': "0"})]
         self.svc.client.svcinfo.lsfcmap.return_value = Mock(as_list=fcmaps)
 
     @patch(
