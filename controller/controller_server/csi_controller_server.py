@@ -229,10 +229,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def _get_src_obj_id(self, request, source_type):
         source = request.volume_content_source
+        logger.info(source)
         res = None
         if source and source.HasField(source_type):
             source_obj = getattr(source, source_type)
-            logger.info(source)
             src_id_field = getattr(source_obj, config.VOLUME_SOURCE_ID[source_type])
             logger.debug("src_id_field: {0}".format(src_id_field))
             _, res = utils.get_object_id_info(src_id_field, source_type)
