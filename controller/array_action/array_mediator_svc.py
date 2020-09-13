@@ -260,10 +260,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return self.client.svcinfo.lsfcmap(filtervalue=filter_value).as_list
 
     def is_volume_has_snapshots(self, volume_id):
+        logger.info("Checking if volume have snapshots")
         volume_name = self._get_volume_name_by_wwn(volume_id)
         fcmaps = self._get_fcmaps_as_source_if_exists(volume_name)
         for fcmap in fcmaps:
-            if fcmap.copy_rate == 0:
+            logger.debug("copy_rate is {0}".format(type(fcmap.copy_rate)))
+            if fcmap.copy_rate == "0":
                 return True
         return False
 
