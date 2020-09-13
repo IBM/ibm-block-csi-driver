@@ -380,8 +380,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 logger.warning("Failed to delete volume {}".format(volume_name))
-                if (OBJ_NOT_FOUND in ex.my_message
-                    or VOL_NOT_FOUND in ex.my_message) and not_exist_err:
+                if (OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message) and not_exist_err:
                     raise controller_errors.ObjectNotFoundError(volume_name)
                 else:
                     raise ex
