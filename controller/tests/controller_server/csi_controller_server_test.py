@@ -6,9 +6,9 @@ import grpc
 from mock import patch, Mock, MagicMock, call
 
 import controller.array_action.errors as array_errors
+import controller.controller_server.config as config
 import controller.controller_server.errors as controller_errors
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
-import controller.controller_server.config as config
 from controller.controller_server.csi_controller_server import ControllerServicer
 from controller.controller_server.test_settings import vol_name, snap_name, snap_vol_name, clone_vol_name
 from controller.csi_general import csi_pb2
@@ -331,6 +331,11 @@ class TestControllerServerDeleteSnapshot(unittest.TestCase):
         self.servicer.DeleteSnapshot(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
+
+
+class ProtoMock(MagicMock):
+    def HasField(self, field):
+        return hasattr(self, field)
 
 
 class TestControllerServerCreateVolume(AbstractControllerTest):
@@ -829,7 +834,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
     @staticmethod
     def _get_source_object(object_id, object_type):
-        source = MagicMock(spec=[object_type])
+        source = ProtoMock(spec=[object_type])
         id_field_name = config.VOLUME_SOURCE_ID[object_type]
         object_field = MagicMock(spec=[id_field_name])
         setattr(source, object_type, object_field)

@@ -80,15 +80,15 @@ def validate_create_volume_source(request):
     source = request.volume_content_source
     if source:
         logger.info(source)
-        if hasattr(source, config.VOLUME_SOURCE_SNAPSHOT):
+        if source.HasField(config.VOLUME_SOURCE_SNAPSHOT):
             _validate_source_info(source, config.VOLUME_SOURCE_SNAPSHOT)
-        elif hasattr(source, config.VOLUME_SOURCE_VOLUME):
+        elif source.HasField(config.VOLUME_SOURCE_VOLUME):
             _validate_source_info(source, config.VOLUME_SOURCE_VOLUME)
 
 
 def _validate_source_info(source, source_type):
     source_object = getattr(source, source_type)
-    logger.info("Source snapshot specified: {0}".format(source_object))
+    logger.info("Source {0} specified: {1}".format(source_type, source_object))
     source_object_id = getattr(source_object, config.VOLUME_SOURCE_ID[source_type])
     if not source_object_id:
         raise ValidationException(messages.volume_src_object_id_is_missing.format(source_type))

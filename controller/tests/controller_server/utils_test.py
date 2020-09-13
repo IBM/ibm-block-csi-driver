@@ -1,6 +1,6 @@
 import unittest
 
-from mock import patch, Mock, MagicMock
+from mock import patch, Mock
 
 import controller.controller_server.utils as utils
 from controller.array_action.errors import HostNotFoundError
@@ -8,6 +8,7 @@ from controller.controller_server.csi_controller_server import ControllerService
 from controller.controller_server.errors import ObjectIdError
 from controller.controller_server.errors import ValidationException
 from controller.csi_general import csi_pb2
+from controller.tests.controller_server.csi_controller_server_test import ProtoMock
 
 
 class TestUtils(unittest.TestCase):
@@ -73,20 +74,20 @@ class TestUtils(unittest.TestCase):
 
     def test_validate_create_volume_source_empty(self):
         request = Mock()
-        source = MagicMock(spec=[])
+        source = ProtoMock(spec=[])
         request.volume_content_source = source
         utils.validate_create_volume_source(request)
 
     def test_validate_create_volume_source_snapshot(self):
         request = Mock()
-        snapshot_source = MagicMock(spec=["snapshot"])
+        snapshot_source = ProtoMock(spec=["snapshot"])
         request.volume_content_source = snapshot_source
         snapshot_source.snapshot.snapshot_id = "A9000:snap_id"
         utils.validate_create_volume_source(request)
 
     def test_validate_create_volume_source_volume(self):
         request = Mock()
-        volume_source = MagicMock(spec=["volume"])
+        volume_source = ProtoMock(spec=["volume"])
         request.volume_content_source = volume_source
         volume_source.volume.volume_id = "A9000:vol_id"
         utils.validate_create_volume_source(request)
