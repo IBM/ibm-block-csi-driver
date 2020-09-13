@@ -261,12 +261,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def is_volume_has_snapshots(self, volume_id):
         volume_name = self._get_volume_name_by_wwn(volume_id)
-        fcmaps = self._get_fcmaps(volume_name, ENDPOINT_TYPE_SOURCE)
+        fcmaps = self._get_fcmaps_as_source_if_exists(volume_name)
         for fcmap in fcmaps:
             if fcmap.copy_rate == 0:
                 return True
         return False
-
 
     def validate_supported_capabilities(self, capabilities):
         logger.debug("validate_supported_capabilities for "
