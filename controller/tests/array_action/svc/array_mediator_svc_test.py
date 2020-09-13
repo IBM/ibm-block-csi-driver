@@ -273,7 +273,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.get_object_by_id("snap_id", "snapshot")
 
-        self.svc.client.svcinfo.lsvdisk.assert_called_once_with(filtervalue="vdisk_UID=snap_id")
+        self.svc.client.svcinfo.lsvdisk.assert_called_once_with(bytes=True, filtervalue="vdisk_UID=snap_id")
 
     def _prepare_mocks_for_create_snapshot(self):
         self.svc.client.svctask.mkvolume.return_value = Mock()
