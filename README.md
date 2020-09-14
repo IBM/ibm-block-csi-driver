@@ -186,7 +186,7 @@ $ kubectl -n <namespace> apply -f ibm-block-csi-operator.yaml
 ```bash
 $ kubectl get pod -l app.kubernetes.io/name=ibm-block-csi-operator -n <namespace>
 NAME                                    READY   STATUS    RESTARTS   AGE
-ibm-block-csi-operator-5bb7996b86-xntss 2/2     Running   0          10m
+ibm-block-csi-operator-5bb7996b86-xntss 1/1     Running   0          10m
 ```
 
 ### Create an IBMBlockCSI custom resource
