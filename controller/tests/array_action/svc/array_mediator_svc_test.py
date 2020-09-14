@@ -28,8 +28,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsnode.return_value = [node]
         port = Munch({'node_id': '1', 'IP_address': '1.1.1.1', 'IP_address_6': None})
         self.svc.client.svcinfo.lsportip.return_value = [port]
-        fcmaps = [Munch({'source_vdisk_name': 'source_name', 'id': 'test_fc_id', 'copy_rate': "0"})]
-        self.svc.client.svcinfo.lsfcmap.return_value = Mock(as_list=fcmaps)
+        self.fcmaps = [Munch({'source_vdisk_name': 'source_name', 'id': 'test_fc_id', 'copy_rate': "0"})]
+        self.svc.client.svcinfo.lsfcmap.return_value = Mock(as_list=self.fcmaps)
 
     @patch(
         "controller.array_action.array_mediator_svc.SVCArrayMediator._connect")
@@ -181,6 +181,25 @@ class TestArrayMediatorSVC(unittest.TestCase):
             CLIFailureError("Failed")]
         with self.assertRaises(CLIFailureError):
             self.svc.delete_volume("vol")
+
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def test_delete_volume_have_snapshot_fcmaps_not_removed(self, mock_warning):
+        mock_warning.return_value = False
+        fcmaps = self.fcmaps.copy()  # copy_rate = "0"
+        self.fcmaps.clear()
+        self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=[]), Mock(as_list=fcmaps)]
+        self.svc.delete_volume("vol")
+        self.svc.client.svctask.rmfcmap.assert_not_called()
+
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def test_delete_volume_have_clone_fcmaps_removed(self, mock_warning):
+        mock_warning.return_value = False
+        fcmaps = self.fcmaps.copy()
+        self.fcmaps.clear()
+        fcmaps[0].copy_rate = "non_zero_value"
+        self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=[]), Mock(as_list=fcmaps)]
+        self.svc.delete_volume("vol")
+        self.svc.client.svctask.rmfcmap.assert_called_once()
 
     def test_delete_volume_success(self):
         self.svc.client.svctask.rmvolume = Mock()
