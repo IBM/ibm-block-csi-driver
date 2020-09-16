@@ -4,14 +4,13 @@ from pyxcli import errors as xcli_errors
 from pyxcli.client import XCLIClient
 
 import controller.array_action.errors as controller_errors
-import controller.array_action.messages as controller_error_messages
 from controller.array_action.array_action_types import Volume, Snapshot
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.utils import classproperty
+from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.utils import string_to_array
-from controller.common import settings
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -131,7 +130,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                         is_ready=True,
                         array_type=self.array_type)
 
-    def get_volume(self, volume_name, volume_context=None, volume_prefix=""):
+    def get_volume(self, volume_name, pool_id=None):
         logger.debug("Get volume : {}".format(volume_name))
         try:
             cli_volume = self.client.cmd.vol_list(vol=volume_name).as_single_element
@@ -175,7 +174,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def _convert_size_bytes_to_blocks(self, size_in_bytes):
         return int(size_in_bytes / self.BLOCK_SIZE_IN_BYTES)
 
-    def create_volume(self, name, size_in_bytes, capabilities, pool, volume_prefix=""):
+    def create_volume(self, name, size_in_bytes, capabilities, pool):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with capabilities : {}".format(
             name, size_in_bytes, pool, capabilities))
 
@@ -200,7 +199,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
     def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
-                                              min_vol_size_in_bytes, pool=None):
+                                              min_vol_size_in_bytes, pool_id=None):
         logger.debug(
             "Copy snapshot {0} data to volume {1}. Snapshot capacity {2}. Minimal requested volume capacity {3}".format(
                 name, src_snap_name, src_snap_capacity_in_bytes, min_vol_size_in_bytes))
@@ -252,7 +251,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
-    def get_snapshot(self, snapshot_name, volume_context=None):
+    def get_snapshot(self, snapshot_name, pool_id=None):
         logger.debug("Get snapshot : {}".format(snapshot_name))
         try:
             cli_snapshot = self.client.cmd.vol_list(vol=snapshot_name).as_single_element
@@ -278,7 +277,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.SnapshotIdBelongsToVolumeError(snapshot_id, self.endpoint)
         return self._generate_snapshot_response(cli_snapshot)
 
-    def create_snapshot(self, name, volume_name, volume_context=None):
+    def create_snapshot(self, name, volume_name, pool_id=None):
         logger.info("creating snapshot {0} from volume {1}".format(name, volume_name))
 
         try:
@@ -362,7 +361,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.HostNotFoundError(host_name)
 
-        luns_in_use = set([host_mapping.lun for host_mapping in host_mapping_list])
+        luns_in_use = set([int(host_mapping.lun) for host_mapping in host_mapping_list])
         logger.debug("luns in use : {0}".format(luns_in_use))
 
         # try to use random lun number just in case there are many calls at the same time to reduce re-tries

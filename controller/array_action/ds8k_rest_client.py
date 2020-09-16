@@ -1,7 +1,8 @@
 from pyds8k.client.ds8k.v1.client import Client
 from pyds8k.exceptions import NotFound
+
 from controller.common.csi_logger import get_stdout_logger
-from munch import Munch
+
 logger = get_stdout_logger()
 
 

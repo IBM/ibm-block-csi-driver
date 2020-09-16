@@ -1,10 +1,10 @@
 import os.path
 import time
+from concurrent import futures
 from optparse import OptionParser
 
 import grpc
 import yaml
-from concurrent import futures
 from retry import retry
 
 import controller.array_action.errors as controller_errors
@@ -84,7 +84,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.debug(array_mediator)
                 # TODO: CSI-1358 - remove try/except
                 try:
-                    volume_full_name, volume_prefix = self._get_volume_name_and_prefix(request, array_mediator)
+                    volume_final_name = self._get_volume_final_name(request, array_mediator)
                 except controller_errors.IllegalObjectName as ex:
                     context.set_details(ex.message)
                     context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
@@ -98,16 +98,15 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         size))
                 try:
                     vol = array_mediator.get_volume(
-                        volume_full_name,
-                        volume_context=request.parameters,
-                        volume_prefix=volume_prefix,
+                        volume_final_name,
+                        pool_id=pool,
                     )
                 except controller_errors.VolumeNotFoundError:
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
                     array_mediator.validate_supported_capabilities(capabilities)
-                    vol = array_mediator.create_volume(volume_full_name, size, capabilities, pool, volume_prefix)
+                    vol = array_mediator.create_volume(volume_final_name, size, capabilities, pool)
                 else:
                     logger.debug("volume found : {}".format(vol))
 
@@ -129,10 +128,15 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 return res
 
         except (controller_errors.IllegalObjectName, controller_errors.StorageClassCapabilityNotSupported,
-                controller_errors.PoolDoesNotExist, controller_errors.PoolDoesNotMatchCapabilities) as ex:
+                controller_errors.PoolDoesNotExist, controller_errors.PoolDoesNotMatchCapabilities,
+                controller_errors.PoolParameterIsMissing) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            return csi_pb2.CreateVolumeResponse()
+        except controller_errors.SnapshotNotFoundError as ex:
+            context.set_code(grpc.StatusCode.NOT_FOUND)
+            context.set_details(ex)
             return csi_pb2.CreateVolumeResponse()
         except controller_errors.PermissionDeniedError as ex:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
@@ -196,7 +200,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.debug(
                 "Volume {0} exists and it is a copy of snapshot {1}.".format(vol_name, src_snapshot_id))
             context.set_code(grpc.StatusCode.OK)
-            return csi_pb2.CreateVolumeResponse()
+            return utils.generate_csi_create_volume_response(volume)
         else:
             logger.debug(
                 "Volume {0} exists but it is not a copy of snapshot {1}.".format(vol_name, src_snapshot_id))
@@ -407,6 +411,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateSnapshotResponse()
 
+        pool = request.parameters.get(config.PARAMETERS_POOL)
         source_volume_id = request.source_volume_id
         logger.info("Snapshot base name : {}. Source volume id : {}".format(request.name, source_volume_id))
         secrets = request.secrets
@@ -418,39 +423,45 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.debug(array_mediator)
                 # TODO: CSI-1358 - remove try/except
                 try:
-                    snapshot_name = self._get_snapshot_name(request, array_mediator)
+                    snapshot_final_name = self._get_snapshot_final_name(request, array_mediator)
                 except controller_errors.IllegalObjectName as ex:
                     context.set_details(ex.message)
                     context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
                     return csi_pb2.CreateSnapshotResponse()
 
                 volume_name = array_mediator.get_volume_name(vol_id)
-                logger.info("Snapshot name : {}. Volume name : {}".format(snapshot_name, volume_name))
+                logger.info("Snapshot name : {}. Volume name : {}".format(snapshot_final_name, volume_name))
                 snapshot = array_mediator.get_snapshot(
-                    snapshot_name,
-                    volume_context=request.parameters
+                    snapshot_final_name,
+                    pool_id=pool
                 )
 
                 if snapshot:
                     if snapshot.volume_name != volume_name:
                         context.set_details(
-                            messages.SnapshotWrongVolumeError_message.format(snapshot_name, snapshot.volume_name,
+                            messages.SnapshotWrongVolumeError_message.format(snapshot_final_name, snapshot.volume_name,
                                                                              volume_name))
                         context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                         return csi_pb2.CreateSnapshotResponse()
                 else:
                     logger.debug(
-                        "Snapshot doesn't exist. Creating a new snapshot {0} from volume {1}".format(snapshot_name,
-                                                                                                     volume_name))
-                    snapshot = array_mediator.create_snapshot(snapshot_name, volume_name, request.parameters)
+                        "Snapshot doesn't exist. Creating a new snapshot {0} from volume {1}".format(
+                            snapshot_final_name,
+                            volume_name))
+                    snapshot = array_mediator.create_snapshot(snapshot_final_name, volume_name, pool)
 
                 logger.debug("generating create snapshot response")
                 res = utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
                 logger.info("finished create snapshot")
                 return res
-        except (controller_errors.IllegalObjectName, controller_errors.VolumeNotFoundError) as ex:
+        except (controller_errors.IllegalObjectName,
+                controller_errors.PoolParameterIsMissing) as ex:
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            return csi_pb2.CreateSnapshotResponse()
+        except controller_errors.VolumeNotFoundError as ex:
+            context.set_code(grpc.StatusCode.NOT_FOUND)
+            context.set_details(ex)
             return csi_pb2.CreateSnapshotResponse()
         except controller_errors.PermissionDeniedError as ex:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
@@ -563,21 +574,21 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.info("finished GetPluginInfo")
         return csi_pb2.GetPluginInfoResponse(name=name, vendor_version=version)
 
-    def _get_volume_name_and_prefix(self, request, array_mediator):
-        return self._get_object_name_and_prefix(request, array_mediator.max_volume_prefix_length,
-                                                array_mediator.max_volume_name_length,
-                                                config.OBJECT_TYPE_NAME_VOLUME,
-                                                config.PARAMETERS_VOLUME_NAME_PREFIX)
+    def _get_volume_final_name(self, request, array_mediator):
+        return self._get_object_final_name(request, array_mediator.max_volume_prefix_length,
+                                           array_mediator.max_volume_name_length,
+                                           config.OBJECT_TYPE_NAME_VOLUME,
+                                           config.PARAMETERS_VOLUME_NAME_PREFIX)
 
-    def _get_snapshot_name(self, request, array_mediator):
-        name, _ = self._get_object_name_and_prefix(request, array_mediator.max_snapshot_prefix_length,
-                                                   array_mediator.max_snapshot_name_length,
-                                                   config.OBJECT_TYPE_NAME_SNAPSHOT,
-                                                   config.PARAMETERS_SNAPSHOT_NAME_PREFIX)
+    def _get_snapshot_final_name(self, request, array_mediator):
+        name = self._get_object_final_name(request, array_mediator.max_snapshot_prefix_length,
+                                           array_mediator.max_snapshot_name_length,
+                                           config.OBJECT_TYPE_NAME_SNAPSHOT,
+                                           config.PARAMETERS_SNAPSHOT_NAME_PREFIX)
         return name
 
-    def _get_object_name_and_prefix(self, request, max_name_prefix_length, max_name_length, object_type,
-                                    prefix_param_name):
+    def _get_object_final_name(self, request, max_name_prefix_length, max_name_length, object_type,
+                               prefix_param_name):
         full_name = name = request.name
         prefix = ""
         if request.parameters and (prefix_param_name in request.parameters):
@@ -594,7 +605,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         if len(full_name) > max_name_length:
             hashed_name = utils.hash_string(name)
             full_name = self._join_object_prefix_with_name(prefix, hashed_name)
-        return full_name[:max_name_length], prefix
+        return full_name[:max_name_length]
 
     def _join_object_prefix_with_name(self, prefix, name):
         if prefix:

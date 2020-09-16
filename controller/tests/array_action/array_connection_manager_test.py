@@ -1,11 +1,13 @@
 import unittest
+
+from mock import patch
+
 import controller.array_action.array_connection_manager as array_connection_manager
 from controller.array_action.array_connection_manager import ArrayConnectionManager, NoConnectionAvailableException
-from mock import patch
-from controller.array_action.errors import FailedToFindStorageSystemType
-from controller.array_action.array_mediator_xiv import XIVArrayMediator
-from controller.array_action.array_mediator_svc import SVCArrayMediator
 from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
+from controller.array_action.array_mediator_svc import SVCArrayMediator
+from controller.array_action.array_mediator_xiv import XIVArrayMediator
+from controller.array_action.errors import FailedToFindStorageSystemType
 
 
 class TestWithFunctionality(unittest.TestCase):

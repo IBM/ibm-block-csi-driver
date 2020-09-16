@@ -99,6 +99,12 @@ class PoolDoesNotExist(BaseArrayActionException):
         self.message = messages.PoolDoesNotExist_message.format(pool, array)
 
 
+class PoolParameterIsMissing(BaseArrayActionException):
+
+    def __init__(self, array_type):
+        self.message = messages.PoolParameterIsMissing.format(array_type)
+
+
 class FailedToFindStorageSystemType(BaseArrayActionException):
 
     def __init__(self, endpoint):

@@ -5,3 +5,10 @@ NodeGetCapabilities
 NodeGetInfo
 CreateSnapshot
 DeleteSnapshot
+NodePublishVolume
+NodeUnpublishVolume
+NodeStageVolume
+NodeUnstageVolume
+GetPluginCapabilities
+GetPluginInfo
+Probe
