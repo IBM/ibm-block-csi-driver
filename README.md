@@ -4,10 +4,10 @@ The Container Storage Interface (CSI) Driver for IBM block storage systems enabl
 This is the official operator to deploy and manage IBM block storage CSI driver.
 
 Supported container platforms:
-  - OpenShift v4.3
   - OpenShift v4.4
-  - Kubernetes v1.16
+  - OpenShift v4.5
   - Kubernetes v1.17
+  - Kubernetes v1.18
 
 Supported IBM storage systems:
   - IBM Spectrum Virtualize Family (including IBM Flash family members built with IBM Spectrum Virtualize (FlashSystem 5010, 5030, 5100, 7200, 9100, 9200, 9200R) and IBM SAN Volume Controller (SVC) models SV2, SA2)
