@@ -7,28 +7,28 @@ pipeline {
         label  "${env.AGENT_LABEL}"
     }
     stages {
-        stage ('CSI-controller: static code analysis') {
-            steps {
-                sh './scripts/run_static_code_analysis.sh'
-            }
-        }
-        stage ('CSI-controller: Unit testing + coverage') {
-            steps {
-                sh 'mkdir -p build/reports && chmod 777 build/reports'
-                sh './scripts/run_unitests.sh `pwd`/build/reports'
-            }
-        }
-        stage ('CSI-node: go local tests') {
-            steps {
-                sh 'mkdir -p build/reports && chmod 777 build/reports'
-                sh 'make test-xunit-in-container'
-            }
-        }
-        stage ('CSI-deployment: k8s yamls validation') {
-            steps {
-                sh './scripts/run_yamlcheck.sh'
-            }
-        }
+        //stage ('CSI-controller: static code analysis') {
+        //    steps {
+        //        sh './scripts/run_static_code_analysis.sh'
+        //    }
+        //}
+        //stage ('CSI-controller: Unit testing + coverage') {
+        //    steps {
+        //        sh 'mkdir -p build/reports && chmod 777 build/reports'
+        //        sh './scripts/run_unitests.sh `pwd`/build/reports'
+        //    }
+        //}
+        //stage ('CSI-node: go local tests') {
+        //    steps {
+        //        sh 'mkdir -p build/reports && chmod 777 build/reports'
+        //        sh 'make test-xunit-in-container'
+        //    }
+        //}
+        //stage ('CSI-deployment: k8s yamls validation') {
+        //    steps {
+        //        sh './scripts/run_yamlcheck.sh'
+        //    }
+        //}
         stage ('Pre-build actions') {
             steps { 
                 script {
