@@ -620,7 +620,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
                                                                                         copy_src_object_id=vol_src_id)
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
+        self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
