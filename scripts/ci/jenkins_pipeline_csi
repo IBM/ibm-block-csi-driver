@@ -2,7 +2,7 @@ pipeline {
     environment {
         registryCredential = 'MatanStgArtifactory'
         artifactory_path = 'build/reports/images_url'
-		registryUrl = 'https://stg-artifactory.haifa.ibm.com:5030'
+        registryUrl = 'https://stg-artifactory.haifa.ibm.com:5030'
     }
     agent {
         label  "${env.AGENT_LABEL}"
