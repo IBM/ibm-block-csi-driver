@@ -37,7 +37,7 @@ pipeline {
 					//sh "cat results.txt"
 					//sh "echo $branch"
 					def branch = "origin.DevOps.CSI-1762_make_GitHub_build_jobs_pass_artifactory_credentials"
-                    def specific_tag = "$IMAGE_VERSION_b$BUILD_NUMBER_$branch"
+                    def specific_tag = "${IMAGE_VERSION}_b${BUILD_NUMBER}_${branch}"
 					sh "echo $specific_tag"
                 }
             }
