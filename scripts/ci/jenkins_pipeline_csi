@@ -2,6 +2,7 @@ pipeline {
     environment {
         registryCredential = 'MatanDockerHub'
         artifactory_path = 'build/reports/images_url'
+		registryUrl = 'https://hub.docker.com'
     }
     agent {
         label  "${env.AGENT_LABEL}"
@@ -50,14 +51,14 @@ pipeline {
             steps {
                 script {
                     if (GIT_BRANCH == 'develop' || 'origin/develop' || 'master') {
-                        docker.withRegistry( '', registryCredential ) {
+                        docker.withRegistry($registryUrl, registryCredential ) {
                             controller_image.push("${specific_tag}")
                             controller_image.push("latest")
                             node_image.push("${specific_tag}")
                             node_image.push("latest")
                         }
                     } else {
-                        docker.withRegistry( '', registryCredential ) {
+                        docker.withRegistry($registryUrl, registryCredential ) {
                             controller_image.push("${specific_tag}")
                             node_image.push("${specific_tag}")
 						}
