@@ -60,7 +60,8 @@ pipeline {
                         docker.withRegistry( '', registryCredential ) {
                             controller_image.push("$specific_tag")
                             node_image.push("$specific_tag")
-                    }
+						}
+					}
                 }
             }
         }
