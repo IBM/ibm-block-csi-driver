@@ -42,7 +42,6 @@ pipeline {
         stage ('Build docker images') {
             steps {
                 script {
-<<<<<<< HEAD
                     if (GIT_BRANCH == 'develop' || GIT_BRANCH == 'origin/develop' || GIT_BRANCH == 'master') {
                         controller_image_latest = docker.build("${DOCKER_REGISTRY}/${CSI_CONTROLLER_IMAGE}", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER} -f Dockerfile-csi-controller .")
                         controller_image_with_generated_tag = docker.build("${DOCKER_REGISTRY}/${CSI_CONTROLLER_IMAGE}:${specific_tag}", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER} -f Dockerfile-csi-controller .")
@@ -52,12 +51,6 @@ pipeline {
                         controller_image_with_generated_tag = docker.build("${DOCKER_REGISTRY}/${CSI_CONTROLLER_IMAGE}:$specific_tag", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER} -f Dockerfile-csi-controller .")
                         node_image_with_generated_tag = docker.build("${DOCKER_REGISTRY}/${CSI_NODE_IMAGE}:$specific_tag", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER} -f Dockerfile-csi-node .")
 					}
-=======
-		   controller_image = docker.build("${DOCKER_REGISTRY}/${CSI_CONTROLLER_IMAGE}", "-f Dockerfile-csi-controller .")
-		   node_image = docker.build("${DOCKER_REGISTRY}/${CSI_NODE_IMAGE}", "-f Dockerfile-csi-node .")
-                    //controller_image = docker.build("${DOCKER_REGISTRY}/${CSI_CONTROLLER_IMAGE}", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER}", "-f Dockerfile-csi-controller .")
-                    //node_image = docker.build("${DOCKER_REGISTRY}/${CSI_NODE_IMAGE}", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER}", "-f Dockerfile-csi-node .")
->>>>>>> c01551061504631a9952a6f233c939d58e0f9160
                 }
             }
         }
