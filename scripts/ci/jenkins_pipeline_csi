@@ -33,7 +33,7 @@ pipeline {
             steps { 
                 script {
                     // not sure if docker accept / in the version
-                    def branch = sh(script:'echo $GIT_BRANCH | sed "s|/|.|g"',returnStdout:true).trim()
+                    def branch = sh(script:"echo $GIT_BRANCH | sed 's|/|.|g'",returnStdout:true).trim()
 		    sh "echo $branch"
                     def specific_tag = "$IMAGE_VERSION_b$BUILD_NUMBER_$branch"
 		    sh "echo $specific_tag"
