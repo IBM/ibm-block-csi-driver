@@ -33,20 +33,16 @@ pipeline {
             steps { 
                 script {
                     // not sure if docker accept / in the version
-                    //def branch = sh(script:"echo $GIT_BRANCH | sed 's|/|.|g' > results.txt",returnStdout:true).trim()
-					//sh "cat results.txt"
-					//sh "echo $branch"
-					def branch = "origin.DevOps.CSI-1762_make_GitHub_build_jobs_pass_artifactory_credentials"
+                    def branch = sh(script:"echo $GIT_BRANCH | sed 's|/|.|g' > results.txt",returnStdout:true).trim()
                     def specific_tag = "${IMAGE_VERSION}_b${BUILD_NUMBER}_${branch}"
-					sh "echo $specific_tag"
                 }
             }
         }
         stage ('Build docker images') {
             steps {
                 script {
-                    controller_image = docker.build("$DOCKER_REGISTRY/$CSI_CONTROLLER_IMAGE", "--build-arg VERSION=$IMAGE_VERSION --build-arg BUILD_NUMBER=$BUILD_NUMBER", "-f Dockerfile-csi-controller .")
-                    node_image = docker.build("$DOCKER_REGISTRY/$CSI_NODE_IMAGE", "--build-arg VERSION=$IMAGE_VERSION --build-arg BUILD_NUMBER=$BUILD_NUMBER", "-f Dockerfile-csi-node .")
+                    controller_image = docker.build("${DOCKER_REGISTRY}/${CSI_CONTROLLER_IMAGE}", "--build-arg VERSION=$IMAGE_VERSION --build-arg BUILD_NUMBER=${BUILD_NUMBER}", "-f Dockerfile-csi-controller .")
+                    node_image = docker.build("${DOCKER_REGISTRY}/${CSI_NODE_IMAGE}", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER}", "-f Dockerfile-csi-node .")
                 }
             }
         }
@@ -55,15 +51,15 @@ pipeline {
                 script {
                     if (GIT_BRANCH == 'develop' || 'origin/develop' || 'master') {
                         docker.withRegistry( '', registryCredential ) {
-                            controller_image.push("$specific_tag")
+                            controller_image.push("${specific_tag}")
                             controller_image.push("latest")
-                            node_image.push("$specific_tag")
+                            node_image.push("${specific_tag}")
                             node_image.push("latest")
                         }
                     } else {
                         docker.withRegistry( '', registryCredential ) {
-                            controller_image.push("$specific_tag")
-                            node_image.push("$specific_tag")
+                            controller_image.push("${specific_tag}")
+                            node_image.push("${specific_tag}")
 						}
 					}
                 }
@@ -71,7 +67,7 @@ pipeline {
         }
         stage ('Save Artifactes') {
             steps {
-                sh 'printf "$DOCKER_REGISTRY/$CSI_CONTROLLER_IMAGE\n$DOCKER_REGISTRY/$CSI_NODE_IMAGE\n" > $artifactory_path'
+                sh 'printf "${DOCKER_REGISTRY}/${CSI_CONTROLLER_IMAGE}\n${DOCKER_REGISTRY}/${CSI_NODE_IMAGE}\n" > ${artifactory_path}'
             }
         }
         //stage ('CSI-controller & node: Build and push images') {
