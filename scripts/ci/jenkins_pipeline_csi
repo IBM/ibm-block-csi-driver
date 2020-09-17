@@ -68,8 +68,8 @@ pipeline {
                         docker.withRegistry('$registryUrl', registryCredential ) {
                             controller_image_with_generated_tag.push()
                             node_image_with_generated_tag.push()
-						}
-					}
+			}
+		    }
                 }
             }
         }
