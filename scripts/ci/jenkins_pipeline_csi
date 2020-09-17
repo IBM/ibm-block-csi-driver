@@ -1,6 +1,6 @@
 pipeline {
     environment {
-        registryCredential = 'REGISTRYCREDENTIAL'
+        registryCredential = 'MatanDockerHub'
         artifactory_path = 'build/reports/images_url'
     }
     agent {
