@@ -3,6 +3,8 @@ pipeline {
         registryCredential = 'MatanStgArtifactory'
         artifactory_path = 'build/reports/images_url'
         registryUrl = 'https://stg-artifactory.haifa.ibm.com:5030'
+        Dockerfile_controller = 'Dockerfile-csi-controller'
+        Dockerfile_node = 'Dockerfile-csi-node'
     }
     agent {
         label  "${env.AGENT_LABEL}"
@@ -43,13 +45,13 @@ pipeline {
             steps {
                 script {
                     if (GIT_BRANCH == 'develop' || GIT_BRANCH == 'origin/develop' || GIT_BRANCH == 'master') {
-                        controller_image_latest = docker.build("${CSI_CONTROLLER_IMAGE}", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER} -f Dockerfile-csi-controller .")
-                        controller_image_with_generated_tag = docker.build("${DOCKER_REGISTRY}/${CSI_CONTROLLER_IMAGE}:${specific_tag}", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER} -f Dockerfile-csi-controller .")
-                        node_image_latest = docker.build("${DOCKER_REGISTRY}/${CSI_NODE_IMAGE}", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER} -f Dockerfile-csi-node .")
-                        node_image_with_generated_tag = docker.build("${DOCKER_REGISTRY}/${CSI_NODE_IMAGE}:${specific_tag}", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER} -f Dockerfile-csi-node .")
+                        controller_image_latest = docker.build("${CSI_CONTROLLER_IMAGE}", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER} -f ${Dockerfile_controller} .")
+                        controller_image_with_generated_tag = docker.build("${DOCKER_REGISTRY}/${CSI_CONTROLLER_IMAGE}:${specific_tag}", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER} -f ${Dockerfile_controller} .")
+                        node_image_latest = docker.build("${DOCKER_REGISTRY}/${CSI_NODE_IMAGE}", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER} -f ${Dockerfile_node} .")
+                        node_image_with_generated_tag = docker.build("${DOCKER_REGISTRY}/${CSI_NODE_IMAGE}:${specific_tag}", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER} -f ${Dockerfile_node} .")
                     } else {
-                        controller_image_with_generated_tag = docker.build("${DOCKER_REGISTRY}/${CSI_CONTROLLER_IMAGE}:$specific_tag", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER} -f Dockerfile-csi-controller .")
-                        node_image_with_generated_tag = docker.build("${DOCKER_REGISTRY}/${CSI_NODE_IMAGE}:$specific_tag", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER} -f Dockerfile-csi-node .")
+                        controller_image_with_generated_tag = docker.build("${DOCKER_REGISTRY}/${CSI_CONTROLLER_IMAGE}:$specific_tag", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER} -f ${Dockerfile_controller} .")
+                        node_image_with_generated_tag = docker.build("${DOCKER_REGISTRY}/${CSI_NODE_IMAGE}:$specific_tag", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER} -f ${Dockerfile_node} .")
                     }
                 }
             }
