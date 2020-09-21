@@ -282,16 +282,16 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except exceptions.NotFound:
             raise controller_errors.ObjectNotFoundError(volume_id)
 
-    def copy_to_existing_volume_from_object(self, name, src_snap_name, src_snap_capacity_in_bytes,
+    def copy_to_existing_volume_from_object(self, name, src_obj_name, src_obj_capacity_in_bytes,
                                             min_vol_size_in_bytes, source_type, pool_id=None):
         api_new_volume = self._get_api_volume_by_name(name, pool_id=pool_id)
         if source_type == controller_config.VOLUME_SOURCE_SNAPSHOT:
-            api_source_object = self._get_api_snapshot(src_snap_name, pool_id=pool_id)
+            api_source_object = self._get_api_snapshot(src_obj_name, pool_id=pool_id)
         elif source_type == controller_config.VOLUME_SOURCE_VOLUME:
-            api_source_object = self._get_api_volume_by_name(src_snap_name, pool_id=pool_id)
-        if min_vol_size_in_bytes < src_snap_capacity_in_bytes:
+            api_source_object = self._get_api_volume_by_name(src_obj_name, pool_id=pool_id)
+        if min_vol_size_in_bytes < src_obj_capacity_in_bytes:
             self._extend_volume(volume_id=api_new_volume.id,
-                                new_size_in_bytes=src_snap_capacity_in_bytes)
+                                new_size_in_bytes=src_obj_capacity_in_bytes)
         options = [FLASHCOPY_PERSISTENT_OPTION]
         self._create_flashcopy(source_volume_id=api_source_object.id, target_volume_id=api_new_volume.id,
                                options=options)
