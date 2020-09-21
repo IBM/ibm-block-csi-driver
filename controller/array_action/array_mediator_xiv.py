@@ -199,17 +199,14 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
-    def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
-                                              min_vol_size_in_bytes, pool_id=None):
-        logger.debug(
-            "Copy snapshot {0} data to volume {1}. Snapshot capacity {2}. Minimal requested volume capacity {3}".format(
-                name, src_snap_name, src_snap_capacity_in_bytes, min_vol_size_in_bytes))
+    def copy_to_existing_volume_from_object(self, name, src_obj_name, src_obj_capacity_in_bytes,
+                                            min_vol_size_in_bytes, source_type, pool_id=None):
         try:
             logger.debug("Formatting volume {0}".format(name))
             self.client.cmd.vol_format(vol=name)
-            logger.debug("Copying Snapshot {0} data to volume {1}.".format(name, src_snap_name))
-            self.client.cmd.vol_copy(vol_src=src_snap_name, vol_trg=name)
-            if min_vol_size_in_bytes > src_snap_capacity_in_bytes:
+            logger.debug("Copying {0} {1} data to volume {2}.".format(source_type, name, src_obj_name))
+            self.client.cmd.vol_copy(vol_src=src_obj_name, vol_trg=name)
+            if min_vol_size_in_bytes > src_obj_capacity_in_bytes:
                 min_vol_size_in_blocks = self._convert_size_bytes_to_blocks(min_vol_size_in_bytes)
                 logger.debug(
                     "Increasing volume {0} size to {1} blocks.".format(name, min_vol_size_in_blocks))
@@ -219,7 +216,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.IllegalObjectName(ex.status)
         except xcli_errors.SourceVolumeBadNameError as ex:
             logger.exception(ex)
-            raise controller_errors.ObjectNotFoundError(src_snap_name)
+            raise controller_errors.ObjectNotFoundError(src_obj_name)
         except (xcli_errors.VolumeBadNameError, xcli_errors.TargetVolumeBadNameError) as ex:
             logger.exception(ex)
             raise controller_errors.ObjectNotFoundError(name)
@@ -227,9 +224,23 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
+    def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
+                                              min_vol_size_in_bytes, pool_id=None):
+        logger.debug(
+            "Copy snapshot {0} data to volume {1}. Snapshot capacity {2}. Minimal requested volume capacity {3}".format(
+                name, src_snap_name, src_snap_capacity_in_bytes, min_vol_size_in_bytes))
+        self.copy_to_existing_volume_from_object(name, src_snap_name, src_snap_capacity_in_bytes,
+                                                 min_vol_size_in_bytes, controller_config.VOLUME_SOURCE_SNAPSHOT,
+                                                 pool_id)
+
     def copy_to_existing_volume_from_volume(self, name, src_vol_name, src_vol_capacity_in_bytes,
                                             min_vol_size_in_bytes, pool_id=None):
-        pass
+        logger.debug(
+            "Copy volume {0} data to volume {1}. Volume capacity {2}. Minimal requested volume capacity {3}".format(
+                name, src_vol_name, src_vol_capacity_in_bytes, min_vol_size_in_bytes))
+        self.copy_to_existing_volume_from_object(name, src_vol_name, src_vol_capacity_in_bytes,
+                                                 min_vol_size_in_bytes, controller_config.VOLUME_SOURCE_VOLUME,
+                                                 pool_id)
 
     def _get_vol_by_wwn(self, volume_id):
         vol_by_wwn = self.client.cmd.vol_list(wwn=volume_id).as_single_element
