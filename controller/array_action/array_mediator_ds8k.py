@@ -67,9 +67,9 @@ def try_convert_first_arg(converter, args):
 def is_snapshot(api_volume):
     flashcopies = api_volume.flashcopy
     for flashcopy in flashcopies:
-        if flashcopy.targetvolume == api_volume.id:
-            return True
-    return False
+        if flashcopy.targetvolume == api_volume.id and flashcopy.backgroundcopy == "disabled":
+            return flashcopy
+    return None
 
 
 @decorator
@@ -78,7 +78,7 @@ def convert_scsi_id_to_array_id(mediator_method, self, *args):
     return mediator_method(self, *args)
 
 
-def get_source_snapshot_flashcopy(api_volume):
+def get_source_object_flashcopy(api_volume):
     flashcopies = [flashcopy for flashcopy in api_volume.flashcopy
                    if flashcopy.targetvolume == api_volume.id]
     if len(flashcopies) != 1:
@@ -193,7 +193,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return '6{}000000000000{}'.format(self.wwnn[1:], volume_id)
 
     def _generate_volume_response(self, api_volume):
-        source_flashcopy = get_source_snapshot_flashcopy(api_volume)
+        source_flashcopy = get_source_object_flashcopy(api_volume)
         source_volume_id = source_flashcopy.sourcevolume if source_flashcopy else None
         return Volume(
             vol_size_bytes=int(api_volume.cap),
@@ -282,23 +282,37 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except exceptions.NotFound:
             raise controller_errors.ObjectNotFoundError(volume_id)
 
+    def copy_to_existing_volume_from_object(self, name, src_snap_name, src_snap_capacity_in_bytes,
+                                            min_vol_size_in_bytes, source_type, pool_id=None):
+        api_new_volume = self._get_api_volume_by_name(name, pool_id=pool_id)
+        if source_type == controller_config.VOLUME_SOURCE_SNAPSHOT:
+            api_source_object = self._get_api_snapshot(src_snap_name, pool_id=pool_id)
+        elif source_type == controller_config.VOLUME_SOURCE_VOLUME:
+            api_source_object = self._get_api_volume_by_name(src_snap_name, pool_id=pool_id)
+        if min_vol_size_in_bytes < src_snap_capacity_in_bytes:
+            self._extend_volume(volume_id=api_new_volume.id,
+                                new_size_in_bytes=src_snap_capacity_in_bytes)
+        options = [FLASHCOPY_PERSISTENT_OPTION]
+        self._create_flashcopy(source_volume_id=api_source_object.id, target_volume_id=api_new_volume.id,
+                               options=options)
+
     def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
                                               min_vol_size_in_bytes, pool_id=None):
         logger.debug(
             "Copy snapshot {0} data to volume {1}. Snapshot capacity {2}. Minimal requested volume capacity {3}".format(
                 name, src_snap_name, src_snap_capacity_in_bytes, min_vol_size_in_bytes))
-        api_new_volume = self._get_api_volume_by_name(name, pool_id=pool_id)
-        api_snapshot = self._get_api_snapshot(src_snap_name, pool_id=pool_id)
-        if min_vol_size_in_bytes < src_snap_capacity_in_bytes:
-            self._extend_volume(volume_id=api_new_volume.id,
-                                new_size_in_bytes=src_snap_capacity_in_bytes)
-        options = [FLASHCOPY_PERSISTENT_OPTION]
-        self._create_flashcopy(source_volume_id=api_snapshot.id, target_volume_id=api_new_volume.id,
-                               options=options)
+        self.copy_to_existing_volume_from_object(name, src_snap_name, src_snap_capacity_in_bytes,
+                                                 min_vol_size_in_bytes, controller_config.VOLUME_SOURCE_SNAPSHOT,
+                                                 pool_id)
 
     def copy_to_existing_volume_from_volume(self, name, src_vol_name, src_vol_capacity_in_bytes,
                                             min_vol_size_in_bytes, pool_id=None):
-        pass
+        logger.debug(
+            "Copy volume {0} data to volume {1}. volume capacity {2}. Minimal requested volume capacity {3}".format(
+                name, src_vol_name, src_vol_capacity_in_bytes, min_vol_size_in_bytes))
+        self.copy_to_existing_volume_from_object(name, src_vol_name, src_vol_capacity_in_bytes,
+                                                 min_vol_size_in_bytes, controller_config.VOLUME_SOURCE_VOLUME,
+                                                 pool_id)
 
     def _delete_volume(self, volume_id, not_exist_err=True):
         logger.info("Deleting volume {}".format(volume_id))
@@ -325,7 +339,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.info("Deleting volume with id : {0}".format(volume_id))
         api_volume = self._get_api_volume_by_id(volume_id)
         for flashcopy in api_volume.flashcopy:
-            if flashcopy.targetvolume == volume_id:
+            if flashcopy.targetvolume == volume_id or flashcopy.backgroundcopy != "disabled":
                 self._delete_flashcopy(flashcopy.id)
         self._delete_volume(volume_id)
         logger.info("Finished deleting volume {}".format(volume_id))
@@ -485,9 +499,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         api_snapshot = self._get_api_snapshot(snapshot_name, pool_id)
         if api_snapshot is None:
             return None
-        flashcopy = get_source_snapshot_flashcopy(api_snapshot)
-        if flashcopy is None or flashcopy.backgroundcopy != "disabled":
-            raise controller_errors.SnapshotIdBelongsToVolumeError(api_snapshot.name, self.service_address)
+        flashcopy = get_source_object_flashcopy(api_snapshot)
         source_volume_name = self.get_volume_name(flashcopy.sourcevolume)
         return self._generate_snapshot_response(api_snapshot, source_volume_name)
 
@@ -546,9 +558,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     def _generate_snapshot_response_with_verification(self, api_object):
-        flashcopy = get_source_snapshot_flashcopy(api_object)
-        if flashcopy is None or flashcopy.backgroundcopy != "disabled":
-            raise controller_errors.SnapshotIdBelongsToVolumeError(api_object.name, self.service_address)
+        flashcopy = is_snapshot(api_object)
+        if not flashcopy:
+            raise controller_errors.SnapshotNameBelongsToVolumeError(api_object.name,
+                                                                     self.service_address)
         source_volume_name = self.get_volume_name(flashcopy.sourcevolume)
         return self._generate_snapshot_response(api_object, source_volume_name)
 

@@ -62,7 +62,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             {"sourcevolume": "0001",
              "targetvolume": "0002",
              "id": "0001:0002",
-             "state": "valid"
+             "state": "valid",
+             "backgroundcopy": "disabled"
              }
         )
 
@@ -193,12 +194,14 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             Munch({"sourcevolume": "0001",
                    "targetvolume": "0002",
                    "id": "0001:0002",
-                   "state": "valid"
+                   "state": "valid",
+                   "backgroundcopy": "disabled"
                    }),
             Munch({"sourcevolume": "0003",
                    "targetvolume": "0001",
                    "id": "0003:0001",
-                   "state": "valid"
+                   "state": "valid",
+                   "backgroundcopy": "inabled"
                    })]
         self.client_mock.delete_volume.side_effect = ClientException("500")
         with self.assertRaises(array_errors.VolumeDeletionError):
