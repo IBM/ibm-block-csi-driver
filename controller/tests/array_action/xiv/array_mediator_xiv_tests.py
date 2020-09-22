@@ -124,16 +124,12 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self._test_copy_to_existing_volume_from_snapshot_error(xcli_errors.IllegalNameForObjectError("", "", ""),
                                                                array_errors.IllegalObjectName)
 
-    def test_copy_to_existing_volume_from_snapshot_failed_volume_not_dound(self):
+    def test_copy_to_existing_volume_from_snapshot_failed_volume_not_found(self):
         self._test_copy_to_existing_volume_from_snapshot_error(xcli_errors.VolumeBadNameError("", "", ""),
                                                                array_errors.ObjectNotFoundError)
 
-    def test_copy_to_existing_volume_from_snapshot_failed_snapshot_not_fpund(self):
+    def test_copy_to_existing_volume_from_snapshot_failed_snapshot_not_found(self):
         self._test_copy_to_existing_volume_from_snapshot_error(xcli_errors.SourceVolumeBadNameError("", "", ""),
-                                                               array_errors.ObjectNotFoundError)
-
-    def test_copy_to_existing_volume_from_snapshot_failed_volume_not_fpund(self):
-        self._test_copy_to_existing_volume_from_snapshot_error(xcli_errors.TargetVolumeBadNameError("", "", ""),
                                                                array_errors.ObjectNotFoundError)
 
     def test_copy_to_existing_volume_from_snapshot_failed_permission_denied(self):
@@ -145,6 +141,11 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_copy.side_effect = [xcli_exception]
         with self.assertRaises(expected_array_exception):
             self.mediator.copy_to_existing_volume_from_snapshot("vol", "snap", 0, 0)
+
+    def test_copy_to_existing_volume_from_volume_failed_volume_not_found(self):
+        self.mediator.client.cmd.vol_copy.side_effect = [xcli_errors.SourceVolumeBadNameError("", "", "")]
+        with self.assertRaises(array_errors.ObjectNotFoundError):
+            self.mediator.copy_to_existing_volume_from_volume("vol", "snap", 0, 0)
 
     def test_delete_volume_return_volume_not_found(self):
         ret = Mock()
