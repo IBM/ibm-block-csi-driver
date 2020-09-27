@@ -30,7 +30,7 @@ import (
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/mount"
 )
 
 const (
@@ -57,6 +57,8 @@ type NodeUtilsInterface interface {
 	IsPathExists(filePath string) bool
 	IsDirectory(filePath string) bool
 	RemoveFileOrDirectory(filePath string) error
+	MakeDir(dirPath string) error
+	MakeFile(filePath string) error
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
 }
@@ -293,6 +295,27 @@ func (n NodeUtils) IsDirectory(path string) bool {
 // Deletes file or directory with all sub-directories and files
 func (n NodeUtils) RemoveFileOrDirectory(path string) error {
 	return os.RemoveAll(path)
+}
+
+func (n NodeUtils) MakeDir(dirPath string) error {
+	err := os.MkdirAll(dirPath, os.FileMode(0755))
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (n NodeUtils) MakeFile(filePath string) error {
+	f, err := os.OpenFile(filePath, os.O_CREATE, os.FileMode(0644))
+	defer f.Close()
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+	return nil
 }
 
 func (n NodeUtils) IsNotMountPoint(file string) (bool, error) {

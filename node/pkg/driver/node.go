@@ -26,7 +26,7 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/mount"
 	"os"
 	"path"
 	"path/filepath"
@@ -409,7 +409,7 @@ func (d *NodeService) mountFileSystemVolume(mpathDevice string, targetPath strin
 	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
 	if !isTargetPathExists {
 		logger.Debugf("Target path directory does not exist. Creating : {%v}", targetPathWithHostPrefix)
-		err := d.Mounter.MakeDir(targetPathWithHostPrefix)
+		err := d.NodeUtils.MakeDir(targetPathWithHostPrefix)
 		if err != nil {
 			return status.Errorf(codes.Internal, "Could not create directory %q: %v", targetPathWithHostPrefix, err)
 		}
@@ -425,14 +425,14 @@ func (d *NodeService) mountRawBlockVolume(mpathDevice string, targetPath string,
 	targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
 	if !d.NodeUtils.IsPathExists(targetPathParentDirWithHostPrefix) {
 		logger.Debugf("Target path parent directory does not exist. creating : {%v}", targetPathParentDirWithHostPrefix)
-		err := d.Mounter.MakeDir(targetPathParentDirWithHostPrefix)
+		err := d.NodeUtils.MakeDir(targetPathParentDirWithHostPrefix)
 		if err != nil {
 			return status.Errorf(codes.Internal, "Could not create directory %q: %v", targetPathParentDirWithHostPrefix, err)
 		}
 	}
 	if !isTargetPathExists {
 		logger.Debugf("Target path file does not exist. creating : {%v}", targetPathWithHostPrefix)
-		err := d.Mounter.MakeFile(targetPathWithHostPrefix)
+		err := d.NodeUtils.MakeFile(targetPathWithHostPrefix)
 		if err != nil {
 			return status.Errorf(codes.Internal, "Could not create file %q: %v", targetPathWithHostPrefix, err)
 		}
