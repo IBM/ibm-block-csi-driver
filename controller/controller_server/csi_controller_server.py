@@ -195,7 +195,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     @retry(Exception, tries=5, delay=1)
     def _rollback_create_volume_from_source(self, array_mediator, vol_id):
-        logger.debug("Rollback copy volume from snapshot. Deleting volume {0}".format(vol_id))
+        logger.debug("Rollback copy volume from source. Deleting volume {0}".format(vol_id))
         array_mediator.delete_volume(vol_id)
 
     def _handle_existing_vol_src(self, volume, src_object_id, source_type, context):
@@ -217,7 +217,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return None
         if vol_copy_src_object_id == src_object_id:
             logger.debug(
-                "Volume {0} exists and it is a copy of snapshot {1}.".format(vol_name, src_object_id))
+                "Volume {0} exists and it is a copy of {1} {2}.".format(vol_name, source_type, src_object_id))
             context.set_code(grpc.StatusCode.OK)
             return utils.generate_csi_create_volume_response(volume, source_type)
         else:
@@ -232,10 +232,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.info(source)
         res = None
         if source and source.HasField(source_type):
-            source_obj = getattr(source, source_type)
-            src_id_field = getattr(source_obj, config.VOLUME_SOURCE_ID[source_type])
-            logger.debug("src_id_field: {0}".format(src_id_field))
-            _, res = utils.get_object_id_info(src_id_field, source_type)
+            if source_type == config.VOLUME_SOURCE_SNAPSHOT:
+                source_id = source.snapshot.snapshot_id
+            elif source_type == config.VOLUME_SOURCE_VOLUME:
+                source_id = source.volume.volume_id
+            logger.debug("src_id_field: {0}".format(source_id))
+            _, res = utils.get_object_id_info(source_id, source_type)
         return res
 
     def DeleteVolume(self, request, context):

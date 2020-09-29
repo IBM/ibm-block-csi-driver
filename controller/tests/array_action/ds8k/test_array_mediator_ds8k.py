@@ -403,7 +403,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_get_snapshot_has_no_fcrel_raise_error(self):
         self.client_mock.get_volumes_by_pool.return_value = [self.volume_response]
         self.client_mock.get_flashcopies_by_volume.return_value = []
-        with self.assertRaises(array_errors.SnapshotNameBelongsToVolumeError):
+        with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.array.get_snapshot("test_name", pool_id=self.volume_response.pool)
 
     def _get_volume_with_flashcopy_relationship(self):
@@ -418,7 +418,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.get_volumes_by_pool.return_value = [target_vol]
         self.client_mock.get_flashcopies_by_volume.return_value = []
 
-        with self.assertRaises(array_errors.SnapshotNameBelongsToVolumeError):
+        with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.array.get_snapshot("test_name", pool_id=self.volume_response.pool)
 
     def test_get_snapshot_success(self):

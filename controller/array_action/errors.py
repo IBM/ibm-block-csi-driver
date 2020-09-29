@@ -183,16 +183,10 @@ class UnsupportedConnectivityTypeError(BaseArrayActionException):
         self.message = messages.UnsupportedConnectivityTypeError_message.format(connectivity_type)
 
 
-class SnapshotNameBelongsToVolumeError(BaseArrayActionException):
+class ExpectedSnapshotButFoundVolumeError(BaseArrayActionException):
 
-    def __init__(self, snapshot, array):
-        self.message = messages.SnapshotNameBelongsToVolumeError_message.format(snapshot, array)
-
-
-class SnapshotIdBelongsToVolumeError(BaseArrayActionException):
-
-    def __init__(self, snapshot, array):
-        self.message = messages.SnapshotIdBelongsToVolumeError_message.format(snapshot, array)
+    def __init__(self, id_or_name, array):
+        self.message = messages.ExpectedSnapshotButFoundVolumeError_message.format(id_or_name, array)
 
 
 class SnapshotAlreadyExists(BaseArrayActionException):
