@@ -68,6 +68,7 @@ const (
 type NodeMounter interface {
 	mount.Interface
 	FormatAndMount(source string, target string, fstype string, options []string) error
+	GetDiskFormat(disk string) (string, error)
 }
 
 // nodeService represents the node service of CSI driver
@@ -414,6 +415,16 @@ func (d *NodeService) mountFileSystemVolume(mpathDevice string, targetPath strin
 			return status.Errorf(codes.Internal, "Could not create directory %q: %v", targetPathWithHostPrefix, err)
 		}
 	}
+
+	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
+	if err != nil {
+		logger.Errorf("Could not determine if disk {%v} is formatted, error: %v", mpathDevice, err)
+		return err
+	}
+	if existingFormat == "" {
+		d.NodeUtils.FormatDevice(mpathDevice, fsType)
+	}
+
 	logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
 	return d.Mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 }

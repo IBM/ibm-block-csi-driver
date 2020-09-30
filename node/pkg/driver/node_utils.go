@@ -27,6 +27,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
@@ -38,6 +39,7 @@ const (
 	// Command lines inside the container will show /host prefix.
 	PrefixChrootOfHostRoot  = "/host"
 	PublishContextSeparator = ","
+	mkfsTimeout             = 15 * time.Minute
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
@@ -59,6 +61,7 @@ type NodeUtilsInterface interface {
 	RemoveFileOrDirectory(filePath string) error
 	MakeDir(dirPath string) error
 	MakeFile(filePath string) error
+	FormatDevice(devicePath string, fsType string)
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
 }
@@ -316,6 +319,21 @@ func (n NodeUtils) MakeFile(filePath string) error {
 		}
 	}
 	return nil
+}
+
+func (n NodeUtils) FormatDevice(devicePath string, fsType string) {
+	var args []string
+	if fsType == "ext4" {
+		args = []string{"-m0", "-Enodiscard,lazy_itable_init=1,lazy_journal_init=1", devicePath}
+	} else if fsType == "xfs" {
+		args = []string{"-Enodiscard", devicePath}
+	}
+
+	logger.Debugf("Formatting the device with fs_type = {%v}", fsType)
+	_, err := n.Executer.ExecuteWithTimeout(int(mkfsTimeout.Seconds()*1000), "mkfs."+fsType, args)
+	if err != nil {
+		logger.Errorf("Failed to run mkfs, error: %v", err)
+	}
 }
 
 func (n NodeUtils) IsNotMountPoint(file string) (bool, error) {

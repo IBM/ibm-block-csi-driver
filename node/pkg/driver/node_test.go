@@ -636,6 +636,8 @@ func TestNodePublishVolume(t *testing.T) {
 				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix).AnyTimes()
 				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(false)
 				mockNodeUtils.EXPECT().MakeDir(targetPathWithHostPrefix).Return(nil)
+				mockMounter.EXPECT().GetDiskFormat(mpathDevice).Return("", nil)
+				mockNodeUtils.EXPECT().FormatDevice(mpathDevice, fsVolCap.GetMount().FsType)
 				mockMounter.EXPECT().FormatAndMount(mpathDevice, targetPath, fsTypeXfs, nil)
 
 				req := &csi.NodePublishVolumeRequest{
