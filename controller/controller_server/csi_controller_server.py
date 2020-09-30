@@ -164,34 +164,34 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateVolumeResponse()
 
-    def _copy_to_existing_volume_from_source_object(self, vol, src_object_id, src_object_type, min_vol_size,
-                                                    array_mediator, pool):
-        vol_name = vol.name
+    def _copy_to_existing_volume_from_source_object(self, volume, source_object_id, source_object_type,
+                                                    minimum_volume_size, array_mediator, pool):
+        volume_name = volume.name
         try:
-            src_object = array_mediator.get_object_by_id(src_object_id, src_object_type)
-            if not src_object:
-                self._rollback_create_volume_from_source(array_mediator, vol.id)
-                raise controller_errors.ObjectNotFoundError(src_object_id)
-            src_object_name = src_object.name
-            src_object_capacity = src_object.capacity_bytes
-            logger.debug("Copy {0} {1} data to volume {2}.".format(src_object_type, src_object_id, vol_name))
-            if src_object_type is config.OBJECT_TYPE_NAME_SNAPSHOT:
-                array_mediator.copy_to_existing_volume_from_snapshot(vol_name, src_object_name, src_object_capacity,
-                                                                     min_vol_size, pool)
+            source_object = array_mediator.get_object_by_id(source_object_id, source_object_type)
+            if not source_object:
+                self._rollback_create_volume_from_source(array_mediator, volume.id)
+                raise controller_errors.ObjectNotFoundError(source_object_id)
+            source_object_name = source_object.name
+            source_object_capacity = source_object.capacity_bytes
+            logger.debug("Copy {0} {1} data to volume {2}.".format(source_object_type, source_object_id, volume_name))
+            if source_object_type is config.OBJECT_TYPE_NAME_SNAPSHOT:
+                array_mediator.copy_to_existing_volume_from_snapshot(volume_name, source_object_name,
+                                                                     source_object_capacity, minimum_volume_size, pool)
             else:
-                array_mediator.copy_to_existing_volume_from_volume(vol_name, src_object_name, src_object_capacity,
-                                                                   min_vol_size, pool)
-            logger.debug("Copy volume from {0} finished".format(src_object_type))
+                array_mediator.copy_to_existing_volume_from_volume(volume_name, source_object_name,
+                                                                   source_object_capacity, minimum_volume_size, pool)
+            logger.debug("Copy volume from {0} finished".format(source_object_type))
         except controller_errors.ObjectNotFoundError as ex:
-            logger.error("Volume not found while copying {0} data to volume".format(src_object_type))
+            logger.error("Volume not found while copying {0} data to volume".format(source_object_type))
             logger.exception(ex)
-            self._rollback_create_volume_from_source(array_mediator, vol.id)
+            self._rollback_create_volume_from_source(array_mediator, volume.id)
             raise ex
         except Exception as ex:
-            logger.error("Exception raised while copying {0} data to volume".format(src_object_type))
-            self._rollback_create_volume_from_source(array_mediator, vol.id)
+            logger.error("Exception raised while copying {0} data to volume".format(source_object_type))
+            self._rollback_create_volume_from_source(array_mediator, volume.id)
             raise ex
-        return vol
+        return volume
 
     @retry(Exception, tries=5, delay=1)
     def _rollback_create_volume_from_source(self, array_mediator, vol_id):

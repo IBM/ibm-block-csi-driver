@@ -193,8 +193,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return '6{}000000000000{}'.format(self.wwnn[1:], volume_id)
 
     def _generate_volume_response(self, api_volume):
-        source_flashcopy = get_flashcopy_as_target(api_volume)
-        source_volume_id = source_flashcopy.sourcevolume if source_flashcopy else None
+        flashcopy_as_target = get_flashcopy_as_target(api_volume)
+        source_volume_id = flashcopy_as_target.sourcevolume if flashcopy_as_target else None
         return Volume(
             vol_size_bytes=int(api_volume.cap),
             vol_id=self._generate_volume_scsi_identifier(api_volume.id),
@@ -542,10 +542,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     def _generate_snapshot_response_with_verification(self, api_object):
-        flashcopy = get_flashcopy_as_target(api_object)
-        if flashcopy is None or flashcopy.backgroundcopy != "disabled":
+        flashcopy_as_target = get_flashcopy_as_target(api_object)
+        if flashcopy_as_target is None or flashcopy_as_target.backgroundcopy != "disabled":
             raise array_errors.ExpectedSnapshotButFoundVolumeError(api_object.name, self.service_address)
-        source_volume_name = self.get_volume_name(flashcopy.sourcevolume)
+        source_volume_name = self.get_volume_name(flashcopy_as_target.sourcevolume)
         return self._generate_snapshot_response(api_object, source_volume_name)
 
     @convert_scsi_id_to_array_id
