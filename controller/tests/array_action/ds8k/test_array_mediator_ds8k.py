@@ -187,7 +187,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.array.delete_volume("fake_name")
 
-    def test_delete_volume_with_source_and_target_flashcopies_failed(self):
+    def test_delete_volume_with_flashcopies_as_source_and_target_failed(self):
         self.client_mock.get_volume.return_value = copy.deepcopy(self.volume_response)
         self.client_mock.get_flashcopies_by_volume.return_value = [
             Munch({"sourcevolume": "0001",
