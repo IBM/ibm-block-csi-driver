@@ -326,7 +326,10 @@ func (n NodeUtils) FormatDevice(devicePath string, fsType string) {
 	if fsType == "ext4" {
 		args = []string{"-m0", "-Enodiscard,lazy_itable_init=1,lazy_journal_init=1", devicePath}
 	} else if fsType == "xfs" {
-		args = []string{"-Enodiscard", devicePath}
+		args = []string{"-K", devicePath}
+	} else {
+		logger.Errorf("Could not format unsupported fsType: %v", fsType)
+		return
 	}
 
 	logger.Debugf("Formatting the device with fs_type = {%v}", fsType)
