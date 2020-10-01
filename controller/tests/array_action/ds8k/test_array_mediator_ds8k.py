@@ -205,7 +205,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             self.array.delete_volume("0001")
         self.client_mock.delete_flashcopy.assert_called_once_with("0003:0001")
 
-    def test_delete_volume_with_source_flashcopy_success(self):
+    def test_delete_volume_with_flashcopy_as_target_success(self):
         self.client_mock.get_volume.return_value = copy.deepcopy(self.volume_response)
         self.client_mock.get_flashcopies_by_volume.return_value = [
             Munch({"sourcevolume": "0003",
