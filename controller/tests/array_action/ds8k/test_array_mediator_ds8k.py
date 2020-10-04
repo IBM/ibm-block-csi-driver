@@ -203,6 +203,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                    "state": "valid",
                    "backgroundcopy": "enabled"
                    })]
+        self.client_mock.get_flashcopies.return_value = Munch({"out_of_sync_tracks": "0"})
         self.client_mock.delete_volume.side_effect = ClientException("500")
         with self.assertRaises(array_errors.VolumeDeletionError):
             self.array.delete_volume("0001")
@@ -217,8 +218,25 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                    "state": "valid",
                    "backgroundcopy": "disabled"
                    })]
+        self.client_mock.get_flashcopies.return_value = Munch({"out_of_sync_tracks": "0"})
         self.client_mock.delete_volume.side_effect = ClientException("500")
         with self.assertRaises(array_errors.VolumeDeletionError):
+            self.array.delete_volume("0001")
+        self.client_mock.delete_flashcopy.assert_not_called()
+
+    def test_delete_volume_with_flashcopy_still_copying(self):
+        self.client_mock.get_volume.return_value = copy.deepcopy(self.volume_response)
+        self.client_mock.get_flashcopies_by_volume.return_value = [
+            Munch({"sourcevolume": "0001",
+                   "targetvolume": "0002",
+                   "id": "0001:0002",
+                   "state": "valid",
+                   "backgroundcopy": "enabled"
+                   })]
+        self.client_mock.get_flashcopies.return_value = Munch({"out_of_sync_tracks": "55",
+                                                               "targetvolume": "0002"})
+        self.client_mock.delete_volume.side_effect = ClientException("500")
+        with self.assertRaises(array_errors.ObjectIsStillInUseError):
             self.array.delete_volume("0001")
         self.client_mock.delete_flashcopy.assert_not_called()
 
@@ -231,7 +249,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                    "state": "valid",
                    "backgroundcopy": "enabled"
                    })]
-
+        self.client_mock.get_flashcopies.return_value = Munch({"out_of_sync_tracks": "0"})
         self.array.delete_volume("0001")
         self.client_mock.delete_flashcopy.assert_called_once()
 

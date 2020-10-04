@@ -338,6 +338,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
         api_volume = self._get_api_volume_by_id(volume_id)
+        self._assert_object_is_not_in_use(volume_id, api_volume.flashcopy)
         for flashcopy in api_volume.flashcopy:
             if flashcopy.targetvolume == volume_id or flashcopy.backgroundcopy != "disabled":
                 self._delete_flashcopy(flashcopy.id)
@@ -604,7 +605,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 "FlashCopy relationship not found for target volume: {}".format(api_volume.name))
             raise controller_errors.SnapshotNameBelongsToVolumeError(api_volume.name,
                                                                      self.service_address)
-        self._assert_snapshot_is_not_in_use(snapshot_id, api_volume.flashcopy)
+        self._assert_object_is_not_in_use(snapshot_id, api_volume.flashcopy)
         for flashcopy in api_volume.flashcopy:
             self._delete_flashcopy(flashcopy.id)
         self._delete_volume(snapshot_id)
@@ -673,9 +674,12 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         flashcopy_process = self._get_flashcopy_process(flashcopy_id)
         return flashcopy_process.state
 
-    def _assert_snapshot_is_not_in_use(self, snapshot_id, flashcopies):
+    def _assert_object_is_not_in_use(self, object_id, flashcopies):
         for flashcopy in flashcopies:
-            if flashcopy.sourcevolume == snapshot_id:
+            if flashcopy.sourcevolume == object_id:
                 flashcopy_process = self._get_flashcopy_process(flashcopy.id)
-                if flashcopy_process.out_of_sync_tracks != '0':
-                    raise controller_errors.SnapshotIsStillInUseError(snapshot_id, flashcopy_process.targetvolume)
+                if self._is_flashcopy_copy(flashcopy_process):
+                    raise controller_errors.ObjectIsStillInUseError(object_id, flashcopy_process.targetvolume)
+
+    def _is_flashcopy_copy(self, flascopy):
+        return flascopy.out_of_sync_tracks != '0'
