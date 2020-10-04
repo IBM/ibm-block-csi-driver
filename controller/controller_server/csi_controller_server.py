@@ -277,6 +277,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     context.set_details(ex)
                     return csi_pb2.DeleteVolumeResponse()
 
+        except controller_errors.ObjectIsStillInUseError:
+            logger.info("could not delete snapshot while in use: {0}".format(ex))
+            context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+            context.set_details(ex)
+            return csi_pb2.DeleteVolumeResponse()
+
         except ValidationException as ex:
             logger.exception(ex)
             context.set_details(ex.message)
@@ -527,7 +533,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.debug("snapshot was not found during deletion: {0}".format(ex))
             context.set_code(grpc.StatusCode.OK)
             return csi_pb2.DeleteSnapshotResponse()
-        except controller_errors.SnapshotIsStillInUseError:
+        except controller_errors.ObjectIsStillInUseError:
             logger.info("could not delete snapshot while in use: {0}".format(ex))
             context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
             context.set_details(ex)

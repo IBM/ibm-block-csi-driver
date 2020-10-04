@@ -477,7 +477,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         unfinished_fcmaps = [fcmap.name for fcmap in snapshot_as_source_fcmaps
                              if fcmap.status != FCMAP_STATUS_DONE]
         if unfinished_fcmaps:
-            raise controller_errors.SnapshotIsStillInUseError(snapshot_name, unfinished_fcmaps)
+            raise controller_errors.ObjectIsStillInUseError(snapshot_name, unfinished_fcmaps)
         for fcmap in snapshot_as_source_fcmaps:
             self._delete_fcmap(fcmap.id, force=False)
 

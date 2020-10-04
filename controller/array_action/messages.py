@@ -59,6 +59,6 @@ ExpectedSnapshotButFoundVolumeError_message = "Could not find info about the sou
 
 SnapshotWrongVolumeError_message = "Snapshot {0} exists but it is of Volume {1} and not {2}"
 
-SnapshotIsStillInUseError_message = "Snapshot {0} is still in use by {1}"
+ObjectIsStillInUseError_message = "Object {0} is still in use by {1}"
 
 InvalidCliResponseError_message = "Invalid CLI response. Details : {0}"
