@@ -284,38 +284,23 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def copy_to_existing_volume_from_object(self, name, source_name, source_capacity_in_bytes,
                                             minimum_volume_size_in_bytes, pool_id=None):
-        logger.debug(
-            "Copy snapshot {0} data to volume {1}. Snapshot capacity {2}. Minimal requested volume capacity {3}".format(
-                name, source_name, source_capacity_in_bytes, minimum_volume_size_in_bytes))
         api_new_volume = self._get_api_volume_by_name(name, pool_id=pool_id)
-        if source_type == controller_config.VOLUME_SOURCE_SNAPSHOT:
-            api_source_object = self._get_api_snapshot(src_obj_name, pool_id=pool_id)
-        elif source_type == controller_config.VOLUME_SOURCE_VOLUME:
-            api_source_object = self._get_api_volume_by_name(src_obj_name, pool_id=pool_id)
-        if min_vol_size_in_bytes < src_obj_capacity_in_bytes:
+        api_source_object = self._get_api_volume_by_name(source_name, pool_id=pool_id)
+        if minimum_volume_size_in_bytes < source_capacity_in_bytes:
             self._extend_volume(volume_id=api_new_volume.id,
-                                new_size_in_bytes=src_obj_capacity_in_bytes)
+                                new_size_in_bytes=source_capacity_in_bytes)
         options = [FLASHCOPY_PERSISTENT_OPTION]
         self._create_flashcopy(source_volume_id=api_source_object.id, target_volume_id=api_new_volume.id,
                                options=options)
 
-    def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
-                                              min_vol_size_in_bytes, pool_id=None):
+    def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
+                                            minimum_volume_size_in_bytes, pool_id=None):
         logger.debug(
-            "Copy snapshot {0} data to volume {1}. Snapshot capacity {2}. Minimal requested volume capacity {3}".format(
-                name, src_snap_name, src_snap_capacity_in_bytes, min_vol_size_in_bytes))
-        self.copy_to_existing_volume_from_object(name, src_snap_name, src_snap_capacity_in_bytes,
-                                                 min_vol_size_in_bytes, controller_config.VOLUME_SOURCE_SNAPSHOT,
-                                                 pool_id)
-
-    def copy_to_existing_volume_from_volume(self, name, src_vol_name, src_vol_capacity_in_bytes,
-                                            min_vol_size_in_bytes, pool_id=None):
-        logger.debug(
-            "Copy volume {0} data to volume {1}. volume capacity {2}. Minimal requested volume capacity {3}".format(
-                name, src_vol_name, src_vol_capacity_in_bytes, min_vol_size_in_bytes))
-        self.copy_to_existing_volume_from_object(name, src_vol_name, src_vol_capacity_in_bytes,
-                                                 min_vol_size_in_bytes, controller_config.VOLUME_SOURCE_VOLUME,
-                                                 pool_id)
+            "Copy source {0} data to volume {1}. source capacity {2}. Minimal requested volume capacity {3}".format(
+                name, source_name, source_capacity_in_bytes,
+                minimum_volume_size_in_bytes))
+        self.copy_to_existing_volume_from_object(name, source_name, source_capacity_in_bytes,
+                                                 minimum_volume_size_in_bytes, pool_id)
 
     def _delete_volume(self, volume_id, not_exist_err=True):
         logger.info("Deleting volume {}".format(volume_id))

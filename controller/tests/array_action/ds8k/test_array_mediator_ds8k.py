@@ -594,7 +594,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_extend_volume(self):
         volume = self._prepare_mocks_for_copy_to_existing_volume()
-        self.array.copy_to_existing_volume_from_snapshot("test_name", "source_name", 3, 2, "fake_pool")
+        self.array.copy_to_existing_volume_from_source("test_name", "source_name", 3, 2, "fake_pool")
         self.client_mock.extend_volume.assert_called_once_with(volume_id=volume.id,
                                                                new_size_in_bytes=3)
 
@@ -602,11 +602,11 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self._prepare_mocks_for_copy_to_existing_volume()
         self.client_mock.extend_volume.side_effect = NotFound("404")
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.array.copy_to_existing_volume_from_snapshot("test_name", "source_name", 3, 2, "fake_pool")
+            self.array.copy_to_existing_volume_from_source("test_name", "source_name", 3, 2, "fake_pool")
 
     def test_copy_to_existing_volume_flashcopy_snapshot(self):
         volume = self._prepare_mocks_for_copy_to_existing_volume()
-        self.array.copy_to_existing_volume_from_snapshot("test_name", "source_name", 3, 2, "fake_pool")
+        self.array.copy_to_existing_volume_from_source("test_name", "source_name", 3, 2, "fake_pool")
         self.client_mock.create_flashcopy.assert_called_once_with(
             source_volume_id="0002",
             target_volume_id=volume.id,
@@ -616,7 +616,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_copy_to_existing_volume_flashcopy_clone(self):
         volume = self._prepare_mocks_for_copy_to_existing_volume()
-        self.array.copy_to_existing_volume_from_volume("test_name", "source_name", 3, 2, "fake_pool")
+        self.array.copy_to_existing_volume_from_source("test_name", "source_name", 3, 2, "fake_pool")
         self.client_mock.create_flashcopy.assert_called_once_with(
             source_volume_id="0002",
             target_volume_id=volume.id,
