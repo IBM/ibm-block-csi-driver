@@ -54,18 +54,18 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def copy_to_existing_volume_from_snapshot(self, name, source_snapshot_name, source_snapshot_capacity_in_bytes,
-                                              minimum_volume_size_in_bytes, pool_id=None):
+    def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
+                                            minimum_volume_size_in_bytes, pool_id=None):
         """
-        This function should create a volume from snapshot in the storage system.
+        This function should create a volume from source volume or snapshot in the storage system.
 
         Args:
-            name                         : name of the volume to be created in the storage system
-            source_snapshot_name                : name of snapshot to create from
-            source_snapshot_capacity_in_bytes   : capacity of snapshot to create from
-            minimum_volume_size_in_bytes        : if snapshot capacity is lower than this value vol will
-                                           be increased to this value
-            pool_id: pool of the volume and snapshot to find them more efficiently.
+            name                            : name of the volume to be created in the storage system
+            source_name                     : name of source to create from
+            source_capacity_in_bytes        : capacity of source to create from
+            minimum_volume_size_in_bytes    : if source capacity is lower than this value vol will
+                                            be increased to this value
+            pool_id                         : pool of the volume and source object to find them more efficiently.
 
         Returns:
             Volume
@@ -73,31 +73,6 @@ class ArrayMediator(ABC):
         Raises:
             VolumeNotFoundError
             SnapshotNotFoundError
-            IllegalObjectName
-            PermissionDenied
-            PoolParameterIsMissing
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def copy_to_existing_volume_from_volume(self, name, source_volume_name, source_volume_capacity_in_bytes,
-                                            minimum_volume_size_in_bytes, pool_id=None):
-        """
-        This function should copy a source-volume data to a target-volume in the storage system.
-
-        Args:
-            name                            : name of the volume to be created in the storage system
-            source_volume_name                    : name of volume to create from
-            source_volume_capacity_in_bytes       : capacity of source volume to create from
-            minimum_volume_size_in_bytes           : if source volume capacity is lower than this value vol will
-                                              be increased to this value
-            pool_id                         : pool of the volume and source volume to find them more efficiently.
-
-        Returns:
-            Volume
-
-        Raises:
-            VolumeNotFoundError
             IllegalObjectName
             PermissionDenied
             PoolParameterIsMissing

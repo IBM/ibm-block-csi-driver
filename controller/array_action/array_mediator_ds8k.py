@@ -78,7 +78,7 @@ def convert_scsi_id_to_array_id(mediator_method, self, *args):
     return mediator_method(self, *args)
 
 
-def get_flashcopy_as_target(api_volume):
+def get_flashcopy_as_target_if_exist(api_volume):
     flashcopies = [flashcopy for flashcopy in api_volume.flashcopy
                    if flashcopy.targetvolume == api_volume.id]
     if len(flashcopies) != 1:
@@ -193,7 +193,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return '6{}000000000000{}'.format(self.wwnn[1:], volume_id)
 
     def _generate_volume_response(self, api_volume):
-        flashcopy_as_target = get_flashcopy_as_target(api_volume)
+        flashcopy_as_target = get_flashcopy_as_target_if_exist(api_volume)
         source_volume_id = flashcopy_as_target.sourcevolume if flashcopy_as_target else None
         return Volume(
             vol_size_bytes=int(api_volume.cap),
@@ -282,23 +282,19 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except exceptions.NotFound:
             raise array_errors.ObjectNotFoundError(volume_id)
 
-    def copy_to_existing_volume_from_snapshot(self, name, source_snapshot_name, source_snapshot_capacity_in_bytes,
-                                              minimum_volume_size_in_bytes, pool_id=None):
+    def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
+                                            minimum_volume_size_in_bytes, pool_id=None):
         logger.debug(
             "Copy snapshot {0} data to volume {1}. Snapshot capacity {2}. Minimal requested volume capacity {3}".format(
-                name, source_snapshot_name, source_snapshot_capacity_in_bytes, minimum_volume_size_in_bytes))
+                name, source_name, source_capacity_in_bytes, minimum_volume_size_in_bytes))
         api_new_volume = self._get_api_volume_by_name(name, pool_id=pool_id)
-        api_snapshot = self._get_api_snapshot(source_snapshot_name, pool_id=pool_id)
-        if minimum_volume_size_in_bytes < source_snapshot_capacity_in_bytes:
+        api_snapshot = self._get_api_snapshot(source_name, pool_id=pool_id)
+        if minimum_volume_size_in_bytes < source_capacity_in_bytes:
             self._extend_volume(volume_id=api_new_volume.id,
-                                new_size_in_bytes=source_snapshot_capacity_in_bytes)
+                                new_size_in_bytes=source_capacity_in_bytes)
         options = [FLASHCOPY_PERSISTENT_OPTION]
         self._create_flashcopy(source_volume_id=api_snapshot.id, target_volume_id=api_new_volume.id,
                                options=options)
-
-    def copy_to_existing_volume_from_volume(self, name, source_volume_name, source_volume_capacity_in_bytes,
-                                            minimum_volume_size_in_bytes, pool_id=None):
-        pass
 
     def _delete_volume(self, volume_id, not_exist_err=True):
         logger.info("Deleting volume {}".format(volume_id))
@@ -542,7 +538,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     def _generate_snapshot_response_with_verification(self, api_object):
-        flashcopy_as_target = get_flashcopy_as_target(api_object)
+        flashcopy_as_target = get_flashcopy_as_target_if_exist(api_object)
         if flashcopy_as_target is None or flashcopy_as_target.backgroundcopy != "disabled":
             raise array_errors.ExpectedSnapshotButFoundVolumeError(api_object.name, self.service_address)
         source_volume_name = self.get_volume_name(flashcopy_as_target.sourcevolume)
