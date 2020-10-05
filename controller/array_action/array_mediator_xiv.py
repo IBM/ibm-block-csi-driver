@@ -199,15 +199,18 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
-    def copy_to_existing_volume_from_object(self, name, src_obj_name, src_obj_capacity_in_bytes,
-                                            min_vol_size_in_bytes, source_type, pool_id=None):
+    def copy_to_existing_volume_from_object(self, name, source_name, source_capacity_in_bytes,
+                                            minimum_volume_size_in_bytes, pool_id=None):
+        logger.debug(
+            "Copy snapshot {0} data to volume {1}. Snapshot capacity {2}. Minimal requested volume capacity {3}".format(
+                name, source_name, source_capacity_in_bytes, minimum_volume_size_in_bytes))
         try:
             logger.debug("Formatting volume {0}".format(name))
             self.client.cmd.vol_format(vol=name)
-            logger.debug("Copying {0} {1} data to volume {2}.".format(source_type, name, src_obj_name))
-            self.client.cmd.vol_copy(vol_src=src_obj_name, vol_trg=name)
-            if min_vol_size_in_bytes > src_obj_capacity_in_bytes:
-                min_vol_size_in_blocks = self._convert_size_bytes_to_blocks(min_vol_size_in_bytes)
+            logger.debug("Copying Snapshot {0} data to volume {1}.".format(name, source_name))
+            self.client.cmd.vol_copy(vol_src=source_name, vol_trg=name)
+            if minimum_volume_size_in_bytes > source_capacity_in_bytes:
+                min_vol_size_in_blocks = self._convert_size_bytes_to_blocks(minimum_volume_size_in_bytes)
                 logger.debug(
                     "Increasing volume {0} size to {1} blocks.".format(name, min_vol_size_in_blocks))
                 self.client.cmd.vol_resize(vol=name, size_blocks=min_vol_size_in_blocks)
@@ -216,7 +219,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.IllegalObjectName(ex.status)
         except xcli_errors.SourceVolumeBadNameError as ex:
             logger.exception(ex)
-            raise controller_errors.ObjectNotFoundError(src_obj_name)
+            raise controller_errors.ObjectNotFoundError(source_name)
         except (xcli_errors.VolumeBadNameError, xcli_errors.TargetVolumeBadNameError) as ex:
             logger.exception(ex)
             raise controller_errors.ObjectNotFoundError(name)
