@@ -199,8 +199,8 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
-    def copy_to_existing_volume_from_snapshot(self, name, source_snapshot_name, source_snapshot_capacity_in_bytes,
-                                              minimum_volume_size_in_bytes, pool_id=None):
+    def copy_to_existing_volume_from_source(self, name, source_snapshot_name, source_snapshot_capacity_in_bytes,
+                                            minimum_volume_size_in_bytes, pool_id=None):
         logger.debug(
             "Copy snapshot {0} data to volume {1}. Snapshot capacity {2}. Minimal requested volume capacity {3}".format(
                 name, source_snapshot_name, source_snapshot_capacity_in_bytes, minimum_volume_size_in_bytes))
@@ -226,10 +226,6 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
-
-    def copy_to_existing_volume_from_volume(self, name, source_volume_name, source_volume_capacity_in_bytes,
-                                            minimum_volume_size_in_bytes, pool_id=None):
-        pass
 
     def _get_vol_by_wwn(self, volume_id):
         vol_by_wwn = self.client.cmd.vol_list(wwn=volume_id).as_single_element

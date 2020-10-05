@@ -167,12 +167,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             source_object_name = source_object.name
             source_object_capacity = source_object.capacity_bytes
             logger.debug("Copy {0} {1} data to volume {2}.".format(source_object_type, source_object_id, volume_name))
-            if source_object_type is config.OBJECT_TYPE_NAME_SNAPSHOT:
-                array_mediator.copy_to_existing_volume_from_snapshot(volume_name, source_object_name,
-                                                                     source_object_capacity, minimum_volume_size, pool)
-            else:
-                array_mediator.copy_to_existing_volume_from_volume(volume_name, source_object_name,
-                                                                   source_object_capacity, minimum_volume_size, pool)
+            array_mediator.copy_to_existing_volume_from_source(volume_name, source_object_name,
+                                                               source_object_capacity, minimum_volume_size, pool)
             logger.debug("Copy volume from {0} finished".format(source_object_type))
         except controller_errors.ObjectNotFoundError as ex:
             logger.error("Volume not found while copying {0} data to volume".format(source_object_type))

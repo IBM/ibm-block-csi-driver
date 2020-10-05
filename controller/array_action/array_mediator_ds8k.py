@@ -282,8 +282,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except exceptions.NotFound:
             raise array_errors.ObjectNotFoundError(volume_id)
 
-    def copy_to_existing_volume_from_snapshot(self, name, source_snapshot_name, source_snapshot_capacity_in_bytes,
-                                              minimum_volume_size_in_bytes, pool_id=None):
+    def copy_to_existing_volume_from_source(self, name, source_snapshot_name, source_snapshot_capacity_in_bytes,
+                                            minimum_volume_size_in_bytes, pool_id=None):
         logger.debug(
             "Copy snapshot {0} data to volume {1}. Snapshot capacity {2}. Minimal requested volume capacity {3}".format(
                 name, source_snapshot_name, source_snapshot_capacity_in_bytes, minimum_volume_size_in_bytes))
@@ -295,10 +295,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         options = [FLASHCOPY_PERSISTENT_OPTION]
         self._create_flashcopy(source_volume_id=api_snapshot.id, target_volume_id=api_new_volume.id,
                                options=options)
-
-    def copy_to_existing_volume_from_volume(self, name, source_volume_name, source_volume_capacity_in_bytes,
-                                            minimum_volume_size_in_bytes, pool_id=None):
-        pass
 
     def _delete_volume(self, volume_id, not_exist_err=True):
         logger.info("Deleting volume {}".format(volume_id))
