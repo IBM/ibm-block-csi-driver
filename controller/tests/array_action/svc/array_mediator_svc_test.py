@@ -263,7 +263,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_snapshot_has_no_fc_id_raise_error(self):
         self._prepare_lsvdisk_to_return_mapless_target_volume()
 
-        with self.assertRaises(array_errors.SnapshotNameBelongsToVolumeError):
+        with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.svc.get_snapshot("test_snap")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
@@ -284,7 +284,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_get_snapshot_by_id_has_no_fcmap_id_raise_error(self):
         self._prepare_lsvdisk_to_return_mapless_target_volume()
-        with self.assertRaises(array_errors.SnapshotIdBelongsToVolumeError):
+        with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.svc.get_object_by_id("snap_id", "snapshot")
 
     def test_get_snapshot_by_id_success(self):

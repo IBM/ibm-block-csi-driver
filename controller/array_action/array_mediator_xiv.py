@@ -199,18 +199,18 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
-    def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
-                                              min_vol_size_in_bytes, pool_id=None):
+    def copy_to_existing_volume_from_snapshot(self, name, source_snapshot_name, source_snapshot_capacity_in_bytes,
+                                              minimum_volume_size_in_bytes, pool_id=None):
         logger.debug(
             "Copy snapshot {0} data to volume {1}. Snapshot capacity {2}. Minimal requested volume capacity {3}".format(
-                name, src_snap_name, src_snap_capacity_in_bytes, min_vol_size_in_bytes))
+                name, source_snapshot_name, source_snapshot_capacity_in_bytes, minimum_volume_size_in_bytes))
         try:
             logger.debug("Formatting volume {0}".format(name))
             self.client.cmd.vol_format(vol=name)
-            logger.debug("Copying Snapshot {0} data to volume {1}.".format(name, src_snap_name))
-            self.client.cmd.vol_copy(vol_src=src_snap_name, vol_trg=name)
-            if min_vol_size_in_bytes > src_snap_capacity_in_bytes:
-                min_vol_size_in_blocks = self._convert_size_bytes_to_blocks(min_vol_size_in_bytes)
+            logger.debug("Copying Snapshot {0} data to volume {1}.".format(name, source_snapshot_name))
+            self.client.cmd.vol_copy(vol_src=source_snapshot_name, vol_trg=name)
+            if minimum_volume_size_in_bytes > source_snapshot_capacity_in_bytes:
+                min_vol_size_in_blocks = self._convert_size_bytes_to_blocks(minimum_volume_size_in_bytes)
                 logger.debug(
                     "Increasing volume {0} size to {1} blocks.".format(name, min_vol_size_in_blocks))
                 self.client.cmd.vol_resize(vol=name, size_blocks=min_vol_size_in_blocks)
@@ -219,7 +219,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.IllegalObjectName(ex.status)
         except xcli_errors.SourceVolumeBadNameError as ex:
             logger.exception(ex)
-            raise controller_errors.ObjectNotFoundError(src_snap_name)
+            raise controller_errors.ObjectNotFoundError(source_snapshot_name)
         except (xcli_errors.VolumeBadNameError, xcli_errors.TargetVolumeBadNameError) as ex:
             logger.exception(ex)
             raise controller_errors.ObjectNotFoundError(name)
@@ -227,8 +227,8 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
-    def copy_to_existing_volume_from_volume(self, name, src_vol_name, src_vol_capacity_in_bytes,
-                                            min_vol_size_in_bytes, pool_id=None):
+    def copy_to_existing_volume_from_volume(self, name, source_volume_name, source_volume_capacity_in_bytes,
+                                            minimum_volume_size_in_bytes, pool_id=None):
         pass
 
     def _get_vol_by_wwn(self, volume_id):
@@ -266,7 +266,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         if not cli_snapshot:
             return None
         if not cli_snapshot.master_name:
-            raise controller_errors.SnapshotNameBelongsToVolumeError(cli_snapshot.name, self.endpoint)
+            raise controller_errors.ExpectedSnapshotButFoundVolumeError(cli_snapshot.name, self.endpoint)
         array_snapshot = self._generate_snapshot_response(cli_snapshot)
         return array_snapshot
 
@@ -280,7 +280,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             return None
         if object_type is controller_config.OBJECT_TYPE_NAME_SNAPSHOT:
             if not cli_object.master_name:
-                raise controller_errors.SnapshotIdBelongsToVolumeError(object_id, self.endpoint)
+                raise controller_errors.ExpectedSnapshotButFoundVolumeError(object_id, self.endpoint)
             return self._generate_snapshot_response(cli_object)
         return self._generate_volume_response(cli_object)
 

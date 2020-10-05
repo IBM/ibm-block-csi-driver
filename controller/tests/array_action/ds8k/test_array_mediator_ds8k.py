@@ -187,7 +187,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.array.delete_volume("fake_name")
 
-    def test_delete_volume_with_source_and_target_flashcopies_failed(self):
+    def test_delete_volume_with_flashcopies_as_source_and_target_failed(self):
         self.client_mock.get_volume.return_value = copy.deepcopy(self.volume_response)
         self.client_mock.get_flashcopies_by_volume.return_value = [
             Munch({"sourcevolume": "0001",
@@ -205,7 +205,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             self.array.delete_volume("0001")
         self.client_mock.delete_flashcopy.assert_called_once_with("0003:0001")
 
-    def test_delete_volume_with_source_flashcopy_success(self):
+    def test_delete_volume_with_flashcopy_as_target_success(self):
         self.client_mock.get_volume.return_value = copy.deepcopy(self.volume_response)
         self.client_mock.get_flashcopies_by_volume.return_value = [
             Munch({"sourcevolume": "0003",
@@ -403,7 +403,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_get_snapshot_has_no_fcrel_raise_error(self):
         self.client_mock.get_volumes_by_pool.return_value = [self.volume_response]
         self.client_mock.get_flashcopies_by_volume.return_value = []
-        with self.assertRaises(array_errors.SnapshotNameBelongsToVolumeError):
+        with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.array.get_snapshot("test_name", pool_id=self.volume_response.pool)
 
     def _get_volume_with_flashcopy_relationship(self):
@@ -418,7 +418,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.get_volumes_by_pool.return_value = [target_vol]
         self.client_mock.get_flashcopies_by_volume.return_value = []
 
-        with self.assertRaises(array_errors.SnapshotNameBelongsToVolumeError):
+        with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.array.get_snapshot("test_name", pool_id=self.volume_response.pool)
 
     def test_get_snapshot_success(self):
