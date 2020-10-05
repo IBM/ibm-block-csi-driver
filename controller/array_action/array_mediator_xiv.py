@@ -277,7 +277,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         if not cli_snapshot:
             return None
         if not cli_snapshot.master_name:
-            raise controller_errors.SnapshotNameBelongsToVolumeError(cli_snapshot.name, self.endpoint)
+            raise controller_errors.ExpectedSnapshotButFoundVolumeError(cli_snapshot.name, self.endpoint)
         array_snapshot = self._generate_snapshot_response(cli_snapshot)
         return array_snapshot
 
@@ -291,7 +291,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             return None
         if object_type is controller_config.OBJECT_TYPE_NAME_SNAPSHOT:
             if not cli_object.master_name:
-                raise controller_errors.SnapshotIdBelongsToVolumeError(object_id, self.endpoint)
+                raise controller_errors.ExpectedSnapshotButFoundVolumeError(object_id, self.endpoint)
             return self._generate_snapshot_response(cli_object)
         return self._generate_volume_response(cli_object)
 

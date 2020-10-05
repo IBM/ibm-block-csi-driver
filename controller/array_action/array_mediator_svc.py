@@ -196,6 +196,15 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                         is_ready=True,
                         array_type=self.array_type)
 
+    def _generate_snapshot_response_with_verification(self, cli_object):
+        if not cli_object.FC_id:
+            logger.error("FlashCopy Mapping not found for target volume: {}".format(cli_object.name))
+            raise controller_errors.ExpectedSnapshotButFoundVolumeError(cli_object.name, self.endpoint)
+        fcmap = self._get_fcmap_as_target_if_exists(cli_object.name)
+        if fcmap is None or fcmap.copy_rate != 0:
+            raise controller_errors.ExpectedSnapshotButFoundVolumeError(cli_object.name, self.endpoint)
+        return self._generate_snapshot_response(cli_object, fcmap.source_vdisk_name)
+
     def _get_cli_volume(self, volume_name_or_id, not_exist_err=True):
         try:
             cli_volume = self.client.svcinfo.lsvdisk(bytes=True, object_id=volume_name_or_id).as_single_element
@@ -223,15 +232,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if len(fcmaps_as_target) != 1:
             return None
         return fcmaps_as_target[0]
-
-    def _get_snapshot_source_fcmap(self, cli_volume):
-        if not cli_volume.FC_id:
-            logger.error("FlashCopy Mapping not found for target volume: {}".format(cli_volume.name))
-            return None
-        fcmap = self._get_fcmap_as_target_if_exists(cli_volume.name)
-        if not fcmap or fcmap.copy_rate != 0:
-            return None
-        return fcmap
 
     def _get_source_volume_wwn_if_exists(self, target_cli_volume):
         fcmap = self._get_fcmap_as_target_if_exists(target_cli_volume.name)
@@ -360,13 +360,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self._rollback_copy_to_target_volume(target_volume_name)
             raise ex
 
-    def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
-                                              min_vol_size_in_bytes, pool_id=None):
-        self._copy_to_target_volume(name, src_snap_name)
-
-    def copy_to_existing_volume_from_volume(self, name, src_vol_name, src_vol_capacity_in_bytes,
-                                            min_vol_size_in_bytes, pool_id=None):
-        pass
+    def copy_to_existing_volume_from_source(self, name, source_snapshot_name, source_snapshot_capacity_in_bytes,
+                                            minimum_volume_size_in_bytes, pool_id=None):
+        self._copy_to_target_volume(name, source_snapshot_name)
 
     def create_volume(self, name, size_in_bytes, capabilities, pool):
         cli_volume = self._create_cli_volume(name, size_in_bytes, capabilities, pool)
@@ -402,20 +398,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         target_cli_volume = self._get_cli_volume_if_exists(snapshot_name)
         if not target_cli_volume:
             return None
-        fcmap = self._get_snapshot_source_fcmap(target_cli_volume)
-        if fcmap is None:
-            raise controller_errors.SnapshotNameBelongsToVolumeError(target_cli_volume.name, self.endpoint)
-        return self._generate_snapshot_response(target_cli_volume, fcmap.source_vdisk_name)
+        return self._generate_snapshot_response_with_verification(target_cli_volume)
 
     def get_object_by_id(self, object_id, object_type):
         cli_object = self._get_cli_volume_by_wwn_if_exist(object_id)
         if not cli_object:
             return None
         if object_type is controller_config.OBJECT_TYPE_NAME_SNAPSHOT:
-            fcmap = self._get_snapshot_source_fcmap(cli_object)
-            if fcmap is None:
-                raise controller_errors.SnapshotIdBelongsToVolumeError(object_id, self.endpoint)
-            return self._generate_snapshot_response(cli_object, fcmap.source_vdisk_name)
+            return self._generate_snapshot_response_with_verification(cli_object)
         return self._generate_volume_response(cli_object)
 
     def _create_similar_volume(self, source_volume_name, target_volume_name):
@@ -483,7 +473,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         unfinished_fcmaps = [fcmap.name for fcmap in snapshot_as_source_fcmaps
                              if fcmap.status != FCMAP_STATUS_DONE]
         if unfinished_fcmaps:
-            raise controller_errors.SnapshotIsStillInUseError(snapshot_name, unfinished_fcmaps)
+            raise controller_errors.ObjectIsStillInUseError(snapshot_name, unfinished_fcmaps)
         for fcmap in snapshot_as_source_fcmaps:
             self._delete_fcmap(fcmap.id, force=False)
 

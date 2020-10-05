@@ -55,14 +55,10 @@ SnapshotNotFoundError_message = "Snapshot was not found : {0} "
 
 SnapshotAlreadyExistsError_message = "Snapshot already exists : {0} , array : {1}"
 
-SnapshotNameBelongsToVolumeError_message = "Snapshot not found. Volume with the same name exists. \
-                                                         Name : {0} , array : {1}"
-
-SnapshotIdBelongsToVolumeError_message = "Snapshot not found. Volume with the same id exists. \
-                                                         Id : {0} , array : {1}"
+ExpectedSnapshotButFoundVolumeError_message = "Could not find info about the source of: {0}, array: {1}"
 
 SnapshotWrongVolumeError_message = "Snapshot {0} exists but it is of Volume {1} and not {2}"
 
-SnapshotIsStillInUseError_message = "Snapshot {0} is still in use by {1}"
+ObjectIsStillInUseError_message = "Object {0} is still in use by {1}"
 
 InvalidCliResponseError_message = "Invalid CLI response. Details : {0}"

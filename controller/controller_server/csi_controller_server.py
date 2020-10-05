@@ -64,16 +64,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         volume_name = request.name
         logger.debug("volume name : {}".format(volume_name))
 
-        src_snapshot_id = self._get_src_obj_id(request, config.VOLUME_SOURCE_SNAPSHOT)
-        logger.debug("Source snapshot id : {}".format(src_snapshot_id))
+        source_type, source_id = self._get_source_type_and_id(request)
 
-        src_volume_id = self._get_src_obj_id(request, config.VOLUME_SOURCE_VOLUME)
-        logger.debug("Source volume id : {}".format(src_volume_id))
-
-        source_obj_id = src_snapshot_id or src_volume_id
-        source_type = config.VOLUME_SOURCE_SNAPSHOT if src_snapshot_id \
-            else config.VOLUME_SOURCE_VOLUME if src_volume_id \
-            else None
+        logger.debug("Source {0} id : {1}".format(source_type, source_id))
 
         secrets = request.secrets
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
@@ -118,23 +111,22 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 else:
                     logger.debug("volume found : {}".format(vol))
 
-                    if not source_obj_id and vol.capacity_bytes != request.capacity_range.required_bytes:
+                    if not source_id and vol.capacity_bytes != request.capacity_range.required_bytes:
                         context.set_details("Volume was already created with different size.")
                         context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                         return csi_pb2.CreateVolumeResponse()
 
-                    copy_source_res = self._handle_existing_vol_src(vol, source_obj_id, source_type, context)
+                    copy_source_res = self._handle_existing_vol_src(vol, source_id, source_type, context)
                     if copy_source_res:
                         return copy_source_res
 
-                if source_obj_id:
-                    self._copy_to_existing_volume_from_source_object(vol, source_obj_id,
+                if source_id:
+                    self._copy_to_existing_volume_from_source_object(vol, source_id,
                                                                      source_type, size,
                                                                      array_mediator, pool)
-                    vol.copy_src_object_id = source_obj_id
-                    res = utils.generate_csi_create_volume_response(vol, source_type)
-                else:
-                    res = utils.generate_csi_create_volume_response(vol)
+                    vol.copy_src_object_id = source_id
+
+                res = utils.generate_csi_create_volume_response(vol, source_type)
                 logger.info("finished create volume")
                 return res
 
@@ -164,38 +156,34 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateVolumeResponse()
 
-    def _copy_to_existing_volume_from_source_object(self, vol, src_object_id, src_object_type, min_vol_size,
-                                                    array_mediator, pool):
-        vol_name = vol.name
+    def _copy_to_existing_volume_from_source_object(self, volume, source_object_id, source_object_type,
+                                                    minimum_volume_size, array_mediator, pool):
+        volume_name = volume.name
         try:
-            src_object = array_mediator.get_object_by_id(src_object_id, src_object_type)
-            if not src_object:
-                self._rollback_create_volume_from_source(array_mediator, vol.id)
-                raise controller_errors.ObjectNotFoundError(src_object_id)
-            src_object_name = src_object.name
-            src_object_capacity = src_object.capacity_bytes
-            logger.debug("Copy {0} {1} data to volume {2}.".format(src_object_type, src_object_id, vol_name))
-            if src_object_type is config.OBJECT_TYPE_NAME_SNAPSHOT:
-                array_mediator.copy_to_existing_volume_from_snapshot(vol_name, src_object_name, src_object_capacity,
-                                                                     min_vol_size, pool)
-            else:
-                array_mediator.copy_to_existing_volume_from_volume(vol_name, src_object_name, src_object_capacity,
-                                                                   min_vol_size, pool)
-            logger.debug("Copy volume from {0} finished".format(src_object_type))
+            source_object = array_mediator.get_object_by_id(source_object_id, source_object_type)
+            if not source_object:
+                self._rollback_create_volume_from_source(array_mediator, volume.id)
+                raise controller_errors.ObjectNotFoundError(source_object_id)
+            source_object_name = source_object.name
+            source_object_capacity = source_object.capacity_bytes
+            logger.debug("Copy {0} {1} data to volume {2}.".format(source_object_type, source_object_id, volume_name))
+            array_mediator.copy_to_existing_volume_from_source(volume_name, source_object_name,
+                                                               source_object_capacity, minimum_volume_size, pool)
+            logger.debug("Copy volume from {0} finished".format(source_object_type))
         except controller_errors.ObjectNotFoundError as ex:
-            logger.error("Volume not found while copying {0} data to volume".format(src_object_type))
+            logger.error("Volume not found while copying {0} data to volume".format(source_object_type))
             logger.exception(ex)
-            self._rollback_create_volume_from_source(array_mediator, vol.id)
+            self._rollback_create_volume_from_source(array_mediator, volume.id)
             raise ex
         except Exception as ex:
-            logger.error("Exception raised while copying {0} data to volume".format(src_object_type))
-            self._rollback_create_volume_from_source(array_mediator, vol.id)
+            logger.error("Exception raised while copying {0} data to volume".format(source_object_type))
+            self._rollback_create_volume_from_source(array_mediator, volume.id)
             raise ex
-        return vol
+        return volume
 
     @retry(Exception, tries=5, delay=1)
     def _rollback_create_volume_from_source(self, array_mediator, vol_id):
-        logger.debug("Rollback copy volume from snapshot. Deleting volume {0}".format(vol_id))
+        logger.debug("Rollback copy volume from source. Deleting volume {0}".format(vol_id))
         array_mediator.delete_volume(vol_id)
 
     def _handle_existing_vol_src(self, volume, src_object_id, source_type, context):
@@ -217,7 +205,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return None
         if vol_copy_src_object_id == src_object_id:
             logger.debug(
-                "Volume {0} exists and it is a copy of snapshot {1}.".format(vol_name, src_object_id))
+                "Volume {0} exists and it is a copy of {1} {2}.".format(vol_name, source_type, src_object_id))
             context.set_code(grpc.StatusCode.OK)
             return utils.generate_csi_create_volume_response(volume, source_type)
         else:
@@ -226,17 +214,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details("Volume already exists but it was created from a different source.")
             context.set_code(grpc.StatusCode.INTERNAL)
             return csi_pb2.CreateVolumeResponse()
-
-    def _get_src_obj_id(self, request, source_type):
-        source = request.volume_content_source
-        logger.info(source)
-        res = None
-        if source and source.HasField(source_type):
-            source_obj = getattr(source, source_type)
-            src_id_field = getattr(source_obj, config.VOLUME_SOURCE_ID[source_type])
-            logger.debug("src_id_field: {0}".format(src_id_field))
-            _, res = utils.get_object_id_info(src_id_field, source_type)
-        return res
 
     def DeleteVolume(self, request, context):
         set_current_thread_name(request.volume_id)
@@ -274,6 +251,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     context.set_code(grpc.StatusCode.PERMISSION_DENIED)
                     context.set_details(ex)
                     return csi_pb2.DeleteVolumeResponse()
+
+        except controller_errors.ObjectIsStillInUseError:
+            logger.info("could not delete snapshot while in use: {0}".format(ex))
+            context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+            context.set_details(ex)
+            return csi_pb2.DeleteVolumeResponse()
 
         except ValidationException as ex:
             logger.exception(ex)
@@ -525,7 +508,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.debug("snapshot was not found during deletion: {0}".format(ex))
             context.set_code(grpc.StatusCode.OK)
             return csi_pb2.DeleteSnapshotResponse()
-        except controller_errors.SnapshotIsStillInUseError:
+        except controller_errors.ObjectIsStillInUseError:
             logger.info("could not delete snapshot while in use: {0}".format(ex))
             context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
             context.set_details(ex)
@@ -680,6 +663,22 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         except KeyboardInterrupt:
             controller_server.stop(0)
             logger.debug('Controller Server Stopped ...')
+
+    def _get_source_type_and_id(self, request):
+        source = request.volume_content_source
+        object_id = None
+        source_type = None
+        if source:
+            logger.info(source)
+            if source.HasField(config.VOLUME_SOURCE_SNAPSHOT):
+                source_id = source.snapshot.snapshot_id
+                source_type = config.VOLUME_SOURCE_SNAPSHOT
+            else:
+                source_id = source.volume.volume_id
+                source_type = config.VOLUME_SOURCE_VOLUME
+            logger.debug("src_id_field: {0}".format(source_id))
+            _, object_id = utils.get_object_id_info(source_id, source_type)
+        return source_type, object_id
 
 
 def main():
