@@ -207,7 +207,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         try:
             logger.debug("Formatting volume {0}".format(name))
             self.client.cmd.vol_format(vol=name)
-            logger.debug("Copying Snapshot {0} data to volume {1}.".format(name, source_name))
+            logger.debug("Copying source {0} data to volume {1}.".format(source_name, name))
             self.client.cmd.vol_copy(vol_src=source_name, vol_trg=name)
             if minimum_volume_size_in_bytes > source_capacity_in_bytes:
                 min_vol_size_in_blocks = self._convert_size_bytes_to_blocks(minimum_volume_size_in_bytes)
@@ -227,23 +227,13 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
-    def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
-                                              min_vol_size_in_bytes, pool_id=None):
+    def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
+                                            minimum_volume_size_in_bytes, pool_id=None):
         logger.debug(
-            "Copy snapshot {0} data to volume {1}. Snapshot capacity {2}. Minimal requested volume capacity {3}".format(
-                name, src_snap_name, src_snap_capacity_in_bytes, min_vol_size_in_bytes))
-        self.copy_to_existing_volume_from_object(name, src_snap_name, src_snap_capacity_in_bytes,
-                                                 min_vol_size_in_bytes, controller_config.VOLUME_SOURCE_SNAPSHOT,
-                                                 pool_id)
-
-    def copy_to_existing_volume_from_volume(self, name, src_vol_name, src_vol_capacity_in_bytes,
-                                            min_vol_size_in_bytes, pool_id=None):
-        logger.debug(
-            "Copy volume {0} data to volume {1}. Volume capacity {2}. Minimal requested volume capacity {3}".format(
-                name, src_vol_name, src_vol_capacity_in_bytes, min_vol_size_in_bytes))
-        self.copy_to_existing_volume_from_object(name, src_vol_name, src_vol_capacity_in_bytes,
-                                                 min_vol_size_in_bytes, controller_config.VOLUME_SOURCE_VOLUME,
-                                                 pool_id)
+            "Copy source {0} data to volume {1}. source capacity {2}. Minimal requested volume capacity {3}".format(
+                name, source_name, source_capacity_in_bytes, minimum_volume_size_in_bytes))
+        self.copy_to_existing_volume_from_object(name, source_name, source_capacity_in_bytes,
+                                                 minimum_volume_size_in_bytes, pool_id)
 
     def _get_vol_by_wwn(self, volume_id):
         vol_by_wwn = self.client.cmd.vol_list(wwn=volume_id).as_single_element
