@@ -116,7 +116,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                         return csi_pb2.CreateVolumeResponse()
 
-                    copy_source_res = self._handle_existing_vol_src(vol, source_id, source_type, context)
+                    copy_source_res = self._handle_existing_volume_source(vol, source_id, source_type, context)
                     if copy_source_res:
                         return copy_source_res
 
@@ -179,18 +179,17 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.error("Exception raised while copying {0} data to volume".format(source_object_type))
             self._rollback_create_volume_from_source(array_mediator, volume.id)
             raise ex
-        return volume
 
     @retry(Exception, tries=5, delay=1)
     def _rollback_create_volume_from_source(self, array_mediator, vol_id):
         logger.debug("Rollback copy volume from source. Deleting volume {0}".format(vol_id))
         array_mediator.delete_volume(vol_id)
 
-    def _handle_existing_vol_src(self, volume, src_object_id, source_type, context):
+    def _handle_existing_volume_source(self, volume, source_object_id, source_type, context):
         """
         Args:
             volume              : volume fetched or created in CreateVolume
-            src_object_id       : id of object we should copy to vol or None if volume should not be copied
+            source_object_id       : id of object we should copy to vol or None if volume should not be copied
             source_type:        : the object type of the source - volume or snapshot
             context             : CreateVolume response context
         Returns:
@@ -199,18 +198,18 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             If volume is a copy of another source - set context status to INTERNAL and return CreateVolumeResponse.
             In any other case return None.
         """
-        vol_name = volume.name
-        vol_copy_src_object_id = volume.copy_src_object_id
-        if not src_object_id or not vol_copy_src_object_id:
+        volume_name = volume.name
+        volume_copy_source_object_id = volume.copy_src_object_id
+        if not source_object_id or not volume_copy_source_object_id:
             return None
-        if vol_copy_src_object_id == src_object_id:
+        if volume_copy_source_object_id == source_object_id:
             logger.debug(
-                "Volume {0} exists and it is a copy of {1} {2}.".format(vol_name, source_type, src_object_id))
+                "Volume {0} exists and it is a copy of {1} {2}.".format(volume_name, source_type, source_object_id))
             context.set_code(grpc.StatusCode.OK)
             return utils.generate_csi_create_volume_response(volume, source_type)
         else:
             logger.debug(
-                "Volume {0} exists but it is not a copy of object {1}.".format(vol_name, src_object_id))
+                "Volume {0} exists but it is not a copy of object {1}.".format(volume_name, source_object_id))
             context.set_details("Volume already exists but it was created from a different source.")
             context.set_code(grpc.StatusCode.INTERNAL)
             return csi_pb2.CreateVolumeResponse()
@@ -253,7 +252,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     return csi_pb2.DeleteVolumeResponse()
 
         except controller_errors.ObjectIsStillInUseError:
-            logger.info("could not delete snapshot while in use: {0}".format(ex))
+            logger.info("could not delete object while in use: {0}".format(ex))
             context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
             context.set_details(ex)
             return csi_pb2.DeleteVolumeResponse()
@@ -673,10 +672,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             if source.HasField(config.VOLUME_SOURCE_SNAPSHOT):
                 source_id = source.snapshot.snapshot_id
                 source_type = config.VOLUME_SOURCE_SNAPSHOT
-            else:
+            elif source.HasField(config.VOLUME_SOURCE_VOLUME):
                 source_id = source.volume.volume_id
                 source_type = config.VOLUME_SOURCE_VOLUME
-            logger.debug("src_id_field: {0}".format(source_id))
+            else:
+                return None, None
+            logger.debug("source_id : {0}".format(source_id))
             _, object_id = utils.get_object_id_info(source_id, source_type)
         return source_type, object_id
 

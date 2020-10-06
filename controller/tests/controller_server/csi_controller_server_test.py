@@ -578,7 +578,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.copy_to_existing_volume_from_source.assert_called_once_with(vol_name, snap_name,
                                                                                   snap_capacity_bytes,
                                                                                   self.capacity_bytes,
-                                                                                    'pool1')
+                                                                                  'pool1')
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, snapshot_id)
 
