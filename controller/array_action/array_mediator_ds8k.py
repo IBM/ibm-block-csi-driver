@@ -78,7 +78,7 @@ def convert_scsi_id_to_array_id(mediator_method, self, *args):
     return mediator_method(self, *args)
 
 
-def get_flashcopy_as_target_if_exist(api_volume):
+def get_flashcopy_as_target_if_exists(api_volume):
     flashcopies = [flashcopy for flashcopy in api_volume.flashcopy
                    if flashcopy.targetvolume == api_volume.id]
     if len(flashcopies) != 1:
@@ -200,7 +200,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             vol_id=self._generate_volume_scsi_identifier(api_volume.id),
             vol_name=api_volume.name,
             array_address=self.service_address,
-            copy_src_object_id=source_volume_id,
+            copy_source_id=source_volume_id,
             pool_name=api_volume.pool,
             array_type=self.array_type
         )

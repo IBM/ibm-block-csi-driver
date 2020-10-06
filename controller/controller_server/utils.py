@@ -91,7 +91,7 @@ def _validate_source_info(source, source_type):
     logger.info("Source {0} specified: {1}".format(source_type, source_object))
     source_object_id = getattr(source_object, config.VOLUME_SOURCE_ID_FIELDS[source_type])
     if not source_object_id:
-        raise ValidationException(messages.volume_src_object_id_is_missing.format(source_type))
+        raise ValidationException(messages.volume_source_id_is_missing.format(source_type))
     if config.PARAMETERS_OBJECT_ID_DELIMITER not in source_object_id:
         raise ObjectIdError(source_type, source_object_id)
 
@@ -158,27 +158,27 @@ def validate_delete_snapshot_request(request):
     logger.debug("request validation finished.")
 
 
-def generate_csi_create_volume_response(new_vol, source_type=None):
-    logger.debug("creating volume response for vol : {0}".format(new_vol))
+def generate_csi_create_volume_response(new_volume, source_type=None):
+    logger.debug("creating volume response for vol : {0}".format(new_volume))
 
-    vol_context = {"volume_name": new_vol.name,
+    vol_context = {"volume_name": new_volume.name,
                    "array_address": ",".join(
-                       new_vol.array_address if isinstance(new_vol.array_address, list) else [new_vol.array_address]),
-                   "pool_name": new_vol.pool_name,
-                   "storage_type": new_vol.array_type
+                       new_volume.array_address if isinstance(new_volume.array_address, list) else [new_volume.array_address]),
+                   "pool_name": new_volume.pool_name,
+                   "storage_type": new_volume.array_type
                    }
     content_source = None
-    if new_vol.copy_src_object_id:
+    if new_volume.copy_source_id:
         if source_type == config.VOLUME_SOURCE_SNAPSHOT:
-            snapshot_source = csi_pb2.VolumeContentSource.SnapshotSource(snapshot_id=new_vol.copy_src_object_id)
+            snapshot_source = csi_pb2.VolumeContentSource.SnapshotSource(snapshot_id=new_volume.copy_source_id)
             content_source = csi_pb2.VolumeContentSource(snapshot=snapshot_source)
         else:
-            volume_source = csi_pb2.VolumeContentSource.VolumeSource(volume_id=new_vol.copy_src_object_id)
+            volume_source = csi_pb2.VolumeContentSource.VolumeSource(volume_id=new_volume.copy_source_id)
             content_source = csi_pb2.VolumeContentSource(volume=volume_source)
 
     res = csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(
-        capacity_bytes=new_vol.capacity_bytes,
-        volume_id=get_vol_id(new_vol),
+        capacity_bytes=new_volume.capacity_bytes,
+        volume_id=get_vol_id(new_volume),
         content_source=content_source,
         volume_context=vol_context))
 
