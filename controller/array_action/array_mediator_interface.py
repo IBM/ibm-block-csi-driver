@@ -71,8 +71,7 @@ class ArrayMediator(ABC):
             Volume
 
         Raises:
-            VolumeNotFoundError
-            SnapshotNotFoundError
+            ObjectNotFoundError
             IllegalObjectName
             PermissionDenied
             PoolParameterIsMissing
@@ -91,7 +90,7 @@ class ArrayMediator(ABC):
             None
 
         Raises:
-            VolumeNotFound
+            ObjectNotFound
             PermissionDenied
             ObjectIsStillInUse
         """
@@ -111,7 +110,7 @@ class ArrayMediator(ABC):
            Volume
 
         Raises:
-            VolumeNotFound
+            ObjectNotFound
             IllegalObjectName
             PermissionDenied
             PoolParameterIsMissing
@@ -127,7 +126,7 @@ class ArrayMediator(ABC):
         Returns:
            volume name
         Raises:
-            VolumeNotFound
+            ObjectNotFound
             IllegalObjectID
         """
         raise NotImplementedError
@@ -144,7 +143,7 @@ class ArrayMediator(ABC):
            mapped_host_luns : a dict like this: {<host name>:<lun id>,...}
 
         Raises:
-            VolumeNotFound
+            ObjectNotFound
         """
         raise NotImplementedError
 
@@ -163,7 +162,7 @@ class ArrayMediator(ABC):
         Raises:
             NoAvailableLun
             LunAlreadyInUse
-            VolumeNotFound
+            ObjectNotFound
             HostNotFound
             PermissionDenied
             MappingError
@@ -184,7 +183,7 @@ class ArrayMediator(ABC):
 
         Raises:
             VolumeAlreadyUnmapped
-            VolumeNotFound
+            ObjectNotFound
             HostNotFound
             PermissionDenied
             UnMappingError
@@ -201,7 +200,7 @@ class ArrayMediator(ABC):
         Returns:
            Snapshot
         Raises:
-            SnapshotNameBelongsToVolumeError
+            ExpectedSnapshotButFoundVolumeError
             IllegalObjectName
             PermissionDenied
             PoolParameterIsMissing
@@ -216,9 +215,10 @@ class ArrayMediator(ABC):
             object_id   : id of the object in the storage system
             object_type : volume or snapshot
         Returns:
-           Snapshot or Volume
+           Snapshot
+           Volume
         Raises:
-            SnapshotIdBelongsToVolumeError
+            ExpectedSnapshotButFoundVolumeError
         """
         raise NotImplementedError
 
@@ -234,7 +234,7 @@ class ArrayMediator(ABC):
             Snapshot
         Raises:
             SnapshotAlreadyExists
-            VolumeNotFound
+            ObjectNotFound
             IllegalObjectName
             PermissionDenied
             PoolParameterIsMissing
@@ -250,8 +250,9 @@ class ArrayMediator(ABC):
         Returns:
             None
         Raises:
-            SnapshotNotFound
+            ObjectNotFound
             PermissionDenied
+            ObjectIsStillInUse
         """
         raise NotImplementedError
 

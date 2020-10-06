@@ -10,7 +10,8 @@ import controller.controller_server.config as config
 import controller.controller_server.errors as controller_errors
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.controller_server.csi_controller_server import ControllerServicer
-from controller.controller_server.test_settings import vol_name, snap_name, snap_vol_name, clone_vol_name
+from controller.controller_server.test_settings import volume_name, snapshot_name, snapshot_volume_name, \
+    clone_volume_name
 from controller.csi_general import csi_pb2
 from controller.tests import utils
 
@@ -97,7 +98,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
         self.request.parameters = {}
         self.capacity_bytes = 10
-        self.request.name = snap_name
+        self.request.name = snapshot_name
         self.request.source_volume_id = "A9000:12345678"
 
         self.context = utils.FakeContext()
@@ -111,9 +112,9 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
         self.mediator.create_snapshot = Mock()
         self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, "snap", "wwn",
-                                                                                               "snap_vol", "xiv")
+                                                                                               "snapshot_vol", "xiv")
         self.mediator.get_volume_name = Mock()
-        self.mediator.get_volume_name.return_value = snap_vol_name
+        self.mediator.get_volume_name.return_value = snapshot_volume_name
         array_type.return_value = "a9k"
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
@@ -124,18 +125,18 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.servicer.CreateSnapshot(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.get_snapshot.assert_called_once_with(snap_name, pool_id=None)
-        self.mediator.create_snapshot.assert_called_once_with(snap_name, snap_vol_name, None)
+        self.mediator.get_snapshot.assert_called_once_with(snapshot_name, pool_id=None)
+        self.mediator.create_snapshot.assert_called_once_with(snapshot_name, snapshot_volume_name, None)
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_belongs_to_wrong_volume(self, storage_agent, array_type):
         storage_agent.return_value = self.storage_agent
         self.mediator.create_snapshot = Mock()
-        self.mediator.get_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, snap_name, "wwn",
+        self.mediator.get_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, snapshot_name, "wwn",
                                                                                             "wrong_volume_name", "xiv")
         self.mediator.get_volume_name = Mock()
-        self.mediator.get_volume_name.return_value = snap_vol_name
+        self.mediator.get_volume_name.return_value = snapshot_volume_name
         array_type.return_value = "a9k"
 
         self.servicer.CreateSnapshot(self.request, self.context)
@@ -154,7 +155,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     def test_create_snapshot_source_volume_not_found(self, storage_agent, array_type):
         storage_agent.return_value = self.storage_agent
         self.mediator.get_volume_name = Mock()
-        self.mediator.get_volume_name.side_effect = array_errors.ObjectNotFoundError("vol_id")
+        self.mediator.get_volume_name.side_effect = array_errors.ObjectNotFoundError("volume_id")
 
         self.servicer.CreateSnapshot(self.request, self.context)
 
@@ -185,7 +186,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
         self.assertTrue("error" in self.context.details)
-        self.mediator.get_snapshot.assert_called_once_with(snap_name, pool_id=None)
+        self.mediator.get_snapshot.assert_called_once_with(snapshot_name, pool_id=None)
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.get_snapshot")
@@ -200,7 +201,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertTrue(msg in self.context.details)
-        self.mediator.get_snapshot.assert_called_once_with(snap_name, pool_id=None)
+        self.mediator.get_snapshot.assert_called_once_with(snapshot_name, pool_id=None)
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -219,7 +220,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     def create_snapshot_returns_error(self, storage_agent, create_snapshot, array_type, return_code, err):
         storage_agent.return_value = self.storage_agent
         self.mediator.get_volume_name = Mock()
-        self.mediator.get_volume_name.return_value = snap_vol_name
+        self.mediator.get_volume_name.return_value = snapshot_volume_name
         create_snapshot.side_effect = [err]
         msg = str(err)
 
@@ -227,8 +228,8 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
         self.assertEqual(self.context.code, return_code)
         self.assertTrue(msg in self.context.details)
-        self.mediator.get_snapshot.assert_called_once_with(snap_name, pool_id=None)
-        self.mediator.create_snapshot.assert_called_once_with(snap_name, snap_vol_name, None)
+        self.mediator.get_snapshot.assert_called_once_with(snapshot_name, pool_id=None)
+        self.mediator.create_snapshot.assert_called_once_with(snapshot_name, snapshot_volume_name, None)
 
     def test_create_snapshot_with_illegal_object_name_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
@@ -251,18 +252,18 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     def test_create_snapshot_with_name_prefix(self, storage_agent, array_type):
         storage_agent.return_value = self.storage_agent
         self.mediator.get_volume_name = Mock()
-        self.mediator.get_volume_name.return_value = "snap_vol"
+        self.mediator.get_volume_name.return_value = "snapshot_vol"
         self.request.name = "some_name"
         self.request.parameters[config.PARAMETERS_SNAPSHOT_NAME_PREFIX] = "prefix"
         self.mediator.create_snapshot = Mock()
         self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, "snap", "wwn",
-                                                                                               "snap_vol", "xiv")
+                                                                                               "snapshot_vol", "xiv")
         array_type.return_value = "a9k"
 
         self.servicer.CreateSnapshot(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.create_snapshot.assert_called_once_with("prefix_some_name", "snap_vol", None)
+        self.mediator.create_snapshot.assert_called_once_with("prefix_some_name", "snapshot_vol", None)
 
 
 class TestControllerServerDeleteSnapshot(unittest.TestCase):
@@ -375,7 +376,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.capacity_bytes = 10
         self.request.capacity_range = Mock()
         self.request.capacity_range.required_bytes = self.capacity_bytes
-        self.request.name = vol_name
+        self.request.name = volume_name
         self.request.volume_content_source = None
 
         self.context = utils.FakeContext()
@@ -398,8 +399,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.get_volume.assert_called_once_with(vol_name, pool_id='pool1')
-        self.mediator.create_volume.assert_called_once_with(vol_name, 10, {}, 'pool1')
+        self.mediator.get_volume.assert_called_once_with(volume_name, pool_id='pool1')
+        self.mediator.create_volume.assert_called_once_with(volume_name, 10, {}, 'pool1')
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
 
@@ -465,7 +466,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
         self.assertTrue("error" in self.context.details)
-        self.mediator.get_volume.assert_called_once_with(vol_name, pool_id='pool1')
+        self.mediator.get_volume.assert_called_once_with(volume_name, pool_id='pool1')
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.get_volume")
@@ -479,7 +480,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertTrue(msg in self.context.details)
-        self.mediator.get_volume.assert_called_once_with(vol_name, pool_id='pool1')
+        self.mediator.get_volume.assert_called_once_with(volume_name, pool_id='pool1')
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -503,8 +504,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
         self.assertEqual(self.context.code, return_code)
         self.assertTrue(msg in self.context.details)
-        self.mediator.get_volume.assert_called_once_with(vol_name, pool_id='pool1')
-        self.mediator.create_volume.assert_called_once_with(vol_name, self.capacity_bytes, {}, self.pool)
+        self.mediator.get_volume.assert_called_once_with(volume_name, pool_id='pool1')
+        self.mediator.create_volume.assert_called_once_with(volume_name, self.capacity_bytes, {}, self.pool)
 
     def test_create_volume_with_illegal_object_name_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
@@ -562,21 +563,23 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     def test_create_volume_from_snapshot_success(self, storage_agent, array_type):
         storage_agent.return_value = self.storage_agent
         snapshot_id = "wwn1"
-        snap_capacity_bytes = 100
+        snapshot_capacity_bytes = 100
         array_type.return_value = "a9k"
         self.request.volume_content_source = self._get_source_snapshot(snapshot_id)
         self.mediator.create_volume = Mock()
-        self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, vol_name, "wwn2", "a9k")
+        self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, volume_name, "wwn2",
+                                                                                           "a9k")
         self.mediator.get_object_by_id = Mock()
-        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_snapshot(snap_capacity_bytes,
-                                                                                                snap_name,
-                                                                                                snapshot_id, vol_name,
+        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_snapshot(snapshot_capacity_bytes,
+                                                                                                snapshot_name,
+                                                                                                snapshot_id,
+                                                                                                volume_name,
                                                                                                 "a9k")
         self.mediator.copy_to_existing_volume_from_source = Mock()
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.copy_to_existing_volume_from_source.assert_called_once_with(vol_name, snap_name,
-                                                                                  snap_capacity_bytes,
+        self.mediator.copy_to_existing_volume_from_source.assert_called_once_with(volume_name, snapshot_name,
+                                                                                  snapshot_capacity_bytes,
                                                                                   self.capacity_bytes,
                                                                                   'pool1')
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
@@ -586,31 +589,31 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_from_snapshot_idempotent(self, storage_agent, array_type):
         storage_agent.return_value = self.storage_agent
-        snap_id = "wwn1"
-        self.request.volume_content_source = self._get_source_snapshot(snap_id)
+        snapshot_id = "wwn1"
+        self.request.volume_content_source = self._get_source_snapshot(snapshot_id)
         self.mediator.get_volume = Mock()
-        self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, vol_name, "wwn2", "a9k",
-                                                                                        copy_source_id=snap_id)
+        self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, volume_name, "wwn2", "a9k",
+                                                                                        copy_source_id=snapshot_id)
         array_type.return_value = "a9k"
         self.mediator.copy_to_existing_volume_from_source = Mock()
 
         response = self.servicer.CreateVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.assertEqual(response.volume.content_source.snapshot.snapshot_id, snap_id)
+        self.assertEqual(response.volume.content_source.snapshot.snapshot_id, snapshot_id)
         self.mediator.copy_to_existing_volume_from_source.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_from_snapshot_volume_without_source(self, storage_agent, array_type):
         storage_agent.return_value = self.storage_agent
-        snap_id = "wwn1"
-        self.request.volume_content_source = self._get_source_snapshot(snap_id)
+        snapshot_id = "wwn1"
+        self.request.volume_content_source = self._get_source_snapshot(snapshot_id)
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
         self.mediator.get_object_by_id = Mock()
-        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_snapshot(1000, snap_name,
-                                                                                                "wwn", vol_name,
+        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_snapshot(1000, snapshot_name,
+                                                                                                "wwn", volume_name,
                                                                                                 "a9k")
         self.mediator.copy_to_existing_volume_from_source = Mock()
         array_type.return_value = "a9k"
@@ -621,32 +624,32 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_from_snapshot_error_other_source(self, storage_agent, array_type):
         storage_agent.return_value = self.storage_agent
-        snap_id = "wwn1"
-        vol_src_id = "wwn3"
-        self.request.volume_content_source = self._get_source_snapshot(snap_id)
+        snapshot_id = "wwn1"
+        volume_source_id = "wwn3"
+        self.request.volume_content_source = self._get_source_snapshot(snapshot_id)
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k",
-                                                                                        copy_source_id=vol_src_id)
+                                                                                        copy_source_id=volume_source_id)
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_volume_from_snapshot_src_snapshot_not_found(self, storage_agent, array_type):
+    def test_create_volume_from_snapshot_source_snapshot_not_found(self, storage_agent, array_type):
         array_exception = array_errors.ObjectNotFoundError("")
         self._test_create_volume_from_snapshot_error(storage_agent, array_type, array_exception,
                                                      grpc.StatusCode.NOT_FOUND)
 
-    def test_create_volume_from_snapshot_src_snapshot_invalid(self):
-        volume_content_source = self._get_source('snap_id', config.SNAPSHOT_TYPE_NAME)
-        volume_content_source.snapshot.snapshot_id = 'invalid_snap_id'
+    def test_create_volume_from_snapshot_source_snapshot_invalid(self):
+        volume_content_source = self._get_source('snapshot_id', config.SNAPSHOT_TYPE_NAME)
+        volume_content_source.snapshot.snapshot_id = 'invalid_snapshot_id'
         self.request.volume_content_source = volume_content_source
 
         self.servicer.CreateVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
-        self.assertTrue("invalid_snap_id" in self.context.details)
+        self.assertTrue("invalid_snapshot_id" in self.context.details)
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -679,14 +682,14 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     def _test_create_volume_from_snapshot_error(self, storage_agent, array_type, array_exception, return_code,
                                                 rollback_called=True):
         storage_agent.return_value = self.storage_agent
-        snap_id = "wwn1"
-        vol_id = "wwn2"
-        self.request.volume_content_source = self._get_source_snapshot(snap_id)
+        snapshot_id = "wwn1"
+        volume_id = "wwn2"
+        self.request.volume_content_source = self._get_source_snapshot(snapshot_id)
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
         self.mediator.get_object_by_id = Mock()
-        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_snapshot(1000, snap_name,
-                                                                                                vol_id, vol_name,
+        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_snapshot(1000, snapshot_name,
+                                                                                                volume_id, volume_name,
                                                                                                 "a9k")
         self.mediator.copy_to_existing_volume_from_source = Mock()
         self.mediator.copy_to_existing_volume_from_source.side_effect = [array_exception]
@@ -695,7 +698,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, self.context)
         if rollback_called:
-            self.mediator.delete_volume.assert_called_with(vol_id)
+            self.mediator.delete_volume.assert_called_with(volume_id)
         self.assertEqual(self.context.code, return_code)
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
@@ -707,16 +710,17 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         array_type.return_value = "a9k"
         self.request.volume_content_source = self._get_source(volume_id, config.VOLUME_TYPE_NAME)
         self.mediator.create_volume = Mock()
-        self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, vol_name, "wwn2", "a9k")
+        self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, volume_name, "wwn2",
+                                                                                           "a9k")
         self.mediator.get_object_by_id = Mock()
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(volume_capacity_bytes,
-                                                                                              clone_vol_name,
+                                                                                              clone_volume_name,
                                                                                               volume_id,
                                                                                               "a9k")
         self.mediator.copy_to_existing_volume_from_source = Mock()
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.copy_to_existing_volume_from_source.assert_called_once_with(vol_name, clone_vol_name,
+        self.mediator.copy_to_existing_volume_from_source.assert_called_once_with(volume_name, clone_volume_name,
                                                                                   volume_capacity_bytes,
                                                                                   self.capacity_bytes,
                                                                                   'pool1')
@@ -727,30 +731,30 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_clone_volume_idempotent(self, storage_agent, array_type):
         storage_agent.return_value = self.storage_agent
-        vol_id = "wwn1"
-        self.request.volume_content_source = self._get_source(vol_id, config.VOLUME_TYPE_NAME)
+        volume_id = "wwn1"
+        self.request.volume_content_source = self._get_source(volume_id, config.VOLUME_TYPE_NAME)
         self.mediator.get_volume = Mock()
-        self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, vol_name, "wwn2", "a9k",
-                                                                                        copy_source_id=vol_id)
+        self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, volume_name, "wwn2", "a9k",
+                                                                                        copy_source_id=volume_id)
         array_type.return_value = "a9k"
         self.mediator.copy_to_existing_volume_from_source = Mock()
 
         response = self.servicer.CreateVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.assertEqual(response.volume.content_source.volume.volume_id, vol_id)
+        self.assertEqual(response.volume.content_source.volume.volume_id, volume_id)
         self.mediator.copy_to_existing_volume_from_source.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_clone_volume_without_source(self, storage_agent, array_type):
         storage_agent.return_value = self.storage_agent
-        vol_id = "wwn1"
-        self.request.volume_content_source = self._get_source(vol_id, config.VOLUME_TYPE_NAME)
+        volume_id = "wwn1"
+        self.request.volume_content_source = self._get_source(volume_id, config.VOLUME_TYPE_NAME)
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
         self.mediator.get_object_by_id = Mock()
-        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(1000, vol_name,
+        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(1000, volume_name,
                                                                                               "wwn", "a9k")
         self.mediator.copy_to_existing_volume_from_source = Mock()
         array_type.return_value = "a9k"
@@ -761,25 +765,25 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_clone_volume_error_other_source(self, storage_agent, array_type):
         storage_agent.return_value = self.storage_agent
-        vol_id = "wwn1"
-        vol_src_id = "wwn3"
-        self.request.volume_content_source = self._get_source(vol_id, config.VOLUME_TYPE_NAME)
+        volume_id = "wwn1"
+        volume_source_id = "wwn3"
+        self.request.volume_content_source = self._get_source(volume_id, config.VOLUME_TYPE_NAME)
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k",
-                                                                                        copy_source_id=vol_src_id)
+                                                                                        copy_source_id=volume_source_id)
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_clone_volume_src_volume_not_found(self, storage_agent, array_type):
+    def test_clone_volume_source_volume_not_found(self, storage_agent, array_type):
         array_exception = array_errors.ObjectNotFoundError("")
         self._test_clone_volume_error(storage_agent, array_type, array_exception,
                                       grpc.StatusCode.NOT_FOUND)
 
-    def test_clone_volume_src_volume_invalid(self):
-        volume_content_source = self._get_source('vol_id', config.VOLUME_TYPE_NAME)
+    def test_clone_volume_source_volume_invalid(self):
+        volume_content_source = self._get_source('volume_id', config.VOLUME_TYPE_NAME)
         volume_content_source.volume.volume_id = 'invalid_volume_id'
         self.request.volume_content_source = volume_content_source
 
@@ -787,13 +791,6 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
         self.assertTrue("invalid_volume_id" in self.context.details)
-
-    @patch("controller.controller_server.csi_controller_server.detect_array_type")
-    @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_clone_volume_target_volume_not_found(self, storage_agent, array_type):
-        array_exception = array_errors.ObjectNotFoundError("")
-        self._test_clone_volume_error(storage_agent, array_type, array_exception,
-                                      grpc.StatusCode.NOT_FOUND, rollback_called=False)
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -819,15 +816,16 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     def _test_clone_volume_error(self, storage_agent, array_type, array_exception, return_code,
                                  rollback_called=True):
         storage_agent.return_value = self.storage_agent
-        clone_vol_id = "wwn2"
-        vol_id = "wwn1"
-        self.request.volume_content_source = self._get_source(vol_id, config.VOLUME_TYPE_NAME)
+        clone_volume_id = "wwn2"
+        volume_id = "wwn1"
+        self.request.volume_content_source = self._get_source(volume_id, config.VOLUME_TYPE_NAME)
         self.mediator.get_volume = Mock()
-        self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, vol_name, vol_id, "a9k")
+        self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, volume_name, volume_id,
+                                                                                        "a9k")
         self.mediator.get_object_by_id = Mock()
-        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(1000, clone_vol_name,
-                                                                                              clone_vol_id, "a9k",
-                                                                                              copy_source_id=vol_id)
+        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(1000, clone_volume_name,
+                                                                                              clone_volume_id, "a9k",
+                                                                                              copy_source_id=volume_id)
         self.mediator.copy_to_existing_volume_from_source = Mock()
         self.mediator.copy_to_existing_volume_from_source.side_effect = [array_exception]
         self.storage_agent.get_mediator.return_value.__exit__.side_effect = [array_exception]
@@ -835,7 +833,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         array_type.return_value = "a9k"
         self.servicer.CreateVolume(self.request, self.context)
         if rollback_called:
-            self.mediator.delete_volume.assert_called_with(vol_id)
+            self.mediator.delete_volume.assert_called_with(volume_id)
         self.assertEqual(self.context.code, return_code)
 
     def _get_source_volume(self, object_id):
