@@ -249,7 +249,6 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def _prepare_mocks_for_get_snapshot(self):
         target_cli_vol = self._get_mapped_target_cli_vol()
-
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(target_cli_vol)
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")

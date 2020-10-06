@@ -78,7 +78,7 @@ def convert_scsi_id_to_array_id(mediator_method, self, *args):
     return mediator_method(self, *args)
 
 
-def get_flashcopy_as_target_if_exist(api_volume):
+def get_flashcopy_as_target_if_exists(api_volume):
     flashcopies = [flashcopy for flashcopy in api_volume.flashcopy
                    if flashcopy.targetvolume == api_volume.id]
     if len(flashcopies) != 1:
@@ -193,14 +193,14 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return '6{}000000000000{}'.format(self.wwnn[1:], volume_id)
 
     def _generate_volume_response(self, api_volume):
-        flashcopy_as_target = get_flashcopy_as_target_if_exist(api_volume)
+        flashcopy_as_target = get_flashcopy_as_target_if_exists(api_volume)
         source_volume_id = flashcopy_as_target.sourcevolume if flashcopy_as_target else None
         return Volume(
             vol_size_bytes=int(api_volume.cap),
             vol_id=self._generate_volume_scsi_identifier(api_volume.id),
             vol_name=api_volume.name,
             array_address=self.service_address,
-            copy_src_object_id=source_volume_id,
+            copy_source_id=source_volume_id,
             pool_name=api_volume.pool,
             array_type=self.array_type
         )
@@ -538,7 +538,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     def _generate_snapshot_response_with_verification(self, api_object):
-        flashcopy_as_target = get_flashcopy_as_target_if_exist(api_object)
+        flashcopy_as_target = get_flashcopy_as_target_if_exists(api_object)
         if flashcopy_as_target is None or flashcopy_as_target.backgroundcopy != "disabled":
             raise array_errors.ExpectedSnapshotButFoundVolumeError(api_object.name, self.service_address)
         source_volume_name = self.get_volume_name(flashcopy_as_target.sourcevolume)
@@ -549,7 +549,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         api_object = self._get_api_volume_by_id(object_id)
         if not api_object:
             return None
-        if object_type is controller_config.OBJECT_TYPE_NAME_SNAPSHOT:
+        if object_type is controller_config.SNAPSHOT_TYPE_NAME:
             return self._generate_snapshot_response_with_verification(api_object)
         return self._generate_volume_response(api_object)
 
