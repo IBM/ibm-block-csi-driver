@@ -205,9 +205,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                    })]
         self.client_mock.get_flashcopies.return_value = Munch({"out_of_sync_tracks": "0"})
         self.client_mock.delete_volume.side_effect = ClientException("500")
-        with self.assertRaises(array_errors.VolumeDeletionError):
+        with self.assertRaises(array_errors.ObjectIsStillInUseError):
             self.array.delete_volume("0001")
-        self.client_mock.delete_flashcopy.assert_called_once_with("0003:0001")
 
     def test_delete_volume_with_source_no_flashcopies_deleted(self):
         self.client_mock.get_volume.return_value = copy.deepcopy(self.volume_response)
@@ -220,9 +219,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                    })]
         self.client_mock.get_flashcopies.return_value = Munch({"out_of_sync_tracks": "0"})
         self.client_mock.delete_volume.side_effect = ClientException("500")
-        with self.assertRaises(array_errors.VolumeDeletionError):
+        with self.assertRaises(array_errors.ObjectIsStillInUseError):
             self.array.delete_volume("0001")
-        self.client_mock.delete_flashcopy.assert_not_called()
 
     def test_delete_volume_with_flashcopy_still_copying(self):
         self.client_mock.get_volume.return_value = copy.deepcopy(self.volume_response)

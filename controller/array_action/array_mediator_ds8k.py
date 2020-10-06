@@ -326,10 +326,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
         api_volume = self._get_api_volume_by_id(volume_id)
-        self._assert_object_is_not_in_use(volume_id, api_volume.flashcopy)
-        for flashcopy in api_volume.flashcopy:
-            if flashcopy.targetvolume == volume_id or flashcopy.backgroundcopy != "disabled":
-                self._delete_flashcopy(flashcopy.id)
+        self._safe_delete_flashcopies(api_volume)
         self._delete_volume(volume_id)
         logger.info("Finished deleting volume {}".format(volume_id))
 
@@ -588,11 +585,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         if not api_volume.flashcopy:
             logger.error(
                 "FlashCopy relationship not found for target volume: {}".format(api_volume.name))
-            raise array_errors.SnapshotNameBelongsToVolumeError(api_volume.name,
+            raise array_errors.VolumeNameBelongsToSnapshotError(api_volume.name,
                                                                 self.service_address)
-        self._assert_object_is_not_in_use(snapshot_id, api_volume.flashcopy)
-        for flashcopy in api_volume.flashcopy:
-            self._delete_flashcopy(flashcopy.id)
+        self._safe_delete_flashcopies(api_volume)
         self._delete_volume(snapshot_id)
         logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
 
@@ -659,12 +654,18 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         flashcopy_process = self._get_flashcopy_process(flashcopy_id)
         return flashcopy_process.state
 
-    def _assert_object_is_not_in_use(self, object_id, flashcopies):
-        for flashcopy in flashcopies:
-            if flashcopy.sourcevolume == object_id:
-                flashcopy_process = self._get_flashcopy_process(flashcopy.id)
-                if self._is_flashcopy_copy(flashcopy_process):
-                    raise array_errors.ObjectIsStillInUseError(object_id, flashcopy_process.targetvolume)
+    def _safe_delete_flashcopies(self, api_volume):
+        flashcopies_as_source = [flashcopy for flashcopy in api_volume.flashcopy
+                                 if flashcopy.sourcevolume == api_volume.id]
+        for flashcopy in flashcopies_as_source:
+            self._safe_delete_flashcopy(flashcopy)
+        flashcopy_as_target = get_flashcopy_as_target_if_exist(api_volume)
+        if flashcopy_as_target:
+            self._delete_flashcopy(flashcopy_as_target.id)
 
-    def _is_flashcopy_copy(self, flascopy):
-        return flascopy.out_of_sync_tracks != '0'
+    def _safe_delete_flashcopy(self, flashcopy):
+        flashcopy_process = self._get_flashcopy_process(flashcopy.id)
+        if flashcopy.backgroundcopy != "disabled" and flashcopy_process.out_of_sync_tracks == '0':
+            self._delete_flashcopy(flashcopy.id)
+        else:
+            raise array_errors.ObjectIsStillInUseError(flashcopy.sourcevolume, flashcopy.targetvolume)
