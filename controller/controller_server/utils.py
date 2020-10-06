@@ -80,10 +80,10 @@ def validate_create_volume_source(request):
     source = request.volume_content_source
     if source:
         logger.info(source)
-        if source.HasField(config.VOLUME_SOURCE_SNAPSHOT):
-            _validate_source_info(source, config.VOLUME_SOURCE_SNAPSHOT)
-        elif source.HasField(config.VOLUME_SOURCE_VOLUME):
-            _validate_source_info(source, config.VOLUME_SOURCE_VOLUME)
+        if source.HasField(config.SNAPSHOT_TYPE_NAME):
+            _validate_source_info(source, config.SNAPSHOT_TYPE_NAME)
+        elif source.HasField(config.VOLUME_TYPE_NAME):
+            _validate_source_info(source, config.VOLUME_TYPE_NAME)
 
 
 def _validate_source_info(source, source_type):
@@ -170,7 +170,7 @@ def generate_csi_create_volume_response(new_volume, source_type=None):
                    }
     content_source = None
     if new_volume.copy_source_id:
-        if source_type == config.VOLUME_SOURCE_SNAPSHOT:
+        if source_type == config.SNAPSHOT_TYPE_NAME:
             snapshot_source = csi_pb2.VolumeContentSource.SnapshotSource(snapshot_id=new_volume.copy_source_id)
             content_source = csi_pb2.VolumeContentSource(snapshot=snapshot_source)
         else:
@@ -234,11 +234,11 @@ def validate_publish_volume_request(request):
 
 
 def get_volume_id_info(volume_id):
-    return get_object_id_info(volume_id, config.OBJECT_TYPE_NAME_VOLUME)
+    return get_object_id_info(volume_id, config.VOLUME_TYPE_NAME)
 
 
 def get_snapshot_id_info(snapshot_id):
-    return get_object_id_info(snapshot_id, config.OBJECT_TYPE_NAME_SNAPSHOT)
+    return get_object_id_info(snapshot_id, config.SNAPSHOT_TYPE_NAME)
 
 
 def get_object_id_info(full_object_id, object_type):

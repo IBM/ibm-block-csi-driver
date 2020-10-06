@@ -577,13 +577,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def _get_volume_final_name(self, request, array_mediator):
         return self._get_object_final_name(request, array_mediator.max_volume_prefix_length,
                                            array_mediator.max_volume_name_length,
-                                           config.OBJECT_TYPE_NAME_VOLUME,
+                                           config.VOLUME_TYPE_NAME,
                                            config.PARAMETERS_VOLUME_NAME_PREFIX)
 
     def _get_snapshot_final_name(self, request, array_mediator):
         name = self._get_object_final_name(request, array_mediator.max_snapshot_prefix_length,
                                            array_mediator.max_snapshot_name_length,
-                                           config.OBJECT_TYPE_NAME_SNAPSHOT,
+                                           config.SNAPSHOT_TYPE_NAME,
                                            config.PARAMETERS_SNAPSHOT_NAME_PREFIX)
         return name
 
@@ -664,12 +664,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         source_type = None
         if source:
             logger.info(source)
-            if source.HasField(config.VOLUME_SOURCE_SNAPSHOT):
+            if source.HasField(config.SNAPSHOT_TYPE_NAME):
                 source_id = source.snapshot.snapshot_id
-                source_type = config.VOLUME_SOURCE_SNAPSHOT
-            elif source.HasField(config.VOLUME_SOURCE_VOLUME):
+                source_type = config.SNAPSHOT_TYPE_NAME
+            elif source.HasField(config.VOLUME_TYPE_NAME):
                 source_id = source.volume.volume_id
-                source_type = config.VOLUME_SOURCE_VOLUME
+                source_type = config.VOLUME_TYPE_NAME
             else:
                 return None, None
             _, object_id = utils.get_object_id_info(source_id, source_type)

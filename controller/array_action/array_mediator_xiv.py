@@ -274,7 +274,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.IllegalObjectID(ex.status)
         if not cli_object:
             return None
-        if object_type is controller_config.OBJECT_TYPE_NAME_SNAPSHOT:
+        if object_type is controller_config.SNAPSHOT_TYPE_NAME:
             if not cli_object.master_name:
                 raise controller_errors.ExpectedSnapshotButFoundVolumeError(object_id, self.endpoint)
             return self._generate_snapshot_response(cli_object)

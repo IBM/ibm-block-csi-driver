@@ -549,7 +549,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         api_object = self._get_api_volume_by_id(object_id)
         if not api_object:
             return None
-        if object_type is controller_config.OBJECT_TYPE_NAME_SNAPSHOT:
+        if object_type is controller_config.SNAPSHOT_TYPE_NAME:
             return self._generate_snapshot_response_with_verification(api_object)
         return self._generate_volume_response(api_object)
 
