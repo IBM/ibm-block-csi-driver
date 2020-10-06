@@ -277,6 +277,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(CLIFailureError):
             self.svc.get_snapshot("test_snap")
 
+    def test_get_snapshot_non_zero_copy_rate(self):
+        self._prepare_mocks_for_get_snapshot()
+        self.fcmaps[0].copy_rate = "non_zero_value"
+        with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
+            self.svc.get_snapshot("test_snap")
+
     def test_get_snapshot_success(self):
         self._prepare_mocks_for_get_snapshot()
 
@@ -286,6 +292,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_lsvdisk_to_return_mapless_target_volume()
         with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.svc.get_object_by_id("snap_id", "snapshot")
+
 
     def test_get_snapshot_by_id_success(self):
         self._prepare_mocks_for_get_snapshot()
