@@ -386,12 +386,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
         volume_name = self._get_volume_name_by_wwn(volume_id)
-        fcmaps = self._get_fcmaps_as_source_if_exists(volume_name)
-        for fcmap in fcmaps:
-            self._safe_delete_fcmap(fcmap)
         fcmap = self._get_fcmap_as_target_if_exists(volume_name)
         if fcmap:
             self._stop_and_delete_fcmap(fcmap.id)
+        fcmaps = self._get_fcmaps_as_source_if_exists(volume_name)
+        for fcmap in fcmaps:
+            self._safe_delete_fcmap(fcmap)
         self._delete_volume_by_name(volume_name)
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
@@ -399,7 +399,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if fcmap.copy_rate != "0" and fcmap.status == FCMAP_STATUS_DONE:
             self._delete_fcmap(fcmap.id, force=False)
         else:
-            raise controller_errors.ObjectIsStillInUseError(fcmap.source_vdisk_name, fcmap.target_vdisk_id)
+            raise controller_errors.ObjectIsStillInUseError(fcmap.source_vdisk_name, fcmap.target_vdisk_name)
 
     def get_snapshot(self, snapshot_name, pool_id=None):
         logger.debug("Get snapshot : {}".format(snapshot_name))

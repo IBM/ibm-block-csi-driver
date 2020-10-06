@@ -8,7 +8,7 @@ from pysvc.unified.response import CLIFailureError
 import controller.array_action.config as config
 import controller.array_action.errors as array_errors
 from controller.array_action.array_mediator_svc import SVCArrayMediator, build_kwargs_from_capabilities, \
-    HOST_ID_PARAM, HOST_NAME_PARAM, HOST_ISCSI_NAMES_PARAM, HOST_WWPNS_PARAM
+    HOST_ID_PARAM, HOST_NAME_PARAM, HOST_ISCSI_NAMES_PARAM, HOST_WWPNS_PARAM, FCMAP_STATUS_DONE
 from controller.array_action.svc_cli_result_reader import SVCListResultsElement
 from controller.common.node_info import Initiators
 
@@ -28,7 +28,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsnode.return_value = [node]
         port = Munch({'node_id': '1', 'IP_address': '1.1.1.1', 'IP_address_6': None})
         self.svc.client.svcinfo.lsportip.return_value = [port]
-        self.fcmaps = [Munch({'source_vdisk_name': 'source_name', 'id': 'test_fc_id', 'copy_rate': "0"})]
+        self.fcmaps = [Munch(
+            {'source_vdisk_name': 'source_name',
+             'target_vdisk_name': 'target_name',
+             'id': 'test_fc_id',
+             'status': FCMAP_STATUS_DONE,
+             'copy_rate': "non_zero_value"})]
         self.svc.client.svcinfo.lsfcmap.return_value = Mock(as_list=self.fcmaps)
 
     @patch(
@@ -185,18 +190,18 @@ class TestArrayMediatorSVC(unittest.TestCase):
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_delete_volume_have_snapshot_fcmaps_not_removed(self, mock_warning):
         mock_warning.return_value = False
-        fcmaps = self.fcmaps.copy()  # copy_rate = "0"
+        fcmaps = self.fcmaps.copy()
+        fcmaps[0].copy_rate = "0"
         self.fcmaps.clear()
         self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=[]), Mock(as_list=fcmaps)]
-        self.svc.delete_volume("vol")
-        self.svc.client.svctask.rmfcmap.assert_not_called()
+        with self.assertRaises(array_errors.ObjectIsStillInUseError):
+            self.svc.delete_volume("vol")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_delete_volume_have_clone_fcmaps_removed(self, mock_warning):
         mock_warning.return_value = False
         fcmaps = self.fcmaps.copy()
         self.fcmaps.clear()
-        fcmaps[0].copy_rate = "non_zero_value"
         self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=[]), Mock(as_list=fcmaps)]
         self.svc.delete_volume("vol")
         self.svc.client.svctask.rmfcmap.assert_called_once()
@@ -284,7 +289,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_get_snapshot_success(self):
         self._prepare_mocks_for_get_snapshot()
-
+        self.fcmaps[0].copy_rate = "0"
         self.svc.get_snapshot("test_snap")
 
     def test_get_snapshot_by_id_has_no_fcmap_id_raise_error(self):
@@ -294,7 +299,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_get_snapshot_by_id_success(self):
         self._prepare_mocks_for_get_snapshot()
-
+        self.fcmaps[0].copy_rate = "0"
         self.svc.get_object_by_id("snap_id", "snapshot")
 
         self.svc.client.svcinfo.lsvdisk.assert_called_once_with(bytes=True, filtervalue="vdisk_UID=snap_id")
