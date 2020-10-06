@@ -93,6 +93,7 @@ class ArrayMediator(ABC):
         Raises:
             VolumeNotFound
             PermissionDenied
+            ObjectIsStillInUse
         """
         raise NotImplementedError
 
@@ -125,19 +126,6 @@ class ArrayMediator(ABC):
            volume_id : volume id
         Returns:
            volume name
-        Raises:
-            VolumeNotFound
-            IllegalObjectID
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def is_volume_has_snapshots(self, volume_id):
-        """
-        Args:
-           volume_id : volume id
-        Returns:
-           Is volume has snapshots
         Raises:
             VolumeNotFound
             IllegalObjectID

@@ -404,7 +404,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         cli_object = self._get_cli_volume_by_wwn_if_exist(object_id)
         if not cli_object:
             return None
-        if object_type is controller_config.OBJECT_TYPE_NAME_SNAPSHOT:
+        if object_type is controller_config.SNAPSHOT_TYPE_NAME:
             return self._generate_snapshot_response_with_verification(cli_object)
         return self._generate_volume_response(cli_object)
 

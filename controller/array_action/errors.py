@@ -197,8 +197,8 @@ class SnapshotAlreadyExists(BaseArrayActionException):
 
 class ObjectIsStillInUseError(BaseArrayActionException):
 
-    def __init__(self, snapshot, used_by):
-        self.message = messages.ObjectIsStillInUseError_message.format(snapshot, used_by)
+    def __init__(self, id_or_name, used_by):
+        self.message = messages.ObjectIsStillInUseError_message.format(id_or_name, used_by)
 
 
 class InvalidCliResponseError(BaseArrayActionException):
