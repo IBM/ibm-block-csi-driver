@@ -293,7 +293,6 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.svc.get_object_by_id("snap_id", "snapshot")
 
-
     def test_get_snapshot_by_id_success(self):
         self._prepare_mocks_for_get_snapshot()
 
