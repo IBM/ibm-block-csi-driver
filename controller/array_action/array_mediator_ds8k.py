@@ -659,7 +659,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                                  if flashcopy.sourcevolume == api_volume.id]
         for flashcopy in flashcopies_as_source:
             self._safe_delete_flashcopy(flashcopy)
-        flashcopy_as_target = get_flashcopy_as_target_if_exist(api_volume)
+        flashcopy_as_target = get_flashcopy_as_target_if_exists(api_volume)
         if flashcopy_as_target:
             self._delete_flashcopy(flashcopy_as_target.id)
 
