@@ -217,6 +217,7 @@ class ArrayMediator(ABC):
         Returns:
            Snapshot
            Volume
+           None
         Raises:
             ExpectedSnapshotButFoundVolumeError
         """

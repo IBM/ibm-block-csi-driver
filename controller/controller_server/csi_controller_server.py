@@ -132,7 +132,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         except (controller_errors.IllegalObjectName, controller_errors.StorageClassCapabilityNotSupported,
                 controller_errors.PoolDoesNotExist, controller_errors.PoolDoesNotMatchCapabilities,
-                controller_errors.PoolParameterIsMissing) as ex:
+                controller_errors.PoolParameterIsMissing, controller_errors.ExpectedSnapshotButFoundVolumeError) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
