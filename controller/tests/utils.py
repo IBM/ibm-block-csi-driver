@@ -2,7 +2,7 @@ from mock import Mock
 import grpc
 
 
-def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_src_object_id=None):
+def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_source_id=None):
     vol = Mock()
     vol.capacity_bytes = size
     vol.id = wwn
@@ -10,7 +10,7 @@ def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_src_obje
     vol.array_address = "arr1"
     vol.pool_name = "pool1"
     vol.array_type = array_type
-    vol.copy_src_object_id = copy_src_object_id
+    vol.copy_source_id = copy_source_id
 
     return vol
 
