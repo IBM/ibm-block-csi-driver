@@ -560,6 +560,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
     def _prepare_mocks_for_copy_from_source(self):
         self.mediator.create_volume = Mock()
+        self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, volume_name, "wwn2",
+                                                                                           "a9k")
         self.mediator.get_object_by_id = Mock()
         self.mediator.copy_to_existing_volume_from_source = Mock()
 
@@ -572,8 +574,6 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         snapshot_capacity_bytes = 100
         array_type.return_value = "a9k"
         self.request.volume_content_source = self._get_source_snapshot(snapshot_id)
-        self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, volume_name, "wwn2",
-                                                                                           "a9k")
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_snapshot(snapshot_capacity_bytes,
                                                                                                 snapshot_name,
                                                                                                 snapshot_id,
@@ -660,8 +660,6 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         source_id = "wwn1"
         target_volume_id = "wwn2"
         self.request.volume_content_source = self._get_source_snapshot(source_id)
-        self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, volume_name,
-                                                                                           target_volume_id, "a9k")
         if not copy_exception:
             self.mediator.get_object_by_id.side_effect = [get_exception]
             self.storage_agent.get_mediator.return_value.__exit__.side_effect = [get_exception]
@@ -687,8 +685,6 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         volume_capacity_bytes = 100
         array_type.return_value = "a9k"
         self.request.volume_content_source = self._get_source_volume(volume_id)
-        self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, volume_name, "wwn2",
-                                                                                           "a9k")
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(volume_capacity_bytes,
                                                                                               clone_volume_name,
                                                                                               volume_id,
