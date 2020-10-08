@@ -27,7 +27,6 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
@@ -39,7 +38,7 @@ const (
 	// Command lines inside the container will show /host prefix.
 	PrefixChrootOfHostRoot  = "/host"
 	PublishContextSeparator = ","
-	mkfsTimeout             = 15 * time.Minute
+	mkfsTimeoutMilliseconds = 15 * 60 * 1000
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
@@ -333,7 +332,7 @@ func (n NodeUtils) FormatDevice(devicePath string, fsType string) {
 	}
 
 	logger.Debugf("Formatting the device with fs_type = {%v}", fsType)
-	_, err := n.Executer.ExecuteWithTimeout(int(mkfsTimeout.Seconds()*1000), "mkfs."+fsType, args)
+	_, err := n.Executer.ExecuteWithTimeout(mkfsTimeoutMilliseconds, "mkfs."+fsType, args)
 	if err != nil {
 		logger.Errorf("Failed to run mkfs, error: %v", err)
 	}
