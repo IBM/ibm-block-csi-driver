@@ -154,18 +154,37 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.mediator.delete_volume("vol-wwn")
 
+    def _prepare_delete_volume_with_no_snapshots(self):
+        self.mediator.client.cmd.snapshot_list.return_value = Mock(as_list=[])
+
     def test_delete_volume_return_bad_name_error(self):
+        self._prepare_delete_volume_with_no_snapshots()
         self.mediator.client.cmd.vol_delete.side_effect = [xcli_errors.VolumeBadNameError("", "vol", "")]
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.mediator.delete_volume("vol-wwn")
 
     def test_delete_volume_fails_on_permissions(self):
+        self._prepare_delete_volume_with_no_snapshots()
         self.mediator.client.cmd.vol_delete.side_effect = [
             xcli_errors.OperationForbiddenForUserCategoryError("", "vol", "")]
         with self.assertRaises(array_errors.PermissionDeniedError):
             self.mediator.delete_volume("vol-wwn")
 
+    def test_delete_volume_with_snapshot(self):
+        snap_name = "snap"
+        snap_vol_name = "snap_vol"
+        xcli_snap = self._get_single_snapshot_result_mock(snap_name, snap_vol_name)
+        self.mediator.client.cmd.snapshot_list.return_value = Mock(as_list=[xcli_snap])
+        with self.assertRaises(array_errors.ObjectIsStillInUseError):
+            self.mediator.delete_volume("vol-wwn")
+
+    def test_delete_volume_snapshot_return_bad_name(self):
+        self.mediator.client.cmd.snapshot_list.side_effect = [xcli_errors.IllegalValueForArgumentError("", "vol", "")]
+        with self.assertRaises(array_errors.IllegalObjectName):
+            self.mediator.delete_volume("vol-wwn")
+
     def test_delete_volume_succeeds(self):
+        self._prepare_delete_volume_with_no_snapshots()
         self.mediator.client.cmd.vol_delete = Mock()
         self.mediator.delete_volume("vol-wwn")
 

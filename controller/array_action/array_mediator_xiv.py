@@ -156,14 +156,6 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.IllegalObjectName(ex.status)
 
-    def is_volume_has_snapshots(self, volume_id):
-        try:
-            volume_name = self._get_vol_by_wwn(volume_id)
-            return bool(self.client.cmd.snapshot_list(vol=volume_name).as_list)
-        except xcli_errors.IllegalValueForArgumentError as ex:
-            logger.exception(ex)
-            raise controller_errors.IllegalObjectID(ex.status)
-
     def validate_supported_capabilities(self, capabilities):
         logger.info("validate_supported_capabilities for capabilities : {0}".format(capabilities))
         # for a9k there should be no capabilities
@@ -243,17 +235,25 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
-        vol_name = self._get_vol_by_wwn(volume_id)
-
+        volume_name = self._get_vol_by_wwn(volume_id)
         try:
-            self.client.cmd.vol_delete(vol=vol_name)
+            cli_snapshots = self.client.cmd.snapshot_list(vol=volume_name).as_list
+        except xcli_errors.IllegalValueForArgumentError as ex:
+            logger.exception(ex)
+            raise controller_errors.IllegalObjectName(ex.status)
+
+        if cli_snapshots:
+            raise controller_errors.ObjectIsStillInUseError([cli_snapshot.name for cli_snapshot in cli_snapshots],
+                                                            volume_id)
+        try:
+            self.client.cmd.vol_delete(vol=volume_name)
         except xcli_errors.VolumeBadNameError as ex:
             logger.exception(ex)
-            raise controller_errors.ObjectNotFoundError(vol_name)
+            raise controller_errors.ObjectNotFoundError(volume_name)
 
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
-            raise controller_errors.PermissionDeniedError("delete vol : {0}".format(vol_name))
+            raise controller_errors.PermissionDeniedError("delete vol : {0}".format(volume_name))
 
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
