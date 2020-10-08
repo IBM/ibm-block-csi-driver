@@ -351,15 +351,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return vol_name
 
     @convert_scsi_id_to_array_id
-    def is_volume_has_snapshots(self, volume_id):
-        array_volume = self._get_api_volume_by_id(volume_id)
-        flash_copies = array_volume.flashcopy
-        for flashcopy in flash_copies:
-            if flashcopy.sourcevolume == volume_id:
-                return True
-        return False
-
-    @convert_scsi_id_to_array_id
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume {}".format(volume_id))
         try:
