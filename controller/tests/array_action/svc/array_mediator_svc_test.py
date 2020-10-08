@@ -66,7 +66,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvdisk.side_effect = [
             CLIFailureError('CMMVC5753E')]
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.svc.get_volume("vol_name")
+            self.svc.get_volume("volume_name")
 
     def test_get_volume_return_correct_value(self):
         vol_ret = Mock(as_single_element=Munch({'vdisk_UID': 'vol_id',
