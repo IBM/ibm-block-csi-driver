@@ -89,7 +89,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 except controller_errors.IllegalObjectName as ex:
                     context.set_details(ex.message)
                     context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                    return csi_pb2.CreateSnapshotResponse()
+                    return csi_pb2.CreateVolumeResponse()
 
                 size = request.capacity_range.required_bytes
 
@@ -370,7 +370,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         except controller_errors.PermissionDeniedError as ex:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
             context.set_details(ex)
-            return csi_pb2.ControllerPublishVolumeResponse()
+            return csi_pb2.ControllerUnpublishVolumeResponse()
 
         except controller_errors.HostNotFoundError as ex:
             logger.exception(ex)
@@ -486,8 +486,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             try:
                 array_type, snapshot_id = utils.get_snapshot_id_info(request.snapshot_id)
             except ObjectIdError as ex:
-                logger.warning("volume id is invalid. error : {}".format(ex))
-                return csi_pb2.DeleteVolumeResponse()
+                logger.warning("Snapshot id is invalid. error : {}".format(ex))
+                return csi_pb2.DeleteSnapshotResponse()
 
             array_type = detect_array_type(array_addresses)
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
