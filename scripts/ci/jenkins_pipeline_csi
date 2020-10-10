@@ -1,6 +1,6 @@
 pipeline {
     environment {
-        registryCredential = 'MatanStgArtifactory'
+        registryCredential = 'csi_w3_user'
         artifactory_path = 'build/reports/images_url'
         registryUrl = 'https://stg-artifactory.haifa.ibm.com:5030'
         Dockerfile_controller = 'Dockerfile-csi-controller'
