@@ -200,7 +200,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             vol_id=self._generate_volume_scsi_identifier(api_volume.id),
             vol_name=api_volume.name,
             array_address=self.service_address,
-            copy_source_id=self._generate_volume_scsi_identifier(source_volume_id),
+            copy_source_id=self._generate_volume_scsi_identifier(source_volume_id) if source_volume_id else None,
             pool_name=api_volume.pool,
             array_type=self.array_type
         )
