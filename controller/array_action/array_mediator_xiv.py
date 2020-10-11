@@ -4,6 +4,7 @@ from pyxcli import errors as xcli_errors
 from pyxcli.client import XCLIClient
 
 import controller.array_action.errors as controller_errors
+import controller.controller_server.config as controller_config
 from controller.array_action.array_action_types import Volume, Snapshot
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
@@ -140,7 +141,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
         logger.debug("cli volume returned : {}".format(cli_volume))
         if not cli_volume:
-            raise controller_errors.VolumeNotFoundError(volume_name)
+            raise controller_errors.ObjectNotFoundError(volume_name)
 
         if cli_volume.master_name:
             raise controller_errors.VolumeNameBelongsToSnapshotError(volume_name, self.endpoint)
@@ -198,18 +199,18 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
-    def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
-                                              min_vol_size_in_bytes, pool_id=None):
+    def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
+                                            minimum_volume_size_in_bytes, pool_id=None):
         logger.debug(
             "Copy snapshot {0} data to volume {1}. Snapshot capacity {2}. Minimal requested volume capacity {3}".format(
-                name, src_snap_name, src_snap_capacity_in_bytes, min_vol_size_in_bytes))
+                name, source_name, source_capacity_in_bytes, minimum_volume_size_in_bytes))
         try:
             logger.debug("Formatting volume {0}".format(name))
             self.client.cmd.vol_format(vol=name)
-            logger.debug("Copying Snapshot {0} data to volume {1}.".format(name, src_snap_name))
-            self.client.cmd.vol_copy(vol_src=src_snap_name, vol_trg=name)
-            if min_vol_size_in_bytes > src_snap_capacity_in_bytes:
-                min_vol_size_in_blocks = self._convert_size_bytes_to_blocks(min_vol_size_in_bytes)
+            logger.debug("Copying Snapshot {0} data to volume {1}.".format(name, source_name))
+            self.client.cmd.vol_copy(vol_src=source_name, vol_trg=name)
+            if minimum_volume_size_in_bytes > source_capacity_in_bytes:
+                min_vol_size_in_blocks = self._convert_size_bytes_to_blocks(minimum_volume_size_in_bytes)
                 logger.debug(
                     "Increasing volume {0} size to {1} blocks.".format(name, min_vol_size_in_blocks))
                 self.client.cmd.vol_resize(vol=name, size_blocks=min_vol_size_in_blocks)
@@ -218,10 +219,10 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.IllegalObjectName(ex.status)
         except xcli_errors.SourceVolumeBadNameError as ex:
             logger.exception(ex)
-            raise controller_errors.SnapshotNotFoundError(src_snap_name)
+            raise controller_errors.ObjectNotFoundError(source_name)
         except (xcli_errors.VolumeBadNameError, xcli_errors.TargetVolumeBadNameError) as ex:
             logger.exception(ex)
-            raise controller_errors.VolumeNotFoundError(name)
+            raise controller_errors.ObjectNotFoundError(name)
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
@@ -229,7 +230,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def _get_vol_by_wwn(self, volume_id):
         vol_by_wwn = self.client.cmd.vol_list(wwn=volume_id).as_single_element
         if not vol_by_wwn:
-            raise controller_errors.VolumeNotFoundError(volume_id)
+            raise controller_errors.ObjectNotFoundError(volume_id)
 
         vol_name = vol_by_wwn.name
         logger.debug("found volume name : {0}".format(vol_name))
@@ -243,7 +244,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             self.client.cmd.vol_delete(vol=vol_name)
         except xcli_errors.VolumeBadNameError as ex:
             logger.exception(ex)
-            raise controller_errors.VolumeNotFoundError(vol_name)
+            raise controller_errors.ObjectNotFoundError(vol_name)
 
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
@@ -261,21 +262,23 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         if not cli_snapshot:
             return None
         if not cli_snapshot.master_name:
-            raise controller_errors.SnapshotNameBelongsToVolumeError(cli_snapshot.name, self.endpoint)
+            raise controller_errors.ExpectedSnapshotButFoundVolumeError(cli_snapshot.name, self.endpoint)
         array_snapshot = self._generate_snapshot_response(cli_snapshot)
         return array_snapshot
 
-    def get_snapshot_by_id(self, snapshot_id):
+    def get_object_by_id(self, object_id, object_type):
         try:
-            cli_snapshot = self.client.cmd.vol_list(wwn=snapshot_id).as_single_element
+            cli_object = self.client.cmd.vol_list(wwn=object_id).as_single_element
         except xcli_errors.IllegalValueForArgumentError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectID(ex.status)
-        if not cli_snapshot:
+        if not cli_object:
             return None
-        if not cli_snapshot.master_name:
-            raise controller_errors.SnapshotIdBelongsToVolumeError(snapshot_id, self.endpoint)
-        return self._generate_snapshot_response(cli_snapshot)
+        if object_type is controller_config.SNAPSHOT_TYPE_NAME:
+            if not cli_object.master_name:
+                raise controller_errors.ExpectedSnapshotButFoundVolumeError(object_id, self.endpoint)
+            return self._generate_snapshot_response(cli_object)
+        return self._generate_volume_response(cli_object)
 
     def create_snapshot(self, name, volume_name, pool_id=None):
         logger.info("creating snapshot {0} from volume {1}".format(name, volume_name))
@@ -292,7 +295,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.SnapshotAlreadyExists(name, self.endpoint)
         except xcli_errors.VolumeBadNameError as ex:
             logger.exception(ex)
-            raise controller_errors.VolumeNotFoundError(volume_name)
+            raise controller_errors.ObjectNotFoundError(volume_name)
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError(
@@ -302,14 +305,14 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
         try:
             snapshot_name = self._get_vol_by_wwn(snapshot_id)
-        except controller_errors.VolumeNotFoundError:
-            raise controller_errors.SnapshotNotFoundError(snapshot_id)
+        except controller_errors.ObjectNotFoundError:
+            raise controller_errors.ObjectNotFoundError(snapshot_id)
 
         try:
             self.client.cmd.snapshot_delete(snapshot=snapshot_name)
         except xcli_errors.VolumeBadNameError as ex:
             logger.exception(ex)
-            raise controller_errors.SnapshotNotFoundError(snapshot_name)
+            raise controller_errors.ObjectNotFoundError(snapshot_name)
 
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
@@ -387,7 +390,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.PermissionDeniedError("map volume : {0} to host : {1}".format(volume_id, host_name))
         except xcli_errors.VolumeBadNameError as ex:
             logger.exception(ex)
-            raise controller_errors.VolumeNotFoundError(vol_name)
+            raise controller_errors.ObjectNotFoundError(vol_name)
         except xcli_errors.HostBadNameError as ex:
             logger.exception(ex)
             raise controller_errors.HostNotFoundError(host_name)
@@ -409,7 +412,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             self.client.cmd.unmap_vol(host=host_name, vol=vol_name)
         except xcli_errors.VolumeBadNameError as ex:
             logger.exception(ex)
-            raise controller_errors.VolumeNotFoundError(vol_name)
+            raise controller_errors.ObjectNotFoundError(vol_name)
         except xcli_errors.HostBadNameError as ex:
             logger.exception(ex)
             raise controller_errors.HostNotFoundError(host_name)

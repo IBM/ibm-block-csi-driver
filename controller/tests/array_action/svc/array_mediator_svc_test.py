@@ -1,6 +1,6 @@
 import unittest
 
-from mock import call, patch, Mock
+from mock import patch, Mock
 from munch import Munch
 from pysvc import errors as svc_errors
 from pysvc.unified.response import CLIFailureError
@@ -28,7 +28,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsnode.return_value = [node]
         port = Munch({'node_id': '1', 'IP_address': '1.1.1.1', 'IP_address_6': None})
         self.svc.client.svcinfo.lsportip.return_value = [port]
-        fcmaps = [Munch({'source_vdisk_name': 'source_name', 'id': 'test_fc_id'})]
+        fcmaps = [Munch({'source_vdisk_name': 'source_name', 'id': 'test_fc_id', 'copy_rate': 0})]
         self.svc.client.svcinfo.lsfcmap.return_value = Mock(as_list=fcmaps)
 
     @patch(
@@ -60,8 +60,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         mock_warning.return_value = False
         self.svc.client.svcinfo.lsvdisk.side_effect = [
             CLIFailureError('CMMVC5753E')]
-        with self.assertRaises(array_errors.VolumeNotFoundError):
-            self.svc.get_volume("vol_name")
+        with self.assertRaises(array_errors.ObjectNotFoundError):
+            self.svc.get_volume("volume_name")
 
     def test_get_volume_return_correct_value(self):
         vol_ret = Mock(as_single_element=Munch({'vdisk_UID': 'vol_id',
@@ -85,7 +85,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_volume_returns_nothing(self):
         vol_ret = Mock(as_single_element=Munch({}))
         self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
-        with self.assertRaises(array_errors.VolumeNotFoundError):
+        with self.assertRaises(array_errors.ObjectNotFoundError):
             self.svc.get_volume("vol")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
@@ -142,20 +142,20 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(volume.array_type, 'SVC')
         self.assertEqual(volume.id, 'vol_id')
 
-    def test_get_vol_by_wwn_return_error(self):
+    def test_get_volume_name_by_wwn_return_error(self):
         vol_ret = Mock(as_single_element=Munch({}))
         self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
-        with self.assertRaises(array_errors.VolumeNotFoundError):
-            self.svc._get_vol_by_wwn("vol")
+        with self.assertRaises(array_errors.ObjectNotFoundError):
+            self.svc._get_volume_name_by_wwn("vol")
 
-    def test_get_vol_by_wwn_return_success(self):
+    def test_get_volume_name_by_wwn_return_success(self):
         vol_ret = Mock(as_single_element=Munch({'vdisk_UID': 'vol_id',
                                                 'name': 'test_vol',
                                                 'capacity': '1024',
                                                 'mdisk_grp_name': 'pool_name'
                                                 }))
         self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
-        ret = self.svc._get_vol_by_wwn("vol_id")
+        ret = self.svc._get_volume_name_by_wwn("vol_id")
         self.assertEqual(ret, 'test_vol')
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
@@ -163,7 +163,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         mock_warning.return_value = False
         self.svc.client.svctask.rmvolume.side_effect = [
             CLIFailureError("CMMVC5753E")]
-        with self.assertRaises(array_errors.VolumeNotFoundError):
+        with self.assertRaises(array_errors.ObjectNotFoundError):
             self.svc.delete_volume("vol")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
@@ -171,11 +171,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
         mock_warning.return_value = False
         self.svc.client.svctask.rmvolume.side_effect = [
             CLIFailureError("CMMVC5753E")]
-        with self.assertRaises(array_errors.VolumeNotFoundError):
+        with self.assertRaises(array_errors.ObjectNotFoundError):
             self.svc.delete_volume("vol")
         self.svc.client.svctask.rmvolume.side_effect = [
             CLIFailureError("CMMVC8957E")]
-        with self.assertRaises(array_errors.VolumeNotFoundError):
+        with self.assertRaises(array_errors.ObjectNotFoundError):
             self.svc.delete_volume("vol")
         self.svc.client.svctask.rmvolume.side_effect = [
             CLIFailureError("Failed")]
@@ -243,7 +243,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_snapshot_has_no_fc_id_raise_error(self):
         self._prepare_lsvdisk_to_return_mapless_target_volume()
 
-        with self.assertRaises(array_errors.SnapshotNameBelongsToVolumeError):
+        with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.svc.get_snapshot("test_snap")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
@@ -264,17 +264,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_get_snapshot_by_id_has_no_fcmap_id_raise_error(self):
         self._prepare_lsvdisk_to_return_mapless_target_volume()
-
-        with self.assertRaises(array_errors.SnapshotIdBelongsToVolumeError):
-            self.svc.get_snapshot_by_id("snap_id")
+        with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
+            self.svc.get_object_by_id("snap_id", "snapshot")
 
     def test_get_snapshot_by_id_success(self):
         self._prepare_mocks_for_get_snapshot()
 
-        self.svc.get_snapshot_by_id("snap_id")
+        self.svc.get_object_by_id("snap_id", "snapshot")
 
-        self.svc.client.svcinfo.lsvdisk.assert_has_calls([call(filtervalue="vdisk_UID=snap_id"),
-                                                          call(bytes=True, object_id="test_snap")])
+        self.svc.client.svcinfo.lsvdisk.assert_called_once_with(bytes=True, filtervalue="vdisk_UID=snap_id")
 
     def _prepare_mocks_for_create_snapshot(self):
         self.svc.client.svctask.mkvolume.return_value = Mock()
@@ -334,13 +332,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_delete_snapshot_no_volume_raise_snapshot_not_found(self):
         self._prepare_lsvdisk_to_return_none()
 
-        with self.assertRaises(array_errors.SnapshotNotFoundError):
+        with self.assertRaises(array_errors.ObjectNotFoundError):
             self.svc.delete_snapshot("test_snap")
 
     def test_delete_snapshot_no_fcmap_id_raise_snapshot_not_found(self):
         self._prepare_lsvdisk_to_return_mapless_target_volume()
 
-        with self.assertRaises(array_errors.SnapshotNotFoundError):
+        with self.assertRaises(array_errors.ObjectNotFoundError):
             self.svc.delete_snapshot("test_snap")
 
     def test_delete_snapshot_call_rmvolume(self):
@@ -580,7 +578,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvdiskhostmap.side_effect = [
             svc_errors.CommandExecutionError('Failed')]
 
-        with self.assertRaises(array_errors.VolumeNotFoundError):
+        with self.assertRaises(array_errors.ObjectNotFoundError):
             self.svc.get_volume_mappings('vol')
 
     def test_get_volume_mappings_success(self):
@@ -636,7 +634,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         mock_get_first_free_lun.return_value = '1'
         self.svc.client.svctask.mkvdiskhostmap.side_effect = [
             svc_errors.CommandExecutionError('CMMVC5804E')]
-        with self.assertRaises(array_errors.VolumeNotFoundError):
+        with self.assertRaises(array_errors.ObjectNotFoundError):
             self.svc.map_volume("vol", "host")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
@@ -689,7 +687,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         mock_is_warning_message.return_value = False
         self.svc.client.svctask.rmvdiskhostmap.side_effect = [
             svc_errors.CommandExecutionError('CMMVC5753E')]
-        with self.assertRaises(array_errors.VolumeNotFoundError):
+        with self.assertRaises(array_errors.ObjectNotFoundError):
             self.svc.unmap_volume("vol", "host")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")

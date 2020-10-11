@@ -1,7 +1,3 @@
-#########################################
-# PVC example for IBM Block CSI Driver.
-#########################################
-
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -13,5 +9,4 @@ spec:
   resources:
     requests:
       storage: 1Gi
-  storageClassName: gold
-      
+  storageClassName: demo-storageclass
