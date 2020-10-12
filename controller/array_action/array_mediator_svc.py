@@ -233,9 +233,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return None
         return fcmaps_as_target[0]
 
-    def _get_fcmaps_as_source_if_exists(self, volume_name):
-        fcmaps_as_target = self._get_fcmaps(volume_name, ENDPOINT_TYPE_SOURCE)
-        return fcmaps_as_target
+    def _get_fcmaps_as_source_if_exist(self, volume_name):
+        return self._get_fcmaps(volume_name, ENDPOINT_TYPE_SOURCE)
 
     def _get_source_volume_wwn_if_exists(self, target_cli_volume):
         fcmap = self._get_fcmap_as_target_if_exists(target_cli_volume.name)
@@ -295,6 +294,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def _get_cli_volume_by_wwn_if_exist(self, volume_id):
         filter_value = 'vdisk_UID=' + volume_id
         cli_volume = self.client.svcinfo.lsvdisk(bytes=True, filtervalue=filter_value).as_single_element
+        logger.debug(cli_volume)
         if not cli_volume:
             return None
         return cli_volume
@@ -386,13 +386,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
         volume_name = self._get_volume_name_by_wwn(volume_id)
-        fcmap = self._get_fcmap_as_target_if_exists(volume_name)
-        if fcmap:
-            self._stop_and_delete_fcmap(fcmap.id)
-        fcmaps = self._get_fcmaps_as_source_if_exists(volume_name)
-        for fcmap in fcmaps:
-            self._safe_delete_fcmap(fcmap)
-        self._delete_volume_by_name(volume_name)
+        self._delete_object(volume_name)
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
     def _safe_delete_fcmap(self, fcmap):
@@ -482,16 +476,18 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self._safe_delete_fcmap(fcmap)
 
     def _delete_snapshot(self, cli_volume):
-        snapshot_name = cli_volume.name
-        fcmap = self._get_fcmap_as_target_if_exists(snapshot_name)
-        if not fcmap:
-            raise controller_errors.ObjectNotFoundError(snapshot_name)
+        self._delete_object(cli_volume.name, snapshot=True)
 
-        fcmap_id = cli_volume.FC_id
-        if fcmap_id == 'many':
-            self._delete_all_fcmaps_as_source_if_exist(snapshot_name)
-        self._stop_and_delete_fcmap(fcmap.id)
-        self._delete_volume_by_name(snapshot_name)
+    def _delete_object(self, object_name, snapshot=False):
+        fcmap_as_target = self._get_fcmap_as_target_if_exists(object_name)
+        if snapshot and not fcmap_as_target:
+            raise controller_errors.ObjectNotFoundError(object_name)
+        fcmaps_as_source = self._get_fcmaps_as_source_if_exist(object_name)
+        for fcmap_as_target in fcmaps_as_source:
+            self._safe_delete_fcmap(fcmap_as_target)
+        if fcmap_as_target:
+            self._stop_and_delete_fcmap(fcmap_as_target.id)
+        self._delete_volume_by_name(object_name)
 
     def _delete_unstarted_fcmap_if_exists(self, target_volume_name):
         target_cli_volume = self._get_cli_volume_if_exists(target_volume_name)
