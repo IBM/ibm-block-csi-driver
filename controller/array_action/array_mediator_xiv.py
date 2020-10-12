@@ -191,8 +191,11 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
-    def copy_to_existing_volume_from_object(self, name, source_name, source_capacity_in_bytes,
+    def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
                                             minimum_volume_size_in_bytes, pool_id=None):
+        logger.debug(
+            "Copy source {0} data to volume {1}. source capacity {2}. Minimal requested volume capacity {3}".format(
+                name, source_name, source_capacity_in_bytes, minimum_volume_size_in_bytes))
         try:
             logger.debug("Formatting volume {0}".format(name))
             self.client.cmd.vol_format(vol=name)
@@ -216,14 +219,6 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
-    def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
-                                            minimum_volume_size_in_bytes, pool_id=None):
-        logger.debug(
-            "Copy source {0} data to volume {1}. source capacity {2}. Minimal requested volume capacity {3}".format(
-                name, source_name, source_capacity_in_bytes, minimum_volume_size_in_bytes))
-        self.copy_to_existing_volume_from_object(name, source_name, source_capacity_in_bytes,
-                                                 minimum_volume_size_in_bytes, pool_id)
-
     def _get_vol_by_wwn(self, volume_id):
         vol_by_wwn = self.client.cmd.vol_list(wwn=volume_id).as_single_element
         if not vol_by_wwn:
@@ -236,12 +231,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
         volume_name = self._get_vol_by_wwn(volume_id)
-        try:
-            cli_snapshots = self.client.cmd.snapshot_list(vol=volume_name).as_list
-        except xcli_errors.IllegalValueForArgumentError as ex:
-            logger.exception(ex)
-            raise controller_errors.IllegalObjectName(ex.status)
-
+        cli_snapshots = self.client.cmd.snapshot_list(vol=volume_name).as_list
         if cli_snapshots:
             raise controller_errors.ObjectIsStillInUseError([cli_snapshot.name for cli_snapshot in cli_snapshots],
                                                             volume_id)

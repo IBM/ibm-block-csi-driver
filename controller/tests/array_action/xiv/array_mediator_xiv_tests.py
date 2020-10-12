@@ -142,11 +142,6 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(expected_array_exception):
             self.mediator.copy_to_existing_volume_from_source("vol", "snap", 0, 0)
 
-    def test_copy_to_existing_volume_from_volume_failed_volume_not_found(self):
-        self.mediator.client.cmd.vol_copy.side_effect = [xcli_errors.SourceVolumeBadNameError("", "", "")]
-        with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.mediator.copy_to_existing_volume_from_source("vol", "snap", 0, 0)
-
     def test_delete_volume_return_volume_not_found(self):
         ret = Mock()
         ret.as_single_element = None
@@ -176,11 +171,6 @@ class TestArrayMediatorXIV(unittest.TestCase):
         xcli_snap = self._get_single_snapshot_result_mock(snap_name, snap_vol_name)
         self.mediator.client.cmd.snapshot_list.return_value = Mock(as_list=[xcli_snap])
         with self.assertRaises(array_errors.ObjectIsStillInUseError):
-            self.mediator.delete_volume("vol-wwn")
-
-    def test_delete_volume_snapshot_return_bad_name(self):
-        self.mediator.client.cmd.snapshot_list.side_effect = [xcli_errors.IllegalValueForArgumentError("", "vol", "")]
-        with self.assertRaises(array_errors.IllegalObjectName):
             self.mediator.delete_volume("vol-wwn")
 
     def test_delete_volume_succeeds(self):
