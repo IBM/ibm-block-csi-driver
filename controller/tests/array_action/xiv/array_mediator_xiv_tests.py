@@ -266,6 +266,45 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.snapshot_delete = Mock()
         self.mediator.delete_snapshot("snap-wwn")
 
+    def test_get_object_by_id_return_correct_snapshot(self):
+        snap_name = "snap"
+        snap_vol_name = "snap_vol"
+        xcli_snap = self._get_single_snapshot_result_mock(snap_name, snap_vol_name)
+        self.mediator.client.cmd.vol_list.return_value = xcli_snap
+        res = self.mediator.get_object_by_id(snap_name, "snapshot")
+        self.assertTrue(res.name == snap_name)
+        self.assertTrue(res.volume_name == snap_vol_name)
+
+    def test_get_object_by_id_return_correct_volume(self):
+        volume_name = "volume_name"
+        vol = utils.get_mock_xiv_volume(10, volume_name, "wwn")
+        ret = Mock()
+        ret.as_single_element = vol
+        self.mediator.client.cmd.vol_list.return_value = ret
+        res = self.mediator.get_object_by_id(volume_name, "volume")
+        self.assertTrue(res.name == volume_name)
+
+
+    def test_get_object_by_id_same_name_vol_exists_error(self):
+        snap_name = "snap"
+        snap_vol_name = ""
+        xcli_snap = self._get_single_snapshot_result_mock(snap_name, snap_vol_name)
+        self.mediator.client.cmd.vol_list.return_value = xcli_snap
+        with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
+            self.mediator.get_object_by_id(snap_name, "snapshot")
+
+    def test_get_object_by_id_returns_illegal_object_name(self):
+        snap_name = "snap"
+        self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalValueForArgumentError("", snap_name, "")]
+        with self.assertRaises(array_errors.IllegalObjectID):
+            self.mediator.get_object_by_id(snap_name, "snapshot")
+
+    def test_get_object_by_id_returns_none(self):
+        snap_name = "snap"
+        self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=None)
+        returned_value = self.mediator.get_object_by_id(snap_name, "snapshot")
+        self.assertEqual(returned_value, None)
+
     def test_property(self):
         self.assertEqual(XIVArrayMediator.port, 7778)
 
