@@ -233,8 +233,9 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         volume_name = self._get_vol_by_wwn(volume_id)
         cli_snapshots = self.client.cmd.snapshot_list(vol=volume_name).as_list
         if cli_snapshots:
-            raise controller_errors.ObjectIsStillInUseError([cli_snapshot.name for cli_snapshot in cli_snapshots],
-                                                            volume_id)
+            raise controller_errors.ObjectIsStillInUseError(
+                id_or_name=[cli_snapshot.name for cli_snapshot in cli_snapshots],
+                used_by=volume_id)
         try:
             self.client.cmd.vol_delete(vol=volume_name)
         except xcli_errors.VolumeBadNameError as ex:
