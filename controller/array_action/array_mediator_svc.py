@@ -247,6 +247,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def get_volume_name(self, volume_id):
         return self._get_volume_name_by_wwn(volume_id)
 
+    def expand_volume(self, volume_id, required_bytes):
+        pass
+
     def _get_fcmaps(self, volume_name, endpoint_type):
         """
         Args:

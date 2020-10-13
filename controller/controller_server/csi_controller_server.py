@@ -536,55 +536,62 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def ControllerExpandVolume(self, request, context):
         logger.info("ControllerExpandVolume")
-        # secrets = request.secrets
-        #
-        # try:
-        #     utils.validate_delete_volume_request(request)
-        #
-        #     user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
-        #
-        #     try:
-        #         array_type, vol_id = utils.get_volume_id_info(request.volume_id)
-        #     except ObjectIdError as ex:
-        #         logger.warning("volume id is invalid. error : {}".format(ex))
-        #         return csi_pb2.DeleteVolumeResponse()
-        #
-        #     with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
-        #         logger.debug(array_mediator)
-        #
-        #         try:
-        #
-        #             logger.debug("Deleting volume {0}".format(vol_id))
-        #             array_mediator.delete_volume(vol_id)
-        #
-        #         except controller_errors.ObjectNotFoundError as ex:
-        #             logger.debug("volume was not found during deletion: {0}".format(ex))
-        #
-        #         except controller_errors.PermissionDeniedError as ex:
-        #             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
-        #             context.set_details(ex)
-        #             return csi_pb2.DeleteVolumeResponse()
-        #
-        # except controller_errors.ObjectIsStillInUseError as ex:
-        #     logger.info("could not delete volume while in use: {0}".format(ex))
-        #     context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
-        #     context.set_details(ex.message)
-        #     return csi_pb2.DeleteVolumeResponse()
-        #
-        # except ValidationException as ex:
-        #     logger.exception(ex)
-        #     context.set_details(ex.message)
-        #     context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-        #     return csi_pb2.DeleteVolumeResponse()
-        #
-        # except Exception as ex:
-        #     logger.debug("an internal exception occurred")
-        #     logger.exception(ex)
-        #     context.set_code(grpc.StatusCode.INTERNAL)
-        #     context.set_details('an internal exception occurred : {}'.format(ex))
-        #     return csi_pb2.DeleteVolumeResponse()
+        secrets = request.secrets
 
-        return csi_pb2.ControllerExpandVolumeResponse()
+        try:
+            utils.validate_expand_volume_request(request)
+
+            user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
+
+            try:
+                array_type, volume_id = utils.get_volume_id_info(request.volume_id)
+            except ObjectIdError as ex:
+                logger.warning("volume id is invalid. error : {}".format(ex))
+                return csi_pb2.DeleteVolumeResponse()
+
+            with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
+                logger.debug(array_mediator)
+
+                try:
+
+                    logger.debug("expanding volume {0}".format(volume_id))
+                    array_mediator.expand_volume(
+                        volume_id=volume_id,
+                        required_bytes=request.capacity_range.required_bytes)
+                    res = utils.generate_csi_expand_volume_response(request)
+                    logger.info("finished expanding volume")
+                    return res
+
+                except controller_errors.PermissionDeniedError as ex:
+                    context.set_code(grpc.StatusCode.PERMISSION_DENIED)
+                    context.set_details(ex)
+                    return csi_pb2.ControllerExpandVolumeResponse()
+
+        except controller_errors.ObjectNotFoundError as ex:
+            context.set_code(grpc.StatusCode.NOT_FOUND)
+            context.set_details(ex)
+            return csi_pb2.ControllerExpandVolumeResponse()
+
+        except controller_errors.ObjectIsStillInUseError as ex:
+            logger.info("could not delete volume while in use: {0}".format(ex))
+            context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
+            context.set_details(ex.message)
+            return csi_pb2.ControllerExpandVolumeResponse()
+
+        except ValidationException as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            return csi_pb2.ControllerExpandVolumeResponse()
+
+        # TODO: OUT_OF_RANGE
+
+        except Exception as ex:
+            logger.debug("an internal exception occurred")
+            logger.exception(ex)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details('an internal exception occurred : {}'.format(ex))
+            return csi_pb2.ControllerExpandVolumeResponse()
 
     def ControllerGetCapabilities(self, request, context):
         logger.info("ControllerGetCapabilities")
