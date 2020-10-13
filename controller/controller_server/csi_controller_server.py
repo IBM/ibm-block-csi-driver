@@ -546,7 +546,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 csi_pb2.ControllerServiceCapability(
                     rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("PUBLISH_UNPUBLISH_VOLUME"))),
                 csi_pb2.ControllerServiceCapability(
-                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CLONE_VOLUME")))])
+                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CLONE_VOLUME"))),
+                csi_pb2.ControllerServiceCapability(
+                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("EXPAND_VOLUME")))])
 
         logger.info("finished ControllerGetCapabilities")
         return res
@@ -614,20 +616,24 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def GetPluginCapabilities(self, request, context):
         logger.info("GetPluginCapabilities")
-        types = csi_pb2.PluginCapability.Service.Type
+        service_type = csi_pb2.PluginCapability.Service.Type
+        volume_expansion_type = csi_pb2.PluginCapability.VolumeExpansion.Type
         capabilities = self.__get_identity_config("capabilities")
         capability_list = []
-        for cap in capabilities:
+        service_capability = capabilities.get('Service')
+        volume_expansion_capability = capabilities.get('VolumeExpansion')
+        if service_capability:
             capability_list.append(
                 csi_pb2.PluginCapability(
-                    service=csi_pb2.PluginCapability.Service(type=types.Value(cap))
-                )
-            )
-
+                    service=csi_pb2.PluginCapability.Service(type=service_type.Value(service_capability))))
+        if volume_expansion_capability:
+            capability_list.append(
+                csi_pb2.PluginCapability(
+                    volume_expansion=csi_pb2.PluginCapability.VolumeExpansion(
+                        type=volume_expansion_type.Value(volume_expansion_capability))))
         logger.info("finished GetPluginCapabilities")
         return csi_pb2.GetPluginCapabilitiesResponse(
             capabilities=capability_list
-
         )
 
     def Probe(self, request, context):
