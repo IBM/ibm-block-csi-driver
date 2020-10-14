@@ -13,4 +13,5 @@ GetPluginCapabilities
 GetPluginInfo
 Probe
 ControllerPublishVolume
+ControllerUnpublishVolume
 Node
