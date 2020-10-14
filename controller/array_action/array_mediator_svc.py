@@ -294,7 +294,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def _get_cli_volume_by_wwn_if_exist(self, volume_id):
         filter_value = 'vdisk_UID=' + volume_id
         cli_volume = self.client.svcinfo.lsvdisk(bytes=True, filtervalue=filter_value).as_single_element
-        logger.debug(cli_volume)
         if not cli_volume:
             return None
         return cli_volume
@@ -385,8 +384,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
-        volume_name = self._get_volume_name_by_wwn(volume_id)
-        self._delete_object(volume_name)
+        cli_volume = self._get_cli_volume_by_wwn_if_exist(volume_id)
+        if not cli_volume:
+            raise controller_errors.ObjectNotFoundError(volume_id)
+        self._delete_object(cli_volume)
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
     def _safe_delete_fcmaps_as_source(self, fcmaps_as_source):
@@ -473,15 +474,13 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._stop_fcmap(fcmap_id)
         self._delete_fcmap(fcmap_id, force=True)
 
-    def _delete_snapshot(self, cli_volume):
-        self._delete_object(cli_volume.name, snapshot=True)
-
-    def _delete_object(self, object_name, snapshot=False):
+    def _delete_object(self, cli_object, snapshot=False):
+        object_name = cli_object.name
         fcmap_as_target = self._get_fcmap_as_target_if_exists(object_name)
         if snapshot and not fcmap_as_target:
             raise controller_errors.ObjectNotFoundError(object_name)
-        fcmaps_as_source = self._get_fcmaps_as_source_if_exist(object_name)
-        if fcmaps_as_source:
+        if cli_object.FC_id == 'many':
+            fcmaps_as_source = self._get_fcmaps_as_source_if_exist(object_name)
             self._safe_delete_fcmaps_as_source(fcmaps_as_source)
         if fcmap_as_target:
             self._stop_and_delete_fcmap(fcmap_as_target.id)
@@ -520,13 +519,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def delete_snapshot(self, snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
-        snapshot_name = self._get_volume_name_by_wwn_if_exists(snapshot_id)
-        if not snapshot_name:
-            raise controller_errors.ObjectNotFoundError(snapshot_id)
-        cli_volume = self._get_cli_volume_if_exists(snapshot_name)
+        cli_volume = self._get_cli_volume_by_wwn_if_exist(snapshot_id)
         if not cli_volume or not cli_volume.FC_id:
-            raise controller_errors.ObjectNotFoundError(snapshot_name)
-        self._delete_snapshot(cli_volume)
+            raise controller_errors.ObjectNotFoundError(snapshot_id)
+        self._delete_object(cli_volume, snapshot=True)
         logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
 
     def get_host_by_host_identifiers(self, initiators):
