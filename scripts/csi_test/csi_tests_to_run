@@ -14,4 +14,4 @@ GetPluginInfo
 Probe
 ControllerPublishVolume
 ControllerUnpublishVolume
-Node
+Node Service
