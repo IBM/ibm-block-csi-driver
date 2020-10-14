@@ -223,6 +223,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.rmvolume = Mock()
         self.svc.delete_volume("vol")
 
+    def test_copy_to_existing_volume_from_source_success(self):
+        self.svc.copy_to_existing_volume_from_source("a", "b", 1, 1)
+        self.svc.client.svctask.mkfcmap.assert_called_once()
+        self.svc.client.svctask.startfcmap.assert_called_once()
+
     @staticmethod
     def _mock_cli_object(cli_object):
         return Mock(as_single_element=cli_object)
