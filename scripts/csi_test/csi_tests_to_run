@@ -15,5 +15,3 @@ Probe
 ControllerPublishVolume
 ControllerUnpublishVolume
 Node Service
-volume lifecycle
-Controller Service
