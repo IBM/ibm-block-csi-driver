@@ -30,7 +30,7 @@ import (
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/mount"
 )
 
 const (
@@ -38,6 +38,7 @@ const (
 	// Command lines inside the container will show /host prefix.
 	PrefixChrootOfHostRoot  = "/host"
 	PublishContextSeparator = ","
+	mkfsTimeoutMilliseconds = 15 * 60 * 1000
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
@@ -57,6 +58,9 @@ type NodeUtilsInterface interface {
 	IsPathExists(filePath string) bool
 	IsDirectory(filePath string) bool
 	RemoveFileOrDirectory(filePath string) error
+	MakeDir(dirPath string) error
+	MakeFile(filePath string) error
+	FormatDevice(devicePath string, fsType string)
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
 }
@@ -293,6 +297,45 @@ func (n NodeUtils) IsDirectory(path string) bool {
 // Deletes file or directory with all sub-directories and files
 func (n NodeUtils) RemoveFileOrDirectory(path string) error {
 	return os.RemoveAll(path)
+}
+
+func (n NodeUtils) MakeDir(dirPath string) error {
+	err := os.MkdirAll(dirPath, os.FileMode(0755))
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (n NodeUtils) MakeFile(filePath string) error {
+	f, err := os.OpenFile(filePath, os.O_CREATE, os.FileMode(0644))
+	defer f.Close()
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+	return nil
+}
+
+func (n NodeUtils) FormatDevice(devicePath string, fsType string) {
+	var args []string
+	if fsType == "ext4" {
+		args = []string{"-m0", "-Enodiscard,lazy_itable_init=1,lazy_journal_init=1", devicePath}
+	} else if fsType == "xfs" {
+		args = []string{"-K", devicePath}
+	} else {
+		logger.Errorf("Could not format unsupported fsType: %v", fsType)
+		return
+	}
+
+	logger.Debugf("Formatting the device with fs_type = {%v}", fsType)
+	_, err := n.Executer.ExecuteWithTimeout(mkfsTimeoutMilliseconds, "mkfs."+fsType, args)
+	if err != nil {
+		logger.Errorf("Failed to run mkfs, error: %v", err)
+	}
 }
 
 func (n NodeUtils) IsNotMountPoint(file string) (bool, error) {
