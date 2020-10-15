@@ -320,7 +320,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         snapshot = self.svc.get_snapshot("test_snap")
         self.assertEqual(snapshot.name, "test_snap")
 
-    def test_get_object_by_id_has_no_fcmap_id_raise_error(self):
+    def test_get_object_by_id_snapshot_has_no_fcmap_id_raise_error(self):
         self._prepare_lsvdisk_to_return_mapless_target_volume()
         with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.svc.get_object_by_id("snap_id", "snapshot")
