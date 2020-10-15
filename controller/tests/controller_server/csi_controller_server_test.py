@@ -1235,6 +1235,150 @@ class TestControllerServerGetCapabilities(unittest.TestCase):
         self.servicer.ControllerGetCapabilities(request, context)
 
 
+class TestControllerServerExpandVolume(AbstractControllerTest):
+
+    def get_create_object_method(self):
+        return self.servicer.ControllerExpandVolume
+
+    def get_create_object_response_method(self):
+        return csi_pb2.ControllerExpandVolumeResponse
+
+    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
+    def setUp(self, connect):
+        self.fqdn = "fqdn"
+        self.mediator = XIVArrayMediator("user", "password", self.fqdn)
+        self.mediator.client = Mock()
+
+        self.storage_agent = MagicMock()
+        self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
+
+        self.servicer = ControllerServicer(self.fqdn)
+
+        self.request = Mock()
+
+        self.access_types = csi_pb2.VolumeCapability.AccessMode
+        self.fs_type = "ext4"
+
+        self.request.volume_capability = csi_pb2.VolumeCapability(
+            access_mode=csi_pb2.VolumeCapability.AccessMode(mode=self.access_types.SINGLE_NODE_WRITER),
+            mount=csi_pb2.VolumeCapability.MountVolume(fs_type=self.fs_type))
+
+        self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
+
+        self.request.parameters = {}
+        self.capacity_bytes = 10
+        self.request.capacity_range = Mock()
+        self.request.capacity_range.required_bytes = self.capacity_bytes
+        self.volume_id = "vol-id"
+        self.request.volume_id = "{}:{}".format("xiv", self.volume_id)
+        self.request.volume_content_source = None
+        self.context = utils.FakeContext()
+
+    def _prepare_expand_volume_mocks(self, storage_agent, array_type):
+        storage_agent.return_value = self.storage_agent
+
+        self.mediator.expand_volume = Mock()
+        array_type.return_value = "a9k"
+
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_expand_volume_with_zero_size(self, storage_agent, array_type):
+        self._prepare_expand_volume_mocks(storage_agent, array_type)
+
+        self.request.capacity_range.required_bytes = 0
+        self.servicer.ControllerExpandVolume(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+        self.mediator.expand_volume.assert_called_once_with(volume_id=self.volume_id, required_bytes=0)
+
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_expand_volume_succeeds_mount_access_mode(self, storage_agent, array_type):
+        self._prepare_expand_volume_mocks(storage_agent, array_type)
+
+        expand_respond = self.servicer.ControllerExpandVolume(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+        self.assertTrue(expand_respond.node_expansion_required)
+        self.mediator.expand_volume.assert_called_once_with(volume_id=self.volume_id,
+                                                            required_bytes=self.capacity_bytes)
+
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_expand_volume_succeeds_block_access_mode(self, storage_agent, array_type):
+        self._prepare_expand_volume_mocks(storage_agent, array_type)
+
+        self.request.volume_capability = csi_pb2.VolumeCapability(
+            access_mode=csi_pb2.VolumeCapability.AccessMode(mode=self.access_types.SINGLE_NODE_WRITER),
+            block=csi_pb2.VolumeCapability.BlockVolume())
+
+        expand_respond = self.servicer.ControllerExpandVolume(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+        self.assertFalse(expand_respond.node_expansion_required)
+        self.mediator.expand_volume.assert_called_once_with(volume_id=self.volume_id,
+                                                            required_bytes=self.capacity_bytes)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_expand_volume_with_wrong_secrets(self, a_enter):
+        self._test_create_object_with_wrong_secrets(a_enter)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_expand_volume_with_wrong_volume_capabilities(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+
+        self.request.volume_capability = csi_pb2.VolumeCapability(
+            access_mode=csi_pb2.VolumeCapability.AccessMode(mode=self.access_types.SINGLE_NODE_WRITER),
+            mount=csi_pb2.VolumeCapability.MountVolume(fs_type="ext42"))
+
+        self.servicer.ControllerExpandVolume(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT, "wrong fs_type")
+        self.assertTrue("fs_type" in self.context.details)
+
+        self.request.volume_capability = csi_pb2.VolumeCapability(
+            access_mode=csi_pb2.VolumeCapability.AccessMode(mode=self.access_types.MULTI_NODE_SINGLE_WRITER),
+            mount=csi_pb2.VolumeCapability.MountVolume(fs_type="ext4"))
+
+        self.servicer.ControllerExpandVolume(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT, "wrong access_mode")
+        self.assertTrue("access mode" in self.context.details)
+
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_expand_volume_with_array_connection_exception(self, storage_agent, array_type):
+        self._test_create_object_with_array_connection_exception(storage_agent)
+
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_expand_volume_with_get_volume_name_too_long_success(self, storage_agent, array_type):
+        self._prepare_expand_volume_mocks(storage_agent, array_type)
+        self.mediator.max_volume_name_length = 63
+
+        self.request.name = "a" * 128
+        self.servicer.ControllerExpandVolume(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+
+    @patch("controller.controller_server.csi_controller_server.detect_array_type")
+    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.expand_volume")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def expand_volume_returns_error(self, storage_agent, expand_volume, array_type, return_code, err):
+        storage_agent.return_value = self.storage_agent
+        expand_volume.side_effect = [err]
+
+        self.servicer.ControllerExpandVolume(self.request, self.context)
+        msg = str(err)
+
+        self.assertEqual(self.context.code, return_code)
+        self.assertTrue(msg in self.context.details)
+        self.mediator.expand_volume.assert_called_once_with(volume_id=self.volume_id,
+                                                            required_bytes=self.capacity_bytes)
+
+    def test_expand_volume_with_illegal_object_id_exception(self):
+        self.expand_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
+                                         err=array_errors.IllegalObjectID("123"))
+
+    def test_expand_volume_with_create_volume_with_other_exception(self):
+        self.expand_volume_returns_error(return_code=grpc.StatusCode.INTERNAL,
+                                         err=Exception("error"))
+
+
 class TestIdentityServer(unittest.TestCase):
 
     def setUp(self):

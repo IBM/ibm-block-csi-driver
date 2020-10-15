@@ -547,7 +547,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 array_type, volume_id = utils.get_volume_id_info(request.volume_id)
             except ObjectIdError as ex:
                 logger.warning("volume id is invalid. error : {}".format(ex))
-                return csi_pb2.DeleteVolumeResponse()
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                return csi_pb2.ControllerExpandVolumeResponse()
 
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
@@ -578,7 +579,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details(ex.message)
             return csi_pb2.ControllerExpandVolumeResponse()
 
-        except ValidationException as ex:
+        except (ValidationException, controller_errors.IllegalObjectID) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
