@@ -52,13 +52,10 @@ pipeline {
                     registryUrl = "${registry_protocol}://${DOCKER_REGISTRY}"
                     if (GIT_BRANCH == 'develop' || GIT_BRANCH == 'origin/develop' || GIT_BRANCH == 'master') {
                         docker.withRegistry(registryUrl, registryCredential ) {
-                            controller_image_latest.push()
-                            controller_image_with_generated_tag.push()
-                            node_image_latest.push()
-                            node_image_with_generated_tag.push()
-                        }
-                    } else {
-                        docker.withRegistry(registryUrl, registryCredential ) {
+                            if (GIT_BRANCH == 'develop' || GIT_BRANCH == 'origin/develop' || GIT_BRANCH == 'master') {
+                                controller_image_latest.push()
+                                node_image_latest.push()
+                            }
                             controller_image_with_generated_tag.push()
                             node_image_with_generated_tag.push()
                         }
@@ -70,14 +67,11 @@ pipeline {
             steps {
                 script {
                     sh 'dirname ${artifactory_path} | xargs mkdir -p'
+                    sh "echo ${DOCKER_REGISTRY}/${CSI_CONTROLLER_IMAGE}:$specific_tag > ${artifactory_path}"
+                    sh "echo ${DOCKER_REGISTRY}/${CSI_NODE_IMAGE}:$specific_tag >> ${artifactory_path}"
                     if (GIT_BRANCH == 'develop' || GIT_BRANCH == 'origin/develop' || GIT_BRANCH == 'master') {
-                        sh "echo ${DOCKER_REGISTRY}/${CSI_CONTROLLER_IMAGE}:$specific_tag > ${artifactory_path}"
-                        sh "echo ${DOCKER_REGISTRY}/${CSI_NODE_IMAGE}:$specific_tag >> ${artifactory_path}"
                         sh "echo ${DOCKER_REGISTRY}/${CSI_CONTROLLER_IMAGE}:latest >> ${artifactory_path}"
                         sh "echo ${DOCKER_REGISTRY}/${CSI_NODE_IMAGE}:latest >> ${artifactory_path}"
-                    } else {
-                        sh "echo ${DOCKER_REGISTRY}/${CSI_CONTROLLER_IMAGE}:$specific_tag > ${artifactory_path}"
-                        sh "echo ${DOCKER_REGISTRY}/${CSI_NODE_IMAGE}:$specific_tag >> ${artifactory_path}"
                     }
                 }
             }
