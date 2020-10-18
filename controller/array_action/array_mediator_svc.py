@@ -395,8 +395,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         unfinished_fcmaps = [fcmap for fcmap in fcmaps_as_source
                              if fcmap.status != FCMAP_STATUS_DONE or fcmap.copy_rate == "0"]
         if unfinished_fcmaps:
-            raise controller_errors.ObjectIsStillInUseError(id_or_name=unfinished_fcmaps,
-                                                            used_by=unfinished_fcmaps[0].target_vdisk_name)
+            raise controller_errors.ObjectIsStillInUseError(id_or_name=unfinished_fcmaps[0].source_vdisk_name,
+                                                            used_by=unfinished_fcmaps)
         for fcmap in fcmaps_as_source:
             self._delete_fcmap(fcmap.id, force=False)
 
