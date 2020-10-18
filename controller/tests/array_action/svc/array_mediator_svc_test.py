@@ -270,12 +270,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def _prepare_lsvdisk_to_return_none(self):
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(None)
 
-    def _prepare_returns_snapshot(self):
+    def _prepare_mocks_for_delete_snapshot(self):
         target_cli_vol = self._get_mapped_target_cli_vol()
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(target_cli_vol)
+        return target_cli_vol
 
     def _prepare_mocks_for_get_snapshot(self):
-        self._prepare_returns_snapshot()
+        self._prepare_mocks_for_delete_snapshot()
         self.fcmaps[0].copy_rate = "0"
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
@@ -411,15 +412,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.svc.delete_snapshot("test_snap")
 
-    def test_delete_snapshot_call_rmvolume(self):
-        self._prepare_returns_snapshot()
-
-        self.svc.delete_snapshot("test_snap")
-
-        self.svc.client.svctask.rmvolume.assert_called_once_with(vdisk_id="test_snap")
-
     def test_delete_snapshot_call_rmfcmap(self):
-        self._prepare_returns_snapshot()
+        self._prepare_mocks_for_delete_snapshot()
         fcmaps_as_target = self.fcmaps
         self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=fcmaps_as_target), Mock(as_list=[])]
         self.svc.delete_snapshot("test_snap")
@@ -428,7 +422,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_delete_snapshot_rmvolume_error(self, mock_warning):
-        self._prepare_returns_snapshot()
+        self._prepare_mocks_for_delete_snapshot()
         mock_warning.return_value = False
         self.svc.client.svctask.rmvolume.side_effect = [
             CLIFailureError("Failed")]
@@ -437,11 +431,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.delete_snapshot("test_snap")
 
     def test_delete_snapshot_success(self):
-        cli_volume = self._get_source_cli_vol()
+        cli_volume = self._prepare_mocks_for_delete_snapshot()
         cli_volume.FC_id = 'many'
-        self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=cli_volume)
         self.svc.delete_snapshot("test_snap")
         self.assertEqual(self.svc.client.svctask.rmfcmap.call_count, 2)
+        self.svc.client.svctask.rmvolume.assert_called_once_with(vdisk_id="test_snap")
 
     def test_validate_supported_capabilities_raise_error(self):
         capabilities_a = {"SpaceEfficiency": "Test"}
