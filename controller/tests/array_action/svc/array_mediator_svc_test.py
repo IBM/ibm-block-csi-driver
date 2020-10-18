@@ -272,7 +272,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def _prepare_mocks_for_delete_snapshot(self):
         target_cli_vol = self._get_mapped_target_cli_vol()
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(target_cli_vol)
-        return target_cli_vol
+        target_cli_vol.FC_id = 'many'
 
     def _prepare_mocks_for_get_snapshot(self):
         self._prepare_mocks_for_delete_snapshot()
@@ -429,11 +429,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(CLIFailureError):
             self.svc.delete_snapshot("test_snap")
 
-    @patch("controller.array_action.array_mediator_svc.is_warning_message")
-    def test_snapshot_still_copy_fcmaps_not_removed(self, mock_warning):
-        cli_volume = self._prepare_mocks_for_delete_snapshot()
-        cli_volume.FC_id = 'many'
-        mock_warning.return_value = False
+    def test_delete_snapshot_still_copy_fcmaps_not_removed(self):
+        self._prepare_mocks_for_object_still_in_use()
         fcmaps_as_source = self.fcmaps
         fcmaps_as_source[0].status = "not good"
         fcmaps_as_source[0].source_vdisk_name = "test_snap"
@@ -442,8 +439,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.delete_snapshot("test_snap")
 
     def test_delete_snapshot_success(self):
-        cli_volume = self._prepare_mocks_for_delete_snapshot()
-        cli_volume.FC_id = 'many'
+        self._prepare_mocks_for_delete_snapshot()
         self.svc.delete_snapshot("test_snap")
         self.assertEqual(self.svc.client.svctask.rmfcmap.call_count, 2)
         self.svc.client.svctask.rmvolume.assert_called_once_with(vdisk_id="test_snap")
