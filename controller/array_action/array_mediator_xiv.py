@@ -234,7 +234,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         cli_snapshots = self.client.cmd.snapshot_list(vol=volume_name).as_list
         if cli_snapshots:
             raise controller_errors.ObjectIsStillInUseError(
-                id_or_name=[cli_snapshot.name for cli_snapshot in cli_snapshots],
+                id_or_name=cli_snapshots,
                 used_by=volume_id)
         try:
             self.client.cmd.vol_delete(vol=volume_name)
