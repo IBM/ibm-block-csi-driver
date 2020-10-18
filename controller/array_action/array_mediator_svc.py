@@ -251,7 +251,15 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return self._get_volume_name_by_wwn(volume_id)
 
     def expand_volume(self, volume_id, required_bytes):
-        pass
+        cli_object = self._get_cli_volume_by_wwn_if_exist(volume_id)
+        if not cli_object:
+            raise controller_errors.ObjectNotFoundError(volume_id)
+        object_name = cli_object.name
+        fcmap_as_target = self._get_fcmap_as_target_if_exists(object_name)
+        self._safe_delete_fcmaps_as_source(object_name)
+        if fcmap_as_target:
+            self._stop_and_delete_fcmap(fcmap_as_target.id)
+        self.client.svctask.expandvdisksize(vdisk_id=volume_id, unit='b', size=required_bytes)
 
     def _get_fcmaps(self, volume_name, endpoint_type):
         """
