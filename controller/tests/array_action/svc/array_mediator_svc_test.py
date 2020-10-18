@@ -267,8 +267,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def _prepare_mocks_for_delete_snapshot(self):
         target_cli_vol = self._get_mapped_target_cli_vol()
-        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(target_cli_vol)
         target_cli_vol.FC_id = 'many'
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(target_cli_vol)
 
     def _prepare_mocks_for_get_snapshot(self):
         self._prepare_mocks_for_delete_snapshot()
