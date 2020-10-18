@@ -650,11 +650,13 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         flashcopies_as_source = [flashcopy for flashcopy in flashcopies
                                  if flashcopy.sourcevolume == api_volume.id]
         for flashcopy in flashcopies_as_source:
-            self._is_flashcopy_safe_to_delete(flashcopy)
+            self._is_flashcopy_safe_to_delete(flashcopy, api_volume.name)
         for flashcopy in flashcopies:
             self._delete_flashcopy(flashcopy.id)
 
-    def _is_flashcopy_safe_to_delete(self, flashcopy):
+    def _is_flashcopy_safe_to_delete(self, flashcopy, volume_name):
         flashcopy_process = self._get_flashcopy_process(flashcopy.id)
-        if flashcopy.backgroundcopy == "disabled" or flashcopy_process.out_of_sync_tracks != '0':
-            raise array_errors.ObjectIsStillInUseError(flashcopy.sourcevolume, flashcopy.id)
+        if flashcopy.backgroundcopy == "disabled":
+            raise array_errors.ObjectIsStillInUseError(volume_name, [flashcopy.representation])
+        elif flashcopy_process.out_of_sync_tracks != '0':
+            raise array_errors.ObjectIsStillInUseError(volume_name, [flashcopy_process.representation])

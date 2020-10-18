@@ -53,7 +53,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             {"sourcevolume": {"id": "0001"},
              "targetvolume": {"id": "0002"},
              "id": "0001:0002",
-             "state": "valid"
+             "state": "valid",
+             "representation": {}
              }
         )
 
@@ -194,13 +195,15 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                    "targetvolume": "0002",
                    "id": "0001:0002",
                    "state": "valid",
-                   "backgroundcopy": "disabled"
+                   "backgroundcopy": "disabled",
+                   "representation": {}
                    }),
             Munch({"sourcevolume": "0003",
                    "targetvolume": "0001",
                    "id": "0003:0001",
                    "state": "valid",
-                   "backgroundcopy": "enabled"
+                   "backgroundcopy": "enabled",
+                   "representation": {}
                    })]
         self.client_mock.get_flashcopies.return_value = Munch({"out_of_sync_tracks": "0"})
         self.client_mock.delete_volume.side_effect = ClientException("500")
@@ -222,7 +225,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                    "targetvolume": "0002",
                    "id": "0001:0002",
                    "state": "valid",
-                   "backgroundcopy": "disabled"
+                   "backgroundcopy": "disabled",
+                   "representation": {}
                    })]
         self.client_mock.get_flashcopies.return_value = Munch({"out_of_sync_tracks": "0"})
         self.client_mock.delete_volume.side_effect = ClientException("500")
@@ -247,7 +251,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                    "backgroundcopy": "enabled"
                    })]
         self.client_mock.get_flashcopies.return_value = Munch({"out_of_sync_tracks": "55",
-                                                               "targetvolume": "0002"})
+                                                               "targetvolume": "0002",
+                                                               "representation": {}})
         self.client_mock.delete_volume.side_effect = ClientException("500")
         with self.assertRaises(array_errors.ObjectIsStillInUseError):
             self.array.delete_volume("0001")
