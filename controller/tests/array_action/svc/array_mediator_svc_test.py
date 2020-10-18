@@ -431,10 +431,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_delete_snapshot_still_copy_fcmaps_not_removed(self):
         self._prepare_mocks_for_object_still_in_use()
-        fcmaps_as_source = self.fcmaps
-        fcmaps_as_source[0].status = "not good"
-        fcmaps_as_source[0].source_vdisk_name = "test_snap"
-        self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=fcmaps_as_source), Mock(as_list=fcmaps_as_source)]
+        fcmaps_as_target = self.fcmaps
+        fcmaps_as_source = [Munch(
+            {'source_vdisk_name': 'test_snap',
+             'target_vdisk_name': 'target_name',
+             'id': 'test_fc_id',
+             'status': "not_good",
+             'copy_rate': "non_zero_value"})]
+        self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=fcmaps_as_target), Mock(as_list=fcmaps_as_source)]
         with self.assertRaises(array_errors.ObjectIsStillInUseError):
             self.svc.delete_snapshot("test_snap")
 
