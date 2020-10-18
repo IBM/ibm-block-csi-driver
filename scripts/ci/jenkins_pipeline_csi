@@ -50,15 +50,13 @@ pipeline {
             steps {
                 script {
                     registryUrl = "${registry_protocol}://${DOCKER_REGISTRY}"
-                    if (GIT_BRANCH == 'develop' || GIT_BRANCH == 'origin/develop' || GIT_BRANCH == 'master') {
-                        docker.withRegistry(registryUrl, registryCredential ) {
-                            if (GIT_BRANCH == 'develop' || GIT_BRANCH == 'origin/develop' || GIT_BRANCH == 'master') {
-                                controller_image_latest.push()
-                                node_image_latest.push()
-                            }
-                            controller_image_with_generated_tag.push()
-                            node_image_with_generated_tag.push()
+                    docker.withRegistry(registryUrl, registryCredential ) {
+                        if (GIT_BRANCH == 'develop' || GIT_BRANCH == 'origin/develop' || GIT_BRANCH == 'master') {
+                            controller_image_latest.push()
+                            node_image_latest.push()
                         }
+                        controller_image_with_generated_tag.push()
+                        node_image_with_generated_tag.push()
                     }
                 }
             }
