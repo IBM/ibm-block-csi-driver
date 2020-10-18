@@ -188,23 +188,22 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.delete_volume("vol")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
-    def test_delete_volume_has_snapshot_fcmaps_not_removed(self, mock_warning):
+    def _prepare_mocks_for_object_still_in_use(self, mock_warning):
         cli_volume = self._get_source_cli_vol()
         cli_volume.FC_id = 'many'
         self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=cli_volume)
         mock_warning.return_value = False
+
+    def test_delete_volume_has_snapshot_fcmaps_not_removed(self):
+        self._prepare_mocks_for_object_still_in_use()
         fcmaps_as_source = self.fcmaps
         fcmaps_as_source[0].copy_rate = "0"
         self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=[]), Mock(as_list=fcmaps_as_source)]
         with self.assertRaises(array_errors.ObjectIsStillInUseError):
             self.svc.delete_volume("vol")
 
-    @patch("controller.array_action.array_mediator_svc.is_warning_message")
-    def test_delete_volume_still_copy_fcmaps_not_removed(self, mock_warning):
-        cli_volume = self._get_source_cli_vol()
-        cli_volume.FC_id = 'many'
-        self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=cli_volume)
-        mock_warning.return_value = False
+    def test_delete_volume_still_copy_fcmaps_not_removed(self):
+        self._prepare_mocks_for_object_still_in_use()
         fcmaps_as_source = self.fcmaps
         fcmaps_as_source[0].status = "not good"
         self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=[]), Mock(as_list=fcmaps_as_source)]
