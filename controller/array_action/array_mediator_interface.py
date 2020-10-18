@@ -132,6 +132,22 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def expand_volume(self, volume_id, required_bytes):
+        """
+        This expand the volume size on storage.
+        Args:
+           volume_id        : volume id
+           required_bytes   : capacity requirements of the volume after expansion
+        Returns:
+           volume
+        Raises:
+            ObjectNotFound
+            IllegalObjectID
+            ObjectIsStillInUse
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def get_volume_mappings(self, volume_id):
         """
         This function return volume mappings.

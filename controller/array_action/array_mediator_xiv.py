@@ -164,6 +164,9 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.IllegalObjectID(ex.status)
 
+    def expand_volume(self, volume_id, required_bytes):
+        pass
+
     def validate_supported_capabilities(self, capabilities):
         logger.info("validate_supported_capabilities for capabilities : {0}".format(capabilities))
         # for a9k there should be no capabilities

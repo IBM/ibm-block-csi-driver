@@ -158,6 +158,32 @@ def validate_delete_snapshot_request(request):
     logger.debug("request validation finished.")
 
 
+def validate_expand_volume_request(request):
+    logger.debug("validating expand volume request")
+
+    if request.volume_id == "":
+        raise ValidationException("Volume id cannot be empty")
+
+    logger.debug("validating volume capacity")
+    if request.capacity_range:
+        if request.capacity_range.required_bytes < 0:
+            raise ValidationException(messages.size_bigger_than_0_message)
+    else:
+        raise ValidationException(messages.no_capacity_range_message)
+
+    logger.debug("validating secrets")
+    if request.secrets:
+        validate_secret(request.secrets)
+
+    logger.debug("validating volume capabilities")
+    capability = request.volume_capability
+    if not capability:
+        raise ValidationException(messages.capabilities_not_set_message)
+    validate_csi_volume_capability(request.volume_capability)
+
+    logger.debug("expand volume validation finished")
+
+
 def generate_csi_create_volume_response(new_volume, source_type=None):
     logger.debug("creating volume response for vol : {0}".format(new_volume))
 
@@ -198,6 +224,18 @@ def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
         ready_to_use=new_snapshot.is_ready))
 
     logger.debug("finished creating snapshot response : {0}".format(res))
+    return res
+
+
+def generate_csi_expand_volume_response(request):
+    logger.debug("creating response for expand volume")
+    is_fs = request.volume_capability.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_MOUNT)
+    res = csi_pb2.ControllerExpandVolumeResponse(
+        capacity_bytes=request.capacity_range.required_bytes,
+        node_expansion_required=is_fs,
+    )
+
+    logger.debug("finished creating expand volume response")
     return res
 
 
