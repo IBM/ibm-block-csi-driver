@@ -430,6 +430,18 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(CLIFailureError):
             self.svc.delete_snapshot("test_snap")
 
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def test_snapshot_still_copy_fcmaps_not_removed(self, mock_warning):
+        cli_volume = self._prepare_mocks_for_delete_snapshot()
+        cli_volume.FC_id = 'many'
+        mock_warning.return_value = False
+        fcmaps_as_source = self.fcmaps
+        fcmaps_as_source[0].status = "not good"
+        fcmaps_as_source[0].source_vdisk_name = "test_snap"
+        self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=fcmaps_as_source), Mock(as_list=fcmaps_as_source)]
+        with self.assertRaises(array_errors.ObjectIsStillInUseError):
+            self.svc.delete_snapshot("test_snap")
+
     def test_delete_snapshot_success(self):
         cli_volume = self._prepare_mocks_for_delete_snapshot()
         cli_volume.FC_id = 'many'
