@@ -189,7 +189,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.mediator.get_snapshot(snap_name)
 
-    def test_get_snapshot_returns_illegal_object_name(self):
+    def test_get_snapshot_raise_illegal_object_name(self):
         snap_name = "snap"
         self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalNameForObjectError("", snap_name, "")]
         with self.assertRaises(array_errors.IllegalObjectName):
@@ -281,7 +281,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.mediator.get_object_by_id(snap_name, "snapshot")
 
-    def test_get_object_by_id_returns_illegal_object_name(self):
+    def test_get_object_by_id_raise_illegal_object_name(self):
         snap_name = "snap"
         self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalValueForArgumentError("", snap_name, "")]
         with self.assertRaises(array_errors.IllegalObjectID):
