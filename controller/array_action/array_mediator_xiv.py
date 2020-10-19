@@ -156,14 +156,6 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.IllegalObjectName(ex.status)
 
-    def is_volume_has_snapshots(self, volume_id):
-        try:
-            volume_name = self._get_vol_by_wwn(volume_id)
-            return bool(self.client.cmd.snapshot_list(vol=volume_name).as_list)
-        except xcli_errors.IllegalValueForArgumentError as ex:
-            logger.exception(ex)
-            raise controller_errors.IllegalObjectID(ex.status)
-
     def expand_volume(self, volume_id, required_bytes):
         min_vol_size_in_blocks = self._convert_size_bytes_to_blocks(required_bytes)
         try:
@@ -219,12 +211,12 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
                                             minimum_volume_size_in_bytes, pool_id=None):
         logger.debug(
-            "Copy snapshot {0} data to volume {1}. Snapshot capacity {2}. Minimal requested volume capacity {3}".format(
+            "Copy source {0} data to volume {1}. source capacity {2}. Minimal requested volume capacity {3}".format(
                 name, source_name, source_capacity_in_bytes, minimum_volume_size_in_bytes))
         try:
             logger.debug("Formatting volume {0}".format(name))
             self.client.cmd.vol_format(vol=name)
-            logger.debug("Copying Snapshot {0} data to volume {1}.".format(name, source_name))
+            logger.debug("Copying source {0} data to volume {1}.".format(source_name, name))
             self.client.cmd.vol_copy(vol_src=source_name, vol_trg=name)
             if minimum_volume_size_in_bytes > source_capacity_in_bytes:
                 min_vol_size_in_blocks = self._convert_size_bytes_to_blocks(minimum_volume_size_in_bytes)
@@ -255,17 +247,21 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
-        vol_name = self._get_vol_by_wwn(volume_id)
-
+        volume_name = self._get_vol_by_wwn(volume_id)
+        cli_snapshots = self.client.cmd.snapshot_list(vol=volume_name).as_list
+        if cli_snapshots:
+            raise controller_errors.ObjectIsStillInUseError(
+                id_or_name=volume_id,
+                used_by=cli_snapshots)
         try:
-            self.client.cmd.vol_delete(vol=vol_name)
+            self.client.cmd.vol_delete(vol=volume_name)
         except xcli_errors.VolumeBadNameError as ex:
             logger.exception(ex)
-            raise controller_errors.ObjectNotFoundError(vol_name)
+            raise controller_errors.ObjectNotFoundError(volume_name)
 
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
-            raise controller_errors.PermissionDeniedError("delete vol : {0}".format(vol_name))
+            raise controller_errors.PermissionDeniedError("delete vol : {0}".format(volume_name))
 
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
