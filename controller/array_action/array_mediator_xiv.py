@@ -159,7 +159,8 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def expand_volume(self, volume_id, required_bytes):
         min_vol_size_in_blocks = self._convert_size_bytes_to_blocks(required_bytes)
         try:
-            self.client.cmd.vol_resize(wwn=volume_id, size_blocks=min_vol_size_in_blocks)
+            volume_name = self._get_vol_by_wwn(volume_id)
+            self.client.cmd.vol_resize(vol=volume_name, size_blocks=min_vol_size_in_blocks)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectID(ex.status)
