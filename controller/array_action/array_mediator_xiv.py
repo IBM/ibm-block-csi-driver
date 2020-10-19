@@ -170,9 +170,6 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         except (xcli_errors.VolumeBadNameError, xcli_errors.TargetVolumeBadNameError) as ex:
             logger.exception(ex)
             raise controller_errors.ObjectNotFoundError(volume_id)
-        except xcli_errors.OperationForbiddenForUserCategoryError as ex:
-            logger.exception(ex)
-            raise controller_errors.PermissionDeniedError("Expand vol : {0}".format(volume_id))
 
     def validate_supported_capabilities(self, capabilities):
         logger.info("validate_supported_capabilities for capabilities : {0}".format(capabilities))
