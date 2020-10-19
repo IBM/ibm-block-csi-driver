@@ -13,3 +13,6 @@ NodeUnstageVolume
 GetPluginCapabilities
 GetPluginInfo
 Probe
+ControllerPublishVolume
+ControllerUnpublishVolume
+Node Service
