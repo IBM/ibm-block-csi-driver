@@ -259,7 +259,18 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._safe_delete_fcmaps_as_source(object_name)
         if fcmap_as_target:
             self._stop_and_delete_fcmap(fcmap_as_target.id)
-        self.client.svctask.expandvdisksize(vdisk_id=volume_id, unit='b', size=required_bytes)
+        try:
+            self.client.svctask.expandvdisksize(vdisk_id=volume_id, unit='b', size=required_bytes)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if not is_warning_message(ex.my_message):
+                logger.warning("Failed to delete volume {}".format(volume_id))
+                if OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message:
+                    raise controller_errors.ObjectNotFoundError(volume_id)
+                else:
+                    raise ex
+        except Exception as ex:
+            logger.exception(ex)
+            raise ex
 
     def _get_fcmaps(self, volume_name, endpoint_type):
         """
