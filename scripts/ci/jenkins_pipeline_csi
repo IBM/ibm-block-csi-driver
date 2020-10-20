@@ -36,7 +36,7 @@ pipeline {
         stage ('Build docker images') {
             steps {
                 script {
-                    sh 'bash ./build/ci/run_variables_verification.sh'
+                    sh 'bash ./scripts/ci/run_variables_verification.sh'
                     branch = sh(script:"echo $GIT_BRANCH | sed 's|/|.|g'",returnStdout:true).trim()
                     specific_tag = "${IMAGE_VERSION}_b${BUILD_NUMBER}_${branch}"
                     if (latest_tag.contains(GIT_BRANCH)) {
