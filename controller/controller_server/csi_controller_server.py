@@ -535,6 +535,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         return csi_pb2.GetCapacityResponse()
 
     def ControllerExpandVolume(self, request, context):
+        set_current_thread_name(request.volume_id)
         logger.info("ControllerExpandVolume")
         secrets = request.secrets
 
