@@ -260,7 +260,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if fcmap_as_target:
             self._stop_and_delete_fcmap(fcmap_as_target.id)
         try:
-            self.client.svctask.expandvdisksize(vdisk_id=volume_id, unit='b', size=required_bytes)
+            self.client.svctask.expandvdisksize(vdisk_id=cli_object.name, unit='b', size=required_bytes)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 logger.warning("Failed to expand volume {}".format(volume_id))
