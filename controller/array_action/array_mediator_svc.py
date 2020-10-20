@@ -263,7 +263,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self.client.svctask.expandvdisksize(vdisk_id=volume_id, unit='b', size=required_bytes)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
-                logger.warning("Failed to delete volume {}".format(volume_id))
+                logger.warning("Failed to expand volume {}".format(volume_id))
                 if OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message:
                     raise controller_errors.ObjectNotFoundError(volume_id)
                 else:
