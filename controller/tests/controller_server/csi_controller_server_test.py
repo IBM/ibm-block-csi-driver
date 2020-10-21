@@ -1312,7 +1312,7 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
 
         expand_respond = self.servicer.ControllerExpandVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.assertFalse(expand_respond.node_expansion_required)
+        self.assertTrue(expand_respond.node_expansion_required)
         self.mediator.expand_volume.assert_called_once_with(volume_id=self.volume_id,
                                                             required_bytes=self.capacity_bytes)
 
