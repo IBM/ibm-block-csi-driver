@@ -63,7 +63,7 @@ pipeline {
                 }
             }
         }
-        stage ('Save Artifactes') {
+        stage ('Save Artifacts') {
             steps {
                 script {
                     controller_registry = "${DOCKER_REGISTRY}/${CSI_CONTROLLER_IMAGE}"
