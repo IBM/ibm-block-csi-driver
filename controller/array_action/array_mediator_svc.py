@@ -250,15 +250,21 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def get_volume_name(self, volume_id):
         return self._get_volume_name_by_wwn(volume_id)
 
+    def _get_fcmaps_by_object(self, object_name):
+        all_fcmaps = []
+        fcmap_as_target = self._get_fcmap_as_target_if_exists(object_name)
+        if fcmap_as_target:
+            all_fcmaps.append(fcmap_as_target)
+        all_fcmaps.extend(self._get_fcmaps_as_source_if_exist(object_name))
+        return all_fcmaps
+
     def expand_volume(self, volume_id, required_bytes):
         cli_volume = self._get_cli_volume_by_wwn_if_exist(volume_id)
         if not cli_volume:
             raise controller_errors.ObjectNotFoundError(volume_id)
         object_name = cli_volume.name
-        fcmap_as_target = self._get_fcmap_as_target_if_exists(object_name)
-        self._safe_delete_fcmaps_as_source(object_name)
-        if fcmap_as_target:
-            self._stop_and_delete_fcmap(fcmap_as_target.id)
+        fcmaps = self._get_fcmaps_by_object(object_name)
+        self._safe_delete_fcmaps(object_name, fcmaps)
         size_in_bytes = int(cli_volume.capacity)
         expanded_bytes = required_bytes - size_in_bytes
         try:
@@ -489,14 +495,13 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._stop_fcmap(fcmap_id)
         self._delete_fcmap(fcmap_id, force=True)
 
-    def _safe_delete_fcmaps_as_source(self, object_name):
-        fcmaps_as_source = self._get_fcmaps_as_source_if_exist(object_name)
-        unfinished_fcmaps = [fcmap for fcmap in fcmaps_as_source
+    def _safe_delete_fcmaps(self, object_name, fcmaps):
+        unfinished_fcmaps = [fcmap for fcmap in fcmaps
                              if fcmap.status != FCMAP_STATUS_DONE or fcmap.copy_rate == "0"]
         if unfinished_fcmaps:
             raise controller_errors.ObjectIsStillInUseError(id_or_name=object_name,
                                                             used_by=unfinished_fcmaps)
-        for fcmap in fcmaps_as_source:
+        for fcmap in fcmaps:
             self._delete_fcmap(fcmap.id, force=False)
 
     def _delete_object(self, cli_object, is_snapshot=False):
@@ -505,7 +510,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if is_snapshot and not fcmap_as_target:
             raise controller_errors.ObjectNotFoundError(object_name)
         if cli_object.FC_id == 'many':
-            self._safe_delete_fcmaps_as_source(object_name)
+            fcmaps_as_source = self._get_fcmaps_as_source_if_exist(object_name)
+            self._safe_delete_fcmaps(object_name, fcmaps_as_source)
         if fcmap_as_target:
             self._stop_and_delete_fcmap(fcmap_as_target.id)
         self._delete_volume_by_name(object_name)
