@@ -197,8 +197,9 @@ class SnapshotAlreadyExists(BaseArrayActionException):
 
 class ObjectIsStillInUseError(BaseArrayActionException):
 
-    def __init__(self, id_or_name, used_by):
-        self.message = messages.ObjectIsStillInUseError_message.format(id_or_name, used_by)
+    def __init__(self, id_or_name, used_by: list):
+        self.message = messages.ObjectIsStillInUseError_message.format(id_or_name, used_by[0])
+        self.message += ' {0} more were truncated.'.format(len(used_by) - 1) if len(used_by) > 1 else ''
 
 
 class InvalidCliResponseError(BaseArrayActionException):
