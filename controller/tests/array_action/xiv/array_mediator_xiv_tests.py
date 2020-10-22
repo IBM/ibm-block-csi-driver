@@ -514,6 +514,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
     def _prepare_mocks_for_expand_volume(self):
         self.volume_name = "volume_name"
+        self.volume_id = "volume_id"
         self.required_bytes = 1000
         vol = utils.get_mock_xiv_volume(size=10, name=self.volume_name, wwn="wwn")
         self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=vol)
@@ -521,21 +522,21 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_expand_volume_succeed(self):
         self._prepare_mocks_for_expand_volume()
         required_size_in_blocks = int(self.mediator._convert_size_bytes_to_blocks(self.required_bytes))
-        self.mediator.expand_volume(volume_id='volume_id', required_bytes=self.required_bytes)
+        self.mediator.expand_volume(volume_id=self.volume_id, required_bytes=self.required_bytes)
         self.mediator.client.cmd.vol_resize.assert_called_once_with(vol=self.volume_name,
                                                                     size_blocks=required_size_in_blocks)
 
     def test_expand_volume_not_found(self):
         self._prepare_mocks_for_expand_volume()
         self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=None)
-        with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.mediator.expand_volume(volume_id='volume_id', required_bytes=self.required_bytes)
+        with self.assertRaises(expected_exception=array_errors.ObjectNotFoundError):
+            self.mediator.expand_volume(volume_id=self.volume_id, required_bytes=self.required_bytes)
 
     def test_expand_volume_vol_resize_errors(self):
         self._prepare_mocks_for_expand_volume()
         self.mediator.client.cmd.vol_resize.side_effect = [xcli_errors.IllegalNameForObjectError("", "", "")]
-        with self.assertRaises(array_errors.IllegalObjectID):
-            self.mediator.expand_volume(volume_id='volume_id', required_bytes=self.required_bytes)
+        with self.assertRaises(expected_exception=array_errors.IllegalObjectID):
+            self.mediator.expand_volume(volume_id=self.volume_id, required_bytes=self.required_bytes)
         self.mediator.client.cmd.vol_resize.side_effect = [xcli_errors.VolumeBadNameError("", "", "")]
-        with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.mediator.expand_volume(volume_id='volume_id', required_bytes=self.required_bytes)
+        with self.assertRaises(expected_exception=array_errors.ObjectNotFoundError):
+            self.mediator.expand_volume(volume_id=self.volume_id, required_bytes=self.required_bytes)
