@@ -192,15 +192,22 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def _generate_volume_scsi_identifier(self, volume_id):
         return '6{}000000000000{}'.format(self.wwnn[1:], volume_id)
 
+    def _get_copy_source_id(self, api_volume):
+        copy_source_id = None
+        flashcopy_as_target = get_flashcopy_as_target_if_exists(api_volume=api_volume)
+        if flashcopy_as_target:
+            source_volume_id = flashcopy_as_target.sourcevolume
+            copy_source_id = self._generate_volume_scsi_identifier(volume_id=source_volume_id)
+        return copy_source_id
+
     def _generate_volume_response(self, api_volume):
-        flashcopy_as_target = get_flashcopy_as_target_if_exists(api_volume)
-        source_volume_id = flashcopy_as_target.sourcevolume if flashcopy_as_target else None
+
         return Volume(
             vol_size_bytes=int(api_volume.cap),
-            vol_id=self._generate_volume_scsi_identifier(api_volume.id),
+            vol_id=self._generate_volume_scsi_identifier(volume_id=api_volume.id),
             vol_name=api_volume.name,
             array_address=self.service_address,
-            copy_source_id=self._generate_volume_scsi_identifier(source_volume_id) if source_volume_id else None,
+            copy_source_id=self._get_copy_source_id(api_volume=api_volume),
             pool_name=api_volume.pool,
             array_type=self.array_type
         )
