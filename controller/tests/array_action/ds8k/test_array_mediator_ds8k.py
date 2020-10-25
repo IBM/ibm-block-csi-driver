@@ -234,7 +234,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             self.array.delete_volume("0001")
         self.client_mock.delete_flashcopy.assert_not_called()
 
-    def test_delete_volume_with_source_flashcopies_deleted(self):
+    def test_delete_volume_with_flashcopies_as_source_deleted(self):
         self._prepare_mocks_for_delete_volume()
         self.client_mock.get_volume.return_value = self.volume_response
         self.array.delete_volume("0001")
@@ -586,7 +586,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.create_flashcopy.return_value = self.flashcopy_response
         return volume
 
-    def test_copy_to_existing_volume_with_extend_volume(self):
+    def test_copy_to_existing_volume_success(self):
         volume = self._prepare_mocks_for_copy_to_existing_volume()
         self.array.copy_to_existing_volume_from_source("test_name", "source_name", 3, 2, "fake_pool")
         self.client_mock.extend_volume.assert_called_once_with(volume_id=volume.id,
@@ -598,7 +598,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                      FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET_OPTION
                      ])
 
-    def test_clone_volume_not_found(self):
+    def test_copy_to_existing_volume_raise_not_found(self):
         self._prepare_mocks_for_copy_to_existing_volume()
         self.client_mock.extend_volume.side_effect = NotFound("404")
         with self.assertRaises(array_errors.ObjectNotFoundError):
