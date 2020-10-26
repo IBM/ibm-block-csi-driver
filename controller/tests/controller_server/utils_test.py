@@ -8,7 +8,7 @@ from controller.controller_server.csi_controller_server import ControllerService
 from controller.controller_server.errors import ObjectIdError
 from controller.controller_server.errors import ValidationException
 from controller.csi_general import csi_pb2
-from controller.tests.controller_server.csi_controller_server_test import ProtoMock
+from controller.tests.controller_server.csi_controller_server_test import ProtoBufMock
 
 
 class TestUtils(unittest.TestCase):
@@ -74,20 +74,20 @@ class TestUtils(unittest.TestCase):
 
     def test_validate_create_volume_source_empty(self):
         request = Mock()
-        source = ProtoMock(spec=[])
+        source = ProtoBufMock(spec=[])
         request.volume_content_source = source
         utils.validate_create_volume_source(request)
 
     def test_validate_create_volume_source_snapshot(self):
         request = Mock()
-        snapshot_source = ProtoMock(spec=["snapshot"])
+        snapshot_source = ProtoBufMock(spec=["snapshot"])
         request.volume_content_source = snapshot_source
         snapshot_source.snapshot.snapshot_id = "A9000:snap_id"
         utils.validate_create_volume_source(request)
 
     def test_validate_create_volume_source_volume(self):
         request = Mock()
-        volume_source = ProtoMock(spec=["volume"])
+        volume_source = ProtoBufMock(spec=["volume"])
         request.volume_content_source = volume_source
         volume_source.volume.volume_id = "A9000:vol_id"
         utils.validate_create_volume_source(request)
@@ -184,7 +184,7 @@ class TestUtils(unittest.TestCase):
         new_vol.pool_name = "pool"
         new_vol.array_type = "a9k"
         new_vol.capacity_bytes = 10
-        new_vol.copy_src_object_id = None
+        new_vol.copy_source_id = None
 
         get_vol_id.return_value = "a9k:name"
         res = utils.generate_csi_create_volume_response(new_vol)
@@ -205,7 +205,7 @@ class TestUtils(unittest.TestCase):
         new_vol.pool_name = "pool"
         new_vol.array_type = "svc"
         new_vol.capacity_bytes = 10
-        new_vol.copy_src_object_id = None
+        new_vol.copy_source_id = None
 
         get_vol_id.return_value = "svc:name"
         res = utils.generate_csi_create_volume_response(new_vol)
@@ -222,7 +222,7 @@ class TestUtils(unittest.TestCase):
         new_vol.pool_name = "pool"
         new_vol.array_type = "svc"
         new_vol.capacity_bytes = 10
-        new_vol.copy_src_object_id = None
+        new_vol.copy_source_id = None
 
         get_vol_id.return_value = "svc:name"
         res = utils.generate_csi_create_volume_response(new_vol)

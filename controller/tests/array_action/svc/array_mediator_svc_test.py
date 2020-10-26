@@ -61,7 +61,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvdisk.side_effect = [
             CLIFailureError('CMMVC5753E')]
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.svc.get_volume("vol_name")
+            self.svc.get_volume("volume_name")
 
     def test_get_volume_return_correct_value(self):
         vol_ret = Mock(as_single_element=Munch({'vdisk_UID': 'vol_id',
@@ -230,7 +230,6 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def _prepare_mocks_for_get_snapshot(self):
         target_cli_vol = self._get_mapped_target_cli_vol()
-
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(target_cli_vol)
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
@@ -244,7 +243,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_snapshot_has_no_fc_id_raise_error(self):
         self._prepare_lsvdisk_to_return_mapless_target_volume()
 
-        with self.assertRaises(array_errors.SnapshotNameBelongsToVolumeError):
+        with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.svc.get_snapshot("test_snap")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
@@ -265,7 +264,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_get_snapshot_by_id_has_no_fcmap_id_raise_error(self):
         self._prepare_lsvdisk_to_return_mapless_target_volume()
-        with self.assertRaises(array_errors.SnapshotIdBelongsToVolumeError):
+        with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.svc.get_object_by_id("snap_id", "snapshot")
 
     def test_get_snapshot_by_id_success(self):
