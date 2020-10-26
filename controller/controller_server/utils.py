@@ -267,7 +267,6 @@ def get_node_id_info(node_id):
 def choose_connectivity_type(connecitvity_types):
     # If connectivity type support FC and iSCSI at the same time, chose FC
     logger.debug("choosing connectivity type for connectivity types : {0}".format(connecitvity_types))
-    res = None
     if FC_CONNECTIVITY_TYPE in connecitvity_types:
         logger.debug("connectivity type is : {0}".format(FC_CONNECTIVITY_TYPE))
         return FC_CONNECTIVITY_TYPE
