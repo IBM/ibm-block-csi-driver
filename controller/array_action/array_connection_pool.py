@@ -21,7 +21,7 @@ class ConnectionPool(object):
         self.channel = Queue(max_size)
         self.lock = RLock()
 
-        for x in range(min_size):
+        for _ in range(min_size):
             self.put(self.get())
 
     def __del__(self):
