@@ -236,7 +236,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             self.array.delete_volume("0001")
         self.client_mock.delete_flashcopy.assert_not_called()
 
-    def test_delete_volume_with_flashcopies_as_source_deleted(self):
+    def test_delete_volume_with_flashcopy_as_source_deleted(self):
         self._prepare_mocks_for_delete_volume()
         self.array.delete_volume("0001")
         self.client_mock.delete_flashcopy.assert_called_once()
