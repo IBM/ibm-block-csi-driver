@@ -591,7 +591,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_from_source_pool_missing(self, storage_agent):
         array_exception = array_errors.PoolParameterIsMissing("")
-        self._test_create_volume_from_snapshot_error(storage_agent, array_type, array_exception,
+        self._test_create_volume_from_snapshot_error(storage_agent, array_exception,
                                                      grpc.StatusCode.INVALID_ARGUMENT)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -603,18 +603,18 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_from_source_get_object_general_error(self, storage_agent):
         array_exception = Exception("")
-        self._test_create_volume_from_snapshot_error(storage_agent, array_type, None,
+        self._test_create_volume_from_snapshot_error(storage_agent, None,
                                                      grpc.StatusCode.INTERNAL, get_exception=array_exception)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_from_source_get_object_error(self, storage_agent):
         array_exception = array_errors.ExpectedSnapshotButFoundVolumeError("", "")
-        self._test_create_volume_from_snapshot_error(storage_agent, array_type, None,
+        self._test_create_volume_from_snapshot_error(storage_agent, None,
                                                      grpc.StatusCode.INVALID_ARGUMENT, get_exception=array_exception)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_from_source_get_object_none(self, storage_agent):
-        self._test_create_volume_from_snapshot_error(storage_agent, array_type, None,
+        self._test_create_volume_from_snapshot_error(storage_agent, None,
                                                      grpc.StatusCode.NOT_FOUND)
 
     def _test_create_volume_from_snapshot_error(self, storage_agent, copy_exception, return_code,
@@ -646,7 +646,6 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self._prepare_mocks_for_copy_from_source()
         volume_id = "wwn1"
         volume_capacity_bytes = 100
-        array_type.return_value = "a9k"
         self.request.volume_content_source = self._get_source_volume(volume_id)
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(volume_capacity_bytes,
                                                                                               clone_volume_name,
