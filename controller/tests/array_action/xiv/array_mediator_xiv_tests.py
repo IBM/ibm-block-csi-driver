@@ -13,10 +13,10 @@ from controller.tests.array_action.xiv import utils
 
 class TestArrayMediatorXIV(unittest.TestCase):
 
-    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
-    def setUp(self, connect):
+    def setUp(self):
         self.fqdn = "fqdn"
-        self.mediator = XIVArrayMediator("user", "password", self.fqdn)
+        with patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect"):
+            self.mediator = XIVArrayMediator("user", "password", self.fqdn)
         self.mediator.client = Mock()
 
     def test_get_volume_raise_correct_errors(self):
@@ -38,12 +38,12 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_get_volume_raise_illegal_object_name(self):
         self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalNameForObjectError("", "vol", "")]
         with self.assertRaises(array_errors.IllegalObjectName):
-            res = self.mediator.get_volume("vol")
+            self.mediator.get_volume("vol")
 
     def test_get_volume_returns_nothing(self):
         self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=None)
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            res = self.mediator.get_volume("vol")
+            self.mediator.get_volume("vol")
 
     @patch("controller.array_action.array_mediator_xiv.XCLIClient")
     def test_connect_errors(self, client):
@@ -53,11 +53,10 @@ class TestArrayMediatorXIV(unittest.TestCase):
             self.mediator._connect()
 
         client.connect_multiendpoint_ssl.side_effect = [xcli_errors.XCLIError()]
-        with self.assertRaises(array_errors.CredentialsError) as ex:
+        with self.assertRaises(array_errors.CredentialsError):
             self.mediator._connect()
 
-    @patch("controller.array_action.array_mediator_xiv.XCLIClient")
-    def test_close(self, client):
+    def test_close(self):
         self.mediator.client.is_connected = lambda: True
         self.mediator.disconnect()
         self.mediator.client.close.assert_called_once_with()
@@ -430,11 +429,11 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(array_errors.NoAvailableLunError):
             self.mediator.map_volume("vol", "host")
 
-    @patch.object(XIVArrayMediator, "_get_next_available_lun")
-    def map_volume_with_error(self, xcli_err, status, returned_err, get_next_lun):
+    def map_volume_with_error(self, xcli_err, status, returned_err):
         self.mediator.client.cmd.map_vol.side_effect = [xcli_err("", status, "")]
-        with self.assertRaises(returned_err):
-            self.mediator.map_volume("vol", "host")
+        with patch.object(XIVArrayMediator, "_get_next_available_lun"):
+            with self.assertRaises(returned_err):
+                self.mediator.map_volume("vol", "host")
 
     def test_map_volume_operation_forbidden(self):
         self.map_volume_with_error(xcli_errors.OperationForbiddenForUserCategoryError, "",
