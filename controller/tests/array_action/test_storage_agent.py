@@ -123,7 +123,7 @@ class TestStorageAgent(unittest.TestCase):
             self.assertEqual(self.client_mock.get_system.call_count, 1)
 
     def test_get_multiple_mediators_sequentially(self):
-        for i in range(3):
+        for _ in range(3):
             with self.agent.get_mediator() as mediator:
                 self.assertIsInstance(mediator, DS8KArrayMediator)
                 self.assertEqual(self.agent.conn_pool.current_size, 1)
@@ -153,7 +153,7 @@ class TestStorageAgent(unittest.TestCase):
         # two clients in the pool, but one of them are inactive after using.
         self.assertEqual(self.agent.conn_pool.current_size, 2)
 
-        for i in range(10):
+        for _ in range(10):
             with self.agent.get_mediator():
                 pass
         # After some iteration, the inactive client is disconnected and removed.
