@@ -1,7 +1,7 @@
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
-  name: demo-pvc-clone-pvc
+  name: demo-pvc-cloned-pvc
 spec:
   volumeMode: Filesystem
   accessModes:
