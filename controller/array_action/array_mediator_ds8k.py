@@ -344,8 +344,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def _delete_object(self, object_id, object_is_snapshot=False):
         api_volume = self._get_api_volume_by_id(object_id)
-        if not api_volume:
-            raise array_errors.ObjectNotFoundError(name=object_id)
         if object_is_snapshot and not is_snapshot(api_volume):
             raise array_errors.ObjectNotFoundError(name=object_id)
         self._safe_delete_flashcopies(api_volume)
@@ -514,12 +512,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         pool = source_api_volume.pool
         return self._create_api_volume(target_volume_name, size_in_bytes, capabilities, pool)
 
-    def _create_flashcopy(self, source_volume_id, target_volume_id, options=None):
+    def _create_flashcopy(self, source_volume_id, target_volume_id, options):
         logger.info(
             "creating FlashCopy relationship from '{0}' to '{1}'".format(source_volume_id,
                                                                          target_volume_id))
-        if not options:
-            options = []
         options.append(FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET_OPTION)
         try:
             api_flashcopy = self.client.create_flashcopy(source_volume_id=source_volume_id,
@@ -568,7 +564,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     @convert_scsi_id_to_array_id
     def get_object_by_id(self, object_id, object_type):
-        api_object = self._get_api_volume_by_id(object_id)
+        api_object = self._get_api_volume_by_id(object_id, not_exist_err=False)
         if not api_object:
             return None
         if object_type is controller_config.SNAPSHOT_TYPE_NAME:
