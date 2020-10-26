@@ -212,7 +212,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectIsStillInUseError):
             self.array.delete_volume("0001")
 
-    def _prepare_mocks_for_delete_volume(self):
+    def _prepare_mocks_for_volume(self):
         self.client_mock.get_flashcopies_by_volume.return_value = [self.flashcopy_response]
         self.client_mock.get_flashcopies.return_value = Munch({"out_of_sync_tracks": "0",
                                                                "targetvolume": "0002",
@@ -222,7 +222,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         return volume
 
     def test_delete_volume_with_snapshot_as_source(self):
-        self._prepare_mocks_for_delete_volume()
+        self._prepare_mocks_for_volume()
         flashcopy = self.flashcopy_response
         flashcopy.backgroundcopy = "disabled"
         self.client_mock.get_flashcopies_by_volume.return_value = [flashcopy]
@@ -230,19 +230,19 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             self.array.delete_volume("0001")
 
     def test_delete_volume_with_flashcopy_still_copying(self):
-        self._prepare_mocks_for_delete_volume()
+        self._prepare_mocks_for_volume()
         self.client_mock.get_flashcopies.return_value.out_of_sync_tracks = "55"
         with self.assertRaises(array_errors.ObjectIsStillInUseError):
             self.array.delete_volume("0001")
         self.client_mock.delete_flashcopy.assert_not_called()
 
     def test_delete_volume_with_flashcopy_as_source_deleted(self):
-        self._prepare_mocks_for_delete_volume()
+        self._prepare_mocks_for_volume()
         self.array.delete_volume("0001")
         self.client_mock.delete_flashcopy.assert_called_once()
 
     def test_delete_volume_with_flashcopy_as_target_success(self):
-        self._prepare_mocks_for_delete_volume()
+        self._prepare_mocks_for_volume()
         self.array.delete_volume("0001")
         self.client_mock.delete_flashcopy.assert_called_once_with("0001:0002")
         self.client_mock.delete_volume.assert_called_once_with(volume_id="0001")
@@ -593,7 +593,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_get_object_by_id_volume_with_source(self):
         self.flashcopy_response.targetvolume = "0001"
-        volume = self._prepare_mocks_for_delete_volume()
+        volume = self._prepare_mocks_for_volume()
         return_value = self.array.get_object_by_id(volume.id, "volume")
         self.assertEqual(type(return_value), Volume)
         self.assertEqual(return_value.id, self.array._generate_volume_scsi_identifier(volume.id))
