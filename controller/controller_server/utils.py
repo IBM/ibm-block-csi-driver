@@ -161,13 +161,13 @@ def validate_delete_snapshot_request(request):
 def generate_csi_create_volume_response(new_volume, source_type=None):
     logger.debug("creating volume response for vol : {0}".format(new_volume))
 
-    vol_context = {"volume_name": new_volume.name,
-                   "array_address": ",".join(
-                       new_volume.array_address if isinstance(new_volume.array_address, list) else [
-                           new_volume.array_address]),
-                   "pool_name": new_volume.pool_name,
-                   "storage_type": new_volume.array_type
-                   }
+    volume_context = {"volume_name": new_volume.name,
+                      "array_address": ",".join(
+                          new_volume.array_address if isinstance(new_volume.array_address, list) else [
+                              new_volume.array_address]),
+                      "pool_name": new_volume.pool_name,
+                      "storage_type": new_volume.array_type
+                      }
     content_source = None
     if new_volume.copy_source_id:
         if source_type == config.SNAPSHOT_TYPE_NAME:
@@ -181,7 +181,7 @@ def generate_csi_create_volume_response(new_volume, source_type=None):
         capacity_bytes=new_volume.capacity_bytes,
         volume_id=get_vol_id(new_volume),
         content_source=content_source,
-        volume_context=vol_context))
+        volume_context=volume_context))
 
     logger.debug("finished creating volume response : {0}".format(res))
     return res
