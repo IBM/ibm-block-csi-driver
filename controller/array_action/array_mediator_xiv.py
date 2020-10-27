@@ -236,20 +236,24 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         logger.debug("found volume name : {0}".format(vol_name))
         return vol_name
 
-    def delete_volume(self, volume_id):
-        logger.info("Deleting volume with id : {0}".format(volume_id))
-        vol_name = self._get_vol_by_wwn(volume_id)
-
+    def _delete_object(self, object_id, is_snapshot=False):
+        object_name = self._get_vol_by_wwn(object_id)
         try:
-            self.client.cmd.vol_delete(vol=vol_name)
+            if is_snapshot:
+                self.client.cmd.snapshot_delete(snapshot=object_name)
+            else:
+                self.client.cmd.vol_delete(vol=object_name)
         except xcli_errors.VolumeBadNameError as ex:
             logger.exception(ex)
-            raise controller_errors.ObjectNotFoundError(vol_name)
+            raise controller_errors.ObjectNotFoundError(object_name)
 
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
-            raise controller_errors.PermissionDeniedError("delete vol : {0}".format(vol_name))
+            raise controller_errors.PermissionDeniedError("delete object : {0}".format(object_name))
 
+    def delete_volume(self, volume_id):
+        logger.info("Deleting volume with id : {0}".format(volume_id))
+        self._delete_object(object_id=volume_id)
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
     def get_snapshot(self, snapshot_name, pool_id=None):
@@ -303,21 +307,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def delete_snapshot(self, snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
-        try:
-            snapshot_name = self._get_vol_by_wwn(snapshot_id)
-        except controller_errors.ObjectNotFoundError:
-            raise controller_errors.ObjectNotFoundError(snapshot_id)
-
-        try:
-            self.client.cmd.snapshot_delete(snapshot=snapshot_name)
-        except xcli_errors.VolumeBadNameError as ex:
-            logger.exception(ex)
-            raise controller_errors.ObjectNotFoundError(snapshot_name)
-
-        except xcli_errors.OperationForbiddenForUserCategoryError as ex:
-            logger.exception(ex)
-            raise controller_errors.PermissionDeniedError("delete snapshot : {0}".format(snapshot_name))
-
+        self._delete_object(object_id=snapshot_id, is_snapshot=True)
         logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
 
     def get_host_by_host_identifiers(self, initiators):
