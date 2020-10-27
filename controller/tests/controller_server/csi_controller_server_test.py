@@ -764,10 +764,11 @@ class TestControllerServerDeleteVolume(AbstractControllerTest):
         self.delete_volume_returns_error(error=array_errors.ObjectIsStillInUseError("a", "b"),
                                          return_code=grpc.StatusCode.FAILED_PRECONDITION)
 
+    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.delete_volume")
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_delete_volume_succeeds(self, storage_agent):
+    def test_delete_volume_succeeds(self, storage_agent, delete_volume):
         storage_agent.return_value = self.storage_agent
-
+        delete_volume.return_value = Mock()
         self.servicer.DeleteVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
