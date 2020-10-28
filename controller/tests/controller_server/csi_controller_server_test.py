@@ -1203,8 +1203,7 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
     def get_create_object_response_method(self):
         return csi_pb2.ControllerExpandVolumeResponse
 
-    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
-    def setUp(self, connect):
+    def setUp(self):
         self.fqdn = "fqdn"
         self.mediator = XIVArrayMediator("user", "password", self.fqdn)
         self.mediator.client = Mock()
@@ -1300,9 +1299,8 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT, "wrong access_mode")
         self.assertTrue("access mode" in self.context.details)
 
-    @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_expand_volume_with_array_connection_exception(self, storage_agent, array_type):
+    def test_expand_volume_with_array_connection_exception(self, storage_agent):
         self._test_create_object_with_array_connection_exception(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.detect_array_type")
@@ -1315,10 +1313,9 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         self.servicer.ControllerExpandVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
-    @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.expand_volume")
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def expand_volume_returns_error(self, storage_agent, expand_volume, array_type, return_code, err):
+    def expand_volume_returns_error(self, storage_agent, expand_volume, return_code, err):
         storage_agent.return_value = self.storage_agent
         expand_volume.side_effect = [err]
 
