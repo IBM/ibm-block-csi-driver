@@ -613,3 +613,29 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.get_flashcopies_by_volume.return_value = [self.flashcopy_response]
         with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.array.get_object_by_id("", "snapshot")
+
+    def test_expand_volume_success(self):
+        volume = self._prepare_mocks_for_volume()
+        self.array.expand_volume(volume_id=volume.id, required_bytes=10)
+        self.client_mock.extend_volume.assert_called_once_with(volume_id=volume.id, new_size_in_bytes=10)
+
+    def test_expand_volume_raise_in_use(self):
+        volume = self._prepare_mocks_for_volume()
+        self.client_mock.get_flashcopies.return_value.out_of_sync_tracks = "55"
+        with self.assertRaises(array_errors.ObjectIsStillInUseError):
+            self.array.expand_volume(volume_id=volume.id, required_bytes=10)
+
+    def test_expand_volume_raise_illegal(self):
+        volume = self._prepare_mocks_for_volume()
+        self.client_mock.get_volume.side_effect = [ClientError("400", "BE7A0005")]
+        with self.assertRaises(array_errors.IllegalObjectID):
+            self.array.expand_volume(volume_id=volume.id, required_bytes=10)
+
+    def test_expand_volume_errors(self):
+        self.client_mock.get_volume.side_effect = [NotFound("404", message="BE7A0001")]
+        with self.assertRaises(array_errors.ObjectNotFoundError):
+            self.array.expand_volume(volume_id="test_id", required_bytes=10)
+        volume = self._prepare_mocks_for_volume()
+        self.client_mock.extend_volume.side_effect = [NotFound("404", message="BE7A0001")]
+        with self.assertRaises(array_errors.ObjectNotFoundError):
+            self.array.expand_volume(volume_id=volume.id, required_bytes=10)
