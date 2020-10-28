@@ -382,8 +382,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def expand_volume(self, volume_id, required_bytes):
         logger.info("Expanding volume with id : {0}".format(volume_id))
         api_volume = self._get_api_volume_by_id(volume_id)
-        if not api_volume:
-            raise array_errors.ObjectNotFoundError(name=volume_id)
         flashcopies = api_volume.flashcopy
         self._safe_delete_flashcopies(flashcopies=flashcopies, volume_name=api_volume.name)
         self._extend_volume(volume_id=volume_id, new_size_in_bytes=required_bytes)
