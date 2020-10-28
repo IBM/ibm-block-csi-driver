@@ -535,6 +535,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         return csi_pb2.GetCapacityResponse()
 
     def ControllerExpandVolume(self, request, context):
+        set_current_thread_name(request.volume_id)
         logger.info("ControllerExpandVolume")
         secrets = request.secrets
 
@@ -569,12 +570,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     return csi_pb2.ControllerExpandVolumeResponse()
 
         except controller_errors.ObjectNotFoundError as ex:
+            logger.info("Volume not found: {0}".format(ex))
             context.set_code(grpc.StatusCode.NOT_FOUND)
             context.set_details(ex)
             return csi_pb2.ControllerExpandVolumeResponse()
 
         except controller_errors.ObjectIsStillInUseError as ex:
-            logger.info("could not delete volume while in use: {0}".format(ex))
+            logger.info("Could not expand volume while in use: {0}".format(ex))
             context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
             context.set_details(ex.message)
             return csi_pb2.ControllerExpandVolumeResponse()
@@ -616,7 +618,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def __get_identity_config(self, attribute_name):
         return self.cfg['identity'][attribute_name]
 
-    def GetPluginInfo(self, request, context):
+    def GetPluginInfo(self, _, context):
         logger.info("GetPluginInfo")
         try:
             name = self.__get_identity_config("name")
@@ -674,7 +676,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return settings.NAME_PREFIX_SEPARATOR.join((prefix, name))
         return name
 
-    def GetPluginCapabilities(self, request, context):
+    def GetPluginCapabilities(self, _, __):
         logger.info("GetPluginCapabilities")
         service_type = csi_pb2.PluginCapability.Service.Type
         volume_expansion_type = csi_pb2.PluginCapability.VolumeExpansion.Type
@@ -696,7 +698,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             capabilities=capability_list
         )
 
-    def Probe(self, request, context):
+    def Probe(self, _, context):
         context.set_code(grpc.StatusCode.OK)
         return csi_pb2.ProbeResponse()
 
@@ -746,7 +748,7 @@ def main():
     parser = OptionParser()
     parser.add_option("-e", "--csi-endpoint", dest="endpoint", help="grpc endpoint")
     parser.add_option("-l", "--loglevel", dest="loglevel", help="log level")
-    (options, args) = parser.parse_args()
+    options, _ = parser.parse_args()
 
     # set logger level and init logger
     log_level = options.loglevel

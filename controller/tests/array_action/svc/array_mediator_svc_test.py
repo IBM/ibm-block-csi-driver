@@ -17,11 +17,10 @@ EMPTY_BYTES = b''
 
 class TestArrayMediatorSVC(unittest.TestCase):
 
-    @patch(
-        "controller.array_action.array_mediator_svc.SVCArrayMediator._connect")
-    def setUp(self, connect):
+    def setUp(self):
         self.endpoint = ["IP_1"]
-        self.svc = SVCArrayMediator("user", "password", self.endpoint)
+        with patch("controller.array_action.array_mediator_svc.SVCArrayMediator._connect"):
+            self.svc = SVCArrayMediator("user", "password", self.endpoint)
         self.svc.client = Mock()
         node = Munch({'id': '1', 'name': 'node1', 'iscsi_name': 'iqn.1986-03.com.ibm:2145.v7k1.node1',
                       'status': 'online'})
@@ -31,9 +30,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         fcmaps = [Munch({'source_vdisk_name': 'source_name', 'id': 'test_fc_id', 'copy_rate': 0})]
         self.svc.client.svcinfo.lsfcmap.return_value = Mock(as_list=fcmaps)
 
-    @patch(
-        "controller.array_action.array_mediator_svc.SVCArrayMediator._connect")
-    def test_raise_ManagementIPsNotSupportError_in_init(self, connect):
+    def test_raise_ManagementIPsNotSupportError_in_init(self):
         self.endpoint = ["IP_1", "IP_2"]
         with self.assertRaises(
                 array_errors.StorageManagementIPsNotSupportError):
