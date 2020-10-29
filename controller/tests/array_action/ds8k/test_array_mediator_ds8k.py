@@ -631,11 +631,11 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.IllegalObjectID):
             self.array.expand_volume(volume_id=volume.id, required_bytes=10)
 
-    def test_expand_volume_errors(self):
-        self.client_mock.get_volume.side_effect = [NotFound("404", message="BE7A0001")]
+    def test_expand_volume_not_found(self):
+        self.client_mock.get_volume.side_effect = [NotFound("404", message="BE7A0001"), self.volume_response]
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.array.expand_volume(volume_id="test_id", required_bytes=10)
-        volume = self._prepare_mocks_for_volume()
         self.client_mock.extend_volume.side_effect = [NotFound("404", message="BE7A0001")]
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.array.expand_volume(volume_id=volume.id, required_bytes=10)
+            self.array.expand_volume(volume_id="test_id", required_bytes=10)
+        self.client_mock.extend_volume.assert_called_once()
