@@ -30,12 +30,12 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_volume(self, vol_name, size_in_bytes, capabilities, pool):
+    def create_volume(self, volume_name, size_in_bytes, capabilities, pool):
         """
         This function should create a volume in the storage system.
 
         Args:
-            vol_name      : name of the volume to be created in the stoarge system
+            volume_name      : name of the volume to be created in the stoarge system
             size_in_bytes : size in bytes of the volume
             capabilities  : dict of capabilities {<capbility_name>:<value>}
             pool          : pool name to create the volume in
@@ -54,25 +54,24 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def copy_to_existing_volume_from_snapshot(self, name, src_snap_name, src_snap_capacity_in_bytes,
-                                              min_vol_size_in_bytes, pool_id=None):
+    def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
+                                            minimum_volume_size_in_bytes, pool_id=None):
         """
-        This function should create a volume from snapshot in the storage system.
+        This function should create a volume from source volume or snapshot in the storage system.
 
         Args:
-            name                         : name of the volume to be created in the storage system
-            src_snap_name                : name of snapshot to create from
-            src_snap_capacity_in_bytes   : capacity of snapshot to create from
-            min_vol_size_in_bytes        : if snapshot capacity is lower than this value vol will
-                                           be increased to this value
-            pool_id: pool of the volume and snapshot to find them more efficiently.
+            name                            : name of the volume to be created in the storage system
+            source_name                     : name of source to create from
+            source_capacity_in_bytes        : capacity of source to create from
+            minimum_volume_size_in_bytes    : if source capacity is lower than this value vol will
+                                            be increased to this value
+            pool_id                         : pool of the volume and source object to find them more efficiently.
 
         Returns:
             Volume
 
         Raises:
-            VolumeNotFoundError
-            SnapshotNotFoundError
+            ObjectNotFoundError
             IllegalObjectName
             PermissionDenied
             PoolParameterIsMissing
@@ -91,8 +90,9 @@ class ArrayMediator(ABC):
             None
 
         Raises:
-            VolumeNotFound
+            ObjectNotFound
             PermissionDenied
+            ObjectIsStillInUse
         """
         raise NotImplementedError
 
@@ -110,7 +110,7 @@ class ArrayMediator(ABC):
            Volume
 
         Raises:
-            VolumeNotFound
+            ObjectNotFound
             IllegalObjectName
             PermissionDenied
             PoolParameterIsMissing
@@ -126,20 +126,7 @@ class ArrayMediator(ABC):
         Returns:
            volume name
         Raises:
-            VolumeNotFound
-            IllegalObjectID
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def is_volume_has_snapshots(self, volume_id):
-        """
-        Args:
-           volume_id : volume id
-        Returns:
-           Is volume has snapshots
-        Raises:
-            VolumeNotFound
+            ObjectNotFound
             IllegalObjectID
         """
         raise NotImplementedError
@@ -156,7 +143,7 @@ class ArrayMediator(ABC):
            mapped_host_luns : a dict like this: {<host name>:<lun id>,...}
 
         Raises:
-            VolumeNotFound
+            ObjectNotFound
         """
         raise NotImplementedError
 
@@ -175,7 +162,7 @@ class ArrayMediator(ABC):
         Raises:
             NoAvailableLun
             LunAlreadyInUse
-            VolumeNotFound
+            ObjectNotFound
             HostNotFound
             PermissionDenied
             MappingError
@@ -196,7 +183,7 @@ class ArrayMediator(ABC):
 
         Raises:
             VolumeAlreadyUnmapped
-            VolumeNotFound
+            ObjectNotFound
             HostNotFound
             PermissionDenied
             UnMappingError
@@ -213,7 +200,7 @@ class ArrayMediator(ABC):
         Returns:
            Snapshot
         Raises:
-            SnapshotNameBelongsToVolumeError
+            ExpectedSnapshotButFoundVolumeError
             IllegalObjectName
             PermissionDenied
             PoolParameterIsMissing
@@ -221,15 +208,18 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_snapshot_by_id(self, snapshot_id):
+    def get_object_by_id(self, object_id, object_type):
         """
-        This function return snapshot info about the snapshot.
+        This function return info about volume or snapshot.
         Args:
-            snapshot_id : id of the snapshot in the storage system
+            object_id   : id of the object in the storage system
+            object_type : volume or snapshot
         Returns:
            Snapshot
+           Volume
+           None
         Raises:
-            SnapshotIdBelongsToVolumeError
+            ExpectedSnapshotButFoundVolumeError
         """
         raise NotImplementedError
 
@@ -245,7 +235,7 @@ class ArrayMediator(ABC):
             Snapshot
         Raises:
             SnapshotAlreadyExists
-            VolumeNotFound
+            ObjectNotFound
             IllegalObjectName
             PermissionDenied
             PoolParameterIsMissing
@@ -261,8 +251,9 @@ class ArrayMediator(ABC):
         Returns:
             None
         Raises:
-            SnapshotNotFound
+            ObjectNotFound
             PermissionDenied
+            ObjectIsStillInUse
         """
         raise NotImplementedError
 

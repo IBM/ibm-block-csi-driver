@@ -38,10 +38,10 @@ class UnsupportedStorageVersionError(BaseArrayActionException):
 # =============================================================================
 # Volume errors
 # =============================================================================
-class VolumeNotFoundError(BaseArrayActionException):
+class ObjectNotFoundError(BaseArrayActionException):
 
     def __init__(self, name):
-        self.message = messages.VolumeNotFoundError_message.format(name)
+        self.message = messages.ObjectNotFoundError_message.format(name)
 
 
 class VolumeNameBelongsToSnapshotError(BaseArrayActionException):
@@ -183,22 +183,10 @@ class UnsupportedConnectivityTypeError(BaseArrayActionException):
         self.message = messages.UnsupportedConnectivityTypeError_message.format(connectivity_type)
 
 
-class SnapshotNotFoundError(BaseArrayActionException):
+class ExpectedSnapshotButFoundVolumeError(BaseArrayActionException):
 
-    def __init__(self, name):
-        self.message = messages.SnapshotNotFoundError_message.format(name)
-
-
-class SnapshotNameBelongsToVolumeError(BaseArrayActionException):
-
-    def __init__(self, snapshot, array):
-        self.message = messages.SnapshotNameBelongsToVolumeError_message.format(snapshot, array)
-
-
-class SnapshotIdBelongsToVolumeError(BaseArrayActionException):
-
-    def __init__(self, snapshot, array):
-        self.message = messages.SnapshotIdBelongsToVolumeError_message.format(snapshot, array)
+    def __init__(self, id_or_name, array):
+        self.message = messages.ExpectedSnapshotButFoundVolumeError_message.format(id_or_name, array)
 
 
 class SnapshotAlreadyExists(BaseArrayActionException):
@@ -207,10 +195,10 @@ class SnapshotAlreadyExists(BaseArrayActionException):
         self.message = messages.SnapshotAlreadyExistsError_message.format(snapshot, array)
 
 
-class SnapshotIsStillInUseError(BaseArrayActionException):
+class ObjectIsStillInUseError(BaseArrayActionException):
 
-    def __init__(self, snapshot, used_by):
-        self.message = messages.SnapshotIsStillInUseError_message.format(snapshot, used_by)
+    def __init__(self, id_or_name, used_by):
+        self.message = messages.ObjectIsStillInUseError_message.format(id_or_name, used_by)
 
 
 class InvalidCliResponseError(BaseArrayActionException):
