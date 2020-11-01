@@ -18,6 +18,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect"):
             self.mediator = XIVArrayMediator("user", "password", self.fqdn)
         self.mediator.client = Mock()
+        self.required_bytes = 2000
 
     def test_get_volume_raise_correct_errors(self):
         error_msg = "ex"
@@ -515,31 +516,28 @@ class TestArrayMediatorXIV(unittest.TestCase):
         return int(self.mediator._convert_size_bytes_to_blocks(size_in_bytes))
 
     def _prepare_mocks_for_expand_volume(self):
-        self.volume_name = "volume_name"
-        self.volume_id = "volume_id"
-        self.required_bytes = 2000
-        self.volume_size_in_blocks = 1
-        vol = utils.get_mock_xiv_volume(size=self.volume_size_in_blocks, name=self.volume_name, wwn="wwn")
-        self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=vol)
+        volume = utils.get_mock_xiv_volume(size=1, name="volume_name", wwn="volume_id")
+        self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=volume)
+        return volume
 
     def test_expand_volume_succeed(self):
-        self._prepare_mocks_for_expand_volume()
-        required_size_in_blocks = self._convert_size_bytes_to_blocks(self.required_bytes) - self.volume_size_in_blocks
-        self.mediator.expand_volume(volume_id=self.volume_id, required_bytes=self.required_bytes)
-        self.mediator.client.cmd.vol_resize.assert_called_once_with(vol=self.volume_name,
+        volume = self._prepare_mocks_for_expand_volume()
+        required_size_in_blocks = self._convert_size_bytes_to_blocks(self.required_bytes) - volume.capacity
+        self.mediator.expand_volume(volume_id=volume.wwn, required_bytes=self.required_bytes)
+        self.mediator.client.cmd.vol_resize.assert_called_once_with(vol=volume.name,
                                                                     size_blocks=required_size_in_blocks)
 
     def test_expand_vol_list_return_none(self):
-        self._prepare_mocks_for_expand_volume()
+        volume = self._prepare_mocks_for_expand_volume()
         self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=None)
         with self.assertRaises(expected_exception=array_errors.ObjectNotFoundError):
-            self.mediator.expand_volume(volume_id=self.volume_id, required_bytes=self.required_bytes)
+            self.mediator.expand_volume(volume_id=volume.wwn, required_bytes=self.required_bytes)
 
     def test_expand_volume_vol_resize_errors(self):
-        self._prepare_mocks_for_expand_volume()
+        volume = self._prepare_mocks_for_expand_volume()
         self.mediator.client.cmd.vol_resize.side_effect = [xcli_errors.IllegalNameForObjectError("", "", "")]
         with self.assertRaises(expected_exception=array_errors.IllegalObjectID):
-            self.mediator.expand_volume(volume_id=self.volume_id, required_bytes=self.required_bytes)
+            self.mediator.expand_volume(volume_id=volume.wwn, required_bytes=self.required_bytes)
         self.mediator.client.cmd.vol_resize.side_effect = [xcli_errors.VolumeBadNameError("", "", "")]
         with self.assertRaises(expected_exception=array_errors.ObjectNotFoundError):
-            self.mediator.expand_volume(volume_id=self.volume_id, required_bytes=self.required_bytes)
+            self.mediator.expand_volume(volume_id=volume.wwn, required_bytes=self.required_bytes)
