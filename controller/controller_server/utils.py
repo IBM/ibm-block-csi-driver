@@ -80,16 +80,20 @@ def validate_create_volume_source(request):
     source = request.volume_content_source
     if source:
         logger.info(source)
-        if source.HasField(config.VOLUME_SOURCE_SNAPSHOT):
-            source_snapshot = source.snapshot
-            logger.info("Source snapshot specified: {0}".format(source_snapshot))
-            source_snapshot_id = source_snapshot.snapshot_id
-            if not source_snapshot_id:
-                raise ValidationException(messages.volume_src_snapshot_id_is_missing)
-            if config.PARAMETERS_OBJECT_ID_DELIMITER not in source_snapshot_id:
-                raise ObjectIdError(config.OBJECT_TYPE_NAME_SNAPSHOT, source_snapshot_id)
-        elif source.HasField(config.VOLUME_SOURCE_VOLUME):
-            raise ValidationException(messages.volume_cloning_not_supported_message)
+        if source.HasField(config.SNAPSHOT_TYPE_NAME):
+            _validate_source_info(source, config.SNAPSHOT_TYPE_NAME)
+        elif source.HasField(config.VOLUME_TYPE_NAME):
+            _validate_source_info(source, config.VOLUME_TYPE_NAME)
+
+
+def _validate_source_info(source, source_type):
+    source_object = getattr(source, source_type)
+    logger.info("Source {0} specified: {1}".format(source_type, source_object))
+    source_object_id = getattr(source_object, config.VOLUME_SOURCE_ID_FIELDS[source_type])
+    if not source_object_id:
+        raise ValidationException(messages.volume_source_id_is_missing.format(source_type))
+    if config.PARAMETERS_OBJECT_ID_DELIMITER not in source_object_id:
+        raise ObjectIdError(source_type, source_object_id)
 
 
 def validate_create_volume_request(request):
@@ -154,25 +158,30 @@ def validate_delete_snapshot_request(request):
     logger.debug("request validation finished.")
 
 
-def generate_csi_create_volume_response(new_vol):
-    logger.debug("creating volume response for vol : {0}".format(new_vol))
+def generate_csi_create_volume_response(new_volume, source_type=None):
+    logger.debug("creating volume response for vol : {0}".format(new_volume))
 
-    vol_context = {"volume_name": new_vol.volume_name,
-                   "array_address": ",".join(
-                       new_vol.array_address if isinstance(new_vol.array_address, list) else [new_vol.array_address]),
-                   "pool_name": new_vol.pool_name,
-                   "storage_type": new_vol.array_type
-                   }
+    volume_context = {"volume_name": new_volume.name,
+                      "array_address": ",".join(
+                          new_volume.array_address if isinstance(new_volume.array_address, list) else [
+                              new_volume.array_address]),
+                      "pool_name": new_volume.pool_name,
+                      "storage_type": new_volume.array_type
+                      }
     content_source = None
-    if new_vol.copy_src_object_id:
-        snapshot_source = csi_pb2.VolumeContentSource.SnapshotSource(snapshot_id=new_vol.copy_src_object_id)
-        content_source = csi_pb2.VolumeContentSource(snapshot=snapshot_source)
+    if new_volume.copy_source_id:
+        if source_type == config.SNAPSHOT_TYPE_NAME:
+            snapshot_source = csi_pb2.VolumeContentSource.SnapshotSource(snapshot_id=new_volume.copy_source_id)
+            content_source = csi_pb2.VolumeContentSource(snapshot=snapshot_source)
+        else:
+            volume_source = csi_pb2.VolumeContentSource.VolumeSource(volume_id=new_volume.copy_source_id)
+            content_source = csi_pb2.VolumeContentSource(volume=volume_source)
 
     res = csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(
-        capacity_bytes=new_vol.capacity_bytes,
-        volume_id=get_vol_id(new_vol),
+        capacity_bytes=new_volume.capacity_bytes,
+        volume_id=get_vol_id(new_volume),
         content_source=content_source,
-        volume_context=vol_context))
+        volume_context=volume_context))
 
     logger.debug("finished creating volume response : {0}".format(res))
     return res
@@ -225,14 +234,14 @@ def validate_publish_volume_request(request):
 
 
 def get_volume_id_info(volume_id):
-    return _get_object_id_info(volume_id, config.OBJECT_TYPE_NAME_VOLUME)
+    return get_object_id_info(volume_id, config.VOLUME_TYPE_NAME)
 
 
 def get_snapshot_id_info(snapshot_id):
-    return _get_object_id_info(snapshot_id, config.OBJECT_TYPE_NAME_SNAPSHOT)
+    return get_object_id_info(snapshot_id, config.SNAPSHOT_TYPE_NAME)
 
 
-def _get_object_id_info(full_object_id, object_type):
+def get_object_id_info(full_object_id, object_type):
     logger.debug("getting {0} info for id : {1}".format(object_type, full_object_id))
     splitted_object_id = full_object_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)
     if len(splitted_object_id) != 2:
