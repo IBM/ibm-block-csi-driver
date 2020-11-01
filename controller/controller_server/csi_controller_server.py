@@ -189,7 +189,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         """
         Args:
             volume              : volume fetched or created in CreateVolume
-            source_id           : id of object we should copy to vol or None if volume should not be copied
+            source_id       : id of object we should copy to vol or None if volume should not be copied
             source_type:        : the object type of the source - volume or snapshot
             context             : CreateVolume response context
         Returns:
@@ -200,7 +200,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         """
         volume_name = volume.name
         volume_copy_source_id = volume.copy_source_id
-        if not source_id:
+        if not source_id or not volume_copy_source_id:
             return None
         if volume_copy_source_id == source_id:
             logger.debug(
@@ -211,7 +211,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.debug(
                 "Volume {0} exists but it is not a copy of {1} {2}.".format(volume_name, source_type, source_id))
             context.set_details("Volume already exists but it was created from a different source.")
-            context.set_code(grpc.StatusCode.ALREADY_EXISTS)
+            context.set_code(grpc.StatusCode.INTERNAL)
             return csi_pb2.CreateVolumeResponse()
 
     def DeleteVolume(self, request, context):
@@ -498,11 +498,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 except controller_errors.ObjectNotFoundError as ex:
                     logger.debug("Snapshot was not found during deletion: {0}".format(ex))
 
-        except controller_errors.ObjectNotFoundError as ex:
+        except controller_errors.ObjectNotFoundError:
             logger.debug("snapshot was not found during deletion: {0}".format(ex))
             context.set_code(grpc.StatusCode.OK)
             return csi_pb2.DeleteSnapshotResponse()
-        except controller_errors.ObjectIsStillInUseError as ex:
+        except controller_errors.ObjectIsStillInUseError:
             logger.info("could not delete snapshot while in use: {0}".format(ex))
             context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
             context.set_details(ex)
@@ -554,7 +554,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def __get_identity_config(self, attribute_name):
         return self.cfg['identity'][attribute_name]
 
-    def GetPluginInfo(self, request, context):
+    def GetPluginInfo(self, _, context):
         logger.info("GetPluginInfo")
         try:
             name = self.__get_identity_config("name")
@@ -612,7 +612,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return settings.NAME_PREFIX_SEPARATOR.join((prefix, name))
         return name
 
-    def GetPluginCapabilities(self, request, context):
+    def GetPluginCapabilities(self, _, __):
         logger.info("GetPluginCapabilities")
         types = csi_pb2.PluginCapability.Service.Type
         capabilities = self.__get_identity_config("capabilities")
@@ -630,7 +630,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         )
 
-    def Probe(self, request, context):
+    def Probe(self, _, context):
         context.set_code(grpc.StatusCode.OK)
         return csi_pb2.ProbeResponse()
 
@@ -680,7 +680,7 @@ def main():
     parser = OptionParser()
     parser.add_option("-e", "--csi-endpoint", dest="endpoint", help="grpc endpoint")
     parser.add_option("-l", "--loglevel", dest="loglevel", help="log level")
-    (options, args) = parser.parse_args()
+    options, _ = parser.parse_args()
 
     # set logger level and init logger
     log_level = options.loglevel

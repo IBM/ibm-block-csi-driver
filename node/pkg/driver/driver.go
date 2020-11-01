@@ -30,7 +30,8 @@ import (
 	mountwrapper "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/mount"
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v2"
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/exec"
+	"k8s.io/utils/mount"
 )
 
 type Driver struct {
@@ -49,7 +50,7 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 
 	mounter := &mount.SafeFormatAndMount{
 		Interface: mountwrapper.New(""),
-		Exec:      mount.NewOsExec(),
+		Exec:      exec.New(),
 	}
 
 	syncLock := NewSyncLock()
