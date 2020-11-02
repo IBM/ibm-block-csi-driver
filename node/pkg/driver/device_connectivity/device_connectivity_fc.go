@@ -40,6 +40,14 @@ func (r OsDeviceConnectivityFc) RescanDevices(lunId int, arrayIdentifiers []stri
 	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers)
 }
 
+func (r OsDeviceConnectivityFc) RescanPhysicalDevice(sysDevices []string) error {
+	return r.HelperScsiGeneric.RescanPhysicalDevice(sysDevices)
+}
+
+func (r OsDeviceConnectivityFc) ExpandMpathDevice(mpathDevice string) error {
+	return r.HelperScsiGeneric.ExpandMpathDevice(mpathDevice)
+}
+
 func (r OsDeviceConnectivityFc) GetMpathDevice(volumeId string) (string, error) {
 	/*
 	   Return Value: "dm-X" of the volumeID.

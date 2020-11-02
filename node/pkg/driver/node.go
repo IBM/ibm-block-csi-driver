@@ -36,6 +36,7 @@ import (
 var (
 	nodeCaps = []csi.NodeServiceCapability_RPC_Type{
 		csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
+		csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
 	}
 
 	// volumeCaps represents how the volume could be accessed.
@@ -580,7 +581,66 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 	goid_info.SetAdditionalIDInfo(req.VolumeId)
 	defer goid_info.DeleteAdditionalIDInfo()
-	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("NodeExpandVolume is not yet implemented"))
+
+	volumeID := req.VolumeId
+
+	err := d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeExpandVolume")
+	if err != nil {
+		logger.Errorf("Another operation is being performed on volume : {%s}", volumeID)
+		return nil, status.Error(codes.Aborted, err.Error())
+	}
+	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeExpandVolume")
+
+	stagingTargetPath := req.GetStagingTargetPath()
+	if len(stagingTargetPath) == 0 {
+		logger.Errorf("Staging target not provided")
+		return nil, status.Error(codes.InvalidArgument, "Staging target not provided")
+	}
+
+	logger.Debugf("Reading stage info file")
+	stageInfoPath := path.Join(stagingTargetPath, StageInfoFilename)
+	infoMap, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
+	if err != nil {
+		logger.Errorf("Error while trying to read from the staging info file : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	logger.Debugf("Reading stage info file detail : {%v}", infoMap)
+
+	connectivityType := infoMap["connectivity"]
+	mpathDevice := infoMap["mpathDevice"]
+	sysDevices := strings.Split(infoMap["sysDevices"], ",")
+
+	logger.Debugf("Got info from stageInfo file. connectivity : {%v}. device : {%v}, sysDevices : {%v}", connectivityType, mpathDevice, sysDevices)
+
+	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
+	}
+
+	err = osDeviceConnectivity.RescanPhysicalDevice(sysDevices)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	baseDevice := path.Base(mpathDevice)
+	err = osDeviceConnectivity.ExpandMpathDevice(baseDevice)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
+	if err != nil {
+		logger.Errorf("Could not determine if disk {%v} is formatted, error: %v", mpathDevice, err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	err = d.NodeUtils.ExpandFilesystem(mpathDevice, existingFormat)
+	if err != nil {
+		logger.Errorf("Could not resize {%v} file system of {%v} , error: %v", existingFormat, mpathDevice, err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &csi.NodeExpandVolumeResponse{}, nil
 }
 
 func (d *NodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {

@@ -36,9 +36,10 @@ import (
 const (
 	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
 	// Command lines inside the container will show /host prefix.
-	PrefixChrootOfHostRoot  = "/host"
-	PublishContextSeparator = ","
-	mkfsTimeoutMilliseconds = 15 * 60 * 1000
+	PrefixChrootOfHostRoot      = "/host"
+	PublishContextSeparator     = ","
+	mkfsTimeoutMilliseconds     = 15 * 60 * 1000
+	resizeFsTimeoutMilliseconds = 30 * 1000
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
@@ -60,6 +61,7 @@ type NodeUtilsInterface interface {
 	RemoveFileOrDirectory(filePath string) error
 	MakeDir(dirPath string) error
 	MakeFile(filePath string) error
+	ExpandFilesystem(devicePath string, fsType string) error
 	FormatDevice(devicePath string, fsType string)
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
@@ -316,6 +318,26 @@ func (n NodeUtils) MakeFile(filePath string) error {
 		if !os.IsExist(err) {
 			return err
 		}
+	}
+	return nil
+}
+
+func (n NodeUtils) ExpandFilesystem(devicePath string, fsType string) error {
+	var cmd string
+	args := []string{devicePath}
+	if fsType == "ext4" {
+		cmd = "resize2fs"
+	} else if fsType == "xfs" {
+		cmd = "xfs_growfs"
+	} else {
+		logger.Warningf("Skipping resize of unsupported fsType: %v", fsType)
+		return nil
+	}
+
+	logger.Debugf("Resizing the device with fs_type = {%v}", fsType)
+	_, err := n.Executer.ExecuteWithTimeout(resizeFsTimeoutMilliseconds, cmd, args)
+	if err != nil {
+		logger.Errorf("Failed to resize filesystem, error: %v", err)
 	}
 	return nil
 }
