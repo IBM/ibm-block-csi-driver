@@ -324,11 +324,13 @@ func (n NodeUtils) MakeFile(filePath string) error {
 
 func (n NodeUtils) ExpandFilesystem(devicePath string, fsType string) error {
 	var cmd string
-	args := []string{devicePath}
+	var args []string
 	if fsType == "ext4" {
 		cmd = "resize2fs"
+		args = []string{devicePath}
 	} else if fsType == "xfs" {
 		cmd = "xfs_growfs"
+		args = []string{"-d", devicePath}
 	} else {
 		logger.Warningf("Skipping resize of unsupported fsType: %v", fsType)
 		return nil
