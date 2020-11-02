@@ -3,7 +3,7 @@ apiVersion: v1
 metadata:
   name: demo-pvc-cloned-pvc
 spec:
-  volumeMode: Filesystem # or Block
+  volumeMode: Filesystem
   accessModes:
   - ReadWriteOnce
   resources:
