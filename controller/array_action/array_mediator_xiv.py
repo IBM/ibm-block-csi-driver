@@ -238,17 +238,17 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
-        vol_name = self._get_vol_by_wwn(volume_id)
+        volume_name = self._get_vol_by_wwn(volume_id)
 
         try:
-            self.client.cmd.vol_delete(vol=vol_name)
+            self.client.cmd.vol_delete(vol=volume_name)
         except xcli_errors.VolumeBadNameError as ex:
             logger.exception(ex)
-            raise controller_errors.ObjectNotFoundError(vol_name)
+            raise controller_errors.ObjectNotFoundError(volume_name)
 
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
-            raise controller_errors.PermissionDeniedError("delete vol : {0}".format(vol_name))
+            raise controller_errors.PermissionDeniedError("delete vol : {0}".format(volume_name))
 
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
