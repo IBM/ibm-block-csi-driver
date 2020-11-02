@@ -582,7 +582,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	goid_info.SetAdditionalIDInfo(req.VolumeId)
 	defer goid_info.DeleteAdditionalIDInfo()
 
-	volumeID := req.VolumeId
+	volumeID := req.GetVolumeId()
 
 	err := d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeExpandVolume")
 	if err != nil {
@@ -591,14 +591,18 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	}
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeExpandVolume")
 
-	stagingTargetPath := req.GetStagingTargetPath()
-	if len(stagingTargetPath) == 0 {
-		logger.Errorf("Staging target not provided")
-		return nil, status.Error(codes.InvalidArgument, "Staging target not provided")
+	targetPath := req.GetStagingTargetPath()
+	if targetPath == "" {
+		logger.Warningf("staging_target_path is empty, trying volume_path")
+		targetPath = req.GetVolumePath()
+	}
+	if targetPath == "" {
+		logger.Errorf("no target path provided")
+		return nil, status.Error(codes.InvalidArgument, "no target path provided")
 	}
 
 	logger.Debugf("Reading stage info file")
-	stageInfoPath := path.Join(stagingTargetPath, StageInfoFilename)
+	stageInfoPath := path.Join(targetPath, StageInfoFilename)
 	infoMap, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
 	if err != nil {
 		logger.Errorf("Error while trying to read from the staging info file : {%v}", err.Error())
