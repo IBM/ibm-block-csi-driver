@@ -67,7 +67,7 @@ def try_convert_first_arg(converter, args):
 def is_snapshot(api_volume):
     flashcopies = api_volume.flashcopy
     for flashcopy in flashcopies:
-        if flashcopy.targetvolume == api_volume.id:
+        if flashcopy.targetvolume == api_volume.id and flashcopy.backgroundcopy == "disabled":
             return True
     return False
 
@@ -192,15 +192,22 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def _generate_volume_scsi_identifier(self, volume_id):
         return '6{}000000000000{}'.format(self.wwnn[1:], volume_id)
 
+    def _get_copy_source_id(self, api_volume):
+        copy_source_id = None
+        flashcopy_as_target = get_flashcopy_as_target_if_exists(api_volume=api_volume)
+        if flashcopy_as_target:
+            source_volume_id = flashcopy_as_target.sourcevolume
+            copy_source_id = self._generate_volume_scsi_identifier(volume_id=source_volume_id)
+        return copy_source_id
+
     def _generate_volume_response(self, api_volume):
-        flashcopy_as_target = get_flashcopy_as_target_if_exists(api_volume)
-        source_volume_id = flashcopy_as_target.sourcevolume if flashcopy_as_target else None
+
         return Volume(
             vol_size_bytes=int(api_volume.cap),
-            vol_id=self._generate_volume_scsi_identifier(api_volume.id),
+            vol_id=self._generate_volume_scsi_identifier(volume_id=api_volume.id),
             vol_name=api_volume.name,
             array_address=self.service_address,
-            copy_source_id=source_volume_id,
+            copy_source_id=self._get_copy_source_id(api_volume=api_volume),
             pool_name=api_volume.pool,
             array_type=self.array_type
         )
@@ -285,15 +292,16 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
                                             minimum_volume_size_in_bytes, pool_id=None):
         logger.debug(
-            "Copy snapshot {0} data to volume {1}. Snapshot capacity {2}. Minimal requested volume capacity {3}".format(
-                name, source_name, source_capacity_in_bytes, minimum_volume_size_in_bytes))
+            "Copy source {0} data to volume {1}. source capacity {2}. Minimal requested volume capacity {3}".format(
+                name, source_name, source_capacity_in_bytes,
+                minimum_volume_size_in_bytes))
         api_new_volume = self._get_api_volume_by_name(name, pool_id=pool_id)
-        api_snapshot = self._get_api_snapshot(source_name, pool_id=pool_id)
+        api_source_object = self._get_api_volume_by_name(source_name, pool_id=pool_id)
         if minimum_volume_size_in_bytes < source_capacity_in_bytes:
             self._extend_volume(volume_id=api_new_volume.id,
                                 new_size_in_bytes=source_capacity_in_bytes)
         options = [FLASHCOPY_PERSISTENT_OPTION]
-        self._create_flashcopy(source_volume_id=api_snapshot.id, target_volume_id=api_new_volume.id,
+        self._create_flashcopy(source_volume_id=api_source_object.id, target_volume_id=api_new_volume.id,
                                options=options)
 
     def _delete_volume(self, volume_id, not_exist_err=True):
@@ -316,14 +324,35 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             )
             raise array_errors.VolumeDeletionError(volume_id)
 
+    def _safe_delete_flashcopies(self, api_volume):
+        flashcopies = api_volume.flashcopy
+        flashcopies_as_source = [flashcopy for flashcopy in flashcopies
+                                 if flashcopy.sourcevolume == api_volume.id]
+        for flashcopy in flashcopies_as_source:
+            self._ensure_flashcopy_safe_to_delete(flashcopy, api_volume.name)
+        for flashcopy in flashcopies:
+            self._delete_flashcopy(flashcopy.id)
+
+    def _ensure_flashcopy_safe_to_delete(self, flashcopy, volume_name):
+        flashcopy_process = self._get_flashcopy_process(flashcopy.id)
+        if flashcopy.backgroundcopy == "disabled":
+            raise array_errors.ObjectIsStillInUseError(id_or_name=volume_name,
+                                                       used_by=[flashcopy.representation])
+        elif flashcopy_process.out_of_sync_tracks != '0':
+            raise array_errors.ObjectIsStillInUseError(id_or_name=volume_name,
+                                                       used_by=[flashcopy_process.representation])
+
+    def _delete_object(self, object_id, object_is_snapshot=False):
+        api_volume = self._get_api_volume_by_id(object_id)
+        if object_is_snapshot and not is_snapshot(api_volume):
+            raise array_errors.ObjectNotFoundError(name=object_id)
+        self._safe_delete_flashcopies(api_volume)
+        self._delete_volume(object_id)
+
     @convert_scsi_id_to_array_id
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
-        api_volume = self._get_api_volume_by_id(volume_id)
-        for flashcopy in api_volume.flashcopy:
-            if flashcopy.targetvolume == volume_id:
-                self._delete_flashcopy(flashcopy.id)
-        self._delete_volume(volume_id)
+        self._delete_object(volume_id)
         logger.info("Finished deleting volume {}".format(volume_id))
 
     def get_volume(self, name, pool_id=None):
@@ -345,18 +374,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         vol_name = api_volume.name
         logger.debug("found volume name : {0}".format(vol_name))
         return vol_name
-
-    @convert_scsi_id_to_array_id
-    def is_volume_has_snapshots(self, volume_id):
-        array_volume = self._get_api_volume_by_id(volume_id)
-        flash_copies = array_volume.flashcopy
-        for flashcopy in flash_copies:
-            if flashcopy.sourcevolume == volume_id:
-                return True
-        return False
-
-    def expand_volume(self, volume_id, required_bytes):
-        pass
 
     @convert_scsi_id_to_array_id
     def get_volume_mappings(self, volume_id):
@@ -495,12 +512,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         pool = source_api_volume.pool
         return self._create_api_volume(target_volume_name, size_in_bytes, capabilities, pool)
 
-    def _create_flashcopy(self, source_volume_id, target_volume_id, options=None):
+    def _create_flashcopy(self, source_volume_id, target_volume_id, options):
         logger.info(
             "creating FlashCopy relationship from '{0}' to '{1}'".format(source_volume_id,
                                                                          target_volume_id))
-        if not options:
-            options = []
         options.append(FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET_OPTION)
         try:
             api_flashcopy = self.client.create_flashcopy(source_volume_id=source_volume_id,
@@ -549,7 +564,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     @convert_scsi_id_to_array_id
     def get_object_by_id(self, object_id, object_type):
-        api_object = self._get_api_volume_by_id(object_id)
+        api_object = self._get_api_volume_by_id(object_id, not_exist_err=False)
         if not api_object:
             return None
         if object_type is controller_config.SNAPSHOT_TYPE_NAME:
@@ -578,18 +593,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     @convert_scsi_id_to_array_id
     def delete_snapshot(self, snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
-        api_volume = self._get_api_volume_by_id(snapshot_id, not_exist_err=False)
-        if not api_volume:
-            raise array_errors.ObjectNotFoundError(snapshot_id)
-        if not api_volume.flashcopy:
-            logger.error(
-                "FlashCopy relationship not found for target volume: {}".format(api_volume.name))
-            raise array_errors.ExpectedSnapshotButFoundVolumeError(api_volume.name,
-                                                                   self.service_address)
-        self._assert_snapshot_is_not_in_use(snapshot_id, api_volume.flashcopy)
-        for flashcopy in api_volume.flashcopy:
-            self._delete_flashcopy(flashcopy.id)
-        self._delete_volume(snapshot_id)
+        self._delete_object(snapshot_id, object_is_snapshot=True)
         logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
 
     def get_iscsi_targets_by_iqn(self):
@@ -654,10 +658,3 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def get_flashcopy_state(self, flashcopy_id):
         flashcopy_process = self._get_flashcopy_process(flashcopy_id)
         return flashcopy_process.state
-
-    def _assert_snapshot_is_not_in_use(self, snapshot_id, flashcopies):
-        for flashcopy in flashcopies:
-            if flashcopy.sourcevolume == snapshot_id:
-                flashcopy_process = self._get_flashcopy_process(flashcopy.id)
-                if flashcopy_process.out_of_sync_tracks != '0':
-                    raise array_errors.SnapshotIsStillInUseError(snapshot_id, flashcopy_process.targetvolume)
