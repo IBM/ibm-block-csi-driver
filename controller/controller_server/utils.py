@@ -166,7 +166,7 @@ def validate_validate_volume_capabilities_request(request):
     if not request.volume_id:
         raise ValidationException(messages.volume_id_should_not_be_empty_message)
     if config.PARAMETERS_OBJECT_ID_DELIMITER not in volume_id:
-        raise ObjectIdError(config.OBJECT_TYPE_NAME_VOLUME, volume_id)
+        raise ObjectIdError(config.VOLUME_TYPE_NAME, volume_id)
 
     logger.debug("validating volume capabilities")
     if not request.volume_capabilities:

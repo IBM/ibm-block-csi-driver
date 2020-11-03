@@ -387,9 +387,34 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def ValidateVolumeCapabilities(self, request, context):
         logger.info("ValidateVolumeCapabilities")
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        logger.info("finished ValidateVolumeCapabilities")
-        return csi_pb2.ValidateVolumeCapabilitiesResponse()
+        try:
+
+            utils.validate_validate_volume_capabilities_request(request)
+
+            secrets = request.secrets
+            user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
+
+            array_type, volume_id = utils.get_volume_id_info(request.volume_id)
+
+            with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
+                volume = array_mediator.get_object_by_id(object_id=volume_id, object_type=config.VOLUME_TYPE_NAME)
+
+            if request.volume_context:
+                utils.validate_volume_context_match_volume(request.volume_context, volume)
+            logger.info("finished ValidateVolumeCapabilities")
+            return utils.generate_csi_validate_volume_capabilities_response(request.volume_context,
+                                                                            request.volume_capabilities,
+                                                                            request.parameters)
+        except (controller_errors.ObjectNotFoundError, ObjectIdError) as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.NOT_FOUND)
+            return csi_pb2.ValidateVolumeCapabilitiesResponse(message=ex.message)
+        except ValidationException as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            return csi_pb2.ValidateVolumeCapabilitiesResponse(message=ex.message)
 
     def ListVolumes(self, request, context):
         logger.info("ListVolumes")

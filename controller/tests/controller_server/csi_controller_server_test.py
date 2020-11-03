@@ -1262,15 +1262,11 @@ class TestControllerServerValidateVolumeCapabilities(AbstractControllerTest):
     def get_create_object_method(self):
         return self.servicer.ValidateVolumeCapabilities
 
-    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
-    def setUp(self, connect):
+    def setUp(self):
+        super().setUp()
         self.fqdn = "fqdn"
-        self.hostname = "hostname"
         self.mediator = XIVArrayMediator("user", "password", self.fqdn)
         self.mediator.client = Mock()
-
-        self.mediator.get_volume_by_id = Mock()
-        self.mediator.get_volume_by_id.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
 
         self.storage_agent = MagicMock()
         self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
@@ -1285,6 +1281,9 @@ class TestControllerServerValidateVolumeCapabilities(AbstractControllerTest):
         self.request.volume_context = {}
         caps = utils.get_mock_volume_capability_object()
         self.request.volume_capabilities = [caps]
+
+        self.mediator.get_object_by_id = Mock()
+        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
 
         self.context = utils.FakeContext()
 
@@ -1339,7 +1338,7 @@ class TestControllerServerValidateVolumeCapabilities(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_cap_with_vol_not_found(self, storage_agent):
         storage_agent.return_value = self.storage_agent
-        self.mediator.get_volume_by_id.side_effect = [array_errors.VolumeNotFoundError("vol")]
+        self.mediator.get_object_by_id.side_effect = [array_errors.ObjectNotFoundError("vol")]
         res = self.get_create_object_method()(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
         self.assertTrue("vol" in self.context.details)
