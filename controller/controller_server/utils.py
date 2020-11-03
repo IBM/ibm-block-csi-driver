@@ -65,8 +65,10 @@ def validate_csi_volume_capability(cap):
     logger.debug("csi volume capabilities validation finished.")
 
 
-def validate_csi_volume_capabilties(capabilities):
+def validate_csi_volume_capabilities(capabilities):
     logger.debug("validating csi volume capabilities: {}".format(capabilities))
+    if not capabilities:
+        raise ValidationException(messages.capabilities_not_set_message)
     if len(capabilities) == 0:
         raise ValidationException(messages.capabilities_not_set_message)
 
@@ -112,7 +114,7 @@ def validate_create_volume_request(request):
         raise ValidationException(messages.no_capacity_range_message)
 
     logger.debug("validating volume capabilities")
-    validate_csi_volume_capabilties(request.volume_capabilities)
+    validate_csi_volume_capabilities(request.volume_capabilities)
 
     logger.debug("validating secrets")
     if request.secrets:
@@ -169,9 +171,8 @@ def validate_validate_volume_capabilities_request(request):
         raise ObjectIdError(config.VOLUME_TYPE_NAME, volume_id)
 
     logger.debug("validating volume capabilities")
-    if not request.volume_capabilities:
-        raise ValidationException(messages.capabilities_not_set_message)
-    validate_csi_volume_capabilties(request.volume_capabilities)
+
+    validate_csi_volume_capabilities(request.volume_capabilities)
 
     logger.debug("validating secrets")
     if request.secrets:

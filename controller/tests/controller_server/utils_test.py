@@ -58,19 +58,19 @@ class TestUtils(unittest.TestCase):
         cap.access_mode.mode = access_mode.SINGLE_NODE_WRITER
         cap.HasField.return_value = True
 
-        utils.validate_csi_volume_capabilties([cap])
+        utils.validate_csi_volume_capabilities([cap])
 
         with self.assertRaises(ValidationException):
-            utils.validate_csi_volume_capabilties([])
+            utils.validate_csi_volume_capabilities([])
 
         cap.mount.fs_type = "ext4dummy"
         with self.assertRaises(ValidationException):
-            utils.validate_csi_volume_capabilties([cap])
+            utils.validate_csi_volume_capabilities([cap])
 
         cap.mount.fs_type = "ext4"
         cap.access_mode.mode = access_mode.SINGLE_NODE_READER_ONLY
         with self.assertRaises(ValidationException):
-            utils.validate_csi_volume_capabilties([cap])
+            utils.validate_csi_volume_capabilities([cap])
 
     def test_validate_create_volume_source_empty(self):
         request = Mock()
@@ -101,11 +101,11 @@ class TestUtils(unittest.TestCase):
         is_block = True
         caps.HasField.side_effect = [is_mount, is_block]
 
-        utils.validate_csi_volume_capabilties([caps])
+        utils.validate_csi_volume_capabilities([caps])
 
     @patch('controller.controller_server.utils.validate_secret')
-    @patch('controller.controller_server.utils.validate_csi_volume_capabilties')
-    def test_validate_create_volume_request(self, valiate_capabilities, validate_secret):
+    @patch('controller.controller_server.utils.validate_csi_volume_capabilities')
+    def test_validate_create_volume_request(self, validate_capabilities, validate_secret):
         request = Mock()
         request.name = ""
 
@@ -122,13 +122,13 @@ class TestUtils(unittest.TestCase):
             self.assertTrue("size" in ex.message)
 
         request.capacity_range.required_bytes = 10
-        valiate_capabilities.side_effect = ValidationException("msg")
+        validate_capabilities.side_effect = ValidationException("msg")
 
         with self.assertRaises(ValidationException) as ex:
             utils.validate_create_volume_request(request)
             self.assertTrue("msg" in ex.message)
 
-        valiate_capabilities.side_effect = None
+        validate_capabilities.side_effect = None
 
         validate_secret.side_effect = ValidationException(" other msg")
 
