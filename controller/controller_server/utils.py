@@ -159,11 +159,11 @@ def validate_delete_snapshot_request(request):
 
 
 def validate_validate_volume_capabilities_request(request):
-    logger.debug("validating validate_volume_capabilities volume request")
+    logger.debug("validating validate_volume_capabilities request")
 
     logger.debug("validating volume id")
     volume_id = request.volume_id
-    if not request.volume_id:
+    if not volume_id:
         raise ValidationException(messages.volume_id_should_not_be_empty_message)
     if config.PARAMETERS_OBJECT_ID_DELIMITER not in volume_id:
         raise ObjectIdError(config.VOLUME_TYPE_NAME, volume_id)
