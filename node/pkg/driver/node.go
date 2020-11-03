@@ -26,7 +26,7 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/mount"
 	"os"
 	"path"
 	"path/filepath"
@@ -68,6 +68,7 @@ const (
 type NodeMounter interface {
 	mount.Interface
 	FormatAndMount(source string, target string, fstype string, options []string) error
+	GetDiskFormat(disk string) (string, error)
 }
 
 // nodeService represents the node service of CSI driver
@@ -140,7 +141,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	device, err := osDeviceConnectivity.GetMpathDevice(volId, lun, arrayInitiators)
+	device, err := osDeviceConnectivity.GetMpathDevice(volId)
 	logger.Debugf("Discovered device : {%v}", device)
 	if err != nil {
 		logger.Errorf("Error while discovring the device : {%v}", err.Error())
@@ -409,11 +410,21 @@ func (d *NodeService) mountFileSystemVolume(mpathDevice string, targetPath strin
 	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
 	if !isTargetPathExists {
 		logger.Debugf("Target path directory does not exist. Creating : {%v}", targetPathWithHostPrefix)
-		err := d.Mounter.MakeDir(targetPathWithHostPrefix)
+		err := d.NodeUtils.MakeDir(targetPathWithHostPrefix)
 		if err != nil {
 			return status.Errorf(codes.Internal, "Could not create directory %q: %v", targetPathWithHostPrefix, err)
 		}
 	}
+
+	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
+	if err != nil {
+		logger.Errorf("Could not determine if disk {%v} is formatted, error: %v", mpathDevice, err)
+		return err
+	}
+	if existingFormat == "" {
+		d.NodeUtils.FormatDevice(mpathDevice, fsType)
+	}
+
 	logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
 	return d.Mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 }
@@ -425,14 +436,14 @@ func (d *NodeService) mountRawBlockVolume(mpathDevice string, targetPath string,
 	targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
 	if !d.NodeUtils.IsPathExists(targetPathParentDirWithHostPrefix) {
 		logger.Debugf("Target path parent directory does not exist. creating : {%v}", targetPathParentDirWithHostPrefix)
-		err := d.Mounter.MakeDir(targetPathParentDirWithHostPrefix)
+		err := d.NodeUtils.MakeDir(targetPathParentDirWithHostPrefix)
 		if err != nil {
 			return status.Errorf(codes.Internal, "Could not create directory %q: %v", targetPathParentDirWithHostPrefix, err)
 		}
 	}
 	if !isTargetPathExists {
 		logger.Debugf("Target path file does not exist. creating : {%v}", targetPathWithHostPrefix)
-		err := d.Mounter.MakeFile(targetPathWithHostPrefix)
+		err := d.NodeUtils.MakeFile(targetPathWithHostPrefix)
 		if err != nil {
 			return status.Errorf(codes.Internal, "Could not create file %q: %v", targetPathWithHostPrefix, err)
 		}

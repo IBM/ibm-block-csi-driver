@@ -1,15 +1,17 @@
 import unittest
-from threading import Thread
 from queue import Queue
+from threading import Thread
 from time import sleep
-from controller.array_action.storage_agent import StorageAgent, get_agent, clear_agents, get_agents, detect_array_type
-from munch import Munch
+
 from mock import patch, NonCallableMagicMock, Mock
-from controller.array_action.errors import FailedToFindStorageSystemType
-from controller.array_action.array_mediator_xiv import XIVArrayMediator
-from controller.array_action.array_mediator_svc import SVCArrayMediator
-from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
+from munch import Munch
+
 import controller.array_action.errors as array_errors
+from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
+from controller.array_action.array_mediator_svc import SVCArrayMediator
+from controller.array_action.array_mediator_xiv import XIVArrayMediator
+from controller.array_action.errors import FailedToFindStorageSystemType
+from controller.array_action.storage_agent import StorageAgent, get_agent, clear_agents, get_agents, detect_array_type
 
 
 def _fake_socket_connect_test(host, port):
@@ -121,7 +123,7 @@ class TestStorageAgent(unittest.TestCase):
             self.assertEqual(self.client_mock.get_system.call_count, 1)
 
     def test_get_multiple_mediators_sequentially(self):
-        for i in range(3):
+        for _ in range(3):
             with self.agent.get_mediator() as mediator:
                 self.assertIsInstance(mediator, DS8KArrayMediator)
                 self.assertEqual(self.agent.conn_pool.current_size, 1)
@@ -151,7 +153,7 @@ class TestStorageAgent(unittest.TestCase):
         # two clients in the pool, but one of them are inactive after using.
         self.assertEqual(self.agent.conn_pool.current_size, 2)
 
-        for i in range(10):
+        for _ in range(10):
             with self.agent.get_mediator():
                 pass
         # After some iteration, the inactive client is disconnected and removed.

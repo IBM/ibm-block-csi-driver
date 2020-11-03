@@ -5,28 +5,20 @@ import (
 )
 
 type MultipleDmDevicesError struct {
-	VolumeId            string
-	LunId               int
-	ArrayIqns           []string
-	MultipathDevicesMap map[string]bool
+	VolumeId         string
+	MultipathDevices map[string]bool
 }
 
 func (e *MultipleDmDevicesError) Error() string {
-	var mps string
-	for key := range e.MultipathDevicesMap {
-		mps += ", " + key
-	}
-	return fmt.Sprintf("Detected more then one multipath devices (%s) for single volume (%s) with lunID %d from array target iqn %v", mps, e.VolumeId, e.LunId, e.ArrayIqns)
+	return fmt.Sprintf("Detected more than one multipath device (%v) for single volume (%s)", e.MultipathDevices, e.VolumeId)
 }
 
-type MultipathDeviceNotFoundForLunError struct {
-	VolumeId  string
-	LunId     int
-	ArrayIqns []string
+type MultipathDeviceNotFoundForVolumeError struct {
+	VolumeId string
 }
 
-func (e *MultipathDeviceNotFoundForLunError) Error() string {
-	return fmt.Sprintf("Couldn't find multipath device for volumeID [%s] lunID [%d] from array [%s]. Please check the host connectivity to the storage.", e.VolumeId, e.LunId, e.ArrayIqns)
+func (e *MultipathDeviceNotFoundForVolumeError) Error() string {
+	return fmt.Sprintf("Couldn't find multipath device for volumeID [%s]. Please check the host connectivity to the storage.", e.VolumeId)
 }
 
 type ConnectivityIdentifierStorageTargetNotFoundError struct {
@@ -61,4 +53,26 @@ type ErrorNotFoundArrayIdentifiers struct {
 
 func (e *ErrorNotFoundArrayIdentifiers) Error() string {
 	return fmt.Sprintf("Couldn't find arrayIdentifiers found for lunId: {%d}", e.lunId)
+}
+
+type ErrorNoRegexWwnMatchInScsiInq struct {
+	dev  string
+	line string
+}
+
+func (e *ErrorNoRegexWwnMatchInScsiInq) Error() string {
+	return fmt.Sprintf("Could not find wwn pattern in sg_inq of mpath devive: [%s] in line Vendor Specific "+
+		"Identifier Extension: [%s]", e.dev, e.line)
+}
+
+type ErrorWrongDeviceFound struct {
+	devPath    string
+	reqVolName string
+	volName    string
+}
+
+func (e *ErrorWrongDeviceFound) Error() string {
+	return fmt.Sprintf("Multipath device [%s] was found as WWN [%s] via multipath -ll command, "+
+		"BUT sg_inq identify this device as a different WWN: [%s]. Check your multipathd.", e.devPath,
+		e.reqVolName, e.volName)
 }

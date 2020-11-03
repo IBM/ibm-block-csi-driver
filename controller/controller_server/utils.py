@@ -1,6 +1,7 @@
+from hashlib import sha256
+
 import base58
 from google.protobuf.timestamp_pb2 import Timestamp
-from hashlib import sha1
 
 import controller.controller_server.config as config
 import controller.controller_server.messages as messages
@@ -79,16 +80,20 @@ def validate_create_volume_source(request):
     source = request.volume_content_source
     if source:
         logger.info(source)
-        if source.HasField(config.VOLUME_SOURCE_SNAPSHOT):
-            source_snapshot = source.snapshot
-            logger.info("Source snapshot specified: {0}".format(source_snapshot))
-            source_snapshot_id = source_snapshot.snapshot_id
-            if not source_snapshot_id:
-                raise ValidationException(messages.volume_src_snapshot_id_is_missing)
-            if config.PARAMETERS_OBJECT_ID_DELIMITER not in source_snapshot_id:
-                raise ObjectIdError(config.OBJECT_TYPE_NAME_SNAPSHOT, source_snapshot_id)
-        elif source.HasField(config.VOLUME_SOURCE_VOLUME):
-            raise ValidationException(messages.volume_cloning_not_supported_message)
+        if source.HasField(config.SNAPSHOT_TYPE_NAME):
+            _validate_source_info(source, config.SNAPSHOT_TYPE_NAME)
+        elif source.HasField(config.VOLUME_TYPE_NAME):
+            _validate_source_info(source, config.VOLUME_TYPE_NAME)
+
+
+def _validate_source_info(source, source_type):
+    source_object = getattr(source, source_type)
+    logger.info("Source {0} specified: {1}".format(source_type, source_object))
+    source_object_id = getattr(source_object, config.VOLUME_SOURCE_ID_FIELDS[source_type])
+    if not source_object_id:
+        raise ValidationException(messages.volume_source_id_is_missing.format(source_type))
+    if config.PARAMETERS_OBJECT_ID_DELIMITER not in source_object_id:
+        raise ObjectIdError(source_type, source_object_id)
 
 
 def validate_create_volume_request(request):
@@ -171,7 +176,6 @@ def validate_validate_volume_capabilities_request(request):
     logger.debug("validating secrets")
     if request.secrets:
         validate_secret(request.secrets)
-
     logger.debug("request validation finished.")
 
 
@@ -184,21 +188,25 @@ def validate_volume_context_match_volume(volume_context, volume):
     logger.debug("volume_context validation finished.")
 
 
-def generate_csi_create_volume_response(new_vol):
-    logger.debug("creating volume response for vol : {0}".format(new_vol))
+def generate_csi_create_volume_response(new_volume, source_type=None):
+    logger.debug("creating volume response for vol : {0}".format(new_volume))
 
-    vol_context = _get_context_from_volume(new_vol)
+    volume_context = _get_context_from_volume(new_volume)
 
     content_source = None
-    if new_vol.copy_src_object_id:
-        snapshot_source = csi_pb2.VolumeContentSource.SnapshotSource(snapshot_id=new_vol.copy_src_object_id)
-        content_source = csi_pb2.VolumeContentSource(snapshot=snapshot_source)
+    if new_volume.copy_source_id:
+        if source_type == config.SNAPSHOT_TYPE_NAME:
+            snapshot_source = csi_pb2.VolumeContentSource.SnapshotSource(snapshot_id=new_volume.copy_source_id)
+            content_source = csi_pb2.VolumeContentSource(snapshot=snapshot_source)
+        else:
+            volume_source = csi_pb2.VolumeContentSource.VolumeSource(volume_id=new_volume.copy_source_id)
+            content_source = csi_pb2.VolumeContentSource(volume=volume_source)
 
     res = csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(
-        capacity_bytes=new_vol.capacity_bytes,
-        volume_id=get_vol_id(new_vol),
+        capacity_bytes=new_volume.capacity_bytes,
+        volume_id=get_vol_id(new_volume),
         content_source=content_source,
-        volume_context=vol_context))
+        volume_context=volume_context))
 
     logger.debug("finished creating volume response : {0}".format(res))
     return res
@@ -263,11 +271,11 @@ def validate_publish_volume_request(request):
 
 
 def get_volume_id_info(volume_id):
-    return _get_object_id_info(volume_id, config.OBJECT_TYPE_NAME_VOLUME)
+    return get_object_id_info(volume_id, config.VOLUME_TYPE_NAME)
 
 
 def get_snapshot_id_info(snapshot_id):
-    return _get_object_id_info(snapshot_id, config.OBJECT_TYPE_NAME_SNAPSHOT)
+    return get_object_id_info(snapshot_id, config.SNAPSHOT_TYPE_NAME)
 
 
 def _get_context_from_volume(volume):
@@ -279,7 +287,7 @@ def _get_context_from_volume(volume):
             }
 
 
-def _get_object_id_info(full_object_id, object_type):
+def get_object_id_info(full_object_id, object_type):
     logger.debug("getting {0} info for id : {1}".format(object_type, full_object_id))
     splitted_object_id = full_object_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)
     if len(splitted_object_id) != 2:
@@ -305,7 +313,6 @@ def get_node_id_info(node_id):
 def choose_connectivity_type(connecitvity_types):
     # If connectivity type support FC and iSCSI at the same time, chose FC
     logger.debug("choosing connectivity type for connectivity types : {0}".format(connecitvity_types))
-    res = None
     if FC_CONNECTIVITY_TYPE in connecitvity_types:
         logger.debug("connectivity type is : {0}".format(FC_CONNECTIVITY_TYPE))
         return FC_CONNECTIVITY_TYPE
@@ -365,4 +372,4 @@ def get_current_timestamp():
 
 
 def hash_string(string):
-    return base58.b58encode(sha1(string.encode()).digest()).decode()
+    return base58.b58encode(sha256(string.encode()).digest()).decode()

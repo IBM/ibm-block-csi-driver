@@ -1,6 +1,7 @@
 import unittest
 
 from mock import patch, Mock
+from pyxcli import errors as xcli_errors
 
 import controller.array_action.errors as array_errors
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
@@ -8,15 +9,14 @@ from controller.array_action.config import FC_CONNECTIVITY_TYPE
 from controller.array_action.config import ISCSI_CONNECTIVITY_TYPE
 from controller.common.node_info import Initiators
 from controller.tests.array_action.xiv import utils
-from pyxcli import errors as xcli_errors
 
 
 class TestArrayMediatorXIV(unittest.TestCase):
 
-    @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect")
-    def setUp(self, connect):
+    def setUp(self):
         self.fqdn = "fqdn"
-        self.mediator = XIVArrayMediator("user", "password", self.fqdn)
+        with patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect"):
+            self.mediator = XIVArrayMediator("user", "password", self.fqdn)
         self.mediator.client = Mock()
 
     def test_get_volume_return_correct_errors(self):
@@ -28,7 +28,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.assertTrue(error_msg in str(ex.exception))
 
     def test_get_volume_return_correct_value(self):
-        vol = utils.get_mock_xiv_volume(10, "vol_name", "wwn")
+        vol = utils.get_mock_xiv_volume(10, "volume_name", "wwn")
         ret = Mock()
         ret.as_single_element = vol
         self.mediator.client.cmd.vol_list.return_value = ret
@@ -40,14 +40,14 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_get_volume_returns_illegal_object_name(self):
         self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalNameForObjectError("", "vol", "")]
         with self.assertRaises(array_errors.IllegalObjectName):
-            res = self.mediator.get_volume("vol")
+            self.mediator.get_volume("vol")
 
     def test_get_volume_returns_nothing(self):
         ret = Mock()
         ret.as_single_element = None
         self.mediator.client.cmd.vol_list.return_value = ret
-        with self.assertRaises(array_errors.VolumeNotFoundError):
-            res = self.mediator.get_volume("vol")
+        with self.assertRaises(array_errors.ObjectNotFoundError):
+            self.mediator.get_volume("vol")
 
     @patch("controller.array_action.array_mediator_xiv.XCLIClient")
     def test_connect_errors(self, client):
@@ -57,11 +57,10 @@ class TestArrayMediatorXIV(unittest.TestCase):
             self.mediator._connect()
 
         client.connect_multiendpoint_ssl.side_effect = [xcli_errors.XCLIError()]
-        with self.assertRaises(array_errors.CredentialsError) as ex:
+        with self.assertRaises(array_errors.CredentialsError):
             self.mediator._connect()
 
-    @patch("controller.array_action.array_mediator_xiv.XCLIClient")
-    def test_close(self, client):
+    def test_close(self):
         self.mediator.client.is_connected = lambda: True
         self.mediator.disconnect()
         self.mediator.client.close.assert_called_once_with()
@@ -99,8 +98,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_format = Mock()
         self.mediator.client.cmd.vol_copy = Mock()
         self.mediator.client.cmd.vol_resize = Mock()
-        self.mediator.copy_to_existing_volume_from_snapshot(vol_name, src_snap_name, src_snap_capacity_in_bytes,
-                                                            min_vol_size_in_bytes)
+        self.mediator.copy_to_existing_volume_from_source(vol_name, src_snap_name, src_snap_capacity_in_bytes,
+                                                          min_vol_size_in_bytes)
         vol_size_in_blocks = int(self.mediator._convert_size_bytes_to_blocks(min_vol_size_in_bytes))
         self.mediator.client.cmd.vol_format.assert_called_once_with(vol=vol_name)
         self.mediator.client.cmd.vol_copy.assert_called_once_with(vol_src=src_snap_name, vol_trg=vol_name)
@@ -114,8 +113,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_format = Mock()
         self.mediator.client.cmd.vol_copy = Mock()
         self.mediator.client.cmd.vol_resize = Mock()
-        self.mediator.copy_to_existing_volume_from_snapshot(vol_name, src_snap_name, src_snap_capacity_in_bytes,
-                                                            min_vol_size_in_bytes)
+        self.mediator.copy_to_existing_volume_from_source(vol_name, src_snap_name, src_snap_capacity_in_bytes,
+                                                          min_vol_size_in_bytes)
         self.mediator.client.cmd.vol_format.assert_called_once_with(vol=vol_name)
         self.mediator.client.cmd.vol_copy.assert_called_once_with(vol_src=src_snap_name, vol_trg=vol_name)
         self.mediator.client.cmd.vol_resize.assert_not_called()
@@ -126,15 +125,15 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
     def test_copy_to_existing_volume_from_snapshot_failed_volume_not_dound(self):
         self._test_copy_to_existing_volume_from_snapshot_error(xcli_errors.VolumeBadNameError("", "", ""),
-                                                               array_errors.VolumeNotFoundError)
+                                                               array_errors.ObjectNotFoundError)
 
     def test_copy_to_existing_volume_from_snapshot_failed_snapshot_not_fpund(self):
         self._test_copy_to_existing_volume_from_snapshot_error(xcli_errors.SourceVolumeBadNameError("", "", ""),
-                                                               array_errors.SnapshotNotFoundError)
+                                                               array_errors.ObjectNotFoundError)
 
     def test_copy_to_existing_volume_from_snapshot_failed_volume_not_fpund(self):
         self._test_copy_to_existing_volume_from_snapshot_error(xcli_errors.TargetVolumeBadNameError("", "", ""),
-                                                               array_errors.VolumeNotFoundError)
+                                                               array_errors.ObjectNotFoundError)
 
     def test_copy_to_existing_volume_from_snapshot_failed_permission_denied(self):
         self._test_copy_to_existing_volume_from_snapshot_error(
@@ -144,18 +143,18 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def _test_copy_to_existing_volume_from_snapshot_error(self, xcli_exception, expected_array_exception):
         self.mediator.client.cmd.vol_copy.side_effect = [xcli_exception]
         with self.assertRaises(expected_array_exception):
-            self.mediator.copy_to_existing_volume_from_snapshot("vol", "snap", 0, 0)
+            self.mediator.copy_to_existing_volume_from_source("vol", "snap", 0, 0)
 
     def test_delete_volume_return_volume_not_found(self):
         ret = Mock()
         ret.as_single_element = None
         self.mediator.client.cmd.vol_list.return_value = ret
-        with self.assertRaises(array_errors.VolumeNotFoundError):
+        with self.assertRaises(array_errors.ObjectNotFoundError):
             self.mediator.delete_volume("vol-wwn")
 
     def test_delete_volume_return_bad_name_error(self):
         self.mediator.client.cmd.vol_delete.side_effect = [xcli_errors.VolumeBadNameError("", "vol", "")]
-        with self.assertRaises(array_errors.VolumeNotFoundError):
+        with self.assertRaises(array_errors.ObjectNotFoundError):
             self.mediator.delete_volume("vol-wwn")
 
     def test_delete_volume_fails_on_permissions(self):
@@ -174,7 +173,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         xcli_snap = self._get_single_snapshot_result_mock(snap_name, snap_vol_name)
         self.mediator.client.cmd.vol_list.return_value = xcli_snap
         res = self.mediator.get_snapshot(snap_name)
-        self.assertTrue(res.snapshot_name == snap_name)
+        self.assertTrue(res.name == snap_name)
         self.assertTrue(res.volume_name == snap_vol_name)
 
     def test_get_snapshot_same_name_vol_exists_error(self):
@@ -182,7 +181,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         snap_vol_name = ""
         xcli_snap = self._get_single_snapshot_result_mock(snap_name, snap_vol_name)
         self.mediator.client.cmd.vol_list.return_value = xcli_snap
-        with self.assertRaises(array_errors.SnapshotNameBelongsToVolumeError):
+        with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.mediator.get_snapshot(snap_name)
 
     def test_get_snapshot_returns_illegal_object_name(self):
@@ -199,7 +198,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         xcli_snap = self._get_single_snapshot_result_mock(snap_name, snap_vol_name, snap_capacity=size_in_blocks_string)
         self.mediator.client.cmd.snapshot_create.return_value = xcli_snap
         res = self.mediator.create_snapshot(snap_name, snap_vol_name)
-        self.assertTrue(res.snapshot_name == snap_name)
+        self.assertTrue(res.name == snap_name)
         self.assertTrue(res.volume_name == snap_vol_name)
         self.assertTrue(res.capacity_bytes == size_in_bytes)
         self.assertTrue(res.capacity_bytes == size_in_bytes)
@@ -211,7 +210,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self._test_create_snapshot_error(xcli_errors.VolumeExistsError, array_errors.SnapshotAlreadyExists)
 
     def test_create_snapshot_return_volume_does_not_exists_error(self):
-        self._test_create_snapshot_error(xcli_errors.VolumeBadNameError, array_errors.VolumeNotFoundError)
+        self._test_create_snapshot_error(xcli_errors.VolumeBadNameError, array_errors.ObjectNotFoundError)
 
     def test_create_snapshot_return_permission_error(self):
         self._test_create_snapshot_error(xcli_errors.OperationForbiddenForUserCategoryError,
@@ -238,12 +237,12 @@ class TestArrayMediatorXIV(unittest.TestCase):
         ret = Mock()
         ret.as_single_element = None
         self.mediator.client.cmd.vol_list.return_value = ret
-        with self.assertRaises(array_errors.SnapshotNotFoundError):
+        with self.assertRaises(array_errors.ObjectNotFoundError):
             self.mediator.delete_snapshot("snap-wwn")
 
     def test_delete_snapshot_return_bad_name_error(self):
         self.mediator.client.cmd.snapshot_delete.side_effect = [xcli_errors.VolumeBadNameError("", "snap", "")]
-        with self.assertRaises(array_errors.SnapshotNotFoundError):
+        with self.assertRaises(array_errors.ObjectNotFoundError):
             self.mediator.delete_snapshot("snap-wwn")
 
     def test_delete_snapshot_fails_on_permissions(self):
@@ -356,7 +355,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         vol.as_single_element = None
         self.mediator.client.cmd.vol_list.return_value = vol
 
-        with self.assertRaises(array_errors.VolumeNotFoundError):
+        with self.assertRaises(array_errors.ObjectNotFoundError):
             self.mediator.get_volume_mappings("vol")
 
     def test_get_next_available_lun_raises_host_bad_name(self):
@@ -365,7 +364,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(array_errors.HostNotFoundError):
             self.mediator._get_next_available_lun("host")
 
-    def test_get_next_available_with_no_host_mappings(self):
+    def test_get_next_available_lun_with_no_host_mappings(self):
         res = Mock()
         res.as_list = []
         self.mediator.client.cmd.mapping_list.return_value = res
@@ -376,8 +375,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
     @patch.object(XIVArrayMediator, "MAX_LUN_NUMBER", 3)
     @patch.object(XIVArrayMediator, "MIN_LUN_NUMBER", 1)
     def test_get_next_available_lun_success(self):
-        mapping1 = utils.get_mock_xiv_host_mapping(1)
-        mapping2 = utils.get_mock_xiv_host_mapping(3)
+        mapping1 = utils.get_mock_xiv_host_mapping("1")
+        mapping2 = utils.get_mock_xiv_host_mapping("3")
         res = Mock()
         res.as_list = [mapping1, mapping2]
         self.mediator.client.cmd.mapping_list.return_value = res
@@ -387,9 +386,9 @@ class TestArrayMediatorXIV(unittest.TestCase):
     @patch.object(XIVArrayMediator, "MAX_LUN_NUMBER", 3)
     @patch.object(XIVArrayMediator, "MIN_LUN_NUMBER", 1)
     def test_get_next_available_lun_no_available_lun(self):
-        mapping1 = utils.get_mock_xiv_host_mapping(1)
-        mapping2 = utils.get_mock_xiv_host_mapping(3)
-        mapping3 = utils.get_mock_xiv_host_mapping(2)
+        mapping1 = utils.get_mock_xiv_host_mapping("1")
+        mapping2 = utils.get_mock_xiv_host_mapping("3")
+        mapping3 = utils.get_mock_xiv_host_mapping("2")
         res = Mock()
         res.as_list = [mapping1, mapping2, mapping3]
         self.mediator.client.cmd.mapping_list.return_value = res
@@ -400,26 +399,26 @@ class TestArrayMediatorXIV(unittest.TestCase):
         vol = Mock()
         vol.as_single_element = None
         self.mediator.client.cmd.vol_list.return_value = vol
-        with self.assertRaises(array_errors.VolumeNotFoundError):
+        with self.assertRaises(array_errors.ObjectNotFoundError):
             self.mediator.map_volume("vol", "host")
 
     @patch.object(XIVArrayMediator, "MAX_LUN_NUMBER", 3)
     @patch.object(XIVArrayMediator, "MIN_LUN_NUMBER", 1)
     def test_map_volume_no_availabe_lun(self):
-        mapping1 = utils.get_mock_xiv_host_mapping(1)
-        mapping2 = utils.get_mock_xiv_host_mapping(3)
-        mapping3 = utils.get_mock_xiv_host_mapping(2)
+        mapping1 = utils.get_mock_xiv_host_mapping("1")
+        mapping2 = utils.get_mock_xiv_host_mapping("3")
+        mapping3 = utils.get_mock_xiv_host_mapping("2")
         res = Mock()
         res.as_list = [mapping1, mapping2, mapping3]
         self.mediator.client.cmd.mapping_list.return_value = res
         with self.assertRaises(array_errors.NoAvailableLunError):
             self.mediator.map_volume("vol", "host")
 
-    @patch.object(XIVArrayMediator, "_get_next_available_lun")
-    def map_volume_with_error(self, xcli_err, status, returned_err, get_next_lun):
+    def map_volume_with_error(self, xcli_err, status, returned_err):
         self.mediator.client.cmd.map_vol.side_effect = [xcli_err("", status, "")]
-        with self.assertRaises(returned_err):
-            self.mediator.map_volume("vol", "host")
+        with patch.object(XIVArrayMediator, "_get_next_available_lun"):
+            with self.assertRaises(returned_err):
+                self.mediator.map_volume("vol", "host")
 
     def test_map_volume_operation_forbidden(self):
         self.map_volume_with_error(xcli_errors.OperationForbiddenForUserCategoryError, "",
@@ -427,7 +426,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
     def test_map_volume_volume_bad_name(self):
         self.map_volume_with_error(xcli_errors.VolumeBadNameError, "",
-                                   array_errors.VolumeNotFoundError)
+                                   array_errors.ObjectNotFoundError)
 
     def test_map_volume_host_bad_name(self):
         self.map_volume_with_error(xcli_errors.HostBadNameError, "",
@@ -452,7 +451,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         vol = Mock()
         vol.as_single_element = None
         self.mediator.client.cmd.vol_list.return_value = vol
-        with self.assertRaises(array_errors.VolumeNotFoundError):
+        with self.assertRaises(array_errors.ObjectNotFoundError):
             self.mediator.unmap_volume("vol", "host")
 
     def unmap_volume_with_error(self, xcli_err, status, returned_err):
@@ -461,7 +460,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
             self.mediator.unmap_volume("vol", "host")
 
     def test_unmap_volume_vol_not_found(self):
-        self.unmap_volume_with_error(xcli_errors.VolumeBadNameError, "", array_errors.VolumeNotFoundError)
+        self.unmap_volume_with_error(xcli_errors.VolumeBadNameError, "", array_errors.ObjectNotFoundError)
 
     def test_unmap_volume_host_not_found(self):
         self.unmap_volume_with_error(xcli_errors.HostBadNameError, "", array_errors.HostNotFoundError)
