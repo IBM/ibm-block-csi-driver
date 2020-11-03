@@ -513,16 +513,16 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.assertEqual(targets_by_iqn, {"iqn1": ["1.2.3.4", "[::1]"]})
 
     def _convert_size_bytes_to_blocks(self, size_in_bytes):
-        return int(self.mediator._convert_size_bytes_to_blocks(size_in_bytes))
+        return self.mediator._convert_size_bytes_to_blocks(size_in_bytes)
 
     def _prepare_mocks_for_expand_volume(self):
-        volume = utils.get_mock_xiv_volume(size=1, name="volume_name", wwn="volume_id")
+        volume = utils.get_mock_xiv_volume(size="1", name="volume_name", wwn="volume_id")
         self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=volume)
         return volume
 
     def test_expand_volume_succeed(self):
         volume = self._prepare_mocks_for_expand_volume()
-        required_size_in_blocks = self._convert_size_bytes_to_blocks(self.required_bytes) - volume.capacity
+        required_size_in_blocks = self._convert_size_bytes_to_blocks(self.required_bytes) - int(volume.capacity)
         self.mediator.expand_volume(volume_id=volume.wwn, required_bytes=self.required_bytes)
         self.mediator.client.cmd.vol_resize.assert_called_once_with(vol=volume.name,
                                                                     size_blocks=required_size_in_blocks)

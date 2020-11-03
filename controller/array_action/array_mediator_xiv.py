@@ -162,7 +162,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             cli_volume = self._get_cli_object_by_wwn_if_exist(volume_id=volume_id)
             if not cli_volume:
                 raise controller_errors.ObjectNotFoundError(name=volume_id)
-            size_blocks = required_bytes_in_blocks - cli_volume.capacity
+            size_blocks = required_bytes_in_blocks - int(cli_volume.capacity)
             self.client.cmd.vol_resize(vol=cli_volume.name, size_blocks=size_blocks)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
