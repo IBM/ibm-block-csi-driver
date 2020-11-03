@@ -59,6 +59,15 @@ class TestArrayMediatorDS8K(unittest.TestCase):
              }
         )
 
+        self.snapshot_response = Munch(
+            {"cap": "1073741824",
+             "id": "0002",
+             "name": "test_name",
+             "pool": "fake_pool",
+             "flashcopy": ""
+             }
+        )
+
         self.flashcopy_response = Munch(
             {"sourcevolume": "0001",
              "targetvolume": "0002",
