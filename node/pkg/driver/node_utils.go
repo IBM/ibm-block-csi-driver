@@ -212,12 +212,14 @@ func (n NodeUtils) GetSysDevicesFromMpath(device string) (string, error) {
 	}
 
 	logger.Debugf("found slaves : {%v}", slaves)
-	slavesString := ""
-	for _, slave := range slaves {
-		slavesString += "," + slave.Name()
-	}
-	return slavesString, nil
 
+	var slavesNames []string
+	for _, slave := range slaves {
+		slavesNames = append(slavesNames, slave.Name())
+	}
+	slavesString := strings.Join(slavesNames, ",")
+
+	return slavesString, nil
 }
 
 func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {

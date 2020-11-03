@@ -172,9 +172,10 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanPhysicalDevice(sysDevices [
 
 func (r OsDeviceConnectivityHelperScsiGeneric) ExpandMpathDevice(mpathDevice string) error {
 	logger.Infof("ExpandMpathDevice: [%s] ", mpathDevice)
-	output, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, "multipathd resize map", []string{mpathDevice})
+	args := []string{"resize", "map", mpathDevice}
+	output, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
 	if err != nil {
-		return fmt.Errorf("multipathd resize failed: %v\narguments: %s\nOutput: %s\n", err, mpathDevice, string(output))
+		return fmt.Errorf("multipathd resize failed: %v\narguments: %v\nOutput: %s\n", err, args, string(output))
 	}
 	return nil
 }

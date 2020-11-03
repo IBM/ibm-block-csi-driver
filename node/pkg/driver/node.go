@@ -584,13 +584,6 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 
 	volumeID := req.GetVolumeId()
 
-	err := d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeExpandVolume")
-	if err != nil {
-		logger.Errorf("Another operation is being performed on volume : {%s}", volumeID)
-		return nil, status.Error(codes.Aborted, err.Error())
-	}
-	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeExpandVolume")
-
 	targetPath := req.GetStagingTargetPath()
 	if targetPath == "" {
 		logger.Warningf("staging_target_path is empty, trying volume_path")
@@ -600,6 +593,13 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 		logger.Errorf("no target path provided")
 		return nil, status.Error(codes.InvalidArgument, "no target path provided")
 	}
+
+	err := d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeExpandVolume")
+	if err != nil {
+		logger.Errorf("Another operation is being performed on volume : {%s}", volumeID)
+		return nil, status.Error(codes.Aborted, err.Error())
+	}
+	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeExpandVolume")
 
 	logger.Debugf("Reading stage info file")
 	stageInfoPath := path.Join(targetPath, StageInfoFilename)
@@ -611,10 +611,10 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	logger.Debugf("Reading stage info file detail : {%v}", infoMap)
 
 	connectivityType := infoMap["connectivity"]
-	mpathDevice := infoMap["mpathDevice"]
+	baseDevice := infoMap["mpathDevice"]
 	sysDevices := strings.Split(infoMap["sysDevices"], ",")
 
-	logger.Debugf("Got info from stageInfo file. connectivity : {%v}. device : {%v}, sysDevices : {%v}", connectivityType, mpathDevice, sysDevices)
+	logger.Debugf("Got info from stageInfo file. connectivity : {%v}. device : {%v}, sysDevices : {%v}", connectivityType, baseDevice, sysDevices)
 
 	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
 	if !ok {
@@ -626,12 +626,12 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	baseDevice := path.Base(mpathDevice)
 	err = osDeviceConnectivity.ExpandMpathDevice(baseDevice)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	mpathDevice := filepath.Join(device_connectivity.DevPath, baseDevice)
 	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
 	if err != nil {
 		logger.Errorf("Could not determine if disk {%v} is formatted, error: %v", mpathDevice, err)
