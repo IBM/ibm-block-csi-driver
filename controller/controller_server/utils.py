@@ -190,7 +190,7 @@ def validate_volume_context_match_volume(volume_context, volume):
 
 
 def generate_csi_create_volume_response(new_volume, source_type=None):
-    logger.debug("creating volume response for vol : {0}".format(new_volume))
+    logger.debug("creating create volume response for vol : {0}".format(new_volume))
 
     volume_context = _get_context_from_volume(new_volume)
 
@@ -214,7 +214,7 @@ def generate_csi_create_volume_response(new_volume, source_type=None):
 
 
 def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
-    logger.debug("creating snapshot response for snapshot : {0}".format(new_snapshot))
+    logger.debug("creating create snapshot response for snapshot : {0}".format(new_snapshot))
 
     res = csi_pb2.CreateSnapshotResponse(snapshot=csi_pb2.Snapshot(
         size_bytes=new_snapshot.capacity_bytes,
@@ -228,7 +228,7 @@ def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
 
 
 def generate_csi_validate_volume_capabilities_response(volume_context, volume_capabilities, parameters):
-    logger.debug("creating volume capabilities response")
+    logger.debug("creating validate volume capabilities response")
 
     res = csi_pb2.ValidateVolumeCapabilitiesResponse(confirmed=csi_pb2.ValidateVolumeCapabilitiesResponse.Confirmed(
         volume_context=volume_context,
