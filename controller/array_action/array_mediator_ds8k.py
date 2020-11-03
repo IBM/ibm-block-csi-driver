@@ -375,6 +375,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.debug("found volume name : {0}".format(vol_name))
         return vol_name
 
+    def expand_volume(self, volume_id, required_bytes):
+        pass
+
     @convert_scsi_id_to_array_id
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume {}".format(volume_id))
