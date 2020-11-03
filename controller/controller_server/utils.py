@@ -279,7 +279,7 @@ def get_snapshot_id_info(snapshot_id):
 
 
 def _get_context_from_volume(volume):
-    return {config.VOLUME_CONTEXT_VOLUME_NAME_PARAMETER: volume.volume_name,
+    return {config.VOLUME_CONTEXT_VOLUME_NAME_PARAMETER: volume.name,
             config.VOLUME_CONTEXT_ARRAY_PARAMETER: ",".join(
                 volume.array_address if isinstance(volume.array_address, list) else [volume.array_address]),
             config.VOLUME_CONTEXT_POOL_PARAMETER: volume.pool_name,
