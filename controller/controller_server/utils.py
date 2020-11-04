@@ -98,6 +98,13 @@ def _validate_source_info(source, source_type):
         raise ObjectIdError(source_type, source_object_id)
 
 
+def _validate_create_volume_parameters(parameters):
+    if not (config.PARAMETERS_POOL in parameters):
+        raise ValidationException(messages.pool_is_missing_message)
+
+    if not parameters[config.PARAMETERS_POOL]:
+        raise ValidationException(messages.wrong_pool_passed_message)
+
 def validate_create_volume_request(request):
     logger.debug("validating create volume request")
 
@@ -122,11 +129,7 @@ def validate_create_volume_request(request):
 
     logger.debug("validating storage class parameters")
     if request.parameters:
-        if not (config.PARAMETERS_POOL in request.parameters):
-            raise ValidationException(messages.pool_is_missing_message)
-
-        if not request.parameters[config.PARAMETERS_POOL]:
-            raise ValidationException(messages.wrong_pool_passed_message)
+        _validate_create_volume_parameters(request.parameters)
     else:
         raise ValidationException(messages.params_are_missing_message)
 
@@ -170,8 +173,11 @@ def validate_validate_volume_capabilities_request(request):
     if config.PARAMETERS_OBJECT_ID_DELIMITER not in volume_id:
         raise ObjectIdError(config.VOLUME_TYPE_NAME, volume_id)
 
-    logger.debug("validating volume capabilities")
+    logger.debug("validating parameters")
+    if request.parameters:
+        _validate_create_volume_parameters(request.parameters)
 
+    logger.debug("validating volume capabilities")
     validate_csi_volume_capabilities(request.volume_capabilities)
 
     logger.debug("validating secrets")
