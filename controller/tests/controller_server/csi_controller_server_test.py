@@ -46,7 +46,7 @@ class CommonControllerTest:
     def get_csi_pb2_response_method(self):
         raise NotImplementedError
 
-    def _test_create_object_with_empty_name(self, storage_agent):
+    def _test_request_with_empty_name(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         self.request.name = ""
         context = utils.FakeContext()
@@ -55,7 +55,7 @@ class CommonControllerTest:
         self.assertTrue("name" in context.details)
         self.assertEqual(res, self.get_csi_pb2_response_method()())
 
-    def _test_create_object_with_wrong_secrets(self, storage_agent):
+    def _test_request_with_wrong_secrets(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
 
@@ -76,14 +76,14 @@ class CommonControllerTest:
 
         self.request.secrets = []
 
-    def _test_create_object_with_array_connection_exception(self, storage_agent):
+    def _test_request_with_array_connection_exception(self, storage_agent):
         storage_agent.side_effect = [Exception("error")]
         context = utils.FakeContext()
         self.get_tested_method()(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL, "connection error occured in array_connection")
         self.assertTrue("error" in context.details)
 
-    def _test_create_object_with_get_array_type_exception(self, storage_agent):
+    def _test_request_with_get_array_type_exception(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
         self.detect_array_type.side_effect = [array_errors.FailedToFindStorageSystemType("endpoint")]
@@ -92,7 +92,7 @@ class CommonControllerTest:
         msg = array_errors.FailedToFindStorageSystemType("endpoint").message
         self.assertTrue(msg in context.details)
 
-    def _test_create_object_with_wrong_parameters(self, storage_agent):
+    def _test_request_with_wrong_parameters(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
         self.request.parameters = {"pool": "pool1"}
@@ -130,7 +130,7 @@ class TestControllerServerCreateSnapshot(BaseControllerSetUp, CommonControllerTe
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_empty_name(self, a_enter):
-        self._test_create_object_with_empty_name(a_enter)
+        self._test_request_with_empty_name(a_enter)
 
     def _prepare_create_snapshot_mocks(self, storage_agent):
         storage_agent.return_value = self.storage_agent
@@ -183,15 +183,15 @@ class TestControllerServerCreateSnapshot(BaseControllerSetUp, CommonControllerTe
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_wrong_secrets(self, storage_agent):
-        self._test_create_object_with_wrong_secrets(storage_agent)
+        self._test_request_with_wrong_secrets(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_array_connection_exception(self, storage_agent):
-        self._test_create_object_with_array_connection_exception(storage_agent)
+        self._test_request_with_array_connection_exception(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_get_array_type_exception(self, storage_agent):
-        self._test_create_object_with_get_array_type_exception(storage_agent)
+        self._test_request_with_get_array_type_exception(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_get_snapshot_exception(self, storage_agent):
@@ -373,7 +373,7 @@ class TestControllerServerCreateVolume(BaseControllerSetUp, CommonControllerTest
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_empty_name(self, storage_agent):
-        self._test_create_object_with_empty_name(storage_agent)
+        self._test_request_with_empty_name(storage_agent)
 
     def _prepare_create_volume_mocks(self, storage_agent):
         storage_agent.return_value = self.storage_agent
@@ -394,11 +394,11 @@ class TestControllerServerCreateVolume(BaseControllerSetUp, CommonControllerTest
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_wrong_secrets(self, a_enter):
-        self._test_create_object_with_wrong_secrets(a_enter)
+        self._test_request_with_wrong_secrets(a_enter)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_wrong_parameters(self, storage_agent):
-        self._test_create_object_with_wrong_parameters(storage_agent)
+        self._test_request_with_wrong_parameters(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_wrong_volume_capabilities(self, storage_agent):
@@ -426,11 +426,11 @@ class TestControllerServerCreateVolume(BaseControllerSetUp, CommonControllerTest
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_array_connection_exception(self, storage_agent):
-        self._test_create_object_with_array_connection_exception(storage_agent)
+        self._test_request_with_array_connection_exception(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_get_array_type_exception(self, storage_agent):
-        self._test_create_object_with_get_array_type_exception(storage_agent)
+        self._test_request_with_get_array_type_exception(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_get_volume_exception(self, storage_agent):
@@ -1209,7 +1209,7 @@ class TestIdentityServer(BaseControllerSetUp):
         self.servicer.Probe(request, context)
 
 
-class TestControllerServerValidateVolumeCapabilities( BaseControllerSetUp, CommonControllerTest):
+class TestControllerServerValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
 
     def get_tested_method(self):
         return self.servicer.ValidateVolumeCapabilities
@@ -1257,11 +1257,11 @@ class TestControllerServerValidateVolumeCapabilities( BaseControllerSetUp, Commo
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_cap_with_wrong_secrets(self, storage_agent):
-        self._test_create_object_with_wrong_secrets(storage_agent)
+        self._test_request_with_wrong_secrets(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_cap_with_wrong_parameters(self, storage_agent):
-        self._test_create_object_with_wrong_parameters(storage_agent)
+        self._test_request_with_wrong_parameters(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_cap_with_unsupported_capabilities(self, storage_agent):
