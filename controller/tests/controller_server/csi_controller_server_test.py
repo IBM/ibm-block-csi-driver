@@ -36,7 +36,7 @@ class BaseControllerSetUp(unittest.TestCase):
         self.request = Mock()
 
 
-class CommonControllerTest(BaseControllerSetUp):
+class CommonControllerTest:
 
     @abc.abstractmethod
     def get_tested_method(self):
@@ -92,7 +92,6 @@ class CommonControllerTest(BaseControllerSetUp):
         msg = array_errors.FailedToFindStorageSystemType("endpoint").message
         self.assertTrue(msg in context.details)
 
-
     def _test_create_object_with_wrong_parameters(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
@@ -107,7 +106,7 @@ class CommonControllerTest(BaseControllerSetUp):
         self.assertTrue("parameter" in context.details)
 
 
-class TestControllerServerCreateSnapshot(CommonControllerTest):
+class TestControllerServerCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
 
     def get_tested_method(self):
         return self.servicer.CreateSnapshot
@@ -339,7 +338,7 @@ class ProtoBufMock(MagicMock):
         return hasattr(self, field)
 
 
-class TestControllerServerCreateVolume(CommonControllerTest):
+class TestControllerServerCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
     def get_tested_method(self):
         return self.servicer.CreateVolume
@@ -675,7 +674,6 @@ class TestControllerServerDeleteVolume(BaseControllerSetUp):
     def setUp(self):
         super().setUp()
 
-
         self.mediator.get_volume = Mock()
         self.mediator.is_volume_has_snapshots = Mock()
         self.mediator.is_volume_has_snapshots.return_value = False
@@ -774,7 +772,6 @@ class TestControllerServerPublishVolume(BaseControllerSetUp):
 
         self.mediator.get_iscsi_targets_by_iqn = Mock()
         self.mediator.get_iscsi_targets_by_iqn.return_value = {"iqn1": ["1.1.1.1", "2.2.2.2"], "iqn2": ["[::1]"]}
-
 
         arr_type = XIVArrayMediator.array_type
         self.request.volume_id = "{}:wwn1".format(arr_type)
@@ -1151,9 +1148,6 @@ class TestControllerServerUnPublishVolume(BaseControllerSetUp):
 
 class TestControllerServerGetCapabilities(BaseControllerSetUp):
 
-    def setUp(self):
-        super().setUp()
-
     def test_controller_get_capabilities(self):
         request = Mock()
         context = Mock()
@@ -1161,9 +1155,6 @@ class TestControllerServerGetCapabilities(BaseControllerSetUp):
 
 
 class TestIdentityServer(BaseControllerSetUp):
-
-    def setUp(self):
-        super().setUp()
 
     @patch.object(ControllerServicer, "_ControllerServicer__get_identity_config")
     def test_identity_plugin_get_info_succeeds(self, identity_config):
@@ -1218,13 +1209,13 @@ class TestIdentityServer(BaseControllerSetUp):
         self.servicer.Probe(request, context)
 
 
-class TestControllerServerValidateVolumeCapabilities(CommonControllerTest):
-
-    def get_csi_pb2_response_method(self):
-        return csi_pb2.ValidateVolumeCapabilitiesResponse
+class TestControllerServerValidateVolumeCapabilities( BaseControllerSetUp, CommonControllerTest):
 
     def get_tested_method(self):
         return self.servicer.ValidateVolumeCapabilities
+
+    def get_csi_pb2_response_method(self):
+        return csi_pb2.ValidateVolumeCapabilitiesResponse
 
     def setUp(self):
         super().setUp()

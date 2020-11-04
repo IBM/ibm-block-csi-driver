@@ -105,6 +105,7 @@ def _validate_create_volume_parameters(parameters):
     if not parameters[config.PARAMETERS_POOL]:
         raise ValidationException(messages.wrong_pool_passed_message)
 
+
 def validate_create_volume_request(request):
     logger.debug("validating create volume request")
 
