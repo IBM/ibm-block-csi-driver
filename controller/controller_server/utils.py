@@ -287,11 +287,11 @@ def get_snapshot_id_info(snapshot_id):
 
 
 def _get_context_from_volume(volume):
-    return {config.VOLUME_CONTEXT_VOLUME_NAME_PARAMETER: volume.name,
-            config.VOLUME_CONTEXT_ARRAY_PARAMETER: ",".join(
+    return {config.VOLUME_CONTEXT_VOLUME_NAME: volume.name,
+            config.VOLUME_CONTEXT_ARRAY_ADDRESS: ",".join(
                 volume.array_address if isinstance(volume.array_address, list) else [volume.array_address]),
-            config.VOLUME_CONTEXT_POOL_PARAMETER: volume.pool_name,
-            config.VOLUME_CONTEXT_STORAGE_TYPE_PARAMETER: volume.array_type
+            config.VOLUME_CONTEXT_POOL: volume.pool_name,
+            config.VOLUME_CONTEXT_STORAGE_TYPE: volume.array_type
             }
 
 

@@ -1302,7 +1302,7 @@ class TestControllerServerValidateVolumeCapabilities(BaseControllerSetUp, Common
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validation_with_vol_context_not_match(self, storage_agent):
         storage_agent.return_value = self.storage_agent
-        self.request.volume_context = {config.VOLUME_CONTEXT_VOLUME_NAME_PARAMETER: "fake"}
+        self.request.volume_context = {config.VOLUME_CONTEXT_VOLUME_NAME: "fake"}
 
         response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
