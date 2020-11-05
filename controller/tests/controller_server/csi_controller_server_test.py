@@ -43,7 +43,7 @@ class CommonControllerTest:
         raise NotImplementedError
 
     @abc.abstractmethod
-    def get_csi_pb2_response_method(self):
+    def get_tested_method_response_class(self):
         raise NotImplementedError
 
     def _test_request_with_empty_name(self, storage_agent):
@@ -53,7 +53,7 @@ class CommonControllerTest:
         res = self.get_tested_method()(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertTrue("name" in context.details)
-        self.assertEqual(res, self.get_csi_pb2_response_method()())
+        self.assertEqual(res, self.get_tested_method_response_class()())
 
     def _test_request_with_wrong_secrets(self, storage_agent):
         storage_agent.return_value = self.storage_agent
@@ -111,7 +111,7 @@ class TestControllerServerCreateSnapshot(BaseControllerSetUp, CommonControllerTe
     def get_tested_method(self):
         return self.servicer.CreateSnapshot
 
-    def get_csi_pb2_response_method(self):
+    def get_tested_method_response_class(self):
         return csi_pb2.CreateSnapshotResponse
 
     def setUp(self):
@@ -343,7 +343,7 @@ class TestControllerServerCreateVolume(BaseControllerSetUp, CommonControllerTest
     def get_tested_method(self):
         return self.servicer.CreateVolume
 
-    def get_csi_pb2_response_method(self):
+    def get_tested_method_response_class(self):
         return csi_pb2.CreateVolumeResponse
 
     def setUp(self):
@@ -1214,7 +1214,7 @@ class TestControllerServerValidateVolumeCapabilities(BaseControllerSetUp, Common
     def get_tested_method(self):
         return self.servicer.ValidateVolumeCapabilities
 
-    def get_csi_pb2_response_method(self):
+    def get_tested_method_response_class(self):
         return csi_pb2.ValidateVolumeCapabilitiesResponse
 
     def setUp(self):
