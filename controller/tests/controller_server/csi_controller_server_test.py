@@ -390,7 +390,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_volume_idempotent_succeeds(self, storage_agent):
+    def test_create_volume_idempotent_no_source_succeeds(self, storage_agent):
         self._prepare_create_volume_mocks(storage_agent)
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, volume_name, "wwn", "xiv")
@@ -551,7 +551,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.request.volume_content_source = self._get_source_snapshot("wwn1")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_volume_from_source_idempotent(self, storage_agent):
+    def test_create_volume_idempotent_with_source_succeed(self, storage_agent):
         self._prepare_idempotent_tests()
         storage_agent.return_value = self.storage_agent
         snapshot_id = "wwn1"
@@ -565,7 +565,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.copy_to_existing_volume_from_source.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_volume_from_source_idempotent_no_source(self, storage_agent):
+    def test_create_volume_idempotent_with_source_volume_have_no_source(self, storage_agent):
         self._prepare_idempotent_tests()
         storage_agent.return_value = self.storage_agent
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, volume_name, "wwn2",
@@ -577,7 +577,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.copy_to_existing_volume_from_source.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_volume_from_source_idempotent_source_not_requested_but_found(self, storage_agent):
+    def test_create_volume_idempotent_source_not_requested_but_found_in_volume(self, storage_agent):
         self._prepare_idempotent_tests()
         storage_agent.return_value = self.storage_agent
         snapshot_id = "wwn1"
@@ -587,11 +587,11 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         response = self.servicer.CreateVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
-        self.assertEqual(response.volume.content_source.snapshot.snapshot_id, '')
+        self.assertFalse(response.HasField("volume"))
         self.mediator.copy_to_existing_volume_from_source.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_volume_from_source_error_other_source(self, storage_agent, ):
+    def test_create_idempotent_with_source_volume_got_other_source(self, storage_agent):
         self._prepare_idempotent_tests()
         storage_agent.return_value = self.storage_agent
         volume_source_id = "wwn3"
