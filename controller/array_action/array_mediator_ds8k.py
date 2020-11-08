@@ -30,6 +30,7 @@ NO_TOKEN_IS_SPECIFIED = 'BE7A001A'
 ERROR_CODE_VOLUME_NOT_FOUND_FOR_MAPPING = 'BE586015'
 ERROR_CODE_ALREADY_FLASHCOPY = '000000AE'
 ERROR_CODE_VOLUME_NOT_FOUND_OR_ALREADY_PART_OF_CS_RELATIONSHIP = '00000013'
+ERROR_CODE_EXPAND_VOLUME_THERE_ARE_NOT_ENOUGH_EXTENTS = 'BE531465'
 
 FLASHCOPY_PERSISTENT_OPTION = ds8k_types.DS8K_OPTION_PER
 FLASHCOPY_NO_BACKGROUND_COPY_OPTION = ds8k_types.DS8K_OPTION_NBC
@@ -288,6 +289,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                                       new_size_in_bytes=new_size_in_bytes)
         except exceptions.NotFound:
             raise array_errors.ObjectNotFoundError(volume_id)
+        except (exceptions.ClientError, exceptions.ClientException) as ex:
+            if ERROR_CODE_EXPAND_VOLUME_THERE_ARE_NOT_ENOUGH_EXTENTS in str(ex.message).upper():
+                raise array_errors.NotEnoughSpaceInPool()
 
     def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
                                             minimum_volume_size_in_bytes, pool_id=None):
