@@ -541,3 +541,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_resize.side_effect = [xcli_errors.VolumeBadNameError("", "", "")]
         with self.assertRaises(expected_exception=array_errors.ObjectNotFoundError):
             self.mediator.expand_volume(volume_id=volume.wwn, required_bytes=self.required_bytes)
+        self.mediator.client.cmd.vol_resize.side_effect = [
+            xcli_errors.CommandFailedRuntimeError("", "No space to allocate to the volume", "")]
+        with self.assertRaises(expected_exception=array_errors.NotEnoughSpaceInPool):
+            self.mediator.expand_volume(volume_id=volume.wwn, required_bytes=self.required_bytes)

@@ -170,6 +170,13 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         except xcli_errors.VolumeBadNameError as ex:
             logger.exception(ex)
             raise controller_errors.ObjectNotFoundError(volume_id)
+        except xcli_errors.CommandFailedRuntimeError as ex:
+            logger.exception(ex)
+            if "No space to allocate to the volume" in ex.status:
+                raise controller_errors.NotEnoughSpaceInPool()
+            else:
+                logger.exception(ex)
+                raise ex
 
     def validate_supported_capabilities(self, capabilities):
         logger.info("validate_supported_capabilities for capabilities : {0}".format(capabilities))
