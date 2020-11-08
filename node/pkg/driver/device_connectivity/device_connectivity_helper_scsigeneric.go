@@ -40,7 +40,6 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 		Mainly for writing clean unit testing, so we can Mock this interface in order to unit test logic.
 	*/
 	RescanDevices(lunId int, arrayIdentifiers []string) error
-	ExpandMpathDevice(mpathDevice string) error
 	GetMpathDevice(volumeId string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
 	RemovePhysicalDevice(sysDevices []string) error
@@ -131,16 +130,6 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 	}
 
 	logger.Debugf("Rescan : finish rescan lun on lun id : {%v}, with array identifiers : {%v}", lunId, arrayIdentifiers)
-	return nil
-}
-
-func (r OsDeviceConnectivityHelperScsiGeneric) ExpandMpathDevice(mpathDevice string) error {
-	logger.Infof("ExpandMpathDevice: [%s] ", mpathDevice)
-	args := []string{"resize", "map", mpathDevice}
-	output, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
-	if err != nil {
-		return fmt.Errorf("multipathd resize failed: %v\narguments: %v\nOutput: %s\n", err, args, string(output))
-	}
 	return nil
 }
 

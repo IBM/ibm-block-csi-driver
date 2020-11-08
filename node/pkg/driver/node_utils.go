@@ -40,6 +40,8 @@ const (
 	PublishContextSeparator     = ","
 	mkfsTimeoutMilliseconds     = 15 * 60 * 1000
 	resizeFsTimeoutMilliseconds = 30 * 1000
+	TimeOutMultipathdCmd        = 10 * 1000
+	multipathdCmd               = "multipathd"
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
@@ -62,6 +64,7 @@ type NodeUtilsInterface interface {
 	MakeDir(dirPath string) error
 	MakeFile(filePath string) error
 	ExpandFilesystem(devicePath string, fsType string) error
+	ExpandMpathDevice(mpathDevice string) error
 	RescanPhysicalDevice(sysDevices []string) error
 	FormatDevice(devicePath string, fsType string)
 	IsNotMountPoint(file string) (bool, error)
@@ -343,6 +346,16 @@ func (n NodeUtils) ExpandFilesystem(devicePath string, fsType string) error {
 	_, err := n.Executer.ExecuteWithTimeout(resizeFsTimeoutMilliseconds, cmd, args)
 	if err != nil {
 		logger.Errorf("Failed to resize filesystem, error: %v", err)
+	}
+	return nil
+}
+
+func (n NodeUtils) ExpandMpathDevice(mpathDevice string) error {
+	logger.Infof("ExpandMpathDevice: [%s] ", mpathDevice)
+	args := []string{"resize", "map", mpathDevice}
+	output, err := n.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
+	if err != nil {
+		return fmt.Errorf("multipathd resize failed: %v\narguments: %v\nOutput: %s\n", err, args, string(output))
 	}
 	return nil
 }

@@ -627,17 +627,12 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 
 	logger.Debugf("Got info from stageInfo file. connectivity : {%v}. device : {%v}, sysDevices : {%v}", connectivityType, baseDevice, sysDevices)
 
-	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
-	if !ok {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
-	}
-
 	err = d.NodeUtils.RescanPhysicalDevice(sysDevices)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	err = osDeviceConnectivity.ExpandMpathDevice(baseDevice)
+	err = d.NodeUtils.ExpandMpathDevice(baseDevice)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

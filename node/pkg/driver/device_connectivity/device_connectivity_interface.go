@@ -21,7 +21,6 @@ package device_connectivity
 type OsDeviceConnectivityInterface interface {
 	EnsureLogin(ipsByArrayIdentifier map[string][]string)    // For iSCSI login
 	RescanDevices(lunId int, arrayIdentifier []string) error // For NVME lunID will be namespace ID.
-	ExpandMpathDevice(mpathDevice string) error
 	GetMpathDevice(volumeId string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
 	RemovePhysicalDevice(sysDevices []string) error
