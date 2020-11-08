@@ -1335,6 +1335,10 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         self.expand_volume_returns_error(return_code=grpc.StatusCode.INTERNAL,
                                          err=Exception("error"))
 
+    def test_expand_volume_with_no_space_in_pool(self):
+        self.expand_volume_returns_error(return_code=grpc.StatusCode.OUT_OF_RANGE,
+                                         err=array_errors.NotEnoughSpaceInPool())
+
 
 class TestIdentityServer(unittest.TestCase):
 
