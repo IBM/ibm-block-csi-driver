@@ -573,7 +573,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         response = self.servicer.CreateVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
-        self.assertEqual(response.volume.content_source.snapshot.snapshot_id, '')
+        self.assertFalse(response.HasField("volume"))
         self.mediator.copy_to_existing_volume_from_source.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -591,7 +591,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.copy_to_existing_volume_from_source.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_idempotent_with_source_volume_got_other_source(self, storage_agent):
+    def test_create_volume_idempotent_with_source_volume_got_other_source(self, storage_agent):
         self._prepare_idempotent_tests()
         storage_agent.return_value = self.storage_agent
         volume_source_id = "wwn3"
