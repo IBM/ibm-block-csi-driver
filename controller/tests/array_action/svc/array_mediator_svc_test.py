@@ -928,6 +928,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.svc.expand_volume('vol_id', 2)
         self.svc.client.svctask.expandvdisksize.side_effect = [
+            CLIFailureError("CMMVC5860E")]
+        with self.assertRaises(array_errors.NotEnoughSpaceInPool):
+            self.svc.expand_volume('vol_id', 2)
+        self.svc.client.svctask.expandvdisksize.side_effect = [
             CLIFailureError("Failed")]
         with self.assertRaises(CLIFailureError):
             self.svc.expand_volume('vol_id', 2)
