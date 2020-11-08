@@ -11,6 +11,7 @@ from controller.csi_general import csi_pb2
 from controller.tests.controller_server.csi_controller_server_test import ProtoBufMock
 from controller.tests import utils as test_utils
 
+
 class TestUtils(unittest.TestCase):
 
     def setUp(self):
@@ -51,7 +52,6 @@ class TestUtils(unittest.TestCase):
             utils.validate_secret(secrets)
 
     def test_validate_file_system_volume_capabilities(self):
-
         access_mode = csi_pb2.VolumeCapability.AccessMode
 
         cap = test_utils.get_mock_volume_capability_object()
