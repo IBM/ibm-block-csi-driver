@@ -99,11 +99,15 @@ class CommonControllerTest:
         self.get_tested_method()(self.request, context)
         self.assertNotEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
 
-        self.request.parameters = {"capabilities": ""}
+        self.request.parameters = {"": ""}
         self.get_tested_method()(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "capacity is missing in secrets")
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "pool parameter is missing")
-        self.assertTrue("parameter" in context.details)
+        self.assertTrue("pool parameter" in context.details)
+
+        self.request.parameters = {"pool": "pool1", "SpaceEfficiency": "thin"}
+        self.get_tested_method()(self.request, context)
+        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
+        self.assertTrue("not supported" in context.details)
 
 
 class TestControllerServerCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
@@ -125,7 +129,8 @@ class TestControllerServerCreateSnapshot(BaseControllerSetUp, CommonControllerTe
         self.capacity_bytes = 10
         self.request.name = snapshot_name
         self.request.source_volume_id = "A9000:12345678"
-
+        caps = utils.get_mock_volume_capability_object()
+        self.request.volume_capabilities = [caps]
         self.context = utils.FakeContext()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -350,14 +355,9 @@ class TestControllerServerCreateVolume(BaseControllerSetUp, CommonControllerTest
         super().setUp()
 
         self.mediator.get_volume = Mock()
-        self.mediator.get_volume.side_effect = [array_errors.ObjectNotFoundError("vol")]
+        self.mediator.get_volume.side_effect = array_errors.ObjectNotFoundError("vol")
 
-        caps = Mock()
-        caps.mount = Mock()
-        caps.mount.fs_type = "ext4"
-        access_types = csi_pb2.VolumeCapability.AccessMode
-        caps.access_mode.mode = access_types.SINGLE_NODE_WRITER
-
+        caps = utils.get_mock_volume_capability_object()
         self.request.volume_capabilities = [caps]
 
         self.pool = 'pool1'
@@ -404,25 +404,27 @@ class TestControllerServerCreateVolume(BaseControllerSetUp, CommonControllerTest
     def test_create_volume_with_wrong_volume_capabilities(self, storage_agent):
         storage_agent.return_value = self.storage_agent
 
-        caps = Mock()
-        caps.mount = Mock()
-        caps.mount.fs_type = "ext42"
-        access_types = csi_pb2.VolumeCapability.AccessMode
-        caps.access_mode.mode = access_types.SINGLE_NODE_WRITER
-
+        caps = utils.get_mock_volume_capability_object(fs_type="ext42")
         self.request.volume_capabilities = [caps]
 
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT, "wrong fs_type")
         self.assertTrue("fs_type" in self.context.details)
 
-        caps.mount.fs_type = "ext4"
-        caps.access_mode.mode = access_types.MULTI_NODE_SINGLE_WRITER
+        access_types = csi_pb2.VolumeCapability.AccessMode
+        caps = utils.get_mock_volume_capability_object(mode=access_types.MULTI_NODE_SINGLE_WRITER)
         self.request.volume_capabilities = [caps]
 
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT, "wrong access_mode")
         self.assertTrue("access mode" in self.context.details)
+
+        caps = utils.get_mock_volume_capability_object(mount_flags=["no_formatting"])
+        self.request.volume_capabilities = [caps]
+
+        self.servicer.CreateVolume(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT, "wrong access_mode")
+        self.assertTrue("mount_flags is unsupported" in self.context.details)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_array_connection_exception(self, storage_agent):
@@ -781,11 +783,7 @@ class TestControllerServerPublishVolume(BaseControllerSetUp):
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
         self.request.volume_context = {}
 
-        caps = Mock()
-        caps.mount = Mock()
-        caps.mount.fs_type = "ext4"
-        access_types = csi_pb2.VolumeCapability.AccessMode
-        caps.access_mode.mode = access_types.SINGLE_NODE_WRITER
+        caps = utils.get_mock_volume_capability_object()
         self.request.volume_capability = caps
 
         self.context = utils.FakeContext()
@@ -1293,11 +1291,11 @@ class TestControllerServerValidateVolumeCapabilities(BaseControllerSetUp, Common
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_cap_with_vol_not_found(self, storage_agent):
         storage_agent.return_value = self.storage_agent
-        self.mediator.get_object_by_id.side_effect = [array_errors.ObjectNotFoundError("vol")]
+        self.mediator.get_object_by_id.return_value = None
 
         response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
-        self._assertResponse(response, grpc.StatusCode.NOT_FOUND, "vol")
+        self._assertResponse(response, grpc.StatusCode.NOT_FOUND, "wwn")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validation_with_vol_context_not_match(self, storage_agent):

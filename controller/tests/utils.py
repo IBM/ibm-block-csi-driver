@@ -29,11 +29,13 @@ def get_mock_mediator_response_snapshot(capacity, name, wwn, volume_name, array_
     return snapshot
 
 
-def get_mock_volume_capability_object():
-    access_modes = csi_pb2.VolumeCapability.AccessMode
+def get_mock_volume_capability_object(mode=csi_pb2.VolumeCapability.AccessMode.SINGLE_NODE_WRITER, fs_type="ext4",
+                                      mount_flags=None):
+    if mount_flags is None:
+        mount_flags = []
     return csi_pb2.VolumeCapability(
-        mount=csi_pb2.VolumeCapability.MountVolume(fs_type="ext4"),
-        access_mode=csi_pb2.VolumeCapability.AccessMode(mode=access_modes.SINGLE_NODE_WRITER))
+        mount=csi_pb2.VolumeCapability.MountVolume(fs_type=fs_type, mount_flags=mount_flags),
+        access_mode=csi_pb2.VolumeCapability.AccessMode(mode=mode))
 
 
 class FakeContext:

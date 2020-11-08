@@ -9,6 +9,7 @@ invalid_secret_message = "invalid secret was passed"
 secret_missing_message = 'secret is missing'
 capabilities_not_set_message = "capabilities were not set"
 unsupported_fs_type_message = "unsupported fs_type : {}"
+unsupported_mount_flags_message = "mount_flags is unsupported"
 unsupported_volume_access_type_message = "unsupported volume access type"
 unsupported_access_mode_message = "unsupported access mode : {}"
 name_should_not_be_empty_message = 'name should not be empty'

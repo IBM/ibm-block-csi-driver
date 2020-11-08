@@ -48,10 +48,12 @@ def validate_secret(secret):
 
 
 def validate_csi_volume_capability(cap):
-    logger.debug("validating csi volume capability : {0}".format(cap))
+    logger.debug("validating csi volume capability")
     if cap.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_MOUNT):
         if cap.mount.fs_type and (cap.mount.fs_type not in config.SUPPORTED_FS_TYPES):
             raise ValidationException(messages.unsupported_fs_type_message.format(cap.mount.fs_type))
+        if cap.mount.mount_flags:
+            raise ValidationException(messages.unsupported_mount_flags_message)
 
     elif not cap.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_BLOCK):
         # should never get here since the value can be only mount (for fs volume) or block (for raw block)
@@ -66,7 +68,7 @@ def validate_csi_volume_capability(cap):
 
 
 def validate_csi_volume_capabilities(capabilities):
-    logger.debug("validating csi volume capabilities: {}".format(capabilities))
+    logger.debug("validating csi volume capabilities")
     if not capabilities:
         raise ValidationException(messages.capabilities_not_set_message)
     if len(capabilities) == 0:
@@ -99,7 +101,7 @@ def _validate_source_info(source, source_type):
 
 
 def _validate_create_volume_parameters(parameters):
-    if not (config.PARAMETERS_POOL in parameters):
+    if config.PARAMETERS_POOL not in parameters:
         raise ValidationException(messages.pool_is_missing_message)
 
     if not parameters[config.PARAMETERS_POOL]:
@@ -234,15 +236,31 @@ def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
     return res
 
 
+def _get_supported_capabilities(volume_capabilities):
+    if volume_capabilities.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_MOUNT):
+        return csi_pb2.VolumeCapability(
+            mount=csi_pb2.VolumeCapability.MountVolume(fs_type=volume_capabilities.mount.fs_type),
+            access_mode=csi_pb2.VolumeCapability.AccessMode(mode=volume_capabilities.access_mode.mode))
+
+    elif volume_capabilities.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_BLOCK):
+        return csi_pb2.VolumeCapability(
+            mount=csi_pb2.VolumeCapability.BlockVolume(),
+            access_mode=csi_pb2.VolumeCapability.AccessMode(mode=volume_capabilities.access_mode.mode))
+
+
 def generate_csi_validate_volume_capabilities_response(volume_context, volume_capabilities, parameters):
     logger.debug("creating validate volume capabilities response")
 
+    capabilities = []
+    for capability in volume_capabilities:
+        capabilities.append(_get_supported_capabilities(volume_capabilities=capability))
+
     res = csi_pb2.ValidateVolumeCapabilitiesResponse(confirmed=csi_pb2.ValidateVolumeCapabilitiesResponse.Confirmed(
         volume_context=volume_context,
-        volume_capabilities=volume_capabilities,
+        volume_capabilities=capabilities,
         parameters=parameters))
 
-    logger.debug("finished creating validate volume capabilities response : {0}".format(res))
+    logger.debug("finished creating validate volume capabilities response")
     return res
 
 
