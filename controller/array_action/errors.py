@@ -206,3 +206,9 @@ class InvalidCliResponseError(BaseArrayActionException):
 
     def __init__(self, details):
         self.message = messages.InvalidCliResponseError_message.format(details)
+
+
+class NotEnoughSpaceInPool(BaseArrayActionException):
+
+    def __init__(self):
+        self.message = messages.NotEnoughSpaceInPoolError_message
