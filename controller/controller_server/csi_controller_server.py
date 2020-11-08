@@ -587,7 +587,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.ControllerExpandVolumeResponse()
 
-        # TODO: OUT_OF_RANGE
+        except controller_errors.NotEnoughSpaceInPool as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.OUT_OF_RANGE)
+            return csi_pb2.ControllerExpandVolumeResponse()
 
         except Exception as ex:
             logger.debug("an internal exception occurred")
