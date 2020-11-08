@@ -155,10 +155,6 @@ func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifiers []s
 	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers)
 }
 
-func (r OsDeviceConnectivityIscsi) RescanPhysicalDevice(sysDevices []string) error {
-	return r.HelperScsiGeneric.RescanPhysicalDevice(sysDevices)
-}
-
 func (r OsDeviceConnectivityIscsi) ExpandMpathDevice(mpathDevice string) error {
 	return r.HelperScsiGeneric.ExpandMpathDevice(mpathDevice)
 }

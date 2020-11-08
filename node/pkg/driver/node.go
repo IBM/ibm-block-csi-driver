@@ -632,7 +632,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
 	}
 
-	err = osDeviceConnectivity.RescanPhysicalDevice(sysDevices)
+	err = d.NodeUtils.RescanPhysicalDevice(sysDevices)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
