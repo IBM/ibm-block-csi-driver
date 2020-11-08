@@ -9,7 +9,7 @@ from controller.controller_server.errors import ObjectIdError
 from controller.controller_server.errors import ValidationException
 from controller.csi_general import csi_pb2
 from controller.tests.controller_server.csi_controller_server_test import ProtoBufMock
-
+from controller.tests import utils as test_utils
 
 class TestUtils(unittest.TestCase):
 
@@ -51,13 +51,10 @@ class TestUtils(unittest.TestCase):
             utils.validate_secret(secrets)
 
     def test_validate_file_system_volume_capabilities(self):
-        cap = Mock()
-        cap.mount = Mock()
-        cap.mount.fs_type = "ext4"
-        access_mode = csi_pb2.VolumeCapability.AccessMode
-        cap.access_mode.mode = access_mode.SINGLE_NODE_WRITER
-        cap.HasField.return_value = True
 
+        access_mode = csi_pb2.VolumeCapability.AccessMode
+
+        cap = test_utils.get_mock_volume_capability_object()
         utils.validate_csi_volume_capabilities([cap])
 
         with self.assertRaises(ValidationException):

@@ -253,7 +253,8 @@ def generate_csi_validate_volume_capabilities_response(volume_context, volume_ca
 
     capabilities = []
     for capability in volume_capabilities:
-        capabilities.append(_get_supported_capabilities(volume_capabilities=capability))
+        supported_capabilities = _get_supported_capabilities(volume_capabilities=capability)
+        capabilities.append(supported_capabilities)
 
     res = csi_pb2.ValidateVolumeCapabilitiesResponse(confirmed=csi_pb2.ValidateVolumeCapabilitiesResponse.Confirmed(
         volume_context=volume_context,
