@@ -106,6 +106,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
             CLIFailureError("Failed")]
         with self.assertRaises(CLIFailureError):
             self.svc.create_volume("vol", 10, {}, "pool")
+        self.svc.client.svctask.mkvolume.side_effect = [
+            CLIFailureError("CMMVC8710E")]
+        with self.assertRaises(array_errors.NotEnoughSpaceInPool):
+            self.svc.create_volume("vol", 10, {}, "pool")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_create_volume_return_volume_exists_error(self, mock_warning):

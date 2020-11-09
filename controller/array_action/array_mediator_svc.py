@@ -30,7 +30,8 @@ FCMAP_ALREADY_COPYING = 'CMMVC5907E'
 VOL_NOT_FOUND = 'CMMVC8957E'
 POOL_NOT_MATCH_VOL_CAPABILITIES = 'CMMVC9292E'
 NOT_REDUCTION_POOL = 'CMMVC9301E'
-NOT_ENOUGH_EXTENTS_IN_POOL = 'CMMVC5860E'
+NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND = 'CMMVC5860E'
+NOT_ENOUGH_EXTENTS_IN_POOL_CREATE = 'CMMVC8710E'
 
 LIST_HOSTS_CMD_FORMAT = 'lshost {HOST_ID};'
 HOST_ID_PARAM = 'id'
@@ -275,7 +276,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 logger.warning("Failed to expand volume {}".format(volume_id))
                 if OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message:
                     raise controller_errors.ObjectNotFoundError(volume_id)
-                if NOT_ENOUGH_EXTENTS_IN_POOL in ex.my_message:
+                if NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND in ex.my_message:
                     raise controller_errors.NotEnoughSpaceInPool()
                 else:
                     raise ex
@@ -371,6 +372,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                         or NOT_REDUCTION_POOL in ex.my_message):
                     raise controller_errors.PoolDoesNotMatchCapabilities(
                         pool, capabilities, ex)
+                if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in ex.my_message:
+                    raise controller_errors.NotEnoughSpaceInPool()
                 raise ex
         except Exception as ex:
             logger.exception(ex)
