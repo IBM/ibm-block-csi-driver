@@ -144,6 +144,7 @@ class ArrayMediator(ABC):
             ObjectNotFound
             IllegalObjectID
             ObjectIsStillInUse
+            NotEnoughSpaceInPool
         """
         raise NotImplementedError
 
@@ -255,6 +256,7 @@ class ArrayMediator(ABC):
             IllegalObjectName
             PermissionDenied
             PoolParameterIsMissing
+            NotEnoughSpaceInPool
         """
         raise NotImplementedError
 
