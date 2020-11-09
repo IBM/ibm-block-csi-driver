@@ -30,7 +30,8 @@ NO_TOKEN_IS_SPECIFIED = 'BE7A001A'
 ERROR_CODE_VOLUME_NOT_FOUND_FOR_MAPPING = 'BE586015'
 ERROR_CODE_ALREADY_FLASHCOPY = '000000AE'
 ERROR_CODE_VOLUME_NOT_FOUND_OR_ALREADY_PART_OF_CS_RELATIONSHIP = '00000013'
-ERROR_CODE_EXPAND_VOLUME_THERE_ARE_NOT_ENOUGH_EXTENTS = 'BE531465'
+ERROR_CODE_EXPAND_VOLUME_NOT_ENOUGH_EXTENTS = 'BE531465'
+ERROR_CODE_CREATE_VOLUME_NOT_ENOUGH_EXTENTS = 'BE534459'
 
 FLASHCOPY_PERSISTENT_OPTION = ds8k_types.DS8K_OPTION_PER
 FLASHCOPY_NO_BACKGROUND_COPY_OPTION = ds8k_types.DS8K_OPTION_NBC
@@ -269,15 +270,18 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                     )
                 )
                 raise array_errors.VolumeCreationError(name)
-        except exceptions.ClientException as ex:
-            logger.error(
-                "Failed to create volume {} on array {}, reason is: {}".format(
-                    name,
-                    self.identifier,
-                    ex.details
+        except (exceptions.ClientError, exceptions.ClientException) as ex:
+            if ERROR_CODE_CREATE_VOLUME_NOT_ENOUGH_EXTENTS in str(ex.message).upper():
+                raise array_errors.NotEnoughSpaceInPool()
+            else:
+                logger.error(
+                    "Failed to create volume {} on array {}, reason is: {}".format(
+                        name,
+                        self.identifier,
+                        ex.details
+                    )
                 )
-            )
-            raise array_errors.VolumeCreationError(name)
+                raise array_errors.VolumeCreationError(name)
 
     def create_volume(self, volume_name, size_in_bytes, capabilities, pool):
         api_volume = self._create_api_volume(volume_name, size_in_bytes, capabilities, pool)
@@ -290,7 +294,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except exceptions.NotFound:
             raise array_errors.ObjectNotFoundError(volume_id)
         except (exceptions.ClientError, exceptions.ClientException) as ex:
-            if ERROR_CODE_EXPAND_VOLUME_THERE_ARE_NOT_ENOUGH_EXTENTS in str(ex.message).upper():
+            if ERROR_CODE_EXPAND_VOLUME_NOT_ENOUGH_EXTENTS in str(ex.message).upper():
                 raise array_errors.NotEnoughSpaceInPool()
 
     def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
