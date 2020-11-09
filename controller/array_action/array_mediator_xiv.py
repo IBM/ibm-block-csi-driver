@@ -212,6 +212,10 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
+        except xcli_errors.CommandFailedRuntimeError as ex:
+            logger.exception(ex)
+            if "No space to allocate to the volume" in ex.status:
+                raise controller_errors.NotEnoughSpaceInPool()
 
     def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
                                             minimum_volume_size_in_bytes, pool_id=None):
