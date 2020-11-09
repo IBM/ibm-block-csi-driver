@@ -152,7 +152,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         except controller_errors.NotEnoughSpaceInPool as ex:
             logger.exception(ex)
             context.set_details(ex.message)
-            context.set_code(grpc.StatusCode.OUT_OF_RANGE)
+            context.set_code(grpc.StatusCode.RESOURCE_EXHAUSTED)
             return csi_pb2.CreateVolumeResponse()
         except Exception as ex:
             logger.error("an internal exception occurred")
@@ -595,10 +595,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         except controller_errors.NotEnoughSpaceInPool as ex:
             logger.exception(ex)
             context.set_details(ex.message)
-            context.set_code(grpc.StatusCode.OUT_OF_RANGE)
+            context.set_code(grpc.StatusCode.RESOURCE_EXHAUSTED)
             return csi_pb2.ControllerExpandVolumeResponse()
 
-        except Exception as ex:
+        except (controller_errors.ObjectIsStillInUseError, Exception) as ex:
             logger.debug("an internal exception occurred")
             logger.exception(ex)
             context.set_code(grpc.StatusCode.INTERNAL)
