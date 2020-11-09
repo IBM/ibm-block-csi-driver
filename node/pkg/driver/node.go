@@ -601,31 +601,24 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	}
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeExpandVolume")
 
-	targetPath := req.GetStagingTargetPath()
-	if targetPath == "" {
-		logger.Warningf("staging_target_path is empty, using volume_path")
-		targetPath = req.GetVolumePath()
-	}
+	osDeviceConnectivityHelper := device_connectivity.NewOsDeviceConnectivityHelperScsiGeneric(d.executer)
 
-	logger.Debugf("Reading stage info file")
-	stageInfoPath := path.Join(targetPath, StageInfoFilename)
-	infoMap, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
+	device, err := osDeviceConnectivityHelper.GetMpathDevice(volumeID)
+	logger.Debugf("Discovered device : {%v}", device)
 	if err != nil {
-		if os.IsNotExist(err) {
-			logger.Errorf("Error: stage info file does not exist.")
-			return nil, status.Error(codes.NotFound, err.Error())
-		} else {
-			logger.Errorf("Error while trying to read from the staging info file : {%v}", err.Error())
-			return nil, status.Error(codes.Internal, err.Error())
-		}
+		logger.Errorf("Error while discovering the device : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
 	}
-	logger.Debugf("Reading stage info file detail : {%v}", infoMap)
 
-	connectivityType := infoMap["connectivity"]
-	baseDevice := infoMap["mpathDevice"]
-	sysDevices := strings.Split(infoMap["sysDevices"], ",")
+	baseDevice := path.Base(device)
 
-	logger.Debugf("Got info from stageInfo file. connectivity : {%v}. device : {%v}, sysDevices : {%v}", connectivityType, baseDevice, sysDevices)
+	rawSysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+	if err != nil {
+		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	sysDevices := strings.Split(rawSysDevices, ",")
 
 	err = d.NodeUtils.RescanPhysicalDevice(sysDevices)
 	if err != nil {
