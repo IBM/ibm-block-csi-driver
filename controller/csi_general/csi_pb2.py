@@ -22,63 +22,15 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   syntax='proto3',
   serialized_options=b'Z\003csi',
   create_key=_descriptor._internal_create_key,
-  serialized_pb=b'\n\tcsi.proto\x12\x06\x63si.v1\x1a google/protobuf/descriptor.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/wrappers.proto\"\x16\n\x14GetPluginInfoRequest\"\xad\x01\n\x15GetPluginInfoResponse\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x16\n\x0evendor_version\x18\x02 \x01(\t\x12=\n\x08manifest\x18\x03 \x03(\x0b\x32+.csi.v1.GetPluginInfoResponse.ManifestEntry\x1a/\n\rManifestEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x1e\n\x1cGetPluginCapabilitiesRequest\"O\n\x1dGetPluginCapabilitiesResponse\x12.\n\x0c\x63\x61pabilities\x18\x01 \x03(\x0b\x32\x18.csi.v1.PluginCapability\"\xa7\x03\n\x10PluginCapability\x12\x33\n\x07service\x18\x01 \x01(\x0b\x32 .csi.v1.PluginCapability.ServiceH\x00\x12\x44\n\x10volume_expansion\x18\x02 \x01(\x0b\x32(.csi.v1.PluginCapability.VolumeExpansionH\x00\x1a\x91\x01\n\x07Service\x12\x33\n\x04type\x18\x01 \x01(\x0e\x32%.csi.v1.PluginCapability.Service.Type\"Q\n\x04Type\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x16\n\x12\x43ONTROLLER_SERVICE\x10\x01\x12$\n VOLUME_ACCESSIBILITY_CONSTRAINTS\x10\x02\x1a|\n\x0fVolumeExpansion\x12;\n\x04type\x18\x01 \x01(\x0e\x32-.csi.v1.PluginCapability.VolumeExpansion.Type\",\n\x04Type\x12\x0b\n\x07UNKNOWN\x10\x00\x12\n\n\x06ONLINE\x10\x01\x12\x0b\n\x07OFFLINE\x10\x02\x42\x06\n\x04type\"\x0e\n\x0cProbeRequest\":\n\rProbeResponse\x12)\n\x05ready\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.BoolValue\"\xea\x03\n\x13\x43reateVolumeRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12-\n\x0e\x63\x61pacity_range\x18\x02 \x01(\x0b\x32\x15.csi.v1.CapacityRange\x12\x35\n\x13volume_capabilities\x18\x03 \x03(\x0b\x32\x18.csi.v1.VolumeCapability\x12?\n\nparameters\x18\x04 \x03(\x0b\x32+.csi.v1.CreateVolumeRequest.ParametersEntry\x12>\n\x07secrets\x18\x05 \x03(\x0b\x32(.csi.v1.CreateVolumeRequest.SecretsEntryB\x03\x98\x42\x01\x12:\n\x15volume_content_source\x18\x06 \x01(\x0b\x32\x1b.csi.v1.VolumeContentSource\x12?\n\x1a\x61\x63\x63\x65ssibility_requirements\x18\x07 \x01(\x0b\x32\x1b.csi.v1.TopologyRequirement\x1a\x31\n\x0fParametersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xe3\x01\n\x13VolumeContentSource\x12>\n\x08snapshot\x18\x01 \x01(\x0b\x32*.csi.v1.VolumeContentSource.SnapshotSourceH\x00\x12:\n\x06volume\x18\x02 \x01(\x0b\x32(.csi.v1.VolumeContentSource.VolumeSourceH\x00\x1a%\n\x0eSnapshotSource\x12\x13\n\x0bsnapshot_id\x18\x01 \x01(\t\x1a!\n\x0cVolumeSource\x12\x11\n\tvolume_id\x18\x01 \x01(\tB\x06\n\x04type\"6\n\x14\x43reateVolumeResponse\x12\x1e\n\x06volume\x18\x01 \x01(\x0b\x32\x0e.csi.v1.Volume\"\xf6\x03\n\x10VolumeCapability\x12\x35\n\x05\x62lock\x18\x01 \x01(\x0b\x32$.csi.v1.VolumeCapability.BlockVolumeH\x00\x12\x35\n\x05mount\x18\x02 \x01(\x0b\x32$.csi.v1.VolumeCapability.MountVolumeH\x00\x12\x38\n\x0b\x61\x63\x63\x65ss_mode\x18\x03 \x01(\x0b\x32#.csi.v1.VolumeCapability.AccessMode\x1a\r\n\x0b\x42lockVolume\x1a\x33\n\x0bMountVolume\x12\x0f\n\x07\x66s_type\x18\x01 \x01(\t\x12\x13\n\x0bmount_flags\x18\x02 \x03(\t\x1a\xe6\x01\n\nAccessMode\x12\x36\n\x04mode\x18\x01 \x01(\x0e\x32(.csi.v1.VolumeCapability.AccessMode.Mode\"\x9f\x01\n\x04Mode\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x16\n\x12SINGLE_NODE_WRITER\x10\x01\x12\x1b\n\x17SINGLE_NODE_READER_ONLY\x10\x02\x12\x1a\n\x16MULTI_NODE_READER_ONLY\x10\x03\x12\x1c\n\x18MULTI_NODE_SINGLE_WRITER\x10\x04\x12\x1b\n\x17MULTI_NODE_MULTI_WRITER\x10\x05\x42\r\n\x0b\x61\x63\x63\x65ss_type\"<\n\rCapacityRange\x12\x16\n\x0erequired_bytes\x18\x01 \x01(\x03\x12\x13\n\x0blimit_bytes\x18\x02 \x01(\x03\"\x88\x02\n\x06Volume\x12\x16\n\x0e\x63\x61pacity_bytes\x18\x01 \x01(\x03\x12\x11\n\tvolume_id\x18\x02 \x01(\t\x12\x39\n\x0evolume_context\x18\x03 \x03(\x0b\x32!.csi.v1.Volume.VolumeContextEntry\x12\x33\n\x0e\x63ontent_source\x18\x04 \x01(\x0b\x32\x1b.csi.v1.VolumeContentSource\x12-\n\x13\x61\x63\x63\x65ssible_topology\x18\x05 \x03(\x0b\x32\x10.csi.v1.Topology\x1a\x34\n\x12VolumeContextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"_\n\x13TopologyRequirement\x12#\n\trequisite\x18\x01 \x03(\x0b\x32\x10.csi.v1.Topology\x12#\n\tpreferred\x18\x02 \x03(\x0b\x32\x10.csi.v1.Topology\"m\n\x08Topology\x12\x30\n\x08segments\x18\x01 \x03(\x0b\x32\x1e.csi.v1.Topology.SegmentsEntry\x1a/\n\rSegmentsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x98\x01\n\x13\x44\x65leteVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12>\n\x07secrets\x18\x02 \x03(\x0b\x32(.csi.v1.DeleteVolumeRequest.SecretsEntryB\x03\x98\x42\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x16\n\x14\x44\x65leteVolumeResponse\"\x8f\x03\n\x1e\x43ontrollerPublishVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x0f\n\x07node_id\x18\x02 \x01(\t\x12\x33\n\x11volume_capability\x18\x03 \x01(\x0b\x32\x18.csi.v1.VolumeCapability\x12\x10\n\x08readonly\x18\x04 \x01(\x08\x12I\n\x07secrets\x18\x05 \x03(\x0b\x32\x33.csi.v1.ControllerPublishVolumeRequest.SecretsEntryB\x03\x98\x42\x01\x12Q\n\x0evolume_context\x18\x06 \x03(\x0b\x32\x39.csi.v1.ControllerPublishVolumeRequest.VolumeContextEntry\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x34\n\x12VolumeContextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xae\x01\n\x1f\x43ontrollerPublishVolumeResponse\x12T\n\x0fpublish_context\x18\x01 \x03(\x0b\x32;.csi.v1.ControllerPublishVolumeResponse.PublishContextEntry\x1a\x35\n\x13PublishContextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xc3\x01\n ControllerUnpublishVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x0f\n\x07node_id\x18\x02 \x01(\t\x12K\n\x07secrets\x18\x03 \x03(\x0b\x32\x35.csi.v1.ControllerUnpublishVolumeRequest.SecretsEntryB\x03\x98\x42\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"#\n!ControllerUnpublishVolumeResponse\"\xf9\x03\n!ValidateVolumeCapabilitiesRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12T\n\x0evolume_context\x18\x02 \x03(\x0b\x32<.csi.v1.ValidateVolumeCapabilitiesRequest.VolumeContextEntry\x12\x35\n\x13volume_capabilities\x18\x03 \x03(\x0b\x32\x18.csi.v1.VolumeCapability\x12M\n\nparameters\x18\x04 \x03(\x0b\x32\x39.csi.v1.ValidateVolumeCapabilitiesRequest.ParametersEntry\x12L\n\x07secrets\x18\x05 \x03(\x0b\x32\x36.csi.v1.ValidateVolumeCapabilitiesRequest.SecretsEntryB\x03\x98\x42\x01\x1a\x34\n\x12VolumeContextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x31\n\x0fParametersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xe7\x03\n\"ValidateVolumeCapabilitiesResponse\x12G\n\tconfirmed\x18\x01 \x01(\x0b\x32\x34.csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed\x12\x0f\n\x07message\x18\x02 \x01(\t\x1a\xe6\x02\n\tConfirmed\x12_\n\x0evolume_context\x18\x01 \x03(\x0b\x32G.csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.VolumeContextEntry\x12\x35\n\x13volume_capabilities\x18\x02 \x03(\x0b\x32\x18.csi.v1.VolumeCapability\x12X\n\nparameters\x18\x03 \x03(\x0b\x32\x44.csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.ParametersEntry\x1a\x34\n\x12VolumeContextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x31\n\x0fParametersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"A\n\x12ListVolumesRequest\x12\x13\n\x0bmax_entries\x18\x01 \x01(\x05\x12\x16\n\x0estarting_token\x18\x02 \x01(\t\"\xa4\x02\n\x13ListVolumesResponse\x12\x32\n\x07\x65ntries\x18\x01 \x03(\x0b\x32!.csi.v1.ListVolumesResponse.Entry\x12\x12\n\nnext_token\x18\x02 \x01(\t\x1a\x62\n\x0cVolumeStatus\x12\x1a\n\x12published_node_ids\x18\x01 \x03(\t\x12\x36\n\x10volume_condition\x18\x02 \x01(\x0b\x32\x17.csi.v1.VolumeConditionB\x03\xa0\x42\x01\x1a\x61\n\x05\x45ntry\x12\x1e\n\x06volume\x18\x01 \x01(\x0b\x32\x0e.csi.v1.Volume\x12\x38\n\x06status\x18\x02 \x01(\x0b\x32(.csi.v1.ListVolumesResponse.VolumeStatus\"4\n\x1a\x43ontrollerGetVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t:\x03\xa0\x42\x01\"\xe3\x01\n\x1b\x43ontrollerGetVolumeResponse\x12\x1e\n\x06volume\x18\x01 \x01(\x0b\x32\x0e.csi.v1.Volume\x12@\n\x06status\x18\x02 \x01(\x0b\x32\x30.csi.v1.ControllerGetVolumeResponse.VolumeStatus\x1a]\n\x0cVolumeStatus\x12\x1a\n\x12published_node_ids\x18\x01 \x03(\t\x12\x31\n\x10volume_condition\x18\x02 \x01(\x0b\x32\x17.csi.v1.VolumeCondition:\x03\xa0\x42\x01\"\xed\x01\n\x12GetCapacityRequest\x12\x35\n\x13volume_capabilities\x18\x01 \x03(\x0b\x32\x18.csi.v1.VolumeCapability\x12>\n\nparameters\x18\x02 \x03(\x0b\x32*.csi.v1.GetCapacityRequest.ParametersEntry\x12-\n\x13\x61\x63\x63\x65ssible_topology\x18\x03 \x01(\x0b\x32\x10.csi.v1.Topology\x1a\x31\n\x0fParametersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"1\n\x13GetCapacityResponse\x12\x1a\n\x12\x61vailable_capacity\x18\x01 \x01(\x03\"\"\n ControllerGetCapabilitiesRequest\"^\n!ControllerGetCapabilitiesResponse\x12\x39\n\x0c\x63\x61pabilities\x18\x01 \x03(\x0b\x32#.csi.v1.ControllerServiceCapability\"\xd0\x03\n\x1b\x43ontrollerServiceCapability\x12\x36\n\x03rpc\x18\x01 \x01(\x0b\x32\'.csi.v1.ControllerServiceCapability.RPCH\x00\x1a\xf0\x02\n\x03RPC\x12:\n\x04type\x18\x01 \x01(\x0e\x32,.csi.v1.ControllerServiceCapability.RPC.Type\"\xac\x02\n\x04Type\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x18\n\x14\x43REATE_DELETE_VOLUME\x10\x01\x12\x1c\n\x18PUBLISH_UNPUBLISH_VOLUME\x10\x02\x12\x10\n\x0cLIST_VOLUMES\x10\x03\x12\x10\n\x0cGET_CAPACITY\x10\x04\x12\x1a\n\x16\x43REATE_DELETE_SNAPSHOT\x10\x05\x12\x12\n\x0eLIST_SNAPSHOTS\x10\x06\x12\x10\n\x0c\x43LONE_VOLUME\x10\x07\x12\x14\n\x10PUBLISH_READONLY\x10\x08\x12\x11\n\rEXPAND_VOLUME\x10\t\x12 \n\x1cLIST_VOLUMES_PUBLISHED_NODES\x10\n\x12\x19\n\x10VOLUME_CONDITION\x10\x0b\x1a\x03\xa0\x42\x01\x12\x13\n\nGET_VOLUME\x10\x0c\x1a\x03\xa0\x42\x01\x42\x06\n\x04type\"\xa7\x02\n\x15\x43reateSnapshotRequest\x12\x18\n\x10source_volume_id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12@\n\x07secrets\x18\x03 \x03(\x0b\x32*.csi.v1.CreateSnapshotRequest.SecretsEntryB\x03\x98\x42\x01\x12\x41\n\nparameters\x18\x04 \x03(\x0b\x32-.csi.v1.CreateSnapshotRequest.ParametersEntry\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x31\n\x0fParametersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"<\n\x16\x43reateSnapshotResponse\x12\"\n\x08snapshot\x18\x01 \x01(\x0b\x32\x10.csi.v1.Snapshot\"\x96\x01\n\x08Snapshot\x12\x12\n\nsize_bytes\x18\x01 \x01(\x03\x12\x13\n\x0bsnapshot_id\x18\x02 \x01(\t\x12\x18\n\x10source_volume_id\x18\x03 \x01(\t\x12\x31\n\rcreation_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x14\n\x0cready_to_use\x18\x05 \x01(\x08\"\x9e\x01\n\x15\x44\x65leteSnapshotRequest\x12\x13\n\x0bsnapshot_id\x18\x01 \x01(\t\x12@\n\x07secrets\x18\x02 \x03(\x0b\x32*.csi.v1.DeleteSnapshotRequest.SecretsEntryB\x03\x98\x42\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x18\n\x16\x44\x65leteSnapshotResponse\"\xe3\x01\n\x14ListSnapshotsRequest\x12\x13\n\x0bmax_entries\x18\x01 \x01(\x05\x12\x16\n\x0estarting_token\x18\x02 \x01(\t\x12\x18\n\x10source_volume_id\x18\x03 \x01(\t\x12\x13\n\x0bsnapshot_id\x18\x04 \x01(\t\x12?\n\x07secrets\x18\x05 \x03(\x0b\x32).csi.v1.ListSnapshotsRequest.SecretsEntryB\x03\x98\x42\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x8e\x01\n\x15ListSnapshotsResponse\x12\x34\n\x07\x65ntries\x18\x01 \x03(\x0b\x32#.csi.v1.ListSnapshotsResponse.Entry\x12\x12\n\nnext_token\x18\x02 \x01(\t\x1a+\n\x05\x45ntry\x12\"\n\x08snapshot\x18\x01 \x01(\x0b\x32\x10.csi.v1.Snapshot\"\x90\x02\n\x1d\x43ontrollerExpandVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12-\n\x0e\x63\x61pacity_range\x18\x02 \x01(\x0b\x32\x15.csi.v1.CapacityRange\x12H\n\x07secrets\x18\x03 \x03(\x0b\x32\x32.csi.v1.ControllerExpandVolumeRequest.SecretsEntryB\x03\x98\x42\x01\x12\x33\n\x11volume_capability\x18\x04 \x01(\x0b\x32\x18.csi.v1.VolumeCapability\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"Y\n\x1e\x43ontrollerExpandVolumeResponse\x12\x16\n\x0e\x63\x61pacity_bytes\x18\x01 \x01(\x03\x12\x1f\n\x17node_expansion_required\x18\x02 \x01(\x08\"\xf5\x03\n\x16NodeStageVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12K\n\x0fpublish_context\x18\x02 \x03(\x0b\x32\x32.csi.v1.NodeStageVolumeRequest.PublishContextEntry\x12\x1b\n\x13staging_target_path\x18\x03 \x01(\t\x12\x33\n\x11volume_capability\x18\x04 \x01(\x0b\x32\x18.csi.v1.VolumeCapability\x12\x41\n\x07secrets\x18\x05 \x03(\x0b\x32+.csi.v1.NodeStageVolumeRequest.SecretsEntryB\x03\x98\x42\x01\x12I\n\x0evolume_context\x18\x06 \x03(\x0b\x32\x31.csi.v1.NodeStageVolumeRequest.VolumeContextEntry\x1a\x35\n\x13PublishContextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x34\n\x12VolumeContextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x19\n\x17NodeStageVolumeResponse\"J\n\x18NodeUnstageVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x1b\n\x13staging_target_path\x18\x02 \x01(\t\"\x1b\n\x19NodeUnstageVolumeResponse\"\xa4\x04\n\x18NodePublishVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12M\n\x0fpublish_context\x18\x02 \x03(\x0b\x32\x34.csi.v1.NodePublishVolumeRequest.PublishContextEntry\x12\x1b\n\x13staging_target_path\x18\x03 \x01(\t\x12\x13\n\x0btarget_path\x18\x04 \x01(\t\x12\x33\n\x11volume_capability\x18\x05 \x01(\x0b\x32\x18.csi.v1.VolumeCapability\x12\x10\n\x08readonly\x18\x06 \x01(\x08\x12\x43\n\x07secrets\x18\x07 \x03(\x0b\x32-.csi.v1.NodePublishVolumeRequest.SecretsEntryB\x03\x98\x42\x01\x12K\n\x0evolume_context\x18\x08 \x03(\x0b\x32\x33.csi.v1.NodePublishVolumeRequest.VolumeContextEntry\x1a\x35\n\x13PublishContextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x34\n\x12VolumeContextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x1b\n\x19NodePublishVolumeResponse\"D\n\x1aNodeUnpublishVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x13\n\x0btarget_path\x18\x02 \x01(\t\"\x1d\n\x1bNodeUnpublishVolumeResponse\"`\n\x19NodeGetVolumeStatsRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x13\n\x0bvolume_path\x18\x02 \x01(\t\x12\x1b\n\x13staging_target_path\x18\x03 \x01(\t\"x\n\x1aNodeGetVolumeStatsResponse\x12\"\n\x05usage\x18\x01 \x03(\x0b\x32\x13.csi.v1.VolumeUsage\x12\x36\n\x10volume_condition\x18\x02 \x01(\x0b\x32\x17.csi.v1.VolumeConditionB\x03\xa0\x42\x01\"\x91\x01\n\x0bVolumeUsage\x12\x11\n\tavailable\x18\x01 \x01(\x03\x12\r\n\x05total\x18\x02 \x01(\x03\x12\x0c\n\x04used\x18\x03 \x01(\x03\x12&\n\x04unit\x18\x04 \x01(\x0e\x32\x18.csi.v1.VolumeUsage.Unit\"*\n\x04Unit\x12\x0b\n\x07UNKNOWN\x10\x00\x12\t\n\x05\x42YTES\x10\x01\x12\n\n\x06INODES\x10\x02\"9\n\x0fVolumeCondition\x12\x10\n\x08\x61\x62normal\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t:\x03\xa0\x42\x01\"\x1c\n\x1aNodeGetCapabilitiesRequest\"R\n\x1bNodeGetCapabilitiesResponse\x12\x33\n\x0c\x63\x61pabilities\x18\x01 \x03(\x0b\x32\x1d.csi.v1.NodeServiceCapability\"\x82\x02\n\x15NodeServiceCapability\x12\x30\n\x03rpc\x18\x01 \x01(\x0b\x32!.csi.v1.NodeServiceCapability.RPCH\x00\x1a\xae\x01\n\x03RPC\x12\x34\n\x04type\x18\x01 \x01(\x0e\x32&.csi.v1.NodeServiceCapability.RPC.Type\"q\n\x04Type\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x18\n\x14STAGE_UNSTAGE_VOLUME\x10\x01\x12\x14\n\x10GET_VOLUME_STATS\x10\x02\x12\x11\n\rEXPAND_VOLUME\x10\x03\x12\x19\n\x10VOLUME_CONDITION\x10\x04\x1a\x03\xa0\x42\x01\x42\x06\n\x04type\"\x14\n\x12NodeGetInfoRequest\"s\n\x13NodeGetInfoResponse\x12\x0f\n\x07node_id\x18\x01 \x01(\t\x12\x1c\n\x14max_volumes_per_node\x18\x02 \x01(\x03\x12-\n\x13\x61\x63\x63\x65ssible_topology\x18\x03 \x01(\x0b\x32\x10.csi.v1.Topology\"\xc2\x01\n\x17NodeExpandVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x13\n\x0bvolume_path\x18\x02 \x01(\t\x12-\n\x0e\x63\x61pacity_range\x18\x03 \x01(\x0b\x32\x15.csi.v1.CapacityRange\x12\x1b\n\x13staging_target_path\x18\x04 \x01(\t\x12\x33\n\x11volume_capability\x18\x05 \x01(\x0b\x32\x18.csi.v1.VolumeCapability\"2\n\x18NodeExpandVolumeResponse\x12\x16\n\x0e\x63\x61pacity_bytes\x18\x01 \x01(\x03\x32\xfa\x01\n\x08Identity\x12N\n\rGetPluginInfo\x12\x1c.csi.v1.GetPluginInfoRequest\x1a\x1d.csi.v1.GetPluginInfoResponse\"\x00\x12\x66\n\x15GetPluginCapabilities\x12$.csi.v1.GetPluginCapabilitiesRequest\x1a%.csi.v1.GetPluginCapabilitiesResponse\"\x00\x12\x36\n\x05Probe\x12\x14.csi.v1.ProbeRequest\x1a\x15.csi.v1.ProbeResponse\"\x00\x32\xcd\t\n\nController\x12K\n\x0c\x43reateVolume\x12\x1b.csi.v1.CreateVolumeRequest\x1a\x1c.csi.v1.CreateVolumeResponse\"\x00\x12K\n\x0c\x44\x65leteVolume\x12\x1b.csi.v1.DeleteVolumeRequest\x1a\x1c.csi.v1.DeleteVolumeResponse\"\x00\x12l\n\x17\x43ontrollerPublishVolume\x12&.csi.v1.ControllerPublishVolumeRequest\x1a\'.csi.v1.ControllerPublishVolumeResponse\"\x00\x12r\n\x19\x43ontrollerUnpublishVolume\x12(.csi.v1.ControllerUnpublishVolumeRequest\x1a).csi.v1.ControllerUnpublishVolumeResponse\"\x00\x12u\n\x1aValidateVolumeCapabilities\x12).csi.v1.ValidateVolumeCapabilitiesRequest\x1a*.csi.v1.ValidateVolumeCapabilitiesResponse\"\x00\x12H\n\x0bListVolumes\x12\x1a.csi.v1.ListVolumesRequest\x1a\x1b.csi.v1.ListVolumesResponse\"\x00\x12H\n\x0bGetCapacity\x12\x1a.csi.v1.GetCapacityRequest\x1a\x1b.csi.v1.GetCapacityResponse\"\x00\x12r\n\x19\x43ontrollerGetCapabilities\x12(.csi.v1.ControllerGetCapabilitiesRequest\x1a).csi.v1.ControllerGetCapabilitiesResponse\"\x00\x12Q\n\x0e\x43reateSnapshot\x12\x1d.csi.v1.CreateSnapshotRequest\x1a\x1e.csi.v1.CreateSnapshotResponse\"\x00\x12Q\n\x0e\x44\x65leteSnapshot\x12\x1d.csi.v1.DeleteSnapshotRequest\x1a\x1e.csi.v1.DeleteSnapshotResponse\"\x00\x12N\n\rListSnapshots\x12\x1c.csi.v1.ListSnapshotsRequest\x1a\x1d.csi.v1.ListSnapshotsResponse\"\x00\x12i\n\x16\x43ontrollerExpandVolume\x12%.csi.v1.ControllerExpandVolumeRequest\x1a&.csi.v1.ControllerExpandVolumeResponse\"\x00\x12\x63\n\x13\x43ontrollerGetVolume\x12\".csi.v1.ControllerGetVolumeRequest\x1a#.csi.v1.ControllerGetVolumeResponse\"\x03\xa0\x42\x01\x32\xda\x05\n\x04Node\x12T\n\x0fNodeStageVolume\x12\x1e.csi.v1.NodeStageVolumeRequest\x1a\x1f.csi.v1.NodeStageVolumeResponse\"\x00\x12Z\n\x11NodeUnstageVolume\x12 .csi.v1.NodeUnstageVolumeRequest\x1a!.csi.v1.NodeUnstageVolumeResponse\"\x00\x12Z\n\x11NodePublishVolume\x12 .csi.v1.NodePublishVolumeRequest\x1a!.csi.v1.NodePublishVolumeResponse\"\x00\x12`\n\x13NodeUnpublishVolume\x12\".csi.v1.NodeUnpublishVolumeRequest\x1a#.csi.v1.NodeUnpublishVolumeResponse\"\x00\x12]\n\x12NodeGetVolumeStats\x12!.csi.v1.NodeGetVolumeStatsRequest\x1a\".csi.v1.NodeGetVolumeStatsResponse\"\x00\x12W\n\x10NodeExpandVolume\x12\x1f.csi.v1.NodeExpandVolumeRequest\x1a .csi.v1.NodeExpandVolumeResponse\"\x00\x12`\n\x13NodeGetCapabilities\x12\".csi.v1.NodeGetCapabilitiesRequest\x1a#.csi.v1.NodeGetCapabilitiesResponse\"\x00\x12H\n\x0bNodeGetInfo\x12\x1a.csi.v1.NodeGetInfoRequest\x1a\x1b.csi.v1.NodeGetInfoResponse\"\x00:1\n\nalpha_enum\x12\x1c.google.protobuf.EnumOptions\x18\xa4\x08 \x01(\x08:<\n\x10\x61lpha_enum_value\x12!.google.protobuf.EnumValueOptions\x18\xa4\x08 \x01(\x08:2\n\ncsi_secret\x12\x1d.google.protobuf.FieldOptions\x18\xa3\x08 \x01(\x08:3\n\x0b\x61lpha_field\x12\x1d.google.protobuf.FieldOptions\x18\xa4\x08 \x01(\x08:7\n\ralpha_message\x12\x1f.google.protobuf.MessageOptions\x18\xa4\x08 \x01(\x08:5\n\x0c\x61lpha_method\x12\x1e.google.protobuf.MethodOptions\x18\xa4\x08 \x01(\x08:7\n\ralpha_service\x12\x1f.google.protobuf.ServiceOptions\x18\xa4\x08 \x01(\x08\x42\x05Z\x03\x63sib\x06proto3'
+  serialized_pb=b'\n\tcsi.proto\x12\x06\x63si.v1\x1a google/protobuf/descriptor.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/wrappers.proto\"\x16\n\x14GetPluginInfoRequest\"\xad\x01\n\x15GetPluginInfoResponse\x12\x0c\n\x04name\x18\x01 \x01(\t\x12\x16\n\x0evendor_version\x18\x02 \x01(\t\x12=\n\x08manifest\x18\x03 \x03(\x0b\x32+.csi.v1.GetPluginInfoResponse.ManifestEntry\x1a/\n\rManifestEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x1e\n\x1cGetPluginCapabilitiesRequest\"O\n\x1dGetPluginCapabilitiesResponse\x12.\n\x0c\x63\x61pabilities\x18\x01 \x03(\x0b\x32\x18.csi.v1.PluginCapability\"\xa7\x03\n\x10PluginCapability\x12\x33\n\x07service\x18\x01 \x01(\x0b\x32 .csi.v1.PluginCapability.ServiceH\x00\x12\x44\n\x10volume_expansion\x18\x02 \x01(\x0b\x32(.csi.v1.PluginCapability.VolumeExpansionH\x00\x1a\x91\x01\n\x07Service\x12\x33\n\x04type\x18\x01 \x01(\x0e\x32%.csi.v1.PluginCapability.Service.Type\"Q\n\x04Type\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x16\n\x12\x43ONTROLLER_SERVICE\x10\x01\x12$\n VOLUME_ACCESSIBILITY_CONSTRAINTS\x10\x02\x1a|\n\x0fVolumeExpansion\x12;\n\x04type\x18\x01 \x01(\x0e\x32-.csi.v1.PluginCapability.VolumeExpansion.Type\",\n\x04Type\x12\x0b\n\x07UNKNOWN\x10\x00\x12\n\n\x06ONLINE\x10\x01\x12\x0b\n\x07OFFLINE\x10\x02\x42\x06\n\x04type\"\x0e\n\x0cProbeRequest\":\n\rProbeResponse\x12)\n\x05ready\x18\x01 \x01(\x0b\x32\x1a.google.protobuf.BoolValue\"\xea\x03\n\x13\x43reateVolumeRequest\x12\x0c\n\x04name\x18\x01 \x01(\t\x12-\n\x0e\x63\x61pacity_range\x18\x02 \x01(\x0b\x32\x15.csi.v1.CapacityRange\x12\x35\n\x13volume_capabilities\x18\x03 \x03(\x0b\x32\x18.csi.v1.VolumeCapability\x12?\n\nparameters\x18\x04 \x03(\x0b\x32+.csi.v1.CreateVolumeRequest.ParametersEntry\x12>\n\x07secrets\x18\x05 \x03(\x0b\x32(.csi.v1.CreateVolumeRequest.SecretsEntryB\x03\x98\x42\x01\x12:\n\x15volume_content_source\x18\x06 \x01(\x0b\x32\x1b.csi.v1.VolumeContentSource\x12?\n\x1a\x61\x63\x63\x65ssibility_requirements\x18\x07 \x01(\x0b\x32\x1b.csi.v1.TopologyRequirement\x1a\x31\n\x0fParametersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xe3\x01\n\x13VolumeContentSource\x12>\n\x08snapshot\x18\x01 \x01(\x0b\x32*.csi.v1.VolumeContentSource.SnapshotSourceH\x00\x12:\n\x06volume\x18\x02 \x01(\x0b\x32(.csi.v1.VolumeContentSource.VolumeSourceH\x00\x1a%\n\x0eSnapshotSource\x12\x13\n\x0bsnapshot_id\x18\x01 \x01(\t\x1a!\n\x0cVolumeSource\x12\x11\n\tvolume_id\x18\x01 \x01(\tB\x06\n\x04type\"6\n\x14\x43reateVolumeResponse\x12\x1e\n\x06volume\x18\x01 \x01(\x0b\x32\x0e.csi.v1.Volume\"\xf6\x03\n\x10VolumeCapability\x12\x35\n\x05\x62lock\x18\x01 \x01(\x0b\x32$.csi.v1.VolumeCapability.BlockVolumeH\x00\x12\x35\n\x05mount\x18\x02 \x01(\x0b\x32$.csi.v1.VolumeCapability.MountVolumeH\x00\x12\x38\n\x0b\x61\x63\x63\x65ss_mode\x18\x03 \x01(\x0b\x32#.csi.v1.VolumeCapability.AccessMode\x1a\r\n\x0b\x42lockVolume\x1a\x33\n\x0bMountVolume\x12\x0f\n\x07\x66s_type\x18\x01 \x01(\t\x12\x13\n\x0bmount_flags\x18\x02 \x03(\t\x1a\xe6\x01\n\nAccessMode\x12\x36\n\x04mode\x18\x01 \x01(\x0e\x32(.csi.v1.VolumeCapability.AccessMode.Mode\"\x9f\x01\n\x04Mode\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x16\n\x12SINGLE_NODE_WRITER\x10\x01\x12\x1b\n\x17SINGLE_NODE_READER_ONLY\x10\x02\x12\x1a\n\x16MULTI_NODE_READER_ONLY\x10\x03\x12\x1c\n\x18MULTI_NODE_SINGLE_WRITER\x10\x04\x12\x1b\n\x17MULTI_NODE_MULTI_WRITER\x10\x05\x42\r\n\x0b\x61\x63\x63\x65ss_type\"<\n\rCapacityRange\x12\x16\n\x0erequired_bytes\x18\x01 \x01(\x03\x12\x13\n\x0blimit_bytes\x18\x02 \x01(\x03\"\x88\x02\n\x06Volume\x12\x16\n\x0e\x63\x61pacity_bytes\x18\x01 \x01(\x03\x12\x11\n\tvolume_id\x18\x02 \x01(\t\x12\x39\n\x0evolume_context\x18\x03 \x03(\x0b\x32!.csi.v1.Volume.VolumeContextEntry\x12\x33\n\x0e\x63ontent_source\x18\x04 \x01(\x0b\x32\x1b.csi.v1.VolumeContentSource\x12-\n\x13\x61\x63\x63\x65ssible_topology\x18\x05 \x03(\x0b\x32\x10.csi.v1.Topology\x1a\x34\n\x12VolumeContextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"_\n\x13TopologyRequirement\x12#\n\trequisite\x18\x01 \x03(\x0b\x32\x10.csi.v1.Topology\x12#\n\tpreferred\x18\x02 \x03(\x0b\x32\x10.csi.v1.Topology\"m\n\x08Topology\x12\x30\n\x08segments\x18\x01 \x03(\x0b\x32\x1e.csi.v1.Topology.SegmentsEntry\x1a/\n\rSegmentsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x98\x01\n\x13\x44\x65leteVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12>\n\x07secrets\x18\x02 \x03(\x0b\x32(.csi.v1.DeleteVolumeRequest.SecretsEntryB\x03\x98\x42\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x16\n\x14\x44\x65leteVolumeResponse\"\x8f\x03\n\x1e\x43ontrollerPublishVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x0f\n\x07node_id\x18\x02 \x01(\t\x12\x33\n\x11volume_capability\x18\x03 \x01(\x0b\x32\x18.csi.v1.VolumeCapability\x12\x10\n\x08readonly\x18\x04 \x01(\x08\x12I\n\x07secrets\x18\x05 \x03(\x0b\x32\x33.csi.v1.ControllerPublishVolumeRequest.SecretsEntryB\x03\x98\x42\x01\x12Q\n\x0evolume_context\x18\x06 \x03(\x0b\x32\x39.csi.v1.ControllerPublishVolumeRequest.VolumeContextEntry\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x34\n\x12VolumeContextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xae\x01\n\x1f\x43ontrollerPublishVolumeResponse\x12T\n\x0fpublish_context\x18\x01 \x03(\x0b\x32;.csi.v1.ControllerPublishVolumeResponse.PublishContextEntry\x1a\x35\n\x13PublishContextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xc3\x01\n ControllerUnpublishVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x0f\n\x07node_id\x18\x02 \x01(\t\x12K\n\x07secrets\x18\x03 \x03(\x0b\x32\x35.csi.v1.ControllerUnpublishVolumeRequest.SecretsEntryB\x03\x98\x42\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"#\n!ControllerUnpublishVolumeResponse\"\xf9\x03\n!ValidateVolumeCapabilitiesRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12T\n\x0evolume_context\x18\x02 \x03(\x0b\x32<.csi.v1.ValidateVolumeCapabilitiesRequest.VolumeContextEntry\x12\x35\n\x13volume_capabilities\x18\x03 \x03(\x0b\x32\x18.csi.v1.VolumeCapability\x12M\n\nparameters\x18\x04 \x03(\x0b\x32\x39.csi.v1.ValidateVolumeCapabilitiesRequest.ParametersEntry\x12L\n\x07secrets\x18\x05 \x03(\x0b\x32\x36.csi.v1.ValidateVolumeCapabilitiesRequest.SecretsEntryB\x03\x98\x42\x01\x1a\x34\n\x12VolumeContextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x31\n\x0fParametersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\xe7\x03\n\"ValidateVolumeCapabilitiesResponse\x12G\n\tconfirmed\x18\x01 \x01(\x0b\x32\x34.csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed\x12\x0f\n\x07message\x18\x02 \x01(\t\x1a\xe6\x02\n\tConfirmed\x12_\n\x0evolume_context\x18\x01 \x03(\x0b\x32G.csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.VolumeContextEntry\x12\x35\n\x13volume_capabilities\x18\x02 \x03(\x0b\x32\x18.csi.v1.VolumeCapability\x12X\n\nparameters\x18\x03 \x03(\x0b\x32\x44.csi.v1.ValidateVolumeCapabilitiesResponse.Confirmed.ParametersEntry\x1a\x34\n\x12VolumeContextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x31\n\x0fParametersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"A\n\x12ListVolumesRequest\x12\x13\n\x0bmax_entries\x18\x01 \x01(\x05\x12\x16\n\x0estarting_token\x18\x02 \x01(\t\"\xec\x01\n\x13ListVolumesResponse\x12\x32\n\x07\x65ntries\x18\x01 \x03(\x0b\x32!.csi.v1.ListVolumesResponse.Entry\x12\x12\n\nnext_token\x18\x02 \x01(\t\x1a*\n\x0cVolumeStatus\x12\x1a\n\x12published_node_ids\x18\x01 \x03(\t\x1a\x61\n\x05\x45ntry\x12\x1e\n\x06volume\x18\x01 \x01(\x0b\x32\x0e.csi.v1.Volume\x12\x38\n\x06status\x18\x02 \x01(\x0b\x32(.csi.v1.ListVolumesResponse.VolumeStatus\"\xed\x01\n\x12GetCapacityRequest\x12\x35\n\x13volume_capabilities\x18\x01 \x03(\x0b\x32\x18.csi.v1.VolumeCapability\x12>\n\nparameters\x18\x02 \x03(\x0b\x32*.csi.v1.GetCapacityRequest.ParametersEntry\x12-\n\x13\x61\x63\x63\x65ssible_topology\x18\x03 \x01(\x0b\x32\x10.csi.v1.Topology\x1a\x31\n\x0fParametersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"1\n\x13GetCapacityResponse\x12\x1a\n\x12\x61vailable_capacity\x18\x01 \x01(\x03\"\"\n ControllerGetCapabilitiesRequest\"^\n!ControllerGetCapabilitiesResponse\x12\x39\n\x0c\x63\x61pabilities\x18\x01 \x03(\x0b\x32#.csi.v1.ControllerServiceCapability\"\xa0\x03\n\x1b\x43ontrollerServiceCapability\x12\x36\n\x03rpc\x18\x01 \x01(\x0b\x32\'.csi.v1.ControllerServiceCapability.RPCH\x00\x1a\xc0\x02\n\x03RPC\x12:\n\x04type\x18\x01 \x01(\x0e\x32,.csi.v1.ControllerServiceCapability.RPC.Type\"\xfc\x01\n\x04Type\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x18\n\x14\x43REATE_DELETE_VOLUME\x10\x01\x12\x1c\n\x18PUBLISH_UNPUBLISH_VOLUME\x10\x02\x12\x10\n\x0cLIST_VOLUMES\x10\x03\x12\x10\n\x0cGET_CAPACITY\x10\x04\x12\x1a\n\x16\x43REATE_DELETE_SNAPSHOT\x10\x05\x12\x12\n\x0eLIST_SNAPSHOTS\x10\x06\x12\x10\n\x0c\x43LONE_VOLUME\x10\x07\x12\x14\n\x10PUBLISH_READONLY\x10\x08\x12\x11\n\rEXPAND_VOLUME\x10\t\x12 \n\x1cLIST_VOLUMES_PUBLISHED_NODES\x10\nB\x06\n\x04type\"\xa7\x02\n\x15\x43reateSnapshotRequest\x12\x18\n\x10source_volume_id\x18\x01 \x01(\t\x12\x0c\n\x04name\x18\x02 \x01(\t\x12@\n\x07secrets\x18\x03 \x03(\x0b\x32*.csi.v1.CreateSnapshotRequest.SecretsEntryB\x03\x98\x42\x01\x12\x41\n\nparameters\x18\x04 \x03(\x0b\x32-.csi.v1.CreateSnapshotRequest.ParametersEntry\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x31\n\x0fParametersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"<\n\x16\x43reateSnapshotResponse\x12\"\n\x08snapshot\x18\x01 \x01(\x0b\x32\x10.csi.v1.Snapshot\"\x96\x01\n\x08Snapshot\x12\x12\n\nsize_bytes\x18\x01 \x01(\x03\x12\x13\n\x0bsnapshot_id\x18\x02 \x01(\t\x12\x18\n\x10source_volume_id\x18\x03 \x01(\t\x12\x31\n\rcreation_time\x18\x04 \x01(\x0b\x32\x1a.google.protobuf.Timestamp\x12\x14\n\x0cready_to_use\x18\x05 \x01(\x08\"\x9e\x01\n\x15\x44\x65leteSnapshotRequest\x12\x13\n\x0bsnapshot_id\x18\x01 \x01(\t\x12@\n\x07secrets\x18\x02 \x03(\x0b\x32*.csi.v1.DeleteSnapshotRequest.SecretsEntryB\x03\x98\x42\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x18\n\x16\x44\x65leteSnapshotResponse\"\xe3\x01\n\x14ListSnapshotsRequest\x12\x13\n\x0bmax_entries\x18\x01 \x01(\x05\x12\x16\n\x0estarting_token\x18\x02 \x01(\t\x12\x18\n\x10source_volume_id\x18\x03 \x01(\t\x12\x13\n\x0bsnapshot_id\x18\x04 \x01(\t\x12?\n\x07secrets\x18\x05 \x03(\x0b\x32).csi.v1.ListSnapshotsRequest.SecretsEntryB\x03\x98\x42\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x8e\x01\n\x15ListSnapshotsResponse\x12\x34\n\x07\x65ntries\x18\x01 \x03(\x0b\x32#.csi.v1.ListSnapshotsResponse.Entry\x12\x12\n\nnext_token\x18\x02 \x01(\t\x1a+\n\x05\x45ntry\x12\"\n\x08snapshot\x18\x01 \x01(\x0b\x32\x10.csi.v1.Snapshot\"\x90\x02\n\x1d\x43ontrollerExpandVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12-\n\x0e\x63\x61pacity_range\x18\x02 \x01(\x0b\x32\x15.csi.v1.CapacityRange\x12H\n\x07secrets\x18\x03 \x03(\x0b\x32\x32.csi.v1.ControllerExpandVolumeRequest.SecretsEntryB\x03\x98\x42\x01\x12\x33\n\x11volume_capability\x18\x04 \x01(\x0b\x32\x18.csi.v1.VolumeCapability\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"Y\n\x1e\x43ontrollerExpandVolumeResponse\x12\x16\n\x0e\x63\x61pacity_bytes\x18\x01 \x01(\x03\x12\x1f\n\x17node_expansion_required\x18\x02 \x01(\x08\"\xf5\x03\n\x16NodeStageVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12K\n\x0fpublish_context\x18\x02 \x03(\x0b\x32\x32.csi.v1.NodeStageVolumeRequest.PublishContextEntry\x12\x1b\n\x13staging_target_path\x18\x03 \x01(\t\x12\x33\n\x11volume_capability\x18\x04 \x01(\x0b\x32\x18.csi.v1.VolumeCapability\x12\x41\n\x07secrets\x18\x05 \x03(\x0b\x32+.csi.v1.NodeStageVolumeRequest.SecretsEntryB\x03\x98\x42\x01\x12I\n\x0evolume_context\x18\x06 \x03(\x0b\x32\x31.csi.v1.NodeStageVolumeRequest.VolumeContextEntry\x1a\x35\n\x13PublishContextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x34\n\x12VolumeContextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x19\n\x17NodeStageVolumeResponse\"J\n\x18NodeUnstageVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x1b\n\x13staging_target_path\x18\x02 \x01(\t\"\x1b\n\x19NodeUnstageVolumeResponse\"\xa4\x04\n\x18NodePublishVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12M\n\x0fpublish_context\x18\x02 \x03(\x0b\x32\x34.csi.v1.NodePublishVolumeRequest.PublishContextEntry\x12\x1b\n\x13staging_target_path\x18\x03 \x01(\t\x12\x13\n\x0btarget_path\x18\x04 \x01(\t\x12\x33\n\x11volume_capability\x18\x05 \x01(\x0b\x32\x18.csi.v1.VolumeCapability\x12\x10\n\x08readonly\x18\x06 \x01(\x08\x12\x43\n\x07secrets\x18\x07 \x03(\x0b\x32-.csi.v1.NodePublishVolumeRequest.SecretsEntryB\x03\x98\x42\x01\x12K\n\x0evolume_context\x18\x08 \x03(\x0b\x32\x33.csi.v1.NodePublishVolumeRequest.VolumeContextEntry\x1a\x35\n\x13PublishContextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a\x34\n\x12VolumeContextEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x1b\n\x19NodePublishVolumeResponse\"D\n\x1aNodeUnpublishVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x13\n\x0btarget_path\x18\x02 \x01(\t\"\x1d\n\x1bNodeUnpublishVolumeResponse\"`\n\x19NodeGetVolumeStatsRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x13\n\x0bvolume_path\x18\x02 \x01(\t\x12\x1b\n\x13staging_target_path\x18\x03 \x01(\t\"@\n\x1aNodeGetVolumeStatsResponse\x12\"\n\x05usage\x18\x01 \x03(\x0b\x32\x13.csi.v1.VolumeUsage\"\x91\x01\n\x0bVolumeUsage\x12\x11\n\tavailable\x18\x01 \x01(\x03\x12\r\n\x05total\x18\x02 \x01(\x03\x12\x0c\n\x04used\x18\x03 \x01(\x03\x12&\n\x04unit\x18\x04 \x01(\x0e\x32\x18.csi.v1.VolumeUsage.Unit\"*\n\x04Unit\x12\x0b\n\x07UNKNOWN\x10\x00\x12\t\n\x05\x42YTES\x10\x01\x12\n\n\x06INODES\x10\x02\"\x1c\n\x1aNodeGetCapabilitiesRequest\"R\n\x1bNodeGetCapabilitiesResponse\x12\x33\n\x0c\x63\x61pabilities\x18\x01 \x03(\x0b\x32\x1d.csi.v1.NodeServiceCapability\"\xe7\x01\n\x15NodeServiceCapability\x12\x30\n\x03rpc\x18\x01 \x01(\x0b\x32!.csi.v1.NodeServiceCapability.RPCH\x00\x1a\x93\x01\n\x03RPC\x12\x34\n\x04type\x18\x01 \x01(\x0e\x32&.csi.v1.NodeServiceCapability.RPC.Type\"V\n\x04Type\x12\x0b\n\x07UNKNOWN\x10\x00\x12\x18\n\x14STAGE_UNSTAGE_VOLUME\x10\x01\x12\x14\n\x10GET_VOLUME_STATS\x10\x02\x12\x11\n\rEXPAND_VOLUME\x10\x03\x42\x06\n\x04type\"\x14\n\x12NodeGetInfoRequest\"s\n\x13NodeGetInfoResponse\x12\x0f\n\x07node_id\x18\x01 \x01(\t\x12\x1c\n\x14max_volumes_per_node\x18\x02 \x01(\x03\x12-\n\x13\x61\x63\x63\x65ssible_topology\x18\x03 \x01(\x0b\x32\x10.csi.v1.Topology\"\xc2\x01\n\x17NodeExpandVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x13\n\x0bvolume_path\x18\x02 \x01(\t\x12-\n\x0e\x63\x61pacity_range\x18\x03 \x01(\x0b\x32\x15.csi.v1.CapacityRange\x12\x1b\n\x13staging_target_path\x18\x04 \x01(\t\x12\x33\n\x11volume_capability\x18\x05 \x01(\x0b\x32\x18.csi.v1.VolumeCapability\"2\n\x18NodeExpandVolumeResponse\x12\x16\n\x0e\x63\x61pacity_bytes\x18\x01 \x01(\x03\x32\xfa\x01\n\x08Identity\x12N\n\rGetPluginInfo\x12\x1c.csi.v1.GetPluginInfoRequest\x1a\x1d.csi.v1.GetPluginInfoResponse\"\x00\x12\x66\n\x15GetPluginCapabilities\x12$.csi.v1.GetPluginCapabilitiesRequest\x1a%.csi.v1.GetPluginCapabilitiesResponse\"\x00\x12\x36\n\x05Probe\x12\x14.csi.v1.ProbeRequest\x1a\x15.csi.v1.ProbeResponse\"\x00\x32\xe8\x08\n\nController\x12K\n\x0c\x43reateVolume\x12\x1b.csi.v1.CreateVolumeRequest\x1a\x1c.csi.v1.CreateVolumeResponse\"\x00\x12K\n\x0c\x44\x65leteVolume\x12\x1b.csi.v1.DeleteVolumeRequest\x1a\x1c.csi.v1.DeleteVolumeResponse\"\x00\x12l\n\x17\x43ontrollerPublishVolume\x12&.csi.v1.ControllerPublishVolumeRequest\x1a\'.csi.v1.ControllerPublishVolumeResponse\"\x00\x12r\n\x19\x43ontrollerUnpublishVolume\x12(.csi.v1.ControllerUnpublishVolumeRequest\x1a).csi.v1.ControllerUnpublishVolumeResponse\"\x00\x12u\n\x1aValidateVolumeCapabilities\x12).csi.v1.ValidateVolumeCapabilitiesRequest\x1a*.csi.v1.ValidateVolumeCapabilitiesResponse\"\x00\x12H\n\x0bListVolumes\x12\x1a.csi.v1.ListVolumesRequest\x1a\x1b.csi.v1.ListVolumesResponse\"\x00\x12H\n\x0bGetCapacity\x12\x1a.csi.v1.GetCapacityRequest\x1a\x1b.csi.v1.GetCapacityResponse\"\x00\x12r\n\x19\x43ontrollerGetCapabilities\x12(.csi.v1.ControllerGetCapabilitiesRequest\x1a).csi.v1.ControllerGetCapabilitiesResponse\"\x00\x12Q\n\x0e\x43reateSnapshot\x12\x1d.csi.v1.CreateSnapshotRequest\x1a\x1e.csi.v1.CreateSnapshotResponse\"\x00\x12Q\n\x0e\x44\x65leteSnapshot\x12\x1d.csi.v1.DeleteSnapshotRequest\x1a\x1e.csi.v1.DeleteSnapshotResponse\"\x00\x12N\n\rListSnapshots\x12\x1c.csi.v1.ListSnapshotsRequest\x1a\x1d.csi.v1.ListSnapshotsResponse\"\x00\x12i\n\x16\x43ontrollerExpandVolume\x12%.csi.v1.ControllerExpandVolumeRequest\x1a&.csi.v1.ControllerExpandVolumeResponse\"\x00\x32\xda\x05\n\x04Node\x12T\n\x0fNodeStageVolume\x12\x1e.csi.v1.NodeStageVolumeRequest\x1a\x1f.csi.v1.NodeStageVolumeResponse\"\x00\x12Z\n\x11NodeUnstageVolume\x12 .csi.v1.NodeUnstageVolumeRequest\x1a!.csi.v1.NodeUnstageVolumeResponse\"\x00\x12Z\n\x11NodePublishVolume\x12 .csi.v1.NodePublishVolumeRequest\x1a!.csi.v1.NodePublishVolumeResponse\"\x00\x12`\n\x13NodeUnpublishVolume\x12\".csi.v1.NodeUnpublishVolumeRequest\x1a#.csi.v1.NodeUnpublishVolumeResponse\"\x00\x12]\n\x12NodeGetVolumeStats\x12!.csi.v1.NodeGetVolumeStatsRequest\x1a\".csi.v1.NodeGetVolumeStatsResponse\"\x00\x12W\n\x10NodeExpandVolume\x12\x1f.csi.v1.NodeExpandVolumeRequest\x1a .csi.v1.NodeExpandVolumeResponse\"\x00\x12`\n\x13NodeGetCapabilities\x12\".csi.v1.NodeGetCapabilitiesRequest\x1a#.csi.v1.NodeGetCapabilitiesResponse\"\x00\x12H\n\x0bNodeGetInfo\x12\x1a.csi.v1.NodeGetInfoRequest\x1a\x1b.csi.v1.NodeGetInfoResponse\"\x00:2\n\ncsi_secret\x12\x1d.google.protobuf.FieldOptions\x18\xa3\x08 \x01(\x08\x42\x05Z\x03\x63sib\x06proto3'
   ,
   dependencies=[google_dot_protobuf_dot_descriptor__pb2.DESCRIPTOR,google_dot_protobuf_dot_timestamp__pb2.DESCRIPTOR,google_dot_protobuf_dot_wrappers__pb2.DESCRIPTOR,])
 
 
-ALPHA_ENUM_FIELD_NUMBER = 1060
-alpha_enum = _descriptor.FieldDescriptor(
-  name='alpha_enum', full_name='csi.v1.alpha_enum', index=0,
-  number=1060, type=8, cpp_type=7, label=1,
-  has_default_value=False, default_value=False,
-  message_type=None, enum_type=None, containing_type=None,
-  is_extension=True, extension_scope=None,
-  serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
-ALPHA_ENUM_VALUE_FIELD_NUMBER = 1060
-alpha_enum_value = _descriptor.FieldDescriptor(
-  name='alpha_enum_value', full_name='csi.v1.alpha_enum_value', index=1,
-  number=1060, type=8, cpp_type=7, label=1,
-  has_default_value=False, default_value=False,
-  message_type=None, enum_type=None, containing_type=None,
-  is_extension=True, extension_scope=None,
-  serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
 CSI_SECRET_FIELD_NUMBER = 1059
 csi_secret = _descriptor.FieldDescriptor(
-  name='csi_secret', full_name='csi.v1.csi_secret', index=2,
+  name='csi_secret', full_name='csi.v1.csi_secret', index=0,
   number=1059, type=8, cpp_type=7, label=1,
-  has_default_value=False, default_value=False,
-  message_type=None, enum_type=None, containing_type=None,
-  is_extension=True, extension_scope=None,
-  serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
-ALPHA_FIELD_FIELD_NUMBER = 1060
-alpha_field = _descriptor.FieldDescriptor(
-  name='alpha_field', full_name='csi.v1.alpha_field', index=3,
-  number=1060, type=8, cpp_type=7, label=1,
-  has_default_value=False, default_value=False,
-  message_type=None, enum_type=None, containing_type=None,
-  is_extension=True, extension_scope=None,
-  serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
-ALPHA_MESSAGE_FIELD_NUMBER = 1060
-alpha_message = _descriptor.FieldDescriptor(
-  name='alpha_message', full_name='csi.v1.alpha_message', index=4,
-  number=1060, type=8, cpp_type=7, label=1,
-  has_default_value=False, default_value=False,
-  message_type=None, enum_type=None, containing_type=None,
-  is_extension=True, extension_scope=None,
-  serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
-ALPHA_METHOD_FIELD_NUMBER = 1060
-alpha_method = _descriptor.FieldDescriptor(
-  name='alpha_method', full_name='csi.v1.alpha_method', index=5,
-  number=1060, type=8, cpp_type=7, label=1,
-  has_default_value=False, default_value=False,
-  message_type=None, enum_type=None, containing_type=None,
-  is_extension=True, extension_scope=None,
-  serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key)
-ALPHA_SERVICE_FIELD_NUMBER = 1060
-alpha_service = _descriptor.FieldDescriptor(
-  name='alpha_service', full_name='csi.v1.alpha_service', index=6,
-  number=1060, type=8, cpp_type=7, label=1,
   has_default_value=False, default_value=False,
   message_type=None, enum_type=None, containing_type=None,
   is_extension=True, extension_scope=None,
@@ -251,21 +203,11 @@ _CONTROLLERSERVICECAPABILITY_RPC_TYPE = _descriptor.EnumDescriptor(
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
-    _descriptor.EnumValueDescriptor(
-      name='VOLUME_CONDITION', index=11, number=11,
-      serialized_options=b'\240B\001',
-      type=None,
-      create_key=_descriptor._internal_create_key),
-    _descriptor.EnumValueDescriptor(
-      name='GET_VOLUME', index=12, number=12,
-      serialized_options=b'\240B\001',
-      type=None,
-      create_key=_descriptor._internal_create_key),
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=5973,
-  serialized_end=6273,
+  serialized_start=5633,
+  serialized_end=5885,
 )
 _sym_db.RegisterEnumDescriptor(_CONTROLLERSERVICECAPABILITY_RPC_TYPE)
 
@@ -294,8 +236,8 @@ _VOLUMEUSAGE_UNIT = _descriptor.EnumDescriptor(
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=9365,
-  serialized_end=9407,
+  serialized_start=8921,
+  serialized_end=8963,
 )
 _sym_db.RegisterEnumDescriptor(_VOLUMEUSAGE_UNIT)
 
@@ -326,16 +268,11 @@ _NODESERVICECAPABILITY_RPC_TYPE = _descriptor.EnumDescriptor(
       serialized_options=None,
       type=None,
       create_key=_descriptor._internal_create_key),
-    _descriptor.EnumValueDescriptor(
-      name='VOLUME_CONDITION', index=4, number=4,
-      serialized_options=b'\240B\001',
-      type=None,
-      create_key=_descriptor._internal_create_key),
   ],
   containing_type=None,
   serialized_options=None,
-  serialized_start=9720,
-  serialized_end=9833,
+  serialized_start=9217,
+  serialized_end=9303,
 )
 _sym_db.RegisterEnumDescriptor(_NODESERVICECAPABILITY_RPC_TYPE)
 
@@ -2162,13 +2099,6 @@ _LISTVOLUMESRESPONSE_VOLUMESTATUS = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='volume_condition', full_name='csi.v1.ListVolumesResponse.VolumeStatus.volume_condition', index=1,
-      number=2, type=11, cpp_type=10, label=1,
-      has_default_value=False, default_value=None,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=b'\240B\001', file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -2182,7 +2112,7 @@ _LISTVOLUMESRESPONSE_VOLUMESTATUS = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=4910,
-  serialized_end=5008,
+  serialized_end=4952,
 )
 
 _LISTVOLUMESRESPONSE_ENTRY = _descriptor.Descriptor(
@@ -2219,8 +2149,8 @@ _LISTVOLUMESRESPONSE_ENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=5010,
-  serialized_end=5107,
+  serialized_start=4954,
+  serialized_end=5051,
 )
 
 _LISTVOLUMESRESPONSE = _descriptor.Descriptor(
@@ -2258,116 +2188,7 @@ _LISTVOLUMESRESPONSE = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=4815,
-  serialized_end=5107,
-)
-
-
-_CONTROLLERGETVOLUMEREQUEST = _descriptor.Descriptor(
-  name='ControllerGetVolumeRequest',
-  full_name='csi.v1.ControllerGetVolumeRequest',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  create_key=_descriptor._internal_create_key,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='volume_id', full_name='csi.v1.ControllerGetVolumeRequest.volume_id', index=0,
-      number=1, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=b"".decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  serialized_options=b'\240B\001',
-  is_extendable=False,
-  syntax='proto3',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=5109,
-  serialized_end=5161,
-)
-
-
-_CONTROLLERGETVOLUMERESPONSE_VOLUMESTATUS = _descriptor.Descriptor(
-  name='VolumeStatus',
-  full_name='csi.v1.ControllerGetVolumeResponse.VolumeStatus',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  create_key=_descriptor._internal_create_key,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='published_node_ids', full_name='csi.v1.ControllerGetVolumeResponse.VolumeStatus.published_node_ids', index=0,
-      number=1, type=9, cpp_type=9, label=3,
-      has_default_value=False, default_value=[],
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='volume_condition', full_name='csi.v1.ControllerGetVolumeResponse.VolumeStatus.volume_condition', index=1,
-      number=2, type=11, cpp_type=10, label=1,
-      has_default_value=False, default_value=None,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  serialized_options=None,
-  is_extendable=False,
-  syntax='proto3',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=5293,
-  serialized_end=5386,
-)
-
-_CONTROLLERGETVOLUMERESPONSE = _descriptor.Descriptor(
-  name='ControllerGetVolumeResponse',
-  full_name='csi.v1.ControllerGetVolumeResponse',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  create_key=_descriptor._internal_create_key,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='volume', full_name='csi.v1.ControllerGetVolumeResponse.volume', index=0,
-      number=1, type=11, cpp_type=10, label=1,
-      has_default_value=False, default_value=None,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='status', full_name='csi.v1.ControllerGetVolumeResponse.status', index=1,
-      number=2, type=11, cpp_type=10, label=1,
-      has_default_value=False, default_value=None,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-  ],
-  extensions=[
-  ],
-  nested_types=[_CONTROLLERGETVOLUMERESPONSE_VOLUMESTATUS, ],
-  enum_types=[
-  ],
-  serialized_options=b'\240B\001',
-  is_extendable=False,
-  syntax='proto3',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=5164,
-  serialized_end=5391,
+  serialized_end=5051,
 )
 
 
@@ -2450,8 +2271,8 @@ _GETCAPACITYREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=5394,
-  serialized_end=5631,
+  serialized_start=5054,
+  serialized_end=5291,
 )
 
 
@@ -2482,8 +2303,8 @@ _GETCAPACITYRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=5633,
-  serialized_end=5682,
+  serialized_start=5293,
+  serialized_end=5342,
 )
 
 
@@ -2507,8 +2328,8 @@ _CONTROLLERGETCAPABILITIESREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=5684,
-  serialized_end=5718,
+  serialized_start=5344,
+  serialized_end=5378,
 )
 
 
@@ -2539,8 +2360,8 @@ _CONTROLLERGETCAPABILITIESRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=5720,
-  serialized_end=5814,
+  serialized_start=5380,
+  serialized_end=5474,
 )
 
 
@@ -2572,8 +2393,8 @@ _CONTROLLERSERVICECAPABILITY_RPC = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=5905,
-  serialized_end=6273,
+  serialized_start=5565,
+  serialized_end=5885,
 )
 
 _CONTROLLERSERVICECAPABILITY = _descriptor.Descriptor(
@@ -2608,8 +2429,8 @@ _CONTROLLERSERVICECAPABILITY = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=5817,
-  serialized_end=6281,
+  serialized_start=5477,
+  serialized_end=5893,
 )
 
 
@@ -2737,8 +2558,8 @@ _CREATESNAPSHOTREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=6284,
-  serialized_end=6579,
+  serialized_start=5896,
+  serialized_end=6191,
 )
 
 
@@ -2769,8 +2590,8 @@ _CREATESNAPSHOTRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=6581,
-  serialized_end=6641,
+  serialized_start=6193,
+  serialized_end=6253,
 )
 
 
@@ -2829,8 +2650,8 @@ _SNAPSHOT = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=6644,
-  serialized_end=6794,
+  serialized_start=6256,
+  serialized_end=6406,
 )
 
 
@@ -2906,8 +2727,8 @@ _DELETESNAPSHOTREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=6797,
-  serialized_end=6955,
+  serialized_start=6409,
+  serialized_end=6567,
 )
 
 
@@ -2931,8 +2752,8 @@ _DELETESNAPSHOTRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=6957,
-  serialized_end=6981,
+  serialized_start=6569,
+  serialized_end=6593,
 )
 
 
@@ -3029,8 +2850,8 @@ _LISTSNAPSHOTSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=6984,
-  serialized_end=7211,
+  serialized_start=6596,
+  serialized_end=6823,
 )
 
 
@@ -3061,8 +2882,8 @@ _LISTSNAPSHOTSRESPONSE_ENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=7313,
-  serialized_end=7356,
+  serialized_start=6925,
+  serialized_end=6968,
 )
 
 _LISTSNAPSHOTSRESPONSE = _descriptor.Descriptor(
@@ -3099,8 +2920,8 @@ _LISTSNAPSHOTSRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=7214,
-  serialized_end=7356,
+  serialized_start=6826,
+  serialized_end=6968,
 )
 
 
@@ -3190,8 +3011,8 @@ _CONTROLLEREXPANDVOLUMEREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=7359,
-  serialized_end=7631,
+  serialized_start=6971,
+  serialized_end=7243,
 )
 
 
@@ -3229,8 +3050,8 @@ _CONTROLLEREXPANDVOLUMERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=7633,
-  serialized_end=7722,
+  serialized_start=7245,
+  serialized_end=7334,
 )
 
 
@@ -3410,8 +3231,8 @@ _NODESTAGEVOLUMEREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=7725,
-  serialized_end=8226,
+  serialized_start=7337,
+  serialized_end=7838,
 )
 
 
@@ -3435,8 +3256,8 @@ _NODESTAGEVOLUMERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=8228,
-  serialized_end=8253,
+  serialized_start=7840,
+  serialized_end=7865,
 )
 
 
@@ -3474,8 +3295,8 @@ _NODEUNSTAGEVOLUMEREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=8255,
-  serialized_end=8329,
+  serialized_start=7867,
+  serialized_end=7941,
 )
 
 
@@ -3499,8 +3320,8 @@ _NODEUNSTAGEVOLUMERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=8331,
-  serialized_end=8358,
+  serialized_start=7943,
+  serialized_end=7970,
 )
 
 
@@ -3694,8 +3515,8 @@ _NODEPUBLISHVOLUMEREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=8361,
-  serialized_end=8909,
+  serialized_start=7973,
+  serialized_end=8521,
 )
 
 
@@ -3719,8 +3540,8 @@ _NODEPUBLISHVOLUMERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=8911,
-  serialized_end=8938,
+  serialized_start=8523,
+  serialized_end=8550,
 )
 
 
@@ -3758,8 +3579,8 @@ _NODEUNPUBLISHVOLUMEREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=8940,
-  serialized_end=9008,
+  serialized_start=8552,
+  serialized_end=8620,
 )
 
 
@@ -3783,8 +3604,8 @@ _NODEUNPUBLISHVOLUMERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=9010,
-  serialized_end=9039,
+  serialized_start=8622,
+  serialized_end=8651,
 )
 
 
@@ -3829,8 +3650,8 @@ _NODEGETVOLUMESTATSREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=9041,
-  serialized_end=9137,
+  serialized_start=8653,
+  serialized_end=8749,
 )
 
 
@@ -3849,13 +3670,6 @@ _NODEGETVOLUMESTATSRESPONSE = _descriptor.Descriptor(
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='volume_condition', full_name='csi.v1.NodeGetVolumeStatsResponse.volume_condition', index=1,
-      number=2, type=11, cpp_type=10, label=1,
-      has_default_value=False, default_value=None,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=b'\240B\001', file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
   ],
   extensions=[
   ],
@@ -3868,8 +3682,8 @@ _NODEGETVOLUMESTATSRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=9139,
-  serialized_end=9259,
+  serialized_start=8751,
+  serialized_end=8815,
 )
 
 
@@ -3922,47 +3736,8 @@ _VOLUMEUSAGE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=9262,
-  serialized_end=9407,
-)
-
-
-_VOLUMECONDITION = _descriptor.Descriptor(
-  name='VolumeCondition',
-  full_name='csi.v1.VolumeCondition',
-  filename=None,
-  file=DESCRIPTOR,
-  containing_type=None,
-  create_key=_descriptor._internal_create_key,
-  fields=[
-    _descriptor.FieldDescriptor(
-      name='abnormal', full_name='csi.v1.VolumeCondition.abnormal', index=0,
-      number=1, type=8, cpp_type=7, label=1,
-      has_default_value=False, default_value=False,
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-    _descriptor.FieldDescriptor(
-      name='message', full_name='csi.v1.VolumeCondition.message', index=1,
-      number=2, type=9, cpp_type=9, label=1,
-      has_default_value=False, default_value=b"".decode('utf-8'),
-      message_type=None, enum_type=None, containing_type=None,
-      is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR,  create_key=_descriptor._internal_create_key),
-  ],
-  extensions=[
-  ],
-  nested_types=[],
-  enum_types=[
-  ],
-  serialized_options=b'\240B\001',
-  is_extendable=False,
-  syntax='proto3',
-  extension_ranges=[],
-  oneofs=[
-  ],
-  serialized_start=9409,
-  serialized_end=9466,
+  serialized_start=8818,
+  serialized_end=8963,
 )
 
 
@@ -3986,8 +3761,8 @@ _NODEGETCAPABILITIESREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=9468,
-  serialized_end=9496,
+  serialized_start=8965,
+  serialized_end=8993,
 )
 
 
@@ -4018,8 +3793,8 @@ _NODEGETCAPABILITIESRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=9498,
-  serialized_end=9580,
+  serialized_start=8995,
+  serialized_end=9077,
 )
 
 
@@ -4051,8 +3826,8 @@ _NODESERVICECAPABILITY_RPC = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=9659,
-  serialized_end=9833,
+  serialized_start=9156,
+  serialized_end=9303,
 )
 
 _NODESERVICECAPABILITY = _descriptor.Descriptor(
@@ -4087,8 +3862,8 @@ _NODESERVICECAPABILITY = _descriptor.Descriptor(
       create_key=_descriptor._internal_create_key,
     fields=[]),
   ],
-  serialized_start=9583,
-  serialized_end=9841,
+  serialized_start=9080,
+  serialized_end=9311,
 )
 
 
@@ -4112,8 +3887,8 @@ _NODEGETINFOREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=9843,
-  serialized_end=9863,
+  serialized_start=9313,
+  serialized_end=9333,
 )
 
 
@@ -4158,8 +3933,8 @@ _NODEGETINFORESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=9865,
-  serialized_end=9980,
+  serialized_start=9335,
+  serialized_end=9450,
 )
 
 
@@ -4218,8 +3993,8 @@ _NODEEXPANDVOLUMEREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=9983,
-  serialized_end=10177,
+  serialized_start=9453,
+  serialized_end=9647,
 )
 
 
@@ -4250,8 +4025,8 @@ _NODEEXPANDVOLUMERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=10179,
-  serialized_end=10229,
+  serialized_start=9649,
+  serialized_end=9699,
 )
 
 _GETPLUGININFORESPONSE_MANIFESTENTRY.containing_type = _GETPLUGININFORESPONSE
@@ -4338,16 +4113,11 @@ _VALIDATEVOLUMECAPABILITIESRESPONSE_CONFIRMED.fields_by_name['volume_capabilitie
 _VALIDATEVOLUMECAPABILITIESRESPONSE_CONFIRMED.fields_by_name['parameters'].message_type = _VALIDATEVOLUMECAPABILITIESRESPONSE_CONFIRMED_PARAMETERSENTRY
 _VALIDATEVOLUMECAPABILITIESRESPONSE_CONFIRMED.containing_type = _VALIDATEVOLUMECAPABILITIESRESPONSE
 _VALIDATEVOLUMECAPABILITIESRESPONSE.fields_by_name['confirmed'].message_type = _VALIDATEVOLUMECAPABILITIESRESPONSE_CONFIRMED
-_LISTVOLUMESRESPONSE_VOLUMESTATUS.fields_by_name['volume_condition'].message_type = _VOLUMECONDITION
 _LISTVOLUMESRESPONSE_VOLUMESTATUS.containing_type = _LISTVOLUMESRESPONSE
 _LISTVOLUMESRESPONSE_ENTRY.fields_by_name['volume'].message_type = _VOLUME
 _LISTVOLUMESRESPONSE_ENTRY.fields_by_name['status'].message_type = _LISTVOLUMESRESPONSE_VOLUMESTATUS
 _LISTVOLUMESRESPONSE_ENTRY.containing_type = _LISTVOLUMESRESPONSE
 _LISTVOLUMESRESPONSE.fields_by_name['entries'].message_type = _LISTVOLUMESRESPONSE_ENTRY
-_CONTROLLERGETVOLUMERESPONSE_VOLUMESTATUS.fields_by_name['volume_condition'].message_type = _VOLUMECONDITION
-_CONTROLLERGETVOLUMERESPONSE_VOLUMESTATUS.containing_type = _CONTROLLERGETVOLUMERESPONSE
-_CONTROLLERGETVOLUMERESPONSE.fields_by_name['volume'].message_type = _VOLUME
-_CONTROLLERGETVOLUMERESPONSE.fields_by_name['status'].message_type = _CONTROLLERGETVOLUMERESPONSE_VOLUMESTATUS
 _GETCAPACITYREQUEST_PARAMETERSENTRY.containing_type = _GETCAPACITYREQUEST
 _GETCAPACITYREQUEST.fields_by_name['volume_capabilities'].message_type = _VOLUMECAPABILITY
 _GETCAPACITYREQUEST.fields_by_name['parameters'].message_type = _GETCAPACITYREQUEST_PARAMETERSENTRY
@@ -4392,7 +4162,6 @@ _NODEPUBLISHVOLUMEREQUEST.fields_by_name['volume_capability'].message_type = _VO
 _NODEPUBLISHVOLUMEREQUEST.fields_by_name['secrets'].message_type = _NODEPUBLISHVOLUMEREQUEST_SECRETSENTRY
 _NODEPUBLISHVOLUMEREQUEST.fields_by_name['volume_context'].message_type = _NODEPUBLISHVOLUMEREQUEST_VOLUMECONTEXTENTRY
 _NODEGETVOLUMESTATSRESPONSE.fields_by_name['usage'].message_type = _VOLUMEUSAGE
-_NODEGETVOLUMESTATSRESPONSE.fields_by_name['volume_condition'].message_type = _VOLUMECONDITION
 _VOLUMEUSAGE.fields_by_name['unit'].enum_type = _VOLUMEUSAGE_UNIT
 _VOLUMEUSAGE_UNIT.containing_type = _VOLUMEUSAGE
 _NODEGETCAPABILITIESRESPONSE.fields_by_name['capabilities'].message_type = _NODESERVICECAPABILITY
@@ -4431,8 +4200,6 @@ DESCRIPTOR.message_types_by_name['ValidateVolumeCapabilitiesRequest'] = _VALIDAT
 DESCRIPTOR.message_types_by_name['ValidateVolumeCapabilitiesResponse'] = _VALIDATEVOLUMECAPABILITIESRESPONSE
 DESCRIPTOR.message_types_by_name['ListVolumesRequest'] = _LISTVOLUMESREQUEST
 DESCRIPTOR.message_types_by_name['ListVolumesResponse'] = _LISTVOLUMESRESPONSE
-DESCRIPTOR.message_types_by_name['ControllerGetVolumeRequest'] = _CONTROLLERGETVOLUMEREQUEST
-DESCRIPTOR.message_types_by_name['ControllerGetVolumeResponse'] = _CONTROLLERGETVOLUMERESPONSE
 DESCRIPTOR.message_types_by_name['GetCapacityRequest'] = _GETCAPACITYREQUEST
 DESCRIPTOR.message_types_by_name['GetCapacityResponse'] = _GETCAPACITYRESPONSE
 DESCRIPTOR.message_types_by_name['ControllerGetCapabilitiesRequest'] = _CONTROLLERGETCAPABILITIESREQUEST
@@ -4458,7 +4225,6 @@ DESCRIPTOR.message_types_by_name['NodeUnpublishVolumeResponse'] = _NODEUNPUBLISH
 DESCRIPTOR.message_types_by_name['NodeGetVolumeStatsRequest'] = _NODEGETVOLUMESTATSREQUEST
 DESCRIPTOR.message_types_by_name['NodeGetVolumeStatsResponse'] = _NODEGETVOLUMESTATSRESPONSE
 DESCRIPTOR.message_types_by_name['VolumeUsage'] = _VOLUMEUSAGE
-DESCRIPTOR.message_types_by_name['VolumeCondition'] = _VOLUMECONDITION
 DESCRIPTOR.message_types_by_name['NodeGetCapabilitiesRequest'] = _NODEGETCAPABILITIESREQUEST
 DESCRIPTOR.message_types_by_name['NodeGetCapabilitiesResponse'] = _NODEGETCAPABILITIESRESPONSE
 DESCRIPTOR.message_types_by_name['NodeServiceCapability'] = _NODESERVICECAPABILITY
@@ -4466,13 +4232,7 @@ DESCRIPTOR.message_types_by_name['NodeGetInfoRequest'] = _NODEGETINFOREQUEST
 DESCRIPTOR.message_types_by_name['NodeGetInfoResponse'] = _NODEGETINFORESPONSE
 DESCRIPTOR.message_types_by_name['NodeExpandVolumeRequest'] = _NODEEXPANDVOLUMEREQUEST
 DESCRIPTOR.message_types_by_name['NodeExpandVolumeResponse'] = _NODEEXPANDVOLUMERESPONSE
-DESCRIPTOR.extensions_by_name['alpha_enum'] = alpha_enum
-DESCRIPTOR.extensions_by_name['alpha_enum_value'] = alpha_enum_value
 DESCRIPTOR.extensions_by_name['csi_secret'] = csi_secret
-DESCRIPTOR.extensions_by_name['alpha_field'] = alpha_field
-DESCRIPTOR.extensions_by_name['alpha_message'] = alpha_message
-DESCRIPTOR.extensions_by_name['alpha_method'] = alpha_method
-DESCRIPTOR.extensions_by_name['alpha_service'] = alpha_service
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 GetPluginInfoRequest = _reflection.GeneratedProtocolMessageType('GetPluginInfoRequest', (_message.Message,), {
@@ -4850,28 +4610,6 @@ _sym_db.RegisterMessage(ListVolumesResponse)
 _sym_db.RegisterMessage(ListVolumesResponse.VolumeStatus)
 _sym_db.RegisterMessage(ListVolumesResponse.Entry)
 
-ControllerGetVolumeRequest = _reflection.GeneratedProtocolMessageType('ControllerGetVolumeRequest', (_message.Message,), {
-  'DESCRIPTOR' : _CONTROLLERGETVOLUMEREQUEST,
-  '__module__' : 'csi_pb2'
-  # @@protoc_insertion_point(class_scope:csi.v1.ControllerGetVolumeRequest)
-  })
-_sym_db.RegisterMessage(ControllerGetVolumeRequest)
-
-ControllerGetVolumeResponse = _reflection.GeneratedProtocolMessageType('ControllerGetVolumeResponse', (_message.Message,), {
-
-  'VolumeStatus' : _reflection.GeneratedProtocolMessageType('VolumeStatus', (_message.Message,), {
-    'DESCRIPTOR' : _CONTROLLERGETVOLUMERESPONSE_VOLUMESTATUS,
-    '__module__' : 'csi_pb2'
-    # @@protoc_insertion_point(class_scope:csi.v1.ControllerGetVolumeResponse.VolumeStatus)
-    })
-  ,
-  'DESCRIPTOR' : _CONTROLLERGETVOLUMERESPONSE,
-  '__module__' : 'csi_pb2'
-  # @@protoc_insertion_point(class_scope:csi.v1.ControllerGetVolumeResponse)
-  })
-_sym_db.RegisterMessage(ControllerGetVolumeResponse)
-_sym_db.RegisterMessage(ControllerGetVolumeResponse.VolumeStatus)
-
 GetCapacityRequest = _reflection.GeneratedProtocolMessageType('GetCapacityRequest', (_message.Message,), {
 
   'ParametersEntry' : _reflection.GeneratedProtocolMessageType('ParametersEntry', (_message.Message,), {
@@ -5159,13 +4897,6 @@ VolumeUsage = _reflection.GeneratedProtocolMessageType('VolumeUsage', (_message.
   })
 _sym_db.RegisterMessage(VolumeUsage)
 
-VolumeCondition = _reflection.GeneratedProtocolMessageType('VolumeCondition', (_message.Message,), {
-  'DESCRIPTOR' : _VOLUMECONDITION,
-  '__module__' : 'csi_pb2'
-  # @@protoc_insertion_point(class_scope:csi.v1.VolumeCondition)
-  })
-_sym_db.RegisterMessage(VolumeCondition)
-
 NodeGetCapabilitiesRequest = _reflection.GeneratedProtocolMessageType('NodeGetCapabilitiesRequest', (_message.Message,), {
   'DESCRIPTOR' : _NODEGETCAPABILITIESREQUEST,
   '__module__' : 'csi_pb2'
@@ -5223,13 +4954,7 @@ NodeExpandVolumeResponse = _reflection.GeneratedProtocolMessageType('NodeExpandV
   })
 _sym_db.RegisterMessage(NodeExpandVolumeResponse)
 
-google_dot_protobuf_dot_descriptor__pb2.EnumOptions.RegisterExtension(alpha_enum)
-google_dot_protobuf_dot_descriptor__pb2.EnumValueOptions.RegisterExtension(alpha_enum_value)
 google_dot_protobuf_dot_descriptor__pb2.FieldOptions.RegisterExtension(csi_secret)
-google_dot_protobuf_dot_descriptor__pb2.FieldOptions.RegisterExtension(alpha_field)
-google_dot_protobuf_dot_descriptor__pb2.MessageOptions.RegisterExtension(alpha_message)
-google_dot_protobuf_dot_descriptor__pb2.MethodOptions.RegisterExtension(alpha_method)
-google_dot_protobuf_dot_descriptor__pb2.ServiceOptions.RegisterExtension(alpha_service)
 
 DESCRIPTOR._options = None
 _GETPLUGININFORESPONSE_MANIFESTENTRY._options = None
@@ -5252,12 +4977,7 @@ _VALIDATEVOLUMECAPABILITIESREQUEST_SECRETSENTRY._options = None
 _VALIDATEVOLUMECAPABILITIESREQUEST.fields_by_name['secrets']._options = None
 _VALIDATEVOLUMECAPABILITIESRESPONSE_CONFIRMED_VOLUMECONTEXTENTRY._options = None
 _VALIDATEVOLUMECAPABILITIESRESPONSE_CONFIRMED_PARAMETERSENTRY._options = None
-_LISTVOLUMESRESPONSE_VOLUMESTATUS.fields_by_name['volume_condition']._options = None
-_CONTROLLERGETVOLUMEREQUEST._options = None
-_CONTROLLERGETVOLUMERESPONSE._options = None
 _GETCAPACITYREQUEST_PARAMETERSENTRY._options = None
-_CONTROLLERSERVICECAPABILITY_RPC_TYPE.values_by_name["VOLUME_CONDITION"]._options = None
-_CONTROLLERSERVICECAPABILITY_RPC_TYPE.values_by_name["GET_VOLUME"]._options = None
 _CREATESNAPSHOTREQUEST_SECRETSENTRY._options = None
 _CREATESNAPSHOTREQUEST_PARAMETERSENTRY._options = None
 _CREATESNAPSHOTREQUEST.fields_by_name['secrets']._options = None
@@ -5275,9 +4995,6 @@ _NODEPUBLISHVOLUMEREQUEST_PUBLISHCONTEXTENTRY._options = None
 _NODEPUBLISHVOLUMEREQUEST_SECRETSENTRY._options = None
 _NODEPUBLISHVOLUMEREQUEST_VOLUMECONTEXTENTRY._options = None
 _NODEPUBLISHVOLUMEREQUEST.fields_by_name['secrets']._options = None
-_NODEGETVOLUMESTATSRESPONSE.fields_by_name['volume_condition']._options = None
-_VOLUMECONDITION._options = None
-_NODESERVICECAPABILITY_RPC_TYPE.values_by_name["VOLUME_CONDITION"]._options = None
 
 _IDENTITY = _descriptor.ServiceDescriptor(
   name='Identity',
@@ -5286,8 +5003,8 @@ _IDENTITY = _descriptor.ServiceDescriptor(
   index=0,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=10232,
-  serialized_end=10482,
+  serialized_start=9702,
+  serialized_end=9952,
   methods=[
   _descriptor.MethodDescriptor(
     name='GetPluginInfo',
@@ -5332,8 +5049,8 @@ _CONTROLLER = _descriptor.ServiceDescriptor(
   index=1,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=10485,
-  serialized_end=11714,
+  serialized_start=9955,
+  serialized_end=11083,
   methods=[
   _descriptor.MethodDescriptor(
     name='CreateVolume',
@@ -5455,16 +5172,6 @@ _CONTROLLER = _descriptor.ServiceDescriptor(
     serialized_options=None,
     create_key=_descriptor._internal_create_key,
   ),
-  _descriptor.MethodDescriptor(
-    name='ControllerGetVolume',
-    full_name='csi.v1.Controller.ControllerGetVolume',
-    index=12,
-    containing_service=None,
-    input_type=_CONTROLLERGETVOLUMEREQUEST,
-    output_type=_CONTROLLERGETVOLUMERESPONSE,
-    serialized_options=b'\240B\001',
-    create_key=_descriptor._internal_create_key,
-  ),
 ])
 _sym_db.RegisterServiceDescriptor(_CONTROLLER)
 
@@ -5478,8 +5185,8 @@ _NODE = _descriptor.ServiceDescriptor(
   index=2,
   serialized_options=None,
   create_key=_descriptor._internal_create_key,
-  serialized_start=11717,
-  serialized_end=12447,
+  serialized_start=11086,
+  serialized_end=11816,
   methods=[
   _descriptor.MethodDescriptor(
     name='NodeStageVolume',
