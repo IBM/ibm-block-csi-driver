@@ -532,6 +532,10 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
         self.mediator.create_volume.assert_called_once_with(self.request.name, 1 * 1024 * 1024 * 1024, {}, "pool1")
 
+    def test_create_volume_with_no_space_in_pool(self):
+        self.create_volume_returns_error(return_code=grpc.StatusCode.OUT_OF_RANGE,
+                                         err=array_errors.NotEnoughSpaceInPool())
+
     def _prepare_mocks_for_copy_from_source(self):
         self.mediator.create_volume = Mock()
         self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, volume_name, "wwn2",
