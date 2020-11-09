@@ -2,7 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-from controller.csi_general import csi_pb2 as csi__pb2
+import controller.csi_general.csi_pb2 as csi__pb2
 
 
 class IdentityStub(object):
@@ -198,11 +198,6 @@ class ControllerStub(object):
                 request_serializer=csi__pb2.ControllerExpandVolumeRequest.SerializeToString,
                 response_deserializer=csi__pb2.ControllerExpandVolumeResponse.FromString,
                 )
-        self.ControllerGetVolume = channel.unary_unary(
-                '/csi.v1.Controller/ControllerGetVolume',
-                request_serializer=csi__pb2.ControllerGetVolumeRequest.SerializeToString,
-                response_deserializer=csi__pb2.ControllerGetVolumeResponse.FromString,
-                )
 
 
 class ControllerServicer(object):
@@ -280,12 +275,6 @@ class ControllerServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
-    def ControllerGetVolume(self, request, context):
-        """Missing associated documentation comment in .proto file."""
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
-
 
 def add_ControllerServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -348,11 +337,6 @@ def add_ControllerServicer_to_server(servicer, server):
                     servicer.ControllerExpandVolume,
                     request_deserializer=csi__pb2.ControllerExpandVolumeRequest.FromString,
                     response_serializer=csi__pb2.ControllerExpandVolumeResponse.SerializeToString,
-            ),
-            'ControllerGetVolume': grpc.unary_unary_rpc_method_handler(
-                    servicer.ControllerGetVolume,
-                    request_deserializer=csi__pb2.ControllerGetVolumeRequest.FromString,
-                    response_serializer=csi__pb2.ControllerGetVolumeResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -553,22 +537,6 @@ class Controller(object):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Controller/ControllerExpandVolume',
             csi__pb2.ControllerExpandVolumeRequest.SerializeToString,
             csi__pb2.ControllerExpandVolumeResponse.FromString,
-            options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
-
-    @staticmethod
-    def ControllerGetVolume(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
-        return grpc.experimental.unary_unary(request, target, '/csi.v1.Controller/ControllerGetVolume',
-            csi__pb2.ControllerGetVolumeRequest.SerializeToString,
-            csi__pb2.ControllerGetVolumeResponse.FromString,
             options, channel_credentials,
             call_credentials, compression, wait_for_ready, timeout, metadata)
 

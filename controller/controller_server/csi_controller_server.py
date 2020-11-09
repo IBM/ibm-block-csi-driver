@@ -149,6 +149,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.ALREADY_EXISTS)
             return csi_pb2.CreateVolumeResponse()
+        except controller_errors.NotEnoughSpaceInPool as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.OUT_OF_RANGE)
+            return csi_pb2.CreateVolumeResponse()
         except Exception as ex:
             logger.error("an internal exception occurred")
             logger.exception(ex)
