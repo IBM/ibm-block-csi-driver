@@ -426,6 +426,14 @@ class ArrayMediator(ABC):
 
     @property
     @abstractmethod
+    def maximal_volume_size_in_bytes(self):
+        """
+        The maximal volume size in bytes.
+        """
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
     def max_lun_retries(self):
         """
             The maximum number of times a map operation will retry if lun is already in use

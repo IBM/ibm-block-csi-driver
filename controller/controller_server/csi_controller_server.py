@@ -559,6 +559,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
 
+                size = request.capacity_range.required_bytes
+
+                if size > array_mediator.maximal_volume_size_in_bytes:
+                    raise controller_errors.SizeOutOfRange(size, array_mediator.maximal_volume_size_in_bytes)
+
                 try:
 
                     logger.debug("expanding volume {0}".format(volume_id))
@@ -596,6 +601,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.RESOURCE_EXHAUSTED)
+            return csi_pb2.ControllerExpandVolumeResponse()
+
+        except controller_errors.SizeOutOfRange as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.OUT_OF_RANGE)
             return csi_pb2.ControllerExpandVolumeResponse()
 
         except (controller_errors.ObjectIsStillInUseError, Exception) as ex:

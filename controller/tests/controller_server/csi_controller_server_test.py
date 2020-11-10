@@ -1208,6 +1208,7 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         return csi_pb2.ControllerExpandVolumeResponse
 
     def setUp(self):
+        super().setUp()
         self.fqdn = "fqdn"
         self.mediator = XIVArrayMediator("user", "password", self.fqdn)
         self.mediator.client = Mock()
@@ -1237,26 +1238,32 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         self.request.volume_content_source = None
         self.context = utils.FakeContext()
 
-    def _prepare_expand_volume_mocks(self, storage_agent, array_type):
+    def _prepare_expand_volume_mocks(self, storage_agent):
         storage_agent.return_value = self.storage_agent
 
         self.mediator.expand_volume = Mock()
-        array_type.return_value = "a9k"
 
-    @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_expand_volume_with_zero_size(self, storage_agent, array_type):
-        self._prepare_expand_volume_mocks(storage_agent, array_type)
+    def test_expand_volume_with_zero_size(self, storage_agent):
+        self._prepare_expand_volume_mocks(storage_agent)
 
         self.request.capacity_range.required_bytes = 0
         self.servicer.ControllerExpandVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
         self.mediator.expand_volume.assert_called_once_with(volume_id=self.volume_id, required_bytes=0)
 
-    @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_expand_volume_succeeds_mount_access_mode(self, storage_agent, array_type):
-        self._prepare_expand_volume_mocks(storage_agent, array_type)
+    def test_expand_volume_with_big_size(self, storage_agent):
+        self._prepare_expand_volume_mocks(storage_agent)
+
+        self.request.capacity_range.required_bytes = 1125899906842625
+        self.servicer.ControllerExpandVolume(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.OUT_OF_RANGE)
+        self.mediator.expand_volume.assert_not_called()
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_expand_volume_succeeds_mount_access_mode(self, storage_agent):
+        self._prepare_expand_volume_mocks(storage_agent)
 
         expand_respond = self.servicer.ControllerExpandVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
@@ -1264,10 +1271,9 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         self.mediator.expand_volume.assert_called_once_with(volume_id=self.volume_id,
                                                             required_bytes=self.capacity_bytes)
 
-    @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_expand_volume_succeeds_block_access_mode(self, storage_agent, array_type):
-        self._prepare_expand_volume_mocks(storage_agent, array_type)
+    def test_expand_volume_succeeds_block_access_mode(self, storage_agent):
+        self._prepare_expand_volume_mocks(storage_agent)
 
         self.request.volume_capability = csi_pb2.VolumeCapability(
             access_mode=csi_pb2.VolumeCapability.AccessMode(mode=self.access_types.SINGLE_NODE_WRITER),
@@ -1307,10 +1313,9 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
     def test_expand_volume_with_array_connection_exception(self, storage_agent):
         self._test_create_object_with_array_connection_exception(storage_agent)
 
-    @patch("controller.controller_server.csi_controller_server.detect_array_type")
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_expand_volume_with_get_volume_name_too_long_success(self, storage_agent, array_type):
-        self._prepare_expand_volume_mocks(storage_agent, array_type)
+    def test_expand_volume_with_get_volume_name_too_long_success(self, storage_agent):
+        self._prepare_expand_volume_mocks(storage_agent)
         self.mediator.max_volume_name_length = 63
 
         self.request.name = "a" * 128
