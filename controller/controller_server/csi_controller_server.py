@@ -572,7 +572,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 array_mediator.expand_volume(
                     volume_id=volume_id,
                     required_bytes=size)
-                res = utils.generate_csi_expand_volume_response(request)
+
+                volume = array_mediator.get_object_by_id(volume_id, config.VOLUME_TYPE_NAME)
+                res = utils.generate_csi_expand_volume_response(volume)
                 logger.info("finished expanding volume")
                 return res
 

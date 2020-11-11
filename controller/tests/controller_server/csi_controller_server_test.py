@@ -1229,6 +1229,11 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         storage_agent.return_value = self.storage_agent
 
         self.mediator.expand_volume = Mock()
+        self.mediator.get_object_by_id = Mock()
+        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(self.capacity_bytes,
+                                                                                              volume_name,
+                                                                                              self.volume_id,
+                                                                                              "a9k")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_expand_volume_with_zero_size(self, storage_agent):
@@ -1252,9 +1257,9 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
     def test_expand_volume_succeeds_mount_access_mode(self, storage_agent):
         self._prepare_expand_volume_mocks(storage_agent)
 
-        expand_respond = self.servicer.ControllerExpandVolume(self.request, self.context)
+        expand_response = self.servicer.ControllerExpandVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.assertTrue(expand_respond.node_expansion_required)
+        self.assertTrue(expand_response.node_expansion_required)
         self.mediator.expand_volume.assert_called_once_with(volume_id=self.volume_id,
                                                             required_bytes=self.capacity_bytes)
 
@@ -1266,9 +1271,9 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
             access_mode=csi_pb2.VolumeCapability.AccessMode(mode=self.access_types.SINGLE_NODE_WRITER),
             block=csi_pb2.VolumeCapability.BlockVolume())
 
-        expand_respond = self.servicer.ControllerExpandVolume(self.request, self.context)
+        expand_response = self.servicer.ControllerExpandVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.assertTrue(expand_respond.node_expansion_required)
+        self.assertTrue(expand_response.node_expansion_required)
         self.mediator.expand_volume.assert_called_once_with(volume_id=self.volume_id,
                                                             required_bytes=self.capacity_bytes)
 
@@ -1285,7 +1290,7 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
             mount=csi_pb2.VolumeCapability.MountVolume(fs_type="ext42"))
 
         self.servicer.ControllerExpandVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT, "wrong fs_type")
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertTrue("fs_type" in self.context.details)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -1297,21 +1302,12 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
             mount=csi_pb2.VolumeCapability.MountVolume(fs_type="ext4"))
 
         self.servicer.ControllerExpandVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT, "wrong access_mode")
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertTrue("access mode" in self.context.details)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_expand_volume_with_array_connection_exception(self, storage_agent):
         self._test_create_object_with_array_connection_exception(storage_agent)
-
-    @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_expand_volume_with_get_volume_name_too_long_success(self, storage_agent):
-        self._prepare_expand_volume_mocks(storage_agent)
-        self.mediator.max_volume_name_length = 63
-
-        self.request.name = "a" * 128
-        self.servicer.ControllerExpandVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.expand_volume")
     @patch("controller.controller_server.csi_controller_server.get_agent")
