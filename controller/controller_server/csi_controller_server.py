@@ -194,7 +194,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         """
         Args:
             volume              : volume fetched or created in CreateVolume
-            source_id       : id of object we should copy to vol or None if volume should not be copied
+            source_id           : id of object we should copy to vol or None if volume should not be copied
             source_type:        : the object type of the source - volume or snapshot
             context             : CreateVolume response context
         Returns:
@@ -205,7 +205,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         """
         volume_name = volume.name
         volume_copy_source_id = volume.copy_source_id
-        if not source_id or not volume_copy_source_id:
+        if not source_id and not volume_copy_source_id:
             return None
         if volume_copy_source_id == source_id:
             logger.debug(
@@ -216,7 +216,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.debug(
                 "Volume {0} exists but it is not a copy of {1} {2}.".format(volume_name, source_type, source_id))
             context.set_details("Volume already exists but it was created from a different source.")
-            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_code(grpc.StatusCode.ALREADY_EXISTS)
             return csi_pb2.CreateVolumeResponse()
 
     def DeleteVolume(self, request, context):
