@@ -194,7 +194,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         """
         Args:
             volume              : volume fetched or created in CreateVolume
-            source_id       : id of object we should copy to vol or None if volume should not be copied
+            source_id           : id of object we should copy to vol or None if volume should not be copied
             source_type:        : the object type of the source - volume or snapshot
             context             : CreateVolume response context
         Returns:
@@ -205,7 +205,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         """
         volume_name = volume.name
         volume_copy_source_id = volume.copy_source_id
-        if not source_id or not volume_copy_source_id:
+        if not source_id and not volume_copy_source_id:
             return None
         if volume_copy_source_id == source_id:
             logger.debug(
@@ -216,7 +216,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.debug(
                 "Volume {0} exists but it is not a copy of {1} {2}.".format(volume_name, source_type, source_id))
             context.set_details("Volume already exists but it was created from a different source.")
-            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_code(grpc.StatusCode.ALREADY_EXISTS)
             return csi_pb2.CreateVolumeResponse()
 
     def DeleteVolume(self, request, context):
@@ -559,20 +559,29 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
 
-                try:
+                size = request.capacity_range.required_bytes
 
-                    logger.debug("expanding volume {0}".format(volume_id))
-                    array_mediator.expand_volume(
-                        volume_id=volume_id,
-                        required_bytes=request.capacity_range.required_bytes)
-                    res = utils.generate_csi_expand_volume_response(request)
-                    logger.info("finished expanding volume")
-                    return res
-
-                except controller_errors.PermissionDeniedError as ex:
-                    context.set_code(grpc.StatusCode.PERMISSION_DENIED)
-                    context.set_details(ex)
+                if size > array_mediator.maximal_volume_size_in_bytes:
+                    message = messages.SizeOutOfRangeError_message.format(size,
+                                                                          array_mediator.maximal_volume_size_in_bytes)
+                    context.set_details(message)
+                    context.set_code(grpc.StatusCode.OUT_OF_RANGE)
                     return csi_pb2.ControllerExpandVolumeResponse()
+
+                logger.debug("expanding volume {0}".format(volume_id))
+                array_mediator.expand_volume(
+                    volume_id=volume_id,
+                    required_bytes=size)
+
+                volume = array_mediator.get_object_by_id(volume_id, config.VOLUME_TYPE_NAME)
+                res = utils.generate_csi_expand_volume_response(volume)
+                logger.info("finished expanding volume")
+                return res
+
+        except controller_errors.PermissionDeniedError as ex:
+            context.set_code(grpc.StatusCode.PERMISSION_DENIED)
+            context.set_details(ex)
+            return csi_pb2.ControllerExpandVolumeResponse()
 
         except controller_errors.ObjectNotFoundError as ex:
             logger.info("Volume not found: {0}".format(ex))
@@ -598,7 +607,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.RESOURCE_EXHAUSTED)
             return csi_pb2.ControllerExpandVolumeResponse()
 
-        except (controller_errors.ObjectIsStillInUseError, Exception) as ex:
+        except Exception as ex:
             logger.debug("an internal exception occurred")
             logger.exception(ex)
             context.set_code(grpc.StatusCode.INTERNAL)
