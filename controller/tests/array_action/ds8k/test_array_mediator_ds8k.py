@@ -184,7 +184,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.PoolDoesNotExist):
             self.array.create_volume("fake_name", 1, {}, "fake_pool")
 
-    def test_create_volume_failed_with_incorrect_id(self):
+    def test_create_volume_failed_with_no_space_in_pool(self):
         self.client_mock.get_volumes_by_pool.side_effect = ClientException("500", message="BE534459")
         with self.assertRaises(array_errors.NotEnoughSpaceInPool):
             self.array.create_volume("fake_name", 1, {}, "fake_pool")
