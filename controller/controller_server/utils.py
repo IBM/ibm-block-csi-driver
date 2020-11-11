@@ -161,8 +161,8 @@ def validate_delete_snapshot_request(request):
 def validate_expand_volume_request(request):
     logger.debug("validating expand volume request")
 
-    if request.volume_id == "":
-        raise ValidationException("Volume id cannot be empty")
+    if not request.volume_id:
+        raise ValidationException(messages.name_should_not_be_empty_message)
 
     logger.debug("validating volume capacity")
     if request.capacity_range:
@@ -171,13 +171,10 @@ def validate_expand_volume_request(request):
     else:
         raise ValidationException(messages.no_capacity_range_message)
 
-    logger.debug("validating secrets")
-    if request.secrets:
-        validate_secret(request.secrets)
+    validate_secret(request.secrets)
 
     logger.debug("validating volume capabilities")
-    capability = request.volume_capability
-    if not capability:
+    if not request.volume_capability:
         raise ValidationException(messages.capabilities_not_set_message)
     validate_csi_volume_capability(request.volume_capability)
 

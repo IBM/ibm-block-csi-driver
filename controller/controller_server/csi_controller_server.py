@@ -562,22 +562,24 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 size = request.capacity_range.required_bytes
 
                 if size > array_mediator.maximal_volume_size_in_bytes:
-                    raise controller_errors.SizeOutOfRange(size, array_mediator.maximal_volume_size_in_bytes)
-
-                try:
-
-                    logger.debug("expanding volume {0}".format(volume_id))
-                    array_mediator.expand_volume(
-                        volume_id=volume_id,
-                        required_bytes=request.capacity_range.required_bytes)
-                    res = utils.generate_csi_expand_volume_response(request)
-                    logger.info("finished expanding volume")
-                    return res
-
-                except controller_errors.PermissionDeniedError as ex:
-                    context.set_code(grpc.StatusCode.PERMISSION_DENIED)
-                    context.set_details(ex)
+                    message = messages.SizeOutOfRangeError_message.format(size,
+                                                                          array_mediator.maximal_volume_size_in_bytes)
+                    context.set_details(message)
+                    context.set_code(grpc.StatusCode.OUT_OF_RANGE)
                     return csi_pb2.ControllerExpandVolumeResponse()
+
+                logger.debug("expanding volume {0}".format(volume_id))
+                array_mediator.expand_volume(
+                    volume_id=volume_id,
+                    required_bytes=size)
+                res = utils.generate_csi_expand_volume_response(request)
+                logger.info("finished expanding volume")
+                return res
+
+        except controller_errors.PermissionDeniedError as ex:
+            context.set_code(grpc.StatusCode.PERMISSION_DENIED)
+            context.set_details(ex)
+            return csi_pb2.ControllerExpandVolumeResponse()
 
         except controller_errors.ObjectNotFoundError as ex:
             logger.info("Volume not found: {0}".format(ex))
@@ -603,13 +605,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.RESOURCE_EXHAUSTED)
             return csi_pb2.ControllerExpandVolumeResponse()
 
-        except controller_errors.SizeOutOfRange as ex:
-            logger.exception(ex)
-            context.set_details(ex.message)
-            context.set_code(grpc.StatusCode.OUT_OF_RANGE)
-            return csi_pb2.ControllerExpandVolumeResponse()
-
-        except (controller_errors.ObjectIsStillInUseError, Exception) as ex:
+        except Exception as ex:
             logger.debug("an internal exception occurred")
             logger.exception(ex)
             context.set_code(grpc.StatusCode.INTERNAL)

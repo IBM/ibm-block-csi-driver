@@ -65,4 +65,4 @@ InvalidCliResponseError_message = "Invalid CLI response. Details : {0}"
 
 NotEnoughSpaceInPoolError_message = "Not enough space in pool"
 
-SiseOutOfRangeError_message = "requested size is above limit. requested: {0}, limit is: {1}"
+SizeOutOfRangeError_message = "requested size is above the limit. requested: {0}, limit is: {1}"

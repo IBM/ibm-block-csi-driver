@@ -212,9 +212,3 @@ class NotEnoughSpaceInPool(BaseArrayActionException):
 
     def __init__(self):
         self.message = messages.NotEnoughSpaceInPoolError_message
-
-
-class SizeOutOfRange(BaseArrayActionException):
-
-    def __init__(self, requested_size, limit):
-        self.message = messages.SiseOutOfRangeError_message.format(requested_size, limit)

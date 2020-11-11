@@ -134,12 +134,12 @@ class ArrayMediator(ABC):
     @abstractmethod
     def expand_volume(self, volume_id, required_bytes):
         """
-        This expand the volume size on storage.
+        Expand the volume size on storage.
         Args:
            volume_id        : volume id
-           required_bytes   : capacity requirements of the volume after expansion
+           required_bytes   : capacity of the volume after expansion
         Returns:
-           volume
+           None
         Raises:
             ObjectNotFound
             IllegalObjectID
@@ -427,9 +427,6 @@ class ArrayMediator(ABC):
     @property
     @abstractmethod
     def maximal_volume_size_in_bytes(self):
-        """
-        The maximal volume size in bytes.
-        """
         raise NotImplementedError
 
     @property
