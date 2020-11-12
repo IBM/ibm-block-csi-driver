@@ -1351,30 +1351,6 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         self._test_create_object_with_wrong_secrets(a_enter)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_expand_volume_with_invalid_fstype_fail(self, storage_agent):
-        storage_agent.return_value = self.storage_agent
-
-        self.request.volume_capability = csi_pb2.VolumeCapability(
-            access_mode=csi_pb2.VolumeCapability.AccessMode(mode=self.access_types.SINGLE_NODE_WRITER),
-            mount=csi_pb2.VolumeCapability.MountVolume(fs_type="ext42"))
-
-        self.servicer.ControllerExpandVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
-        self.assertTrue("fs_type" in self.context.details)
-
-    @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_expand_volume_with_invalid_access_mode_fail(self, storage_agent):
-        storage_agent.return_value = self.storage_agent
-
-        self.request.volume_capability = csi_pb2.VolumeCapability(
-            access_mode=csi_pb2.VolumeCapability.AccessMode(mode=self.access_types.MULTI_NODE_SINGLE_WRITER),
-            mount=csi_pb2.VolumeCapability.MountVolume(fs_type="ext4"))
-
-        self.servicer.ControllerExpandVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
-        self.assertTrue("access mode" in self.context.details)
-
-    @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_expand_volume_with_array_connection_exception(self, storage_agent):
         self._test_create_object_with_array_connection_exception(storage_agent)
 

@@ -173,11 +173,6 @@ def validate_expand_volume_request(request):
 
     validate_secret(request.secrets)
 
-    logger.debug("validating volume capabilities")
-    if not request.volume_capability:
-        raise ValidationException(messages.capabilities_not_set_message)
-    validate_csi_volume_capability(request.volume_capability)
-
     logger.debug("expand volume validation finished")
 
 
