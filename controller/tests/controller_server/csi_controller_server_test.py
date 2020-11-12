@@ -1316,8 +1316,8 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_expand_volume_with_size_too_large_fail(self, storage_agent):
         self._prepare_expand_volume_mocks(storage_agent)
-        self.mediator.maximal_volume_size_in_bytes = 1 * 1024 * 1024 * 1024 * 1024 * 1024
-        self.request.capacity_range.required_bytes = 1 * 1024 * 1024 * 1024 * 1024 * 1024 * 1024
+        self.mediator.maximal_volume_size_in_bytes = 1
+        self.request.capacity_range.required_bytes = 2
         self.servicer.ControllerExpandVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OUT_OF_RANGE)
         self.mediator.expand_volume.assert_not_called()
