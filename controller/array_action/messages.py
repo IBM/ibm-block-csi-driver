@@ -63,6 +63,6 @@ ObjectIsStillInUseError_message = "Object {0} is still in use by {1}"
 
 InvalidCliResponseError_message = "Invalid CLI response. Details : {0}"
 
-NotEnoughSpaceInPoolError_message = "Not enough space in pool"
+NotEnoughSpaceInPoolError_message = "Not enough space in pool {0}"
 
 SizeOutOfRangeError_message = "requested size is above the limit. requested: {0}, limit is: {1}"

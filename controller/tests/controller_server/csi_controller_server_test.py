@@ -543,7 +543,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
     def test_create_volume_with_no_space_in_pool(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.RESOURCE_EXHAUSTED,
-                                         err=array_errors.NotEnoughSpaceInPool())
+                                         err=array_errors.NotEnoughSpaceInPool("pool"))
 
     def _prepare_idempotent_tests(self):
         self.mediator.get_volume = Mock()
@@ -1298,11 +1298,10 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         storage_agent.return_value = self.storage_agent
 
         self.mediator.expand_volume = Mock()
-        self.mediator.get_object_by_id = Mock()
-        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(self.capacity_bytes,
-                                                                                              volume_name,
-                                                                                              self.volume_id,
-                                                                                              "a9k")
+        self.mediator.expand_volume.return_value = utils.get_mock_mediator_response_volume(self.capacity_bytes,
+                                                                                           volume_name,
+                                                                                           self.volume_id,
+                                                                                           "a9k")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_expand_volume_with_zero_size(self, storage_agent):
@@ -1382,7 +1381,7 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
 
     def test_expand_volume_with_no_space_in_pool_exception(self):
         self._expand_volume_returns_error(return_code=grpc.StatusCode.RESOURCE_EXHAUSTED,
-                                          err=array_errors.NotEnoughSpaceInPool())
+                                          err=array_errors.NotEnoughSpaceInPool("pool"))
 
 
 class TestIdentityServer(unittest.TestCase):
