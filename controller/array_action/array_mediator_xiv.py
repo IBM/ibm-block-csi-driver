@@ -163,9 +163,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def expand_volume(self, volume_id, required_bytes):
         required_bytes_in_blocks = self._convert_size_bytes_to_blocks(required_bytes)
         try:
-            cli_volume = self._get_cli_object_by_wwn_if_exist(volume_id=volume_id)
-            if not cli_volume:
-                raise controller_errors.ObjectNotFoundError(name=volume_id)
+            cli_volume = self._get_cli_object_by_wwn(volume_id=volume_id, not_exist_err=True)
             size_blocks = required_bytes_in_blocks - int(cli_volume.capacity)
             self.client.cmd.vol_resize(vol=cli_volume.name, size_blocks=size_blocks)
         except xcli_errors.IllegalNameForObjectError as ex:
@@ -181,6 +179,8 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             else:
                 logger.exception(ex)
                 raise ex
+        cli_volume = self._get_cli_object_by_wwn(volume_id=volume_id, not_exist_err=True)
+        return self._generate_volume_response(cli_volume)
 
     def validate_supported_capabilities(self, capabilities):
         logger.info("validate_supported_capabilities for capabilities : {0}".format(capabilities))
@@ -249,13 +249,16 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
-    def _get_cli_object_by_wwn_if_exist(self, volume_id):
-        return self.client.cmd.vol_list(wwn=volume_id).as_single_element
+    def _get_cli_object_by_wwn(self, volume_id, not_exist_err=False):
+        cli_object = self.client.cmd.vol_list(wwn=volume_id).as_single_element
+        if not cli_object:
+            if not_exist_err:
+                raise controller_errors.ObjectNotFoundError(volume_id)
+            return None
+        return cli_object
 
     def _get_object_name_by_wwn(self, volume_id):
-        cli_object = self._get_cli_object_by_wwn_if_exist(volume_id)
-        if not cli_object:
-            raise controller_errors.ObjectNotFoundError(volume_id)
+        cli_object = self._get_cli_object_by_wwn(volume_id, not_exist_err=True)
 
         object_name = cli_object.name
         logger.debug("found volume name : {0}".format(object_name))
@@ -297,7 +300,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def get_object_by_id(self, object_id, object_type):
         try:
-            cli_object = self._get_cli_object_by_wwn_if_exist(object_id)
+            cli_object = self._get_cli_object_by_wwn(object_id)
         except xcli_errors.IllegalValueForArgumentError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectID(ex.status)

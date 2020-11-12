@@ -529,7 +529,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_expand_volume_succeed(self):
         volume = self._prepare_mocks_for_expand_volume()
         required_size_in_blocks = self._convert_size_bytes_to_blocks(self.required_bytes) - int(volume.capacity)
-        self.mediator.expand_volume(volume_id=volume.wwn, required_bytes=self.required_bytes)
+        volume = self.mediator.expand_volume(volume_id=volume.wwn, required_bytes=self.required_bytes)
+        self.assertEqual(volume.name, "volume_name")
         self.mediator.client.cmd.vol_resize.assert_called_once_with(vol=volume.name,
                                                                     size_blocks=required_size_in_blocks)
 
