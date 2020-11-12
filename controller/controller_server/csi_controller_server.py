@@ -580,13 +580,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         except controller_errors.PermissionDeniedError as ex:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
-            context.set_details(ex)
+            context.set_details(ex.message)
             return csi_pb2.ControllerExpandVolumeResponse()
 
         except controller_errors.ObjectNotFoundError as ex:
             logger.info("Volume not found: {0}".format(ex))
             context.set_code(grpc.StatusCode.NOT_FOUND)
-            context.set_details(ex)
+            context.set_details(ex.message)
             return csi_pb2.ControllerExpandVolumeResponse()
 
         except (ValidationException, controller_errors.IllegalObjectID) as ex:

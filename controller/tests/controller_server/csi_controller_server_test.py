@@ -1323,7 +1323,7 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         self.mediator.expand_volume.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_expand_volume_succeeds_mount_access_mode(self, storage_agent):
+    def test_expand_volume_succeeds(self, storage_agent):
         self._prepare_expand_volume_mocks(storage_agent)
 
         expand_response = self.servicer.ControllerExpandVolume(self.request, self.context)
@@ -1333,18 +1333,14 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
                                                             required_bytes=self.capacity_bytes)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_expand_volume_succeeds_block_access_mode(self, storage_agent):
+    def test_expand_volume_with_bad_id(self, storage_agent):
         self._prepare_expand_volume_mocks(storage_agent)
 
-        self.request.volume_capability = csi_pb2.VolumeCapability(
-            access_mode=csi_pb2.VolumeCapability.AccessMode(mode=self.access_types.SINGLE_NODE_WRITER),
-            block=csi_pb2.VolumeCapability.BlockVolume())
+        self.request.volume_id = "123"
 
-        expand_response = self.servicer.ControllerExpandVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.assertTrue(expand_response.node_expansion_required)
-        self.mediator.expand_volume.assert_called_once_with(volume_id=self.volume_id,
-                                                            required_bytes=self.capacity_bytes)
+        self.servicer.ControllerExpandVolume(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
+        self.mediator.expand_volume.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_expand_volume_with_wrong_secrets(self, a_enter):
@@ -1372,11 +1368,19 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         self._expand_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                           err=array_errors.IllegalObjectID("123"))
 
+    def test_expand_volume_with_permission_denied_exception(self):
+        self._expand_volume_returns_error(return_code=grpc.StatusCode.PERMISSION_DENIED,
+                                          err=array_errors.PermissionDeniedError("msg"))
+
+    def test_expand_volume_with_object_not_found_exception(self):
+        self._expand_volume_returns_error(return_code=grpc.StatusCode.NOT_FOUND,
+                                          err=array_errors.ObjectNotFoundError("name"))
+
     def test_expand_volume_with_create_volume_with_other_exception(self):
         self._expand_volume_returns_error(return_code=grpc.StatusCode.INTERNAL,
                                           err=Exception("error"))
 
-    def test_expand_volume_with_no_space_in_pool(self):
+    def test_expand_volume_with_no_space_in_pool_exception(self):
         self._expand_volume_returns_error(return_code=grpc.StatusCode.RESOURCE_EXHAUSTED,
                                           err=array_errors.NotEnoughSpaceInPool())
 
