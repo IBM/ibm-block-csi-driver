@@ -895,7 +895,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def _prepare_mocks_for_expand_volume(self):
         volume = Munch({'name': 'test_vol',
-                        'capacity': '1'})
+                        'capacity': '1',
+                        'mdisk_grp_name': 'pool_name'})
         self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=volume)
         self.svc.client.svcinfo.lsfcmap.return_value = Mock(as_list=[])
 

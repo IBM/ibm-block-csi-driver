@@ -281,7 +281,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 if OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message:
                     raise controller_errors.ObjectNotFoundError(volume_id)
                 if NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND in ex.my_message:
-                    raise controller_errors.NotEnoughSpaceInPool()
+                    raise controller_errors.NotEnoughSpaceInPool(pool=cli_volume.mdisk_grp_name)
                 else:
                     raise ex
         except Exception as ex:
@@ -377,7 +377,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                     raise controller_errors.PoolDoesNotMatchCapabilities(
                         pool, capabilities, ex)
                 if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in ex.my_message:
-                    raise controller_errors.NotEnoughSpaceInPool()
+                    raise controller_errors.NotEnoughSpaceInPool(pool=pool)
                 raise ex
         except Exception as ex:
             logger.exception(ex)
