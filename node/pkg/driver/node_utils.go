@@ -65,7 +65,7 @@ type NodeUtilsInterface interface {
 	MakeFile(filePath string) error
 	ExpandFilesystem(devicePath string, fsType string) error
 	ExpandMpathDevice(mpathDevice string) error
-	RescanPhysicalDevice(sysDevices []string) error
+	RescanPhysicalDevices(sysDevices []string) error
 	FormatDevice(devicePath string, fsType string)
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
@@ -346,6 +346,7 @@ func (n NodeUtils) ExpandFilesystem(devicePath string, fsType string) error {
 	_, err := n.Executer.ExecuteWithTimeout(resizeFsTimeoutMilliseconds, cmd, args)
 	if err != nil {
 		logger.Errorf("Failed to resize filesystem, error: %v", err)
+		return err
 	}
 	return nil
 }
@@ -383,7 +384,7 @@ func (n NodeUtils) rescanPhysicalDevice(deviceName string) error {
 	return nil
 }
 
-func (n NodeUtils) RescanPhysicalDevice(sysDevices []string) error {
+func (n NodeUtils) RescanPhysicalDevices(sysDevices []string) error {
 	logger.Debugf("Rescan : Start rescan on sys devices : {%v}", sysDevices)
 	for _, deviceName := range sysDevices {
 		err := n.rescanPhysicalDevice(deviceName)

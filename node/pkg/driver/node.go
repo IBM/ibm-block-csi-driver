@@ -604,11 +604,11 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	osDeviceConnectivityHelper := device_connectivity.NewOsDeviceConnectivityHelperScsiGeneric(d.executer)
 
 	device, err := osDeviceConnectivityHelper.GetMpathDevice(volumeID)
-	logger.Debugf("Discovered device : {%v}", device)
 	if err != nil {
 		logger.Errorf("Error while discovering the device : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	logger.Debugf("Discovered device : {%v}", device)
 
 	baseDevice := path.Base(device)
 
@@ -620,7 +620,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 
 	sysDevices := strings.Split(rawSysDevices, ",")
 
-	err = d.NodeUtils.RescanPhysicalDevice(sysDevices)
+	err = d.NodeUtils.RescanPhysicalDevices(sysDevices)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
