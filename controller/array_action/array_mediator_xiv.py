@@ -162,9 +162,9 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def expand_volume(self, volume_id, required_bytes):
         required_bytes_in_blocks = self._convert_size_bytes_to_blocks(required_bytes)
+        cli_volume = self._get_cli_object_by_wwn(volume_id=volume_id, not_exist_err=True)
+        size_blocks = required_bytes_in_blocks - int(cli_volume.capacity)
         try:
-            cli_volume = self._get_cli_object_by_wwn(volume_id=volume_id, not_exist_err=True)
-            size_blocks = required_bytes_in_blocks - int(cli_volume.capacity)
             self.client.cmd.vol_resize(vol=cli_volume.name, size_blocks=size_blocks)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
@@ -175,7 +175,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         except xcli_errors.CommandFailedRuntimeError as ex:
             logger.exception(ex)
             if "No space to allocate to the volume" in ex.status:
-                raise controller_errors.NotEnoughSpaceInPool()
+                raise controller_errors.NotEnoughSpaceInPool(cli_volume.pool_name)
             else:
                 logger.exception(ex)
                 raise ex
@@ -219,7 +219,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         except xcli_errors.CommandFailedRuntimeError as ex:
             logger.exception(ex)
             if "No space to allocate to the volume" in ex.status:
-                raise controller_errors.NotEnoughSpaceInPool()
+                raise controller_errors.NotEnoughSpaceInPool(pool=pool)
 
     def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
                                             minimum_volume_size_in_bytes, pool_id=None):
