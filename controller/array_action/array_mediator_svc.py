@@ -133,7 +133,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     @classproperty
     def maximal_volume_size_in_bytes(self):
-        return 256 * 1024 * 1024 * 1024 * 1024  # 256 TB
+        return 256 * 1024 * 1024 * 1024 * 1024  # 256 TiB
 
     @classproperty
     def max_lun_retries(self):

@@ -569,29 +569,22 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     return csi_pb2.ControllerExpandVolumeResponse()
 
                 logger.debug("expanding volume {0}".format(volume_id))
-                array_mediator.expand_volume(
+                volume = array_mediator.expand_volume(
                     volume_id=volume_id,
                     required_bytes=size)
 
-                volume = array_mediator.get_object_by_id(volume_id, config.VOLUME_TYPE_NAME)
                 res = utils.generate_csi_expand_volume_response(volume)
                 logger.info("finished expanding volume")
                 return res
 
         except controller_errors.PermissionDeniedError as ex:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
-            context.set_details(ex)
+            context.set_details(ex.message)
             return csi_pb2.ControllerExpandVolumeResponse()
 
         except controller_errors.ObjectNotFoundError as ex:
             logger.info("Volume not found: {0}".format(ex))
             context.set_code(grpc.StatusCode.NOT_FOUND)
-            context.set_details(ex)
-            return csi_pb2.ControllerExpandVolumeResponse()
-
-        except controller_errors.ObjectIsStillInUseError as ex:
-            logger.info("Could not expand volume while in use: {0}".format(ex))
-            context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
             context.set_details(ex.message)
             return csi_pb2.ControllerExpandVolumeResponse()
 
