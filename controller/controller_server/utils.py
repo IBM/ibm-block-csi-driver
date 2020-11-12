@@ -162,7 +162,7 @@ def validate_expand_volume_request(request):
     logger.debug("validating expand volume request")
 
     if not request.volume_id:
-        raise ValidationException(messages.name_should_not_be_empty_message)
+        raise ValidationException(messages.id_should_not_be_empty_message)
 
     logger.debug("validating volume capacity")
     if request.capacity_range:
@@ -172,11 +172,6 @@ def validate_expand_volume_request(request):
         raise ValidationException(messages.no_capacity_range_message)
 
     validate_secret(request.secrets)
-
-    logger.debug("validating volume capabilities")
-    if not request.volume_capability:
-        raise ValidationException(messages.capabilities_not_set_message)
-    validate_csi_volume_capability(request.volume_capability)
 
     logger.debug("expand volume validation finished")
 
