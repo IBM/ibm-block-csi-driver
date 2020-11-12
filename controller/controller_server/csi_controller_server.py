@@ -589,12 +589,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details(ex)
             return csi_pb2.ControllerExpandVolumeResponse()
 
-        except controller_errors.ObjectIsStillInUseError as ex:
-            logger.info("Could not expand volume while in use: {0}".format(ex))
-            context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
-            context.set_details(ex.message)
-            return csi_pb2.ControllerExpandVolumeResponse()
-
         except (ValidationException, controller_errors.IllegalObjectID) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
