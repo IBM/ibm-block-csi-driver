@@ -265,9 +265,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return all_fcmaps
 
     def expand_volume(self, volume_id, required_bytes):
-        cli_volume = self._get_cli_volume_by_wwn_if_exist(volume_id)
-        if not cli_volume:
-            raise controller_errors.ObjectNotFoundError(volume_id)
+        cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
         object_name = cli_volume.name
         fcmaps = self._get_fcmaps_by_object(object_name)
         self._safe_delete_fcmaps(object_name, fcmaps)
@@ -287,6 +285,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         except Exception as ex:
             logger.exception(ex)
             raise ex
+        cli_volume_after_resize = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
+        return self._generate_volume_response(cli_volume=cli_volume_after_resize)
 
     def _get_fcmaps(self, volume_name, endpoint_type):
         """
@@ -329,15 +329,17 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.debug("found wwn : {0}".format(wwn))
         return wwn
 
-    def _get_cli_volume_by_wwn_if_exist(self, volume_id):
+    def _get_cli_volume_by_wwn(self, volume_id, not_exist_err=False):
         filter_value = 'vdisk_UID=' + volume_id
         cli_volume = self.client.svcinfo.lsvdisk(bytes=True, filtervalue=filter_value).as_single_element
         if not cli_volume:
+            if not_exist_err:
+                raise controller_errors.ObjectNotFoundError(volume_id)
             return None
         return cli_volume
 
     def _get_volume_name_by_wwn_if_exists(self, volume_id):
-        cli_volume = self._get_cli_volume_by_wwn_if_exist(volume_id)
+        cli_volume = self._get_cli_volume_by_wwn(volume_id)
         if not cli_volume:
             return None
         vol_name = cli_volume.name
@@ -424,9 +426,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
-        cli_volume = self._get_cli_volume_by_wwn_if_exist(volume_id)
-        if not cli_volume:
-            raise controller_errors.ObjectNotFoundError(volume_id)
+        cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
         self._delete_object(cli_volume)
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
@@ -438,7 +438,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return self._generate_snapshot_response_with_verification(target_cli_volume)
 
     def get_object_by_id(self, object_id, object_type):
-        cli_object = self._get_cli_volume_by_wwn_if_exist(object_id)
+        cli_object = self._get_cli_volume_by_wwn(object_id)
         if not cli_object:
             return None
         if object_type is controller_config.SNAPSHOT_TYPE_NAME:
@@ -559,7 +559,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def delete_snapshot(self, snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
-        cli_volume = self._get_cli_volume_by_wwn_if_exist(snapshot_id)
+        cli_volume = self._get_cli_volume_by_wwn(snapshot_id)
         if not cli_volume or not cli_volume.FC_id:
             raise controller_errors.ObjectNotFoundError(snapshot_id)
         self._delete_object(cli_volume, is_snapshot=True)

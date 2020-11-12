@@ -894,15 +894,18 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(wwns, ['5005076810282CD8', '5005076810262CD8'])
 
     def _prepare_mocks_for_expand_volume(self):
-        volume = Munch({'name': 'test_vol',
-                        'capacity': '1',
-                        'mdisk_grp_name': 'pool_name'})
-        self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=volume)
+        volume = Mock(as_single_element=Munch({'vdisk_UID': 'vol_id',
+                                               'name': 'test_vol',
+                                               'capacity': '1',
+                                               'mdisk_grp_name': 'pool_name'
+                                               }))
+        self.svc.client.svcinfo.lsvdisk.return_value = volume
         self.svc.client.svcinfo.lsfcmap.return_value = Mock(as_list=[])
 
     def test_expand_volume_success(self):
         self._prepare_mocks_for_expand_volume()
-        self.svc.expand_volume('vol_id', 2)
+        volume = self.svc.expand_volume('vol_id', 2)
+        self.assertEqual(volume.name, 'test_vol')
         self.svc.client.svctask.expandvdisksize.assert_called_once_with(vdisk_id='test_vol', unit='b', size=1)
 
     def test_expand_volume_raise_object_in_use(self):
