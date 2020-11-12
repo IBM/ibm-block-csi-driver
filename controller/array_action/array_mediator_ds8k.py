@@ -276,7 +276,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 raise array_errors.VolumeCreationError(name)
         except (exceptions.ClientError, exceptions.ClientException) as ex:
             if ERROR_CODE_CREATE_VOLUME_NOT_ENOUGH_EXTENTS in str(ex.message).upper():
-                raise array_errors.NotEnoughSpaceInPool()
+                raise array_errors.NotEnoughSpaceInPool(pool=pool_id)
             else:
                 logger.error(
                     "Failed to create volume {} on array {}, reason is: {}".format(
@@ -291,15 +291,15 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         api_volume = self._create_api_volume(volume_name, size_in_bytes, capabilities, pool)
         return self._generate_volume_response(api_volume)
 
-    def _extend_volume(self, volume_id, new_size_in_bytes):
+    def _extend_volume(self, api_volume, new_size_in_bytes):
         try:
-            self.client.extend_volume(volume_id=volume_id,
+            self.client.extend_volume(volume_id=api_volume.id,
                                       new_size_in_bytes=new_size_in_bytes)
         except exceptions.NotFound:
-            raise array_errors.ObjectNotFoundError(volume_id)
+            raise array_errors.ObjectNotFoundError(api_volume.id)
         except (exceptions.ClientError, exceptions.ClientException) as ex:
             if ERROR_CODE_EXPAND_VOLUME_NOT_ENOUGH_EXTENTS in str(ex.message).upper():
-                raise array_errors.NotEnoughSpaceInPool()
+                raise array_errors.NotEnoughSpaceInPool(api_volume.pool)
 
     def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
                                             minimum_volume_size_in_bytes, pool_id=None):
@@ -310,7 +310,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         api_new_volume = self._get_api_volume_by_name(name, pool_id=pool_id)
         api_source_object = self._get_api_volume_by_name(source_name, pool_id=pool_id)
         if minimum_volume_size_in_bytes < source_capacity_in_bytes:
-            self._extend_volume(volume_id=api_new_volume.id,
+            self._extend_volume(api_volume=api_new_volume,
                                 new_size_in_bytes=source_capacity_in_bytes)
         options = [FLASHCOPY_PERSISTENT_OPTION]
         self._create_flashcopy(source_volume_id=api_source_object.id, target_volume_id=api_new_volume.id,
@@ -396,8 +396,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         api_volume = self._get_api_volume_by_id(volume_id)
         flashcopies = api_volume.flashcopy
         self._safe_delete_flashcopies(flashcopies=flashcopies, volume_name=api_volume.name)
-        self._extend_volume(volume_id=volume_id, new_size_in_bytes=required_bytes)
+        self._extend_volume(api_volume=api_volume, new_size_in_bytes=required_bytes)
         logger.info("Finished Expanding volume {}".format(volume_id))
+        api_volume_after_expand = self._get_api_volume_by_id(volume_id)
+        return self._generate_volume_response(api_volume_after_expand)
 
     @convert_scsi_id_to_array_id
     def get_volume_mappings(self, volume_id):
