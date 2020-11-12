@@ -561,8 +561,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 size = request.capacity_range.required_bytes
 
-                if size > array_mediator.maximal_volume_size_in_bytes:
+                if size > array_mediator.maximal_volume_size_in_bytes or \
+                        size < array_mediator.minimal_volume_size_in_bytes:
                     message = messages.SizeOutOfRangeError_message.format(size,
+                                                                          array_mediator.minimal_volume_size_in_bytes,
                                                                           array_mediator.maximal_volume_size_in_bytes)
                     context.set_details(message)
                     context.set_code(grpc.StatusCode.OUT_OF_RANGE)

@@ -1282,11 +1282,14 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         self.access_types = csi_pb2.VolumeCapability.AccessMode
         self.fs_type = "ext4"
 
+        self.mediator.maximal_volume_size_in_bytes = 3
+        self.mediator.minimal_volume_size_in_bytes = 1
+
         self.request.volume_capability = csi_pb2.VolumeCapability(
             access_mode=csi_pb2.VolumeCapability.AccessMode(mode=self.access_types.SINGLE_NODE_WRITER),
             mount=csi_pb2.VolumeCapability.MountVolume(fs_type=self.fs_type))
         self.request.parameters = {}
-        self.capacity_bytes = 10
+        self.capacity_bytes = 2
         self.request.capacity_range = Mock()
         self.request.capacity_range.required_bytes = self.capacity_bytes
         self.volume_id = "vol-id"
@@ -1304,19 +1307,18 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
                                                                                            "a9k")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_expand_volume_with_zero_size(self, storage_agent):
+    def test_expand_volume_with_size_too_small_fail(self, storage_agent):
         self._prepare_expand_volume_mocks(storage_agent)
 
         self.request.capacity_range.required_bytes = 0
         self.servicer.ControllerExpandVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.expand_volume.assert_called_once_with(volume_id=self.volume_id, required_bytes=0)
+        self.assertEqual(self.context.code, grpc.StatusCode.OUT_OF_RANGE)
+        self.mediator.expand_volume.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_expand_volume_with_size_too_large_fail(self, storage_agent):
         self._prepare_expand_volume_mocks(storage_agent)
-        self.mediator.maximal_volume_size_in_bytes = 1
-        self.request.capacity_range.required_bytes = 2
+        self.request.capacity_range.required_bytes = 4
         self.servicer.ControllerExpandVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OUT_OF_RANGE)
         self.mediator.expand_volume.assert_not_called()
