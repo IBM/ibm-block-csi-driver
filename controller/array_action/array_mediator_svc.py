@@ -285,8 +285,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         except Exception as ex:
             logger.exception(ex)
             raise ex
-        cli_volume_after_resize = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
-        return self._generate_volume_response(cli_volume=cli_volume_after_resize)
 
     def _get_fcmaps(self, volume_name, endpoint_type):
         """

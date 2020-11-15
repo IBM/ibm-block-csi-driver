@@ -904,8 +904,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_expand_volume_success(self):
         self._prepare_mocks_for_expand_volume()
-        volume = self.svc.expand_volume('vol_id', 2)
-        self.assertEqual(volume.name, 'test_vol')
+        self.svc.expand_volume('vol_id', 2)
         self.svc.client.svctask.expandvdisksize.assert_called_once_with(vdisk_id='test_vol', unit='b', size=1)
 
     def test_expand_volume_raise_object_in_use(self):
