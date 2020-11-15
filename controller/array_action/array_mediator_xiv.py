@@ -179,8 +179,6 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             else:
                 logger.exception(ex)
                 raise ex
-        cli_volume = self._get_cli_object_by_wwn(volume_id=volume_id, not_exist_err=True)
-        return self._generate_volume_response(cli_volume)
 
     def validate_supported_capabilities(self, capabilities):
         logger.info("validate_supported_capabilities for capabilities : {0}".format(capabilities))
