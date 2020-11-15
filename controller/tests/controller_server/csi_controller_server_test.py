@@ -1301,10 +1301,11 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         storage_agent.return_value = self.storage_agent
 
         self.mediator.expand_volume = Mock()
-        self.mediator.expand_volume.return_value = utils.get_mock_mediator_response_volume(self.capacity_bytes,
-                                                                                           volume_name,
-                                                                                           self.volume_id,
-                                                                                           "a9k")
+        self.mediator.get_object_by_id = Mock()
+        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(self.capacity_bytes,
+                                                                                              volume_name,
+                                                                                              self.volume_id,
+                                                                                              "a9k")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_expand_volume_with_size_too_small_fail(self, storage_agent):

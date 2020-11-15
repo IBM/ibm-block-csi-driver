@@ -139,7 +139,7 @@ class ArrayMediator(ABC):
            volume_id        : volume id
            required_bytes   : capacity of the volume after expansion
         Returns:
-           volume
+           None
         Raises:
             ObjectNotFound
             IllegalObjectID
