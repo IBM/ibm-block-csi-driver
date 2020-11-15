@@ -81,17 +81,19 @@ type NodeService struct {
 	executer                    executer.ExecuterInterface
 	VolumeIdLocksMap            SyncLockInterface
 	OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface
+	OsDeviceConnectivityHelper  device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface
 }
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
-func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface, executer executer.ExecuterInterface, mounter NodeMounter, syncLock SyncLockInterface) NodeService {
+func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface, osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface, executer executer.ExecuterInterface, mounter NodeMounter, syncLock SyncLockInterface) NodeService {
 	return NodeService{
 		ConfigYaml:                  configYaml,
 		Hostname:                    hostname,
 		NodeUtils:                   nodeUtils,
 		executer:                    executer,
 		OsDeviceConnectivityMapping: OsDeviceConnectivityMapping,
+		OsDeviceConnectivityHelper:  osDeviceConnectivityHelper,
 		Mounter:                     mounter,
 		VolumeIdLocksMap:            syncLock,
 	}
@@ -601,9 +603,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	}
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeExpandVolume")
 
-	osDeviceConnectivityHelper := device_connectivity.NewOsDeviceConnectivityHelperScsiGeneric(d.executer)
-
-	device, err := osDeviceConnectivityHelper.GetMpathDevice(volumeID)
+	device, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeID)
 	if err != nil {
 		logger.Errorf("Error while discovering the device : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
@@ -630,16 +630,15 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	mpathDevice := filepath.Join(device_connectivity.DevPath, baseDevice)
-	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
+	existingFormat, err := d.Mounter.GetDiskFormat(device)
 	if err != nil {
-		logger.Errorf("Could not determine if disk {%v} is formatted, error: %v", mpathDevice, err)
+		logger.Errorf("Could not determine if disk {%v} is formatted, error: %v", device, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	err = d.NodeUtils.ExpandFilesystem(mpathDevice, existingFormat)
+	err = d.NodeUtils.ExpandFilesystem(device, existingFormat)
 	if err != nil {
-		logger.Errorf("Could not resize {%v} file system of {%v} , error: %v", existingFormat, mpathDevice, err)
+		logger.Errorf("Could not resize {%v} file system of {%v} , error: %v", existingFormat, device, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
