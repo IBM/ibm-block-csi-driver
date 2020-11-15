@@ -883,6 +883,7 @@ func TestNodeExpandVolume(t *testing.T) {
 	sysDevices := []string{"/dev/d1", "/dev/d2"}
 	mpathDevice := "/dev/" + mpathDeviceName
 	fsType := "ext4"
+	dummyError := errors.New("Dummy error")
 
 	testCases := []struct {
 		name     string
@@ -910,6 +911,25 @@ func TestNodeExpandVolume(t *testing.T) {
 
 				_, err := node.NodeExpandVolume(context.TODO(), expandRequest)
 				assertError(t, err, codes.InvalidArgument)
+			},
+		},
+		{
+			name: "expand multipath device fail",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtl)
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				node := newTestNodeServiceExpand(mockNodeUtils, mockOsDeviceConHelper, mockMounter)
+
+				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(rawSysDevices, nil)
+				mockNodeUtils.EXPECT().RescanPhysicalDevices(sysDevices)
+				mockNodeUtils.EXPECT().ExpandMpathDevice(mpathDeviceName).Return(dummyError)
+
+				_, err := node.NodeExpandVolume(context.TODO(), expandRequest)
+				assertError(t, err, codes.Internal)
 			},
 		},
 		{
