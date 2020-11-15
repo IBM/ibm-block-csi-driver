@@ -575,9 +575,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     required_bytes=size)
 
                 volume = array_mediator.get_object_by_id(volume_id, config.VOLUME_TYPE_NAME)
-                res = utils.generate_csi_expand_volume_response(volume)
-                logger.info("finished expanding volume")
-                return res
+
+            res = utils.generate_csi_expand_volume_response(volume)
+            logger.info("finished expanding volume")
+            return res
 
         except controller_errors.PermissionDeniedError as ex:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
