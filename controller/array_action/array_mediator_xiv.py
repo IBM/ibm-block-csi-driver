@@ -57,7 +57,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     @classproperty
     def maximal_volume_size_in_bytes(self):
-        return 1 * 1024 * 1024 * 1024 * 1024 * 1024  # 1 PB
+        return 1 * 1024 * 1024 * 1024 * 1024 * 1024
 
     @classproperty
     def max_lun_retries(self):
