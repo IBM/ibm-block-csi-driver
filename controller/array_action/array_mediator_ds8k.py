@@ -126,7 +126,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     @classproperty
     def maximal_volume_size_in_bytes(self):
-        return 16 * 1024 * 1024 * 1024 * 1024  # 16 TiB
+        return 16 * 1024 * 1024 * 1024 * 1024
 
     @classproperty
     def max_lun_retries(self):
