@@ -630,8 +630,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_expand_volume_success(self):
         volume = self._prepare_mocks_for_volume()
-        returned_volume = self.array.expand_volume(volume_id=volume.id, required_bytes=10)
-        self.assertEqual(returned_volume.name, "test_name")
+        self.array.expand_volume(volume_id=volume.id, required_bytes=10)
         self.client_mock.extend_volume.assert_called_once_with(volume_id=volume.id, new_size_in_bytes=10)
 
     def test_expand_volume_raise_in_use(self):
