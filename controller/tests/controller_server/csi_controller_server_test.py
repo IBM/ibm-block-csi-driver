@@ -1374,7 +1374,7 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         self.mediator.expand_volume.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_expand_volume_with_first_object_not_found(self, storage_agent):
+    def test_expand_volume_not_found_before_expansion(self, storage_agent):
         self._prepare_expand_volume_mocks(storage_agent)
         self.mediator.get_object_by_id.side_effect = [None, None]
 
@@ -1383,7 +1383,7 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_expand_volume_with_second_object_not_found(self, storage_agent):
+    def test_expand_volume_not_found_after_expansion(self, storage_agent):
         self._prepare_expand_volume_mocks(storage_agent)
         self.mediator.get_object_by_id.side_effect = [self.volume_before_expand, None]
 
