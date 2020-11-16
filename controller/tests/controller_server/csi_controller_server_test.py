@@ -1346,7 +1346,7 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         self._test_no_expand_needed()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_expand_volume_with_source_volume_already_in_range(self, storage_agent):
+    def test_expand_volume_with_size_already_in_range(self, storage_agent):
         self._prepare_expand_volume_mocks(storage_agent)
         self.request.capacity_range.required_bytes = 2
         self._test_no_expand_needed()
@@ -1374,7 +1374,7 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         self.mediator.expand_volume.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_expand_volume_with_object_not_found(self, storage_agent):
+    def test_expand_volume_with_first_object_not_found(self, storage_agent):
         self._prepare_expand_volume_mocks(storage_agent)
         self.mediator.get_object_by_id.side_effect = [None, None]
 
@@ -1382,6 +1382,9 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
 
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_expand_volume_with_second_object_not_found(self, storage_agent):
+        self._prepare_expand_volume_mocks(storage_agent)
         self.mediator.get_object_by_id.side_effect = [self.volume_before_expand, None]
 
         self.servicer.ControllerExpandVolume(self.request, self.context)
