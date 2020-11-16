@@ -569,7 +569,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 if required_bytes == 0:
                     context.set_code(grpc.StatusCode.OK)
-                    return csi_pb2.ControllerExpandVolumeResponse()
+                    return utils.generate_csi_expand_volume_response(volume_before_expand.capacity_bytes,
+                                                                     node_expansion_required=False)
 
                 if not min_size <= required_bytes <= max_size:
                     message = messages.SizeOutOfRangeError_message.format(required_bytes, min_size, max_size)
@@ -579,7 +580,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 if volume_before_expand.capacity_bytes >= required_bytes:
                     context.set_code(grpc.StatusCode.OK)
-                    return csi_pb2.ControllerExpandVolumeResponse()
+                    return utils.generate_csi_expand_volume_response(volume_before_expand.capacity_bytes,
+                                                                     node_expansion_required=False)
 
                 logger.debug("expanding volume {0}".format(volume_id))
                 array_mediator.expand_volume(
@@ -590,7 +592,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 if not volume_after_expand:
                     raise controller_errors.ObjectNotFoundError(volume_id)
 
-            res = utils.generate_csi_expand_volume_response(volume_after_expand)
+            res = utils.generate_csi_expand_volume_response(volume_after_expand.capacity_bytes)
             logger.info("finished expanding volume")
             return res
 
