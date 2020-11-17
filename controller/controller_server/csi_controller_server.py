@@ -559,25 +559,42 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
 
-                size = request.capacity_range.required_bytes
+                required_bytes = request.capacity_range.required_bytes
                 min_size = array_mediator.minimal_volume_size_in_bytes
                 max_size = array_mediator.maximal_volume_size_in_bytes
 
-                if not min_size <= size <= max_size:
-                    message = messages.SizeOutOfRangeError_message.format(size, min_size, max_size)
+                volume_before_expand = array_mediator.get_object_by_id(volume_id, config.VOLUME_TYPE_NAME)
+                if not volume_before_expand:
+                    raise controller_errors.ObjectNotFoundError(volume_id)
+
+                if required_bytes == 0:
+                    context.set_code(grpc.StatusCode.OK)
+                    return utils.generate_csi_expand_volume_response(volume_before_expand.capacity_bytes,
+                                                                     node_expansion_required=False)
+
+                if not min_size <= required_bytes <= max_size:
+                    message = messages.SizeOutOfRangeError_message.format(required_bytes, min_size, max_size)
                     context.set_details(message)
                     context.set_code(grpc.StatusCode.OUT_OF_RANGE)
                     return csi_pb2.ControllerExpandVolumeResponse()
 
+                if volume_before_expand.capacity_bytes >= required_bytes:
+                    context.set_code(grpc.StatusCode.OK)
+                    return utils.generate_csi_expand_volume_response(volume_before_expand.capacity_bytes,
+                                                                     node_expansion_required=False)
+
                 logger.debug("expanding volume {0}".format(volume_id))
                 array_mediator.expand_volume(
                     volume_id=volume_id,
-                    required_bytes=size)
+                    required_bytes=required_bytes)
 
-                volume = array_mediator.get_object_by_id(volume_id, config.VOLUME_TYPE_NAME)
-                res = utils.generate_csi_expand_volume_response(volume)
-                logger.info("finished expanding volume")
-                return res
+                volume_after_expand = array_mediator.get_object_by_id(volume_id, config.VOLUME_TYPE_NAME)
+                if not volume_after_expand:
+                    raise controller_errors.ObjectNotFoundError(volume_id)
+
+            res = utils.generate_csi_expand_volume_response(volume_after_expand.capacity_bytes)
+            logger.info("finished expanding volume")
+            return res
 
         except controller_errors.PermissionDeniedError as ex:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)

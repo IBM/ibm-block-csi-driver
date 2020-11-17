@@ -1282,67 +1282,114 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         self.access_types = csi_pb2.VolumeCapability.AccessMode
         self.fs_type = "ext4"
 
-        self.mediator.maximal_volume_size_in_bytes = 3
-        self.mediator.minimal_volume_size_in_bytes = 1
+        self.mediator.maximal_volume_size_in_bytes = 10
+        self.mediator.minimal_volume_size_in_bytes = 2
 
         self.request.volume_capability = csi_pb2.VolumeCapability(
             access_mode=csi_pb2.VolumeCapability.AccessMode(mode=self.access_types.SINGLE_NODE_WRITER),
             mount=csi_pb2.VolumeCapability.MountVolume(fs_type=self.fs_type))
         self.request.parameters = {}
-        self.capacity_bytes = 2
+        self.capacity_bytes = 6
         self.request.capacity_range = Mock()
         self.request.capacity_range.required_bytes = self.capacity_bytes
         self.volume_id = "vol-id"
         self.request.volume_id = "{}:{}".format("xiv", self.volume_id)
         self.request.volume_content_source = None
         self.context = utils.FakeContext()
+        self.mediator.get_object_by_id = Mock()
+        self.volume_before_expand = utils.get_mock_mediator_response_volume(2,
+                                                                            volume_name,
+                                                                            self.volume_id,
+                                                                            "a9k")
+        self.volume_after_expand = utils.get_mock_mediator_response_volume(self.capacity_bytes,
+                                                                           volume_name,
+                                                                           self.volume_id,
+                                                                           "a9k")
+        self.mediator.get_object_by_id.side_effect = [self.volume_before_expand, self.volume_after_expand]
 
     def _prepare_expand_volume_mocks(self, storage_agent):
         storage_agent.return_value = self.storage_agent
-
         self.mediator.expand_volume = Mock()
-        self.mediator.get_object_by_id = Mock()
-        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(self.capacity_bytes,
-                                                                                              volume_name,
-                                                                                              self.volume_id,
-                                                                                              "a9k")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_expand_volume_with_size_too_small_fail(self, storage_agent):
         self._prepare_expand_volume_mocks(storage_agent)
+        self.request.capacity_range.required_bytes = 1
 
-        self.request.capacity_range.required_bytes = 0
         self.servicer.ControllerExpandVolume(self.request, self.context)
+
         self.assertEqual(self.context.code, grpc.StatusCode.OUT_OF_RANGE)
         self.mediator.expand_volume.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_expand_volume_with_size_too_large_fail(self, storage_agent):
         self._prepare_expand_volume_mocks(storage_agent)
-        self.request.capacity_range.required_bytes = 4
+        self.request.capacity_range.required_bytes = 11
+
         self.servicer.ControllerExpandVolume(self.request, self.context)
+
         self.assertEqual(self.context.code, grpc.StatusCode.OUT_OF_RANGE)
         self.mediator.expand_volume.assert_not_called()
+
+    def _test_no_expand_needed(self):
+        response = self.servicer.ControllerExpandVolume(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+        self.assertFalse(response.node_expansion_required)
+        self.assertEqual(response.capacity_bytes, self.volume_before_expand.capacity_bytes)
+        self.mediator.expand_volume.assert_not_called()
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_expand_volume_with_size_zero(self, storage_agent):
+        self._prepare_expand_volume_mocks(storage_agent)
+        self.request.capacity_range.required_bytes = 0
+        self._test_no_expand_needed()
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_expand_volume_with_size_already_in_range(self, storage_agent):
+        self._prepare_expand_volume_mocks(storage_agent)
+        self.request.capacity_range.required_bytes = 2
+        self._test_no_expand_needed()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_expand_volume_succeeds(self, storage_agent):
         self._prepare_expand_volume_mocks(storage_agent)
 
-        expand_response = self.servicer.ControllerExpandVolume(self.request, self.context)
+        response = self.servicer.ControllerExpandVolume(self.request, self.context)
+
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.assertTrue(expand_response.node_expansion_required)
+        self.assertTrue(response.node_expansion_required)
+        self.assertEqual(response.capacity_bytes, self.volume_after_expand.capacity_bytes)
         self.mediator.expand_volume.assert_called_once_with(volume_id=self.volume_id,
                                                             required_bytes=self.capacity_bytes)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_expand_volume_with_bad_id(self, storage_agent):
         self._prepare_expand_volume_mocks(storage_agent)
-
         self.request.volume_id = "123"
 
         self.servicer.ControllerExpandVolume(self.request, self.context)
+
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.mediator.expand_volume.assert_not_called()
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_expand_volume_not_found_before_expansion(self, storage_agent):
+        self._prepare_expand_volume_mocks(storage_agent)
+        self.mediator.get_object_by_id.side_effect = [None, None]
+
+        self.servicer.ControllerExpandVolume(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_expand_volume_not_found_after_expansion(self, storage_agent):
+        self._prepare_expand_volume_mocks(storage_agent)
+        self.mediator.get_object_by_id.side_effect = [self.volume_before_expand, None]
+
+        self.servicer.ControllerExpandVolume(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_expand_volume_with_wrong_secrets(self, a_enter):
@@ -1357,9 +1404,9 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
     def _expand_volume_returns_error(self, storage_agent, expand_volume, return_code, err):
         storage_agent.return_value = self.storage_agent
         expand_volume.side_effect = [err]
+        msg = str(err)
 
         self.servicer.ControllerExpandVolume(self.request, self.context)
-        msg = str(err)
 
         self.assertEqual(self.context.code, return_code)
         self.assertTrue(msg in self.context.details)
