@@ -896,7 +896,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def _prepare_mocks_for_expand_volume(self):
         volume = Mock(as_single_element=Munch({'vdisk_UID': 'vol_id',
                                                'name': 'test_vol',
-                                               'capacity': '1',
+                                               'capacity': '512',
                                                'mdisk_grp_name': 'pool_name'
                                                }))
         self.svc.client.svcinfo.lsvdisk.return_value = volume
@@ -904,8 +904,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_expand_volume_success(self):
         self._prepare_mocks_for_expand_volume()
-        self.svc.expand_volume('vol_id', 2)
-        self.svc.client.svctask.expandvdisksize.assert_called_once_with(vdisk_id='test_vol', unit='b', size=1)
+        self.svc.expand_volume('vol_id', 1024)
+        self.svc.client.svctask.expandvdisksize.assert_called_once_with(vdisk_id='test_vol', unit='b', size=512)
 
     def test_expand_volume_raise_object_in_use(self):
         self._prepare_mocks_for_expand_volume()

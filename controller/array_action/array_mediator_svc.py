@@ -256,7 +256,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def get_volume_name(self, volume_id):
         return self._get_volume_name_by_wwn(volume_id)
 
-    def _get_fcmaps_by_object(self, object_name):
+    def _get_object_fcmaps(self, object_name):
         all_fcmaps = []
         fcmap_as_target = self._get_fcmap_as_target_if_exists(object_name)
         if fcmap_as_target:
@@ -264,20 +264,15 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         all_fcmaps.extend(self._get_fcmaps_as_source_if_exist(object_name))
         return all_fcmaps
 
-    def expand_volume(self, volume_id, required_bytes):
-        cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
-        object_name = cli_volume.name
-        fcmaps = self._get_fcmaps_by_object(object_name)
-        self._safe_delete_fcmaps(object_name, fcmaps)
-        size_in_bytes = int(cli_volume.capacity)
-        expanded_bytes = required_bytes - size_in_bytes
+    def _expand_cli_volume(self, cli_volume, expanded_bytes):
+        volume_name = cli_volume.name
         try:
-            self.client.svctask.expandvdisksize(vdisk_id=cli_volume.name, unit='b', size=expanded_bytes)
+            self.client.svctask.expandvdisksize(vdisk_id=volume_name, unit='b', size=expanded_bytes)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
-                logger.warning("Failed to expand volume {}".format(volume_id))
+                logger.warning("Failed to expand volume {}".format(volume_name))
                 if OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message:
-                    raise controller_errors.ObjectNotFoundError(volume_id)
+                    raise controller_errors.ObjectNotFoundError(volume_name)
                 if NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND in ex.my_message:
                     raise controller_errors.NotEnoughSpaceInPool(pool=cli_volume.mdisk_grp_name)
                 else:
@@ -285,6 +280,16 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         except Exception as ex:
             logger.exception(ex)
             raise ex
+
+    def expand_volume(self, volume_id, required_bytes):
+        cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
+        volume_name = cli_volume.name
+        fcmaps = self._get_object_fcmaps(volume_name)
+        self._safe_delete_fcmaps(volume_name, fcmaps)
+        volume_current_size = int(cli_volume.capacity)
+        final_required_size = self._convert_size_bytes(required_bytes)
+        expanded_bytes = final_required_size - volume_current_size
+        self._expand_cli_volume(cli_volume, expanded_bytes)
 
     def _get_fcmaps(self, volume_name, endpoint_type):
         """
@@ -330,10 +335,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def _get_cli_volume_by_wwn(self, volume_id, not_exist_err=False):
         filter_value = 'vdisk_UID=' + volume_id
         cli_volume = self.client.svcinfo.lsvdisk(bytes=True, filtervalue=filter_value).as_single_element
-        if not cli_volume:
-            if not_exist_err:
-                raise controller_errors.ObjectNotFoundError(volume_id)
-            return None
+        if not cli_volume and not_exist_err:
+            raise controller_errors.ObjectNotFoundError(volume_id)
         return cli_volume
 
     def _get_volume_name_by_wwn_if_exists(self, volume_id):
