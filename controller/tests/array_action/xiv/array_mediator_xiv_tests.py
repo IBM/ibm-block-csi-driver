@@ -539,15 +539,21 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(expected_exception=array_errors.ObjectNotFoundError):
             self.mediator.expand_volume(volume_id=volume.wwn, required_bytes=self.required_bytes)
 
-    def test_expand_volume_vol_resize_errors(self):
+    def _expand_volume_vol_resize_errors(self, returned_error, expected_exception):
         volume = self._prepare_mocks_for_expand_volume()
-        self.mediator.client.cmd.vol_resize.side_effect = [xcli_errors.IllegalNameForObjectError("", "", "")]
-        with self.assertRaises(expected_exception=array_errors.IllegalObjectID):
+        self.mediator.client.cmd.vol_resize.side_effect = [returned_error]
+        with self.assertRaises(expected_exception=expected_exception):
             self.mediator.expand_volume(volume_id=volume.wwn, required_bytes=self.required_bytes)
-        self.mediator.client.cmd.vol_resize.side_effect = [xcli_errors.VolumeBadNameError("", "", "")]
-        with self.assertRaises(expected_exception=array_errors.ObjectNotFoundError):
-            self.mediator.expand_volume(volume_id=volume.wwn, required_bytes=self.required_bytes)
-        self.mediator.client.cmd.vol_resize.side_effect = [
-            xcli_errors.CommandFailedRuntimeError("", "No space to allocate to the volume", "")]
-        with self.assertRaises(expected_exception=array_errors.NotEnoughSpaceInPool):
-            self.mediator.expand_volume(volume_id=volume.wwn, required_bytes=self.required_bytes)
+
+    def test_expand_volume_illegal_object_id_error(self):
+        self._expand_volume_vol_resize_errors(returned_error=xcli_errors.IllegalNameForObjectError("", "", ""),
+                                              expected_exception=array_errors.IllegalObjectID)
+
+    def test_expand_volume_not_found_error(self):
+        self._expand_volume_vol_resize_errors(returned_error=xcli_errors.VolumeBadNameError("", "", ""),
+                                              expected_exception=array_errors.ObjectNotFoundError)
+
+    def test_expand_volume_not_enough_space_error(self):
+        self._expand_volume_vol_resize_errors(
+            returned_error=xcli_errors.CommandFailedRuntimeError("", "No space to allocate to the volume", ""),
+            expected_exception=array_errors.NotEnoughSpaceInPool)
