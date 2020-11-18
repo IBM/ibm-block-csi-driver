@@ -645,14 +645,18 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.IllegalObjectID):
             self.array.expand_volume(volume_id=volume.id, required_bytes=10)
 
-    def test_expand_volume_errors(self):
+    def test_expand_volume_get_volume_not_found_error(self):
         self.client_mock.get_volume.side_effect = [NotFound("404", message="BE7A0001")]
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.array.expand_volume(volume_id="test_id", required_bytes=10)
+
+    def test_expand_volume_extend_volume_not_found_error(self):
         self.client_mock.get_volume.side_effect = [self.volume_response, self.volume_response]
         self.client_mock.extend_volume.side_effect = [NotFound("404", message="BE7A0001")]
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.array.expand_volume(volume_id="test_id", required_bytes=10)
+
+    def test_expand_volume_extend_not_enough_space_error(self):
         self.client_mock.extend_volume.side_effect = [ClientException("500", message="BE531465")]
         with self.assertRaises(array_errors.NotEnoughSpaceInPool):
             self.array.expand_volume(volume_id="test_id", required_bytes=10)
