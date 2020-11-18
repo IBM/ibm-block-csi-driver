@@ -264,10 +264,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         all_fcmaps.extend(self._get_fcmaps_as_source_if_exist(object_name))
         return all_fcmaps
 
-    def _expand_cli_volume(self, cli_volume, expanded_bytes):
+    def _expand_cli_volume(self, cli_volume, increase_in_bytes):
         volume_name = cli_volume.name
         try:
-            self.client.svctask.expandvdisksize(vdisk_id=volume_name, unit='b', size=expanded_bytes)
+            self.client.svctask.expandvdisksize(vdisk_id=volume_name, unit='b', size=increase_in_bytes)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 logger.warning("Failed to expand volume {}".format(volume_name))
@@ -279,7 +279,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                     raise ex
 
     def expand_volume(self, volume_id, required_bytes):
-        logger.info("Expanding volume with id : {0}".format(volume_id))
+        logger.info("Expanding volume with id : {0} to {1} bytes".format(volume_id, required_bytes))
         cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
         volume_name = cli_volume.name
         fcmaps = self._get_object_fcmaps(volume_name)
@@ -289,7 +289,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         final_size = self._convert_size_bytes(required_bytes)
         increase_in_bytes = final_size - current_size
         self._expand_cli_volume(cli_volume, increase_in_bytes)
-        logger.info("Finished volume expansion. id : {0}".format(volume_id))
+        logger.info("Finished volume expansion. id : {0}. volume increased by {1} bytes".format(volume_id, increase_in_bytes))
 
     def _get_fcmaps(self, volume_name, endpoint_type):
         """
