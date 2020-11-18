@@ -284,6 +284,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         volume_name = cli_volume.name
         fcmaps = self._get_object_fcmaps(volume_name)
         self._safe_delete_fcmaps(volume_name, fcmaps)
+
         current_size = int(cli_volume.capacity)
         final_size = self._convert_size_bytes(required_bytes)
         increase_in_bytes = final_size - current_size
