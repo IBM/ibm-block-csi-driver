@@ -219,11 +219,11 @@ def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
     return res
 
 
-def generate_csi_expand_volume_response(volume):
+def generate_csi_expand_volume_response(capacity_bytes, node_expansion_required=True):
     logger.debug("creating response for expand volume")
     res = csi_pb2.ControllerExpandVolumeResponse(
-        capacity_bytes=volume.capacity_bytes,
-        node_expansion_required=True,
+        capacity_bytes=capacity_bytes,
+        node_expansion_required=node_expansion_required,
     )
 
     logger.debug("finished creating expand volume response")
