@@ -180,13 +180,9 @@ def validate_validate_volume_capabilities_request(request):
     if request.parameters:
         _validate_create_volume_parameters(request.parameters)
 
-    logger.debug("validating volume capabilities")
     validate_csi_volume_capabilities(request.volume_capabilities)
 
-    logger.debug("validating secrets")
-    if request.secrets:
-        validate_secret(request.secrets)
-    logger.debug("request validation finished.")
+    validate_secret(request.secrets)
 
 
 def validate_volume_context_match_volume(volume_context, volume):
