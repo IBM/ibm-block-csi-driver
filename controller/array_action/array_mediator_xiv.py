@@ -160,13 +160,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.IllegalObjectName(ex.status)
 
-    def expand_volume(self, volume_id, required_bytes):
-        logger.info("Expanding volume with id : {0} to {1} bytes".format(volume_id, required_bytes))
-        cli_volume = self._get_cli_object_by_wwn(volume_id=volume_id, not_exist_err=True)
-
-        final_size_in_blocks = self._convert_size_bytes_to_blocks(required_bytes)
-        current_size_in_blocks = int(cli_volume.capacity)
-        increase_in_blocks = final_size_in_blocks - current_size_in_blocks
+    def _expand_cli_volume(self, cli_volume, increase_in_blocks):
         try:
             self.client.cmd.vol_resize(vol=cli_volume.name, size_blocks=increase_in_blocks)
         except xcli_errors.IllegalNameForObjectError as ex:
@@ -174,14 +168,22 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.IllegalObjectID(ex.status)
         except xcli_errors.VolumeBadNameError as ex:
             logger.exception(ex)
-            raise controller_errors.ObjectNotFoundError(volume_id)
+            raise controller_errors.ObjectNotFoundError(cli_volume.id)
         except xcli_errors.CommandFailedRuntimeError as ex:
             logger.exception(ex)
             if "No space to allocate to the volume" in ex.status:
                 raise controller_errors.NotEnoughSpaceInPool(cli_volume.pool_name)
             else:
-                logger.exception(ex)
                 raise ex
+
+    def expand_volume(self, volume_id, required_bytes):
+        logger.info("Expanding volume with id : {0} to {1} bytes".format(volume_id, required_bytes))
+        cli_volume = self._get_cli_object_by_wwn(volume_id=volume_id, not_exist_err=True)
+
+        final_size_in_blocks = self._convert_size_bytes_to_blocks(required_bytes)
+        current_size_in_blocks = int(cli_volume.capacity)
+        increase_in_blocks = final_size_in_blocks - current_size_in_blocks
+        self._expand_cli_volume(cli_volume=cli_volume, increase_in_blocks=increase_in_blocks)
         logger.info(
             "Finished volume expansion. id : {0}. volume increased by {1} bytes".format(volume_id, increase_in_blocks))
 
