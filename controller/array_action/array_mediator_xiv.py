@@ -16,6 +16,10 @@ from controller.common.utils import string_to_array
 array_connections_dict = {}
 logger = get_stdout_logger()
 
+LUN_IS_ALREADY_IN_USE_ERROR = "LUN is already in use"
+THE_REQUESTED_MAPPING_IS_NOT_DEFINED_ERROR = "The requested mapping is not defined"
+NO_SPACE_TO_ALLOCATE_TO_THE_VOLUME_ERROR = "No space to allocate to the volume"
+
 
 class XIVArrayMediator(ArrayMediatorAbstract):
     ARRAY_ACTIONS = {}
@@ -171,7 +175,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.ObjectNotFoundError(cli_volume.id)
         except xcli_errors.CommandFailedRuntimeError as ex:
             logger.exception(ex)
-            if "No space to allocate to the volume" in ex.status:
+            if NO_SPACE_TO_ALLOCATE_TO_THE_VOLUME_ERROR in ex.status:
                 raise controller_errors.NotEnoughSpaceInPool(cli_volume.pool_name)
             else:
                 raise ex
@@ -223,7 +227,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
         except xcli_errors.CommandFailedRuntimeError as ex:
             logger.exception(ex)
-            if "No space to allocate to the volume" in ex.status:
+            if NO_SPACE_TO_ALLOCATE_TO_THE_VOLUME_ERROR in ex.status:
                 raise controller_errors.NotEnoughSpaceInPool(pool=pool)
 
     def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
@@ -256,10 +260,8 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def _get_cli_object_by_wwn(self, volume_id, not_exist_err=False):
         cli_object = self.client.cmd.vol_list(wwn=volume_id).as_single_element
-        if not cli_object:
-            if not_exist_err:
-                raise controller_errors.ObjectNotFoundError(volume_id)
-            return None
+        if not cli_object and not_exist_err:
+            raise controller_errors.ObjectNotFoundError(volume_id)
         return cli_object
 
     def _get_object_name_by_wwn(self, volume_id):
@@ -433,7 +435,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.HostNotFoundError(host_name)
         except xcli_errors.CommandFailedRuntimeError as ex:
             logger.exception(ex)
-            if "LUN is already in use" in ex.status:
+            if LUN_IS_ALREADY_IN_USE_ERROR in ex.status:
                 raise controller_errors.LunAlreadyInUseError(lun, host_name)
             else:
                 raise controller_errors.MappingError(vol_name, host_name, ex)
@@ -459,7 +461,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                 "unmap volume : {0} from host : {1}".format(volume_id, host_name))
         except xcli_errors.CommandFailedRuntimeError as ex:
             logger.exception(ex)
-            if "The requested mapping is not defined" in ex.status:
+            if THE_REQUESTED_MAPPING_IS_NOT_DEFINED_ERROR in ex.status:
                 raise controller_errors.VolumeAlreadyUnmappedError(vol_name)
             else:
                 raise controller_errors.UnMappingError(vol_name, host_name, ex)
