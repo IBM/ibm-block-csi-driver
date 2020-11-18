@@ -907,6 +907,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.expand_volume('vol_id', 1024)
         self.svc.client.svctask.expandvdisksize.assert_called_once_with(vdisk_id='test_vol', unit='b', size=512)
 
+    def test_expand_volume_success_with_size_rounded_up(self):
+        self._prepare_mocks_for_expand_volume()
+        self.svc.expand_volume('vol_id', 513)
+        self.svc.client.svctask.expandvdisksize.assert_called_once_with(vdisk_id='test_vol', unit='b', size=512)
+
     def test_expand_volume_raise_object_in_use(self):
         self._prepare_mocks_for_expand_volume()
         fcmaps = self.fcmaps_as_source
@@ -923,26 +928,30 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.expandvdisksize.assert_not_called()
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
-    def test_expand_volume_expandvdisksize_errors(self, mock_warning):
+    def _expand_volume_expandvdisksize_errors(self, mock_warning, returned_error, expected_raised):
         self._prepare_mocks_for_expand_volume()
         mock_warning.return_value = False
-        self.svc.client.svctask.expandvdisksize.side_effect = [
-            CLIFailureError("CMMVC5753E")]
-        with self.assertRaises(array_errors.ObjectNotFoundError):
+
+        self.svc.client.svctask.expandvdisksize.side_effect = [returned_error]
+
+        with self.assertRaises(expected_raised):
             self.svc.expand_volume('vol_id', 2)
-        self.svc.client.svctask.expandvdisksize.side_effect = [
-            CLIFailureError("CMMVC8957E")]
-        with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.svc.expand_volume('vol_id', 2)
-        self.svc.client.svctask.expandvdisksize.side_effect = [
-            CLIFailureError("CMMVC5860E")]
-        with self.assertRaises(array_errors.NotEnoughSpaceInPool):
-            self.svc.expand_volume('vol_id', 2)
-        self.svc.client.svctask.expandvdisksize.side_effect = [
-            CLIFailureError("Failed")]
-        with self.assertRaises(CLIFailureError):
-            self.svc.expand_volume('vol_id', 2)
-        self.svc.client.svctask.expandvdisksize.side_effect = [
-            Exception("Failed")]
-        with self.assertRaises(Exception):
-            self.svc.expand_volume('vol_id', 2)
+
+    def test_expand_volume_expandvdisksize_object_not_found_error(self):
+        self._expand_volume_expandvdisksize_errors(returned_error=CLIFailureError("CMMVC5753E"),
+                                                   expected_raised=array_errors.ObjectNotFoundError)
+
+    def test_expand_volume_expandvdisksize_volume_not_found_error(self):
+        self._expand_volume_expandvdisksize_errors(returned_error=CLIFailureError("CMMVC8957E"),
+                                                   expected_raised=array_errors.ObjectNotFoundError)
+
+    def test_expand_volume_expandvdisksize_not_enough_space_error(self):
+        self._expand_volume_expandvdisksize_errors(returned_error=CLIFailureError("CMMVC5860E"),
+                                                   expected_raised=array_errors.NotEnoughSpaceInPool)
+
+    def test_expand_volume_expandvdisksize_cli_failure_error(self):
+        self._expand_volume_expandvdisksize_errors(returned_error=CLIFailureError("Failed"),
+                                                   expected_raised=CLIFailureError)
+
+    def test_expand_volume_expandvdisksize_general_error(self):
+        self._expand_volume_expandvdisksize_errors(returned_error=Exception("Failed"), expected_raised=Exception)

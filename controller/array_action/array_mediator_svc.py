@@ -277,19 +277,18 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                     raise controller_errors.NotEnoughSpaceInPool(pool=cli_volume.mdisk_grp_name)
                 else:
                     raise ex
-        except Exception as ex:
-            logger.exception(ex)
-            raise ex
 
     def expand_volume(self, volume_id, required_bytes):
+        logger.info("Expanding volume with id : {0}".format(volume_id))
         cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
         volume_name = cli_volume.name
         fcmaps = self._get_object_fcmaps(volume_name)
         self._safe_delete_fcmaps(volume_name, fcmaps)
         current_size = int(cli_volume.capacity)
         final_size = self._convert_size_bytes(required_bytes)
-        expanded_bytes = final_size - current_size
-        self._expand_cli_volume(cli_volume, expanded_bytes)
+        increase_in_bytes = final_size - current_size
+        self._expand_cli_volume(cli_volume, increase_in_bytes)
+        logger.info("Finished volume expansion. id : {0}".format(volume_id))
 
     def _get_fcmaps(self, volume_name, endpoint_type):
         """
