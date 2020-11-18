@@ -289,7 +289,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         final_size = self._convert_size_bytes(required_bytes)
         increase_in_bytes = final_size - current_size
         self._expand_cli_volume(cli_volume, increase_in_bytes)
-        logger.info("Finished volume expansion. id : {0}. volume increased by {1} bytes".format(volume_id, increase_in_bytes))
+        logger.info(
+            "Finished volume expansion. id : {0}. volume increased by {1} bytes".format(volume_id, increase_in_bytes))
 
     def _get_fcmaps(self, volume_name, endpoint_type):
         """
