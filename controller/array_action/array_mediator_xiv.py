@@ -161,11 +161,14 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.IllegalObjectName(ex.status)
 
     def expand_volume(self, volume_id, required_bytes):
-        required_bytes_in_blocks = self._convert_size_bytes_to_blocks(required_bytes)
+        logger.info("Expanding volume with id : {0} to {1} bytes".format(volume_id, required_bytes))
         cli_volume = self._get_cli_object_by_wwn(volume_id=volume_id, not_exist_err=True)
-        size_blocks = required_bytes_in_blocks - int(cli_volume.capacity)
+
+        final_size_in_blocks = self._convert_size_bytes_to_blocks(required_bytes)
+        current_size_in_blocks = int(cli_volume.capacity)
+        increase_in_blocks = final_size_in_blocks - current_size_in_blocks
         try:
-            self.client.cmd.vol_resize(vol=cli_volume.name, size_blocks=size_blocks)
+            self.client.cmd.vol_resize(vol=cli_volume.name, size_blocks=increase_in_blocks)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectID(ex.status)
@@ -179,6 +182,8 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             else:
                 logger.exception(ex)
                 raise ex
+        logger.info(
+            "Finished volume expansion. id : {0}. volume increased by {1} bytes".format(volume_id, increase_in_blocks))
 
     def validate_supported_capabilities(self, capabilities):
         logger.info("validate_supported_capabilities for capabilities : {0}".format(capabilities))
