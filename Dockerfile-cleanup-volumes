@@ -13,7 +13,7 @@
 # limitations under the License.
 
 FROM centos:7
-RUN yum --enablerepo=extras -y install epel-release && yum -y install python36-pip
+RUN yum --enablerepo=extras -y install epel-release && yum -y install python38-pip
 
 COPY scripts/ci/cleanup_volumes.py /scripts/cleanup_volumes.py
 RUN pip3 install pyxcli
