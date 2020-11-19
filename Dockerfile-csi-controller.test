@@ -22,7 +22,7 @@ COPY controller/requirements.txt /driver/controller/
 RUN pip3 install --upgrade pip==19.1.1
 # avoid default boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
-# TODO: CSI-2350 remove env var
+# TODO: remove CRYPTOGRAPHY_ALLOW_OPENSSL_102 when upgrading to ubi8
 ENV CRYPTOGRAPHY_ALLOW_OPENSSL_102=true
 RUN pip3 install -r /driver/controller/requirements.txt
 
