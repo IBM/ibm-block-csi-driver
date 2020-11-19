@@ -17,8 +17,8 @@ array_connections_dict = {}
 logger = get_stdout_logger()
 
 LUN_IS_ALREADY_IN_USE_ERROR = "LUN is already in use"
-THE_REQUESTED_MAPPING_IS_NOT_DEFINED_ERROR = "The requested mapping is not defined"
-NO_SPACE_TO_ALLOCATE_TO_THE_VOLUME_ERROR = "No space to allocate to the volume"
+UNDEFINED_MAPPING_ERROR = "The requested mapping is not defined"
+NO_ALLOCATION_SPACE_ERROR = "No space to allocate to the volume"
 
 
 class XIVArrayMediator(ArrayMediatorAbstract):
@@ -175,7 +175,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.ObjectNotFoundError(cli_volume.id)
         except xcli_errors.CommandFailedRuntimeError as ex:
             logger.exception(ex)
-            if NO_SPACE_TO_ALLOCATE_TO_THE_VOLUME_ERROR in ex.status:
+            if NO_ALLOCATION_SPACE_ERROR in ex.status:
                 raise controller_errors.NotEnoughSpaceInPool(cli_volume.pool_name)
             else:
                 raise ex
@@ -227,7 +227,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
         except xcli_errors.CommandFailedRuntimeError as ex:
             logger.exception(ex)
-            if NO_SPACE_TO_ALLOCATE_TO_THE_VOLUME_ERROR in ex.status:
+            if NO_ALLOCATION_SPACE_ERROR in ex.status:
                 raise controller_errors.NotEnoughSpaceInPool(pool=pool)
 
     def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
@@ -461,7 +461,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                 "unmap volume : {0} from host : {1}".format(volume_id, host_name))
         except xcli_errors.CommandFailedRuntimeError as ex:
             logger.exception(ex)
-            if THE_REQUESTED_MAPPING_IS_NOT_DEFINED_ERROR in ex.status:
+            if UNDEFINED_MAPPING_ERROR in ex.status:
                 raise controller_errors.VolumeAlreadyUnmappedError(vol_name)
             else:
                 raise controller_errors.UnMappingError(vol_name, host_name, ex)
