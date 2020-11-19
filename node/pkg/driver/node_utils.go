@@ -63,6 +63,7 @@ type NodeUtilsInterface interface {
 	FormatDevice(devicePath string, fsType string)
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
+	ShortenNodeID(nodeId string) string
 }
 
 type NodeUtils struct {
@@ -346,4 +347,11 @@ func (n NodeUtils) IsNotMountPoint(file string) (bool, error) {
 // E.g. in order to access /etc/test.txt pod has to use /host/etc/test.txt
 func (n NodeUtils) GetPodPath(origPath string) string {
 	return path.Join(PrefixChrootOfHostRoot, origPath)
+}
+
+func (n NodeUtils) ShortenNodeID(nodeId string) string {
+	fcDelimiter := ":"
+	idWithSuffixToRemove := nodeId[:(MaxNodeIdLength + len(fcDelimiter))]
+	indexToTrimFrom := strings.LastIndex(idWithSuffixToRemove, fcDelimiter)
+	return idWithSuffixToRemove[:indexToTrimFrom]
 }

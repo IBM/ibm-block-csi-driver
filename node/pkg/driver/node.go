@@ -59,8 +59,9 @@ var (
 )
 
 const (
-	FCPath     = "/sys/class/fc_host"
-	FCPortPath = "/sys/class/fc_host/host*/port_name"
+	FCPath          = "/sys/class/fc_host"
+	FCPortPath      = "/sys/class/fc_host/host*/port_name"
+	MaxNodeIdLength = 128
 )
 
 //go:generate mockgen -destination=../../mocks/mock_NodeMounter.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeMounter
@@ -630,6 +631,12 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	delimiter := ";"
 	fcPorts := strings.Join(fcWWNs, ":")
 	nodeId := d.Hostname + delimiter + iscsiIQN + delimiter + fcPorts
+
+	if len(nodeId) > MaxNodeIdLength {
+		logger.Debugf("node id %s is longer then %v chars", nodeId, MaxNodeIdLength)
+		nodeId = d.NodeUtils.ShortenNodeID(nodeId)
+	}
+
 	logger.Debugf("node id is : %s", nodeId)
 
 	return &csi.NodeGetInfoResponse{
