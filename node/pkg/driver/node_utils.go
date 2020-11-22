@@ -38,6 +38,8 @@ const (
 	// Command lines inside the container will show /host prefix.
 	PrefixChrootOfHostRoot  = "/host"
 	PublishContextSeparator = ","
+	NodeIdDelimiter         = ";"
+	NodeIdFcDelimiter       = ":"
 	mkfsTimeoutMilliseconds = 15 * 60 * 1000
 )
 
@@ -63,7 +65,7 @@ type NodeUtilsInterface interface {
 	FormatDevice(devicePath string, fsType string)
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
-	ShortenNodeID(nodeId string) string
+	GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN string) (string, error)
 }
 
 type NodeUtils struct {
@@ -349,9 +351,30 @@ func (n NodeUtils) GetPodPath(origPath string) string {
 	return path.Join(PrefixChrootOfHostRoot, origPath)
 }
 
-func (n NodeUtils) ShortenNodeID(nodeId string) string {
-	fcDelimiter := ":"
-	idWithSuffixToRemove := nodeId[:(MaxNodeIdLength + len(fcDelimiter))]
-	indexToTrimFrom := strings.LastIndex(idWithSuffixToRemove, fcDelimiter)
-	return idWithSuffixToRemove[:indexToTrimFrom]
+func (n NodeUtils) GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN string) (string, error) {
+	var nodeId strings.Builder
+	nodeId.Grow(MaxNodeIdLength)
+	nodeId.WriteString(hostName)
+
+	if len(fcWWNs) != 0 {
+		if nodeId.Len()+len(NodeIdDelimiter)+len(fcWWNs[0]) <= MaxNodeIdLength {
+			nodeId.WriteString(NodeIdDelimiter)
+			nodeId.WriteString(fcWWNs[0])
+		} else {
+			return "", fmt.Errorf(ErrorWhileTringToGenerateNodeId, nodeId.String(), MaxNodeIdLength)
+		}
+
+		for _, fcPort := range fcWWNs[1:] {
+			if nodeId.Len()+len(NodeIdFcDelimiter)+len(fcPort) <= MaxNodeIdLength {
+				nodeId.WriteString(NodeIdFcDelimiter)
+				nodeId.WriteString(fcPort)
+			}
+		}
+	}
+	if nodeId.Len()+len(NodeIdDelimiter)+len(iscsiIQN) <= MaxNodeIdLength {
+		nodeId.WriteString(NodeIdDelimiter)
+		nodeId.WriteString(iscsiIQN)
+	}
+
+	return nodeId.String(), nil
 }

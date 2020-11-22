@@ -628,13 +628,9 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	delimiter := ";"
-	fcPorts := strings.Join(fcWWNs, ":")
-	nodeId := d.Hostname + delimiter + iscsiIQN + delimiter + fcPorts
-
-	if len(nodeId) > MaxNodeIdLength {
-		logger.Debugf("node id %s is longer then %v chars", nodeId, MaxNodeIdLength)
-		nodeId = d.NodeUtils.ShortenNodeID(nodeId)
+	nodeId, err := d.NodeUtils.GenerateNodeID(d.Hostname, fcWWNs, iscsiIQN)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	logger.Debugf("node id is : %s", nodeId)
