@@ -586,12 +586,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 
 	err := d.nodeExpandVolumeRequestValidation(req)
 	if err != nil {
-		switch err.(type) {
-		case *RequestValidationError:
-			return nil, status.Error(codes.InvalidArgument, err.Error())
-		default:
-			return nil, status.Error(codes.Internal, err.Error())
-		}
+		return nil, err
 	}
 
 	volumeID := req.GetVolumeId()
@@ -648,17 +643,17 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 func (d *NodeService) nodeExpandVolumeRequestValidation(req *csi.NodeExpandVolumeRequest) error {
 	volumeID := req.GetVolumeId()
 	if volumeID == "" {
-		return &RequestValidationError{"Volume ID not provided"}
+		return status.Error(codes.InvalidArgument, &RequestValidationError{"Volume ID not provided"})
 	}
 
 	if !strings.Contains(volumeID, device_connectivity.VolumeIdDelimiter) {
 		errMsg := fmt.Sprintf("invalid Volume ID - no {%v} found", device_connectivity.VolumeIdDelimiter)
-		return &RequestValidationError{errMsg}
+		return status.Error(codes.NotFound, &RequestValidationError{errMsg})
 	}
 
 	volumePath := req.GetVolumePath()
 	if volumePath == "" {
-		return &RequestValidationError{"Volume path not provided"}
+		return status.Error(codes.InvalidArgument, &RequestValidationError{"Volume path not provided"})
 	}
 	return nil
 }
