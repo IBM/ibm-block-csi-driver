@@ -651,6 +651,11 @@ func (d *NodeService) nodeExpandVolumeRequestValidation(req *csi.NodeExpandVolum
 		return &RequestValidationError{"Volume ID not provided"}
 	}
 
+	if !strings.Contains(volumeID, device_connectivity.VolumeIdDelimiter) {
+		errMsg := fmt.Sprintf("invalid Volume ID - no {%v} found", device_connectivity.VolumeIdDelimiter)
+		return &RequestValidationError{errMsg}
+	}
+
 	volumePath := req.GetVolumePath()
 	if volumePath == "" {
 		return &RequestValidationError{"Volume path not provided"}

@@ -873,7 +873,7 @@ func newTestNodeServiceExpand(nodeUtils driver.NodeUtilsInterface, osDevConHelpe
 func TestNodeExpandVolume(t *testing.T) {
 	d := newTestNodeService(nil, nil)
 	targetPath := "/test/path"
-	volId := "vol-test"
+	volId := "someStorageType:vol-test"
 	expandRequest := &csi.NodeExpandVolumeRequest{
 		VolumeId:   volId,
 		VolumePath: targetPath,
