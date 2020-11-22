@@ -643,17 +643,20 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 func (d *NodeService) nodeExpandVolumeRequestValidation(req *csi.NodeExpandVolumeRequest) error {
 	volumeID := req.GetVolumeId()
 	if volumeID == "" {
-		return status.Error(codes.InvalidArgument, &RequestValidationError{"Volume ID not provided"})
+		err := &RequestValidationError{"Volume ID not provided"}
+		return status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	if !strings.Contains(volumeID, device_connectivity.VolumeIdDelimiter) {
 		errMsg := fmt.Sprintf("invalid Volume ID - no {%v} found", device_connectivity.VolumeIdDelimiter)
-		return status.Error(codes.NotFound, &RequestValidationError{errMsg})
+		err := &RequestValidationError{errMsg}
+		return status.Error(codes.NotFound, err.Error())
 	}
 
 	volumePath := req.GetVolumePath()
 	if volumePath == "" {
-		return status.Error(codes.InvalidArgument, &RequestValidationError{"Volume path not provided"})
+		err := &RequestValidationError{"Volume path not provided"}
+		return status.Error(codes.InvalidArgument, err.Error())
 	}
 	return nil
 }
