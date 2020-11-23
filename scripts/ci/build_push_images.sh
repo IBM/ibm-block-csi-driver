@@ -48,3 +48,4 @@ echo "   ${node_tag_specific}"
 
 # if param $1 given the script echo the specific tag
 [ -n "$1" ] && printf "${ctl_tag_specific}\n${node_tag_specific}\n" > $1 || :
+
