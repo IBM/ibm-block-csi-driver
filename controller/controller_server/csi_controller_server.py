@@ -153,7 +153,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateVolumeResponse()
 
-
     def _copy_to_existing_volume_from_source(self, volume, source_id, source_type,
                                              minimum_volume_size, array_mediator, pool):
         volume_name = volume.name
