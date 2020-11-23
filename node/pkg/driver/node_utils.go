@@ -355,10 +355,10 @@ func (n NodeUtils) GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN str
 	var nodeId strings.Builder
 	nodeId.Grow(MaxNodeIdLength)
 	nodeId.WriteString(hostName)
+	nodeId.WriteString(NodeIdDelimiter)
 
 	if len(fcWWNs) != 0 {
-		if nodeId.Len()+len(NodeIdDelimiter)+len(fcWWNs[0]) <= MaxNodeIdLength {
-			nodeId.WriteString(NodeIdDelimiter)
+		if nodeId.Len()+len(fcWWNs[0]) <= MaxNodeIdLength {
 			nodeId.WriteString(fcWWNs[0])
 		} else {
 			return "", fmt.Errorf(ErrorWhileTringToGenerateNodeId, nodeId.String(), MaxNodeIdLength)
@@ -371,9 +371,12 @@ func (n NodeUtils) GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN str
 			}
 		}
 	}
+
 	if nodeId.Len()+len(NodeIdDelimiter)+len(iscsiIQN) <= MaxNodeIdLength {
 		nodeId.WriteString(NodeIdDelimiter)
 		nodeId.WriteString(iscsiIQN)
+	} else if len(fcWWNs) == 0 {
+		return "", fmt.Errorf(ErrorWhileTringToGenerateNodeId, nodeId.String(), MaxNodeIdLength)
 	}
 
 	return nodeId.String(), nil
