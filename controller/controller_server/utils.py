@@ -257,7 +257,7 @@ def get_node_id_info(node_id):
     split_node = node_id.split(config.PARAMETERS_NODE_ID_DELIMITER)
     hostname, iscsi_iqn, fc_wwns = "", "", ""
     if len(split_node) == config.SUPPORTED_CONNECTIVITY_TYPES + 1:
-        hostname, iscsi_iqn, fc_wwns = split_node
+        hostname, fc_wwns, iscsi_iqn = split_node
     elif len(split_node) == 2:
         hostname, fc_wwns = split_node
     else:
