@@ -85,14 +85,14 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_validate_capabilities_passed(self):
         self.array.validate_supported_capabilities(
-            {config.CAPABILITIES_SPACEEFFICIENCY: config.CAPABILITY_THIN}
+            config.CAPABILITY_THIN
         )
         # nothing is raised
 
     def test_validate_capabilities_failed(self):
         with self.assertRaises(array_errors.StorageClassCapabilityNotSupported):
             self.array.validate_supported_capabilities(
-                {config.CAPABILITIES_SPACEEFFICIENCY: "fake"}
+                "fake"
             )
 
     def test_get_volume_with_no_pool(self):
