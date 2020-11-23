@@ -72,11 +72,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
 
         pool = request.parameters[config.PARAMETERS_POOL]
-        capabilities = {
-            key: value for key, value in request.parameters.items() if key in [
-                config.PARAMETERS_CAPABILITIES_SPACEEFFICIENCY,
-            ]
-        }
+
+        space_efficiency_type = request.parameters.get(config.PARAMETERS_SPACEEFFICIENCY)
 
         try:
             # TODO : pass multiple array addresses
@@ -106,8 +103,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
-                    array_mediator.validate_supported_capabilities(capabilities)
-                    volume = array_mediator.create_volume(volume_final_name, size, capabilities, pool)
+                    array_mediator.validate_supported_capabilities(space_efficiency_type)
+                    volume = array_mediator.create_volume(volume_final_name, size, space_efficiency_type, pool)
                 else:
                     logger.debug("volume found : {}".format(volume))
 
@@ -155,6 +152,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.INTERNAL)
             context.set_details('an internal exception occurred : {}'.format(ex))
             return csi_pb2.CreateVolumeResponse()
+
 
     def _copy_to_existing_volume_from_source(self, volume, source_id, source_type,
                                              minimum_volume_size, array_mediator, pool):
@@ -395,14 +393,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             array_type, volume_id = utils.get_volume_id_info(request.volume_id)
 
-            space_efficiency_capabilities = {
-                key: value for key, value in request.parameters.items() if key in [
-                    config.PARAMETERS_CAPABILITIES_SPACEEFFICIENCY,
-                ]
-            }
+            space_efficiency_type = request.parameters.get(config.PARAMETERS_SPACEEFFICIENCY)
 
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
-                array_mediator.validate_supported_capabilities(space_efficiency_capabilities)
+                array_mediator.validate_supported_capabilities(space_efficiency_type)
                 volume = array_mediator.get_object_by_id(object_id=volume_id, object_type=config.VOLUME_TYPE_NAME)
 
             if not volume:

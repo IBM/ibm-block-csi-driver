@@ -258,20 +258,19 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         filter_value = '{0}_vdisk_name={1}'.format(endpoint_type, volume_name)
         return self.client.svcinfo.lsfcmap(filtervalue=filter_value).as_list
 
-    def validate_supported_capabilities(self, capabilities):
-        logger.debug("validate_supported_capabilities for "
-                     "capabilities : {0}".format(capabilities))
+    def validate_supported_capabilities(self, space_efficiency_type):
+        logger.debug("validate_supported_space_efficiency_type for "
+                     "space_efficiency : {0}".format(space_efficiency_type))
         # Currently, we only support one capability "SpaceEfficiency"
         # The value should be: "thin/thick/compressed/deduplicated"
-        if (capabilities and capabilities.get(
-                config.CAPABILITIES_SPACEEFFICIENCY).lower() not in
+        if (space_efficiency_type and space_efficiency_type.lower() not in
                 [config.CAPABILITY_THIN, config.CAPABILITY_THICK,
                  config.CAPABILITY_COMPRESSED,
                  config.CAPABILITY_DEDUPLICATED]):
-            logger.error("capability value is not "
-                         "supported {0}".format(capabilities))
+            logger.error("space_efficiency type value is not "
+                         "supported {0}".format(space_efficiency_type))
             raise controller_errors.StorageClassCapabilityNotSupported(
-                capabilities)
+                space_efficiency_type)
 
         logger.info("Finished validate_supported_capabilities")
 

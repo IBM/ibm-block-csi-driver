@@ -632,17 +632,16 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             logger.debug("can not found host by initiators: {0} ".format(initiators))
             raise array_errors.HostNotFoundError(initiators)
 
-    def validate_supported_capabilities(self, capabilities):
-        logger.debug("Validating capabilities: {0}".format(capabilities))
+    def validate_supported_capabilities(self, space_efficiency_type):
+        logger.debug("Validating capabilities: {0}".format(space_efficiency_type))
 
         # Currently, we only support one capability "SpaceEfficiency"
         # The value should be: "thin"
-        if (capabilities and capabilities.get(
-                config.CAPABILITIES_SPACEEFFICIENCY).lower() not in
+        if (space_efficiency_type and space_efficiency_type.lower() not in
                 [config.CAPABILITY_THIN, ]):
             logger.error("capabilities is not supported.")
             raise array_errors.StorageClassCapabilityNotSupported(
-                capabilities)
+                space_efficiency_type)
 
         logger.debug("Finished validating capabilities.")
 

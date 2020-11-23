@@ -159,7 +159,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def validate_supported_capabilities(self, capabilities):
         logger.info("validate_supported_capabilities for capabilities : {0}".format(capabilities))
         # for a9k there should be no capabilities
-        if capabilities or len(capabilities) > 0:
+        if capabilities:
             raise controller_errors.StorageClassCapabilityNotSupported(capabilities)
 
         logger.info("Finished validate_supported_capabilities")

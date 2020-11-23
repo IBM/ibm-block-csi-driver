@@ -232,16 +232,18 @@ def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
     return res
 
 
-def _get_supported_capabilities(volume_capabilities):
-    if volume_capabilities.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_MOUNT):
-        return csi_pb2.VolumeCapability(
-            mount=csi_pb2.VolumeCapability.MountVolume(fs_type=volume_capabilities.mount.fs_type),
-            access_mode=csi_pb2.VolumeCapability.AccessMode(mode=volume_capabilities.access_mode.mode))
+def _get_supported_capability(volume_capability):
+    access_mode = csi_pb2.VolumeCapability.AccessMode(mode=volume_capability.access_mode.mode)
 
-    elif volume_capabilities.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_BLOCK):
+    if volume_capability.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_MOUNT):
+        return csi_pb2.VolumeCapability(
+            mount=csi_pb2.VolumeCapability.MountVolume(fs_type=volume_capability.mount.fs_type),
+            access_mode=access_mode)
+
+    elif volume_capability.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_BLOCK):
         return csi_pb2.VolumeCapability(
             mount=csi_pb2.VolumeCapability.BlockVolume(),
-            access_mode=csi_pb2.VolumeCapability.AccessMode(mode=volume_capabilities.access_mode.mode))
+            access_mode=access_mode)
 
 
 def generate_csi_validate_volume_capabilities_response(volume_context, volume_capabilities, parameters):
@@ -249,7 +251,7 @@ def generate_csi_validate_volume_capabilities_response(volume_context, volume_ca
 
     capabilities = []
     for capability in volume_capabilities:
-        supported_capabilities = _get_supported_capabilities(volume_capabilities=capability)
+        supported_capabilities = _get_supported_capability(volume_capability=capability)
         capabilities.append(supported_capabilities)
 
     res = csi_pb2.ValidateVolumeCapabilitiesResponse(confirmed=csi_pb2.ValidateVolumeCapabilitiesResponse.Confirmed(
