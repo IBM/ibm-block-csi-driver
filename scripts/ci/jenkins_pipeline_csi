@@ -33,47 +33,12 @@ pipeline {
                 sh './scripts/run_yamlcheck.sh'
             }
         }
-        stage ('Build docker images') {
-            steps {
-                script {
-                    sh 'bash ./scripts/ci/run_variables_verification.sh'
-                    branch = sh(script:"echo $GIT_BRANCH | sed 's|/|.|g'",returnStdout:true).trim()
-                    specific_tag = "${IMAGE_VERSION}_b${BUILD_NUMBER}_${branch}"
-                    if (latest_tag.contains(GIT_BRANCH)) {
-                        controller_image_latest = docker.build("${CSI_CONTROLLER_IMAGE}", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER} -f ${Dockerfile_controller} .")
-                        node_image_latest = docker.build("${CSI_NODE_IMAGE}", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER} -f ${Dockerfile_node} .")
-                    }
-                    controller_image_with_generated_tag = docker.build("${CSI_CONTROLLER_IMAGE}:$specific_tag", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER} -f ${Dockerfile_controller} .")
-                    node_image_with_generated_tag = docker.build("${CSI_NODE_IMAGE}:$specific_tag", "--build-arg VERSION=${IMAGE_VERSION} --build-arg BUILD_NUMBER=${BUILD_NUMBER} -f ${Dockerfile_node} .")
-                }
-            }
-        }
-        stage ('push docker images') {
+        stage ('CSI-controller & node: Build and push images') {
             steps {
                 script {
                     registryUrl = "${registry_protocol}://${DOCKER_REGISTRY}"
                     docker.withRegistry(registryUrl, registryCredential) {
-                        if (latest_tag.contains(GIT_BRANCH)) {
-                            controller_image_latest.push()
-                            node_image_latest.push()
-                        }
-                        controller_image_with_generated_tag.push()
-                        node_image_with_generated_tag.push()
-                    }
-                }
-            }
-        }
-        stage ('Save Artifacts') {
-            steps {
-                script {
-                    controller_registry = "${DOCKER_REGISTRY}/${CSI_CONTROLLER_IMAGE}"
-                    node_registry = "${DOCKER_REGISTRY}/${CSI_NODE_IMAGE}"
-                    sh 'dirname ${artifactory_path} | xargs mkdir -p'
-                    sh "echo ${controller_registry}:$specific_tag > ${artifactory_path}"
-                    sh "echo ${node_registry}:$specific_tag >> ${artifactory_path}"
-                    if (latest_tag.contains(GIT_BRANCH)) {
-                        sh "echo ${controller_registry}:latest >> ${artifactory_path}"
-                        sh "echo ${node_registry}:latest >> ${artifactory_path}"
+                        sh './scripts/ci/build_push_images.sh build/reports/images_url'
                     }
                 }
             }
