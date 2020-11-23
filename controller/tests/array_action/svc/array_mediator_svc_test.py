@@ -444,25 +444,21 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.rmvolume.assert_called_once_with(vdisk_id="test_snap")
 
     def test_validate_supported_capabilities_raise_error(self):
-        capabilities_a = {"SpaceEfficiency": "Test"}
+        capabilities_a = "Test"
         with self.assertRaises(
                 array_errors.StorageClassCapabilityNotSupported):
             self.svc.validate_supported_capabilities(capabilities_a)
-        capabilities_b = {"SpaceEfficiency": ""}
-        with self.assertRaises(
-                array_errors.StorageClassCapabilityNotSupported):
-            self.svc.validate_supported_capabilities(capabilities_b)
-        capabilities_c = {}
+        capabilities_c = ""
         self.svc.validate_supported_capabilities(capabilities_c)
 
     def test_validate_supported_capabilities_success(self):
-        capabilities = {"SpaceEfficiency": "thin"}
+        capabilities = "thin"
         self.svc.validate_supported_capabilities(capabilities)
-        capabilities = {"SpaceEfficiency": "thick"}
+        capabilities = "thick"
         self.svc.validate_supported_capabilities(capabilities)
-        capabilities = {"SpaceEfficiency": "compressed"}
+        capabilities = "compressed"
         self.svc.validate_supported_capabilities(capabilities)
-        capabilities = {"SpaceEfficiency": "deduplicated"}
+        capabilities = "deduplicated"
         self.svc.validate_supported_capabilities(capabilities)
 
     def test_build_kwargs_from_capabilities(self):
