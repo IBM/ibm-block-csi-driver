@@ -361,7 +361,7 @@ func (n NodeUtils) GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN str
 		if nodeId.Len()+len(fcWWNs[0]) <= MaxNodeIdLength {
 			nodeId.WriteString(fcWWNs[0])
 		} else {
-			return "", fmt.Errorf(ErrorWhileTringToGenerateNodeId, nodeId.String(), MaxNodeIdLength)
+			return "", fmt.Errorf(ErrorWhileTryingToGenerateNodeId, nodeId.String(), MaxNodeIdLength)
 		}
 
 		for _, fcPort := range fcWWNs[1:] {
@@ -376,7 +376,7 @@ func (n NodeUtils) GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN str
 		nodeId.WriteString(NodeIdDelimiter)
 		nodeId.WriteString(iscsiIQN)
 	} else if len(fcWWNs) == 0 {
-		return "", fmt.Errorf(ErrorWhileTringToGenerateNodeId, nodeId.String(), MaxNodeIdLength)
+		return "", fmt.Errorf(ErrorWhileTryingToGenerateNodeId, nodeId.String(), MaxNodeIdLength)
 	}
 
 	return nodeId.String(), nil
