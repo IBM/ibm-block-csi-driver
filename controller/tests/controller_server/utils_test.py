@@ -305,17 +305,17 @@ class TestUtils(unittest.TestCase):
             utils.get_node_id_info("badnodeformat")
             self.assertTrue("node" in ex.message)
 
-        hostname, iscsi_iqn, fc_wwns = utils.get_node_id_info("hostabc;iqn.ibm;")
+        hostname, iscsi_iqn, fc_wwns = utils.get_node_id_info("hostabc;;iqn.ibm")
         self.assertEqual(hostname, "hostabc")
         self.assertEqual(iscsi_iqn, "iqn.ibm")
         self.assertEqual(fc_wwns, "")
 
-        hostname, iscsi_iqn, fc_wwns = utils.get_node_id_info("hostabc;iqn.ibm;wwn1:wwn2")
+        hostname, iscsi_iqn, fc_wwns = utils.get_node_id_info("hostabc;wwn1:wwn2;iqn.ibm")
         self.assertEqual(hostname, "hostabc")
         self.assertEqual(iscsi_iqn, "iqn.ibm")
         self.assertEqual(fc_wwns, "wwn1:wwn2")
 
-        hostname, iscsi_iqn, fc_wwns = utils.get_node_id_info("hostabc;;wwn1:wwn2")
+        hostname, iscsi_iqn, fc_wwns = utils.get_node_id_info("hostabc;wwn1:wwn2;")
         self.assertEqual(hostname, "hostabc")
         self.assertEqual(iscsi_iqn, "")
         self.assertEqual(fc_wwns, "wwn1:wwn2")
