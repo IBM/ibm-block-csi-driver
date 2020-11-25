@@ -92,18 +92,17 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     return csi_pb2.CreateVolumeResponse()
 
                 required_bytes = request.capacity_range.required_bytes
-
-                min_size = array_mediator.minimal_volume_size_in_bytes
                 max_size = array_mediator.maximal_volume_size_in_bytes
+                min_size = array_mediator.minimal_volume_size_in_bytes
 
                 if required_bytes > max_size:
-                    message = messages.SizeOutOfRangeError_message.format(required_bytes, min_size, max_size)
+                    message = messages.SizeOutOfRangeError_message.format(required_bytes, max_size)
                     context.set_details(message)
                     context.set_code(grpc.StatusCode.OUT_OF_RANGE)
-                    return csi_pb2.ControllerExpandVolumeResponse()
+                    return csi_pb2.CreateVolumeResponse()
 
                 if required_bytes == 0:
-                    required_bytes = array_mediator.minimal_volume_size_in_bytes
+                    required_bytes = min_size
                     logger.debug("requested size is 0 so the default size will be used : {0} ".format(
                         required_bytes))
                 try:
