@@ -569,20 +569,19 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.debug(array_mediator)
 
                 required_bytes = request.capacity_range.required_bytes
-                min_size = array_mediator.minimal_volume_size_in_bytes
                 max_size = array_mediator.maximal_volume_size_in_bytes
 
                 volume_before_expand = array_mediator.get_object_by_id(volume_id, config.VOLUME_TYPE_NAME)
                 if not volume_before_expand:
                     raise controller_errors.ObjectNotFoundError(volume_id)
 
-                if required_bytes == 0 or volume_before_expand.capacity_bytes >= required_bytes:
+                if volume_before_expand.capacity_bytes >= required_bytes:
                     context.set_code(grpc.StatusCode.OK)
                     return utils.generate_csi_expand_volume_response(volume_before_expand.capacity_bytes,
                                                                      node_expansion_required=False)
 
                 if required_bytes > max_size:
-                    message = messages.SizeOutOfRangeError_message.format(required_bytes, min_size, max_size)
+                    message = messages.SizeOutOfRangeError_message.format(required_bytes, max_size)
                     context.set_details(message)
                     context.set_code(grpc.StatusCode.OUT_OF_RANGE)
                     return csi_pb2.ControllerExpandVolumeResponse()
