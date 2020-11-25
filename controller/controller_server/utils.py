@@ -106,7 +106,7 @@ def validate_create_volume_request(request):
     logger.debug("validating volume capacity")
     if request.capacity_range:
         if request.capacity_range.required_bytes < 0:
-            raise ValidationException(messages.size_not_negative_message)
+            raise ValidationException(messages.size_should_not_be_negative_message)
 
     else:
         raise ValidationException(messages.no_capacity_range_message)
@@ -167,7 +167,7 @@ def validate_expand_volume_request(request):
     logger.debug("validating volume capacity")
     if request.capacity_range:
         if request.capacity_range.required_bytes < 0:
-            raise ValidationException(messages.size_not_negative_message)
+            raise ValidationException(messages.size_should_not_be_negative_message)
     else:
         raise ValidationException(messages.no_capacity_range_message)
 
