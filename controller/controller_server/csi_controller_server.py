@@ -560,7 +560,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.debug(array_mediator)
 
                 required_bytes = request.capacity_range.required_bytes
-                min_size = array_mediator.minimal_volume_size_in_bytes
                 max_size = array_mediator.maximal_volume_size_in_bytes
 
                 volume_before_expand = array_mediator.get_object_by_id(volume_id, config.VOLUME_TYPE_NAME)
