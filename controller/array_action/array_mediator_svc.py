@@ -130,6 +130,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return 512  # 512 Bytes
 
     @classproperty
+    def maximal_volume_size_in_bytes(self):
+        return 256 * 1024 * 1024 * 1024 * 1024
+
+    @classproperty
     def max_lun_retries(self):
         return 10
 
@@ -249,6 +253,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def get_volume_name(self, volume_id):
         return self._get_volume_name_by_wwn(volume_id)
+
+    def expand_volume(self, volume_id, required_bytes):
+        pass
 
     def _get_fcmaps(self, volume_name, endpoint_type):
         """

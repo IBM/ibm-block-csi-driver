@@ -123,6 +123,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return 512  # 1 block, 512 bytes
 
     @classproperty
+    def maximal_volume_size_in_bytes(self):
+        return 16 * 1024 * 1024 * 1024 * 1024
+
+    @classproperty
     def max_lun_retries(self):
         return 10
 
@@ -374,6 +378,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         vol_name = api_volume.name
         logger.debug("found volume name : {0}".format(vol_name))
         return vol_name
+
+    def expand_volume(self, volume_id, required_bytes):
+        pass
 
     @convert_scsi_id_to_array_id
     def get_volume_mappings(self, volume_id):

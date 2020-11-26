@@ -149,6 +149,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.ALREADY_EXISTS)
             return csi_pb2.CreateVolumeResponse()
+        except controller_errors.NotEnoughSpaceInPool as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.RESOURCE_EXHAUSTED)
+            return csi_pb2.CreateVolumeResponse()
         except Exception as ex:
             logger.error("an internal exception occurred")
             logger.exception(ex)
@@ -534,6 +539,87 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.info("finished GetCapacity")
         return csi_pb2.GetCapacityResponse()
 
+    def ControllerExpandVolume(self, request, context):
+        set_current_thread_name(request.volume_id)
+        logger.info("ControllerExpandVolume")
+        secrets = request.secrets
+
+        try:
+            utils.validate_expand_volume_request(request)
+
+            user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
+
+            try:
+                array_type, volume_id = utils.get_volume_id_info(request.volume_id)
+            except ObjectIdError as ex:
+                logger.warning("volume id is invalid. error : {}".format(ex))
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+                return csi_pb2.ControllerExpandVolumeResponse()
+
+            with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
+                logger.debug(array_mediator)
+
+                required_bytes = request.capacity_range.required_bytes
+                max_size = array_mediator.maximal_volume_size_in_bytes
+
+                volume_before_expand = array_mediator.get_object_by_id(volume_id, config.VOLUME_TYPE_NAME)
+                if not volume_before_expand:
+                    raise controller_errors.ObjectNotFoundError(volume_id)
+
+                if volume_before_expand.capacity_bytes >= required_bytes:
+                    context.set_code(grpc.StatusCode.OK)
+                    return utils.generate_csi_expand_volume_response(volume_before_expand.capacity_bytes,
+                                                                     node_expansion_required=False)
+
+                if required_bytes > max_size:
+                    message = messages.SizeOutOfRangeError_message.format(required_bytes, max_size)
+                    context.set_details(message)
+                    context.set_code(grpc.StatusCode.OUT_OF_RANGE)
+                    return csi_pb2.ControllerExpandVolumeResponse()
+
+                logger.debug("expanding volume {0}".format(volume_id))
+                array_mediator.expand_volume(
+                    volume_id=volume_id,
+                    required_bytes=required_bytes)
+
+                volume_after_expand = array_mediator.get_object_by_id(volume_id, config.VOLUME_TYPE_NAME)
+                if not volume_after_expand:
+                    raise controller_errors.ObjectNotFoundError(volume_id)
+
+            res = utils.generate_csi_expand_volume_response(volume_after_expand.capacity_bytes)
+            logger.info("finished expanding volume")
+            return res
+
+        except controller_errors.PermissionDeniedError as ex:
+            context.set_code(grpc.StatusCode.PERMISSION_DENIED)
+            context.set_details(ex.message)
+            return csi_pb2.ControllerExpandVolumeResponse()
+
+        except controller_errors.ObjectNotFoundError as ex:
+            logger.info("Volume not found: {0}".format(ex))
+            context.set_code(grpc.StatusCode.NOT_FOUND)
+            context.set_details(ex.message)
+            return csi_pb2.ControllerExpandVolumeResponse()
+
+        except (ValidationException, controller_errors.IllegalObjectID) as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            return csi_pb2.ControllerExpandVolumeResponse()
+
+        except controller_errors.NotEnoughSpaceInPool as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.RESOURCE_EXHAUSTED)
+            return csi_pb2.ControllerExpandVolumeResponse()
+
+        except Exception as ex:
+            logger.debug("an internal exception occurred")
+            logger.exception(ex)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            context.set_details('an internal exception occurred : {}'.format(ex))
+            return csi_pb2.ControllerExpandVolumeResponse()
+
     def ControllerGetCapabilities(self, request, context):
         logger.info("ControllerGetCapabilities")
         types = csi_pb2.ControllerServiceCapability.RPC.Type
@@ -546,7 +632,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 csi_pb2.ControllerServiceCapability(
                     rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("PUBLISH_UNPUBLISH_VOLUME"))),
                 csi_pb2.ControllerServiceCapability(
-                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CLONE_VOLUME")))])
+                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CLONE_VOLUME"))),
+                csi_pb2.ControllerServiceCapability(
+                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("EXPAND_VOLUME")))])
 
         logger.info("finished ControllerGetCapabilities")
         return res
@@ -614,20 +702,24 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def GetPluginCapabilities(self, _, __):
         logger.info("GetPluginCapabilities")
-        types = csi_pb2.PluginCapability.Service.Type
+        service_type = csi_pb2.PluginCapability.Service.Type
+        volume_expansion_type = csi_pb2.PluginCapability.VolumeExpansion.Type
         capabilities = self.__get_identity_config("capabilities")
         capability_list = []
-        for cap in capabilities:
+        service_capability = capabilities.get('Service')
+        volume_expansion_capability = capabilities.get('VolumeExpansion')
+        if service_capability:
             capability_list.append(
                 csi_pb2.PluginCapability(
-                    service=csi_pb2.PluginCapability.Service(type=types.Value(cap))
-                )
-            )
-
+                    service=csi_pb2.PluginCapability.Service(type=service_type.Value(service_capability))))
+        if volume_expansion_capability:
+            capability_list.append(
+                csi_pb2.PluginCapability(
+                    volume_expansion=csi_pb2.PluginCapability.VolumeExpansion(
+                        type=volume_expansion_type.Value(volume_expansion_capability))))
         logger.info("finished GetPluginCapabilities")
         return csi_pb2.GetPluginCapabilitiesResponse(
             capabilities=capability_list
-
         )
 
     def Probe(self, _, context):

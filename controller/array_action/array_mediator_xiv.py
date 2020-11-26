@@ -56,6 +56,10 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         return 1 * 1024 * 1024 * 1024  # 1 GiB
 
     @classproperty
+    def maximal_volume_size_in_bytes(self):
+        return 1 * 1024 * 1024 * 1024 * 1024 * 1024
+
+    @classproperty
     def max_lun_retries(self):
         return 10
 
@@ -155,6 +159,9 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectName(ex.status)
+
+    def expand_volume(self, volume_id, required_bytes):
+        pass
 
     def validate_supported_capabilities(self, capabilities):
         logger.info("validate_supported_capabilities for capabilities : {0}".format(capabilities))
