@@ -27,7 +27,7 @@ COPY . .
 RUN make ibm-block-csi-driver
 
 # Final stage
-FROM registry.access.redhat.com/ubi7/ubi-minimal:7.8-328
+FROM registry.access.redhat.com/ubi7/ubi-minimal:7.9-224
 MAINTAINER IBM Storage
 
 ARG VERSION=1.4.0
@@ -67,8 +67,10 @@ RUN    ln -s /chroot/chroot-host-wrapper.sh /chroot/blkid \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/multipath \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/multipathd \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/mount \
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/resize2fs \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/sg_inq \
-    && ln -s /chroot/chroot-host-wrapper.sh /chroot/umount
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/umount \
+    && ln -s /chroot/chroot-host-wrapper.sh /chroot/xfs_growfs
 
 ENV PATH="/chroot:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
