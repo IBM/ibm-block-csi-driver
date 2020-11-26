@@ -30,6 +30,8 @@ FCMAP_ALREADY_COPYING = 'CMMVC5907E'
 VOL_NOT_FOUND = 'CMMVC8957E'
 POOL_NOT_MATCH_VOL_CAPABILITIES = 'CMMVC9292E'
 NOT_REDUCTION_POOL = 'CMMVC9301E'
+NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND = 'CMMVC5860E'
+NOT_ENOUGH_EXTENTS_IN_POOL_CREATE = 'CMMVC8710E'
 
 LIST_HOSTS_CMD_FORMAT = 'lshost {HOST_ID};'
 HOST_ID_PARAM = 'id'
@@ -254,8 +256,41 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def get_volume_name(self, volume_id):
         return self._get_volume_name_by_wwn(volume_id)
 
+    def _get_object_fcmaps(self, object_name):
+        all_fcmaps = []
+        fcmap_as_target = self._get_fcmap_as_target_if_exists(object_name)
+        if fcmap_as_target:
+            all_fcmaps.append(fcmap_as_target)
+        all_fcmaps.extend(self._get_fcmaps_as_source_if_exist(object_name))
+        return all_fcmaps
+
+    def _expand_cli_volume(self, cli_volume, increase_in_bytes):
+        volume_name = cli_volume.name
+        try:
+            self.client.svctask.expandvdisksize(vdisk_id=volume_name, unit='b', size=increase_in_bytes)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if not is_warning_message(ex.my_message):
+                logger.warning("Failed to expand volume {}".format(volume_name))
+                if OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message:
+                    raise controller_errors.ObjectNotFoundError(volume_name)
+                if NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND in ex.my_message:
+                    raise controller_errors.NotEnoughSpaceInPool(pool=cli_volume.mdisk_grp_name)
+                else:
+                    raise ex
+
     def expand_volume(self, volume_id, required_bytes):
-        pass
+        logger.info("Expanding volume with id : {0} to {1} bytes".format(volume_id, required_bytes))
+        cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
+        volume_name = cli_volume.name
+        fcmaps = self._get_object_fcmaps(volume_name)
+        self._safe_delete_fcmaps(volume_name, fcmaps)
+
+        current_size = int(cli_volume.capacity)
+        final_size = self._convert_size_bytes(required_bytes)
+        increase_in_bytes = final_size - current_size
+        self._expand_cli_volume(cli_volume, increase_in_bytes)
+        logger.info(
+            "Finished volume expansion. id : {0}. volume increased by {1} bytes".format(volume_id, increase_in_bytes))
 
     def _get_fcmaps(self, volume_name, endpoint_type):
         """
@@ -298,15 +333,15 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.debug("found wwn : {0}".format(wwn))
         return wwn
 
-    def _get_cli_volume_by_wwn_if_exist(self, volume_id):
+    def _get_cli_volume_by_wwn(self, volume_id, not_exist_err=False):
         filter_value = 'vdisk_UID=' + volume_id
         cli_volume = self.client.svcinfo.lsvdisk(bytes=True, filtervalue=filter_value).as_single_element
-        if not cli_volume:
-            return None
+        if not cli_volume and not_exist_err:
+            raise controller_errors.ObjectNotFoundError(volume_id)
         return cli_volume
 
     def _get_volume_name_by_wwn_if_exists(self, volume_id):
-        cli_volume = self._get_cli_volume_by_wwn_if_exist(volume_id)
+        cli_volume = self._get_cli_volume_by_wwn(volume_id)
         if not cli_volume:
             return None
         vol_name = cli_volume.name
@@ -345,6 +380,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                         or NOT_REDUCTION_POOL in ex.my_message):
                     raise controller_errors.PoolDoesNotMatchCapabilities(
                         pool, capabilities, ex)
+                if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in ex.my_message:
+                    raise controller_errors.NotEnoughSpaceInPool(pool=pool)
                 raise ex
         except Exception as ex:
             logger.exception(ex)
@@ -391,9 +428,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
-        cli_volume = self._get_cli_volume_by_wwn_if_exist(volume_id)
-        if not cli_volume:
-            raise controller_errors.ObjectNotFoundError(volume_id)
+        cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
         self._delete_object(cli_volume)
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
@@ -405,7 +440,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return self._generate_snapshot_response_with_verification(target_cli_volume)
 
     def get_object_by_id(self, object_id, object_type):
-        cli_object = self._get_cli_volume_by_wwn_if_exist(object_id)
+        cli_object = self._get_cli_volume_by_wwn(object_id)
         if not cli_object:
             return None
         if object_type is controller_config.SNAPSHOT_TYPE_NAME:
@@ -472,14 +507,13 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._stop_fcmap(fcmap_id)
         self._delete_fcmap(fcmap_id, force=True)
 
-    def _safe_delete_fcmaps_as_source(self, object_name):
-        fcmaps_as_source = self._get_fcmaps_as_source_if_exist(object_name)
-        unfinished_fcmaps = [fcmap for fcmap in fcmaps_as_source
+    def _safe_delete_fcmaps(self, object_name, fcmaps):
+        unfinished_fcmaps = [fcmap for fcmap in fcmaps
                              if fcmap.status != FCMAP_STATUS_DONE or fcmap.copy_rate == "0"]
         if unfinished_fcmaps:
             raise controller_errors.ObjectIsStillInUseError(id_or_name=object_name,
                                                             used_by=unfinished_fcmaps)
-        for fcmap in fcmaps_as_source:
+        for fcmap in fcmaps:
             self._delete_fcmap(fcmap.id, force=False)
 
     def _delete_object(self, cli_object, is_snapshot=False):
@@ -488,7 +522,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if is_snapshot and not fcmap_as_target:
             raise controller_errors.ObjectNotFoundError(object_name)
         if cli_object.FC_id == 'many':
-            self._safe_delete_fcmaps_as_source(object_name)
+            fcmaps_as_source = self._get_fcmaps_as_source_if_exist(object_name)
+            self._safe_delete_fcmaps(object_name, fcmaps_as_source)
         if fcmap_as_target:
             self._stop_and_delete_fcmap(fcmap_as_target.id)
         self._delete_volume_by_name(object_name)
@@ -526,7 +561,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def delete_snapshot(self, snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
-        cli_volume = self._get_cli_volume_by_wwn_if_exist(snapshot_id)
+        cli_volume = self._get_cli_volume_by_wwn(snapshot_id)
         if not cli_volume or not cli_volume.FC_id:
             raise controller_errors.ObjectNotFoundError(snapshot_id)
         self._delete_object(cli_volume, is_snapshot=True)
