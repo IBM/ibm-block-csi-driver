@@ -401,16 +401,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.info("Finished Expanding volume {0}.".format(volume_id))
 
     @convert_scsi_id_to_array_id
-    def expand_volume(self, volume_id, required_bytes):
-        logger.info("Expanding volume with id : {0} to {1} bytes".format(volume_id, required_bytes))
-        api_volume = self._get_api_volume_by_id(volume_id)
-        flashcopies = api_volume.flashcopy
-        self._safe_delete_flashcopies(flashcopies=flashcopies, volume_name=api_volume.name)
-
-        self._extend_volume(api_volume=api_volume, new_size_in_bytes=required_bytes)
-        logger.info("Finished Expanding volume {0}.".format(volume_id))
-
-    @convert_scsi_id_to_array_id
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume {}".format(volume_id))
         try:
