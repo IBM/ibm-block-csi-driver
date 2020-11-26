@@ -16,6 +16,10 @@ from controller.common.utils import string_to_array
 array_connections_dict = {}
 logger = get_stdout_logger()
 
+LUN_IS_ALREADY_IN_USE_ERROR = "LUN is already in use"
+UNDEFINED_MAPPING_ERROR = "The requested mapping is not defined"
+NO_ALLOCATION_SPACE_ERROR = "No space to allocate to the volume"
+
 
 class XIVArrayMediator(ArrayMediatorAbstract):
     ARRAY_ACTIONS = {}
@@ -155,13 +159,35 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def get_volume_name(self, volume_id):
         try:
-            return self._get_vol_by_wwn(volume_id)
+            return self._get_object_name_by_wwn(volume_id)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectName(ex.status)
 
+    def _expand_cli_volume(self, cli_volume, increase_in_blocks):
+        try:
+            self.client.cmd.vol_resize(vol=cli_volume.name, size_blocks=increase_in_blocks)
+        except xcli_errors.IllegalNameForObjectError as ex:
+            logger.exception(ex)
+            raise controller_errors.IllegalObjectID(ex.status)
+        except xcli_errors.VolumeBadNameError as ex:
+            logger.exception(ex)
+            raise controller_errors.ObjectNotFoundError(cli_volume.id)
+        except xcli_errors.CommandFailedRuntimeError as ex:
+            logger.exception(ex)
+            if NO_ALLOCATION_SPACE_ERROR in ex.status:
+                raise controller_errors.NotEnoughSpaceInPool(cli_volume.pool_name)
+            else:
+                raise ex
+
     def expand_volume(self, volume_id, required_bytes):
-        pass
+        logger.info("Expanding volume with id : {0} to {1} bytes".format(volume_id, required_bytes))
+        cli_volume = self._get_cli_object_by_wwn(volume_id=volume_id, not_exist_err=True)
+
+        size_in_blocks = self._convert_size_bytes_to_blocks(required_bytes)
+        self._expand_cli_volume(cli_volume=cli_volume, increase_in_blocks=size_in_blocks)
+        logger.info(
+            "Finished volume expansion. id : {0}. volume increased by {1} bytes".format(volume_id, size_in_blocks))
 
     def validate_supported_capabilities(self, capabilities):
         logger.info("validate_supported_capabilities for capabilities : {0}".format(capabilities))
@@ -197,6 +223,10 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
+        except xcli_errors.CommandFailedRuntimeError as ex:
+            logger.exception(ex)
+            if NO_ALLOCATION_SPACE_ERROR in ex.status:
+                raise controller_errors.NotEnoughSpaceInPool(pool=pool)
 
     def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
                                             minimum_volume_size_in_bytes, pool_id=None):
@@ -226,18 +256,22 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
-    def _get_vol_by_wwn(self, volume_id):
-        vol_by_wwn = self.client.cmd.vol_list(wwn=volume_id).as_single_element
-        if not vol_by_wwn:
+    def _get_cli_object_by_wwn(self, volume_id, not_exist_err=False):
+        cli_object = self.client.cmd.vol_list(wwn=volume_id).as_single_element
+        if not cli_object and not_exist_err:
             raise controller_errors.ObjectNotFoundError(volume_id)
+        return cli_object
 
-        vol_name = vol_by_wwn.name
-        logger.debug("found volume name : {0}".format(vol_name))
-        return vol_name
+    def _get_object_name_by_wwn(self, volume_id):
+        cli_object = self._get_cli_object_by_wwn(volume_id, not_exist_err=True)
+
+        object_name = cli_object.name
+        logger.debug("found volume name : {0}".format(object_name))
+        return object_name
 
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
-        volume_name = self._get_vol_by_wwn(volume_id)
+        volume_name = self._get_object_name_by_wwn(volume_id)
         cli_snapshots = self.client.cmd.snapshot_list(vol=volume_name).as_list
         if cli_snapshots:
             raise controller_errors.ObjectIsStillInUseError(
@@ -271,7 +305,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def get_object_by_id(self, object_id, object_type):
         try:
-            cli_object = self.client.cmd.vol_list(wwn=object_id).as_single_element
+            cli_object = self._get_cli_object_by_wwn(object_id)
         except xcli_errors.IllegalValueForArgumentError as ex:
             logger.exception(ex)
             raise controller_errors.IllegalObjectID(ex.status)
@@ -307,7 +341,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def delete_snapshot(self, snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
         try:
-            snapshot_name = self._get_vol_by_wwn(snapshot_id)
+            snapshot_name = self._get_object_name_by_wwn(snapshot_id)
         except controller_errors.ObjectNotFoundError:
             raise controller_errors.ObjectNotFoundError(snapshot_id)
 
@@ -349,7 +383,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume id : {0}".format(volume_id))
-        vol_name = self._get_vol_by_wwn(volume_id)
+        vol_name = self._get_object_name_by_wwn(volume_id)
         logger.debug("vol name : {0}".format(vol_name))
         mapping_list = self.client.cmd.vol_mapping_list(vol=vol_name).as_list
         res = {}
@@ -383,7 +417,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def map_volume(self, volume_id, host_name):
         logger.debug("mapping volume : {0} to host : {1}".format(volume_id, host_name))
-        vol_name = self._get_vol_by_wwn(volume_id)
+        vol_name = self._get_object_name_by_wwn(volume_id)
         lun = self._get_next_available_lun(host_name)
 
         try:
@@ -399,7 +433,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.HostNotFoundError(host_name)
         except xcli_errors.CommandFailedRuntimeError as ex:
             logger.exception(ex)
-            if "LUN is already in use" in ex.status:
+            if LUN_IS_ALREADY_IN_USE_ERROR in ex.status:
                 raise controller_errors.LunAlreadyInUseError(lun, host_name)
             else:
                 raise controller_errors.MappingError(vol_name, host_name, ex)
@@ -409,7 +443,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def unmap_volume(self, volume_id, host_name):
         logger.debug("un-mapping volume : {0} from host : {1}".format(volume_id, host_name))
 
-        vol_name = self._get_vol_by_wwn(volume_id)
+        vol_name = self._get_object_name_by_wwn(volume_id)
 
         try:
             self.client.cmd.unmap_vol(host=host_name, vol=vol_name)
@@ -425,7 +459,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                 "unmap volume : {0} from host : {1}".format(volume_id, host_name))
         except xcli_errors.CommandFailedRuntimeError as ex:
             logger.exception(ex)
-            if "The requested mapping is not defined" in ex.status:
+            if UNDEFINED_MAPPING_ERROR in ex.status:
                 raise controller_errors.VolumeAlreadyUnmappedError(vol_name)
             else:
                 raise controller_errors.UnMappingError(vol_name, host_name, ex)

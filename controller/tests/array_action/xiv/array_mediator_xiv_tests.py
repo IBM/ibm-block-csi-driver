@@ -18,6 +18,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect"):
             self.mediator = XIVArrayMediator("user", "password", self.fqdn)
         self.mediator.client = Mock()
+        self.required_bytes = 2000
 
     def test_get_volume_raise_correct_errors(self):
         error_msg = "ex"
@@ -80,6 +81,12 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(array_errors.PoolDoesNotExist):
             self.mediator.create_volume("vol", 10, [], "pool1")
 
+    def test_create_volume_raise_no_space_error(self):
+        self.mediator.client.cmd.vol_create.side_effect = [
+            xcli_errors.CommandFailedRuntimeError("", "No space to allocate to the volume", "")]
+        with self.assertRaises(array_errors.NotEnoughSpaceInPool):
+            self.mediator.create_volume("vol", 10, [], "pool1")
+
     @patch.object(XIVArrayMediator, "_generate_volume_response")
     def test_create_volume__generate_volume_response_raise_exception(self, response):
         response.side_effect = Exception("err")
@@ -96,7 +103,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_resize = Mock()
         self.mediator.copy_to_existing_volume_from_source(vol_name, src_snap_name, src_snap_capacity_in_bytes,
                                                           min_vol_size_in_bytes)
-        vol_size_in_blocks = int(self.mediator._convert_size_bytes_to_blocks(min_vol_size_in_bytes))
+        vol_size_in_blocks = 1
         self.mediator.client.cmd.vol_format.assert_called_once_with(vol=vol_name)
         self.mediator.client.cmd.vol_copy.assert_called_once_with(vol_src=src_snap_name, vol_trg=vol_name)
         self.mediator.client.cmd.vol_resize.assert_called_once_with(vol=vol_name, size_blocks=vol_size_in_blocks)
@@ -510,3 +517,40 @@ class TestArrayMediatorXIV(unittest.TestCase):
         targets_by_iqn = self.mediator.get_iscsi_targets_by_iqn()
 
         self.assertEqual(targets_by_iqn, {"iqn1": ["1.2.3.4", "[::1]"]})
+
+    def _prepare_mocks_for_expand_volume(self):
+        volume = utils.get_mock_xiv_volume(size="1", name="volume_name", wwn="volume_id")
+        self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=volume)
+        return volume
+
+    def test_expand_volume_succeed(self):
+        volume = self._prepare_mocks_for_expand_volume()
+        required_size_in_blocks = 3
+        self.mediator.expand_volume(volume_id=volume.wwn, required_bytes=self.required_bytes)
+        self.mediator.client.cmd.vol_resize.assert_called_once_with(vol=volume.name,
+                                                                    size_blocks=required_size_in_blocks)
+
+    def test_expand_vol_list_return_none(self):
+        volume = self._prepare_mocks_for_expand_volume()
+        self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=None)
+        with self.assertRaises(expected_exception=array_errors.ObjectNotFoundError):
+            self.mediator.expand_volume(volume_id=volume.wwn, required_bytes=self.required_bytes)
+
+    def _expand_volume_vol_resize_errors(self, returned_error, expected_exception):
+        volume = self._prepare_mocks_for_expand_volume()
+        self.mediator.client.cmd.vol_resize.side_effect = [returned_error]
+        with self.assertRaises(expected_exception=expected_exception):
+            self.mediator.expand_volume(volume_id=volume.wwn, required_bytes=self.required_bytes)
+
+    def test_expand_volume_illegal_object_id_error(self):
+        self._expand_volume_vol_resize_errors(returned_error=xcli_errors.IllegalNameForObjectError("", "", ""),
+                                              expected_exception=array_errors.IllegalObjectID)
+
+    def test_expand_volume_not_found_error(self):
+        self._expand_volume_vol_resize_errors(returned_error=xcli_errors.VolumeBadNameError("", "", ""),
+                                              expected_exception=array_errors.ObjectNotFoundError)
+
+    def test_expand_volume_not_enough_space_error(self):
+        self._expand_volume_vol_resize_errors(
+            returned_error=xcli_errors.CommandFailedRuntimeError("", "No space to allocate to the volume", ""),
+            expected_exception=array_errors.NotEnoughSpaceInPool)
