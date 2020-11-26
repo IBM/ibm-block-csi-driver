@@ -60,10 +60,11 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 		device_connectivity.ConnectionTypeFC:    device_connectivity.NewOsDeviceConnectivityFc(executer),
 		// TODO nvme
 	}
+	osDeviceConnectivityHelper := device_connectivity.NewOsDeviceConnectivityHelperScsiGeneric(executer)
 	return &Driver{
 		endpoint:    endpoint,
 		config:      configFile,
-		NodeService: NewNodeService(configFile, hostname, *NewNodeUtils(executer, mounter), osDeviceConnectivityMapping, executer, mounter, syncLock),
+		NodeService: NewNodeService(configFile, hostname, *NewNodeUtils(executer, mounter), osDeviceConnectivityMapping, osDeviceConnectivityHelper, executer, mounter, syncLock),
 	}, nil
 }
 

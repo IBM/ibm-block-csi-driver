@@ -11,5 +11,5 @@ chmod 777 /tmp/k8s_dir
 
 docker build -f Dockerfile-csi-node -t csi-node . &&  \
 docker run --privileged -v /:/host:rshared -v /tmp/k8s_dir:/tmp/k8s_dir:rw \
--d --network host --ipc="host" --rm --name $1 \
+-d --network host --ipc="host" --name $1 \
 csi-node --csi-endpoint unix://tmp/k8s_dir/nodecsi --hostname=`hostname` --config-file-path=./config.yaml
