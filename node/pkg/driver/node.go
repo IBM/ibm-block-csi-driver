@@ -86,7 +86,10 @@ type NodeService struct {
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
-func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface, osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface, executer executer.ExecuterInterface, mounter NodeMounter, syncLock SyncLockInterface) NodeService {
+func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface,
+	OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface,
+	osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface,
+	executer executer.ExecuterInterface, mounter NodeMounter, syncLock SyncLockInterface) NodeService {
 	return NodeService{
 		ConfigYaml:                  configYaml,
 		Hostname:                    hostname,

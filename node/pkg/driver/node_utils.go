@@ -342,7 +342,7 @@ func (n NodeUtils) ExpandFilesystem(devicePath string, fsType string) error {
 		return nil
 	}
 
-	logger.Debugf("Resizing the device with fs_type = {%v}", fsType)
+	logger.Debugf("Resizing the device: {%v} with fs_type = {%v}", devicePath, fsType)
 	_, err := n.Executer.ExecuteWithTimeout(resizeFsTimeoutMilliseconds, cmd, args)
 	if err != nil {
 		logger.Errorf("Failed to resize filesystem, error: %v", err)
