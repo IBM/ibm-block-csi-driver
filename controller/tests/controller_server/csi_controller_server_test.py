@@ -1312,17 +1312,7 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         self.mediator.expand_volume = Mock()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_expand_volume_with_size_too_small_fail(self, storage_agent):
-        self._prepare_expand_volume_mocks(storage_agent)
-        self.request.capacity_range.required_bytes = 1
-
-        self.servicer.ControllerExpandVolume(self.request, self.context)
-
-        self.assertEqual(self.context.code, grpc.StatusCode.OUT_OF_RANGE)
-        self.mediator.expand_volume.assert_not_called()
-
-    @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_expand_volume_with_size_too_large_fail(self, storage_agent):
+    def test_expand_volume_with_required_bytes_too_large_fail(self, storage_agent):
         self._prepare_expand_volume_mocks(storage_agent)
         self.request.capacity_range.required_bytes = 11
 
@@ -1340,13 +1330,19 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         self.mediator.expand_volume.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_expand_volume_with_size_zero(self, storage_agent):
+    def test_expand_volume_with_required_bytes_below_minimal(self, storage_agent):
+        self._prepare_expand_volume_mocks(storage_agent)
+        self.request.capacity_range.required_bytes = 1
+        self._test_no_expand_needed()
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_expand_volume_with_required_bytes_zero(self, storage_agent):
         self._prepare_expand_volume_mocks(storage_agent)
         self.request.capacity_range.required_bytes = 0
         self._test_no_expand_needed()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_expand_volume_with_size_already_in_range(self, storage_agent):
+    def test_expand_volume_with_volume_size_already_in_range(self, storage_agent):
         self._prepare_expand_volume_mocks(storage_agent)
         self.request.capacity_range.required_bytes = 2
         self._test_no_expand_needed()
