@@ -315,7 +315,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(iscsi_iqn, "iqn.ibm")
         self.assertEqual(fc_wwns, "wwn1:wwn2")
 
-        hostname, iscsi_iqn, fc_wwns = utils.get_node_id_info("hostabc;wwn1:wwn2;")
+        hostname, iscsi_iqn, fc_wwns = utils.get_node_id_info("hostabc;wwn1:wwn2")
         self.assertEqual(hostname, "hostabc")
         self.assertEqual(iscsi_iqn, "")
         self.assertEqual(fc_wwns, "wwn1:wwn2")
