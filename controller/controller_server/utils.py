@@ -293,7 +293,7 @@ def get_node_id_info(node_id):
         raise HostNotFoundError(node_id)
     logger.debug("node name : {0}, iscsi_iqn : {1}, fc_wwns : {2} ".format(
         hostname, iscsi_iqn, fc_wwns))
-    return hostname, iscsi_iqn, fc_wwns
+    return hostname, fc_wwns, iscsi_iqn
 
 
 def choose_connectivity_type(connecitvity_types):
