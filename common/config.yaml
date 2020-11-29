@@ -2,7 +2,8 @@ identity:
    name: block.csi.ibm.com
    version: 1.4.0
    capabilities: 
-      - CONTROLLER_SERVICE
+      Service: CONTROLLER_SERVICE
+      VolumeExpansion: ONLINE
 
 controller:
    publish_context_lun_parameter : "PUBLISH_CONTEXT_LUN"

@@ -36,11 +36,14 @@ import (
 const (
 	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
 	// Command lines inside the container will show /host prefix.
-	PrefixChrootOfHostRoot  = "/host"
-	PublishContextSeparator = ","
-	NodeIdDelimiter         = ";"
-	NodeIdFcDelimiter       = ":"
-	mkfsTimeoutMilliseconds = 15 * 60 * 1000
+	PrefixChrootOfHostRoot      = "/host"
+	PublishContextSeparator     = ","
+	NodeIdDelimiter             = ";"
+	NodeIdFcDelimiter           = ":"
+	mkfsTimeoutMilliseconds     = 15 * 60 * 1000
+	resizeFsTimeoutMilliseconds = 30 * 1000
+	TimeOutMultipathdCmd        = 10 * 1000
+	multipathdCmd               = "multipathd"
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
@@ -62,6 +65,9 @@ type NodeUtilsInterface interface {
 	RemoveFileOrDirectory(filePath string) error
 	MakeDir(dirPath string) error
 	MakeFile(filePath string) error
+	ExpandFilesystem(devicePath string, fsType string) error
+	ExpandMpathDevice(mpathDevice string) error
+	RescanPhysicalDevices(sysDevices []string) error
 	FormatDevice(devicePath string, fsType string)
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
@@ -213,12 +219,14 @@ func (n NodeUtils) GetSysDevicesFromMpath(device string) (string, error) {
 	}
 
 	logger.Debugf("found slaves : {%v}", slaves)
-	slavesString := ""
-	for _, slave := range slaves {
-		slavesString += "," + slave.Name()
-	}
-	return slavesString, nil
 
+	var slavesNames []string
+	for _, slave := range slaves {
+		slavesNames = append(slavesNames, slave.Name())
+	}
+	slavesString := strings.Join(slavesNames, ",")
+
+	return slavesString, nil
 }
 
 func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
@@ -320,6 +328,74 @@ func (n NodeUtils) MakeFile(filePath string) error {
 			return err
 		}
 	}
+	return nil
+}
+
+func (n NodeUtils) ExpandFilesystem(devicePath string, fsType string) error {
+	var cmd string
+	var args []string
+	if fsType == "ext4" {
+		cmd = "resize2fs"
+		args = []string{devicePath}
+	} else if fsType == "xfs" {
+		cmd = "xfs_growfs"
+		args = []string{"-d", devicePath}
+	} else {
+		logger.Warningf("Skipping resize of unsupported fsType: %v", fsType)
+		return nil
+	}
+
+	logger.Debugf("Resizing the device: {%v} with fs_type = {%v}", devicePath, fsType)
+	_, err := n.Executer.ExecuteWithTimeout(resizeFsTimeoutMilliseconds, cmd, args)
+	if err != nil {
+		logger.Errorf("Failed to resize filesystem, error: %v", err)
+		return err
+	}
+	return nil
+}
+
+func (n NodeUtils) ExpandMpathDevice(mpathDevice string) error {
+	logger.Infof("ExpandMpathDevice: [%s] ", mpathDevice)
+	args := []string{"resize", "map", mpathDevice}
+	output, err := n.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
+	if err != nil {
+		return fmt.Errorf("multipathd resize failed: %v\narguments: %v\nOutput: %s\n", err, args, string(output))
+	}
+	return nil
+}
+
+func (n NodeUtils) rescanPhysicalDevice(deviceName string) error {
+	filename := fmt.Sprintf("/sys/block/%s/device/rescan", deviceName)
+	f, err := n.Executer.OsOpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200)
+	if err != nil {
+		logger.Errorf("Rescan Error: could not open filename : {%v}. err : {%v}", filename, err)
+		return err
+	}
+
+	defer f.Close()
+
+	scanCmd := fmt.Sprintf("1")
+	logger.Debugf("Rescan sys device : echo %s > %s", scanCmd, filename)
+	if written, err := n.Executer.FileWriteString(f, scanCmd); err != nil {
+		logger.Errorf("Rescan Error: could not write to rescan file :{%v}, error : {%v}", filename, err)
+		return err
+	} else if written == 0 {
+		e := fmt.Errorf("rescan error: nothing was written to rescan file : {%s}", filename)
+		logger.Errorf(e.Error())
+		return e
+	}
+	return nil
+}
+
+func (n NodeUtils) RescanPhysicalDevices(sysDevices []string) error {
+	logger.Debugf("Rescan : Start rescan on sys devices : {%v}", sysDevices)
+	for _, deviceName := range sysDevices {
+		err := n.rescanPhysicalDevice(deviceName)
+		if err != nil {
+			return err
+		}
+	}
+	logger.Debugf("Rescan : finish rescan on sys devices : {%v}", sysDevices)
 	return nil
 }
 

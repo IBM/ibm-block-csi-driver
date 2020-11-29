@@ -858,6 +858,202 @@ func TestNodeGetVolumeStats(t *testing.T) {
 	}
 }
 
+func newTestNodeServiceExpand(nodeUtils driver.NodeUtilsInterface, osDevConHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface, nodeMounter driver.NodeMounter) driver.NodeService {
+	return driver.NodeService{
+		Hostname:                    "test-host",
+		ConfigYaml:                  driver.ConfigFile{},
+		VolumeIdLocksMap:            driver.NewSyncLock(),
+		NodeUtils:                   nodeUtils,
+		OsDeviceConnectivityMapping: map[string]device_connectivity.OsDeviceConnectivityInterface{},
+		OsDeviceConnectivityHelper:  osDevConHelper,
+		Mounter:                     nodeMounter,
+	}
+}
+
+func TestNodeExpandVolume(t *testing.T) {
+	d := newTestNodeService(nil, nil)
+	targetPath := "/test/path"
+	volId := "someStorageType:vol-test"
+	expandRequest := &csi.NodeExpandVolumeRequest{
+		VolumeId:   volId,
+		VolumePath: targetPath,
+	}
+	mpathDeviceName := "dm-2"
+	rawSysDevices := "/dev/d1,/dev/d2"
+	sysDevices := []string{"/dev/d1", "/dev/d2"}
+	mpathDevice := "/dev/" + mpathDeviceName
+	fsType := "ext4"
+	dummyError := errors.New("Dummy error")
+
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "fail no VolumeId",
+			testFunc: func(t *testing.T) {
+				node := d
+				expandRequest := &csi.NodeExpandVolumeRequest{
+					VolumePath: targetPath,
+				}
+
+				_, err := node.NodeExpandVolume(context.TODO(), expandRequest)
+				assertError(t, err, codes.InvalidArgument)
+			},
+		},
+		{
+			name: "fail no VolumePath",
+			testFunc: func(t *testing.T) {
+				node := d
+				expandRequest := &csi.NodeExpandVolumeRequest{
+					VolumeId: volId,
+				}
+
+				_, err := node.NodeExpandVolume(context.TODO(), expandRequest)
+				assertError(t, err, codes.InvalidArgument)
+			},
+		},
+		{
+			name: "get multipath device fail",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtl)
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				node := newTestNodeServiceExpand(mockNodeUtils, mockOsDeviceConHelper, mockMounter)
+
+				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return("", dummyError)
+
+				_, err := node.NodeExpandVolume(context.TODO(), expandRequest)
+				assertError(t, err, codes.Internal)
+			},
+		},
+		{
+			name: "get sys devices fail",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtl)
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				node := newTestNodeServiceExpand(mockNodeUtils, mockOsDeviceConHelper, mockMounter)
+
+				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return("", dummyError)
+
+				_, err := node.NodeExpandVolume(context.TODO(), expandRequest)
+				assertError(t, err, codes.Internal)
+			},
+		},
+		{
+			name: "rescan fail",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtl)
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				node := newTestNodeServiceExpand(mockNodeUtils, mockOsDeviceConHelper, mockMounter)
+
+				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(rawSysDevices, nil)
+				mockNodeUtils.EXPECT().RescanPhysicalDevices(sysDevices).Return(dummyError)
+
+				_, err := node.NodeExpandVolume(context.TODO(), expandRequest)
+				assertError(t, err, codes.Internal)
+			},
+		},
+		{
+			name: "expand multipath device fail",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtl)
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				node := newTestNodeServiceExpand(mockNodeUtils, mockOsDeviceConHelper, mockMounter)
+
+				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(rawSysDevices, nil)
+				mockNodeUtils.EXPECT().RescanPhysicalDevices(sysDevices)
+				mockNodeUtils.EXPECT().ExpandMpathDevice(mpathDeviceName).Return(dummyError)
+
+				_, err := node.NodeExpandVolume(context.TODO(), expandRequest)
+				assertError(t, err, codes.Internal)
+			},
+		},
+		{
+			name: "get disk format fail",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtl)
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				node := newTestNodeServiceExpand(mockNodeUtils, mockOsDeviceConHelper, mockMounter)
+
+				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(rawSysDevices, nil)
+				mockNodeUtils.EXPECT().RescanPhysicalDevices(sysDevices)
+				mockNodeUtils.EXPECT().ExpandMpathDevice(mpathDeviceName)
+				mockMounter.EXPECT().GetDiskFormat(mpathDevice).Return("", dummyError)
+
+				_, err := node.NodeExpandVolume(context.TODO(), expandRequest)
+				assertError(t, err, codes.Internal)
+			},
+		},
+		{
+			name: "expand filesystem fail",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtl)
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				node := newTestNodeServiceExpand(mockNodeUtils, mockOsDeviceConHelper, mockMounter)
+
+				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(rawSysDevices, nil)
+				mockNodeUtils.EXPECT().RescanPhysicalDevices(sysDevices)
+				mockNodeUtils.EXPECT().ExpandMpathDevice(mpathDeviceName)
+				mockMounter.EXPECT().GetDiskFormat(mpathDevice).Return(fsType, nil)
+				mockNodeUtils.EXPECT().ExpandFilesystem(mpathDevice, fsType).Return(dummyError)
+
+				_, err := node.NodeExpandVolume(context.TODO(), expandRequest)
+				assertError(t, err, codes.Internal)
+			},
+		},
+		{
+			name: "success expand volume",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtl)
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				node := newTestNodeServiceExpand(mockNodeUtils, mockOsDeviceConHelper, mockMounter)
+
+				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(rawSysDevices, nil)
+				mockNodeUtils.EXPECT().RescanPhysicalDevices(sysDevices)
+				mockNodeUtils.EXPECT().ExpandMpathDevice(mpathDeviceName)
+				mockMounter.EXPECT().GetDiskFormat(mpathDevice).Return(fsType, nil)
+				mockNodeUtils.EXPECT().ExpandFilesystem(mpathDevice, fsType)
+
+				_, err := node.NodeExpandVolume(context.TODO(), expandRequest)
+				if err != nil {
+					t.Fatalf("Expect no error but got: %v", err)
+				}
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
+
 func TestNodeGetCapabilities(t *testing.T) {
 	req := &csi.NodeGetCapabilitiesRequest{}
 
@@ -868,6 +1064,13 @@ func TestNodeGetCapabilities(t *testing.T) {
 			Type: &csi.NodeServiceCapability_Rpc{
 				Rpc: &csi.NodeServiceCapability_RPC{
 					Type: csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
+				},
+			},
+		},
+		{
+			Type: &csi.NodeServiceCapability_Rpc{
+				Rpc: &csi.NodeServiceCapability_RPC{
+					Type: csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
 				},
 			},
 		},

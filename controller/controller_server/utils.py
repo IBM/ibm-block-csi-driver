@@ -106,7 +106,7 @@ def validate_create_volume_request(request):
     logger.debug("validating volume capacity")
     if request.capacity_range:
         if request.capacity_range.required_bytes < 0:
-            raise ValidationException(messages.size_bigger_than_0_message)
+            raise ValidationException(messages.size_should_not_be_negative_message)
 
     else:
         raise ValidationException(messages.no_capacity_range_message)
@@ -158,6 +158,24 @@ def validate_delete_snapshot_request(request):
     logger.debug("request validation finished.")
 
 
+def validate_expand_volume_request(request):
+    logger.debug("validating expand volume request")
+
+    if not request.volume_id:
+        raise ValidationException(messages.id_should_not_be_empty_message)
+
+    logger.debug("validating volume capacity")
+    if request.capacity_range:
+        if request.capacity_range.required_bytes < 0:
+            raise ValidationException(messages.size_should_not_be_negative_message)
+    else:
+        raise ValidationException(messages.no_capacity_range_message)
+
+    validate_secret(request.secrets)
+
+    logger.debug("expand volume validation finished")
+
+
 def generate_csi_create_volume_response(new_volume, source_type=None):
     logger.debug("creating volume response for vol : {0}".format(new_volume))
 
@@ -198,6 +216,17 @@ def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
         ready_to_use=new_snapshot.is_ready))
 
     logger.debug("finished creating snapshot response : {0}".format(res))
+    return res
+
+
+def generate_csi_expand_volume_response(capacity_bytes, node_expansion_required=True):
+    logger.debug("creating response for expand volume")
+    res = csi_pb2.ControllerExpandVolumeResponse(
+        capacity_bytes=capacity_bytes,
+        node_expansion_required=node_expansion_required,
+    )
+
+    logger.debug("finished creating expand volume response")
     return res
 
 
