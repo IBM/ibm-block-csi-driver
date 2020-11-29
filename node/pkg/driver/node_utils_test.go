@@ -277,8 +277,8 @@ func TestGenerateNodeID(t *testing.T) {
 				if err != nil {
 					t.Fatalf("err is not nil. got: %v", err)
 				}
-				if !reflect.DeepEqual(nodeId, tc.expNodeId) {
-					t.Fatalf("scheme mismatches: expected %v, got %v", tc.expNodeId, nodeId)
+				if nodeId != tc.expNodeId {
+					t.Fatalf("wrong nodeId: expected %v, got %v", tc.expNodeId, nodeId)
 				}
 
 			}
