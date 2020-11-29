@@ -357,7 +357,7 @@ func (n NodeUtils) GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN str
 	nodeId.WriteString(hostName)
 	nodeId.WriteString(NodeIdDelimiter)
 
-	if len(fcWWNs) != 0 {
+	if len(fcWWNs) > 0 {
 		if nodeId.Len()+len(fcWWNs[0]) <= MaxNodeIdLength {
 			nodeId.WriteString(fcWWNs[0])
 		} else {
