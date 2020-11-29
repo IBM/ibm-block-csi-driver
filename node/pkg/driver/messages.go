@@ -21,4 +21,4 @@ var ErrorUnsupportedConnectivityType = "Unsupported connectivity type : {%v}"
 
 var ErrorWhileTryingToReadFC = "Error while tring to get FC port from string: %v."
 
-var ErrorWhileTryingToGenerateNodeId = "could not fit any ports in node id: %v, length limit: %d"
+var ErrorNoPortsCouldFitInNodeId = "could not fit any ports in node id: %v, length limit: %d"
