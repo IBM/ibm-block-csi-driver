@@ -447,12 +447,13 @@ func (n NodeUtils) GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN str
 			}
 		}
 	}
-
-	if nodeId.Len()+len(NodeIdDelimiter)+len(iscsiIQN) <= MaxNodeIdLength {
-		nodeId.WriteString(NodeIdDelimiter)
-		nodeId.WriteString(iscsiIQN)
-	} else if len(fcWWNs) == 0 {
-		return "", fmt.Errorf(ErrorWhileTryingToGenerateNodeId, nodeId.String(), MaxNodeIdLength)
+	if len(iscsiIQN) > 0 {
+		if nodeId.Len()+len(NodeIdDelimiter)+len(iscsiIQN) <= MaxNodeIdLength {
+			nodeId.WriteString(NodeIdDelimiter)
+			nodeId.WriteString(iscsiIQN)
+		} else if len(fcWWNs) == 0 {
+			return "", fmt.Errorf(ErrorWhileTryingToGenerateNodeId, nodeId.String(), MaxNodeIdLength)
+		}
 	}
 
 	return nodeId.String(), nil

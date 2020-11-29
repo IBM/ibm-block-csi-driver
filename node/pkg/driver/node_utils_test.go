@@ -210,3 +210,153 @@ func TestParseFCPortsName(t *testing.T) {
 		})
 	}
 }
+
+func TestGenerateNodeID(t *testing.T) {
+	testCases := []struct {
+		name      string
+		hostName  string
+		fcWWNs    []string
+		iscsiIQN  string
+		expErr    error
+		expNodeId string
+	}{
+		{name: "success all in",
+			hostName:  "test-host",
+			fcWWNs:    []string{"10000000c9934d9f", "10000000c9934d9h"},
+			iscsiIQN:  "iqn.1994-07.com.redhat:e123456789",
+			expNodeId: "test-host;10000000c9934d9f:10000000c9934d9h;iqn.1994-07.com.redhat:e123456789",
+		},
+		{name: "success no fc ports",
+			hostName:  "test-hostname.ibm.com",
+			fcWWNs:    []string{},
+			iscsiIQN:  "iqn.1994-07.com.redhat:e123456789",
+			expNodeId: "test-hostname.ibm.com;;iqn.1994-07.com.redhat:e123456789",
+		},
+		{name: "success no iscsi port",
+			hostName:  "test-hostname.ibm.com",
+			fcWWNs:    []string{"10000000c9934d9f", "10000000c9934d9h"},
+			iscsiIQN:  "",
+			expNodeId: "test-hostname.ibm.com;10000000c9934d9f:10000000c9934d9h",
+		},
+		{name: "success many fc ports",
+			hostName:  "test-hostname.ibm.com",
+			fcWWNs:    []string{"10000000c9934d9f", "10000000c9934d9h", "10000000c9934d9a", "10000000c9934d9b", "10000000c9934d9z"},
+			iscsiIQN:  "iqn.1994-07.com.redhat:e123456789",
+			expNodeId: "test-hostname.ibm.com;10000000c9934d9f:10000000c9934d9h:10000000c9934d9a:10000000c9934d9b:10000000c9934d9z",
+		},
+		{name: "fail long hostName on fc ports",
+			hostName: "test-hostname-that-is-too-long-and-take-almost-128-characters-so-no-port-get-place-additional-characters.nodeutilstest.ibm.com",
+			fcWWNs:   []string{"10000000c9934d9f", "10000000c9934d9h"},
+			iscsiIQN: "",
+			expErr:   errors.New("could not fit any ports in node id: test-hostname-that-is-too-long-and-take-almost-128-characters-so-no-port-get-place-additional-characters.nodeutilstest.ibm.com;, length limit: 128"),
+		},
+		{name: "fail long hostName on iscsi ports",
+			hostName: "test-hostname-that-is-too-long-and-take-almost-128-characters-so-no-port-get-place-additional-characters.nodeutilstest.ibm.com",
+			fcWWNs:   []string{},
+			iscsiIQN: "iqn.1994-07.com.redhat:e123456789",
+			expErr:   errors.New("could not fit any ports in node id: test-hostname-that-is-too-long-and-take-almost-128-characters-so-no-port-get-place-additional-characters.nodeutilstest.ibm.com;, length limit: 128"),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
+			nodeUtils := driver.NewNodeUtils(fake_executer, nil)
+
+			nodeId, err := nodeUtils.GenerateNodeID(tc.hostName, tc.fcWWNs, tc.iscsiIQN)
+
+			if tc.expErr != nil {
+				if err.Error() != tc.expErr.Error() {
+					t.Fatalf("Expecting err: expected %v, got %v", tc.expErr, err)
+				}
+
+			} else {
+				if err != nil {
+					t.Fatalf("err is not nil. got: %v", err)
+				}
+				if !reflect.DeepEqual(nodeId, tc.expNodeId) {
+					t.Fatalf("scheme mismatches: expected %v, got %v", tc.expNodeId, nodeId)
+				}
+
+			}
+		})
+	}
+}
+
+func TestGenerateNodeID(t *testing.T) {
+	testCases := []struct {
+		name      string
+		hostName  string
+		fcWWNs    []string
+		iscsiIQN  string
+		expErr    error
+		expNodeId string
+	}{
+		{name: "success all in",
+			hostName:  "test-host",
+			fcWWNs:    []string{"10000000c9934d9f", "10000000c9934d9h"},
+			iscsiIQN:  "iqn.1994-07.com.redhat:e123456789",
+			expNodeId: "test-host;10000000c9934d9f:10000000c9934d9h;iqn.1994-07.com.redhat:e123456789",
+		},
+		{name: "success no fc ports",
+			hostName:  "test-hostname.ibm.com",
+			fcWWNs:    []string{},
+			iscsiIQN:  "iqn.1994-07.com.redhat:e123456789",
+			expNodeId: "test-hostname.ibm.com;;iqn.1994-07.com.redhat:e123456789",
+		},
+		{name: "success no iscsi port",
+			hostName:  "test-hostname.ibm.com",
+			fcWWNs:    []string{"10000000c9934d9f", "10000000c9934d9h"},
+			iscsiIQN:  "",
+			expNodeId: "test-hostname.ibm.com;10000000c9934d9f:10000000c9934d9h",
+		},
+		{name: "success many fc ports",
+			hostName:  "test-hostname.ibm.com",
+			fcWWNs:    []string{"10000000c9934d9f", "10000000c9934d9h", "10000000c9934d9a", "10000000c9934d9b", "10000000c9934d9z"},
+			iscsiIQN:  "iqn.1994-07.com.redhat:e123456789",
+			expNodeId: "test-hostname.ibm.com;10000000c9934d9f:10000000c9934d9h:10000000c9934d9a:10000000c9934d9b:10000000c9934d9z",
+		},
+		{name: "fail long hostName on fc ports",
+			hostName: "test-hostname-that-is-too-long-and-take-almost-128-characters-so-no-port-get-place-additional-characters.nodeutilstest.ibm.com",
+			fcWWNs:   []string{"10000000c9934d9f", "10000000c9934d9h"},
+			iscsiIQN: "",
+			expErr:   errors.New("could not fit any ports in node id: test-hostname-that-is-too-long-and-take-almost-128-characters-so-no-port-get-place-additional-characters.nodeutilstest.ibm.com;, length limit: 128"),
+		},
+		{name: "fail long hostName on iscsi ports",
+			hostName: "test-hostname-that-is-too-long-and-take-almost-128-characters-so-no-port-get-place-additional-characters.nodeutilstest.ibm.com",
+			fcWWNs:   []string{},
+			iscsiIQN: "iqn.1994-07.com.redhat:e123456789",
+			expErr:   errors.New("could not fit any ports in node id: test-hostname-that-is-too-long-and-take-almost-128-characters-so-no-port-get-place-additional-characters.nodeutilstest.ibm.com;, length limit: 128"),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
+			nodeUtils := driver.NewNodeUtils(fake_executer, nil)
+
+			nodeId, err := nodeUtils.GenerateNodeID(tc.hostName, tc.fcWWNs, tc.iscsiIQN)
+
+			if tc.expErr != nil {
+				if err.Error() != tc.expErr.Error() {
+					t.Fatalf("Expecting err: expected %v, got %v", tc.expErr, err)
+				}
+
+			} else {
+				if err != nil {
+					t.Fatalf("err is not nil. got: %v", err)
+				}
+				if !reflect.DeepEqual(nodeId, tc.expNodeId) {
+					t.Fatalf("scheme mismatches: expected %v, got %v", tc.expNodeId, nodeId)
+				}
+
+			}
+		})
+	}
+}
