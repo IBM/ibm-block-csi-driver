@@ -8,7 +8,7 @@ class NodeIdInfo:
         Args:
             node_id: <node_name>,<iqn>,<wwns>
         """
-        node_name, iscsi_iqn, fc_wwns_str = utils.get_node_id_info(node_id)
+        node_name, fc_wwns_str, iscsi_iqn = utils.get_node_id_info(node_id)
         fc_wwns = fc_wwns_str.split(config.PARAMETERS_FC_WWN_DELIMITER)
         self.node_name = node_name
         self.initiators = Initiators(iscsi_iqn.strip(), fc_wwns)
