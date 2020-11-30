@@ -30,6 +30,8 @@ NO_TOKEN_IS_SPECIFIED = 'BE7A001A'
 ERROR_CODE_VOLUME_NOT_FOUND_FOR_MAPPING = 'BE586015'
 ERROR_CODE_ALREADY_FLASHCOPY = '000000AE'
 ERROR_CODE_VOLUME_NOT_FOUND_OR_ALREADY_PART_OF_CS_RELATIONSHIP = '00000013'
+ERROR_CODE_EXPAND_VOLUME_NOT_ENOUGH_EXTENTS = 'BE531465'
+ERROR_CODE_CREATE_VOLUME_NOT_ENOUGH_EXTENTS = 'BE534459'
 
 FLASHCOPY_PERSISTENT_OPTION = ds8k_types.DS8K_OPTION_PER
 FLASHCOPY_NO_BACKGROUND_COPY_OPTION = ds8k_types.DS8K_OPTION_NBC
@@ -272,26 +274,32 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                     )
                 )
                 raise array_errors.VolumeCreationError(name)
-        except exceptions.ClientException as ex:
-            logger.error(
-                "Failed to create volume {} on array {}, reason is: {}".format(
-                    name,
-                    self.identifier,
-                    ex.details
+        except (exceptions.ClientError, exceptions.ClientException) as ex:
+            if ERROR_CODE_CREATE_VOLUME_NOT_ENOUGH_EXTENTS in str(ex.message).upper():
+                raise array_errors.NotEnoughSpaceInPool(pool=pool_id)
+            else:
+                logger.error(
+                    "Failed to create volume {} on array {}, reason is: {}".format(
+                        name,
+                        self.identifier,
+                        ex.details
+                    )
                 )
-            )
-            raise array_errors.VolumeCreationError(name)
+                raise array_errors.VolumeCreationError(name)
 
     def create_volume(self, volume_name, size_in_bytes, capabilities, pool):
         api_volume = self._create_api_volume(volume_name, size_in_bytes, capabilities, pool)
         return self._generate_volume_response(api_volume)
 
-    def _extend_volume(self, volume_id, new_size_in_bytes):
+    def _extend_volume(self, api_volume, new_size_in_bytes):
         try:
-            self.client.extend_volume(volume_id=volume_id,
+            self.client.extend_volume(volume_id=api_volume.id,
                                       new_size_in_bytes=new_size_in_bytes)
         except exceptions.NotFound:
-            raise array_errors.ObjectNotFoundError(volume_id)
+            raise array_errors.ObjectNotFoundError(api_volume.id)
+        except (exceptions.ClientError, exceptions.ClientException) as ex:
+            if ERROR_CODE_EXPAND_VOLUME_NOT_ENOUGH_EXTENTS in str(ex.message).upper():
+                raise array_errors.NotEnoughSpaceInPool(api_volume.pool)
 
     def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
                                             minimum_volume_size_in_bytes, pool_id=None):
@@ -302,7 +310,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         api_new_volume = self._get_api_volume_by_name(name, pool_id=pool_id)
         api_source_object = self._get_api_volume_by_name(source_name, pool_id=pool_id)
         if minimum_volume_size_in_bytes < source_capacity_in_bytes:
-            self._extend_volume(volume_id=api_new_volume.id,
+            self._extend_volume(api_volume=api_new_volume,
                                 new_size_in_bytes=source_capacity_in_bytes)
         options = [FLASHCOPY_PERSISTENT_OPTION]
         self._create_flashcopy(source_volume_id=api_source_object.id, target_volume_id=api_new_volume.id,
@@ -328,12 +336,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             )
             raise array_errors.VolumeDeletionError(volume_id)
 
-    def _safe_delete_flashcopies(self, api_volume):
-        flashcopies = api_volume.flashcopy
-        flashcopies_as_source = [flashcopy for flashcopy in flashcopies
-                                 if flashcopy.sourcevolume == api_volume.id]
-        for flashcopy in flashcopies_as_source:
-            self._ensure_flashcopy_safe_to_delete(flashcopy, api_volume.name)
+    def _safe_delete_flashcopies(self, flashcopies, volume_name):
+        for flashcopy in flashcopies:
+            self._ensure_flashcopy_safe_to_delete(flashcopy, volume_name)
         for flashcopy in flashcopies:
             self._delete_flashcopy(flashcopy.id)
 
@@ -350,7 +355,13 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         api_volume = self._get_api_volume_by_id(object_id)
         if object_is_snapshot and not is_snapshot(api_volume):
             raise array_errors.ObjectNotFoundError(name=object_id)
-        self._safe_delete_flashcopies(api_volume)
+        flashcopies = api_volume.flashcopy
+        flashcopies_as_source = [flashcopy for flashcopy in flashcopies
+                                 if flashcopy.sourcevolume == api_volume.id]
+        self._safe_delete_flashcopies(flashcopies=flashcopies_as_source, volume_name=api_volume.name)
+        flashcopy_as_target = get_flashcopy_as_target_if_exists(api_volume=api_volume)
+        if flashcopy_as_target:
+            self._delete_flashcopy(flashcopy_id=flashcopy_as_target.id)
         self._delete_volume(object_id)
 
     @convert_scsi_id_to_array_id
@@ -381,6 +392,16 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def expand_volume(self, volume_id, required_bytes):
         pass
+
+    @convert_scsi_id_to_array_id
+    def expand_volume(self, volume_id, required_bytes):
+        logger.info("Expanding volume with id : {0} to {1} bytes".format(volume_id, required_bytes))
+        api_volume = self._get_api_volume_by_id(volume_id)
+        flashcopies = api_volume.flashcopy
+        self._safe_delete_flashcopies(flashcopies=flashcopies, volume_name=api_volume.name)
+
+        self._extend_volume(api_volume=api_volume, new_size_in_bytes=required_bytes)
+        logger.info("Finished Expanding volume {0}.".format(volume_id))
 
     @convert_scsi_id_to_array_id
     def get_volume_mappings(self, volume_id):
@@ -477,6 +498,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except exceptions.NotFound:
             if not_exist_err:
                 raise array_errors.ObjectNotFoundError(volume_id)
+        except (exceptions.ClientError, exceptions.Unauthorized) as ex:
+            if INCORRECT_ID in str(ex.message).upper():
+                raise array_errors.IllegalObjectID(volume_id)
 
     def _get_flashcopy_process(self, flashcopy_id, not_exist_err=True):
         logger.info("Getting flashcopy {}".format(flashcopy_id))
