@@ -1,11 +1,6 @@
 pipeline {
     environment {
-        registryCredential = 'csi_w3_user'
-        artifactory_path = 'build/reports/images_url'
-        registry_protocol = 'https'
-        Dockerfile_controller = 'Dockerfile-csi-controller'
-        Dockerfile_node = 'Dockerfile-csi-node'
-        latest_tag = "develop origin/develop master"
+        registryCredentialsID = 'csi_w3_user'
     }
     agent {
         label  "${env.AGENT_LABEL}"
@@ -36,8 +31,8 @@ pipeline {
         stage ('CSI-controller & node: Build and push images') {
             steps {
                 script {
-                    registryUrl = "${registry_protocol}://${DOCKER_REGISTRY}"
-                    docker.withRegistry(registryUrl, registryCredential) {
+                    registryUrl = "https://${DOCKER_REGISTRY}"
+                    docker.withRegistry(registryUrl, registryCredentialsID) {
                         sh './scripts/ci/build_push_images.sh build/reports/images_url'
                     }
                 }
