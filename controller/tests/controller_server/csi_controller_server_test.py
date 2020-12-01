@@ -354,6 +354,9 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
         self.request.volume_capabilities = [caps]
 
+        self.mediator.maximal_volume_size_in_bytes = 10
+        self.mediator.minimal_volume_size_in_bytes = 2
+
         self.pool = 'pool1'
         self.request.parameters = {"pool": self.pool}
         self.capacity_bytes = 10
@@ -471,6 +474,14 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.get_volume.assert_called_once_with(volume_name, pool_id='pool1')
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_with_prefix_too_long_exception(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+        self.request.parameters.update({"volume_name_prefix": "a" * 128})
+        self.servicer.CreateVolume(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_get_volume_name_too_long_success(self, storage_agent):
         self._prepare_create_volume_mocks(storage_agent)
         self.mediator.max_volume_name_length = 63
@@ -530,16 +541,23 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.create_volume.assert_called_once_with("prefix_some_name", 10, {}, "pool1")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_volume_with_zero_size(self, storage_agent):
-        storage_agent.return_value = self.storage_agent
-
+    def test_create_volume_with_required_bytes_zero(self, storage_agent):
+        self._prepare_create_volume_mocks(storage_agent)
         self.request.capacity_range.required_bytes = 0
-        self.mediator.create_volume = Mock()
-        self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn", "xiv")
 
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.create_volume.assert_called_once_with(self.request.name, 1 * 1024 * 1024 * 1024, {}, "pool1")
+        self.mediator.create_volume.assert_called_once_with(self.request.name, 2, {}, "pool1")
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_with_required_bytes_too_large_fail(self, storage_agent):
+        self._prepare_create_volume_mocks(storage_agent)
+        self.request.capacity_range.required_bytes = 11
+
+        self.servicer.CreateVolume(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.OUT_OF_RANGE)
+        self.mediator.create_volume.assert_not_called()
 
     def test_create_volume_with_no_space_in_pool(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.RESOURCE_EXHAUSTED,
@@ -600,6 +618,16 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
         self.mediator.copy_to_existing_volume_from_source.assert_not_called()
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_idempotent_with_size_not_matched(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+        self.mediator.get_volume = Mock()
+        self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(100, volume_name, "wwn2", "a9k")
+
+        self.servicer.CreateVolume(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
 
     def _prepare_mocks_for_copy_from_source(self):
         self.mediator.create_volume = Mock()
