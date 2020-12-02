@@ -106,6 +106,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
             CLIFailureError("Failed")]
         with self.assertRaises(CLIFailureError):
             self.svc.create_volume("vol", 10, {}, "pool")
+        self.svc.client.svctask.mkvolume.side_effect = [
+            CLIFailureError("CMMVC8710E")]
+        with self.assertRaises(array_errors.NotEnoughSpaceInPool):
+            self.svc.create_volume("vol", 10, {}, "pool")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_create_volume_return_volume_exists_error(self, mock_warning):
@@ -884,3 +888,66 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsfabric.return_value = [port_1, port_2]
         wwns = self.svc.get_array_fc_wwns('host')
         self.assertEqual(wwns, ['5005076810282CD8', '5005076810262CD8'])
+
+    def _prepare_mocks_for_expand_volume(self):
+        volume = Mock(as_single_element=Munch({'vdisk_UID': 'vol_id',
+                                               'name': 'test_vol',
+                                               'capacity': '512',
+                                               'mdisk_grp_name': 'pool_name'
+                                               }))
+        self.svc.client.svcinfo.lsvdisk.return_value = volume
+        self.svc.client.svcinfo.lsfcmap.return_value = Mock(as_list=[])
+
+    def test_expand_volume_success(self):
+        self._prepare_mocks_for_expand_volume()
+        self.svc.expand_volume('vol_id', 1024)
+        self.svc.client.svctask.expandvdisksize.assert_called_once_with(vdisk_id='test_vol', unit='b', size=512)
+
+    def test_expand_volume_success_with_size_rounded_up(self):
+        self._prepare_mocks_for_expand_volume()
+        self.svc.expand_volume('vol_id', 513)
+        self.svc.client.svctask.expandvdisksize.assert_called_once_with(vdisk_id='test_vol', unit='b', size=512)
+
+    def test_expand_volume_raise_object_in_use(self):
+        self._prepare_mocks_for_expand_volume()
+        fcmaps = self.fcmaps_as_source
+        fcmaps[0].status = 'not good'
+        self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=self.fcmaps), Mock(as_list=fcmaps)]
+        with self.assertRaises(array_errors.ObjectIsStillInUseError):
+            self.svc.expand_volume('vol_id', 2)
+        self.svc.client.svctask.expandvdisksize.assert_not_called()
+
+    def test_expand_volume_raise_object_not_found(self):
+        self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=None)
+        with self.assertRaises(array_errors.ObjectNotFoundError):
+            self.svc.expand_volume('vol_id', 2)
+        self.svc.client.svctask.expandvdisksize.assert_not_called()
+
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def _expand_volume_expandvdisksize_errors(self, mock_warning, returned_error, expected_raised):
+        self._prepare_mocks_for_expand_volume()
+        mock_warning.return_value = False
+
+        self.svc.client.svctask.expandvdisksize.side_effect = [returned_error]
+
+        with self.assertRaises(expected_raised):
+            self.svc.expand_volume('vol_id', 2)
+
+    def test_expand_volume_expandvdisksize_object_not_found_error(self):
+        self._expand_volume_expandvdisksize_errors(returned_error=CLIFailureError("CMMVC5753E"),
+                                                   expected_raised=array_errors.ObjectNotFoundError)
+
+    def test_expand_volume_expandvdisksize_volume_not_found_error(self):
+        self._expand_volume_expandvdisksize_errors(returned_error=CLIFailureError("CMMVC8957E"),
+                                                   expected_raised=array_errors.ObjectNotFoundError)
+
+    def test_expand_volume_expandvdisksize_not_enough_space_error(self):
+        self._expand_volume_expandvdisksize_errors(returned_error=CLIFailureError("CMMVC5860E"),
+                                                   expected_raised=array_errors.NotEnoughSpaceInPool)
+
+    def test_expand_volume_expandvdisksize_cli_failure_error(self):
+        self._expand_volume_expandvdisksize_errors(returned_error=CLIFailureError("Failed"),
+                                                   expected_raised=CLIFailureError)
+
+    def test_expand_volume_expandvdisksize_general_error(self):
+        self._expand_volume_expandvdisksize_errors(returned_error=Exception("Failed"), expected_raised=Exception)

@@ -132,6 +132,23 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def expand_volume(self, volume_id, required_bytes):
+        """
+        Expand the volume size on storage.
+        Args:
+           volume_id        : volume id
+           required_bytes   : capacity of the volume after expansion
+        Returns:
+           None
+        Raises:
+            ObjectNotFound
+            IllegalObjectID
+            ObjectIsStillInUse
+            NotEnoughSpaceInPool
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def get_volume_mappings(self, volume_id):
         """
         This function return volume mappings.
@@ -239,6 +256,7 @@ class ArrayMediator(ABC):
             IllegalObjectName
             PermissionDenied
             PoolParameterIsMissing
+            NotEnoughSpaceInPool
         """
         raise NotImplementedError
 
@@ -404,6 +422,11 @@ class ArrayMediator(ABC):
         """
         The minimal volume size in bytes (used in case trying to provision volume with zero size).
         """
+        raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def maximal_volume_size_in_bytes(self):
         raise NotImplementedError
 
     @property

@@ -59,6 +59,15 @@ class TestArrayMediatorDS8K(unittest.TestCase):
              }
         )
 
+        self.snapshot_response = Munch(
+            {"cap": "1073741824",
+             "id": "0002",
+             "name": "test_name",
+             "pool": "fake_pool",
+             "flashcopy": ""
+             }
+        )
+
         self.flashcopy_response = Munch(
             {"sourcevolume": "0001",
              "targetvolume": "0002",
@@ -173,6 +182,11 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_create_volume_failed_with_incorrect_id(self):
         self.client_mock.get_volumes_by_pool.side_effect = NotFound("500", message="BE7A0005")
         with self.assertRaises(array_errors.PoolDoesNotExist):
+            self.array.create_volume("fake_name", 1, {}, "fake_pool")
+
+    def test_create_volume_failed_with_no_space_in_pool(self):
+        self.client_mock.get_volumes_by_pool.side_effect = ClientException("500", message="BE534459")
+        with self.assertRaises(array_errors.NotEnoughSpaceInPool):
             self.array.create_volume("fake_name", 1, {}, "fake_pool")
 
     def test_delete_volume(self):
@@ -613,3 +627,36 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.get_flashcopies_by_volume.return_value = [self.flashcopy_response]
         with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.array.get_object_by_id("", "snapshot")
+
+    def test_expand_volume_success(self):
+        volume = self._prepare_mocks_for_volume()
+        self.array.expand_volume(volume_id=volume.id, required_bytes=10)
+        self.client_mock.extend_volume.assert_called_once_with(volume_id=volume.id, new_size_in_bytes=10)
+
+    def test_expand_volume_raise_in_use(self):
+        volume = self._prepare_mocks_for_volume()
+        self.client_mock.get_flashcopies.return_value.out_of_sync_tracks = "55"
+        with self.assertRaises(array_errors.ObjectIsStillInUseError):
+            self.array.expand_volume(volume_id=volume.id, required_bytes=10)
+
+    def test_expand_volume_raise_illegal(self):
+        volume = self._prepare_mocks_for_volume()
+        self.client_mock.get_volume.side_effect = [ClientError("400", "BE7A0005")]
+        with self.assertRaises(array_errors.IllegalObjectID):
+            self.array.expand_volume(volume_id=volume.id, required_bytes=10)
+
+    def test_expand_volume_get_volume_not_found_error(self):
+        self.client_mock.get_volume.side_effect = [NotFound("404", message="BE7A0001")]
+        with self.assertRaises(array_errors.ObjectNotFoundError):
+            self.array.expand_volume(volume_id="test_id", required_bytes=10)
+
+    def test_expand_volume_extend_volume_not_found_error(self):
+        self.client_mock.get_volume.side_effect = [self.volume_response, self.volume_response]
+        self.client_mock.extend_volume.side_effect = [NotFound("404", message="BE7A0001")]
+        with self.assertRaises(array_errors.ObjectNotFoundError):
+            self.array.expand_volume(volume_id="test_id", required_bytes=10)
+
+    def test_expand_volume_extend_not_enough_space_error(self):
+        self.client_mock.extend_volume.side_effect = [ClientException("500", message="BE531465")]
+        with self.assertRaises(array_errors.NotEnoughSpaceInPool):
+            self.array.expand_volume(volume_id="test_id", required_bytes=10)
