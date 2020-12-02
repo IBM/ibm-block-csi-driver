@@ -284,13 +284,16 @@ def get_object_id_info(full_object_id, object_type):
 def get_node_id_info(node_id):
     logger.debug("getting node info for node id : {0}".format(node_id))
     split_node = node_id.split(config.PARAMETERS_NODE_ID_DELIMITER)
-    if len(split_node) != config.SUPPORTED_CONNECTIVITY_TYPES + 1:  # the 1 is for the hostname
+    hostname, fc_wwns, iscsi_iqn = "", "", ""
+    if len(split_node) == config.SUPPORTED_CONNECTIVITY_TYPES + 1:
+        hostname, fc_wwns, iscsi_iqn = split_node
+    elif len(split_node) == 2:
+        hostname, fc_wwns = split_node
+    else:
         raise HostNotFoundError(node_id)
-
-    hostname, iscsi_iqn, fc_wwns = split_node
     logger.debug("node name : {0}, iscsi_iqn : {1}, fc_wwns : {2} ".format(
         hostname, iscsi_iqn, fc_wwns))
-    return hostname, iscsi_iqn, fc_wwns
+    return hostname, fc_wwns, iscsi_iqn
 
 
 def choose_connectivity_type(connecitvity_types):
