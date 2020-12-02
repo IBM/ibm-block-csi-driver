@@ -211,7 +211,7 @@ $ kubectl -n <namespace> apply -f csi.ibm.com_v1_ibmblockcsi_cr.yaml
 ```bash
 $ kubectl get all -n <namespace>  -l csi
 NAME                             READY   STATUS    RESTARTS   AGE
-pod/ibm-block-csi-controller-0   5/5     Running   0          9m36s
+pod/ibm-block-csi-controller-0   6/6     Running   0          9m36s
 pod/ibm-block-csi-node-jvmvh     3/3     Running   0          9m36s
 pod/ibm-block-csi-node-tsppw     3/3     Running   0          9m36s
 
@@ -276,7 +276,7 @@ Use the `SpaceEfficiency` parameters for each storage system. These values are n
 	* `compressed`
 	* `deduplicated`
 * IBM DS8000 Family
-	* `standard` (default value, if not specified)
+	* `none` (default value, if not specified)
 	* `thin`
 
 ```
@@ -293,9 +293,12 @@ parameters:
   csi.storage.k8s.io/provisioner-secret-namespace: <ARRAY_SECRET_NAMESPACE>
   csi.storage.k8s.io/controller-publish-secret-name: <ARRAY_SECRET>
   csi.storage.k8s.io/controller-publish-secret-namespace: <ARRAY_SECRET_NAMESPACE>
+  csi.storage.k8s.io/controller-expand-secret-name: <ARRAY_SECRET>
+  csi.storage.k8s.io/controller-expand-secret-namespace: <ARRAY_SECRET_NAMESPACE>
 
   csi.storage.k8s.io/fstype: xfs    # Optional: Values ext4/xfs. The default is ext4.
   volume_name_prefix: <prefix_name> # Optional: DS8000 Family maximum prefix length is 5 characters. Maximum prefix length for other systems is 20 characters.
+allowVolumeExpansion: true
 ```
 
 #### 3. Apply the storage class:
