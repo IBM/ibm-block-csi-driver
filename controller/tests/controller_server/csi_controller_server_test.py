@@ -1222,24 +1222,16 @@ class TestControllerServerGetCapabilities(BaseControllerSetUp):
         self.servicer.ControllerGetCapabilities(request, context)
 
 
-class TestControllerServerExpandVolume(AbstractControllerTest):
+class TestControllerServerExpandVolume(BaseControllerSetUp, CommonControllerTest):
 
-    def get_create_object_method(self):
+    def get_tested_method(self):
         return self.servicer.ControllerExpandVolume
 
-    def get_create_object_response_method(self):
+    def get_tested_method_response_class(self):
         return csi_pb2.ControllerExpandVolumeResponse
 
     def setUp(self):
         super().setUp()
-        self.fqdn = "fqdn"
-        self.mediator = XIVArrayMediator("user", "password", self.fqdn)
-        self.mediator.client = Mock()
-
-        self.storage_agent = MagicMock()
-        self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
-
-        self.servicer = ControllerServicer(self.fqdn)
 
         self.access_types = csi_pb2.VolumeCapability.AccessMode
         self.fs_type = "ext4"
@@ -1392,11 +1384,10 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
                                           err=array_errors.NotEnoughSpaceInPool("pool"))
 
 
-class TestIdentityServer(unittest.TestCase):
+class TestIdentityServer(BaseControllerSetUp):
 
     def setUp(self):
-        self.fqdn = "fqdn"
-        self.servicer = ControllerServicer(self.fqdn)
+        super().setUp()
 
     @patch.object(ControllerServicer, "_ControllerServicer__get_identity_config")
     def test_identity_plugin_get_info_succeeds(self, identity_config):
