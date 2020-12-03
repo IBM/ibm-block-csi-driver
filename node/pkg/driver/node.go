@@ -432,8 +432,14 @@ func (d *NodeService) mountFileSystemVolume(mpathDevice string, targetPath strin
 		d.NodeUtils.FormatDevice(mpathDevice, fsType)
 	}
 
+	var mountOptions []string
+
+	if fsType == "xfs" {
+		mountOptions = append(mountOptions, "nouuid")
+	}
+
 	logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
-	return d.Mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
+	return d.Mounter.FormatAndMount(mpathDevice, targetPath, fsType, mountOptions) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 }
 
 func (d *NodeService) mountRawBlockVolume(mpathDevice string, targetPath string, isTargetPathExists bool) error {

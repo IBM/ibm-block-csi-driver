@@ -626,6 +626,7 @@ func TestNodePublishVolume(t *testing.T) {
 		{
 			name: "success with filesystem volume",
 			testFunc: func(t *testing.T) {
+				var mountOptions []string
 				mockCtl := gomock.NewController(t)
 				defer mockCtl.Finish()
 				mockMounter := mocks.NewMockNodeMounter(mockCtl)
@@ -638,7 +639,7 @@ func TestNodePublishVolume(t *testing.T) {
 				mockNodeUtils.EXPECT().MakeDir(targetPathWithHostPrefix).Return(nil)
 				mockMounter.EXPECT().GetDiskFormat(mpathDevice).Return("", nil)
 				mockNodeUtils.EXPECT().FormatDevice(mpathDevice, fsVolCap.GetMount().FsType)
-				mockMounter.EXPECT().FormatAndMount(mpathDevice, targetPath, fsTypeXfs, nil)
+				mockMounter.EXPECT().FormatAndMount(mpathDevice, targetPath, fsTypeXfs, mountOptions)
 
 				req := &csi.NodePublishVolumeRequest{
 					PublishContext:    map[string]string{},
