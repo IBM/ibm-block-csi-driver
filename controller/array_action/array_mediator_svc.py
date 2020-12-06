@@ -521,8 +521,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         fcmap_as_target = self._get_fcmap_as_target_if_exists(object_name)
         if is_snapshot and not fcmap_as_target:
             raise controller_errors.ObjectNotFoundError(object_name)
-        if cli_object.FC_id == 'many':
-            fcmaps_as_source = self._get_fcmaps_as_source_if_exist(object_name)
+        fcmaps_as_source = self._get_fcmaps_as_source_if_exist(object_name)
+        if fcmaps_as_source:
             self._safe_delete_fcmaps(object_name, fcmaps_as_source)
         if fcmap_as_target:
             self._stop_and_delete_fcmap(fcmap_as_target.id)

@@ -216,8 +216,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.delete_volume("vol")
 
     def test_delete_volume_has_clone_fcmaps_removed(self):
-        fcmaps_as_target = self.fcmaps
-        self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=fcmaps_as_target), Mock(as_list=[])]
+        self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=[]), Mock(as_list=self.fcmaps_as_source)]
         self.svc.delete_volume("vol")
         self.svc.client.svctask.rmfcmap.assert_called_once()
 
