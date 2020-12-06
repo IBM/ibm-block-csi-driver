@@ -44,7 +44,7 @@ yum -y install xfsprogs                # Only if XFS file system is required
 **Important:** Be sure to configure each worker with storage connectivity according to your storage system instructions. 
 For more information, find your storage system documentation on [IBM Knowledge Center](https://www.ibm.com/support/knowledgecenter/SSRQ8T).
 
-##### 2.1 Additional configuration steps for OpenShift® Container Platform users (RHEL and RHCOS). Other users can continue to step 2.1.
+##### 2.1 Additional configuration steps for OpenShift® Container Platform users (RHEL and RHCOS). Other users can continue to step 3.
 
 The following yaml file example is for both Fibre Channel and iSCSI configurations. To support iSCSI, uncomment the last two lines in the file:
 
@@ -121,13 +121,13 @@ Apply the yaml file.
 oc apply -f 99-ibm-attach.yaml
 ```
 
-##### 2.1 If needed, enable support for volume snapshots (FlashCopy® function) on your Kubernetes cluster.
+#### 3 If needed, enable support for volume snapshots (FlashCopy® function) on your Kubernetes cluster.
 For more information and instructions, see the Kubernetes blog post, [Kubernetes 1.17 Feature: Kubernetes Volume Snapshot Moves to Beta](https://kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/).
 
-#### 3. Configure storage system connectivity
-##### 3.1. Define the hostname of each Kubernetes node on the relevant storage systems with the valid WWPN (for Fibre Channel) or IQN (for iSCSI) of the node.
+#### 4. Configure storage system connectivity
+##### 4.1. Define the hostname of each Kubernetes node on the relevant storage systems with the valid WWPN (for Fibre Channel) or IQN (for iSCSI) of the node.
 
-##### 3.2. For Fibre Channel, configure the relevant zoning from the storage to the host.
+##### 4.2. For Fibre Channel, configure the relevant zoning from the storage to the host.
 
 
 <br/>
