@@ -41,7 +41,10 @@ yum -y install iscsi-initiator-utils   # Only if iSCSI connectivity is required
 yum -y install xfsprogs                # Only if XFS file system is required
 ```
 
-#### 2. Configure Linux multipath devices on the host, using one of the following procedures.
+#### 2. Configure Linux multipath devices on the host:
+
+Be sure to configure each worker with storage connectivity according to your storage system instructions. 
+For more information, find your storage system documentation on [IBM Knowledge Center](https://www.ibm.com/support/knowledgecenter/SSRQ8T).
 
 ##### 2.1 Configuring for OpenShift Container Platform users (RHEL and RHCOS)
 
@@ -118,31 +121,6 @@ enabled: true
 Apply the yaml file.
 ```bash
 oc apply -f 99-ibm-attach.yaml
-```
-
-RHEL users should verify that the `systemctl status multipathd` output indicates that the multipath status is active and error-free.
-
-```bash
-yum install device-mapper-multipath
-modprobe dm-multipath
-systemctl enable multipathd
-systemctl start multipathd
-systemctl status multipathd
-multipath -ll
-```
-
-##### 2.2 Configuring for Kubernetes users (RHEL)
-Create and set the relevant storage system parameters in the `/etc/multipath.conf` file. You can also use the default `multipath.conf` file, located in the `/usr/share/doc/device-mapper-multipath-*` directory.
-
-Verify that the `systemctl status multipathd` output indicates that the multipath status is active and error-free.
-
-```bash
-yum install device-mapper-multipath
-modprobe dm-multipath
-systemctl enable multipathd
-systemctl start multipathd
-systemctl status multipathd
-multipath -ll
 ```
 
 #### 3. Configure storage system connectivity
@@ -272,6 +250,7 @@ Use the `SpaceEfficiency` parameters for each storage system. These values are n
 	* Always includes deduplication and compression.
 	No need to specify during configuration.
 * IBM Spectrum Virtualize Family
+    * `thick` (default value, if not specified)
 	* `thin`
 	* `compressed`
 	* `deduplicated`
