@@ -1,7 +1,5 @@
-# Operator for IBM block storage CSI driver
+# IBM block storage CSI driver 
 The Container Storage Interface (CSI) Driver for IBM block storage systems enables container orchestrators such as Kubernetes to manage the life cycle of persistent storage.
-
-This is the official operator to deploy and manage IBM block storage CSI driver.
 
 Supported container platforms (and architectures):
   - OpenShift v4.3 (IBM Z and IBM PowerPC)
@@ -41,12 +39,12 @@ yum -y install iscsi-initiator-utils   # Only if iSCSI connectivity is required
 yum -y install xfsprogs                # Only if XFS file system is required
 ```
 
-#### 2. Configure Linux multipath devices on the host:
+#### 2. Configure Linux® multipath devices on the host.
 
-Be sure to configure each worker with storage connectivity according to your storage system instructions. 
+**Important:** Be sure to configure each worker with storage connectivity according to your storage system instructions. 
 For more information, find your storage system documentation on [IBM Knowledge Center](https://www.ibm.com/support/knowledgecenter/SSRQ8T).
 
-##### 2.1 Configuring for OpenShift Container Platform users (RHEL and RHCOS)
+##### 2.1 Additional configuration steps for OpenShift® Container Platform users (RHEL and RHCOS). Other users can continue to step 2.1.
 
 The following yaml file example is for both Fibre Channel and iSCSI configurations. To support iSCSI, uncomment the last two lines in the file:
 
@@ -122,6 +120,9 @@ Apply the yaml file.
 ```bash
 oc apply -f 99-ibm-attach.yaml
 ```
+
+##### 2.1 If needed, enable support for volume snapshots (FlashCopy® function) on your Kubernetes cluster.
+For more information and instructions, see the Kubernetes blog post, [Kubernetes 1.17 Feature: Kubernetes Volume Snapshot Moves to Beta](https://kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/).
 
 #### 3. Configure storage system connectivity
 ##### 3.1. Define the hostname of each Kubernetes node on the relevant storage systems with the valid WWPN (for Fibre Channel) or IQN (for iSCSI) of the node.
