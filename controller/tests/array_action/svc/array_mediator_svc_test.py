@@ -201,23 +201,28 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_delete_volume_has_snapshot_fcmaps_not_removed(self):
         self._prepare_mocks_for_object_still_in_use()
-        fcmaps_as_source = self.fcmaps
-        fcmaps_as_source[0].copy_rate = "0"
-        self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=[]), Mock(as_list=fcmaps_as_source)]
+        fcmaps_as_target = Mock(as_list=[])
+        fcmaps = self.fcmaps
+        fcmaps[0].copy_rate = "0"
+        fcmaps_as_source = Mock(as_list=fcmaps)
+        self.svc.client.svcinfo.lsfcmap.side_effect = [fcmaps_as_target, fcmaps_as_source]
         with self.assertRaises(array_errors.ObjectIsStillInUseError):
             self.svc.delete_volume("vol")
 
     def test_delete_volume_still_copy_fcmaps_not_removed(self):
         self._prepare_mocks_for_object_still_in_use()
-        fcmaps_as_source = self.fcmaps
-        fcmaps_as_source[0].status = "not good"
-        self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=[]), Mock(as_list=fcmaps_as_source)]
+        fcmaps_as_target = Mock(as_list=[])
+        fcmaps = self.fcmaps
+        fcmaps[0].status = "not good"
+        fcmaps_as_source = Mock(as_list=fcmaps)
+        self.svc.client.svcinfo.lsfcmap.side_effect = [fcmaps_as_target, fcmaps_as_source]
         with self.assertRaises(array_errors.ObjectIsStillInUseError):
             self.svc.delete_volume("vol")
 
     def test_delete_volume_has_clone_fcmaps_removed(self):
-        fcmaps_as_target = self.fcmaps
-        self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=fcmaps_as_target), Mock(as_list=[])]
+        fcmaps_as_target = Mock(as_list=[])
+        fcmaps_as_source = Mock(as_list=self.fcmaps_as_source)
+        self.svc.client.svcinfo.lsfcmap.side_effect = [fcmaps_as_target, fcmaps_as_source]
         self.svc.delete_volume("vol")
         self.svc.client.svctask.rmfcmap.assert_called_once()
 
