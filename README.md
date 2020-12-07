@@ -42,7 +42,7 @@ yum -y install xfsprogs                # Only if XFS file system is required
 #### 2. Configure Linux® multipath devices on the host.
 
 **Important:** Be sure to configure each worker with storage connectivity according to your storage system instructions. 
-For more information, find your storage system documentation on [IBM Knowledge Center](https://www.ibm.com/support/knowledgecenter/SSRQ8T).
+For more information, find your storage system documentation on [IBM Knowledge Center](https://www.ibm.com/support/knowledgecenter).
 
 ##### 2.1 Additional configuration steps for OpenShift® Container Platform users (RHEL and RHCOS). Other users can continue to step 3.
 
@@ -251,7 +251,7 @@ Use the `SpaceEfficiency` parameters for each storage system. These values are n
 	* Always includes deduplication and compression.
 	No need to specify during configuration.
 * IBM Spectrum Virtualize Family
-    * `thick` (default value, if not specified)
+	* `thick` (default value, if not specified)
 	* `thin`
 	* `compressed`
 	* `deduplicated`
