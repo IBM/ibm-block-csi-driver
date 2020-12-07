@@ -121,7 +121,7 @@ Apply the yaml file.
 oc apply -f 99-ibm-attach.yaml
 ```
 
-#### 3 If needed, enable support for volume snapshots (FlashCopy® function) on your Kubernetes cluster.
+#### 3. If needed, enable support for volume snapshots (FlashCopy® function) on your Kubernetes cluster.
 For more information and instructions, see the Kubernetes blog post, [Kubernetes 1.17 Feature: Kubernetes Volume Snapshot Moves to Beta](https://kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/).
 
 #### 4. Configure storage system connectivity
