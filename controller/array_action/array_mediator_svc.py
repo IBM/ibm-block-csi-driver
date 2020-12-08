@@ -88,8 +88,9 @@ def get_cli_volume_capabilities(cli_volume):
         capability = config.CAPABILITY_THIN
     if cli_volume.compressed_copy == YES:
         capability = config.CAPABILITY_COMPRESSED
-    if cli_volume.deduplicated_copy == YES:
-        capability = config.CAPABILITY_DEDUPLICATED
+    if hasattr(cli_volume, "deduplicated_copy"):
+        if cli_volume.deduplicated_copy == YES:
+            capability = config.CAPABILITY_DEDUPLICATED
     return {config.CAPABILITIES_SPACEEFFICIENCY: capability}
 
 
