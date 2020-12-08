@@ -9,7 +9,7 @@ Supported container platforms (and architectures):
 
 Supported IBM storage systems:
   - IBM Spectrum Virtualize Family including IBM SAN Volume Controller (SVC) and IBM FlashSystem® family members built with IBM Spectrum® Virtualize (FlashSystem 5010, 5030, 5100, 7200, 9100, 9200, 9200R)
-  - IBM FlashSystem A9000/R
+  - IBM FlashSystem A9000 and A9000R
   - IBM DS8000 Family
 
 Supported operating systems (and architectures):
