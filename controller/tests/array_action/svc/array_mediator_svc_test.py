@@ -352,11 +352,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
         volume = self.svc.get_object_by_id("volume_id", "volume")
         self.assertEqual(volume.name, "volume_id")
 
-    def _prepare_mocks_for_create_snapshot(self):
+    def _prepare_mocks_for_create_snapshot(self, deduplicated_copy=True):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         self.svc.client.svctask.mkfcmap.return_value = Mock()
 
         source_vol_to_copy_from = self._get_source_cli_vol()
+        if not deduplicated_copy:
+            del source_vol_to_copy_from.deduplicated_copy
         target_vol_after_creation = self._get_mapless_target_cli_vol()
         target_vol_after_mapping = self._get_mapped_target_cli_vol()
         target_vol_for_rollback = self._get_mapped_target_cli_vol()
@@ -400,6 +402,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_create_snapshot_success(self):
         self._prepare_mocks_for_create_snapshot()
+
+        snapshot = self.svc.create_snapshot("test_snap", "source_vol")
+
+        self.assertEqual(snapshot.capacity_bytes, 1024)
+        self.assertEqual(snapshot.array_type, 'SVC')
+        self.assertEqual(snapshot.id, 'snap_id')
+
+    def test_create_snapshot_no_deduplicated_copy_success(self):
+        self._prepare_mocks_for_create_snapshot(deduplicated_copy=False)
 
         snapshot = self.svc.create_snapshot("test_snap", "source_vol")
 
