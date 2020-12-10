@@ -16,14 +16,12 @@
 #    This Dockerfile.test is for running the csi controller local tests inside a container.
 #    Its similar to the Dockerfile, but with additional requirements-tests.txt and ENTRYPOINT to run the local tests.
 
-FROM registry.access.redhat.com/ubi7/python-38:1-21
+FROM registry.access.redhat.com/ubi8/python-38:1-41
 
 COPY controller/requirements.txt /driver/controller/
-RUN pip3 install --upgrade pip==20.3.1
+RUN pip3 install --upgrade pip==19.3.1
 # avoid default boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
-# TODO: remove CRYPTOGRAPHY_ALLOW_OPENSSL_102 when upgrading to ubi8
-ENV CRYPTOGRAPHY_ALLOW_OPENSSL_102=true
 RUN pip3 install -r /driver/controller/requirements.txt
 
 # Requires to run local testing
