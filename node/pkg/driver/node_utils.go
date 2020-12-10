@@ -361,6 +361,12 @@ func (n NodeUtils) ExpandMpathDevice(mpathDevice string) error {
 	if err != nil {
 		return fmt.Errorf("multipathd resize failed: %v\narguments: %v\nOutput: %s\n", err, args, string(output))
 	}
+
+	args = []string{"reconfigure"}
+	output, err = n.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
+	if err != nil {
+		return fmt.Errorf("multipathd reconfigure failed: %v\narguments: %v\nOutput: %s\n", err, args, string(output))
+	}
 	return nil
 }
 
