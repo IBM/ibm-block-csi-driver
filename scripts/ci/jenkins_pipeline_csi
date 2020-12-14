@@ -2,6 +2,9 @@ pipeline {
     environment {
         registryCredentialsID = 'csi_w3_user'
     }
+    options {
+        ansiColor('xterm')
+    }
     agent {
         label  "${env.AGENT_LABEL}"
     }
