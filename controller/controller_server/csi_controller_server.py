@@ -112,7 +112,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
                     array_mediator.validate_supported_capabilities(space_efficiency_type)
-                    volume = array_mediator.create_volume(volume_final_name, size, space_efficiency_type, pool)
+                    volume = array_mediator.create_volume(volume_final_name, required_bytes, space_efficiency_type,
+                                                          pool)
                 else:
                     logger.debug("volume found : {}".format(volume))
 

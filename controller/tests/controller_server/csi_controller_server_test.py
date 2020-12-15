@@ -34,6 +34,7 @@ class BaseControllerSetUp(unittest.TestCase):
         self.servicer = ControllerServicer(self.fqdn)
 
         self.request = Mock()
+        self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
 
 
 class CommonControllerTest:
@@ -124,7 +125,6 @@ class TestControllerServerCreateSnapshot(BaseControllerSetUp, CommonControllerTe
         self.mediator.get_snapshot = Mock()
         self.mediator.get_snapshot.return_value = None
 
-        self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
         self.request.parameters = {}
         self.capacity_bytes = 10
         self.request.name = snapshot_name
@@ -545,7 +545,7 @@ class TestControllerServerCreateVolume(BaseControllerSetUp, CommonControllerTest
 
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.create_volume.assert_called_once_with(self.request.name, 1 * 1024 * 1024 * 1024, None, "pool1")
+        self.mediator.create_volume.assert_called_once_with(self.request.name, 2, None, "pool1")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_required_bytes_too_large_fail(self, storage_agent):
@@ -1371,11 +1371,11 @@ class TestControllerServerExpandVolume(BaseControllerSetUp, CommonControllerTest
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_expand_volume_with_wrong_secrets(self, a_enter):
-        self._test_create_object_with_wrong_secrets(a_enter)
+        self._test_request_with_wrong_secrets(a_enter)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_expand_volume_with_array_connection_exception(self, storage_agent):
-        self._test_create_object_with_array_connection_exception(storage_agent)
+        self._test_request_with_array_connection_exception(storage_agent)
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.expand_volume")
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -1413,9 +1413,6 @@ class TestControllerServerExpandVolume(BaseControllerSetUp, CommonControllerTest
 
 
 class TestIdentityServer(BaseControllerSetUp):
-
-    def setUp(self):
-        super().setUp()
 
     @patch.object(ControllerServicer, "_ControllerServicer__get_identity_config")
     def test_identity_plugin_get_info_succeeds(self, identity_config):
