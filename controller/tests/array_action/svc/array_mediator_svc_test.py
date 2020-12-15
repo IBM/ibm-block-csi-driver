@@ -7,7 +7,7 @@ from pysvc.unified.response import CLIFailureError
 
 import controller.array_action.config as config
 import controller.array_action.errors as array_errors
-from controller.array_action.array_mediator_svc import SVCArrayMediator, build_kwargs_from_capabilities, \
+from controller.array_action.array_mediator_svc import SVCArrayMediator, build_kwargs_from_parameters, \
     HOST_ID_PARAM, HOST_NAME_PARAM, HOST_ISCSI_NAMES_PARAM, HOST_WWPNS_PARAM, FCMAP_STATUS_DONE
 from controller.array_action.svc_cli_result_reader import SVCListResultsElement
 from controller.common.node_info import Initiators
@@ -463,40 +463,35 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(self.svc.client.svctask.rmfcmap.call_count, 2)
         self.svc.client.svctask.rmvolume.assert_called_once_with(vdisk_id="test_snap")
 
-    def test_validate_supported_capabilities_raise_error(self):
-        capabilities_a = "Test"
+    def test_validate_supported_space_efficiency_raise_error(self):
+        space_efficiency = "Test"
         with self.assertRaises(
-                array_errors.StorageClassCapabilityNotSupported):
-            self.svc.validate_supported_capabilities(capabilities_a)
-        capabilities_c = ""
-        self.svc.validate_supported_capabilities(capabilities_c)
+                array_errors.SpaceEfficiencyNotSupported):
+            self.svc.validate_supported_space_efficiency(space_efficiency)
 
-    def test_validate_supported_capabilities_success(self):
-        capabilities = "thin"
-        self.svc.validate_supported_capabilities(capabilities)
-        capabilities = "thick"
-        self.svc.validate_supported_capabilities(capabilities)
-        capabilities = "compressed"
-        self.svc.validate_supported_capabilities(capabilities)
-        capabilities = "deduplicated"
-        self.svc.validate_supported_capabilities(capabilities)
+    def test_validate_supported_space_efficiency_success(self):
+        no_space_efficiency = ""
+        self.svc.validate_supported_space_efficiency(no_space_efficiency)
+        thin_space_efficiency = "thin"
+        self.svc.validate_supported_space_efficiency(thin_space_efficiency)
+        thick_space_efficiency = "thick"
+        self.svc.validate_supported_space_efficiency(thick_space_efficiency)
+        compressed_space_efficiency = "compressed"
+        self.svc.validate_supported_space_efficiency(compressed_space_efficiency)
+        deduplicated_space_efficiency = "deduplicated"
+        self.svc.validate_supported_space_efficiency(deduplicated_space_efficiency)
 
-    def test_build_kwargs_from_capabilities(self):
+    def test_build_kwargs_from_parameters(self):
         size = self.svc._convert_size_bytes(1000)
-        result_a = build_kwargs_from_capabilities({'SpaceEfficiency': 'Thin'},
-                                                  'P1', 'V1', size)
+        result_a = build_kwargs_from_parameters('Thin', 'P1', 'V1', size)
         self.assertDictEqual(result_a, {'name': 'V1', 'unit': 'b',
                                         'size': 1024, 'pool': 'P1',
                                         'thin': True})
-        result_b = build_kwargs_from_capabilities(
-            {'SpaceEfficiency': 'compressed'}, 'P2', 'V2', size)
+        result_b = build_kwargs_from_parameters('compressed', 'P2', 'V2', size)
         self.assertDictEqual(result_b, {'name': 'V2', 'unit': 'b',
                                         'size': 1024, 'pool': 'P2',
                                         'compressed': True})
-        result_c = build_kwargs_from_capabilities({'SpaceEfficiency': 'Deduplicated'},
-                                                  'P3', 'V3',
-                                                  self.svc._convert_size_bytes(
-                                                      2048))
+        result_c = build_kwargs_from_parameters('Deduplicated', 'P3', 'V3', self.svc._convert_size_bytes(2048))
         self.assertDictEqual(result_c, {'name': 'V3', 'unit': 'b',
                                         'size': 2048, 'pool': 'P3',
                                         'compressed': True,

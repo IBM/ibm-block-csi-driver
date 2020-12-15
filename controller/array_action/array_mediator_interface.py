@@ -30,14 +30,14 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_volume(self, volume_name, size_in_bytes, capabilities, pool):
+    def create_volume(self, volume_name, size_in_bytes, space_efficiency, pool):
         """
         This function should create a volume in the storage system.
 
         Args:
             volume_name      : name of the volume to be created in the stoarge system
             size_in_bytes : size in bytes of the volume
-            capabilities  : dict of capabilities {<capbility_name>:<value>}
+            space_efficiency  : space_efficiency type (None for default)
             pool          : pool name to create the volume in
 
         Returns:
@@ -337,18 +337,18 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def validate_supported_capabilities(self, capabilities):
+    def validate_supported_space_efficiency(self, space_efficiency):
         """
-        This function will check if the capabilities passed to the create volume are valid
+        This function will check if the space efficiency passed to the create volume are valid
 
         Args:
-           capabilities : as passed from the storage class
+           space_efficiency : as passed from the storage class
 
         Returns:
             None
 
         Raises:
-            CapabilityNotSupported
+            SpaceEfficiencyNotSupported
         """
         raise NotImplementedError
 

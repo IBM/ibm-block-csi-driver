@@ -92,15 +92,15 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.UnsupportedStorageVersionError):
             DS8KArrayMediator("user", "password", self.endpoint)
 
-    def test_validate_capabilities_passed(self):
-        self.array.validate_supported_capabilities(
-            config.CAPABILITY_THIN
+    def test_validate_space_efficiency_passed(self):
+        self.array.validate_supported_space_efficiency(
+            config.SPACE_EFFICIENCY_THIN
         )
         # nothing is raised
 
-    def test_validate_capabilities_failed(self):
-        with self.assertRaises(array_errors.StorageClassCapabilityNotSupported):
-            self.array.validate_supported_capabilities(
+    def test_validate_space_efficiency_failed(self):
+        with self.assertRaises(array_errors.SpaceEfficiencyNotSupported):
+            self.array.validate_supported_space_efficiency(
                 "fake"
             )
 
@@ -128,28 +128,26 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                 pool_id=self.volume_response.pool
             )
 
-    def test_create_volume_with_default_capabilities_succeeded(self):
-        self._test_create_volume_with_capabilities_succeeded(False)
+    def test_create_volume_with_default_space_efficiency_succeeded(self):
+        self._test_create_volume_with_space_efficiency_succeeded(False)
 
-    def test_create_volume_with_thin_capabilities_succeeded(self):
-        self._test_create_volume_with_capabilities_succeeded(True)
+    def test_create_volume_with_thin_space_efficiency_succeeded(self):
+        self._test_create_volume_with_space_efficiency_succeeded(True)
 
-    def _test_create_volume_with_capabilities_succeeded(self, is_thin):
+    def _test_create_volume_with_space_efficiency_succeeded(self, is_thin):
         self.client_mock.create_volume.return_value = self.volume_response
         self.client_mock.get_volume.return_value = self.volume_response
         name = self.volume_response.name
         size_in_bytes = self.volume_response.cap
         if is_thin:
-            capabilities = {
-                config.CAPABILITIES_SPACEEFFICIENCY: config.CAPABILITY_THIN
-            }
+            space_efficiency = config.SPACE_EFFICIENCY_THIN
             tp = 'ese'
         else:
-            capabilities = {}
+            space_efficiency = None
             tp = 'none'
         pool_id = self.volume_response.pool
         volume = self.array.create_volume(
-            name, size_in_bytes, capabilities, pool_id,
+            name, size_in_bytes, space_efficiency, pool_id,
         )
         self.client_mock.create_volume.assert_called_once_with(
             pool_id=pool_id,

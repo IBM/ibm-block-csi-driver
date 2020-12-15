@@ -189,20 +189,20 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         logger.info(
             "Finished volume expansion. id : {0}. volume increased by {1} bytes".format(volume_id, size_in_blocks))
 
-    def validate_supported_capabilities(self, capabilities):
-        logger.info("validate_supported_capabilities for capabilities : {0}".format(capabilities))
-        # for a9k there should be no capabilities
-        if capabilities:
-            raise controller_errors.StorageClassCapabilityNotSupported(capabilities)
+    def validate_supported_space_efficiency(self, space_efficiency):
+        logger.info("validate_supported_space_efficiency for space efficiency : {0}".format(space_efficiency))
+        # for a9k there should be no space efficiency
+        if space_efficiency:
+            raise controller_errors.SpaceEfficiencyNotSupported(space_efficiency)
 
-        logger.info("Finished validate_supported_capabilities")
+        logger.info("Finished validate_supported_space_efficiency")
 
     def _convert_size_bytes_to_blocks(self, size_in_bytes):
         return int(size_in_bytes / self.BLOCK_SIZE_IN_BYTES)
 
-    def create_volume(self, name, size_in_bytes, capabilities, pool):
-        logger.info("creating volume with name : {}. size : {} . in pool : {} with capabilities : {}".format(
-            name, size_in_bytes, pool, capabilities))
+    def create_volume(self, name, size_in_bytes, space_efficiency, pool):
+        logger.info("creating volume with name : {}. size : {} . in pool : {} with parameters : {}".format(
+            name, size_in_bytes, pool, space_efficiency))
 
         size_in_blocks = self._convert_size_bytes_to_blocks(size_in_bytes)
 

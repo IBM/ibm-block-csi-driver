@@ -190,7 +190,8 @@ def validate_volume_context_match_volume(volume_context, volume):
     context_from_existing_volume = _get_context_from_volume(volume)
 
     if volume_context != context_from_existing_volume:
-        raise ValidationException(messages.volume_context_not_match_volume_message)
+        raise ValidationException(
+            messages.volume_context_not_match_volume_message.format(volume_context, context_from_existing_volume))
     logger.debug("volume_context validation finished.")
 
 
@@ -198,7 +199,7 @@ def validate_expand_volume_request(request):
     logger.debug("validating expand volume request")
 
     if not request.volume_id:
-        raise ValidationException(messages.id_should_not_be_empty_message)
+        raise ValidationException(messages.volume_id_should_not_be_empty_message)
 
     logger.debug("validating volume capacity")
     if request.capacity_range:

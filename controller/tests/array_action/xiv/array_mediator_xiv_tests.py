@@ -69,29 +69,29 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_create_volume_raise_illegal_name_for_object(self):
         self.mediator.client.cmd.vol_create.side_effect = [xcli_errors.IllegalNameForObjectError("", "vol", "")]
         with self.assertRaises(array_errors.IllegalObjectName):
-            self.mediator.create_volume("vol", 10, [], "pool1")
+            self.mediator.create_volume("vol", 10, None, "pool1")
 
     def test_create_volume_raise_volume_exists_error(self):
         self.mediator.client.cmd.vol_create.side_effect = [xcli_errors.VolumeExistsError("", "vol", "")]
         with self.assertRaises(array_errors.VolumeAlreadyExists):
-            self.mediator.create_volume("vol", 10, [], "pool1")
+            self.mediator.create_volume("vol", 10, None, "pool1")
 
     def test_create_volume_raise_pool_does_not_exists_error(self):
         self.mediator.client.cmd.vol_create.side_effect = [xcli_errors.PoolDoesNotExistError("", "pool", "")]
         with self.assertRaises(array_errors.PoolDoesNotExist):
-            self.mediator.create_volume("vol", 10, [], "pool1")
+            self.mediator.create_volume("vol", 10, None, "pool1")
 
     def test_create_volume_raise_no_space_error(self):
         self.mediator.client.cmd.vol_create.side_effect = [
             xcli_errors.CommandFailedRuntimeError("", "No space to allocate to the volume", "")]
         with self.assertRaises(array_errors.NotEnoughSpaceInPool):
-            self.mediator.create_volume("vol", 10, [], "pool1")
+            self.mediator.create_volume("vol", 10, None, "pool1")
 
     @patch.object(XIVArrayMediator, "_generate_volume_response")
     def test_create_volume__generate_volume_response_raise_exception(self, response):
         response.side_effect = Exception("err")
         with self.assertRaises(Exception):
-            self.mediator.create_volume("vol", 10, [], "pool1")
+            self.mediator.create_volume("vol", 10, None, "pool1")
 
     def test_copy_to_existing_volume_from_snapshot_succeeds_with_resize(self):
         vol_name = "vol"

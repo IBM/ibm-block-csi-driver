@@ -73,7 +73,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         pool = request.parameters[config.PARAMETERS_POOL]
 
-        space_efficiency_type = request.parameters.get(config.PARAMETERS_SPACEEFFICIENCY)
+        space_efficiency = request.parameters.get(config.PARAMETERS_SPACEEFFICIENCY)
 
         try:
             # TODO : pass multiple array addresses
@@ -111,8 +111,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
-                    array_mediator.validate_supported_capabilities(space_efficiency_type)
-                    volume = array_mediator.create_volume(volume_final_name, required_bytes, space_efficiency_type,
+                    array_mediator.validate_supported_space_efficiency(space_efficiency)
+                    volume = array_mediator.create_volume(volume_final_name, required_bytes, space_efficiency,
                                                           pool)
                 else:
                     logger.debug("volume found : {}".format(volume))
@@ -136,7 +136,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.info("finished create volume")
                 return res
 
-        except (controller_errors.IllegalObjectName, controller_errors.StorageClassCapabilityNotSupported,
+        except (controller_errors.IllegalObjectName, controller_errors.SpaceEfficiencyNotSupported,
                 controller_errors.PoolDoesNotExist, controller_errors.PoolDoesNotMatchCapabilities,
                 controller_errors.PoolParameterIsMissing, controller_errors.ExpectedSnapshotButFoundVolumeError) as ex:
             logger.exception(ex)
@@ -409,7 +409,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             space_efficiency_type = request.parameters.get(config.PARAMETERS_SPACEEFFICIENCY)
 
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
-                array_mediator.validate_supported_capabilities(space_efficiency_type)
+                array_mediator.validate_supported_space_efficiency(space_efficiency_type)
                 volume = array_mediator.get_object_by_id(object_id=volume_id, object_type=config.VOLUME_TYPE_NAME)
 
             if not volume:
@@ -426,7 +426,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)
             return csi_pb2.ValidateVolumeCapabilitiesResponse(message=ex.message)
-        except (ValidationException, controller_errors.StorageClassCapabilityNotSupported) as ex:
+        except (ValidationException, controller_errors.SpaceEfficiencyNotSupported) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)

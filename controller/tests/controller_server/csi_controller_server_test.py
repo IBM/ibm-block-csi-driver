@@ -426,8 +426,8 @@ class TestControllerServerCreateVolume(BaseControllerSetUp, CommonControllerTest
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertTrue("fs_type" in self.context.details)
 
-        access_types = csi_pb2.VolumeCapability.AccessMode
-        caps = utils.get_mock_volume_capability_object(mode=access_types.MULTI_NODE_SINGLE_WRITER)
+        access_mode = csi_pb2.VolumeCapability.AccessMode
+        caps = utils.get_mock_volume_capability_object(mode=access_mode.MULTI_NODE_SINGLE_WRITER)
         self.request.volume_capabilities = [caps]
 
         self.servicer.CreateVolume(self.request, self.context)
@@ -518,9 +518,9 @@ class TestControllerServerCreateVolume(BaseControllerSetUp, CommonControllerTest
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                          err=array_errors.PoolDoesNotMatchCapabilities("pool1", "", "endpoint"))
 
-    def test_create_volume_with_create_volume_with_capability_not_supported_exception(self):
+    def test_create_volume_with_create_volume_with_space_efficiency_not_supported_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
-                                         err=array_errors.StorageClassCapabilityNotSupported(["cap"]))
+                                         err=array_errors.SpaceEfficiencyNotSupported(["cap"]))
 
     def test_create_volume_with_create_volume_with_other_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INTERNAL,
@@ -1261,14 +1261,14 @@ class TestControllerServerExpandVolume(BaseControllerSetUp, CommonControllerTest
     def setUp(self):
         super().setUp()
 
-        self.access_types = csi_pb2.VolumeCapability.AccessMode
+        self.access_mode = csi_pb2.VolumeCapability.AccessMode
         self.fs_type = "ext4"
 
         self.mediator.maximal_volume_size_in_bytes = 10
         self.mediator.minimal_volume_size_in_bytes = 2
 
         self.request.volume_capability = csi_pb2.VolumeCapability(
-            access_mode=csi_pb2.VolumeCapability.AccessMode(mode=self.access_types.SINGLE_NODE_WRITER),
+            access_mode=csi_pb2.VolumeCapability.AccessMode(mode=self.access_mode.SINGLE_NODE_WRITER),
             mount=csi_pb2.VolumeCapability.MountVolume(fs_type=self.fs_type))
         self.request.parameters = {}
         self.capacity_bytes = 6
