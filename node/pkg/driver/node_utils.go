@@ -38,6 +38,8 @@ const (
 	// Command lines inside the container will show /host prefix.
 	PrefixChrootOfHostRoot      = "/host"
 	PublishContextSeparator     = ","
+	NodeIdDelimiter             = ";"
+	NodeIdFcDelimiter           = ":"
 	mkfsTimeoutMilliseconds     = 15 * 60 * 1000
 	resizeFsTimeoutMilliseconds = 30 * 1000
 	TimeOutMultipathdCmd        = 10 * 1000
@@ -69,6 +71,7 @@ type NodeUtilsInterface interface {
 	FormatDevice(devicePath string, fsType string)
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
+	GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN string) (string, error)
 }
 
 type NodeUtils struct {
@@ -358,6 +361,12 @@ func (n NodeUtils) ExpandMpathDevice(mpathDevice string) error {
 	if err != nil {
 		return fmt.Errorf("multipathd resize failed: %v\narguments: %v\nOutput: %s\n", err, args, string(output))
 	}
+
+	args = []string{"reconfigure"}
+	output, err = n.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
+	if err != nil {
+		return fmt.Errorf("multipathd reconfigure failed: %v\narguments: %v\nOutput: %s\n", err, args, string(output))
+	}
 	return nil
 }
 
@@ -422,4 +431,36 @@ func (n NodeUtils) IsNotMountPoint(file string) (bool, error) {
 // E.g. in order to access /etc/test.txt pod has to use /host/etc/test.txt
 func (n NodeUtils) GetPodPath(origPath string) string {
 	return path.Join(PrefixChrootOfHostRoot, origPath)
+}
+
+func (n NodeUtils) GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN string) (string, error) {
+	var nodeId strings.Builder
+	nodeId.Grow(MaxNodeIdLength)
+	nodeId.WriteString(hostName)
+	nodeId.WriteString(NodeIdDelimiter)
+
+	if len(fcWWNs) > 0 {
+		if nodeId.Len()+len(fcWWNs[0]) <= MaxNodeIdLength {
+			nodeId.WriteString(fcWWNs[0])
+		} else {
+			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
+		}
+
+		for _, fcPort := range fcWWNs[1:] {
+			if nodeId.Len()+len(NodeIdFcDelimiter)+len(fcPort) <= MaxNodeIdLength {
+				nodeId.WriteString(NodeIdFcDelimiter)
+				nodeId.WriteString(fcPort)
+			}
+		}
+	}
+	if len(iscsiIQN) > 0 {
+		if nodeId.Len()+len(NodeIdDelimiter)+len(iscsiIQN) <= MaxNodeIdLength {
+			nodeId.WriteString(NodeIdDelimiter)
+			nodeId.WriteString(iscsiIQN)
+		} else if len(fcWWNs) == 0 {
+			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
+		}
+	}
+
+	return nodeId.String(), nil
 }

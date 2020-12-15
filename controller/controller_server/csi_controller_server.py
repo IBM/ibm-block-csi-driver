@@ -88,12 +88,20 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
                     return csi_pb2.CreateVolumeResponse()
 
-                size = request.capacity_range.required_bytes
+                required_bytes = request.capacity_range.required_bytes
+                max_size = array_mediator.maximal_volume_size_in_bytes
+                min_size = array_mediator.minimal_volume_size_in_bytes
 
-                if size == 0:
-                    size = array_mediator.minimal_volume_size_in_bytes
+                if required_bytes > max_size:
+                    message = messages.SizeOutOfRangeError_message.format(required_bytes, max_size)
+                    context.set_details(message)
+                    context.set_code(grpc.StatusCode.OUT_OF_RANGE)
+                    return csi_pb2.CreateVolumeResponse()
+
+                if required_bytes == 0:
+                    required_bytes = min_size
                     logger.debug("requested size is 0 so the default size will be used : {0} ".format(
-                        size))
+                        required_bytes))
                 try:
                     volume = array_mediator.get_volume(
                         volume_final_name,
@@ -119,7 +127,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 if source_id:
                     self._copy_to_existing_volume_from_source(volume, source_id,
-                                                              source_type, size,
+                                                              source_type, required_bytes,
                                                               array_mediator, pool)
                     volume.copy_source_id = source_id
 

@@ -25,7 +25,7 @@ PermissionDeniedError_message = "Permission was denied to operation : {0}"
 
 MultipleHostsFoundError_message = "Multiple hosts found for port(s): {0}. hosts are : {1}"
 
-HostNotFoundError_message = "Host for node: {0} was not found"
+HostNotFoundError_message = "Host for node: {0} was not found, ensure all host ports are configured on storage"
 
 NoAvailableLunError_message = "No available lun was found for host : {0}"
 

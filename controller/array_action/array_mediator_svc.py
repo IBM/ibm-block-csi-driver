@@ -88,8 +88,9 @@ def get_cli_volume_capabilities(cli_volume):
         capability = config.CAPABILITY_THIN
     if cli_volume.compressed_copy == YES:
         capability = config.CAPABILITY_COMPRESSED
-    if cli_volume.deduplicated_copy == YES:
-        capability = config.CAPABILITY_DEDUPLICATED
+    if hasattr(cli_volume, "deduplicated_copy"):
+        if cli_volume.deduplicated_copy == YES:
+            capability = config.CAPABILITY_DEDUPLICATED
     return {config.CAPABILITIES_SPACEEFFICIENCY: capability}
 
 
@@ -520,8 +521,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         fcmap_as_target = self._get_fcmap_as_target_if_exists(object_name)
         if is_snapshot and not fcmap_as_target:
             raise controller_errors.ObjectNotFoundError(object_name)
-        if cli_object.FC_id == 'many':
-            fcmaps_as_source = self._get_fcmaps_as_source_if_exist(object_name)
+        fcmaps_as_source = self._get_fcmaps_as_source_if_exist(object_name)
+        if fcmaps_as_source:
             self._safe_delete_fcmaps(object_name, fcmaps_as_source)
         if fcmap_as_target:
             self._stop_and_delete_fcmap(fcmap_as_target.id)

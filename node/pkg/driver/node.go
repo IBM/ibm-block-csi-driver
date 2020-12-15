@@ -60,8 +60,9 @@ var (
 )
 
 const (
-	FCPath     = "/sys/class/fc_host"
-	FCPortPath = "/sys/class/fc_host/host*/port_name"
+	FCPath          = "/sys/class/fc_host"
+	FCPortPath      = "/sys/class/fc_host/host*/port_name"
+	MaxNodeIdLength = 128
 )
 
 //go:generate mockgen -destination=../../mocks/mock_NodeMounter.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeMounter
@@ -431,8 +432,14 @@ func (d *NodeService) mountFileSystemVolume(mpathDevice string, targetPath strin
 		d.NodeUtils.FormatDevice(mpathDevice, fsType)
 	}
 
+	var mountOptions []string
+
+	if fsType == "xfs" {
+		mountOptions = append(mountOptions, "nouuid")
+	}
+
 	logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
-	return d.Mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
+	return d.Mounter.FormatAndMount(mpathDevice, targetPath, fsType, mountOptions) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 }
 
 func (d *NodeService) mountRawBlockVolume(mpathDevice string, targetPath string, isTargetPathExists bool) error {
@@ -708,9 +715,11 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	delimiter := ";"
-	fcPorts := strings.Join(fcWWNs, ":")
-	nodeId := d.Hostname + delimiter + iscsiIQN + delimiter + fcPorts
+	nodeId, err := d.NodeUtils.GenerateNodeID(d.Hostname, fcWWNs, iscsiIQN)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
 	logger.Debugf("node id is : %s", nodeId)
 
 	return &csi.NodeGetInfoResponse{
