@@ -36,6 +36,13 @@ class BaseControllerSetUp(unittest.TestCase):
         self.request = Mock()
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
 
+        self.request.parameters = {}
+        self.request.volume_context = {}
+        caps = utils.get_mock_volume_capability_object()
+        self.request.volume_capabilities = [caps]
+
+        self.context = utils.FakeContext()
+
 
 class CommonControllerTest:
 
@@ -125,13 +132,9 @@ class TestControllerServerCreateSnapshot(BaseControllerSetUp, CommonControllerTe
         self.mediator.get_snapshot = Mock()
         self.mediator.get_snapshot.return_value = None
 
-        self.request.parameters = {}
         self.capacity_bytes = 10
         self.request.name = snapshot_name
         self.request.source_volume_id = "A9000:12345678"
-        caps = utils.get_mock_volume_capability_object()
-        self.request.volume_capabilities = [caps]
-        self.context = utils.FakeContext()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_empty_name(self, a_enter):
@@ -286,10 +289,7 @@ class TestControllerServerDeleteSnapshot(BaseControllerSetUp):
         self.mediator.get_snapshot = Mock()
         self.mediator.get_snapshot.return_value = None
 
-        self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
-        self.request.parameters = {}
         self.request.snapshot_id = "A9000:BADC0FFEE0DDF00D00000000DEADBABE"
-        self.context = utils.FakeContext()
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.delete_snapshot", Mock())
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -357,9 +357,6 @@ class TestControllerServerCreateVolume(BaseControllerSetUp, CommonControllerTest
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.side_effect = array_errors.ObjectNotFoundError("vol")
 
-        caps = utils.get_mock_volume_capability_object()
-        self.request.volume_capabilities = [caps]
-
         self.mediator.maximal_volume_size_in_bytes = 10
         self.mediator.minimal_volume_size_in_bytes = 2
 
@@ -370,8 +367,6 @@ class TestControllerServerCreateVolume(BaseControllerSetUp, CommonControllerTest
         self.request.capacity_range.required_bytes = self.capacity_bytes
         self.request.name = volume_name
         self.request.volume_content_source = None
-
-        self.context = utils.FakeContext()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_empty_name(self, storage_agent):
@@ -783,8 +778,6 @@ class TestControllerServerDeleteVolume(BaseControllerSetUp):
         self.pool = 'pool1'
         self.request.volume_id = "xiv:vol-id"
 
-        self.context = utils.FakeContext()
-
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_delete_volume_with_wrong_secrets(self, storage_agent):
         storage_agent.return_value = self.storage_agent
@@ -878,13 +871,9 @@ class TestControllerServerPublishVolume(BaseControllerSetUp):
         self.request.node_id = "hostname;iqn.1994-05.com.redhat:686358c930fe;500143802426baf4"
         self.request.readonly = False
         self.request.readonly = False
-        self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
-        self.request.volume_context = {}
 
         caps = utils.get_mock_volume_capability_object()
         self.request.volume_capability = caps
-
-        self.context = utils.FakeContext()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_publish_volume_success(self, storage_agent):
@@ -1162,10 +1151,7 @@ class TestControllerServerUnPublishVolume(BaseControllerSetUp):
         arr_type = XIVArrayMediator.array_type
         self.request.volume_id = "{}:wwn1".format(arr_type)
         self.request.node_id = "hostname;iqn1;500143802426baf4"
-        self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
         self.request.volume_context = {}
-
-        self.context = utils.FakeContext()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_unpublish_volume_success(self, storage_agent):
@@ -1277,7 +1263,6 @@ class TestControllerServerExpandVolume(BaseControllerSetUp, CommonControllerTest
         self.volume_id = "vol-id"
         self.request.volume_id = "{}:{}".format("xiv", self.volume_id)
         self.request.volume_content_source = None
-        self.context = utils.FakeContext()
         self.mediator.get_object_by_id = Mock()
         self.volume_before_expand = utils.get_mock_mediator_response_volume(2,
                                                                             volume_name,
@@ -1480,16 +1465,9 @@ class TestControllerServerValidateVolumeCapabilities(BaseControllerSetUp, Common
 
         arr_type = XIVArrayMediator.array_type
         self.request.volume_id = "{}:wwn1".format(arr_type)
-        self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
-        self.request.parameters = {}
-        self.request.volume_context = {}
-        caps = utils.get_mock_volume_capability_object()
-        self.request.volume_capabilities = [caps]
 
         self.mediator.get_object_by_id = Mock()
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
-
-        self.context = utils.FakeContext()
 
     def _assertResponse(self, response, expected_status_code, expected_details_substring):
         self.assertEqual(self.context.code, expected_status_code)
