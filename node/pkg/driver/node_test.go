@@ -875,6 +875,7 @@ func TestNodeExpandVolume(t *testing.T) {
 	d := newTestNodeService(nil, nil)
 	targetPath := "/test/path"
 	volId := "someStorageType:vol-test"
+	mountPoint := "/test/path/someStorageType:vol-test"
 	expandRequest := &csi.NodeExpandVolumeRequest{
 		VolumeId:   volId,
 		VolumePath: targetPath,
@@ -1019,7 +1020,7 @@ func TestNodeExpandVolume(t *testing.T) {
 				mockNodeUtils.EXPECT().RescanPhysicalDevices(sysDevices)
 				mockNodeUtils.EXPECT().ExpandMpathDevice(mpathDeviceName)
 				mockMounter.EXPECT().GetDiskFormat(mpathDevice).Return(fsType, nil)
-				mockNodeUtils.EXPECT().ExpandFilesystem(mpathDevice, targetPath, fsType).Return(dummyError)
+				mockNodeUtils.EXPECT().ExpandFilesystem(mpathDevice, mountPoint, fsType).Return(dummyError)
 
 				_, err := node.NodeExpandVolume(context.TODO(), expandRequest)
 				assertError(t, err, codes.Internal)
@@ -1040,7 +1041,7 @@ func TestNodeExpandVolume(t *testing.T) {
 				mockNodeUtils.EXPECT().RescanPhysicalDevices(sysDevices)
 				mockNodeUtils.EXPECT().ExpandMpathDevice(mpathDeviceName)
 				mockMounter.EXPECT().GetDiskFormat(mpathDevice).Return(fsType, nil)
-				mockNodeUtils.EXPECT().ExpandFilesystem(mpathDevice, targetPath, fsType)
+				mockNodeUtils.EXPECT().ExpandFilesystem(mpathDevice, mountPoint, fsType)
 
 				_, err := node.NodeExpandVolume(context.TODO(), expandRequest)
 				if err != nil {
