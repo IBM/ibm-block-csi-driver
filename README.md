@@ -2,8 +2,8 @@
 The Container Storage Interface (CSI) Driver for IBM block storage systems enables container orchestrators such as Kubernetes to manage the life cycle of persistent storage.
 
 Supported container platforms (and architectures):
-  - OpenShift v4.4 (x86, IBM Z, and IBM PowerPC)
-  - OpenShift v4.5 (x86, IBM Z, and IBM PowerPC)
+  - OpenShift v4.4 (x86, IBM Z, and IBM Power Systems)
+  - OpenShift v4.5 (x86, IBM Z, and IBM Power Systems)
   - Kubernetes v1.18 (x86)
   - Kubernetes v1.19 (x86)
 
@@ -14,7 +14,7 @@ Supported IBM storage systems:
 
 Supported operating systems (and architectures):
   - RHEL 7.x (x86)
-  - RHCOS (x86, IBM Z, and IBM PowerPC)
+  - RHCOS (x86, IBM Z, and IBM Power Systems)
 
 Full documentation can be found on the [IBM Knowledge Center](https://www.ibm.com/support/knowledgecenter/SSRQ8T).
 
