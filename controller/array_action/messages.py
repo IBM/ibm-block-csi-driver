@@ -4,7 +4,7 @@ CredentialsError_message = "Credential error has occurred while connecting to en
 
 StorageManagementIPsNotSupportError_message = "Invalid Management IP for SVC : {0} "
 
-VolumeNotFoundError_message = "Volume was not found : {0} "
+ObjectNotFoundError_message = "Object was not found : {0} "
 
 VolumeNameBelongsToSnapshotError_message = "Volume not found. Snapshot with the same id exists. \
                                                          Name : {0} , array : {1}"
@@ -25,7 +25,7 @@ PermissionDeniedError_message = "Permission was denied to operation : {0}"
 
 MultipleHostsFoundError_message = "Multiple hosts found for port(s): {0}. hosts are : {1}"
 
-HostNotFoundError_message = "Host for node: {0} was not found"
+HostNotFoundError_message = "Host for node: {0} was not found, ensure all host ports are configured on storage"
 
 NoAvailableLunError_message = "No available lun was found for host : {0}"
 
@@ -55,14 +55,15 @@ SnapshotNotFoundError_message = "Snapshot was not found : {0} "
 
 SnapshotAlreadyExistsError_message = "Snapshot already exists : {0} , array : {1}"
 
-SnapshotNameBelongsToVolumeError_message = "Snapshot not found. Volume with the same name exists. \
-                                                         Name : {0} , array : {1}"
-
-SnapshotIdBelongsToVolumeError_message = "Snapshot not found. Volume with the same id exists. \
-                                                         Id : {0} , array : {1}"
+ExpectedSnapshotButFoundVolumeError_message = "Could not find info about the source of: {0}, array: {1}"
 
 SnapshotWrongVolumeError_message = "Snapshot {0} exists but it is of Volume {1} and not {2}"
 
-SnapshotIsStillInUseError_message = "Snapshot {0} is still in use by {1}"
+ObjectIsStillInUseError_message = "Object {0} is still in use by {1}"
 
 InvalidCliResponseError_message = "Invalid CLI response. Details : {0}"
+
+NotEnoughSpaceInPoolError_message = "Not enough space in pool {0}"
+
+SizeOutOfRangeError_message = "requested size is out of limits. requested: {0}," \
+                              " max_in_byte: {1}"

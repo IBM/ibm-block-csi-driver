@@ -26,7 +26,7 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/kubernetes/pkg/util/mount"
+	"k8s.io/utils/mount"
 	"os"
 	"path"
 	"path/filepath"
@@ -36,6 +36,7 @@ import (
 var (
 	nodeCaps = []csi.NodeServiceCapability_RPC_Type{
 		csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
+		csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
 	}
 
 	// volumeCaps represents how the volume could be accessed.
@@ -59,8 +60,9 @@ var (
 )
 
 const (
-	FCPath     = "/sys/class/fc_host"
-	FCPortPath = "/sys/class/fc_host/host*/port_name"
+	FCPath          = "/sys/class/fc_host"
+	FCPortPath      = "/sys/class/fc_host/host*/port_name"
+	MaxNodeIdLength = 128
 )
 
 //go:generate mockgen -destination=../../mocks/mock_NodeMounter.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeMounter
@@ -68,6 +70,7 @@ const (
 type NodeMounter interface {
 	mount.Interface
 	FormatAndMount(source string, target string, fstype string, options []string) error
+	GetDiskFormat(disk string) (string, error)
 }
 
 // nodeService represents the node service of CSI driver
@@ -79,17 +82,22 @@ type NodeService struct {
 	executer                    executer.ExecuterInterface
 	VolumeIdLocksMap            SyncLockInterface
 	OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface
+	OsDeviceConnectivityHelper  device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface
 }
 
 // newNodeService creates a new node service
 // it panics if failed to create the service
-func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface, OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface, executer executer.ExecuterInterface, mounter NodeMounter, syncLock SyncLockInterface) NodeService {
+func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface,
+	OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface,
+	osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface,
+	executer executer.ExecuterInterface, mounter NodeMounter, syncLock SyncLockInterface) NodeService {
 	return NodeService{
 		ConfigYaml:                  configYaml,
 		Hostname:                    hostname,
 		NodeUtils:                   nodeUtils,
 		executer:                    executer,
 		OsDeviceConnectivityMapping: OsDeviceConnectivityMapping,
+		OsDeviceConnectivityHelper:  osDeviceConnectivityHelper,
 		Mounter:                     mounter,
 		VolumeIdLocksMap:            syncLock,
 	}
@@ -409,13 +417,29 @@ func (d *NodeService) mountFileSystemVolume(mpathDevice string, targetPath strin
 	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
 	if !isTargetPathExists {
 		logger.Debugf("Target path directory does not exist. Creating : {%v}", targetPathWithHostPrefix)
-		err := d.Mounter.MakeDir(targetPathWithHostPrefix)
+		err := d.NodeUtils.MakeDir(targetPathWithHostPrefix)
 		if err != nil {
 			return status.Errorf(codes.Internal, "Could not create directory %q: %v", targetPathWithHostPrefix, err)
 		}
 	}
+
+	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
+	if err != nil {
+		logger.Errorf("Could not determine if disk {%v} is formatted, error: %v", mpathDevice, err)
+		return err
+	}
+	if existingFormat == "" {
+		d.NodeUtils.FormatDevice(mpathDevice, fsType)
+	}
+
+	var mountOptions []string
+
+	if fsType == "xfs" {
+		mountOptions = append(mountOptions, "nouuid")
+	}
+
 	logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
-	return d.Mounter.FormatAndMount(mpathDevice, targetPath, fsType, nil) // Passing without /host because k8s mounter uses mount\mkfs\fsck
+	return d.Mounter.FormatAndMount(mpathDevice, targetPath, fsType, mountOptions) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 }
 
 func (d *NodeService) mountRawBlockVolume(mpathDevice string, targetPath string, isTargetPathExists bool) error {
@@ -425,14 +449,14 @@ func (d *NodeService) mountRawBlockVolume(mpathDevice string, targetPath string,
 	targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
 	if !d.NodeUtils.IsPathExists(targetPathParentDirWithHostPrefix) {
 		logger.Debugf("Target path parent directory does not exist. creating : {%v}", targetPathParentDirWithHostPrefix)
-		err := d.Mounter.MakeDir(targetPathParentDirWithHostPrefix)
+		err := d.NodeUtils.MakeDir(targetPathParentDirWithHostPrefix)
 		if err != nil {
 			return status.Errorf(codes.Internal, "Could not create directory %q: %v", targetPathParentDirWithHostPrefix, err)
 		}
 	}
 	if !isTargetPathExists {
 		logger.Debugf("Target path file does not exist. creating : {%v}", targetPathWithHostPrefix)
-		err := d.Mounter.MakeFile(targetPathWithHostPrefix)
+		err := d.NodeUtils.MakeFile(targetPathWithHostPrefix)
 		if err != nil {
 			return status.Errorf(codes.Internal, "Could not create file %q: %v", targetPathWithHostPrefix, err)
 		}
@@ -569,7 +593,82 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
 	goid_info.SetAdditionalIDInfo(req.VolumeId)
 	defer goid_info.DeleteAdditionalIDInfo()
-	return nil, status.Error(codes.Unimplemented, fmt.Sprintf("NodeExpandVolume is not yet implemented"))
+
+	err := d.nodeExpandVolumeRequestValidation(req)
+	if err != nil {
+		return nil, err
+	}
+
+	volumeID := req.GetVolumeId()
+
+	err = d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeExpandVolume")
+	if err != nil {
+		logger.Errorf("Another operation is being performed on volume : {%s}", volumeID)
+		return nil, status.Error(codes.Aborted, err.Error())
+	}
+	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeExpandVolume")
+
+	device, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeID)
+	if err != nil {
+		logger.Errorf("Error while discovering the device : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	logger.Debugf("Discovered device : {%v}", device)
+
+	baseDevice := path.Base(device)
+
+	rawSysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+	if err != nil {
+		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	sysDevices := strings.Split(rawSysDevices, ",")
+
+	err = d.NodeUtils.RescanPhysicalDevices(sysDevices)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	err = d.NodeUtils.ExpandMpathDevice(baseDevice)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	existingFormat, err := d.Mounter.GetDiskFormat(device)
+	if err != nil {
+		logger.Errorf("Could not determine if disk {%v} is formatted, error: %v", device, err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	err = d.NodeUtils.ExpandFilesystem(device, existingFormat)
+	if err != nil {
+		logger.Errorf("Could not resize {%v} file system of {%v} , error: %v", existingFormat, device, err)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	return &csi.NodeExpandVolumeResponse{}, nil
+}
+
+func (d *NodeService) nodeExpandVolumeRequestValidation(req *csi.NodeExpandVolumeRequest) error {
+	volumeID := req.GetVolumeId()
+	if volumeID == "" {
+		err := &RequestValidationError{"Volume ID not provided"}
+		return status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	if !strings.Contains(volumeID, device_connectivity.VolumeIdDelimiter) {
+		errMsg := fmt.Sprintf("invalid Volume ID - no {%v} found", device_connectivity.VolumeIdDelimiter)
+		err := &RequestValidationError{errMsg}
+		return status.Error(codes.NotFound, err.Error())
+	}
+
+	volumePath := req.GetVolumePath()
+	if volumePath == "" {
+		err := &RequestValidationError{"Volume path not provided"}
+		return status.Error(codes.InvalidArgument, err.Error())
+	}
+	return nil
 }
 
 func (d *NodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
@@ -616,9 +715,11 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	delimiter := ";"
-	fcPorts := strings.Join(fcWWNs, ":")
-	nodeId := d.Hostname + delimiter + iscsiIQN + delimiter + fcPorts
+	nodeId, err := d.NodeUtils.GenerateNodeID(d.Hostname, fcWWNs, iscsiIQN)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
 	logger.Debugf("node id is : %s", nodeId)
 
 	return &csi.NodeGetInfoResponse{

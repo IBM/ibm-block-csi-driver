@@ -1,6 +1,7 @@
 ControllerGetCapabilities
 CreateVolume
 DeleteVolume
+ExpandVolume
 NodeGetCapabilities
 NodeGetInfo
 CreateSnapshot
@@ -12,3 +13,6 @@ NodeUnstageVolume
 GetPluginCapabilities
 GetPluginInfo
 Probe
+ControllerPublishVolume
+ControllerUnpublishVolume
+Node Service

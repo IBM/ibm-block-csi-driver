@@ -80,16 +80,20 @@ def validate_create_volume_source(request):
     source = request.volume_content_source
     if source:
         logger.info(source)
-        if source.HasField(config.VOLUME_SOURCE_SNAPSHOT):
-            source_snapshot = source.snapshot
-            logger.info("Source snapshot specified: {0}".format(source_snapshot))
-            source_snapshot_id = source_snapshot.snapshot_id
-            if not source_snapshot_id:
-                raise ValidationException(messages.volume_src_snapshot_id_is_missing)
-            if config.PARAMETERS_OBJECT_ID_DELIMITER not in source_snapshot_id:
-                raise ObjectIdError(config.OBJECT_TYPE_NAME_SNAPSHOT, source_snapshot_id)
-        elif source.HasField(config.VOLUME_SOURCE_VOLUME):
-            raise ValidationException(messages.volume_cloning_not_supported_message)
+        if source.HasField(config.SNAPSHOT_TYPE_NAME):
+            _validate_source_info(source, config.SNAPSHOT_TYPE_NAME)
+        elif source.HasField(config.VOLUME_TYPE_NAME):
+            _validate_source_info(source, config.VOLUME_TYPE_NAME)
+
+
+def _validate_source_info(source, source_type):
+    source_object = getattr(source, source_type)
+    logger.info("Source {0} specified: {1}".format(source_type, source_object))
+    source_object_id = getattr(source_object, config.VOLUME_SOURCE_ID_FIELDS[source_type])
+    if not source_object_id:
+        raise ValidationException(messages.volume_source_id_is_missing.format(source_type))
+    if config.PARAMETERS_OBJECT_ID_DELIMITER not in source_object_id:
+        raise ObjectIdError(source_type, source_object_id)
 
 
 def validate_create_volume_request(request):
@@ -102,7 +106,7 @@ def validate_create_volume_request(request):
     logger.debug("validating volume capacity")
     if request.capacity_range:
         if request.capacity_range.required_bytes < 0:
-            raise ValidationException(messages.size_bigger_than_0_message)
+            raise ValidationException(messages.size_should_not_be_negative_message)
 
     else:
         raise ValidationException(messages.no_capacity_range_message)
@@ -154,25 +158,48 @@ def validate_delete_snapshot_request(request):
     logger.debug("request validation finished.")
 
 
-def generate_csi_create_volume_response(new_vol):
-    logger.debug("creating volume response for vol : {0}".format(new_vol))
+def validate_expand_volume_request(request):
+    logger.debug("validating expand volume request")
 
-    vol_context = {"volume_name": new_vol.volume_name,
-                   "array_address": ",".join(
-                       new_vol.array_address if isinstance(new_vol.array_address, list) else [new_vol.array_address]),
-                   "pool_name": new_vol.pool_name,
-                   "storage_type": new_vol.array_type
-                   }
+    if not request.volume_id:
+        raise ValidationException(messages.id_should_not_be_empty_message)
+
+    logger.debug("validating volume capacity")
+    if request.capacity_range:
+        if request.capacity_range.required_bytes < 0:
+            raise ValidationException(messages.size_should_not_be_negative_message)
+    else:
+        raise ValidationException(messages.no_capacity_range_message)
+
+    validate_secret(request.secrets)
+
+    logger.debug("expand volume validation finished")
+
+
+def generate_csi_create_volume_response(new_volume, source_type=None):
+    logger.debug("creating volume response for vol : {0}".format(new_volume))
+
+    volume_context = {"volume_name": new_volume.name,
+                      "array_address": ",".join(
+                          new_volume.array_address if isinstance(new_volume.array_address, list) else [
+                              new_volume.array_address]),
+                      "pool_name": new_volume.pool_name,
+                      "storage_type": new_volume.array_type
+                      }
     content_source = None
-    if new_vol.copy_src_object_id:
-        snapshot_source = csi_pb2.VolumeContentSource.SnapshotSource(snapshot_id=new_vol.copy_src_object_id)
-        content_source = csi_pb2.VolumeContentSource(snapshot=snapshot_source)
+    if new_volume.copy_source_id:
+        if source_type == config.SNAPSHOT_TYPE_NAME:
+            snapshot_source = csi_pb2.VolumeContentSource.SnapshotSource(snapshot_id=new_volume.copy_source_id)
+            content_source = csi_pb2.VolumeContentSource(snapshot=snapshot_source)
+        else:
+            volume_source = csi_pb2.VolumeContentSource.VolumeSource(volume_id=new_volume.copy_source_id)
+            content_source = csi_pb2.VolumeContentSource(volume=volume_source)
 
     res = csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(
-        capacity_bytes=new_vol.capacity_bytes,
-        volume_id=get_vol_id(new_vol),
+        capacity_bytes=new_volume.capacity_bytes,
+        volume_id=get_vol_id(new_volume),
         content_source=content_source,
-        volume_context=vol_context))
+        volume_context=volume_context))
 
     logger.debug("finished creating volume response : {0}".format(res))
     return res
@@ -189,6 +216,17 @@ def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
         ready_to_use=new_snapshot.is_ready))
 
     logger.debug("finished creating snapshot response : {0}".format(res))
+    return res
+
+
+def generate_csi_expand_volume_response(capacity_bytes, node_expansion_required=True):
+    logger.debug("creating response for expand volume")
+    res = csi_pb2.ControllerExpandVolumeResponse(
+        capacity_bytes=capacity_bytes,
+        node_expansion_required=node_expansion_required,
+    )
+
+    logger.debug("finished creating expand volume response")
     return res
 
 
@@ -225,14 +263,14 @@ def validate_publish_volume_request(request):
 
 
 def get_volume_id_info(volume_id):
-    return _get_object_id_info(volume_id, config.OBJECT_TYPE_NAME_VOLUME)
+    return get_object_id_info(volume_id, config.VOLUME_TYPE_NAME)
 
 
 def get_snapshot_id_info(snapshot_id):
-    return _get_object_id_info(snapshot_id, config.OBJECT_TYPE_NAME_SNAPSHOT)
+    return get_object_id_info(snapshot_id, config.SNAPSHOT_TYPE_NAME)
 
 
-def _get_object_id_info(full_object_id, object_type):
+def get_object_id_info(full_object_id, object_type):
     logger.debug("getting {0} info for id : {1}".format(object_type, full_object_id))
     splitted_object_id = full_object_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)
     if len(splitted_object_id) != 2:
@@ -246,19 +284,21 @@ def _get_object_id_info(full_object_id, object_type):
 def get_node_id_info(node_id):
     logger.debug("getting node info for node id : {0}".format(node_id))
     split_node = node_id.split(config.PARAMETERS_NODE_ID_DELIMITER)
-    if len(split_node) != config.SUPPORTED_CONNECTIVITY_TYPES + 1:  # the 1 is for the hostname
+    hostname, fc_wwns, iscsi_iqn = "", "", ""
+    if len(split_node) == config.SUPPORTED_CONNECTIVITY_TYPES + 1:
+        hostname, fc_wwns, iscsi_iqn = split_node
+    elif len(split_node) == 2:
+        hostname, fc_wwns = split_node
+    else:
         raise HostNotFoundError(node_id)
-
-    hostname, iscsi_iqn, fc_wwns = split_node
     logger.debug("node name : {0}, iscsi_iqn : {1}, fc_wwns : {2} ".format(
         hostname, iscsi_iqn, fc_wwns))
-    return hostname, iscsi_iqn, fc_wwns
+    return hostname, fc_wwns, iscsi_iqn
 
 
 def choose_connectivity_type(connecitvity_types):
     # If connectivity type support FC and iSCSI at the same time, chose FC
     logger.debug("choosing connectivity type for connectivity types : {0}".format(connecitvity_types))
-    res = None
     if FC_CONNECTIVITY_TYPE in connecitvity_types:
         logger.debug("connectivity type is : {0}".format(FC_CONNECTIVITY_TYPE))
         return FC_CONNECTIVITY_TYPE

@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM registry.access.redhat.com/ubi7/python-36:1-74.1593607204
+FROM registry.access.redhat.com/ubi8/python-38:1-41
 MAINTAINER IBM Storage
 
-ARG VERSION=1.3.0
+ARG VERSION=1.4.0
 ARG BUILD_NUMBER=0
 
 ###Required Labels
@@ -30,9 +30,11 @@ LABEL name="IBM block storage CSI driver controller" \
       io.openshift.tags=ibm,csi,ibm-block-csi-driver,ibm-block-csi-node
 
 COPY controller/requirements.txt /driver/controller/
-RUN pip3 install --default-timeout=100 --upgrade pip==19.1.1
+RUN pip3 install --default-timeout=100 --upgrade pip==19.3.1
 # avoid default boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
+# TODO: remove CRYPTOGRAPHY_ALLOW_OPENSSL_102 when upgrading to ubi8
+ENV CRYPTOGRAPHY_ALLOW_OPENSSL_102=true
 RUN pip3 install -r /driver/controller/requirements.txt
 
 COPY ./common /driver/common

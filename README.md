@@ -1,20 +1,16 @@
-# Operator for IBM block storage CSI driver
+# IBM block storage CSI driver 
 The Container Storage Interface (CSI) Driver for IBM block storage systems enables container orchestrators such as Kubernetes to manage the life cycle of persistent storage.
 
-This is the official operator to deploy and manage IBM block storage CSI driver.
-
 Supported container platforms (and architectures):
-  - OpenShift v4.3 (IBM Z and IBM PowerPC)
-  - OpenShift v4.4 (x86 and IBM Z)
-  - OpenShift v4.5 (x86)
-  - Kubernetes v1.17 (x86)
+  - OpenShift v4.4 (x86, IBM Z, and IBM PowerPC)
+  - OpenShift v4.5 (x86, IBM Z, and IBM PowerPC)
   - Kubernetes v1.18 (x86)
+  - Kubernetes v1.19 (x86)
 
 Supported IBM storage systems:
   - IBM Spectrum Virtualize Family including IBM SAN Volume Controller (SVC) and IBM FlashSystem® family members built with IBM Spectrum® Virtualize (FlashSystem 5010, 5030, 5100, 7200, 9100, 9200, 9200R)
-  - IBM FlashSystem A9000/R
-  - IBM DS8880
-  - IBM DS8900
+  - IBM FlashSystem A9000 and A9000R
+  - IBM DS8000 Family
 
 Supported operating systems (and architectures):
   - RHEL 7.x (x86)
@@ -41,9 +37,12 @@ yum -y install iscsi-initiator-utils   # Only if iSCSI connectivity is required
 yum -y install xfsprogs                # Only if XFS file system is required
 ```
 
-#### 2. Configure Linux multipath devices on the host, using one of the following procedures.
+#### 2. Configure Linux® multipath devices on the host.
 
-##### 2.1 Configuring for OpenShift Container Platform users (RHEL and RHCOS)
+**Important:** Be sure to configure each worker with storage connectivity according to your storage system instructions. 
+For more information, find your storage system documentation on [IBM Knowledge Center](https://www.ibm.com/support/knowledgecenter).
+
+##### 2.1 Additional configuration steps for OpenShift® Container Platform users (RHEL and RHCOS). Other users can continue to step 3.
 
 The following yaml file example is for both Fibre Channel and iSCSI configurations. To support iSCSI, uncomment the last two lines in the file:
 
@@ -120,35 +119,13 @@ Apply the yaml file.
 oc apply -f 99-ibm-attach.yaml
 ```
 
-RHEL users should verify that the `systemctl status multipathd` output indicates that the multipath status is active and error-free.
+#### 3. If needed, enable support for volume snapshots (FlashCopy® function) on your Kubernetes cluster.
+For more information and instructions, see the Kubernetes blog post, [Kubernetes 1.17 Feature: Kubernetes Volume Snapshot Moves to Beta](https://kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/).
 
-```bash
-yum install device-mapper-multipath
-modprobe dm-multipath
-systemctl enable multipathd
-systemctl start multipathd
-systemctl status multipathd
-multipath -ll
-```
+#### 4. Configure storage system connectivity
+##### 4.1. Define the hostname of each Kubernetes node on the relevant storage systems with the valid WWPN (for Fibre Channel) or IQN (for iSCSI) of the node.
 
-##### 2.2 Configuring for Kubernetes users (RHEL)
-Create and set the relevant storage system parameters in the `/etc/multipath.conf` file. You can also use the default `multipath.conf` file, located in the `/usr/share/doc/device-mapper-multipath-*` directory.
-
-Verify that the `systemctl status multipathd` output indicates that the multipath status is active and error-free.
-
-```bash
-yum install device-mapper-multipath
-modprobe dm-multipath
-systemctl enable multipathd
-systemctl start multipathd
-systemctl status multipathd
-multipath -ll
-```
-
-#### 3. Configure storage system connectivity
-##### 3.1. Define the hostname of each Kubernetes node on the relevant storage systems with the valid WWPN (for Fibre Channel) or IQN (for iSCSI) of the node.
-
-##### 3.2. For Fibre Channel, configure the relevant zoning from the storage to the host.
+##### 4.2. For Fibre Channel, configure the relevant zoning from the storage to the host.
 
 
 <br/>
@@ -211,7 +188,7 @@ $ kubectl -n <namespace> apply -f csi.ibm.com_v1_ibmblockcsi_cr.yaml
 ```bash
 $ kubectl get all -n <namespace>  -l csi
 NAME                             READY   STATUS    RESTARTS   AGE
-pod/ibm-block-csi-controller-0   5/5     Running   0          9m36s
+pod/ibm-block-csi-controller-0   6/6     Running   0          9m36s
 pod/ibm-block-csi-node-jvmvh     3/3     Running   0          9m36s
 pod/ibm-block-csi-node-tsppw     3/3     Running   0          9m36s
 
@@ -272,11 +249,12 @@ Use the `SpaceEfficiency` parameters for each storage system. These values are n
 	* Always includes deduplication and compression.
 	No need to specify during configuration.
 * IBM Spectrum Virtualize Family
+	* `thick` (default value, if not specified)
 	* `thin`
 	* `compressed`
 	* `deduplicated`
 * IBM DS8000 Family
-	* `standard` (default value, if not specified)
+	* `none` (default value, if not specified)
 	* `thin`
 
 ```
@@ -293,9 +271,12 @@ parameters:
   csi.storage.k8s.io/provisioner-secret-namespace: <ARRAY_SECRET_NAMESPACE>
   csi.storage.k8s.io/controller-publish-secret-name: <ARRAY_SECRET>
   csi.storage.k8s.io/controller-publish-secret-namespace: <ARRAY_SECRET_NAMESPACE>
+  csi.storage.k8s.io/controller-expand-secret-name: <ARRAY_SECRET>
+  csi.storage.k8s.io/controller-expand-secret-namespace: <ARRAY_SECRET_NAMESPACE>
 
   csi.storage.k8s.io/fstype: xfs    # Optional: Values ext4/xfs. The default is ext4.
   volume_name_prefix: <prefix_name> # Optional: DS8000 Family maximum prefix length is 5 characters. Maximum prefix length for other systems is 20 characters.
+allowVolumeExpansion: true
 ```
 
 #### 3. Apply the storage class:

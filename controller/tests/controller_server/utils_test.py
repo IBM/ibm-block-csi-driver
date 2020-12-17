@@ -8,6 +8,7 @@ from controller.controller_server.csi_controller_server import ControllerService
 from controller.controller_server.errors import ObjectIdError
 from controller.controller_server.errors import ValidationException
 from controller.csi_general import csi_pb2
+from controller.tests.controller_server.csi_controller_server_test import ProtoBufMock
 
 
 class TestUtils(unittest.TestCase):
@@ -73,31 +74,23 @@ class TestUtils(unittest.TestCase):
 
     def test_validate_create_volume_source_empty(self):
         request = Mock()
-        source = Mock()
+        source = ProtoBufMock(spec=[])
         request.volume_content_source = source
-        is_snapshot_source = False
-        is_volume_source = False
-        source.HasField.side_effect = [is_snapshot_source, is_volume_source]
         utils.validate_create_volume_source(request)
 
     def test_validate_create_volume_source_snapshot(self):
         request = Mock()
-        snapshot_source = Mock()
+        snapshot_source = ProtoBufMock(spec=["snapshot"])
         request.volume_content_source = snapshot_source
         snapshot_source.snapshot.snapshot_id = "A9000:snap_id"
-        is_snapshot_source = True
-        snapshot_source.HasField.side_effect = [is_snapshot_source]
         utils.validate_create_volume_source(request)
 
     def test_validate_create_volume_source_volume(self):
         request = Mock()
-        volume_source = Mock()
-        is_snapshot_source = False
-        is_volume_source = True
-        volume_source.HasField.side_effect = [is_snapshot_source, is_volume_source]
+        volume_source = ProtoBufMock(spec=["volume"])
         request.volume_content_source = volume_source
-        with self.assertRaises(ValidationException):
-            utils.validate_create_volume_source(request)
+        volume_source.volume.volume_id = "A9000:vol_id"
+        utils.validate_create_volume_source(request)
 
     def test_validate_raw_block_volume_capabilities(self):
         caps = Mock()
@@ -185,13 +178,13 @@ class TestUtils(unittest.TestCase):
     @patch("controller.controller_server.utils.get_vol_id")
     def test_get_create_volume_response(self, get_vol_id):
         new_vol = Mock()
-        new_vol.volume_name = "name"
+        new_vol.name = "name"
         new_vol.array_address = ["fqdn1", "fqdn2"]
 
         new_vol.pool_name = "pool"
         new_vol.array_type = "a9k"
         new_vol.capacity_bytes = 10
-        new_vol.copy_src_object_id = None
+        new_vol.copy_source_id = None
 
         get_vol_id.return_value = "a9k:name"
         res = utils.generate_csi_create_volume_response(new_vol)
@@ -206,13 +199,13 @@ class TestUtils(unittest.TestCase):
     @patch("controller.controller_server.utils.get_vol_id")
     def test_get_create_volume_response_with_single_IP(self, get_vol_id):
         new_vol = Mock()
-        new_vol.volume_name = "name"
+        new_vol.name = "name"
         new_vol.array_address = "9.1.1.1"
 
         new_vol.pool_name = "pool"
         new_vol.array_type = "svc"
         new_vol.capacity_bytes = 10
-        new_vol.copy_src_object_id = None
+        new_vol.copy_source_id = None
 
         get_vol_id.return_value = "svc:name"
         res = utils.generate_csi_create_volume_response(new_vol)
@@ -223,13 +216,13 @@ class TestUtils(unittest.TestCase):
     @patch("controller.controller_server.utils.get_vol_id")
     def test_get_create_volume_response_with_Multiple_IP(self, get_vol_id):
         new_vol = Mock()
-        new_vol.volume_name = "name"
+        new_vol.name = "name"
         new_vol.array_address = ["9.1.1.1", "9.1.1.2"]
 
         new_vol.pool_name = "pool"
         new_vol.array_type = "svc"
         new_vol.capacity_bytes = 10
-        new_vol.copy_src_object_id = None
+        new_vol.copy_source_id = None
 
         get_vol_id.return_value = "svc:name"
         res = utils.generate_csi_create_volume_response(new_vol)
@@ -312,17 +305,17 @@ class TestUtils(unittest.TestCase):
             utils.get_node_id_info("badnodeformat")
             self.assertTrue("node" in ex.message)
 
-        hostname, iscsi_iqn, fc_wwns = utils.get_node_id_info("hostabc;iqn.ibm;")
+        hostname, fc_wwns, iscsi_iqn = utils.get_node_id_info("hostabc;;iqn.ibm")
         self.assertEqual(hostname, "hostabc")
         self.assertEqual(iscsi_iqn, "iqn.ibm")
         self.assertEqual(fc_wwns, "")
 
-        hostname, iscsi_iqn, fc_wwns = utils.get_node_id_info("hostabc;iqn.ibm;wwn1:wwn2")
+        hostname, fc_wwns, iscsi_iqn = utils.get_node_id_info("hostabc;wwn1:wwn2;iqn.ibm")
         self.assertEqual(hostname, "hostabc")
         self.assertEqual(iscsi_iqn, "iqn.ibm")
         self.assertEqual(fc_wwns, "wwn1:wwn2")
 
-        hostname, iscsi_iqn, fc_wwns = utils.get_node_id_info("hostabc;;wwn1:wwn2")
+        hostname, fc_wwns, iscsi_iqn = utils.get_node_id_info("hostabc;wwn1:wwn2")
         self.assertEqual(hostname, "hostabc")
         self.assertEqual(iscsi_iqn, "")
         self.assertEqual(fc_wwns, "wwn1:wwn2")
