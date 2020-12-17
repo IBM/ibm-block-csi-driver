@@ -600,6 +600,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	}
 
 	volumeID := req.GetVolumeId()
+	volumePath := req.GetVolumePath()
 
 	err = d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeExpandVolume")
 	if err != nil {
@@ -641,7 +642,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	err = d.NodeUtils.ExpandFilesystem(device, existingFormat)
+	err = d.NodeUtils.ExpandFilesystem(device, volumePath, existingFormat)
 	if err != nil {
 		logger.Errorf("Could not resize {%v} file system of {%v} , error: %v", existingFormat, device, err)
 		return nil, status.Error(codes.Internal, err.Error())

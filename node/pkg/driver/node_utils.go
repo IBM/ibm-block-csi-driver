@@ -65,7 +65,7 @@ type NodeUtilsInterface interface {
 	RemoveFileOrDirectory(filePath string) error
 	MakeDir(dirPath string) error
 	MakeFile(filePath string) error
-	ExpandFilesystem(devicePath string, fsType string) error
+	ExpandFilesystem(devicePath string, volumePath string, fsType string) error
 	ExpandMpathDevice(mpathDevice string) error
 	RescanPhysicalDevices(sysDevices []string) error
 	FormatDevice(devicePath string, fsType string)
@@ -331,7 +331,7 @@ func (n NodeUtils) MakeFile(filePath string) error {
 	return nil
 }
 
-func (n NodeUtils) ExpandFilesystem(devicePath string, fsType string) error {
+func (n NodeUtils) ExpandFilesystem(devicePath string, volumePath string, fsType string) error {
 	var cmd string
 	var args []string
 	if fsType == "ext4" {
@@ -339,7 +339,7 @@ func (n NodeUtils) ExpandFilesystem(devicePath string, fsType string) error {
 		args = []string{devicePath}
 	} else if fsType == "xfs" {
 		cmd = "xfs_growfs"
-		args = []string{"-d", devicePath}
+		args = []string{"-d", volumePath}
 	} else {
 		logger.Warningf("Skipping resize of unsupported fsType: %v", fsType)
 		return nil
