@@ -38,8 +38,8 @@ class BaseControllerSetUp(unittest.TestCase):
 
         self.request.parameters = {}
         self.request.volume_context = {}
-        caps = utils.get_mock_volume_capability()
-        self.request.volume_capabilities = [caps]
+        volume_capability = utils.get_mock_volume_capability()
+        self.request.volume_capabilities = [volume_capability]
 
         self.context = utils.FakeContext()
 
@@ -414,23 +414,23 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
     def test_create_volume_with_wrong_volume_capabilities(self, storage_agent):
         storage_agent.return_value = self.storage_agent
 
-        caps = utils.get_mock_volume_capability(fs_type="ext42")
-        self.request.volume_capabilities = [caps]
+        volume_capability = utils.get_mock_volume_capability(fs_type="ext42")
+        self.request.volume_capabilities = [volume_capability]
 
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertTrue("fs_type" in self.context.details)
 
         access_mode = csi_pb2.VolumeCapability.AccessMode
-        caps = utils.get_mock_volume_capability(mode=access_mode.MULTI_NODE_SINGLE_WRITER)
-        self.request.volume_capabilities = [caps]
+        volume_capability = utils.get_mock_volume_capability(mode=access_mode.MULTI_NODE_SINGLE_WRITER)
+        self.request.volume_capabilities = [volume_capability]
 
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertTrue("access mode" in self.context.details)
 
-        caps = utils.get_mock_volume_capability(mount_flags=["no_formatting"])
-        self.request.volume_capabilities = [caps]
+        volume_capability = utils.get_mock_volume_capability(mount_flags=["no_formatting"])
+        self.request.volume_capabilities = [volume_capability]
 
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
@@ -872,8 +872,8 @@ class TestPublishVolume(BaseControllerSetUp):
         self.request.readonly = False
         self.request.readonly = False
 
-        caps = utils.get_mock_volume_capability()
-        self.request.volume_capability = caps
+        volume_capability = utils.get_mock_volume_capability()
+        self.request.volume_capability = volume_capability
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_publish_volume_success(self, storage_agent):

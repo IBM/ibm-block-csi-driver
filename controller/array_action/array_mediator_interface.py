@@ -339,7 +339,7 @@ class ArrayMediator(ABC):
     @abstractmethod
     def validate_supported_space_efficiency(self, space_efficiency):
         """
-        This function will check if the space efficiency passed to the create volume are valid
+        This function will check if the space efficiency passed to the create volume is valid
 
         Args:
            space_efficiency : as passed from the storage class

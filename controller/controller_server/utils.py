@@ -71,8 +71,6 @@ def validate_csi_volume_capabilities(capabilities):
     logger.debug("validating csi volume capabilities")
     if not capabilities:
         raise ValidationException(messages.capabilities_not_set_message)
-    if len(capabilities) == 0:
-        raise ValidationException(messages.capabilities_not_set_message)
 
     for cap in capabilities:
         validate_csi_volume_capability(cap)

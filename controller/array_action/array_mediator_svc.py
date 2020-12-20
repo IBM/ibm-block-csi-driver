@@ -81,18 +81,6 @@ def build_kwargs_from_parameters(space_efficiency, pool_name, volume_name,
     return cli_kwargs
 
 
-def get_cli_volume_space_efficiency(cli_volume):
-    space_efficiency = config.SPACE_EFFICIENCY_THICK
-    if cli_volume.se_copy == YES:
-        space_efficiency = config.SPACE_EFFICIENCY_THIN
-    if cli_volume.compressed_copy == YES:
-        space_efficiency = config.SPACE_EFFICIENCY_COMPRESSED
-    if hasattr(cli_volume, "deduplicated_copy"):
-        if cli_volume.deduplicated_copy == YES:
-            space_efficiency = config.SPACE_EFFICIENCY_DEDUPLICATED
-    return space_efficiency
-
-
 class SVCArrayMediator(ArrayMediatorAbstract):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
@@ -184,7 +172,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _generate_volume_response(self, cli_volume):
         source_volume_wwn = self._get_source_volume_wwn_if_exists(cli_volume)
-        space_efficiency = get_cli_volume_space_efficiency(cli_volume)
+        space_efficiency = self.get_cli_volume_space_efficiency(cli_volume)
         return Volume(
             vol_size_bytes=int(cli_volume.capacity),
             vol_id=cli_volume.vdisk_UID,
@@ -195,6 +183,18 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             array_type=self.array_type,
             space_efficiency=space_efficiency
         )
+
+    def get_cli_volume_space_efficiency(self, cli_volume):
+        cli_volume = self._get_cli_volume(cli_volume.volume_name)
+        space_efficiency = config.SPACE_EFFICIENCY_THICK
+        if cli_volume.se_copy == YES:
+            space_efficiency = config.SPACE_EFFICIENCY_THIN
+        if cli_volume.compressed_copy == YES:
+            space_efficiency = config.SPACE_EFFICIENCY_COMPRESSED
+        if hasattr(cli_volume, "deduplicated_copy"):
+            if cli_volume.deduplicated_copy == YES:
+                space_efficiency = config.SPACE_EFFICIENCY_DEDUPLICATED
+        return space_efficiency
 
     def _generate_snapshot_response(self, cli_snapshot, source_volume_name):
         return Snapshot(int(cli_snapshot.capacity),
@@ -311,7 +311,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 [config.SPACE_EFFICIENCY_THIN, config.SPACE_EFFICIENCY_THICK,
                  config.SPACE_EFFICIENCY_COMPRESSED,
                  config.SPACE_EFFICIENCY_DEDUPLICATED]):
-            logger.error("space efficiency type value is not "
+            logger.error("space efficiency value is not "
                          "supported {0}".format(space_efficiency))
             raise controller_errors.SpaceEfficiencyNotSupported(
                 space_efficiency)
@@ -440,6 +440,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return self._generate_snapshot_response_with_verification(target_cli_volume)
 
     def get_object_by_id(self, object_id, object_type):
+        self._get_volume_name_by_wwn()
         cli_object = self._get_cli_volume_by_wwn(object_id)
         if not cli_object:
             return None
@@ -451,7 +452,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.info("creating target cli volume '{0}' from source volume '{1}'".format(target_volume_name,
                                                                                        source_volume_name))
         source_cli_volume = self._get_cli_volume(source_volume_name)
-        space_efficiency = get_cli_volume_space_efficiency(source_cli_volume)
+        space_efficiency = self.get_cli_volume_space_efficiency(source_cli_volume)
         size_in_bytes = int(source_cli_volume.capacity)
         pool = source_cli_volume.mdisk_grp_name
         self._create_cli_volume(target_volume_name, size_in_bytes, space_efficiency, pool)
