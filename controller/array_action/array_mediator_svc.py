@@ -440,7 +440,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return self._generate_snapshot_response_with_verification(target_cli_volume)
 
     def get_object_by_id(self, object_id, object_type):
-        self._get_volume_name_by_wwn()
         cli_object = self._get_cli_volume_by_wwn(object_id)
         if not cli_object:
             return None
