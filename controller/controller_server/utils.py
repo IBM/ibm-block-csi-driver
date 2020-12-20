@@ -423,11 +423,12 @@ def validate_parameters_match_volume(parameters, volume):
     space_efficiency = parameters.get(config.PARAMETERS_SPACEEFFICIENCY)
     volume_space_efficiency = volume.space_efficiency
     if space_efficiency:
+        space_efficiency = space_efficiency.lower()
         if space_efficiency != volume_space_efficiency:
             raise ValidationException(
                 messages.space_efficiency_not_match_volume_message.format(space_efficiency, volume_space_efficiency))
     else:
-        if volume_space_efficiency is not None and volume_space_efficiency != 'none':
+        if volume_space_efficiency not in [None, 'none', 'thick']:
             raise ValidationException(
                 messages.space_efficiency_not_match_volume_message.format(space_efficiency, volume_space_efficiency))
 
