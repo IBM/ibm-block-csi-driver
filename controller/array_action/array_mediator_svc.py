@@ -185,7 +185,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         )
 
     def get_cli_volume_space_efficiency(self, cli_volume):
-        cli_volume = self._get_cli_volume(cli_volume.name)
+        if not hasattr(cli_volume, "se_copy"):
+            cli_volume = self._get_cli_volume(cli_volume.name)
         space_efficiency = config.SPACE_EFFICIENCY_THICK
         if cli_volume.se_copy == YES:
             space_efficiency = config.SPACE_EFFICIENCY_THIN
