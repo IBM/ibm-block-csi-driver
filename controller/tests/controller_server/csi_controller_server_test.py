@@ -38,7 +38,7 @@ class BaseControllerSetUp(unittest.TestCase):
 
         self.request.parameters = {}
         self.request.volume_context = {}
-        caps = utils.get_mock_volume_capability_object()
+        caps = utils.get_mock_volume_capability()
         self.request.volume_capabilities = [caps]
 
         self.context = utils.FakeContext()
@@ -118,7 +118,7 @@ class CommonControllerTest:
         self.assertTrue("not supported" in context.details)
 
 
-class TestControllerServerCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
+class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
 
     def get_tested_method(self):
         return self.servicer.CreateSnapshot
@@ -283,7 +283,7 @@ class TestControllerServerCreateSnapshot(BaseControllerSetUp, CommonControllerTe
         self.mediator.create_snapshot.assert_called_once_with("prefix_some_name", "snapshot_vol", None)
 
 
-class TestControllerServerDeleteSnapshot(BaseControllerSetUp):
+class TestDeleteSnapshot(BaseControllerSetUp):
     def setUp(self):
         super().setUp()
         self.mediator.get_snapshot = Mock()
@@ -343,7 +343,7 @@ class ProtoBufMock(MagicMock):
         return hasattr(self, field)
 
 
-class TestControllerServerCreateVolume(BaseControllerSetUp, CommonControllerTest):
+class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
     def get_tested_method(self):
         return self.servicer.CreateVolume
@@ -414,7 +414,7 @@ class TestControllerServerCreateVolume(BaseControllerSetUp, CommonControllerTest
     def test_create_volume_with_wrong_volume_capabilities(self, storage_agent):
         storage_agent.return_value = self.storage_agent
 
-        caps = utils.get_mock_volume_capability_object(fs_type="ext42")
+        caps = utils.get_mock_volume_capability(fs_type="ext42")
         self.request.volume_capabilities = [caps]
 
         self.servicer.CreateVolume(self.request, self.context)
@@ -422,14 +422,14 @@ class TestControllerServerCreateVolume(BaseControllerSetUp, CommonControllerTest
         self.assertTrue("fs_type" in self.context.details)
 
         access_mode = csi_pb2.VolumeCapability.AccessMode
-        caps = utils.get_mock_volume_capability_object(mode=access_mode.MULTI_NODE_SINGLE_WRITER)
+        caps = utils.get_mock_volume_capability(mode=access_mode.MULTI_NODE_SINGLE_WRITER)
         self.request.volume_capabilities = [caps]
 
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertTrue("access mode" in self.context.details)
 
-        caps = utils.get_mock_volume_capability_object(mount_flags=["no_formatting"])
+        caps = utils.get_mock_volume_capability(mount_flags=["no_formatting"])
         self.request.volume_capabilities = [caps]
 
         self.servicer.CreateVolume(self.request, self.context)
@@ -501,23 +501,23 @@ class TestControllerServerCreateVolume(BaseControllerSetUp, CommonControllerTest
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                          err=array_errors.IllegalObjectName("vol"))
 
-    def test_create_volume_with_create_volume_with_volume_exsits_exception(self):
+    def test__volume_exsits_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.ALREADY_EXISTS,
                                          err=array_errors.VolumeAlreadyExists("vol", "endpoint"))
 
-    def test_create_volume_with_create_volume_with_pool_does_not_exist_exception(self):
+    def test__pool_does_not_exist_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                          err=array_errors.PoolDoesNotExist("pool1", "endpoint"))
 
-    def test_create_volume_with_create_volume_with_pool_does_not_match_capabilities_exception(self):
+    def test__pool_does_not_match_capabilities_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                          err=array_errors.PoolDoesNotMatchCapabilities("pool1", "", "endpoint"))
 
-    def test_create_volume_with_create_volume_with_space_efficiency_not_supported_exception(self):
+    def test__space_efficiency_not_supported_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                          err=array_errors.SpaceEfficiencyNotSupported(["cap"]))
 
-    def test_create_volume_with_create_volume_with_other_exception(self):
+    def test__other_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INTERNAL,
                                          err=Exception("error"))
 
@@ -766,7 +766,7 @@ class TestControllerServerCreateVolume(BaseControllerSetUp, CommonControllerTest
         return source
 
 
-class TestControllerServerDeleteVolume(BaseControllerSetUp):
+class TestDeleteVolume(BaseControllerSetUp):
 
     def setUp(self):
         super().setUp()
@@ -848,7 +848,7 @@ class TestControllerServerDeleteVolume(BaseControllerSetUp):
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
 
-class TestControllerServerPublishVolume(BaseControllerSetUp):
+class TestPublishVolume(BaseControllerSetUp):
 
     def setUp(self):
         super().setUp()
@@ -872,7 +872,7 @@ class TestControllerServerPublishVolume(BaseControllerSetUp):
         self.request.readonly = False
         self.request.readonly = False
 
-        caps = utils.get_mock_volume_capability_object()
+        caps = utils.get_mock_volume_capability()
         self.request.volume_capability = caps
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -1136,7 +1136,7 @@ class TestControllerServerPublishVolume(BaseControllerSetUp):
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
 
 
-class TestControllerServerUnPublishVolume(BaseControllerSetUp):
+class TestUnPublishVolume(BaseControllerSetUp):
 
     def setUp(self):
         super().setUp()
@@ -1228,7 +1228,7 @@ class TestControllerServerUnPublishVolume(BaseControllerSetUp):
         self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
 
 
-class TestControllerServerGetCapabilities(BaseControllerSetUp):
+class TestGetCapabilities(BaseControllerSetUp):
 
     def test_controller_get_capabilities(self):
         request = Mock()
@@ -1236,7 +1236,7 @@ class TestControllerServerGetCapabilities(BaseControllerSetUp):
         self.servicer.ControllerGetCapabilities(request, context)
 
 
-class TestControllerServerExpandVolume(BaseControllerSetUp, CommonControllerTest):
+class TestExpandVolume(BaseControllerSetUp, CommonControllerTest):
 
     def get_tested_method(self):
         return self.servicer.ControllerExpandVolume
@@ -1452,7 +1452,7 @@ class TestIdentityServer(BaseControllerSetUp):
         self.servicer.Probe(request, context)
 
 
-class TestControllerServerValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
+class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
 
     def get_tested_method(self):
         return self.servicer.ValidateVolumeCapabilities
@@ -1562,4 +1562,3 @@ class TestControllerServerValidateVolumeCapabilities(BaseControllerSetUp, Common
         response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
         self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "pool")
-

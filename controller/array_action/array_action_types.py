@@ -1,5 +1,6 @@
 class Volume:
-    def __init__(self, vol_size_bytes, vol_id, vol_name, array_address, pool_name, copy_source_id, array_type, space_efficiency):
+    def __init__(self, vol_size_bytes, vol_id, vol_name, array_address, pool_name, copy_source_id, array_type,
+                 space_efficiency):
         self.capacity_bytes = vol_size_bytes
         self.id = vol_id
         self.name = vol_name
@@ -8,6 +9,7 @@ class Volume:
         self.copy_source_id = copy_source_id
         self.array_type = array_type
         self.space_efficiency = space_efficiency
+
 
 class Snapshot:
     def __init__(self, capacity_bytes, snapshot_id, snapshot_name, array_address, volume_name, is_ready, array_type):

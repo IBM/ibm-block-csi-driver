@@ -29,8 +29,8 @@ def get_mock_mediator_response_snapshot(capacity, name, wwn, volume_name, array_
     return snapshot
 
 
-def get_mock_volume_capability_object(mode=csi_pb2.VolumeCapability.AccessMode.SINGLE_NODE_WRITER, fs_type="ext4",
-                                      mount_flags=None):
+def get_mock_volume_capability(mode=csi_pb2.VolumeCapability.AccessMode.SINGLE_NODE_WRITER, fs_type="ext4",
+                               mount_flags=None):
     if mount_flags is None:
         mount_flags = []
     return csi_pb2.VolumeCapability(

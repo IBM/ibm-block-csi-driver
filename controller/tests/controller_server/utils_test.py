@@ -54,7 +54,7 @@ class TestUtils(unittest.TestCase):
     def test_validate_file_system_volume_capabilities(self):
         access_mode = csi_pb2.VolumeCapability.AccessMode
 
-        cap = test_utils.get_mock_volume_capability_object()
+        cap = test_utils.get_mock_volume_capability()
         utils.validate_csi_volume_capabilities([cap])
 
         with self.assertRaises(ValidationException):
@@ -245,18 +245,12 @@ class TestUtils(unittest.TestCase):
             self.assertTrue("msg1" in ex.message)
 
         validate_capabilities.side_effect = None
+        validate_secrets.side_effect = [ValidationException("secrets")]
         request.secrets = []
 
         with self.assertRaises(ValidationException) as ex:
             utils.validate_publish_volume_request(request)
             self.assertTrue("secrets" in ex.message)
-
-        request.secrets = ["secret"]
-        validate_secrets.side_effect = [ValidationException("msg2")]
-
-        with self.assertRaises(ValidationException) as ex:
-            utils.validate_publish_volume_request(request)
-            self.assertTrue("msg2" in ex.message)
 
         validate_secrets.side_effect = None
 
@@ -273,16 +267,11 @@ class TestUtils(unittest.TestCase):
 
         request.volume_id = "xiv:volume"
 
-        request.secrets = []
+        validate_secret.side_effect = [ValidationException("secret")]
+
         with self.assertRaises(ValidationException) as ex:
             utils.validate_unpublish_volume_request(request)
             self.assertTrue("secret" in ex.message)
-
-        request.secrets = ["secret"]
-        validate_secret.side_effect = [ValidationException("msg2")]
-        with self.assertRaises(ValidationException) as ex:
-            utils.validate_unpublish_volume_request(request)
-            self.assertTrue("msg2" in ex.message)
 
         validate_secret.side_effect = None
 

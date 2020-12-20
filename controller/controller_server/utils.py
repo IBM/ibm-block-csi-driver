@@ -126,9 +126,7 @@ def validate_create_volume_request(request):
     logger.debug("validating volume capabilities")
     validate_csi_volume_capabilities(request.volume_capabilities)
 
-    logger.debug("validating secrets")
-    if request.secrets:
-        validate_secret(request.secrets)
+    validate_secret(request.secrets)
 
     logger.debug("validating storage class parameters")
     if request.parameters:
@@ -147,9 +145,9 @@ def validate_create_snapshot_request(request):
     logger.debug("validating snapshot name")
     if not request.name:
         raise ValidationException(messages.name_should_not_be_empty_message)
-    logger.debug("validating secrets")
-    if request.secrets:
-        validate_secret(request.secrets)
+
+    validate_secret(request.secrets)
+
     logger.debug("validating source volume id")
     if not request.source_volume_id:
         raise ValidationException(messages.snapshot_src_volume_id_is_missing)
@@ -160,9 +158,9 @@ def validate_delete_snapshot_request(request):
     logger.debug("validating delete snapshot request")
     if not request.snapshot_id:
         raise ValidationException(messages.snapshot_id_should_not_be_empty_message)
-    logger.debug("validating secrets")
-    if request.secrets:
-        validate_secret(request.secrets)
+
+    validate_secret(request.secrets)
+
     logger.debug("request validation finished.")
 
 
@@ -299,9 +297,7 @@ def validate_delete_volume_request(request):
     if request.volume_id == "":
         raise ValidationException("Volume id cannot be empty")
 
-    logger.debug("validating secrets")
-    if request.secrets:
-        validate_secret(request.secrets)
+    validate_secret(request.secrets)
 
     logger.debug("delete volume validation finished")
 
@@ -316,11 +312,7 @@ def validate_publish_volume_request(request):
     logger.debug("validating volume capabilities")
     validate_csi_volume_capability(request.volume_capability)
 
-    logger.debug("validating secrets")
-    if request.secrets:
-        validate_secret(request.secrets)
-    else:
-        raise ValidationException(messages.secret_missing_message)
+    validate_secret(request.secrets)
 
     logger.debug("publish volume request validation finished.")
 
@@ -414,11 +406,7 @@ def validate_unpublish_volume_request(request):
     if len(request.volume_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)) != 2:
         raise ValidationException(messages.volume_id_wrong_format_message)
 
-    logger.debug("validating secrets")
-    if request.secrets:
-        validate_secret(request.secrets)
-    else:
-        raise ValidationException(messages.secret_missing_message)
+    validate_secret(request.secrets)
 
     logger.debug("unpublish volume request validation finished.")
 
