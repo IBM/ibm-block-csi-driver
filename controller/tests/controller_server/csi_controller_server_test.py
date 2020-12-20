@@ -1465,6 +1465,7 @@ class TestControllerServerValidateVolumeCapabilities(BaseControllerSetUp, Common
 
         arr_type = XIVArrayMediator.array_type
         self.request.volume_id = "{}:wwn1".format(arr_type)
+        self.request.parameters = {config.PARAMETERS_POOL: "pool1"}
 
         self.mediator.get_object_by_id = Mock()
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
@@ -1543,3 +1544,22 @@ class TestControllerServerValidateVolumeCapabilities(BaseControllerSetUp, Common
         response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
         self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "volume context")
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_validation_with_space_efficiency_not_match(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+        self.request.parameters.update({config.PARAMETERS_SPACEEFFICIENCY: "not_none"})
+
+        response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
+
+        self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "space_efficiency")
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_validation_with_pool_not_match(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+        self.request.parameters[config.PARAMETERS_POOL] = "other pool"
+
+        response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
+
+        self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "pool")
+

@@ -431,3 +431,23 @@ def get_current_timestamp():
 
 def hash_string(string):
     return base58.b58encode(sha256(string.encode()).digest()).decode()
+
+
+def validate_parameters_match_volume(parameters, volume):
+    space_efficiency = parameters.get(config.PARAMETERS_SPACEEFFICIENCY)
+    volume_space_efficiency = volume.space_efficiency
+    if space_efficiency:
+        if space_efficiency != volume_space_efficiency:
+            raise ValidationException(
+                messages.space_efficiency_not_match_volume_message.format(space_efficiency, volume_space_efficiency))
+    else:
+        if volume_space_efficiency is not None and volume_space_efficiency != 'none':
+            raise ValidationException(
+                messages.space_efficiency_not_match_volume_message.format(space_efficiency, volume_space_efficiency))
+
+    pool = parameters.get(config.PARAMETERS_POOL)
+    volume_pool = volume.pool_name
+    if pool:
+        if pool != volume_pool:
+            raise ValidationException(
+                messages.pool_not_match_volume_message.format(pool, volume_pool))

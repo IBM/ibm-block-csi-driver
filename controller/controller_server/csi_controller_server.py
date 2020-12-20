@@ -406,10 +406,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             array_type, volume_id = utils.get_volume_id_info(request.volume_id)
 
-            space_efficiency_type = request.parameters.get(config.PARAMETERS_SPACEEFFICIENCY)
+            space_efficiency = request.parameters.get(config.PARAMETERS_SPACEEFFICIENCY)
 
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
-                array_mediator.validate_supported_space_efficiency(space_efficiency_type)
+
+                array_mediator.validate_supported_space_efficiency(space_efficiency)
+
                 volume = array_mediator.get_object_by_id(object_id=volume_id, object_type=config.VOLUME_TYPE_NAME)
 
             if not volume:
@@ -417,6 +419,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             if request.volume_context:
                 utils.validate_volume_context_match_volume(request.volume_context, volume)
+
+            utils.validate_parameters_match_volume(request.parameters, volume)
+
             logger.info("finished ValidateVolumeCapabilities")
             return utils.generate_csi_validate_volume_capabilities_response(request.volume_context,
                                                                             request.volume_capabilities,

@@ -215,7 +215,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             array_address=self.service_address,
             copy_source_id=self._get_copy_source_id(api_volume=api_volume),
             pool_name=api_volume.pool,
-            array_type=self.array_type
+            array_type=self.array_type,
+            space_efficiency=api_volume.tp
         )
 
     @staticmethod

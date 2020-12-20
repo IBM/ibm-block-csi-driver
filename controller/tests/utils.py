@@ -3,7 +3,7 @@ import grpc
 from controller.csi_general import csi_pb2
 
 
-def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_source_id=None):
+def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_source_id=None, space_efficiency=None):
     vol = Mock()
     vol.capacity_bytes = size
     vol.id = wwn
@@ -12,7 +12,7 @@ def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_source_i
     vol.pool_name = "pool1"
     vol.array_type = array_type
     vol.copy_source_id = copy_source_id
-
+    vol.space_efficiency = space_efficiency
     return vol
 
 

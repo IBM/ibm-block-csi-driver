@@ -72,11 +72,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.get_volume("volume_name")
 
     def test_get_volume_return_correct_value(self):
-        vol_ret = Mock(as_single_element=Munch({'vdisk_UID': 'vol_id',
-                                                'name': 'test_vol',
-                                                'capacity': '1024',
-                                                'mdisk_grp_name': 'pool_name'
-                                                }))
+        vol_ret = Mock(as_single_element=self._get_cli_vol())
         self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
         vol = self.svc.get_volume("test_vol")
         self.assertTrue(vol.capacity_bytes == 1024)
@@ -143,11 +139,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_create_volume_success(self):
         self.svc.client.svctask.mkvolume.return_value = Mock()
-        vol_ret = Mock(as_single_element=Munch({'vdisk_UID': 'vol_id',
-                                                'name': 'test_vol',
-                                                'capacity': '1024',
-                                                'mdisk_grp_name': 'pool_name'
-                                                }))
+        vol_ret = Mock(as_single_element=self._get_cli_vol())
         self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
         volume = self.svc.create_volume("test_vol", 10, {}, "pool_name")
         self.assertEqual(volume.capacity_bytes, 1024)
@@ -195,7 +187,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.delete_volume("vol")
 
     def _prepare_mocks_for_object_still_in_use(self):
-        cli_volume = self._get_source_cli_vol()
+        cli_volume = self._get_cli_vol()
         cli_volume.FC_id = 'many'
         self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=cli_volume)
 
@@ -240,7 +232,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         return Mock(as_single_element=cli_object)
 
     @staticmethod
-    def _get_source_cli_vol():
+    def _get_cli_vol():
         return Munch({'vdisk_UID': 'vol_id',
                       'name': 'source_vol',
                       'capacity': '1024',
@@ -253,7 +245,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @classmethod
     def _get_mapless_target_cli_vol(cls):
-        target_cli_vol = cls._get_source_cli_vol()
+        target_cli_vol = cls._get_cli_vol()
         target_cli_vol.vdisk_UID = 'snap_id'
         target_cli_vol.name = 'test_snap'
         return target_cli_vol
@@ -356,7 +348,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         self.svc.client.svctask.mkfcmap.return_value = Mock()
 
-        source_vol_to_copy_from = self._get_source_cli_vol()
+        source_vol_to_copy_from = self._get_cli_vol()
         if not deduplicated_copy:
             del source_vol_to_copy_from.deduplicated_copy
         target_vol_after_creation = self._get_mapless_target_cli_vol()
@@ -371,7 +363,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_create_snapshot_create_volume_error(self, mock_warning):
-        source_cli_vol = self._get_source_cli_vol()
+        source_cli_vol = self._get_cli_vol()
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(source_cli_vol)
         mock_warning.return_value = False
         self.svc.client.svctask.mkvolume.side_effect = [
