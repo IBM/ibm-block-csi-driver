@@ -1,3 +1,3 @@
-SpaceEfficiency: Thin
+#SpaceEfficiency: Thin
 pool: POOL_NAME
-volume_name_prefix: vol_
+#volume_name_prefix: vol_
