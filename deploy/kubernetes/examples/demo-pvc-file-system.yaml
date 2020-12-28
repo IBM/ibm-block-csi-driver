@@ -3,7 +3,7 @@ apiVersion: v1
 metadata:
   name: demo-pvc-file-system
 spec:
-  volumeMode: Filesystem
+  volumeMode: Filesystem  #Optional. Values Filesystem\Block. The default is Filesystem.
   accessModes:
   - ReadWriteOnce
   resources:
