@@ -581,8 +581,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 if required_bytes > max_size:
                     message = messages.SizeOutOfRangeError_message.format(required_bytes, max_size)
-                    context.set_details(message)
+                    logger.info("OUT_OF_RANGE: {0}".format(message))
                     context.set_code(grpc.StatusCode.OUT_OF_RANGE)
+                    context.set_details(message)
                     return csi_pb2.ControllerExpandVolumeResponse()
 
                 logger.debug("expanding volume {0}".format(volume_id))
