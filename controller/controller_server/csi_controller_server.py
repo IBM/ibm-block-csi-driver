@@ -407,7 +407,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             space_efficiency = request.parameters.get(config.PARAMETERS_SPACEEFFICIENCY)
 
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
-
                 array_mediator.validate_supported_space_efficiency(space_efficiency)
 
                 volume = array_mediator.get_object_by_id(object_id=volume_id, object_type=config.VOLUME_TYPE_NAME)
