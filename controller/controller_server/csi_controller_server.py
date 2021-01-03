@@ -73,7 +73,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         pool = request.parameters[config.PARAMETERS_POOL]
 
-        space_efficiency = request.parameters.get(config.PARAMETERS_SPACEEFFICIENCY)
+        space_efficiency = request.parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
 
         try:
             # TODO : pass multiple array addresses
@@ -404,7 +404,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             secrets = request.secrets
             user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
             array_type, volume_id = utils.get_volume_id_info(request.volume_id)
-            space_efficiency = request.parameters.get(config.PARAMETERS_SPACEEFFICIENCY)
+            space_efficiency = request.parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
 
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 array_mediator.validate_supported_space_efficiency(space_efficiency)

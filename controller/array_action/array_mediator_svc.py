@@ -28,7 +28,7 @@ OBJ_ALREADY_EXIST = 'CMMVC6035E'
 FCMAP_ALREADY_EXIST = 'CMMVC6466E'
 FCMAP_ALREADY_COPYING = 'CMMVC5907E'
 VOL_NOT_FOUND = 'CMMVC8957E'
-POOL_NOT_MATCH_VOL_CAPABILITIES = 'CMMVC9292E'
+POOL_NOT_MATCH_VOL_SPACE_EFFICIENCY = 'CMMVC9292E'
 NOT_REDUCTION_POOL = 'CMMVC9301E'
 NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND = 'CMMVC5860E'
 NOT_ENOUGH_EXTENTS_IN_POOL_CREATE = 'CMMVC8710E'
@@ -377,7 +377,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 if NAME_NOT_MEET in ex.my_message:
                     raise controller_errors.PoolDoesNotExist(pool,
                                                              self.endpoint)
-                if (POOL_NOT_MATCH_VOL_CAPABILITIES in ex.my_message
+                if (POOL_NOT_MATCH_VOL_SPACE_EFFICIENCY in ex.my_message
                         or NOT_REDUCTION_POOL in ex.my_message):
                     raise controller_errors.PoolDoesNotMatchSpaceEfficiency(
                         pool, space_efficiency, ex)

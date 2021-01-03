@@ -76,8 +76,8 @@ class IllegalObjectID(BaseArrayActionException):
 
 class PoolDoesNotMatchSpaceEfficiency(BaseArrayActionException):
 
-    def __init__(self, pool, capabilities, error):
-        self.message = messages.PoolDoesNotMatchSpaceEfficiency_message.format(pool, capabilities,
+    def __init__(self, pool, space_efficiency, error):
+        self.message = messages.PoolDoesNotMatchSpaceEfficiency_message.format(pool, space_efficiency,
                                                                                error)
 
 

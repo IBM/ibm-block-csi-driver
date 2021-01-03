@@ -420,7 +420,7 @@ def hash_string(string):
 
 
 def validate_parameters_match_volume(parameters, volume):
-    space_efficiency = parameters.get(config.PARAMETERS_SPACEEFFICIENCY)
+    space_efficiency = parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
     volume_space_efficiency = volume.space_efficiency
     if space_efficiency:
         space_efficiency = space_efficiency.lower()

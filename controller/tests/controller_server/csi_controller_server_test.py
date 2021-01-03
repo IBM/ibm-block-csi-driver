@@ -1548,7 +1548,7 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validation_with_space_efficiency_not_match(self, storage_agent):
         storage_agent.return_value = self.storage_agent
-        self.request.parameters.update({config.PARAMETERS_SPACEEFFICIENCY: "not_none"})
+        self.request.parameters.update({config.PARAMETERS_SPACE_EFFICIENCY: "not_none"})
 
         response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
