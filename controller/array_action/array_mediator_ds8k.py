@@ -88,6 +88,14 @@ def get_flashcopy_as_target_if_exists(api_volume):
     return flashcopies[0]
 
 
+def get_array_space_efficiency_value(space_efficiency):
+    if space_efficiency:
+        space_efficiency_lower = space_efficiency.lower()
+        if space_efficiency_lower == config.SPACE_EFFICIENCY_THIN:
+            return "ese"
+    return "none"
+
+
 class DS8KArrayMediator(ArrayMediatorAbstract):
     SUPPORTED_FROM_VERSION = '7.5.1'
 
@@ -219,14 +227,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             space_efficiency=api_volume.tp
         )
 
-    @staticmethod
-    def get_se_space_efficiency_value(space_efficiency):
-        if space_efficiency:
-            space_efficiency_lower = space_efficiency.lower()
-            if space_efficiency_lower == config.SPACE_EFFICIENCY_THIN:
-                return "ese"
-        return "none"
-
     def _create_api_volume(self, name, size_in_bytes, space_efficiency, pool_id):
         logger.info("Creating volume with name: {}, size: {}, in pool: {}, with parameters: {}".format(
             name, size_in_bytes, pool_id, space_efficiency))
@@ -236,7 +236,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 'name': name,
                 'capacity_in_bytes': size_in_bytes,
                 'pool_id': pool_id,
-                'tp': self.get_se_space_efficiency_value(space_efficiency),
+                'tp': get_array_space_efficiency_value(space_efficiency),
 
             })
             logger.debug(
