@@ -501,23 +501,23 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                          err=array_errors.IllegalObjectName("vol"))
 
-    def test__volume_exsits_exception(self):
+    def test_volume_exsits_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.ALREADY_EXISTS,
                                          err=array_errors.VolumeAlreadyExists("vol", "endpoint"))
 
-    def test__pool_does_not_exist_exception(self):
+    def test_pool_does_not_exist_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                          err=array_errors.PoolDoesNotExist("pool1", "endpoint"))
 
-    def test__pool_does_not_match_capabilities_exception(self):
+    def test_pool_does_not_match_capabilities_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                          err=array_errors.PoolDoesNotMatchCapabilities("pool1", "", "endpoint"))
 
-    def test__space_efficiency_not_supported_exception(self):
+    def test_space_efficiency_not_supported_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                          err=array_errors.SpaceEfficiencyNotSupported(["cap"]))
 
-    def test__other_exception(self):
+    def test_other_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INTERNAL,
                                          err=Exception("error"))
 
