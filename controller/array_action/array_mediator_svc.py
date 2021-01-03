@@ -172,7 +172,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _generate_volume_response(self, cli_volume):
         source_volume_wwn = self._get_source_volume_wwn_if_exists(cli_volume)
-        space_efficiency = self.get_cli_volume_space_efficiency(cli_volume)
+        space_efficiency = self._get_cli_volume_space_efficiency(cli_volume)
         return Volume(
             vol_size_bytes=int(cli_volume.capacity),
             vol_id=cli_volume.vdisk_UID,
@@ -184,7 +184,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             space_efficiency=space_efficiency
         )
 
-    def get_cli_volume_space_efficiency(self, cli_volume):
+    def _get_cli_volume_space_efficiency(self, cli_volume):
         if not hasattr(cli_volume, "se_copy"):
             cli_volume = self._get_cli_volume(cli_volume.name)
         space_efficiency = config.SPACE_EFFICIENCY_THICK
@@ -452,7 +452,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.info("creating target cli volume '{0}' from source volume '{1}'".format(target_volume_name,
                                                                                        source_volume_name))
         source_cli_volume = self._get_cli_volume(source_volume_name)
-        space_efficiency = self.get_cli_volume_space_efficiency(source_cli_volume)
+        space_efficiency = self._get_cli_volume_space_efficiency(source_cli_volume)
         size_in_bytes = int(source_cli_volume.capacity)
         pool = source_cli_volume.mdisk_grp_name
         self._create_cli_volume(target_volume_name, size_in_bytes, space_efficiency, pool)
