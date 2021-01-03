@@ -92,18 +92,18 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.UnsupportedStorageVersionError):
             DS8KArrayMediator("user", "password", self.endpoint)
 
-    def test_validate_space_efficiency_thin_passed(self):
+    def test_validate_space_efficiency_thin_success(self):
         self.array.validate_supported_space_efficiency(
             config.SPACE_EFFICIENCY_THIN
         )
         # nothing is raised
 
-    def test_validate_space_efficiency_none_passed(self):
+    def test_validate_space_efficiency_none_success(self):
         self.array.validate_supported_space_efficiency(
             config.SPACE_EFFICIENCY_NONE
         )
 
-    def test_validate_space_efficiency_failed(self):
+    def test_validate_space_efficiency_fail(self):
         with self.assertRaises(array_errors.SpaceEfficiencyNotSupported):
             self.array.validate_supported_space_efficiency(
                 "fake"
@@ -133,13 +133,13 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                 pool_id=self.volume_response.pool
             )
 
-    def test_create_volume_with_default_space_efficiency_succeeded(self):
-        self._test_create_volume_with_space_efficiency_succeeded(False)
+    def test_create_volume_with_default_space_efficiency_success(self):
+        self._test_create_volume_with_space_efficiency_success(False)
 
-    def test_create_volume_with_thin_space_efficiency_succeeded(self):
-        self._test_create_volume_with_space_efficiency_succeeded(True)
+    def test_create_volume_with_thin_space_efficiency_success(self):
+        self._test_create_volume_with_space_efficiency_success(True)
 
-    def _test_create_volume_with_space_efficiency_succeeded(self, is_thin):
+    def _test_create_volume_with_space_efficiency_success(self, is_thin):
         self.client_mock.create_volume.return_value = self.volume_response
         self.client_mock.get_volume.return_value = self.volume_response
         name = self.volume_response.name
@@ -172,22 +172,22 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         )
         self.assertEqual(volume.name, self.volume_response.name)
 
-    def test_create_volume_failed_with_ClientException(self):
+    def test_create_volume_fail_with_ClientException(self):
         self.client_mock.create_volume.side_effect = ClientException("500")
         with self.assertRaises(array_errors.VolumeCreationError):
             self.array.create_volume("fake_name", 1, {}, "fake_pool")
 
-    def test_create_volume_failed_with_pool_not_found(self):
+    def test_create_volume_fail_with_pool_not_found(self):
         self.client_mock.create_volume.side_effect = NotFound("404", message="BE7A0001")
         with self.assertRaises(array_errors.PoolDoesNotExist):
             self.array.create_volume("fake_name", 1, {}, "fake_pool")
 
-    def test_create_volume_failed_with_incorrect_id(self):
+    def test_create_volume_fail_with_incorrect_id(self):
         self.client_mock.get_volumes_by_pool.side_effect = NotFound("500", message="BE7A0005")
         with self.assertRaises(array_errors.PoolDoesNotExist):
             self.array.create_volume("fake_name", 1, {}, "fake_pool")
 
-    def test_create_volume_failed_with_no_space_in_pool(self):
+    def test_create_volume_fail_with_no_space_in_pool(self):
         self.client_mock.get_volumes_by_pool.side_effect = ClientException("500", message="BE534459")
         with self.assertRaises(array_errors.NotEnoughSpaceInPool):
             self.array.create_volume("fake_name", 1, {}, "fake_pool")
@@ -197,17 +197,17 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.array.delete_volume(scsi_id)
         self.client_mock.delete_volume.assert_called_once_with(volume_id=scsi_id[-4:])
 
-    def test_delete_volume_failed_with_ClientException(self):
+    def test_delete_volume_fail_with_ClientException(self):
         self.client_mock.delete_volume.side_effect = ClientException("500")
         with self.assertRaises(array_errors.VolumeDeletionError):
             self.array.delete_volume("fake_name")
 
-    def test_delete_volume_failed_with_NotFound(self):
+    def test_delete_volume_fail_with_NotFound(self):
         self.client_mock.delete_volume.side_effect = NotFound("404")
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.array.delete_volume("fake_name")
 
-    def test_delete_volume_with_flashcopies_as_source_and_target_failed(self):
+    def test_delete_volume_with_flashcopies_as_source_and_target_fail(self):
         self.client_mock.get_volume.return_value = self.volume_response
         self.client_mock.get_flashcopies_by_volume.return_value = [
             Munch({"sourcevolume": "0001",
@@ -264,7 +264,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.delete_flashcopy.assert_called_once_with("0001:0002")
         self.client_mock.delete_volume.assert_called_once_with(volume_id="0001")
 
-    def test_get_volume_mappings_failed_with_ClientException(self):
+    def test_get_volume_mappings_fail_with_ClientException(self):
         self.client_mock.get_hosts.side_effect = ClientException("500")
         with self.assertRaises(ClientException):
             self.array.get_volume_mappings("fake_name")
@@ -308,7 +308,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.array.map_volume("fake_name", "fake_host")
 
-    def test_map_volume_failed_with_ClientException(self):
+    def test_map_volume_fail_with_ClientException(self):
         self.client_mock.map_volume_to_host.side_effect = ClientException("500")
         with self.assertRaises(array_errors.MappingError):
             self.array.map_volume("fake_name", "fake_host")
@@ -331,7 +331,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.array.unmap_volume("fake_name", "fake_host")
 
-    def test_unmap_volume_failed_with_ClientException(self):
+    def test_unmap_volume_fail_with_ClientException(self):
         volume_id = "0001"
         lunid = "1"
         host_name = "test_host"
@@ -361,7 +361,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.unmap_volume_from_host.assert_called_once_with(host_name=host_name,
                                                                         lunid=lunid)
 
-    def test_get_array_fc_wwns_failed_with_ClientException(self):
+    def test_get_array_fc_wwns_fail_with_ClientException(self):
         self.client_mock.get_host.side_effect = ClientException("500")
         with self.assertRaises(ClientException):
             self.array.get_array_fc_wwns()
@@ -544,20 +544,20 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.delete_volume.assert_called_once()
         self.client_mock.delete_flashcopy.assert_called_once_with(self.flashcopy_response.id)
 
-    def test_delete_snapshot_flashcopy_failed_with_ClientException(self):
+    def test_delete_snapshot_flashcopy_fail_with_ClientException(self):
         self._prepare_mocks_for_snapshot()
         self.client_mock.delete_flashcopy.side_effect = ClientException("500")
         self.client_mock.get_volume.return_value = self.snapshot_response
         with self.assertRaises(ClientException):
             self.array.delete_snapshot("fake_name")
 
-    def test_delete_snapshot_failed_with_ClientException(self):
+    def test_delete_snapshot_fail_with_ClientException(self):
         self._prepare_mocks_for_snapshot()
         self.client_mock.delete_volume.side_effect = ClientException("500")
         with self.assertRaises(array_errors.VolumeDeletionError):
             self.array.delete_snapshot("fake_name")
 
-    def test_delete_snapshot_failed_with_NotFound(self):
+    def test_delete_snapshot_fail_with_NotFound(self):
         self.client_mock.get_volume.side_effect = NotFound("404")
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.array.delete_snapshot("fake_name")
