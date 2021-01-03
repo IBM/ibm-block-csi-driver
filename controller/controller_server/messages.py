@@ -27,6 +27,6 @@ volume_source_id_is_missing = 'volume source {0} id is missing'
 snapshot_src_volume_id_is_missing = 'snapshot source volume id is missing'
 volume_cloning_not_supported_message = 'volume cloning is not supported'
 volume_context_not_match_volume_message = 'volume context: {0} does not match existing volume context: {1}'
-space_efficiency_not_match_volume_message = 'space_efficiency: {0}' \
-                                            ' does not match existing volume space_efficiency: {1}'
+space_efficiency_not_match_volume_message = 'space efficiency: {0}' \
+                                            ' does not match existing volume space efficiency: {1}'
 pool_not_match_volume_message = 'pool name: {0} does not match existing volume pool name: {1}'

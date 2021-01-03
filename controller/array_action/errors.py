@@ -74,11 +74,11 @@ class IllegalObjectID(BaseArrayActionException):
         self.message = "{0}".format(msg)
 
 
-class PoolDoesNotMatchCapabilities(BaseArrayActionException):
+class PoolDoesNotMatchSpaceEfficiency(BaseArrayActionException):
 
     def __init__(self, pool, capabilities, error):
-        self.message = messages.PoolDoesNotMatchCapabilities_message.format(pool, capabilities,
-                                                                            error)
+        self.message = messages.PoolDoesNotMatchSpaceEfficiency_message.format(pool, capabilities,
+                                                                               error)
 
 
 class SpaceEfficiencyNotSupported(BaseArrayActionException):

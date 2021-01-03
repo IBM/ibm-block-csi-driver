@@ -501,23 +501,23 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                          err=array_errors.IllegalObjectName("vol"))
 
-    def test_volume_exsits_exception(self):
+    def test_create_volume_with_volume_exsits_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.ALREADY_EXISTS,
                                          err=array_errors.VolumeAlreadyExists("vol", "endpoint"))
 
-    def test_pool_does_not_exist_exception(self):
+    def test_create_volume_with_pool_does_not_exist_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                          err=array_errors.PoolDoesNotExist("pool1", "endpoint"))
 
-    def test_pool_does_not_match_capabilities_exception(self):
+    def test_create_volume_with_pool_does_not_match_capabilities_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
-                                         err=array_errors.PoolDoesNotMatchCapabilities("pool1", "", "endpoint"))
+                                         err=array_errors.PoolDoesNotMatchSpaceEfficiency("pool1", "", "endpoint"))
 
-    def test_space_efficiency_not_supported_exception(self):
+    def test_create_volume_with_capability_not_supported_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                          err=array_errors.SpaceEfficiencyNotSupported(["cap"]))
 
-    def test_other_exception(self):
+    def test_create_volume_with_other_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INTERNAL,
                                          err=Exception("error"))
 
@@ -1552,7 +1552,7 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
 
         response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
-        self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "space_efficiency")
+        self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "space efficiency")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validation_with_pool_not_match(self, storage_agent):

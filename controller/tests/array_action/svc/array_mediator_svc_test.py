@@ -129,12 +129,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
         mock_warning.return_value = False
         self.svc.client.svctask.mkvolume.side_effect = [
             CLIFailureError("CMMVC9292E")]
-        with self.assertRaises(array_errors.PoolDoesNotMatchCapabilities):
+        with self.assertRaises(array_errors.PoolDoesNotMatchSpaceEfficiency):
             self.svc.create_volume("vol", 10, {}, "pool")
 
         self.svc.client.svctask.mkvolume.side_effect = [
             CLIFailureError("CMMVC9301E")]
-        with self.assertRaises(array_errors.PoolDoesNotMatchCapabilities):
+        with self.assertRaises(array_errors.PoolDoesNotMatchSpaceEfficiency):
             self.svc.create_volume("vol", 10, {}, "pool")
 
     def test_create_volume_success(self):

@@ -379,7 +379,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                                                              self.endpoint)
                 if (POOL_NOT_MATCH_VOL_CAPABILITIES in ex.my_message
                         or NOT_REDUCTION_POOL in ex.my_message):
-                    raise controller_errors.PoolDoesNotMatchCapabilities(
+                    raise controller_errors.PoolDoesNotMatchSpaceEfficiency(
                         pool, space_efficiency, ex)
                 if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in ex.my_message:
                     raise controller_errors.NotEnoughSpaceInPool(pool=pool)

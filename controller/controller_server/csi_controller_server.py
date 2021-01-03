@@ -137,7 +137,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 return res
 
         except (controller_errors.IllegalObjectName, controller_errors.SpaceEfficiencyNotSupported,
-                controller_errors.PoolDoesNotExist, controller_errors.PoolDoesNotMatchCapabilities,
+                controller_errors.PoolDoesNotExist, controller_errors.PoolDoesNotMatchSpaceEfficiency,
                 controller_errors.PoolParameterIsMissing, controller_errors.ExpectedSnapshotButFoundVolumeError) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
