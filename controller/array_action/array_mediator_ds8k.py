@@ -659,7 +659,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.debug("validate_supported_space_efficiency for space efficiency : {0}".format(space_efficiency))
 
         if (space_efficiency and space_efficiency.lower() not in
-                [config.SPACE_EFFICIENCY_THIN, ]):
+                [config.SPACE_EFFICIENCY_THIN, config.SPACE_EFFICIENCY_NONE]):
             logger.error("space efficiency is not supported.")
             raise array_errors.SpaceEfficiencyNotSupported(
                 space_efficiency)

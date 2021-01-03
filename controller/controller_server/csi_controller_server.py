@@ -403,9 +403,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             secrets = request.secrets
             user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
-
             array_type, volume_id = utils.get_volume_id_info(request.volume_id)
-
             space_efficiency = request.parameters.get(config.PARAMETERS_SPACEEFFICIENCY)
 
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:

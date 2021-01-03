@@ -92,11 +92,16 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.UnsupportedStorageVersionError):
             DS8KArrayMediator("user", "password", self.endpoint)
 
-    def test_validate_space_efficiency_passed(self):
+    def test_validate_space_efficiency_thin_passed(self):
         self.array.validate_supported_space_efficiency(
             config.SPACE_EFFICIENCY_THIN
         )
         # nothing is raised
+
+    def test_validate_space_efficiency_none_passed(self):
+        self.array.validate_supported_space_efficiency(
+            config.SPACE_EFFICIENCY_NONE
+        )
 
     def test_validate_space_efficiency_failed(self):
         with self.assertRaises(array_errors.SpaceEfficiencyNotSupported):
