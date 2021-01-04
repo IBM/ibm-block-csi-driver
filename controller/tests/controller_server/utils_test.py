@@ -30,26 +30,26 @@ class TestUtils(unittest.TestCase):
         mgmt = "mg"
         secrets = {"username": username, "password": password, "management_address": mgmt}
 
-        utils.validate_secret(secrets)
+        utils.validate_secrets(secrets)
 
         with self.assertRaises(ValidationException):
-            utils.validate_secret(None)
+            utils.validate_secrets(None)
 
         secrets = {"username": username, "password": password}
         with self.assertRaises(ValidationException):
-            utils.validate_secret(secrets)
+            utils.validate_secrets(secrets)
 
         secrets = {"username": username, "management_address": mgmt}
         with self.assertRaises(ValidationException):
-            utils.validate_secret(secrets)
+            utils.validate_secrets(secrets)
 
         secrets = {"password": password, "management_address": mgmt}
         with self.assertRaises(ValidationException):
-            utils.validate_secret(secrets)
+            utils.validate_secrets(secrets)
 
         secrets = {}
         with self.assertRaises(ValidationException):
-            utils.validate_secret(secrets)
+            utils.validate_secrets(secrets)
 
     def test_validate_file_system_volume_capabilities(self):
         access_mode = csi_pb2.VolumeCapability.AccessMode
@@ -100,9 +100,9 @@ class TestUtils(unittest.TestCase):
 
         utils.validate_csi_volume_capabilities([caps])
 
-    @patch('controller.controller_server.utils.validate_secret')
+    @patch('controller.controller_server.utils.validate_secrets')
     @patch('controller.controller_server.utils.validate_csi_volume_capabilities')
-    def test_validate_create_volume_request(self, validate_capabilities, validate_secret):
+    def test_validate_create_volume_request(self, validate_capabilities, validate_secrets):
         request = Mock()
         request.name = ""
 
@@ -127,13 +127,13 @@ class TestUtils(unittest.TestCase):
 
         validate_capabilities.side_effect = None
 
-        validate_secret.side_effect = ValidationException(" other msg")
+        validate_secrets.side_effect = ValidationException(" other msg")
 
         with self.assertRaises(ValidationException) as ex:
             utils.validate_create_volume_request(request)
             self.assertTrue("other msg" in ex.message)
 
-        validate_secret.side_effect = None
+        validate_secrets.side_effect = None
 
         request.parameters = {"capabilities": ""}
 
@@ -164,7 +164,7 @@ class TestUtils(unittest.TestCase):
         request.capacity_range.required_bytes = 0
         utils.validate_create_volume_request(request)
 
-    @patch('controller.controller_server.utils.validate_secret', Mock())
+    @patch('controller.controller_server.utils.validate_secrets', Mock())
     def test_validate_delete_snapshot_request(self):
         request = Mock()
         request.snapshot_id = ""
@@ -227,7 +227,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(10, res.volume.capacity_bytes)
         self.assertEqual("9.1.1.1,9.1.1.2", res.volume.volume_context['array_address'])
 
-    @patch('controller.controller_server.utils.validate_secret')
+    @patch('controller.controller_server.utils.validate_secrets')
     @patch('controller.controller_server.utils.validate_csi_volume_capability')
     def test_validate_publish_volume_request(self, validate_capabilities, validate_secrets):
         request = Mock()
@@ -256,8 +256,8 @@ class TestUtils(unittest.TestCase):
 
         utils.validate_publish_volume_request(request)
 
-    @patch('controller.controller_server.utils.validate_secret')
-    def test_validate_unpublish_volume_request(self, validate_secret):
+    @patch('controller.controller_server.utils.validate_secrets')
+    def test_validate_unpublish_volume_request(self, validate_secrets):
         request = Mock()
         request.volume_id = "somebadvolumename"
 
@@ -267,13 +267,13 @@ class TestUtils(unittest.TestCase):
 
         request.volume_id = "xiv:volume"
 
-        validate_secret.side_effect = [ValidationException("secret")]
+        validate_secrets.side_effect = [ValidationException("secret")]
 
         with self.assertRaises(ValidationException) as ex:
             utils.validate_unpublish_volume_request(request)
             self.assertTrue("secret" in ex.message)
 
-        validate_secret.side_effect = None
+        validate_secrets.side_effect = None
 
         utils.validate_unpublish_volume_request(request)
 

@@ -185,8 +185,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         )
 
     def _get_cli_volume_space_efficiency(self, cli_volume):
-        if not hasattr(cli_volume, "se_copy"):
-            cli_volume = self._get_cli_volume(cli_volume.name)
         space_efficiency = config.SPACE_EFFICIENCY_THICK
         if cli_volume.se_copy == YES:
             space_efficiency = config.SPACE_EFFICIENCY_THIN
@@ -446,7 +444,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return None
         if object_type is controller_config.SNAPSHOT_TYPE_NAME:
             return self._generate_snapshot_response_with_verification(cli_object)
-        return self._generate_volume_response(cli_object)
+        cli_volume = self._get_cli_volume(cli_object.name)
+        return self._generate_volume_response(cli_volume)
 
     def _create_similar_volume(self, source_volume_name, target_volume_name):
         logger.info("creating target cli volume '{0}' from source volume '{1}'".format(target_volume_name,

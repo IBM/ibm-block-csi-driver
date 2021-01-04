@@ -14,6 +14,7 @@ from controller.controller_server.test_settings import volume_name, snapshot_nam
     clone_volume_name
 from controller.csi_general import csi_pb2
 from controller.tests import utils
+from controller.tests.utils import ProtoBufMock
 
 
 class BaseControllerSetUp(unittest.TestCase):
@@ -40,7 +41,11 @@ class BaseControllerSetUp(unittest.TestCase):
         self.request.volume_context = {}
         volume_capability = utils.get_mock_volume_capability()
         self.request.volume_capabilities = [volume_capability]
-
+        self.capacity_bytes = 10
+        self.request.capacity_range = Mock()
+        self.request.capacity_range.required_bytes = self.capacity_bytes
+        self.mediator.maximal_volume_size_in_bytes = 10
+        self.mediator.minimal_volume_size_in_bytes = 2
         self.context = utils.FakeContext()
 
 
@@ -132,7 +137,6 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_snapshot = Mock()
         self.mediator.get_snapshot.return_value = None
 
-        self.capacity_bytes = 10
         self.request.name = snapshot_name
         self.request.source_volume_id = "A9000:12345678"
 
@@ -338,11 +342,6 @@ class TestDeleteSnapshot(BaseControllerSetUp):
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
 
-class ProtoBufMock(MagicMock):
-    def HasField(self, field):
-        return hasattr(self, field)
-
-
 class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
     def get_tested_method(self):
@@ -357,14 +356,9 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.side_effect = array_errors.ObjectNotFoundError("vol")
 
-        self.mediator.maximal_volume_size_in_bytes = 10
-        self.mediator.minimal_volume_size_in_bytes = 2
-
         self.pool = 'pool1'
         self.request.parameters = {"pool": self.pool}
-        self.capacity_bytes = 10
-        self.request.capacity_range = Mock()
-        self.request.capacity_range.required_bytes = self.capacity_bytes
+
         self.request.name = volume_name
         self.request.volume_content_source = None
 
@@ -388,6 +382,18 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.create_volume.assert_called_once_with(volume_name, 10, None, 'pool1')
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_with_space_efficiency_succeeds(self, storage_agent):
+        self._prepare_create_volume_mocks(storage_agent)
+        self.request.parameters.update({config.PARAMETERS_SPACE_EFFICIENCY: "not_none"})
+        self.mediator.validate_supported_space_efficiency = Mock()
+
+        self.servicer.CreateVolume(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+        self.mediator.get_volume.assert_called_once_with(volume_name, pool_id='pool1')
+        self.mediator.create_volume.assert_called_once_with(volume_name, 10, "not_none", 'pool1')
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_idempotent_no_source_succeeds(self, storage_agent):
@@ -524,7 +530,6 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_name_prefix(self, storage_agent):
         storage_agent.return_value = self.storage_agent
-
         self.request.name = "some_name"
         self.request.parameters[config.PARAMETERS_VOLUME_NAME_PREFIX] = "prefix"
         self.mediator.create_volume = Mock()
@@ -1231,9 +1236,7 @@ class TestUnPublishVolume(BaseControllerSetUp):
 class TestGetCapabilities(BaseControllerSetUp):
 
     def test_controller_get_capabilities(self):
-        request = Mock()
-        context = Mock()
-        self.servicer.ControllerGetCapabilities(request, context)
+        self.servicer.ControllerGetCapabilities(self.request, self.context)
 
 
 class TestExpandVolume(BaseControllerSetUp, CommonControllerTest):
@@ -1247,19 +1250,7 @@ class TestExpandVolume(BaseControllerSetUp, CommonControllerTest):
     def setUp(self):
         super().setUp()
 
-        self.access_mode = csi_pb2.VolumeCapability.AccessMode
-        self.fs_type = "ext4"
-
-        self.mediator.maximal_volume_size_in_bytes = 10
-        self.mediator.minimal_volume_size_in_bytes = 2
-
-        self.request.volume_capability = csi_pb2.VolumeCapability(
-            access_mode=csi_pb2.VolumeCapability.AccessMode(mode=self.access_mode.SINGLE_NODE_WRITER),
-            mount=csi_pb2.VolumeCapability.MountVolume(fs_type=self.fs_type))
         self.request.parameters = {}
-        self.capacity_bytes = 6
-        self.request.capacity_range = Mock()
-        self.request.capacity_range.required_bytes = self.capacity_bytes
         self.volume_id = "vol-id"
         self.request.volume_id = "{}:{}".format("xiv", self.volume_id)
         self.request.volume_content_source = None
@@ -1501,13 +1492,24 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
         self._test_request_with_wrong_parameters(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_validate_volume_cap_with_unsupported_capabilities(self, storage_agent):
+    def test_validate_volume_cap_with_unsupported_access_mode(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         self.request.volume_capabilities[0].access_mode.mode = 999
 
         response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
         self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "unsupported access mode")
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_validate_volume_cap_with_unsupported_fs_type(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+
+        volume_capability = utils.get_mock_volume_capability(fs_type="ext3")
+        self.request.volume_capabilities = [volume_capability]
+
+        response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
+
+        self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "fs_type")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_cap_with_no_capabilities(self, storage_agent):

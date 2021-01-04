@@ -1,6 +1,12 @@
-from mock import Mock
 import grpc
+from mock import Mock, MagicMock
+
 from controller.csi_general import csi_pb2
+
+
+class ProtoBufMock(MagicMock):
+    def HasField(self, field):
+        return hasattr(self, field)
 
 
 def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_source_id=None, space_efficiency=None):
@@ -29,13 +35,16 @@ def get_mock_mediator_response_snapshot(capacity, name, wwn, volume_name, array_
     return snapshot
 
 
-def get_mock_volume_capability(mode=csi_pb2.VolumeCapability.AccessMode.SINGLE_NODE_WRITER, fs_type="ext4",
-                               mount_flags=None):
-    if mount_flags is None:
-        mount_flags = []
-    return csi_pb2.VolumeCapability(
-        mount=csi_pb2.VolumeCapability.MountVolume(fs_type=fs_type, mount_flags=mount_flags),
-        access_mode=csi_pb2.VolumeCapability.AccessMode(mode=mode))
+def get_mock_volume_capability(mode=1, fs_type="ext4", mount_flags=None):
+    capability = ProtoBufMock(spec=["mount", "access_mode"])
+    mount = ProtoBufMock(spec=["fs_type", "mount_flags"])
+    access_mode = ProtoBufMock(spec=["mode"])
+    setattr(mount, "mount_flags", mount_flags)
+    setattr(mount, "fs_type", fs_type)
+    setattr(access_mode, "mode", mode)
+    setattr(capability, "mount", mount)
+    setattr(capability, "access_mode", access_mode)
+    return capability
 
 
 class FakeContext:

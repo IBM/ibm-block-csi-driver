@@ -97,15 +97,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
         mock_warning.return_value = False
         self.svc.client.svctask.mkvolume.side_effect = [Exception]
         with self.assertRaises(Exception):
-            self.svc.create_volume("vol", 10, {}, "pool")
+            self.svc.create_volume("vol", 10, "thin", "pool")
         self.svc.client.svctask.mkvolume.side_effect = [
             CLIFailureError("Failed")]
         with self.assertRaises(CLIFailureError):
-            self.svc.create_volume("vol", 10, {}, "pool")
+            self.svc.create_volume("vol", 10, "thin", "pool")
         self.svc.client.svctask.mkvolume.side_effect = [
             CLIFailureError("CMMVC8710E")]
         with self.assertRaises(array_errors.NotEnoughSpaceInPool):
-            self.svc.create_volume("vol", 10, {}, "pool")
+            self.svc.create_volume("vol", 10, "thin", "pool")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_create_volume_return_volume_exists_error(self, mock_warning):
@@ -113,7 +113,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkvolume.side_effect = [
             CLIFailureError("CMMVC6035E")]
         with self.assertRaises(array_errors.VolumeAlreadyExists):
-            self.svc.create_volume("vol", 10, {}, "pool")
+            self.svc.create_volume("vol", 10, "thin", "pool")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_create_volume_return_pool_not_exists_error(self, mock_warning):
@@ -121,7 +121,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkvolume.side_effect = [
             CLIFailureError("CMMVC5754E")]
         with self.assertRaises(array_errors.PoolDoesNotExist):
-            self.svc.create_volume("vol", 10, {}, "pool")
+            self.svc.create_volume("vol", 10, "thin", "pool")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_create_volume_return_pool_not_match_capabilities_error(
@@ -130,18 +130,21 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkvolume.side_effect = [
             CLIFailureError("CMMVC9292E")]
         with self.assertRaises(array_errors.PoolDoesNotMatchSpaceEfficiency):
-            self.svc.create_volume("vol", 10, {}, "pool")
+            self.svc.create_volume("vol", 10, "thin", "pool")
 
         self.svc.client.svctask.mkvolume.side_effect = [
             CLIFailureError("CMMVC9301E")]
         with self.assertRaises(array_errors.PoolDoesNotMatchSpaceEfficiency):
-            self.svc.create_volume("vol", 10, {}, "pool")
+            self.svc.create_volume("vol", 10, "thin", "pool")
 
     def test_create_volume_success(self):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         vol_ret = Mock(as_single_element=self._get_cli_vol())
         self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
-        volume = self.svc.create_volume("test_vol", 10, {}, "pool_name")
+        volume = self.svc.create_volume("test_vol", 1024, "thin", "pool_name")
+
+        self.svc.client.svctask.mkvolume.assert_called_with(name="test_vol", unit="b", size=1024, pool="pool_name",
+                                                            thin=True)
         self.assertEqual(volume.capacity_bytes, 1024)
         self.assertEqual(volume.array_type, 'SVC')
         self.assertEqual(volume.id, 'vol_id')

@@ -33,12 +33,12 @@ def _get_object_id(obj):
     return config.PARAMETERS_OBJECT_ID_DELIMITER.join((obj.array_type, obj.id))
 
 
-def validate_secret(secret):
+def validate_secrets(secrets):
     logger.debug("validating secrets")
-    if secret:
-        if not (config.SECRET_USERNAME_PARAMETER in secret and
-                config.SECRET_PASSWORD_PARAMETER in secret and
-                config.SECRET_ARRAY_PARAMETER in secret):
+    if secrets:
+        if not (config.SECRET_USERNAME_PARAMETER in secrets and
+                config.SECRET_PASSWORD_PARAMETER in secrets and
+                config.SECRET_ARRAY_PARAMETER in secrets):
             raise ValidationException(messages.invalid_secret_message)
 
     else:
@@ -98,7 +98,7 @@ def _validate_source_info(source, source_type):
         raise ObjectIdError(source_type, source_object_id)
 
 
-def _validate_create_volume_parameters(parameters):
+def _validate_pool_parameter(parameters):
     if config.PARAMETERS_POOL not in parameters:
         raise ValidationException(messages.pool_is_missing_message)
 
@@ -124,11 +124,11 @@ def validate_create_volume_request(request):
     logger.debug("validating volume capabilities")
     validate_csi_volume_capabilities(request.volume_capabilities)
 
-    validate_secret(request.secrets)
+    validate_secrets(request.secrets)
 
     logger.debug("validating storage class parameters")
     if request.parameters:
-        _validate_create_volume_parameters(request.parameters)
+        _validate_pool_parameter(request.parameters)
     else:
         raise ValidationException(messages.params_are_missing_message)
 
@@ -144,7 +144,7 @@ def validate_create_snapshot_request(request):
     if not request.name:
         raise ValidationException(messages.name_should_not_be_empty_message)
 
-    validate_secret(request.secrets)
+    validate_secrets(request.secrets)
 
     logger.debug("validating source volume id")
     if not request.source_volume_id:
@@ -157,7 +157,7 @@ def validate_delete_snapshot_request(request):
     if not request.snapshot_id:
         raise ValidationException(messages.snapshot_id_should_not_be_empty_message)
 
-    validate_secret(request.secrets)
+    validate_secrets(request.secrets)
 
     logger.debug("request validation finished.")
 
@@ -174,11 +174,11 @@ def validate_validate_volume_capabilities_request(request):
 
     logger.debug("validating parameters")
     if request.parameters:
-        _validate_create_volume_parameters(request.parameters)
+        _validate_pool_parameter(request.parameters)
 
     validate_csi_volume_capabilities(request.volume_capabilities)
 
-    validate_secret(request.secrets)
+    validate_secrets(request.secrets)
 
 
 def validate_volume_context_match_volume(volume_context, volume):
@@ -204,7 +204,7 @@ def validate_expand_volume_request(request):
     else:
         raise ValidationException(messages.no_capacity_range_message)
 
-    validate_secret(request.secrets)
+    validate_secrets(request.secrets)
 
     logger.debug("expand volume validation finished")
 
@@ -295,7 +295,7 @@ def validate_delete_volume_request(request):
     if request.volume_id == "":
         raise ValidationException("Volume id cannot be empty")
 
-    validate_secret(request.secrets)
+    validate_secrets(request.secrets)
 
     logger.debug("delete volume validation finished")
 
@@ -310,7 +310,7 @@ def validate_publish_volume_request(request):
     logger.debug("validating volume capabilities")
     validate_csi_volume_capability(request.volume_capability)
 
-    validate_secret(request.secrets)
+    validate_secrets(request.secrets)
 
     logger.debug("publish volume request validation finished.")
 
@@ -404,7 +404,7 @@ def validate_unpublish_volume_request(request):
     if len(request.volume_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)) != 2:
         raise ValidationException(messages.volume_id_wrong_format_message)
 
-    validate_secret(request.secrets)
+    validate_secrets(request.secrets)
 
     logger.debug("unpublish volume request validation finished.")
 
