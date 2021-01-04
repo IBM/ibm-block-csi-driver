@@ -433,6 +433,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.ValidateVolumeCapabilitiesResponse(message=ex.message)
+        except Exception as ex:
+            logger.exception(ex)
+            context.set_details(ex)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            return csi_pb2.ValidateVolumeCapabilitiesResponse(message=ex)
 
     def ListVolumes(self, request, context):
         logger.info("ListVolumes")
