@@ -30,3 +30,4 @@ volume_context_not_match_volume_message = 'volume context: {0} does not match ex
 space_efficiency_not_match_volume_message = 'space efficiency: {0}' \
                                             ' does not match existing volume space efficiency: {1}'
 pool_not_match_volume_message = 'pool name: {0} does not match existing volume pool name: {1}'
+prefix_not_match_volume_message = 'prefix: {0} does not match existing volume name: {1}'

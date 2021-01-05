@@ -39,8 +39,7 @@ class BaseControllerSetUp(unittest.TestCase):
 
         self.request.parameters = {}
         self.request.volume_context = {}
-        volume_capability = utils.get_mock_volume_capability()
-        self.request.volume_capabilities = [volume_capability]
+        self.volume_capability = utils.get_mock_volume_capability()
         self.capacity_bytes = 10
         self.request.capacity_range = Mock()
         self.request.capacity_range.required_bytes = self.capacity_bytes
@@ -358,6 +357,8 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
         self.pool = 'pool1'
         self.request.parameters = {"pool": self.pool}
+
+        self.request.volume_capabilities = [self.volume_capability]
 
         self.request.name = volume_name
         self.request.volume_content_source = None
@@ -1264,6 +1265,7 @@ class TestExpandVolume(BaseControllerSetUp, CommonControllerTest):
                                                                            self.volume_id,
                                                                            "a9k")
         self.mediator.get_object_by_id.side_effect = [self.volume_before_expand, self.volume_after_expand]
+        self.request.volume_capability = self.volume_capability
 
     def _prepare_expand_volume_mocks(self, storage_agent):
         storage_agent.return_value = self.storage_agent
@@ -1460,6 +1462,7 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
 
         self.mediator.get_object_by_id = Mock()
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
+        self.request.volume_capabilities = [self.volume_capability]
 
     def _assertResponse(self, response, expected_status_code, expected_details_substring):
         self.assertEqual(self.context.code, expected_status_code)
@@ -1551,6 +1554,7 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
     def test_validation_with_space_efficiency_not_match(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         self.request.parameters.update({config.PARAMETERS_SPACE_EFFICIENCY: "not_none"})
+        self.mediator.validate_supported_space_efficiency = Mock()
 
         response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
@@ -1559,8 +1563,33 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validation_with_pool_not_match(self, storage_agent):
         storage_agent.return_value = self.storage_agent
-        self.request.parameters[config.PARAMETERS_POOL] = "other pool"
+        self.request.parameters.update({config.PARAMETERS_POOL: "other pool"})
 
         response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
         self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "pool")
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_validation_with_prefix_not_match(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+        self.request.parameters.update({config.PARAMETERS_VOLUME_NAME_PREFIX: "prefix"})
+
+        response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
+
+        self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "prefix")
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_validation_parameters_success(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+        self.request.parameters = {config.PARAMETERS_VOLUME_NAME_PREFIX: "prefix",
+                                   config.PARAMETERS_POOL: "pool2",
+                                   config.PARAMETERS_SPACE_EFFICIENCY: "not_none"}
+        volume_response = utils.get_mock_mediator_response_volume(10, "prefix_vol", "wwn2", "a9k",
+                                                                  space_efficiency="not_none")
+        volume_response.pool_name = "pool2"
+        self.mediator.get_object_by_id.return_value = volume_response
+        self.mediator.validate_supported_space_efficiency = Mock()
+
+        self.servicer.ValidateVolumeCapabilities(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)

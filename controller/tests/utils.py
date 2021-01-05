@@ -1,8 +1,6 @@
 import grpc
 from mock import Mock, MagicMock
 
-from controller.csi_general import csi_pb2
-
 
 class ProtoBufMock(MagicMock):
     def HasField(self, field):

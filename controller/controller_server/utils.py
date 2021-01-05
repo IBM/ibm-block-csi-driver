@@ -8,6 +8,7 @@ import controller.controller_server.messages as messages
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.errors import HostNotFoundError
 from controller.common.csi_logger import get_stdout_logger
+from controller.common.settings import NAME_PREFIX_SEPARATOR
 from controller.controller_server.errors import ValidationException, ObjectIdError
 from controller.csi_general import csi_pb2
 
@@ -205,6 +206,10 @@ def validate_expand_volume_request(request):
         raise ValidationException(messages.no_capacity_range_message)
 
     validate_secrets(request.secrets)
+
+    if request.volume_capability:
+        logger.debug("validating volume capabilities")
+        validate_csi_volume_capability(request.volume_capability)
 
     logger.debug("expand volume validation finished")
 
@@ -438,3 +443,11 @@ def validate_parameters_match_volume(parameters, volume):
         if pool != volume_pool:
             raise ValidationException(
                 messages.pool_not_match_volume_message.format(pool, volume_pool))
+
+    prefix = parameters.get(config.PARAMETERS_VOLUME_NAME_PREFIX)
+    volume_name = volume.name
+    if prefix:
+        full_prefix = prefix + NAME_PREFIX_SEPARATOR
+        if not volume_name.startswith(full_prefix):
+            raise ValidationException(
+                messages.prefix_not_match_volume_message.format(prefix, volume_name))
