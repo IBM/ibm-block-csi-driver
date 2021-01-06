@@ -508,7 +508,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                          err=array_errors.IllegalObjectName("vol"))
 
-    def test_create_volume_with_volume_exsits_exception(self):
+    def test_create_volume_with_volume_exists_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.ALREADY_EXISTS,
                                          err=array_errors.VolumeAlreadyExists("vol", "endpoint"))
 
@@ -516,7 +516,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                          err=array_errors.PoolDoesNotExist("pool1", "endpoint"))
 
-    def test_create_volume_with_pool_does_not_match_capabilities_exception(self):
+    def test_create_volume_with_pool_does_not_match_space_efficiency_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                          err=array_errors.PoolDoesNotMatchSpaceEfficiency("pool1", "", "endpoint"))
 
@@ -1542,7 +1542,7 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
         self._assertResponse(response, grpc.StatusCode.NOT_FOUND, "wwn")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_validation_with_vol_context_not_match(self, storage_agent):
+    def test_validate_volume_cap_with_vol_context_not_match(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         self.request.volume_context = {config.VOLUME_CONTEXT_VOLUME_NAME: "fake"}
 
@@ -1551,7 +1551,7 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
         self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "volume context")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_validation_with_space_efficiency_not_match(self, storage_agent):
+    def test_validate_volume_cap_with_space_efficiency_not_match(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         self.request.parameters.update({config.PARAMETERS_SPACE_EFFICIENCY: "not_none"})
         self.mediator.validate_supported_space_efficiency = Mock()
@@ -1561,7 +1561,7 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
         self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "space efficiency")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_validation_with_pool_not_match(self, storage_agent):
+    def test_validate_volume_cap_with_pool_not_match(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         self.request.parameters.update({config.PARAMETERS_POOL: "other pool"})
 
@@ -1570,7 +1570,7 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
         self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "pool")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_validation_with_prefix_not_match(self, storage_agent):
+    def test_validate_volume_cap_with_prefix_not_match(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         self.request.parameters.update({config.PARAMETERS_VOLUME_NAME_PREFIX: "prefix"})
 
@@ -1579,7 +1579,7 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
         self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "prefix")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_validation_parameters_success(self, storage_agent):
+    def test_validate_volume_cap_parameters_success(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         self.request.parameters = {config.PARAMETERS_VOLUME_NAME_PREFIX: "prefix",
                                    config.PARAMETERS_POOL: "pool2",

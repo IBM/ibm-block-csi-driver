@@ -168,29 +168,29 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         ]
         pool_id = self.volume_response.pool
         volume = self.array.create_volume(
-            self.volume_response.name, "1", {}, pool_id,
+            self.volume_response.name, "1", 'thin', pool_id,
         )
         self.assertEqual(volume.name, self.volume_response.name)
 
     def test_create_volume_fail_with_ClientException(self):
         self.client_mock.create_volume.side_effect = ClientException("500")
         with self.assertRaises(array_errors.VolumeCreationError):
-            self.array.create_volume("fake_name", 1, {}, "fake_pool")
+            self.array.create_volume("fake_name", 1, 'thin', "fake_pool")
 
     def test_create_volume_fail_with_pool_not_found(self):
         self.client_mock.create_volume.side_effect = NotFound("404", message="BE7A0001")
         with self.assertRaises(array_errors.PoolDoesNotExist):
-            self.array.create_volume("fake_name", 1, {}, "fake_pool")
+            self.array.create_volume("fake_name", 1, 'thin', "fake_pool")
 
     def test_create_volume_fail_with_incorrect_id(self):
         self.client_mock.get_volumes_by_pool.side_effect = NotFound("500", message="BE7A0005")
         with self.assertRaises(array_errors.PoolDoesNotExist):
-            self.array.create_volume("fake_name", 1, {}, "fake_pool")
+            self.array.create_volume("fake_name", 1, 'thin', "fake_pool")
 
     def test_create_volume_fail_with_no_space_in_pool(self):
         self.client_mock.get_volumes_by_pool.side_effect = ClientException("500", message="BE534459")
         with self.assertRaises(array_errors.NotEnoughSpaceInPool):
-            self.array.create_volume("fake_name", 1, {}, "fake_pool")
+            self.array.create_volume("fake_name", 1, 'thin', "fake_pool")
 
     def test_delete_volume(self):
         scsi_id = "6005076306FFD3010000000000000001"

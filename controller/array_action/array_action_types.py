@@ -1,10 +1,10 @@
-class TypeRepresent:
+class MembersPrintable:
     def __str__(self):
         return "<{}: {}>".format(self.__class__.__name__,
                                  " ".join("{}={!r}".format(k, v) for k, v in self.__dict__.items()), )
 
 
-class Volume(TypeRepresent):
+class Volume(MembersPrintable):
     def __init__(self, vol_size_bytes, vol_id, vol_name, array_address, pool_name, copy_source_id, array_type,
                  space_efficiency):
         self.capacity_bytes = vol_size_bytes
@@ -17,7 +17,7 @@ class Volume(TypeRepresent):
         self.space_efficiency = space_efficiency
 
 
-class Snapshot(TypeRepresent):
+class Snapshot(MembersPrintable):
     def __init__(self, capacity_bytes, snapshot_id, snapshot_name, array_address, volume_name, is_ready, array_type):
         self.capacity_bytes = capacity_bytes
         self.id = snapshot_id
