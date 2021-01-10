@@ -96,6 +96,15 @@ def get_array_space_efficiency(space_efficiency):
     return "none"
 
 
+def _get_parameter_space_efficiency(array_space_efficiency):
+    if array_space_efficiency == "ese":
+        return config.SPACE_EFFICIENCY_THIN
+    if array_space_efficiency == "none":
+        return config.SPACE_EFFICIENCY_NONE
+    else:
+        raise array_errors.SpaceEfficiencyNotSupported(array_space_efficiency)
+
+
 class DS8KArrayMediator(ArrayMediatorAbstract):
     SUPPORTED_FROM_VERSION = '7.5.1'
 
@@ -215,7 +224,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return copy_source_id
 
     def _generate_volume_response(self, api_volume):
-
+        space_efficiency = _get_parameter_space_efficiency(api_volume.tp)
         return Volume(
             vol_size_bytes=int(api_volume.cap),
             vol_id=self._generate_volume_scsi_identifier(volume_id=api_volume.id),
@@ -224,7 +233,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             copy_source_id=self._get_copy_source_id(api_volume=api_volume),
             pool_name=api_volume.pool,
             array_type=self.array_type,
-            space_efficiency=api_volume.tp
+            space_efficiency=space_efficiency
         )
 
     def _create_api_volume(self, name, size_in_bytes, space_efficiency, pool_id):

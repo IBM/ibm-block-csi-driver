@@ -124,7 +124,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.create_volume("vol", 10, "thin", "pool")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
-    def test_create_volume_return_pool_not_match_capabilities_error(
+    def test_create_volume_return_pool_not_match_space_efficiency_error(
             self, mock_warning):
         mock_warning.return_value = False
         self.svc.client.svctask.mkvolume.side_effect = [

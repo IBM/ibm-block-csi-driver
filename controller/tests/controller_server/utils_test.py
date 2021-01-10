@@ -3,13 +3,15 @@ import unittest
 from mock import patch, Mock
 
 import controller.controller_server.utils as utils
+from controller.array_action import config as array_config
 from controller.array_action.errors import HostNotFoundError
+from controller.controller_server import config as controller_config
 from controller.controller_server.csi_controller_server import ControllerServicer
 from controller.controller_server.errors import ObjectIdError
 from controller.controller_server.errors import ValidationException
 from controller.csi_general import csi_pb2
-from controller.tests.controller_server.csi_controller_server_test import ProtoBufMock
 from controller.tests import utils as test_utils
+from controller.tests.controller_server.csi_controller_server_test import ProtoBufMock
 
 
 class TestUtils(unittest.TestCase):
@@ -331,3 +333,58 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(res.publish_context["lun"], '1')
         self.assertEqual(res.publish_context["connectivity_type"], "fc")
         self.assertEqual(res.publish_context["fc_wwns"], "wwn1,wwn2")
+
+    def _test_validate_parameters_match_volume(self, volume_field, volume_value, parameter_field, parameter_value):
+        volume = test_utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
+        setattr(volume, volume_field, volume_value)
+        if parameter_field:
+            parameters = {parameter_field: parameter_value}
+        else:
+            parameters = {}
+
+        utils.validate_parameters_match_volume(parameters, volume)
+
+    def test_validate_parameters_match_volume_se_fail(self):
+        with self.assertRaises(ValidationException):
+            self._test_validate_parameters_match_volume(volume_field="space_efficiency",
+                                                        volume_value=array_config.SPACE_EFFICIENCY_NONE,
+                                                        parameter_field=controller_config.PARAMETERS_SPACE_EFFICIENCY,
+                                                        parameter_value="thin")
+
+    def test_validate_parameters_match_volume_thin_se_success(self):
+        self._test_validate_parameters_match_volume(volume_field="space_efficiency",
+                                                    volume_value=array_config.SPACE_EFFICIENCY_THIN,
+                                                    parameter_field=controller_config.PARAMETERS_SPACE_EFFICIENCY,
+                                                    parameter_value="thin")
+
+    def test_validate_parameters_match_volume_default_se_success(self):
+        self._test_validate_parameters_match_volume(volume_field="space_efficiency",
+                                                    volume_value=array_config.SPACE_EFFICIENCY_NONE,
+                                                    parameter_field=None,
+                                                    parameter_value=None)
+
+    def test_validate_parameters_match_volume_pool_fail(self):
+        with self.assertRaises(ValidationException):
+            self._test_validate_parameters_match_volume(volume_field="pool_name",
+                                                        volume_value="test_pool",
+                                                        parameter_field=controller_config.PARAMETERS_POOL,
+                                                        parameter_value="fake_pool")
+
+    def test_validate_parameters_match_volume_pool_success(self):
+        self._test_validate_parameters_match_volume(volume_field="pool_name",
+                                                    volume_value="test_pool",
+                                                    parameter_field=controller_config.PARAMETERS_POOL,
+                                                    parameter_value="test_pool")
+
+    def test_validate_parameters_match_volume_prefix_fail(self):
+        with self.assertRaises(ValidationException):
+            self._test_validate_parameters_match_volume(volume_field="name",
+                                                        volume_value="vol-with-no-prefix",
+                                                        parameter_field=controller_config.PARAMETERS_VOLUME_NAME_PREFIX,
+                                                        parameter_value="prefix")
+
+    def test_validate_parameters_match_volume_prefix_success(self):
+        self._test_validate_parameters_match_volume(volume_field="name",
+                                                    volume_value="prefix_vol",
+                                                    parameter_field=controller_config.PARAMETERS_VOLUME_NAME_PREFIX,
+                                                    parameter_value="prefix")
