@@ -19,7 +19,6 @@ def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_source_i
     vol.copy_source_id = copy_source_id
     vol.space_efficiency = space_efficiency
     vol.default_space_efficiency = default_space_efficiency
-
     return vol
 
 
