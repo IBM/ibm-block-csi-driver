@@ -506,9 +506,9 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                          err=array_errors.PoolDoesNotMatchSpaceEfficiency("pool1", "", "endpoint"))
 
-    def test_create_volume_with_capability_not_supported_exception(self):
+    def test_create_volume_with_space_efficiency_not_supported_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
-                                         err=array_errors.SpaceEfficiencyNotSupported(["cap"]))
+                                         err=array_errors.SpaceEfficiencyNotSupported(["fake"]))
 
     def test_create_volume_with_other_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INTERNAL,
