@@ -1,4 +1,5 @@
 from hashlib import sha256
+from operator import eq
 
 import base58
 from google.protobuf.timestamp_pb2 import Timestamp
@@ -424,30 +425,27 @@ def hash_string(string):
     return base58.b58encode(sha256(string.encode()).digest()).decode()
 
 
+def _validate_parameter_match_volume(parameter_value, value_from_volume, error_message_format, cmp=eq):
+    if parameter_value:
+        if not cmp(parameter_value, value_from_volume):
+            raise ValidationException(error_message_format.format(parameter_value, value_from_volume))
+
+
 def validate_parameters_match_volume(parameters, volume):
+    logger.debug("validating space efficiency parameter matches volume's")
     space_efficiency = parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
-    volume_space_efficiency = volume.space_efficiency
     if space_efficiency:
         space_efficiency = space_efficiency.lower()
-        if space_efficiency != volume_space_efficiency:
-            raise ValidationException(
-                messages.space_efficiency_not_match_volume_message.format(space_efficiency, volume_space_efficiency))
     else:
-        if volume_space_efficiency != volume.default_space_efficiency:
-            raise ValidationException(
-                messages.space_efficiency_not_match_volume_message.format(space_efficiency, volume_space_efficiency))
+        space_efficiency = volume.default_space_efficiency
+    _validate_parameter_match_volume(space_efficiency, volume.space_efficiency,
+                                     messages.space_efficiency_not_match_volume_message)
 
+    logger.debug("validating pool parameter matches volume's")
     pool = parameters.get(config.PARAMETERS_POOL)
-    volume_pool = volume.pool_name
-    if pool:
-        if pool != volume_pool:
-            raise ValidationException(
-                messages.pool_not_match_volume_message.format(pool, volume_pool))
+    _validate_parameter_match_volume(pool, volume.pool_name, messages.pool_not_match_volume_message)
 
+    logger.debug("validating prefix parameter matches volume's")
     prefix = parameters.get(config.PARAMETERS_VOLUME_NAME_PREFIX)
-    volume_name = volume.name
-    if prefix:
-        full_prefix = prefix + NAME_PREFIX_SEPARATOR
-        if not volume_name.startswith(full_prefix):
-            raise ValidationException(
-                messages.prefix_not_match_volume_message.format(prefix, volume_name))
+    _validate_parameter_match_volume(prefix, volume.name, messages.prefix_not_match_volume_message,
+                                     lambda pref, name: name.startswith(pref + NAME_PREFIX_SEPARATOR))
