@@ -286,7 +286,13 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.mediator.create_snapshot.assert_called_once_with("prefix_some_name", "snapshot_vol", None)
 
 
-class TestDeleteSnapshot(BaseControllerSetUp):
+class TestDeleteSnapshot(BaseControllerSetUp, CommonControllerTest):
+    def get_tested_method(self):
+        return self.servicer.DeleteSnapshot
+
+    def get_tested_method_response_class(self):
+        return csi_pb2.DeleteSnapshotResponse
+
     def setUp(self):
         super().setUp()
         self.mediator.get_snapshot = Mock()
@@ -305,31 +311,11 @@ class TestDeleteSnapshot(BaseControllerSetUp):
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_delete_snapshot_with_wrong_secrets(self, storage_agent):
-        storage_agent.return_value = self.storage_agent
-
-        self.request.secrets = {"password": "pass", "management_address": "mg"}
-        self.servicer.DeleteSnapshot(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
-        self.assertTrue("secret" in self.context.details)
-
-        self.request.secrets = {"username": "user", "management_address": "mg"}
-        self.servicer.DeleteSnapshot(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
-        self.assertTrue("secret" in self.context.details)
-
-        self.request.secrets = {"username": "user", "password": "pass"}
-        self.servicer.DeleteSnapshot(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
-        self.assertTrue("secret" in self.context.details)
+        self._test_request_with_wrong_secrets(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_delete_snapshot_with_array_connection_exception(self, storage_agent):
-        storage_agent.side_effect = [Exception("a_enter error")]
-
-        self.servicer.DeleteSnapshot(self.request, self.context)
-
-        self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
-        self.assertTrue("a_enter error" in self.context.details)
+        self._test_request_with_array_connection_exception(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_delete_snapshot_invalid_snapshot_id(self, storage_agent):
@@ -772,7 +758,13 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         return source
 
 
-class TestDeleteVolume(BaseControllerSetUp):
+class TestDeleteVolume(BaseControllerSetUp, CommonControllerTest):
+
+    def get_tested_method(self):
+        return self.servicer.DeleteVolume
+
+    def get_tested_method_response_class(self):
+        return csi_pb2.DeleteVolumeResponse
 
     def setUp(self):
         super().setUp()
@@ -786,22 +778,7 @@ class TestDeleteVolume(BaseControllerSetUp):
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_delete_volume_with_wrong_secrets(self, storage_agent):
-        storage_agent.return_value = self.storage_agent
-
-        self.request.secrets = {"password": "pass", "management_address": "mg"}
-        self.servicer.DeleteVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
-        self.assertTrue("secret" in self.context.details)
-
-        self.request.secrets = {"username": "user", "management_address": "mg"}
-        self.servicer.DeleteVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
-        self.assertTrue("secret" in self.context.details)
-
-        self.request.secrets = {"username": "user", "password": "pass"}
-        self.servicer.DeleteVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
-        self.assertTrue("secret" in self.context.details)
+        self._test_request_with_wrong_secrets(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_delete_volume_invalid_volume_id(self, storage_agent):

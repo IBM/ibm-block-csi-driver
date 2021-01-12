@@ -414,6 +414,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             if not volume:
                 raise controller_errors.ObjectNotFoundError(volume_id)
 
+            logger.debug("volume found : {}".format(volume))
+
             if request.volume_context:
                 utils.validate_volume_context_match_volume(request.volume_context, volume)
 

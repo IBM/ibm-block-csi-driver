@@ -81,6 +81,18 @@ def build_kwargs_from_parameters(space_efficiency, pool_name, volume_name,
     return cli_kwargs
 
 
+def _get_cli_volume_space_efficiency(cli_volume):
+    space_efficiency = config.SPACE_EFFICIENCY_THICK
+    if cli_volume.se_copy == YES:
+        space_efficiency = config.SPACE_EFFICIENCY_THIN
+    if cli_volume.compressed_copy == YES:
+        space_efficiency = config.SPACE_EFFICIENCY_COMPRESSED
+    if hasattr(cli_volume, "deduplicated_copy"):
+        if cli_volume.deduplicated_copy == YES:
+            space_efficiency = config.SPACE_EFFICIENCY_DEDUPLICATED
+    return space_efficiency
+
+
 class SVCArrayMediator(ArrayMediatorAbstract):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
@@ -181,19 +193,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             pool_name=cli_volume.mdisk_grp_name,
             copy_source_id=source_volume_wwn,
             array_type=self.array_type,
-            space_efficiency=space_efficiency
+            space_efficiency=space_efficiency,
+            default_space_efficiency=config.SPACE_EFFICIENCY_THICK
         )
-
-    def _get_cli_volume_space_efficiency(self, cli_volume):
-        space_efficiency = config.SPACE_EFFICIENCY_THICK
-        if cli_volume.se_copy == YES:
-            space_efficiency = config.SPACE_EFFICIENCY_THIN
-        if cli_volume.compressed_copy == YES:
-            space_efficiency = config.SPACE_EFFICIENCY_COMPRESSED
-        if hasattr(cli_volume, "deduplicated_copy"):
-            if cli_volume.deduplicated_copy == YES:
-                space_efficiency = config.SPACE_EFFICIENCY_DEDUPLICATED
-        return space_efficiency
 
     def _generate_snapshot_response(self, cli_snapshot, source_volume_name):
         return Snapshot(int(cli_snapshot.capacity),

@@ -433,7 +433,7 @@ def validate_parameters_match_volume(parameters, volume):
             raise ValidationException(
                 messages.space_efficiency_not_match_volume_message.format(space_efficiency, volume_space_efficiency))
     else:
-        if volume_space_efficiency not in [None, 'none', 'thick']:
+        if volume_space_efficiency != volume.default_space_efficiency:
             raise ValidationException(
                 messages.space_efficiency_not_match_volume_message.format(space_efficiency, volume_space_efficiency))
 

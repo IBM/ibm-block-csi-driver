@@ -334,9 +334,11 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(res.publish_context["connectivity_type"], "fc")
         self.assertEqual(res.publish_context["fc_wwns"], "wwn1,wwn2")
 
-    def _test_validate_parameters_match_volume(self, volume_field, volume_value, parameter_field, parameter_value):
+    def _test_validate_parameters_match_volume(self, volume_field, volume_value, parameter_field, parameter_value,
+                                               default_space_efficiency=None):
         volume = test_utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
         setattr(volume, volume_field, volume_value)
+        volume.default_space_efficiency = default_space_efficiency
         if parameter_field:
             parameters = {parameter_field: parameter_value}
         else:
@@ -361,7 +363,8 @@ class TestUtils(unittest.TestCase):
         self._test_validate_parameters_match_volume(volume_field="space_efficiency",
                                                     volume_value=array_config.SPACE_EFFICIENCY_NONE,
                                                     parameter_field=None,
-                                                    parameter_value=None)
+                                                    parameter_value=None,
+                                                    default_space_efficiency='none')
 
     def test_validate_parameters_match_volume_pool_fail(self):
         with self.assertRaises(ValidationException):
