@@ -18,4 +18,4 @@ TESTS="volume lifecycle|Node Service"
 --csi.secrets ${SECRET_FILE} \
 --csi.testvolumeparameters ${PARAM_FILE} \
 --csi.junitfile ${JUNIT_OUTPUT} \
---ginkgo.focus ${TESTS}
+--ginkgo.focus `cat ${TESTS_TO_RUN_FILE}| sed -Ez '$ s/\n+$//' | tr '\n' "|"`
