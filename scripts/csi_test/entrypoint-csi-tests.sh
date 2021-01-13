@@ -18,4 +18,4 @@ TESTS="volume lifecycle|Node Service"
 --csi.secrets ${SECRET_FILE} \
 --csi.testvolumeparameters ${PARAM_FILE} \
 --csi.junitfile ${JUNIT_OUTPUT} \
---ginkgo.focus "volume lifecycle|Node Service"
+--ginkgo.focus "${TESTS}"
