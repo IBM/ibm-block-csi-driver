@@ -1,7 +1,9 @@
 #!/bin/bash -xe
 
 # assume that all the environment storage was setup in advance.
+echo 'lihitest0'
 ./scripts/ci/run_controller_server_for_csi_test.sh csi-controller > "csi_controller_deploy.log" 2>&1
+echo 'lihitest5'
 ./scripts/ci/run_node_server_for_csi_test.sh csi-node > "csi_node_deploy.log" 2>&1
 echo `pwd`
 sleep 2
