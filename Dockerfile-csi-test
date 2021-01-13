@@ -15,7 +15,7 @@
 FROM golang:1.11
 
 RUN git clone https://github.com/kubernetes-csi/csi-test /usr/local/go/src/github.com/kubernetes-csi/csi-test
-RUN cd csi-test && git checkout release-3.1 && cd ..
+RUN cd /usr/local/go/src/github.com/kubernetes-csi/csi-test && git checkout release-3.1 && cd _
 RUN make -C /usr/local/go/src/github.com/kubernetes-csi/csi-test
 
 COPY ./scripts/csi_test /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver
