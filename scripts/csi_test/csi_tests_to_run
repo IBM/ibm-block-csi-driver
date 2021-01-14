@@ -15,5 +15,5 @@ GetPluginInfo
 Probe
 ControllerPublishVolume
 ControllerUnpublishVolume
-volume lifecycle
 Node Service
+volume lifecycle
