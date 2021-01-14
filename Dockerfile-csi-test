@@ -18,7 +18,7 @@ RUN git clone https://github.com/kubernetes-csi/csi-test /usr/local/go/src/githu
 RUN cd /usr/local/go/src/github.com/kubernetes-csi/csi-test && \
     git fetch --all --tags && \
     tag=$(git describe --tags `git rev-list --tags --max-count=1`) && \
-    git checkout release-3.1 && \
+    git checkout $tag -b latest && \
     cd -
 RUN make -C /usr/local/go/src/github.com/kubernetes-csi/csi-test
 
