@@ -1,2 +1,19 @@
+ControllerGetCapabilities
+CreateVolume
+DeleteVolume
+ExpandVolume
+NodeGetCapabilities
+NodeGetInfo
+CreateSnapshot
+DeleteSnapshot
+NodePublishVolume
+NodeUnpublishVolume
+NodeStageVolume
+NodeUnstageVolume
+GetPluginCapabilities
+GetPluginInfo
+Probe
+ControllerPublishVolume
+ControllerUnpublishVolume
 volume lifecycle
 Node Service
