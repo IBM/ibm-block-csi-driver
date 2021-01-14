@@ -18,5 +18,7 @@ TESTS="volume lifecycle"
 --csi.secrets ${SECRET_FILE} \
 --csi.testvolumeparameters ${PARAM_FILE} \
 --csi.junitfile ${JUNIT_OUTPUT} \
---ginkgo.focus "${TESTS}" \
---ginkgo.debug
+--ginkgo.v \
+--ginkgo.debug \
+--ginkgo.focus "${TESTS}"
+
