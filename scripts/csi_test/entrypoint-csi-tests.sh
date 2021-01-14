@@ -10,7 +10,7 @@ sed -i -e "s/POOL_NAME/${POOL_NAME}/g" ${PARAM_FILE}
 
 # get tests to run
 #TESTS=`cat ${TESTS_TO_RUN_FILE}| sed -Ez '$ s/\n+$//' | tr '\n' "|"`
-TESTS="volume lifecycle|Node Service"
+TESTS="volume lifecycle"
 
 /usr/local/go/src/github.com/kubernetes-csi/csi-test/cmd/csi-sanity/csi-sanity \
 --csi.endpoint ${ENDPOINT} \
