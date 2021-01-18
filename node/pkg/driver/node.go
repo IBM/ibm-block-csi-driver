@@ -27,9 +27,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/utils/mount"
-	"os"
 	"path"
-	"path/filepath"
 	"strings"
 )
 
@@ -122,7 +120,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	volId := req.VolumeId
 	err = d.VolumeIdLocksMap.AddVolumeLock(volId, "NodeStageVolume")
 	if err != nil {
-		logger.Errorf("Another operation is being perfomed on volume : {%s}.", volId)
+		logger.Errorf("Another operation is being performed on volume : {%s}.", volId)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
 
@@ -133,8 +131,6 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	arrayInitiators := d.NodeUtils.GetArrayInitiators(ipsByArrayInitiator)
-
-	stagingPath := req.GetStagingTargetPath() // e.g in k8s /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-21967c74-b456-11e9-b93e-005056a45d5f/globalmount
 
 	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
 	if !ok {
@@ -148,55 +144,52 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	device, err := osDeviceConnectivity.GetMpathDevice(volId)
-	logger.Debugf("Discovered device : {%v}", device)
+	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(volId)
+	logger.Debugf("Discovered device : {%v}", mpathDevice)
 	if err != nil {
-		logger.Errorf("Error while discovring the device : {%v}", err.Error())
+		logger.Errorf("Error while discovering the device : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	// TODO move stageInfo into the node_until API
-	// Generate the stageInfo detail
-	stageInfoPath := path.Join(stagingPath, StageInfoFilename)
-	stageInfo := make(map[string]string)
-	baseDevice := path.Base(device)
-	stageInfo["mpathDevice"] = baseDevice //this should return the mathhh for example
-	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+	volumeCap := req.GetVolumeCapability()
+	switch volumeCap.GetAccessType().(type) {
+	case *csi.VolumeCapability_Block:
+		logger.Debugf("NodeStageVolume Finished: multipath device [%s] is ready to be mounted by NodePublishVolume API.", mpathDevice)
+		return &csi.NodeStageVolumeResponse{}, nil
+	}
+
+	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
 	if err != nil {
-		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	stageInfo["sysDevices"] = sysDevices // like sda,sdb,...
-	stageInfo["connectivity"] = connectivityType
-
-	// checking idempotent case if the stageInfoPath file is already exist
-	if d.NodeUtils.StageInfoFileIsExist(stageInfoPath) {
-		// means the file already exist
-		logger.Warningf("Idempotent case: stage info file exist - indicates that node stage was already done on this path. Verify its content...")
-		// lets read the file and comprae the stageInfo
-		existingStageInfo, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
-		if err != nil {
-			logger.Warningf("Could not read and compare the info inside the staging info file. error : {%v}", err)
-		} else {
-			logger.Warningf("Idempotent case: check if stage info file is as expected. stage info is {%v} vs expected {%v}", existingStageInfo, stageInfo)
-
-			if (stageInfo["mpathDevice"] != existingStageInfo["mpathDevice"]) ||
-				(stageInfo["sysDevices"] != existingStageInfo["sysDevices"]) ||
-				(stageInfo["connectivity"] != existingStageInfo["connectivity"]) {
-				logger.Errorf("Stage info is not as expected. expected:  {%v}. got : {%v}", stageInfo, existingStageInfo)
-				return nil, status.Error(codes.AlreadyExists, "Stage info file is not as expected")
-			}
-			logger.Warningf("Idempotent case: stage info file is the same as expected. NodeStageVolume Finished: multipath device is ready [%s] to be mounted by NodePublishVolume API.", baseDevice)
-			return &csi.NodeStageVolumeResponse{}, nil
-		}
-	}
-
-	if err := d.NodeUtils.WriteStageInfoToFile(stageInfoPath, stageInfo); err != nil {
-		logger.Errorf("Error while trying to save the stage metadata file: {%v}", err.Error())
+		logger.Errorf("Could not determine if disk {%v} is formatted, error: %v", mpathDevice, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	logger.Debugf("NodeStageVolume Finished: multipath device is ready [%s] to be mounted by NodePublishVolume API.", baseDevice)
+	requestedFsType := volumeCap.GetMount().FsType
+	fsTypeForMount, err := d.resolveFsTypeForMount(requestedFsType, existingFormat)
+	if err != nil {
+		logger.Errorf("Error while resolving type of filesystem to mount : {%v}", err.Error())
+		return nil, err
+	}
+
+	stagingPath := req.GetStagingTargetPath() // e.g in k8s /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-21967c74-b456-11e9-b93e-005056a45d5f/globalmount
+	stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingPath)
+
+	// check if already mounted
+	isMounted, err := d.isTargetMounted(stagingPathWithHostPrefix, true)
+	if err != nil {
+		logger.Debugf("Existing mount check failed {%v}", err.Error())
+		return nil, err
+	}
+	if isMounted { // idempotent case
+		return &csi.NodeStageVolumeResponse{}, nil
+	}
+
+	err = d.formatAndMount(mpathDevice, stagingPath, fsTypeForMount, existingFormat)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	logger.Debugf("NodeStageVolume Finished: staging path [%s] is ready to be mounted by NodePublishVolume API.", stagingPath)
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
@@ -207,9 +200,15 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{"Volume ID not provided"}
 	}
 
-	target := req.GetStagingTargetPath()
-	if len(target) == 0 {
-		return &RequestValidationError{"Staging target not provided"}
+	stagingPath := req.GetStagingTargetPath()
+	if len(stagingPath) == 0 {
+		return &RequestValidationError{"Staging path not provided"}
+	}
+
+	stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingPath)
+	isStagingPathExists := d.NodeUtils.IsPathExists(stagingPathWithHostPrefix)
+	if !isStagingPathExists {
+		return &RequestValidationError{fmt.Sprintf("Staging path #{stagingPathWithHostPrefix} does not exist")}
 	}
 
 	volCap := req.GetVolumeCapability()
@@ -264,6 +263,36 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 	return nil
 }
 
+func (d *NodeService) resolveFsTypeForMount(requestedFsType string, existingFormat string) (string, error) {
+	fsTypeForMount := requestedFsType
+	if requestedFsType == "" {
+		if existingFormat == "" {
+			fsTypeForMount = defaultFSType
+		} else {
+			fsTypeForMount = existingFormat
+		}
+	} else if existingFormat != "" {
+		if requestedFsType != existingFormat {
+			return "", status.Errorf(codes.AlreadyExists, "Requested fs_type {%v} but found {%v}", requestedFsType, existingFormat)
+		}
+	}
+	return fsTypeForMount, nil
+}
+
+func (d *NodeService) formatAndMount(mpathDevice string, stagingPath string, fsTypeForMount string, existingFormat string) error {
+	if existingFormat == "" {
+		d.NodeUtils.FormatDevice(mpathDevice, fsTypeForMount)
+	}
+
+	var mountOptions []string
+	if fsTypeForMount == "xfs" {
+		mountOptions = append(mountOptions, "nouuid")
+	}
+
+	logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsTypeForMount)
+	return d.Mounter.FormatAndMount(mpathDevice, stagingPath, fsTypeForMount, mountOptions) // Passing without /host because k8s mounter uses mount\mkfs\fsck
+}
+
 func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
 	volumeID := req.GetVolumeId()
 	goid_info.SetAdditionalIDInfo(volumeID)
@@ -278,7 +307,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 	err := d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeUnstageVolume")
 	if err != nil {
-		logger.Errorf("Another operation is being perfomed on volume : {%s}", volumeID)
+		logger.Errorf("Another operation is being performed on volume : {%s}", volumeID)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeUnstageVolume")
@@ -289,42 +318,57 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return nil, status.Error(codes.InvalidArgument, "Staging target not provided")
 	}
 
-	logger.Debugf("Reading stage info file")
-	stageInfoPath := path.Join(stagingTargetPath, StageInfoFilename)
-	infoMap, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
+	stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingTargetPath)
+	logger.Debugf("Check if staging path {%s} is mounted", stagingPathWithHostPrefix)
+	isNotMounted, err := d.NodeUtils.IsNotMountPoint(stagingPathWithHostPrefix)
 	if err != nil {
-		if os.IsNotExist(err) {
-			logger.Warningf("Idempotent case : stage info file does not exist. Finish NodeUnstageVolume OK.")
-			return &csi.NodeUnstageVolumeResponse{}, nil
-		} else {
-			logger.Errorf("Error while trying to read from the staging info file : {%v}", err.Error())
+		logger.Warningf("Failed to check if (%s), is mounted.", stagingPathWithHostPrefix)
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	if !isNotMounted {
+		err = d.Mounter.Unmount(stagingTargetPath)
+		if err != nil {
+			logger.Errorf("Unmount failed. Target : %q, err : %v", stagingTargetPath, err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
-	logger.Debugf("Reading stage info file detail : {%v}", infoMap)
 
-	connectivityType := infoMap["connectivity"]
-	mpathDevice := infoMap["mpathDevice"]
-	sysDevices := strings.Split(infoMap["sysDevices"], ",")
+	mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeID)
+	if err != nil {
+		switch err.(type) {
+		case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
+			return &csi.NodeUnstageVolumeResponse{}, nil
+		default:
+			logger.Errorf("Error while discovering the device : {%v}", err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
+	logger.Debugf("Discovered device : {%v}", mpathDevice)
 
-	logger.Debugf("Got info from stageInfo file. connectivity : {%v}. device : {%v}, sysDevices : {%v}", connectivityType, mpathDevice, sysDevices)
+	baseDevice := path.Base(mpathDevice)
 
-	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
-	if !ok {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
+	rawSysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+	if err != nil {
+		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	err = osDeviceConnectivity.FlushMultipathDevice(mpathDevice)
+	sysDevices := strings.Split(rawSysDevices, ",")
+
+	err = d.OsDeviceConnectivityHelper.FlushMultipathDevice(baseDevice)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Multipath -f command failed with error: %v", err)
 	}
-	err = osDeviceConnectivity.RemovePhysicalDevice(sysDevices)
+	err = d.OsDeviceConnectivityHelper.RemovePhysicalDevice(sysDevices)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Remove iscsi device failed with error: %v", err)
+		return nil, status.Errorf(codes.Internal, "Remove scsi device failed with error: %v", err)
 	}
 
-	if err := d.NodeUtils.ClearStageInfoFile(stageInfoPath); err != nil {
-		return nil, status.Errorf(codes.Internal, "Fail to clear the stage info file: error %v", err)
+	stageInfoPath := path.Join(stagingTargetPath, StageInfoFilename)
+	if d.NodeUtils.StageInfoFileIsExist(stageInfoPath) {
+		if err := d.NodeUtils.ClearStageInfoFile(stageInfoPath); err != nil {
+			return nil, status.Errorf(codes.Internal, "Fail to clear the stage info file: error %v", err)
+		}
 	}
 
 	logger.Debugf("NodeUnStageVolume Finished: multipath device removed from host")
@@ -347,7 +391,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
-	volumeID := req.VolumeId
+	volumeID := req.GetVolumeId()
 
 	err = d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodePublishVolume")
 	if err != nil {
@@ -356,24 +400,12 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodePublishVolume")
 
-	// checking if the node staging path was mpounted into
+	// checking if the node staging path was mounted into
 	stagingPath := req.GetStagingTargetPath()
 	targetPath := req.GetTargetPath()
 	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
 
 	logger.Debugf("stagingPath : {%v}, targetPath : {%v}", stagingPath, targetPath)
-
-	// Read staging info file in order to find the mpath device for mounting.
-	stageInfoPath := path.Join(stagingPath, StageInfoFilename)
-	infoMap, err := d.NodeUtils.ReadFromStagingInfoFile(stageInfoPath)
-	if err != nil {
-		// Note: after validation it looks like k8s create the directory in advance. So we don't try to remove it at the Unpublish
-		logger.Errorf("Error while trying to read from the staging info file : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	mpathDevice := filepath.Join(device_connectivity.DevPath, infoMap["mpathDevice"])
-	logger.Debugf("Got info from stageInfo file. device : {%v}", mpathDevice)
 
 	// if the device is not mounted then we are mounting it.
 	volumeCap := req.GetVolumeCapability()
@@ -393,76 +425,47 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		if isMounted { // idempotent case
 			return &csi.NodePublishVolumeResponse{}, nil
 		}
+	} else {
+		logger.Debugf("Target path does not exist. Creating : {%v}", targetPathWithHostPrefix)
+		if isFSVolume {
+			err = d.NodeUtils.MakeDir(targetPathWithHostPrefix)
+		} else {
+			err = d.NodeUtils.MakeFile(targetPathWithHostPrefix)
+		}
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Could not create %q: %v", targetPathWithHostPrefix, err.Error())
+		}
 	}
+
 	if isFSVolume {
 		fsType := volumeCap.GetMount().FsType
-		err = d.mountFileSystemVolume(mpathDevice, targetPath, fsType, isTargetPathExists)
+		err = d.publishFileSystemVolume(stagingPath, targetPath, fsType)
 	} else {
-		err = d.mountRawBlockVolume(mpathDevice, targetPath, isTargetPathExists)
+		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeID)
+		if err != nil {
+			logger.Errorf("Error while discovering the device : {%v}", err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		logger.Debugf("Discovered device : {%v}", mpathDevice)
+
+		err = d.publishRawBlockVolume(mpathDevice, targetPath)
 	}
 
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	logger.Debugf("NodePublishVolume Finished: multipath device is now mounted to targetPath.")
+	logger.Debugf("NodePublishVolume Finished: targetPath {%v} is now a mount point.", targetPath)
 
 	return &csi.NodePublishVolumeResponse{}, nil
 }
 
-func (d *NodeService) mountFileSystemVolume(mpathDevice string, targetPath string, fsType string, isTargetPathExists bool) error {
-	if fsType == "" {
-		fsType = defaultFSType
-	}
-	logger.Debugf("Volume will have FS type : {%v}", fsType)
-	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
-	if !isTargetPathExists {
-		logger.Debugf("Target path directory does not exist. Creating : {%v}", targetPathWithHostPrefix)
-		err := d.NodeUtils.MakeDir(targetPathWithHostPrefix)
-		if err != nil {
-			return status.Errorf(codes.Internal, "Could not create directory %q: %v", targetPathWithHostPrefix, err)
-		}
-	}
-
-	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
-	if err != nil {
-		logger.Errorf("Could not determine if disk {%v} is formatted, error: %v", mpathDevice, err)
-		return err
-	}
-	if existingFormat == "" {
-		d.NodeUtils.FormatDevice(mpathDevice, fsType)
-	}
-
-	var mountOptions []string
-
-	if fsType == "xfs" {
-		mountOptions = append(mountOptions, "nouuid")
-	}
-
-	logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsType)
-	return d.Mounter.FormatAndMount(mpathDevice, targetPath, fsType, mountOptions) // Passing without /host because k8s mounter uses mount\mkfs\fsck
+func (d *NodeService) publishFileSystemVolume(stagingPath string, targetPath string, fsType string) error {
+	mountOptions := []string{"bind"}
+	logger.Debugf("Bind mount staging: {%v} with target: {%v}, fs_type: {%v}", stagingPath, targetPath, fsType)
+	return d.Mounter.Mount(stagingPath, targetPath, fsType, mountOptions) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 }
 
-func (d *NodeService) mountRawBlockVolume(mpathDevice string, targetPath string, isTargetPathExists bool) error {
-	logger.Debugf("Raw block volume will be created")
-	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
-	// Create mount file and its parent directory if they don't exist
-	targetPathParentDirWithHostPrefix := filepath.Dir(targetPathWithHostPrefix)
-	if !d.NodeUtils.IsPathExists(targetPathParentDirWithHostPrefix) {
-		logger.Debugf("Target path parent directory does not exist. creating : {%v}", targetPathParentDirWithHostPrefix)
-		err := d.NodeUtils.MakeDir(targetPathParentDirWithHostPrefix)
-		if err != nil {
-			return status.Errorf(codes.Internal, "Could not create directory %q: %v", targetPathParentDirWithHostPrefix, err)
-		}
-	}
-	if !isTargetPathExists {
-		logger.Debugf("Target path file does not exist. creating : {%v}", targetPathWithHostPrefix)
-		err := d.NodeUtils.MakeFile(targetPathWithHostPrefix)
-		if err != nil {
-			return status.Errorf(codes.Internal, "Could not create file %q: %v", targetPathWithHostPrefix, err)
-		}
-	}
-
-	// Mount
+func (d *NodeService) publishRawBlockVolume(mpathDevice string, targetPath string) error {
 	options := []string{"bind"}
 	logger.Debugf("Mount the device to raw block volume. Target : {%s}, device : {%s}", targetPath, mpathDevice)
 	return d.Mounter.Mount(mpathDevice, targetPath, "", options)
@@ -566,7 +569,6 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if !isNotMounted {
-		logger.Debugf("Unmounting %s", target)
 		err = d.Mounter.Unmount(target)
 		if err != nil {
 			logger.Errorf("Unmount failed. Target : %q, err : %v", target, err.Error())
@@ -600,11 +602,6 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	}
 
 	volumeID := req.GetVolumeId()
-	mountPointParentDir := req.GetStagingTargetPath()
-	if mountPointParentDir == "" {
-		mountPointParentDir = req.GetVolumePath()
-	}
-	mountPoint := mountPointParentDir + "/" + volumeID
 
 	err = d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeExpandVolume")
 	if err != nil {
@@ -646,7 +643,9 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	err = d.NodeUtils.ExpandFilesystem(device, mountPoint, existingFormat)
+	stagingTargetPath := req.GetStagingTargetPath()
+
+	err = d.NodeUtils.ExpandFilesystem(device, stagingTargetPath, existingFormat)
 	if err != nil {
 		logger.Errorf("Could not resize {%v} file system of {%v} , error: %v", existingFormat, device, err)
 		return nil, status.Error(codes.Internal, err.Error())
@@ -673,6 +672,13 @@ func (d *NodeService) nodeExpandVolumeRequestValidation(req *csi.NodeExpandVolum
 		err := &RequestValidationError{"Volume path not provided"}
 		return status.Error(codes.InvalidArgument, err.Error())
 	}
+
+	stagingTargetPath := req.GetStagingTargetPath()
+	if stagingTargetPath == "" {
+		err := &RequestValidationError{"Staging target path not provided"}
+		return status.Error(codes.InvalidArgument, err.Error())
+	}
+
 	return nil
 }
 

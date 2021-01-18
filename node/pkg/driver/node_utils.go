@@ -17,14 +17,12 @@
 package driver
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"io/ioutil"
 	"k8s.io/apimachinery/pkg/util/errors"
 	"os"
 	"path"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -56,8 +54,6 @@ type NodeUtilsInterface interface {
 	GetSysDevicesFromMpath(baseDevice string) (string, error)
 
 	// TODO refactor and move all staging methods to dedicate interface.
-	WriteStageInfoToFile(path string, info map[string]string) error
-	ReadFromStagingInfoFile(filePath string) (map[string]string, error)
 	ClearStageInfoFile(filePath string) error
 	StageInfoFileIsExist(filePath string) bool
 	IsPathExists(filePath string) bool
@@ -148,56 +144,6 @@ func (n NodeUtils) GetArrayInitiators(ipsByArrayInitiator map[string][]string) [
 		arrayInitiators = append(arrayInitiators, arrayInitiator)
 	}
 	return arrayInitiators
-}
-
-func (n NodeUtils) WriteStageInfoToFile(fPath string, info map[string]string) error {
-	// writes to stageTargetPath/filename
-
-	fPath = n.GetPodPath(fPath)
-	stagePath := filepath.Dir(fPath)
-	if _, err := os.Stat(stagePath); os.IsNotExist(err) {
-		logger.Debugf("The filePath [%s] is not existed. Create it.", stagePath)
-		if err = os.MkdirAll(stagePath, os.FileMode(0755)); err != nil {
-			logger.Debugf("The filePath [%s] create fail. Error: [%v]", stagePath, err)
-		}
-	}
-	logger.Debugf("WriteStageInfo file : path {%v}, info {%v}", fPath, info)
-	stageInfo, err := json.Marshal(info)
-	if err != nil {
-		logger.Errorf("Error marshalling info file %s to json : {%v}", fPath, err.Error())
-		return err
-	}
-
-	err = ioutil.WriteFile(fPath, stageInfo, 0600)
-
-	if err != nil {
-		logger.Errorf("Error while writing to file %s: {%v}", fPath, err.Error())
-		return err
-	}
-
-	return nil
-}
-
-func (n NodeUtils) ReadFromStagingInfoFile(filePath string) (map[string]string, error) {
-	// reads from stageTargetPath/filename
-	filePath = n.GetPodPath(filePath)
-
-	logger.Debugf("Read StagingInfoFile : path {%v},", filePath)
-	stageInfo, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		logger.Errorf("error reading file %s. err : {%v}", filePath, err.Error())
-		return nil, err
-	}
-
-	infoMap := make(map[string]string)
-
-	err = json.Unmarshal(stageInfo, &infoMap)
-	if err != nil {
-		logger.Errorf("Error unmarshalling file %s. err : {%v}", filePath, err.Error())
-		return nil, err
-	}
-
-	return infoMap, nil
 }
 
 func (n NodeUtils) ClearStageInfoFile(filePath string) error {
