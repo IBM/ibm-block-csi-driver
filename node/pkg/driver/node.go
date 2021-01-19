@@ -643,9 +643,12 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	stagingTargetPath := req.GetStagingTargetPath()
+	mountPointToExpand := req.GetStagingTargetPath()
+	if mountPointToExpand == "" {
+		mountPointToExpand = req.GetVolumePath()
+	}
 
-	err = d.NodeUtils.ExpandFilesystem(device, stagingTargetPath, existingFormat)
+	err = d.NodeUtils.ExpandFilesystem(device, mountPointToExpand, existingFormat)
 	if err != nil {
 		logger.Errorf("Could not resize {%v} file system of {%v} , error: %v", existingFormat, device, err)
 		return nil, status.Error(codes.Internal, err.Error())
@@ -670,12 +673,6 @@ func (d *NodeService) nodeExpandVolumeRequestValidation(req *csi.NodeExpandVolum
 	volumePath := req.GetVolumePath()
 	if volumePath == "" {
 		err := &RequestValidationError{"Volume path not provided"}
-		return status.Error(codes.InvalidArgument, err.Error())
-	}
-
-	stagingTargetPath := req.GetStagingTargetPath()
-	if stagingTargetPath == "" {
-		err := &RequestValidationError{"Staging target path not provided"}
 		return status.Error(codes.InvalidArgument, err.Error())
 	}
 
