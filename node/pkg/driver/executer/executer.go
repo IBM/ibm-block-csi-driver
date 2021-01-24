@@ -52,8 +52,8 @@ func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []strin
 	// Create the command with our context
 	cmd := exec.CommandContext(ctx, command, args...)
 
-	// This time we can simply use Output() to get the result.
-	out, err := cmd.Output()
+	// This time we can simply use CombinedOutput() to get the result.
+	out, err := cmd.CombinedOutput()
 
 	// We want to check the context error to see if the timeout was executed.
 	// The error returned by cmd.Output() will be OS specific based on what
