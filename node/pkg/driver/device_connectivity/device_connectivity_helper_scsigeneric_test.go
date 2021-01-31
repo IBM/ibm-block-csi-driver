@@ -108,7 +108,7 @@ func TestGetMpathDevice(t *testing.T) {
 		},
 
 		{
-			name: "Should fail when WaitForDmToExist find more than 1 dm for volume",
+			name: "Should fail when WaitForDmToExist found more than 1 dm for volume",
 			getDmsPathReturn: []GetDmsPathReturn{
 				GetDmsPathReturn{
 					dmPath: "",
@@ -353,7 +353,7 @@ func TestGetDmsPath(t *testing.T) {
 						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
 					}
 				} else {
-					if !areStringsEqualAsSet(err.Error(), tc.expErr.Error()) {
+					if err.Error() != tc.expErr.Error() {
 						t.Fatalf("Expected error %s, got %s", tc.expErr, err.Error())
 					}
 				}
