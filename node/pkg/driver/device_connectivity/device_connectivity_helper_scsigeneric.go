@@ -69,7 +69,6 @@ const (
 	WaitForMpathWaitIntervalSec = 1
 	FC_HOST_SYSFS_PATH          = "/sys/class/fc_remote_ports/rport-*/port_name"
 	IscsiHostRexExPath          = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
-	GetMpahDevErrorsSep         = ","
 	MpathdSeparator             = ","
 	multipathdCmd               = "multipathd"
 	multipathCmd                = "multipath"
@@ -477,12 +476,12 @@ func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeId string) (string, 
 		return "", &MultipleDmDevicesError{volumeId, dms}
 	}
 
-	var md string
-	for md = range dms {
+	var dm string
+	for dm = range dms {
 		break // because its a single value in the map(1 mpath device, if not it should fail above), so just take the first
 	}
 
-	return md, nil
+	return dm, nil
 }
 
 //go:generate mockgen -destination=../../../mocks/mock_GetDmsPathHelperInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity GetDmsPathHelperInterface
