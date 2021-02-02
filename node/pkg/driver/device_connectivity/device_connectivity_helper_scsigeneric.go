@@ -501,8 +501,8 @@ func NewGetDmsPathHelperGeneric(executer executer.ExecuterInterface) GetDmsPathH
 
 func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeUuid string, maxRetries int, intervalSeconds int) (string, error) {
 
-	formatOrder := strings.Join([]string{"%d", "%w"}, MpathdSeparator)
-	args := []string{"show", "maps", "raw", "format", "\"", formatOrder, "\""}
+	formatTemplate := strings.Join([]string{"%d", "%w"}, MpathdSeparator)
+	args := []string{"show", "maps", "raw", "format", "\"", formatTemplate, "\""}
 	var err error
 	for i := 0; i < maxRetries; i++ {
 		err = nil
