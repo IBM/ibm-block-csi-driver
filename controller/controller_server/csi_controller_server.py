@@ -513,11 +513,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug("Snapshot was not found during deletion: {0}".format(ex))
 
         except controller_errors.ObjectNotFoundError as ex:
-            logger.debug("snapshot was not found during deletion: {0}".format(ex))
+            logger.debug("snapshot was not found during deletion: {0}".format(ex.message))
             context.set_code(grpc.StatusCode.OK)
             return csi_pb2.DeleteSnapshotResponse()
         except controller_errors.ObjectIsStillInUseError as ex:
-            logger.info("could not delete snapshot while in use: {0}".format(ex))
+            logger.info("could not delete snapshot while in use: {0}".format(ex.message))
             context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
             context.set_details(ex)
             return csi_pb2.DeleteSnapshotResponse()
