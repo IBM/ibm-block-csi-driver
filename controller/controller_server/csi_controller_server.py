@@ -512,11 +512,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 except controller_errors.ObjectNotFoundError as ex:
                     logger.debug("Snapshot was not found during deletion: {0}".format(ex))
 
-        except controller_errors.ObjectNotFoundError:
+        except controller_errors.ObjectNotFoundError as ex:
             logger.debug("snapshot was not found during deletion: {0}".format(ex))
             context.set_code(grpc.StatusCode.OK)
             return csi_pb2.DeleteSnapshotResponse()
-        except controller_errors.ObjectIsStillInUseError:
+        except controller_errors.ObjectIsStillInUseError as ex:
             logger.info("could not delete snapshot while in use: {0}".format(ex))
             context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
             context.set_details(ex)
@@ -706,9 +706,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         return full_name[:max_name_length]
 
     def _join_object_prefix_with_name(self, prefix, name):
-        if prefix:
-            return settings.NAME_PREFIX_SEPARATOR.join((prefix, name))
-        return name
+        return settings.NAME_PREFIX_SEPARATOR.join((prefix, name))
 
     def GetPluginCapabilities(self, _, __):
         logger.info("GetPluginCapabilities")
