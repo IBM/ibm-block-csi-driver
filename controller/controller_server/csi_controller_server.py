@@ -519,7 +519,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         except controller_errors.ObjectIsStillInUseError as ex:
             logger.info("could not delete snapshot while in use: {0}".format(ex.message))
             context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
-            context.set_details(ex)
+            context.set_details(ex.message)
             return csi_pb2.DeleteSnapshotResponse()
         except controller_errors.PermissionDeniedError as ex:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
