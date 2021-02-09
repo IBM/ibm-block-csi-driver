@@ -208,7 +208,7 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 	stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingPath)
 	isStagingPathExists := d.NodeUtils.IsPathExists(stagingPathWithHostPrefix)
 	if !isStagingPathExists {
-		return &RequestValidationError{fmt.Sprintf("Staging path #{stagingPathWithHostPrefix} does not exist")}
+		return &RequestValidationError{fmt.Sprintf("Staging path [%s] does not exist", stagingPathWithHostPrefix)}
 	}
 
 	volCap := req.GetVolumeCapability()
