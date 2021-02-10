@@ -35,6 +35,7 @@ RUN pip3 install --default-timeout=100 --upgrade pip==19.3.1
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
 # TODO: remove CRYPTOGRAPHY_ALLOW_OPENSSL_102 when upgrading to ubi8
 ENV CRYPTOGRAPHY_ALLOW_OPENSSL_102=true
+ENV CRYPTOGRAPHY_DONT_BUILD_RUST=1
 RUN pip3 install -r /driver/controller/requirements.txt
 
 COPY ./common /driver/common
