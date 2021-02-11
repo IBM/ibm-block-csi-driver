@@ -4,8 +4,6 @@ DeleteVolume
 ExpandVolume
 NodeGetCapabilities
 NodeGetInfo
-CreateSnapshot
-
 NodePublishVolume
 NodeUnpublishVolume
 NodeStageVolume
