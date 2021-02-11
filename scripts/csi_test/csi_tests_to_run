@@ -1,9 +1,9 @@
 ControllerGetCapabilities
-CreateVolume
-DeleteVolume
 ExpandVolume
 NodeGetCapabilities
 NodeGetInfo
+CreateSnapshot
+DeleteSnapshot
 NodePublishVolume
 NodeUnpublishVolume
 NodeStageVolume
