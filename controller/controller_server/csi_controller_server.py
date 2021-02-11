@@ -637,8 +637,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         res = csi_pb2.ControllerGetCapabilitiesResponse(
             capabilities=[csi_pb2.ControllerServiceCapability(
                 rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_VOLUME"))),
-                csi_pb2.ControllerServiceCapability(
-                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_SNAPSHOT"))),
+                # csi_pb2.ControllerServiceCapability(
+                #     rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_SNAPSHOT"))),
                 csi_pb2.ControllerServiceCapability(
                     rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("PUBLISH_UNPUBLISH_VOLUME"))),
                 csi_pb2.ControllerServiceCapability(
