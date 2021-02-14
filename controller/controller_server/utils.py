@@ -94,18 +94,26 @@ def _validate_source_info(source, source_type):
     source_object = getattr(source, source_type)
     logger.info("Source {0} specified: {1}".format(source_type, source_object))
     source_object_id = getattr(source_object, config.VOLUME_SOURCE_ID_FIELDS[source_type])
-    if not source_object_id:
-        raise ValidationException(messages.volume_source_id_is_missing.format(source_type))
-    if config.PARAMETERS_OBJECT_ID_DELIMITER not in source_object_id:
-        raise ObjectIdError(source_type, source_object_id)
+    message = messages.volume_source_id_is_missing.format(source_type)
+    _validate_object_id(source_object_id, object_type=source_type, message=message)
 
 
 def _validate_pool_parameter(parameters):
+    logger.debug("validating pool parameter")
     if config.PARAMETERS_POOL not in parameters:
         raise ValidationException(messages.pool_is_missing_message)
 
     if not parameters[config.PARAMETERS_POOL]:
         raise ValidationException(messages.wrong_pool_passed_message)
+
+
+def _validate_object_id(object_id, object_type=config.VOLUME_TYPE_NAME,
+                        message=messages.volume_id_should_not_be_empty_message):
+    logger.debug("validating volume id")
+    if not object_id:
+        raise ValidationException(message)
+    if config.PARAMETERS_OBJECT_ID_DELIMITER not in object_id:
+        raise ObjectIdError(object_type, object_id)
 
 
 def validate_create_volume_request(request):
@@ -128,7 +136,6 @@ def validate_create_volume_request(request):
 
     validate_secrets(request.secrets)
 
-    logger.debug("validating storage class parameters")
     if request.parameters:
         _validate_pool_parameter(request.parameters)
     else:
@@ -167,14 +174,8 @@ def validate_delete_snapshot_request(request):
 def validate_validate_volume_capabilities_request(request):
     logger.debug("validating validate_volume_capabilities request")
 
-    logger.debug("validating volume id")
-    volume_id = request.volume_id
-    if not volume_id:
-        raise ValidationException(messages.volume_id_should_not_be_empty_message)
-    if config.PARAMETERS_OBJECT_ID_DELIMITER not in volume_id:
-        raise ObjectIdError(config.VOLUME_TYPE_NAME, volume_id)
+    _validate_object_id(request.volume_id)
 
-    logger.debug("validating parameters")
     if request.parameters:
         _validate_pool_parameter(request.parameters)
 
@@ -209,7 +210,6 @@ def validate_expand_volume_request(request):
     validate_secrets(request.secrets)
 
     if request.volume_capability:
-        logger.debug("validating volume capabilities")
         validate_csi_volume_capability(request.volume_capability)
 
     logger.debug("expand volume validation finished")
@@ -313,7 +313,6 @@ def validate_publish_volume_request(request):
     if request.readonly:
         raise ValidationException(messages.readonly_not_supported_message)
 
-    logger.debug("validating volume capabilities")
     validate_csi_volume_capability(request.volume_capability)
 
     validate_secrets(request.secrets)
@@ -406,9 +405,7 @@ def generate_csi_publish_volume_response(lun, connectivity_type, config, array_i
 def validate_unpublish_volume_request(request):
     logger.debug("validating unpublish volume request")
 
-    logger.debug("validating volume id")
-    if len(request.volume_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)) != 2:
-        raise ValidationException(messages.volume_id_wrong_format_message)
+    _validate_object_id(request.volume_id)
 
     validate_secrets(request.secrets)
 
@@ -426,8 +423,7 @@ def hash_string(string):
 
 
 def _validate_parameter_match_volume(parameter_value, value_from_volume, error_message_format, cmp=eq):
-    if parameter_value:
-        if not cmp(parameter_value, value_from_volume):
+    if parameter_value and not cmp(parameter_value, value_from_volume):
             raise ValidationException(error_message_format.format(parameter_value, value_from_volume))
 
 

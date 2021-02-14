@@ -349,7 +349,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         try:
             try:
                 utils.validate_unpublish_volume_request(request)
-            except ValidationException as ex:
+            except (ValidationException, ObjectIdError) as ex:
                 logger.exception(ex)
                 context.set_details(ex.message)
                 context.set_code(grpc.StatusCode.INVALID_ARGUMENT)

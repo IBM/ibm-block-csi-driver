@@ -248,7 +248,6 @@ class TestUtils(unittest.TestCase):
 
         validate_capabilities.side_effect = None
         validate_secrets.side_effect = [ValidationException("secrets")]
-        request.secrets = []
 
         with self.assertRaises(ValidationException) as ex:
             utils.validate_publish_volume_request(request)
@@ -263,7 +262,7 @@ class TestUtils(unittest.TestCase):
         request = Mock()
         request.volume_id = "somebadvolumename"
 
-        with self.assertRaises(ValidationException) as ex:
+        with self.assertRaises(ObjectIdError) as ex:
             utils.validate_unpublish_volume_request(request)
             self.assertTrue("volume" in ex.message)
 
