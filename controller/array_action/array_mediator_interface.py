@@ -436,3 +436,11 @@ class ArrayMediator(ABC):
             The maximum number of times a map operation will retry if lun is already in use
         """
         raise NotImplementedError
+
+    @property
+    @abstractmethod
+    def default_object_prefix(self):
+        """
+            The default prefix for object names
+        """
+        raise NotImplementedError

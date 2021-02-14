@@ -528,17 +528,25 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INTERNAL,
                                          err=Exception("error"))
 
-    @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_volume_with_name_prefix(self, storage_agent):
-        storage_agent.return_value = self.storage_agent
-
+    def _test_create_volume_prefix(self, prefix, final_name):
+        self.mediator.default_object_prefix = "default"
         self.request.name = "some_name"
-        self.request.parameters[config.PARAMETERS_VOLUME_NAME_PREFIX] = "prefix"
+        self.request.parameters[config.PARAMETERS_VOLUME_NAME_PREFIX] = prefix
         self.mediator.create_volume = Mock()
         self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn", "xiv")
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.create_volume.assert_called_once_with("prefix_some_name", 10, {}, "pool1")
+        self.mediator.create_volume.assert_called_once_with(final_name, 10, {}, "pool1")
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_with_name_prefix(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+        self._test_create_volume_prefix("prefix", "prefix_some_name")
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_with_no_name_prefix(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+        self._test_create_volume_prefix("", "default_some_name")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_required_bytes_zero(self, storage_agent):

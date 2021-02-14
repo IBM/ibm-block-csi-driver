@@ -132,6 +132,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def max_lun_retries(self):
         return 10
 
+    @classproperty
+    def default_object_prefix(self):
+        return None
+
     def __init__(self, user, password, endpoint):
         self.user = user
         self.service_address = \
