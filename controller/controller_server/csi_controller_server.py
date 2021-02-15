@@ -72,11 +72,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
 
         pool = request.parameters[config.PARAMETERS_POOL]
-        capabilities = {
-            key: value for key, value in request.parameters.items() if key in [
-                config.PARAMETERS_CAPABILITIES_SPACEEFFICIENCY,
-            ]
-        }
+
+        space_efficiency = request.parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
 
         try:
             # TODO : pass multiple array addresses
@@ -115,8 +112,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
-                    array_mediator.validate_supported_capabilities(capabilities)
-                    volume = array_mediator.create_volume(volume_final_name, required_bytes, capabilities, pool)
+                    array_mediator.validate_supported_space_efficiency(space_efficiency)
+                    volume = array_mediator.create_volume(volume_final_name, required_bytes, space_efficiency,
+                                                          pool)
                 else:
                     logger.debug("volume found : {}".format(volume))
 
@@ -139,7 +137,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.info("finished create volume")
                 return res
 
-        except (controller_errors.IllegalObjectName, controller_errors.StorageClassCapabilityNotSupported,
+        except (controller_errors.IllegalObjectName, controller_errors.SpaceEfficiencyNotSupported,
                 controller_errors.PoolDoesNotExist, controller_errors.PoolDoesNotMatchCapabilities,
                 controller_errors.PoolParameterIsMissing, controller_errors.ExpectedSnapshotButFoundVolumeError) as ex:
             logger.exception(ex)

@@ -59,8 +59,8 @@ def is_warning_message(ex):
     return False
 
 
-def build_kwargs_from_capabilities(capabilities, pool_name, volume_name,
-                                   volume_size):
+def build_kwargs_from_parameters(space_efficiency, pool_name, volume_name,
+                                 volume_size):
     cli_kwargs = {}
     cli_kwargs.update({
         'name': volume_name,
@@ -68,30 +68,29 @@ def build_kwargs_from_capabilities(capabilities, pool_name, volume_name,
         'size': volume_size,
         'pool': pool_name
     })
-    # if capabilities == None, create default capability volume thick
-    capability = capabilities.get(config.CAPABILITIES_SPACEEFFICIENCY)
-    if capability:
-        capability = capability.lower()
-        if capability == config.CAPABILITY_THIN:
+    # if space efficiency == None, create default space efficiency volume thick
+    if space_efficiency:
+        space_efficiency = space_efficiency.lower()
+        if space_efficiency == config.SPACE_EFFICIENCY_THIN:
             cli_kwargs.update({'thin': True})
-        elif capability == config.CAPABILITY_COMPRESSED:
+        elif space_efficiency == config.SPACE_EFFICIENCY_COMPRESSED:
             cli_kwargs.update({'compressed': True})
-        elif capability == config.CAPABILITY_DEDUPLICATED:
+        elif space_efficiency == config.SPACE_EFFICIENCY_DEDUPLICATED:
             cli_kwargs.update({'compressed': True, 'deduplicated': True})
 
     return cli_kwargs
 
 
-def get_cli_volume_capabilities(cli_volume):
-    capability = config.CAPABILITY_THICK
+def _get_cli_volume_space_efficiency(cli_volume):
+    space_efficiency = config.SPACE_EFFICIENCY_THICK
     if cli_volume.se_copy == YES:
-        capability = config.CAPABILITY_THIN
+        space_efficiency = config.SPACE_EFFICIENCY_THIN
     if cli_volume.compressed_copy == YES:
-        capability = config.CAPABILITY_COMPRESSED
+        space_efficiency = config.SPACE_EFFICIENCY_COMPRESSED
     if hasattr(cli_volume, "deduplicated_copy"):
         if cli_volume.deduplicated_copy == YES:
-            capability = config.CAPABILITY_DEDUPLICATED
-    return {config.CAPABILITIES_SPACEEFFICIENCY: capability}
+            space_efficiency = config.SPACE_EFFICIENCY_DEDUPLICATED
+    return space_efficiency
 
 
 class SVCArrayMediator(ArrayMediatorAbstract):
@@ -301,22 +300,20 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         filter_value = '{0}_vdisk_name={1}'.format(endpoint_type, volume_name)
         return self.client.svcinfo.lsfcmap(filtervalue=filter_value).as_list
 
-    def validate_supported_capabilities(self, capabilities):
-        logger.debug("validate_supported_capabilities for "
-                     "capabilities : {0}".format(capabilities))
-        # Currently, we only support one capability "SpaceEfficiency"
-        # The value should be: "thin/thick/compressed/deduplicated"
-        if (capabilities and capabilities.get(
-                config.CAPABILITIES_SPACEEFFICIENCY).lower() not in
-                [config.CAPABILITY_THIN, config.CAPABILITY_THICK,
-                 config.CAPABILITY_COMPRESSED,
-                 config.CAPABILITY_DEDUPLICATED]):
-            logger.error("capability value is not "
-                         "supported {0}".format(capabilities))
-            raise controller_errors.StorageClassCapabilityNotSupported(
-                capabilities)
+    def validate_supported_space_efficiency(self, space_efficiency):
+        logger.debug("validate_supported_space_efficiency for "
+                     "space efficiency : {0}".format(space_efficiency))
 
-        logger.info("Finished validate_supported_capabilities")
+        if (space_efficiency and space_efficiency.lower() not in
+                [config.SPACE_EFFICIENCY_THIN, config.SPACE_EFFICIENCY_THICK,
+                 config.SPACE_EFFICIENCY_COMPRESSED,
+                 config.SPACE_EFFICIENCY_DEDUPLICATED]):
+            logger.error("space efficiency value is not "
+                         "supported {0}".format(space_efficiency))
+            raise controller_errors.SpaceEfficiencyNotSupported(
+                space_efficiency)
+
+        logger.info("Finished validate_supported_space_efficiency")
 
     def _convert_size_bytes(self, size_in_bytes):
         # SVC volume size must be the multiple of 512 bytes
@@ -355,14 +352,13 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.ObjectNotFoundError(volume_id)
         return vol_name
 
-    def _create_cli_volume(self, name, size_in_bytes, capabilities, pool):
-        logger.info("creating volume with name : {}. size : {} . in pool : {} "
-                    "with capabilities : {}".format(name, size_in_bytes, pool,
-                                                    capabilities))
+    def _create_cli_volume(self, name, size_in_bytes, space_efficiency, pool):
+        logger.info("creating volume with name : {}. size : {} . in pool : {} with parameters : {}".format(
+            name, size_in_bytes, pool, space_efficiency))
         try:
             size = self._convert_size_bytes(size_in_bytes)
-            cli_kwargs = build_kwargs_from_capabilities(capabilities, pool,
-                                                        name, size)
+            cli_kwargs = build_kwargs_from_parameters(space_efficiency, pool,
+                                                      name, size)
             self.client.svctask.mkvolume(**cli_kwargs)
             vol = self._get_cli_volume(name)
             logger.info("finished creating cli volume : {}".format(vol.name))
@@ -380,7 +376,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 if (POOL_NOT_MATCH_VOL_CAPABILITIES in ex.my_message
                         or NOT_REDUCTION_POOL in ex.my_message):
                     raise controller_errors.PoolDoesNotMatchCapabilities(
-                        pool, capabilities, ex)
+                        pool, space_efficiency, ex)
                 if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in ex.my_message:
                     raise controller_errors.NotEnoughSpaceInPool(pool=pool)
                 raise ex
@@ -407,8 +403,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                                             minimum_volume_size_in_bytes, pool_id=None):
         self._copy_to_target_volume(name, source_name)
 
-    def create_volume(self, name, size_in_bytes, capabilities, pool):
-        cli_volume = self._create_cli_volume(name, size_in_bytes, capabilities, pool)
+    def create_volume(self, name, size_in_bytes, space_efficiency, pool):
+        cli_volume = self._create_cli_volume(name, size_in_bytes, space_efficiency, pool)
 
         return self._generate_volume_response(cli_volume)
 
@@ -452,10 +448,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.info("creating target cli volume '{0}' from source volume '{1}'".format(target_volume_name,
                                                                                        source_volume_name))
         source_cli_volume = self._get_cli_volume(source_volume_name)
-        capabilities = get_cli_volume_capabilities(source_cli_volume)
+        space_efficiency = _get_cli_volume_space_efficiency(source_cli_volume)
         size_in_bytes = int(source_cli_volume.capacity)
         pool = source_cli_volume.mdisk_grp_name
-        self._create_cli_volume(target_volume_name, size_in_bytes, capabilities, pool)
+        self._create_cli_volume(target_volume_name, size_in_bytes, space_efficiency, pool)
 
     def _create_fcmap(self, source_volume_name, target_volume_name, is_copy):
         logger.info("creating FlashCopy Mapping from '{0}' to '{1}'".format(source_volume_name, target_volume_name))

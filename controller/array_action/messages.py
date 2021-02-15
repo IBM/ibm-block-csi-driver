@@ -11,7 +11,7 @@ VolumeNameBelongsToSnapshotError_message = "Volume not found. Snapshot with the 
 
 PoolDoesNotMatchCapabilities_message = "Pool : {0} does not match the following capabilities : {1} . error : {2}"
 
-StorageClassCapabilityNotSupported_message = "Storage class capability is not supported : {0} "
+SpaceEfficiencyNotSupported_message = "space efficiency is not supported : {0} "
 
 VolumeAlreadyExists_message = "Volume already exists : {0} , array : {1}"
 

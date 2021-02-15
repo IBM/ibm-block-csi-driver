@@ -81,10 +81,10 @@ class PoolDoesNotMatchCapabilities(BaseArrayActionException):
                                                                             error)
 
 
-class StorageClassCapabilityNotSupported(BaseArrayActionException):
+class SpaceEfficiencyNotSupported(BaseArrayActionException):
 
-    def __init__(self, capabilities):
-        self.message = messages.StorageClassCapabilityNotSupported_message.format(capabilities)
+    def __init__(self, space_efficiency):
+        self.message = messages.SpaceEfficiencyNotSupported_message.format(space_efficiency)
 
 
 class VolumeAlreadyExists(BaseArrayActionException):

@@ -92,16 +92,21 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.UnsupportedStorageVersionError):
             DS8KArrayMediator("user", "password", self.endpoint)
 
-    def test_validate_capabilities_passed(self):
-        self.array.validate_supported_capabilities(
-            {config.CAPABILITIES_SPACEEFFICIENCY: config.CAPABILITY_THIN}
+    def test_validate_space_efficiency_thin_success(self):
+        self.array.validate_supported_space_efficiency(
+            config.SPACE_EFFICIENCY_THIN
         )
         # nothing is raised
 
-    def test_validate_capabilities_failed(self):
-        with self.assertRaises(array_errors.StorageClassCapabilityNotSupported):
-            self.array.validate_supported_capabilities(
-                {config.CAPABILITIES_SPACEEFFICIENCY: "fake"}
+    def test_validate_space_efficiency_none_success(self):
+        self.array.validate_supported_space_efficiency(
+            config.SPACE_EFFICIENCY_NONE
+        )
+
+    def test_validate_space_efficiency_fail(self):
+        with self.assertRaises(array_errors.SpaceEfficiencyNotSupported):
+            self.array.validate_supported_space_efficiency(
+                "fake"
             )
 
     def test_get_volume_with_no_pool(self):
@@ -128,33 +133,32 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                 pool_id=self.volume_response.pool
             )
 
-    def test_create_volume_with_default_capabilities_succeeded(self):
-        self._test_create_volume_with_capabilities_succeeded(False)
+    def test_create_volume_with_default_space_efficiency_success(self):
+        self._test_create_volume_with_space_efficiency_success('none')
 
-    def test_create_volume_with_thin_capabilities_succeeded(self):
-        self._test_create_volume_with_capabilities_succeeded(True)
+    def test_create_volume_with_thin_space_efficiency_success(self):
+        self._test_create_volume_with_space_efficiency_success('thin')
 
-    def _test_create_volume_with_capabilities_succeeded(self, is_thin):
+    def test_create_volume_with_empty_space_efficiency_success(self):
+        self._test_create_volume_with_space_efficiency_success('')
+
+    def _test_create_volume_with_space_efficiency_success(self, space_efficiency):
         self.client_mock.create_volume.return_value = self.volume_response
         self.client_mock.get_volume.return_value = self.volume_response
         name = self.volume_response.name
         size_in_bytes = self.volume_response.cap
-        if is_thin:
-            capabilities = {
-                config.CAPABILITIES_SPACEEFFICIENCY: config.CAPABILITY_THIN
-            }
-            tp = 'ese'
-        else:
-            capabilities = {}
-            tp = 'none'
         pool_id = self.volume_response.pool
         volume = self.array.create_volume(
-            name, size_in_bytes, capabilities, pool_id,
+            name, size_in_bytes, space_efficiency, pool_id,
         )
+        if space_efficiency == 'thin':
+            space_efficiency = 'ese'
+        else:
+            space_efficiency = 'none'
         self.client_mock.create_volume.assert_called_once_with(
             pool_id=pool_id,
             capacity_in_bytes=self.volume_response.cap,
-            tp=tp,
+            tp=space_efficiency,
             name='test_name',
         )
         self.assertEqual(volume.name, self.volume_response.name)
@@ -165,29 +169,29 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         ]
         pool_id = self.volume_response.pool
         volume = self.array.create_volume(
-            self.volume_response.name, "1", {}, pool_id,
+            self.volume_response.name, "1", 'thin', pool_id,
         )
         self.assertEqual(volume.name, self.volume_response.name)
 
     def test_create_volume_failed_with_ClientException(self):
         self.client_mock.create_volume.side_effect = ClientException("500")
         with self.assertRaises(array_errors.VolumeCreationError):
-            self.array.create_volume("fake_name", 1, {}, "fake_pool")
+            self.array.create_volume("fake_name", 1, 'thin', "fake_pool")
 
     def test_create_volume_failed_with_pool_not_found(self):
         self.client_mock.create_volume.side_effect = NotFound("404", message="BE7A0001")
         with self.assertRaises(array_errors.PoolDoesNotExist):
-            self.array.create_volume("fake_name", 1, {}, "fake_pool")
+            self.array.create_volume("fake_name", 1, 'thin', "fake_pool")
 
     def test_create_volume_failed_with_incorrect_id(self):
         self.client_mock.get_volumes_by_pool.side_effect = NotFound("500", message="BE7A0005")
         with self.assertRaises(array_errors.PoolDoesNotExist):
-            self.array.create_volume("fake_name", 1, {}, "fake_pool")
+            self.array.create_volume("fake_name", 1, 'thin', "fake_pool")
 
     def test_create_volume_failed_with_no_space_in_pool(self):
         self.client_mock.get_volumes_by_pool.side_effect = ClientException("500", message="BE534459")
         with self.assertRaises(array_errors.NotEnoughSpaceInPool):
-            self.array.create_volume("fake_name", 1, {}, "fake_pool")
+            self.array.create_volume("fake_name", 1, 'thin', "fake_pool")
 
     def test_delete_volume(self):
         scsi_id = "6005076306FFD3010000000000000001"

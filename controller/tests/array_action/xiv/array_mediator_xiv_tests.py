@@ -1,6 +1,7 @@
 import unittest
 
 from mock import patch, Mock
+from munch import Munch
 from pyxcli import errors as xcli_errors
 
 import controller.array_action.errors as array_errors
@@ -66,32 +67,53 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.disconnect()
         self.mediator.client.close.assert_called_once_with()
 
+    @staticmethod
+    def _get_cli_vol():
+        return Munch({
+            'wwn': '123',
+            'name': 'mock_volume',
+            'pool_name': 'fake_pool',
+            'capacity': '512'})
+
+    def _test_create_volume_with_space_efficiency_success(self, space_efficiency):
+        self.mediator.client.cmd.vol_create = Mock()
+        self.mediator.client.cmd.vol_create.return_value = Mock(as_single_element=self._get_cli_vol())
+        volume = self.mediator.create_volume("mock_volume", 512, space_efficiency, "fake_pool")
+        self.mediator.client.cmd.vol_create.assert_called_once_with(vol='mock_volume', size_blocks=1, pool='fake_pool')
+        self.assertEqual(volume.name, "mock_volume")
+
+    def test_create_volume_success(self):
+        self._test_create_volume_with_space_efficiency_success(None)
+
+    def test_create_volume_with_empty_space_efficiency_success(self):
+        self._test_create_volume_with_space_efficiency_success("")
+
     def test_create_volume_raise_illegal_name_for_object(self):
         self.mediator.client.cmd.vol_create.side_effect = [xcli_errors.IllegalNameForObjectError("", "vol", "")]
         with self.assertRaises(array_errors.IllegalObjectName):
-            self.mediator.create_volume("vol", 10, [], "pool1")
+            self.mediator.create_volume("vol", 10, None, "pool1")
 
     def test_create_volume_raise_volume_exists_error(self):
         self.mediator.client.cmd.vol_create.side_effect = [xcli_errors.VolumeExistsError("", "vol", "")]
         with self.assertRaises(array_errors.VolumeAlreadyExists):
-            self.mediator.create_volume("vol", 10, [], "pool1")
+            self.mediator.create_volume("vol", 10, None, "pool1")
 
     def test_create_volume_raise_pool_does_not_exists_error(self):
         self.mediator.client.cmd.vol_create.side_effect = [xcli_errors.PoolDoesNotExistError("", "pool", "")]
         with self.assertRaises(array_errors.PoolDoesNotExist):
-            self.mediator.create_volume("vol", 10, [], "pool1")
+            self.mediator.create_volume("vol", 10, None, "pool1")
 
     def test_create_volume_raise_no_space_error(self):
         self.mediator.client.cmd.vol_create.side_effect = [
             xcli_errors.CommandFailedRuntimeError("", "No space to allocate to the volume", "")]
         with self.assertRaises(array_errors.NotEnoughSpaceInPool):
-            self.mediator.create_volume("vol", 10, [], "pool1")
+            self.mediator.create_volume("vol", 10, None, "pool1")
 
     @patch.object(XIVArrayMediator, "_generate_volume_response")
     def test_create_volume__generate_volume_response_raise_exception(self, response):
         response.side_effect = Exception("err")
         with self.assertRaises(Exception):
-            self.mediator.create_volume("vol", 10, [], "pool1")
+            self.mediator.create_volume("vol", 10, None, "pool1")
 
     def test_copy_to_existing_volume_from_snapshot_succeeds_with_resize(self):
         vol_name = "vol"
@@ -206,7 +228,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
         snap_vol_name = "snap_vol"
         size_in_blocks_string = "10"
         size_in_bytes = int(size_in_blocks_string) * XIVArrayMediator.BLOCK_SIZE_IN_BYTES
-        xcli_snap = self._get_single_snapshot_result_mock(snap_name, snap_vol_name, snap_capacity=size_in_blocks_string)
+        xcli_snap = self._get_single_snapshot_result_mock(snap_name, snap_vol_name,
+                                                          snap_capacity=size_in_blocks_string)
         self.mediator.client.cmd.snapshot_create.return_value = xcli_snap
         res = self.mediator.create_snapshot(snap_name, snap_vol_name)
         self.assertTrue(res.name == snap_name)
@@ -289,7 +312,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
     def test_get_object_by_id_raise_illegal_object_name(self):
         snap_name = "snap"
-        self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalValueForArgumentError("", snap_name, "")]
+        self.mediator.client.cmd.vol_list.side_effect = [
+            xcli_errors.IllegalValueForArgumentError("", snap_name, "")]
         with self.assertRaises(array_errors.IllegalObjectID):
             self.mediator.get_object_by_id(snap_name, "snapshot")
 
