@@ -63,7 +63,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.disconnect()
         self.svc.client.close.assert_called_with()
 
-    def test_default_object_prefix_size(self):
+    def test_default_object_prefix_length(self):
         prefix_length = len(self.svc.default_object_prefix)
         self.assertGreaterEqual(self.svc.max_volume_prefix_length, prefix_length)
         self.assertGreaterEqual(self.svc.max_snapshot_prefix_length, prefix_length)
