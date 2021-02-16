@@ -137,17 +137,40 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.PoolDoesNotMatchCapabilities):
             self.svc.create_volume("vol", 10, "thin", "pool")
 
-    def test_create_volume_success(self):
+    def _test_create_volume_success(self, space_efficiency):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         vol_ret = Mock(as_single_element=self._get_cli_vol())
         self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
-        volume = self.svc.create_volume("test_vol", 1024, "thin", "pool_name")
+        volume = self.svc.create_volume("test_vol", 1024, space_efficiency, "pool_name")
 
-        self.svc.client.svctask.mkvolume.assert_called_with(name="test_vol", unit="b", size=1024, pool="pool_name",
-                                                            thin=True)
         self.assertEqual(volume.capacity_bytes, 1024)
         self.assertEqual(volume.array_type, 'SVC')
         self.assertEqual(volume.id, 'vol_id')
+
+    def test_create_volume_with_thin_space_efficiency_success(self):
+        self._test_create_volume_success("thin")
+        self.svc.client.svctask.mkvolume.assert_called_with(name="test_vol", unit="b", size=1024, pool="pool_name",
+                                                            thin=True)
+
+    def test_create_volume_with_compressed_space_efficiency_success(self):
+        self._test_create_volume_success("compressed")
+        self.svc.client.svctask.mkvolume.assert_called_with(name="test_vol", unit="b", size=1024, pool="pool_name",
+                                                            compressed=True)
+
+    def test_create_volume_with_deduplicated_space_efficiency_success(self):
+        self._test_create_volume_success("deduplicated")
+        self.svc.client.svctask.mkvolume.assert_called_with(name="test_vol", unit="b", size=1024, pool="pool_name",
+                                                            compressed=True, deduplicated=True)
+
+    def _test_create_volume_with_default_space_efficiency_success(self, space_efficiency):
+        self._test_create_volume_success(space_efficiency)
+        self.svc.client.svctask.mkvolume.assert_called_with(name="test_vol", unit="b", size=1024, pool="pool_name")
+
+    def test_create_volume_with_empty_string_space_efficiency_success(self):
+        self._test_create_volume_with_default_space_efficiency_success("")
+
+    def test_create_volume_with_thick_space_efficiency_success(self):
+        self._test_create_volume_with_default_space_efficiency_success("thick")
 
     def test_get_volume_name_by_wwn_return_error(self):
         vol_ret = Mock(as_single_element=Munch({}))
