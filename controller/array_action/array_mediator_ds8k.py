@@ -38,6 +38,9 @@ FLASHCOPY_NO_BACKGROUND_COPY_OPTION = ds8k_types.DS8K_OPTION_NBC
 FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET_OPTION = ds8k_types.DS8K_OPTION_PSET
 FLASHCOPY_STATE_VALID = 'valid'
 
+ARRAY_SPACE_EFFICIENCY_THIN = ds8k_types.DS8K_TP_ESE
+ARRAY_SPACE_EFFICIENCY_NONE = ds8k_types.DS8K_TP_NONE
+
 
 def parse_version(bundle):
     """
@@ -86,6 +89,14 @@ def get_flashcopy_as_target_if_exists(api_volume):
     if len(flashcopies) != 1:
         return None
     return flashcopies[0]
+
+
+def get_array_space_efficiency(space_efficiency):
+    if space_efficiency:
+        space_efficiency_lower = space_efficiency.lower()
+        if space_efficiency_lower == config.SPACE_EFFICIENCY_THIN:
+            return ARRAY_SPACE_EFFICIENCY_THIN
+    return ARRAY_SPACE_EFFICIENCY_NONE
 
 
 class DS8KArrayMediator(ArrayMediatorAbstract):
@@ -218,30 +229,16 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             array_type=self.array_type
         )
 
-    @staticmethod
-    def get_se_capability_value(capabilities):
-        capability = capabilities.get(config.CAPABILITIES_SPACEEFFICIENCY)
-        if capability:
-            capability = capability.lower()
-            if capability == config.CAPABILITY_THIN:
-                return "ese"
-        return "none"
-
-    def _create_api_volume(self, name, size_in_bytes, capabilities, pool_id):
-        logger.info(
-            "Creating volume with name: {}, size: {}, in pool: {}, "
-            "with capabilities: {}".format(
-                name, size_in_bytes, pool_id,
-                capabilities
-            )
-        )
+    def _create_api_volume(self, name, size_in_bytes, space_efficiency, pool_id):
+        logger.info("Creating volume with name: {}, size: {}, in pool: {}, with parameters: {}".format(
+            name, size_in_bytes, pool_id, space_efficiency))
         try:
             cli_kwargs = {}
             cli_kwargs.update({
                 'name': name,
                 'capacity_in_bytes': size_in_bytes,
                 'pool_id': pool_id,
-                'tp': self.get_se_capability_value(capabilities),
+                'tp': get_array_space_efficiency(space_efficiency),
 
             })
             logger.debug(
@@ -287,8 +284,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 )
                 raise array_errors.VolumeCreationError(name)
 
-    def create_volume(self, volume_name, size_in_bytes, capabilities, pool):
-        api_volume = self._create_api_volume(volume_name, size_in_bytes, capabilities, pool)
+    def create_volume(self, volume_name, size_in_bytes, space_efficiency, pool):
+        api_volume = self._create_api_volume(volume_name, size_in_bytes, space_efficiency, pool)
         return self._generate_volume_response(api_volume)
 
     def _extend_volume(self, api_volume, new_size_in_bytes):
@@ -535,10 +532,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.info(
             "creating target api volume '{0}' from source volume '{1}'".format(target_volume_name,
                                                                                source_api_volume.name))
-        capabilities = {config.CAPABILITIES_SPACEEFFICIENCY: source_api_volume.tp}
+        space_efficiency = source_api_volume.tp
         size_in_bytes = int(source_api_volume.cap)
         pool = source_api_volume.pool
-        return self._create_api_volume(target_volume_name, size_in_bytes, capabilities, pool)
+        return self._create_api_volume(target_volume_name, size_in_bytes, space_efficiency, pool)
 
     def _create_flashcopy(self, source_volume_id, target_volume_id, options):
         logger.info(
@@ -660,19 +657,16 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             logger.debug("can not found host by initiators: {0} ".format(initiators))
             raise array_errors.HostNotFoundError(initiators)
 
-    def validate_supported_capabilities(self, capabilities):
-        logger.debug("Validating capabilities: {0}".format(capabilities))
+    def validate_supported_space_efficiency(self, space_efficiency):
+        logger.debug("validate_supported_space_efficiency for space efficiency : {0}".format(space_efficiency))
 
-        # Currently, we only support one capability "SpaceEfficiency"
-        # The value should be: "thin"
-        if (capabilities and capabilities.get(
-                config.CAPABILITIES_SPACEEFFICIENCY).lower() not in
-                [config.CAPABILITY_THIN, ]):
-            logger.error("capabilities is not supported.")
-            raise array_errors.StorageClassCapabilityNotSupported(
-                capabilities)
+        if (space_efficiency and space_efficiency.lower() not in
+                [config.SPACE_EFFICIENCY_THIN, config.SPACE_EFFICIENCY_NONE]):
+            logger.error("space efficiency is not supported.")
+            raise array_errors.SpaceEfficiencyNotSupported(
+                space_efficiency)
 
-        logger.debug("Finished validating capabilities.")
+        logger.debug("Finished validate_supported_space_efficiency.")
 
     def _generate_snapshot_response(self, api_snapshot, source_volume_name):
         return Snapshot(capacity_bytes=int(api_snapshot.cap),
