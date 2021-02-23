@@ -63,6 +63,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.disconnect()
         self.svc.client.close.assert_called_with()
 
+    def test_default_object_prefix_length_not_larger_than_max(self):
+        prefix_length = len(self.svc.default_object_prefix)
+        self.assertGreaterEqual(self.svc.max_volume_prefix_length, prefix_length)
+        self.assertGreaterEqual(self.svc.max_snapshot_prefix_length, prefix_length)
+
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_get_volume_return_CLI_Failure_errors(self, mock_warning):
         mock_warning.return_value = False
