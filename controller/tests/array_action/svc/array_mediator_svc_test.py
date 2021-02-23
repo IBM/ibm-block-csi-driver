@@ -7,7 +7,7 @@ from pysvc.unified.response import CLIFailureError
 
 import controller.array_action.config as config
 import controller.array_action.errors as array_errors
-from controller.array_action.array_mediator_svc import SVCArrayMediator, build_kwargs_from_capabilities, \
+from controller.array_action.array_mediator_svc import SVCArrayMediator, build_kwargs_from_parameters, \
     HOST_ID_PARAM, HOST_NAME_PARAM, HOST_ISCSI_NAMES_PARAM, HOST_WWPNS_PARAM, FCMAP_STATUS_DONE
 from controller.array_action.svc_cli_result_reader import SVCListResultsElement
 from controller.common.node_info import Initiators
@@ -77,11 +77,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.get_volume("volume_name")
 
     def test_get_volume_return_correct_value(self):
-        vol_ret = Mock(as_single_element=Munch({'vdisk_UID': 'vol_id',
-                                                'name': 'test_vol',
-                                                'capacity': '1024',
-                                                'mdisk_grp_name': 'pool_name'
-                                                }))
+        vol_ret = Mock(as_single_element=self._get_cli_vol())
         self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
         vol = self.svc.get_volume("test_vol")
         self.assertTrue(vol.capacity_bytes == 1024)
@@ -106,15 +102,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
         mock_warning.return_value = False
         self.svc.client.svctask.mkvolume.side_effect = [Exception]
         with self.assertRaises(Exception):
-            self.svc.create_volume("vol", 10, {}, "pool")
+            self.svc.create_volume("vol", 10, "thin", "pool")
         self.svc.client.svctask.mkvolume.side_effect = [
             CLIFailureError("Failed")]
         with self.assertRaises(CLIFailureError):
-            self.svc.create_volume("vol", 10, {}, "pool")
+            self.svc.create_volume("vol", 10, "thin", "pool")
         self.svc.client.svctask.mkvolume.side_effect = [
             CLIFailureError("CMMVC8710E")]
         with self.assertRaises(array_errors.NotEnoughSpaceInPool):
-            self.svc.create_volume("vol", 10, {}, "pool")
+            self.svc.create_volume("vol", 10, "thin", "pool")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_create_volume_return_volume_exists_error(self, mock_warning):
@@ -122,7 +118,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkvolume.side_effect = [
             CLIFailureError("CMMVC6035E")]
         with self.assertRaises(array_errors.VolumeAlreadyExists):
-            self.svc.create_volume("vol", 10, {}, "pool")
+            self.svc.create_volume("vol", 10, "thin", "pool")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_create_volume_return_pool_not_exists_error(self, mock_warning):
@@ -130,7 +126,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkvolume.side_effect = [
             CLIFailureError("CMMVC5754E")]
         with self.assertRaises(array_errors.PoolDoesNotExist):
-            self.svc.create_volume("vol", 10, {}, "pool")
+            self.svc.create_volume("vol", 10, "thin", "pool")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_create_volume_return_pool_not_match_capabilities_error(
@@ -139,25 +135,47 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkvolume.side_effect = [
             CLIFailureError("CMMVC9292E")]
         with self.assertRaises(array_errors.PoolDoesNotMatchCapabilities):
-            self.svc.create_volume("vol", 10, {}, "pool")
+            self.svc.create_volume("vol", 10, "thin", "pool")
 
         self.svc.client.svctask.mkvolume.side_effect = [
             CLIFailureError("CMMVC9301E")]
         with self.assertRaises(array_errors.PoolDoesNotMatchCapabilities):
-            self.svc.create_volume("vol", 10, {}, "pool")
+            self.svc.create_volume("vol", 10, "thin", "pool")
 
-    def test_create_volume_success(self):
+    def _test_create_volume_success(self, space_efficiency):
         self.svc.client.svctask.mkvolume.return_value = Mock()
-        vol_ret = Mock(as_single_element=Munch({'vdisk_UID': 'vol_id',
-                                                'name': 'test_vol',
-                                                'capacity': '1024',
-                                                'mdisk_grp_name': 'pool_name'
-                                                }))
+        vol_ret = Mock(as_single_element=self._get_cli_vol())
         self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
-        volume = self.svc.create_volume("test_vol", 10, {}, "pool_name")
+        volume = self.svc.create_volume("test_vol", 1024, space_efficiency, "pool_name")
+
         self.assertEqual(volume.capacity_bytes, 1024)
         self.assertEqual(volume.array_type, 'SVC')
         self.assertEqual(volume.id, 'vol_id')
+
+    def test_create_volume_with_thin_space_efficiency_success(self):
+        self._test_create_volume_success("thin")
+        self.svc.client.svctask.mkvolume.assert_called_with(name="test_vol", unit="b", size=1024, pool="pool_name",
+                                                            thin=True)
+
+    def test_create_volume_with_compressed_space_efficiency_success(self):
+        self._test_create_volume_success("compressed")
+        self.svc.client.svctask.mkvolume.assert_called_with(name="test_vol", unit="b", size=1024, pool="pool_name",
+                                                            compressed=True)
+
+    def test_create_volume_with_deduplicated_space_efficiency_success(self):
+        self._test_create_volume_success("deduplicated")
+        self.svc.client.svctask.mkvolume.assert_called_with(name="test_vol", unit="b", size=1024, pool="pool_name",
+                                                            compressed=True, deduplicated=True)
+
+    def _test_create_volume_with_default_space_efficiency_success(self, space_efficiency):
+        self._test_create_volume_success(space_efficiency)
+        self.svc.client.svctask.mkvolume.assert_called_with(name="test_vol", unit="b", size=1024, pool="pool_name")
+
+    def test_create_volume_with_empty_string_space_efficiency_success(self):
+        self._test_create_volume_with_default_space_efficiency_success("")
+
+    def test_create_volume_with_thick_space_efficiency_success(self):
+        self._test_create_volume_with_default_space_efficiency_success("thick")
 
     def test_get_volume_name_by_wwn_return_error(self):
         vol_ret = Mock(as_single_element=Munch({}))
@@ -200,7 +218,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.delete_volume("vol")
 
     def _prepare_mocks_for_object_still_in_use(self):
-        cli_volume = self._get_source_cli_vol()
+        cli_volume = self._get_cli_vol()
         cli_volume.FC_id = 'many'
         self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=cli_volume)
 
@@ -245,7 +263,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         return Mock(as_single_element=cli_object)
 
     @staticmethod
-    def _get_source_cli_vol():
+    def _get_cli_vol():
         return Munch({'vdisk_UID': 'vol_id',
                       'name': 'source_vol',
                       'capacity': '1024',
@@ -258,7 +276,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @classmethod
     def _get_mapless_target_cli_vol(cls):
-        target_cli_vol = cls._get_source_cli_vol()
+        target_cli_vol = cls._get_cli_vol()
         target_cli_vol.vdisk_UID = 'snap_id'
         target_cli_vol.name = 'test_snap'
         return target_cli_vol
@@ -361,7 +379,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         self.svc.client.svctask.mkfcmap.return_value = Mock()
 
-        source_vol_to_copy_from = self._get_source_cli_vol()
+        source_vol_to_copy_from = self._get_cli_vol()
         if not deduplicated_copy:
             del source_vol_to_copy_from.deduplicated_copy
         target_vol_after_creation = self._get_mapless_target_cli_vol()
@@ -376,7 +394,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_create_snapshot_create_volume_error(self, mock_warning):
-        source_cli_vol = self._get_source_cli_vol()
+        source_cli_vol = self._get_cli_vol()
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(source_cli_vol)
         mock_warning.return_value = False
         self.svc.client.svctask.mkvolume.side_effect = [
@@ -468,44 +486,35 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(self.svc.client.svctask.rmfcmap.call_count, 2)
         self.svc.client.svctask.rmvolume.assert_called_once_with(vdisk_id="test_snap")
 
-    def test_validate_supported_capabilities_raise_error(self):
-        capabilities_a = {"SpaceEfficiency": "Test"}
+    def test_validate_supported_space_efficiency_raise_error(self):
+        space_efficiency = "Test"
         with self.assertRaises(
-                array_errors.StorageClassCapabilityNotSupported):
-            self.svc.validate_supported_capabilities(capabilities_a)
-        capabilities_b = {"SpaceEfficiency": ""}
-        with self.assertRaises(
-                array_errors.StorageClassCapabilityNotSupported):
-            self.svc.validate_supported_capabilities(capabilities_b)
-        capabilities_c = {}
-        self.svc.validate_supported_capabilities(capabilities_c)
+                array_errors.SpaceEfficiencyNotSupported):
+            self.svc.validate_supported_space_efficiency(space_efficiency)
 
-    def test_validate_supported_capabilities_success(self):
-        capabilities = {"SpaceEfficiency": "thin"}
-        self.svc.validate_supported_capabilities(capabilities)
-        capabilities = {"SpaceEfficiency": "thick"}
-        self.svc.validate_supported_capabilities(capabilities)
-        capabilities = {"SpaceEfficiency": "compressed"}
-        self.svc.validate_supported_capabilities(capabilities)
-        capabilities = {"SpaceEfficiency": "deduplicated"}
-        self.svc.validate_supported_capabilities(capabilities)
+    def test_validate_supported_space_efficiency_success(self):
+        no_space_efficiency = ""
+        self.svc.validate_supported_space_efficiency(no_space_efficiency)
+        thin_space_efficiency = "thin"
+        self.svc.validate_supported_space_efficiency(thin_space_efficiency)
+        thick_space_efficiency = "thick"
+        self.svc.validate_supported_space_efficiency(thick_space_efficiency)
+        compressed_space_efficiency = "compressed"
+        self.svc.validate_supported_space_efficiency(compressed_space_efficiency)
+        deduplicated_space_efficiency = "deduplicated"
+        self.svc.validate_supported_space_efficiency(deduplicated_space_efficiency)
 
-    def test_build_kwargs_from_capabilities(self):
+    def test_build_kwargs_from_parameters(self):
         size = self.svc._convert_size_bytes(1000)
-        result_a = build_kwargs_from_capabilities({'SpaceEfficiency': 'Thin'},
-                                                  'P1', 'V1', size)
+        result_a = build_kwargs_from_parameters('Thin', 'P1', 'V1', size)
         self.assertDictEqual(result_a, {'name': 'V1', 'unit': 'b',
                                         'size': 1024, 'pool': 'P1',
                                         'thin': True})
-        result_b = build_kwargs_from_capabilities(
-            {'SpaceEfficiency': 'compressed'}, 'P2', 'V2', size)
+        result_b = build_kwargs_from_parameters('compressed', 'P2', 'V2', size)
         self.assertDictEqual(result_b, {'name': 'V2', 'unit': 'b',
                                         'size': 1024, 'pool': 'P2',
                                         'compressed': True})
-        result_c = build_kwargs_from_capabilities({'SpaceEfficiency': 'Deduplicated'},
-                                                  'P3', 'V3',
-                                                  self.svc._convert_size_bytes(
-                                                      2048))
+        result_c = build_kwargs_from_parameters('Deduplicated', 'P3', 'V3', self.svc._convert_size_bytes(2048))
         self.assertDictEqual(result_c, {'name': 'V3', 'unit': 'b',
                                         'size': 2048, 'pool': 'P3',
                                         'compressed': True,
