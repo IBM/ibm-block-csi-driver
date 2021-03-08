@@ -327,7 +327,9 @@ No resources found.
 
 ## Upgrading
 
-In order to upgrade the CSI operator and driver from a previous version, Perform step 1 and 4 from [Installation](#installation)
+In order to upgrade the CSI operator and driver from a previous version.
+ 1. [Download the manifest from GitHub.](#1-download-the-manifest-from-github)
+ 2. [Install the operator](#4-install-the-operator-while-using-a-user-defined-namespace)
 
 ## Uninstalling
 
