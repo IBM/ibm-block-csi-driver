@@ -328,6 +328,7 @@ No resources found.
 ## Upgrading
 
 ###Upgrade the CSI operator and driver from a previous version.
+
 Perform step 1 and 4 from [Installation](#installation)
 
 ## Uninstalling
