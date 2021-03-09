@@ -23,7 +23,6 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"reflect"
-	"sort"
 	"strings"
 	"sync"
 	"testing"
@@ -50,14 +49,6 @@ func NewOsDeviceConnectivityHelperGenericForTest(
 		Executer: executer,
 		Helper:   helper,
 	}
-}
-
-func areStringsEqualAsSet(str1, str2 string) bool {
-	sl1 := strings.Split(str1, device_connectivity.GetMpahDevErrorsSep)
-	sl2 := strings.Split(str2, device_connectivity.GetMpahDevErrorsSep)
-	sort.Strings(sl1)
-	sort.Strings(sl2)
-	return reflect.DeepEqual(sl1, sl2)
 }
 
 type GetDmsPathReturn struct {
@@ -108,7 +99,7 @@ func TestGetMpathDevice(t *testing.T) {
 		},
 
 		{
-			name: "Should fail when WaitForDmToExist find more than 1 dm for volume",
+			name: "Should fail when WaitForDmToExist found more than 1 dm for volume",
 			getDmsPathReturn: []GetDmsPathReturn{
 				GetDmsPathReturn{
 					dmPath: "",
@@ -248,7 +239,7 @@ func TestGetMpathDevice(t *testing.T) {
 						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
 					}
 				} else {
-					if !areStringsEqualAsSet(err.Error(), tc.expErr.Error()) {
+					if err.Error() != tc.expErr.Error() {
 						t.Fatalf("Expected error %s, got %s", tc.expErr, err.Error())
 					}
 				}
@@ -353,7 +344,7 @@ func TestGetDmsPath(t *testing.T) {
 						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
 					}
 				} else {
-					if !areStringsEqualAsSet(err.Error(), tc.expErr.Error()) {
+					if err.Error() != tc.expErr.Error() {
 						t.Fatalf("Expected error %s, got %s", tc.expErr, err.Error())
 					}
 				}
@@ -498,7 +489,7 @@ func TestHelperGetWwnByScsiInq(t *testing.T) {
 						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
 					}
 				} else {
-					if !areStringsEqualAsSet(err.Error(), tc.expErr.Error()) {
+					if err.Error() != tc.expErr.Error() {
 						t.Fatalf("Expected error %s, got %s", tc.expErr, err.Error())
 					}
 				}

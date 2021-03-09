@@ -72,11 +72,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
 
         pool = request.parameters[config.PARAMETERS_POOL]
-        capabilities = {
-            key: value for key, value in request.parameters.items() if key in [
-                config.PARAMETERS_CAPABILITIES_SPACEEFFICIENCY,
-            ]
-        }
+
+        space_efficiency = request.parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
 
         try:
             # TODO : pass multiple array addresses
@@ -97,6 +94,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 if required_bytes > max_size:
                     message = messages.SizeOutOfRangeError_message.format(required_bytes, max_size)
+                    logger.error(message)
                     context.set_details(message)
                     context.set_code(grpc.StatusCode.OUT_OF_RANGE)
                     return csi_pb2.CreateVolumeResponse()
@@ -114,8 +112,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
-                    array_mediator.validate_supported_capabilities(capabilities)
-                    volume = array_mediator.create_volume(volume_final_name, required_bytes, capabilities, pool)
+                    array_mediator.validate_supported_space_efficiency(space_efficiency)
+                    volume = array_mediator.create_volume(volume_final_name, required_bytes, space_efficiency,
+                                                          pool)
                 else:
                     logger.debug("volume found : {}".format(volume))
 
@@ -138,7 +137,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.info("finished create volume")
                 return res
 
-        except (controller_errors.IllegalObjectName, controller_errors.StorageClassCapabilityNotSupported,
+        except (controller_errors.IllegalObjectName, controller_errors.SpaceEfficiencyNotSupported,
                 controller_errors.PoolDoesNotExist, controller_errors.PoolDoesNotMatchCapabilities,
                 controller_errors.PoolParameterIsMissing, controller_errors.ExpectedSnapshotButFoundVolumeError) as ex:
             logger.exception(ex)
@@ -511,14 +510,14 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 except controller_errors.ObjectNotFoundError as ex:
                     logger.debug("Snapshot was not found during deletion: {0}".format(ex))
 
-        except controller_errors.ObjectNotFoundError:
-            logger.debug("snapshot was not found during deletion: {0}".format(ex))
+        except controller_errors.ObjectNotFoundError as ex:
+            logger.debug("snapshot was not found during deletion: {0}".format(ex.message))
             context.set_code(grpc.StatusCode.OK)
             return csi_pb2.DeleteSnapshotResponse()
-        except controller_errors.ObjectIsStillInUseError:
-            logger.info("could not delete snapshot while in use: {0}".format(ex))
+        except controller_errors.ObjectIsStillInUseError as ex:
+            logger.info("could not delete snapshot while in use: {0}".format(ex.message))
             context.set_code(grpc.StatusCode.FAILED_PRECONDITION)
-            context.set_details(ex)
+            context.set_details(ex.message)
             return csi_pb2.DeleteSnapshotResponse()
         except controller_errors.PermissionDeniedError as ex:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
@@ -581,8 +580,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 if required_bytes > max_size:
                     message = messages.SizeOutOfRangeError_message.format(required_bytes, max_size)
-                    context.set_details(message)
+                    logger.error(message)
                     context.set_code(grpc.StatusCode.OUT_OF_RANGE)
+                    context.set_details(message)
                     return csi_pb2.ControllerExpandVolumeResponse()
 
                 logger.debug("expanding volume {0}".format(volume_id))
@@ -674,18 +674,20 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         return self._get_object_final_name(request, array_mediator.max_volume_prefix_length,
                                            array_mediator.max_volume_name_length,
                                            config.VOLUME_TYPE_NAME,
-                                           config.PARAMETERS_VOLUME_NAME_PREFIX)
+                                           config.PARAMETERS_VOLUME_NAME_PREFIX,
+                                           array_mediator.default_object_prefix)
 
     def _get_snapshot_final_name(self, request, array_mediator):
         name = self._get_object_final_name(request, array_mediator.max_snapshot_prefix_length,
                                            array_mediator.max_snapshot_name_length,
                                            config.SNAPSHOT_TYPE_NAME,
-                                           config.PARAMETERS_SNAPSHOT_NAME_PREFIX)
+                                           config.PARAMETERS_SNAPSHOT_NAME_PREFIX,
+                                           array_mediator.default_object_prefix)
         return name
 
     def _get_object_final_name(self, request, max_name_prefix_length, max_name_length, object_type,
-                               prefix_param_name):
-        full_name = name = request.name
+                               prefix_param_name, default_prefix):
+        name = request.name
         prefix = ""
         if request.parameters and (prefix_param_name in request.parameters):
             prefix = request.parameters[prefix_param_name]
@@ -697,7 +699,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         max_name_prefix_length
                     )
                 )
-            full_name = self._join_object_prefix_with_name(prefix, name)
+        if not prefix:
+            prefix = default_prefix
+        full_name = self._join_object_prefix_with_name(prefix, name)
         if len(full_name) > max_name_length:
             hashed_name = utils.hash_string(name)
             full_name = self._join_object_prefix_with_name(prefix, hashed_name)

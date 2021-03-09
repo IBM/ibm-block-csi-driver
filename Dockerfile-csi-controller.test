@@ -16,12 +16,13 @@
 #    This Dockerfile.test is for running the csi controller local tests inside a container.
 #    Its similar to the Dockerfile, but with additional requirements-tests.txt and ENTRYPOINT to run the local tests.
 
-FROM registry.access.redhat.com/ubi8/python-38:1-41
+FROM registry.access.redhat.com/ubi8/python-38:1-43.16099467811
 
 COPY controller/requirements.txt /driver/controller/
 RUN pip3 install --upgrade pip==19.3.1
 # avoid default boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
+ENV CRYPTOGRAPHY_DONT_BUILD_RUST=1
 RUN pip3 install -r /driver/controller/requirements.txt
 
 # Requires to run local testing

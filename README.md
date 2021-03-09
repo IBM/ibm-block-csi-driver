@@ -2,19 +2,19 @@
 The Container Storage Interface (CSI) Driver for IBM block storage systems enables container orchestrators such as Kubernetes to manage the life cycle of persistent storage.
 
 Supported container platforms (and architectures):
-  - OpenShift v4.4 (x86, IBM Z, and IBM PowerPC)
-  - OpenShift v4.5 (x86, IBM Z, and IBM PowerPC)
-  - Kubernetes v1.18 (x86)
+  - OpenShift v4.6 (x86, IBM Z, and IBM Power Systems)
+  - OpenShift v4.7 (x86, IBM Z, and IBM Power Systems)
   - Kubernetes v1.19 (x86)
+  - Kubernetes v1.20 (x86)
 
 Supported IBM storage systems:
-  - IBM Spectrum Virtualize Family including IBM SAN Volume Controller (SVC) and IBM FlashSystem® family members built with IBM Spectrum® Virtualize (FlashSystem 5010, 5030, 5100, 7200, 9100, 9200, 9200R)
+  - IBM Spectrum Virtualize Family including IBM SAN Volume Controller (SVC) and IBM FlashSystem® family members built with IBM Spectrum® Virtualize (FlashSystem 5010, 5030, 5100, 5200, 7200, 9100, 9200, 9200R)
   - IBM FlashSystem A9000 and A9000R
   - IBM DS8000 Family
 
 Supported operating systems (and architectures):
   - RHEL 7.x (x86)
-  - RHCOS (x86, IBM Z, and IBM PowerPC)
+  - RHCOS (x86, IBM Z, and IBM Power Systems)
 
 Full documentation can be found on the [IBM Knowledge Center](https://www.ibm.com/support/knowledgecenter/SSRQ8T).
 
@@ -44,75 +44,13 @@ For more information, find your storage system documentation on [IBM Knowledge C
 
 ##### 2.1 Additional configuration steps for OpenShift® Container Platform users (RHEL and RHCOS). Other users can continue to step 3.
 
-The following yaml file example is for both Fibre Channel and iSCSI configurations. To support iSCSI, uncomment the last two lines in the file:
-
+Download and save the following yaml file:
+```bash
+curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/master/deploy/99-ibm-attach.yaml > 99-ibm-attach.yaml
+```
+This file can be used for both Fibre Channel and iSCSI configurations. To support iSCSI, uncomment the last two lines in the file.
 
 **Important:** The  `99-ibm-attach.yaml` configuration file overrides any files that already exist on your system. Only use this file if the files mentioned in the yaml below are not already created. If one or more have been created, edit this yaml file, as necessary.
-
-Save the `99-ibm-attach.yaml` file.
-
-```bash
-apiVersion: machineconfiguration.openshift.io/v1
-kind: MachineConfig
-metadata:
-labels:
-machineconfiguration.openshift.io/role: worker
-name: 99-ibm-attach
-spec:
-config:
-ignition:
-version: 2.2.0
-storage:
-files:
-- path: /etc/multipath.conf
-mode: 384
-filesystem: root
-contents:
-source: data:,defaults%20%7B%0A%20%20%20%20path_checker%20tur%0A%20%20%20%20path_selector
-%20%22round-robin%200%22%0A%20%20%20%20rr_weight%20uniform%0A%20%20%20%20prio%20const%0A
-%20%20%20%20rr_min_io_rq%201%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%0A%20%20%20%20polling_interval
-%2030%0A%20%20%20%20path_grouping_policy%20multibus%0A%20%20%20%20find_multipaths%20yes%0A
-%20%20%20%20no_path_retry%20fail%0A%20%20%20%20user_friendly_names%20yes%0A%20%20%20%20failback
-%20immediate%0A%20%20%20%20checker_timeout%2010%0A%20%20%20%20fast_io_fail_tmo%20off%0A%7D%0A%0Adevices
-%20%7B%0A%20%20%20%20device%20%7B%0A%20%20%20%20%20%20%20%20path_checker%20tur%0A
-%20%20%20%20%20%20%20%20product%20%22FlashSystem%22%0A%20%20%20%20%20%20%20%20vendor%20%22IBM%22%0A
-%20%20%20%20%20%20%20%20rr_weight%20uniform%0A%20%20%20%20%20%20%20%20rr_min_io_rq
-%204%20%20%20%20%20%20%20%20%20%20%20%20%20%20%20%0A%20%20%20%20%20%20%20%20path_grouping_policy
-%20multibus%0A%20%20%20%20%20%20%20%20path_selector%20%22round-robin%200%22%0A
-%20%20%20%20%20%20%20%20no_path_retry%20fail%0A%20%20%20%20%20%20%20%20failback%20immediate%0A
-%20%20%20%20%7D%0A%20%20%20%20device%20%7B%0A%20%20%20%20%20%20%20%20path_checker%20tur%0A
-%20%20%20%20%20%20%20%20product%20%22FlashSystem-9840%22%0A%20%20%20%20%20%20%20%20vendor%20%22IBM%22%0A
-%20%20%20%20%20%20%20%20fast_io_fail_tmo%20off%0A%20%20%20%20%20%20%20%20rr_weight%20uniform%0A
-%20%20%20%20%20%20%20%20rr_min_io_rq%201000%20%20%20%20%20%20%20%20%20%20%20%20%0A
-%20%20%20%20%20%20%20%20path_grouping_policy%20multibus%0A%20%20%20%20%20%20%20%20path_selector
-%20%22round-robin%200%22%0A%20%20%20%20%20%20%20%20no_path_retry%20fail%0A
-%20%20%20%20%20%20%20%20failback%20immediate%0A%20%20%20%20%7D%0A%20%20%20%20device%20%7B%0A
-%20%20%20%20%20%20%20%20vendor%20%22IBM%22%0A%20%20%20%20%20%20%20%20product%20%222145%22%0A
-%20%20%20%20%20%20%20%20path_checker%20tur%0A%20%20%20%20%20%20%20%20features%20%221%20queue_if_no_path
-%22%0A%20%20%20%20%20%20%20%20path_grouping_policy%20group_by_prio%0A
-%20%20%20%20%20%20%20%20path_selector%20%22service-time%200%22%20%23%20Used%20by%20Red%20Hat%207.x%0A
-%20%20%20%20%20%20%20%20prio%20alua%0A%20%20%20%20%20%20%20%20rr_min_io_rq%201%0A
-%20%20%20%20%20%20%20%20rr_weight%20uniform%20%0A%20%20%20%20%20%20%20%20no_path_retry%20%225%22%0A
-%20%20%20%20%20%20%20%20dev_loss_tmo%20120%0A%20%20%20%20%20%20%20%20failback%20immediate%0A%20%20%20%7D
-%0A%7D%0A
-verification: {}
-- path: /etc/udev/rules.d/99-ibm-2145.rules
-mode: 420
-filesystem: root
-contents:
-source: data:,%23%20Set%20SCSI%20command%20timeout%20to%20120s%20%28default%20%3D%3D
-%2030%20or%2060%29%20for%20IBM%202145%20devices%0ASUBSYSTEM%3D%3D%22block%22%2C%20ACTION%3D%3D%22add
-%22%2C%20ENV%7BID_VENDOR%7D%3D%3D%22IBM%22%2CENV%7BID_MODEL%7D%3D%3D%222145%22%2C%20RUN%2B%3D%22/bin/sh
-%20-c%20%27echo%20120%20%3E/sys/block/%25k/device/timeout%27%22%0A
-verification: {}
-systemd:
-units:
-- name: multipathd.service
-enabled: true
-# Uncomment the following lines if this MachineConfig will be used with iSCSI connectivity
-#- name: iscsid.service
-#    enabled: true
-```
 
 Apply the yaml file.
 ```bash
@@ -389,7 +327,7 @@ No resources found.
 
 ## Upgrading
 
-In order to upgrade the CSI operator and driver from a previous version, uninstall the existing operator and driver, and then install the newer version.
+In order to upgrade the CSI operator and driver from a previous version, perform [step 1](#1-download-the-manifest-from-github) and [step 4](#4-install-the-operator-while-using-a-user-defined-namespace) from [Installation](#Installation).
 
 ## Uninstalling
 
