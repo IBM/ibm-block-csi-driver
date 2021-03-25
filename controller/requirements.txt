@@ -1,7 +1,7 @@
 grpcio==1.20.1
 grpcio-tools==1.20.1
 protobuf==3.13.0
-pyyaml==5.3.1
+pyyaml==5.4
 munch==2.3.2
 retry==0.9.2
 packaging==20.1
