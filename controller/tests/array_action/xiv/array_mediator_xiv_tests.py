@@ -47,6 +47,31 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.mediator.get_volume("vol")
 
+    def test_get_volume_name_raise_correct_errors(self):
+        error_msg = "ex"
+        self.mediator.client.cmd.vol_list.side_effect = [Exception(error_msg)]
+        with self.assertRaises(Exception) as ex:
+            self.mediator.get_volume_name("vol-wwn")
+
+        self.assertTrue(error_msg in str(ex.exception))
+
+    def test_get_volume_name_return_correct_value(self):
+        vol = utils.get_mock_xiv_volume(10, "volume_name", "wwn")
+        self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=vol)
+        volume_name = self.mediator.get_volume_name("wwn")
+
+        self.assertTrue(volume_name == "volume_name")
+
+    def test_get_volume_name_raise_object_not_found(self):
+        self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=None)
+        with self.assertRaises(array_errors.ObjectNotFoundError):
+            self.mediator.get_volume_name("vol-wwn")
+
+    def test_get_volume_name_raise_illegal_object_id(self):
+        self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalValueForArgumentError("", "vol-wwn", "")]
+        with self.assertRaises(array_errors.IllegalObjectID):
+            self.mediator.get_volume_name("vol-wwn")
+
     @patch("controller.array_action.array_mediator_xiv.XCLIClient")
     def test_connect_errors(self, client):
         client.connect_multiendpoint_ssl.return_value = Mock()
@@ -174,10 +199,15 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def _prepare_delete_volume_with_no_snapshots(self):
         self.mediator.client.cmd.snapshot_list.return_value = Mock(as_list=[])
 
-    def test_delete_volume_raise_bad_name_error(self):
+    def test_delete_volume_raise_object_not_found(self):
         self._prepare_delete_volume_with_no_snapshots()
         self.mediator.client.cmd.vol_delete.side_effect = [xcli_errors.VolumeBadNameError("", "vol", "")]
         with self.assertRaises(array_errors.ObjectNotFoundError):
+            self.mediator.delete_volume("vol-wwn")
+
+    def test_delete_volume_raise_illegal_object_id(self):
+        self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalValueForArgumentError("", "vol-wwn", "")]
+        with self.assertRaises(array_errors.IllegalObjectID):
             self.mediator.delete_volume("vol-wwn")
 
     def test_delete_volume_fails_on_permissions(self):
@@ -276,6 +306,11 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.mediator.delete_snapshot("snap-wwn")
 
+    def test_delete_snapshot_raise_illegal_object_id(self):
+        self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalValueForArgumentError("", "snap-wwn", "")]
+        with self.assertRaises(array_errors.IllegalObjectID):
+            self.mediator.delete_snapshot("snap-wwn")
+
     def test_delete_snapshot_fails_on_permissions(self):
         self.mediator.client.cmd.snapshot_delete.side_effect = [
             xcli_errors.OperationForbiddenForUserCategoryError("", "snap", "")]
@@ -291,36 +326,37 @@ class TestArrayMediatorXIV(unittest.TestCase):
         snap_vol_name = "snap_vol"
         xcli_snap = self._get_single_snapshot_result_mock(snap_name, snap_vol_name)
         self.mediator.client.cmd.vol_list.return_value = xcli_snap
-        res = self.mediator.get_object_by_id(snap_name, "snapshot")
+        res = self.mediator.get_object_by_id("1235678", "snapshot")
         self.assertTrue(res.name == snap_name)
         self.assertTrue(res.volume_name == snap_vol_name)
 
     def test_get_object_by_id_return_correct_volume(self):
         volume_name = "volume_name"
-        vol = utils.get_mock_xiv_volume(10, volume_name, "wwn")
+        volume_wwn = "wwn"
+        vol = utils.get_mock_xiv_volume(10, volume_name, volume_wwn)
         self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=vol)
-        res = self.mediator.get_object_by_id(volume_name, "volume")
+        res = self.mediator.get_object_by_id(volume_wwn, "volume")
         self.assertTrue(res.name == volume_name)
 
     def test_get_object_by_id_same_name_vol_exists_error(self):
         snap_name = "snap"
-        snap_vol_name = ""
+        snap_vol_name = None
         xcli_snap = self._get_single_snapshot_result_mock(snap_name, snap_vol_name)
         self.mediator.client.cmd.vol_list.return_value = xcli_snap
         with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
-            self.mediator.get_object_by_id(snap_name, "snapshot")
+            self.mediator.get_object_by_id("1235678", "snapshot")
 
-    def test_get_object_by_id_raise_illegal_object_name(self):
-        snap_name = "snap"
+    def test_get_object_by_id_raise_illegal_object_id(self):
+        snap_wwn = "snap-wwn"
         self.mediator.client.cmd.vol_list.side_effect = [
-            xcli_errors.IllegalValueForArgumentError("", snap_name, "")]
+            xcli_errors.IllegalValueForArgumentError("", snap_wwn, "")]
         with self.assertRaises(array_errors.IllegalObjectID):
-            self.mediator.get_object_by_id(snap_name, "snapshot")
+            self.mediator.get_object_by_id(snap_wwn, "snapshot")
 
     def test_get_object_by_id_returns_none(self):
-        snap_name = "snap"
+        snap_wwn = "snap-wwn"
         self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=None)
-        returned_value = self.mediator.get_object_by_id(snap_name, "snapshot")
+        returned_value = self.mediator.get_object_by_id(snap_wwn, "snapshot")
         self.assertEqual(returned_value, None)
 
     def test_property(self):
@@ -411,6 +447,12 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.mediator.get_volume_mappings("vol")
 
+    def test_get_volume_mappings_raise_illegal_object_id(self):
+        self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalValueForArgumentError("", "vol-wwn", "")]
+
+        with self.assertRaises(array_errors.IllegalObjectID):
+            self.mediator.get_volume_mappings("vol-wwn")
+
     def test_get_next_available_lun_raises_host_bad_name(self):
         # mapping = get_mock_xiv_host_mapping(1)
         self.mediator.client.cmd.mapping_list.side_effect = [xcli_errors.HostBadNameError("", "host", "")]
@@ -444,10 +486,15 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(array_errors.NoAvailableLunError):
             self.mediator._get_next_available_lun("host")
 
-    def test_map_volume_vol_bot_found(self):
+    def test_map_volume_vol_not_found(self):
         self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=None)
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.mediator.map_volume("vol", "host")
+            self.mediator.map_volume("vol-wwn", "host")
+
+    def test_map_volume_raise_illegal_object_id(self):
+        self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalValueForArgumentError("", "vol-wwn", "")]
+        with self.assertRaises(array_errors.IllegalObjectID):
+            self.mediator.map_volume("vol-wwn", "host")
 
     @patch.object(XIVArrayMediator, "MAX_LUN_NUMBER", 3)
     @patch.object(XIVArrayMediator, "MIN_LUN_NUMBER", 1)
@@ -458,13 +505,13 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
         self.mediator.client.cmd.mapping_list.return_value = Mock(as_list=[mapping1, mapping2, mapping3])
         with self.assertRaises(array_errors.NoAvailableLunError):
-            self.mediator.map_volume("vol", "host")
+            self.mediator.map_volume("vol-wwn", "host")
 
     def map_volume_with_error(self, xcli_err, status, returned_err):
         self.mediator.client.cmd.map_vol.side_effect = [xcli_err("", status, "")]
         with patch.object(XIVArrayMediator, "_get_next_available_lun"):
             with self.assertRaises(returned_err):
-                self.mediator.map_volume("vol", "host")
+                self.mediator.map_volume("vol-wwn", "host")
 
     def test_map_volume_operation_forbidden(self):
         self.map_volume_with_error(xcli_errors.OperationForbiddenForUserCategoryError, "",
@@ -490,18 +537,23 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_map_volume_success(self, next_lun):
         next_lun.return_value = 5
         self.mediator.client.cmd.map_vol.return_value = None
-        lun = self.mediator.map_volume("vol", "host")
+        lun = self.mediator.map_volume("vol-wwn", "host")
         self.assertEqual(lun, '5')
 
     def test_unmap_volume_volume_not_found(self):
         self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=None)
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.mediator.unmap_volume("vol", "host")
+            self.mediator.unmap_volume("vol-wwn", "host")
+
+    def test_unmap_volume_raise_illegal_object_id(self):
+        self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalValueForArgumentError("", "vol-wwn", "")]
+        with self.assertRaises(array_errors.IllegalObjectID):
+            self.mediator.unmap_volume("vol-wwn", "host")
 
     def unmap_volume_with_error(self, xcli_err, status, returned_err):
         self.mediator.client.cmd.unmap_vol.side_effect = [xcli_err("", status, "")]
         with self.assertRaises(returned_err):
-            self.mediator.unmap_volume("vol", "host")
+            self.mediator.unmap_volume("vol-wwn", "host")
 
     def test_unmap_volume_vol_not_found(self):
         self.unmap_volume_with_error(xcli_errors.VolumeBadNameError, "", array_errors.ObjectNotFoundError)
@@ -522,7 +574,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
     def test_unmap_volume_success(self):
         self.mediator.client.cmd.unmap_vol.return_value = None
-        self.mediator.unmap_volume("vol", "host")
+        self.mediator.unmap_volume("vol-wwn", "host")
 
     def test_get_iscsi_targets_by_iqn_fail(self):
         self.mediator.client.cmd.config_get.return_value = Mock(as_list=[])
@@ -567,8 +619,10 @@ class TestArrayMediatorXIV(unittest.TestCase):
             self.mediator.expand_volume(volume_id=volume.wwn, required_bytes=self.required_bytes)
 
     def test_expand_volume_illegal_object_id_error(self):
-        self._expand_volume_vol_resize_errors(returned_error=xcli_errors.IllegalNameForObjectError("", "", ""),
-                                              expected_exception=array_errors.IllegalObjectID)
+        volume = self._prepare_mocks_for_expand_volume()
+        self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalValueForArgumentError("", volume.wwn, "")]
+        with self.assertRaises(array_errors.IllegalObjectID):
+            self.mediator.expand_volume(volume_id=volume.wwn, required_bytes=self.required_bytes)
 
     def test_expand_volume_not_found_error(self):
         self._expand_volume_vol_resize_errors(returned_error=xcli_errors.VolumeBadNameError("", "", ""),

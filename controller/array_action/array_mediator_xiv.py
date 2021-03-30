@@ -162,18 +162,11 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         return array_vol
 
     def get_volume_name(self, volume_id):
-        try:
-            return self._get_object_name_by_wwn(volume_id)
-        except xcli_errors.IllegalNameForObjectError as ex:
-            logger.exception(ex)
-            raise controller_errors.IllegalObjectName(ex.status)
+        return self._get_object_name_by_wwn(volume_id)
 
     def _expand_cli_volume(self, cli_volume, increase_in_blocks):
         try:
             self.client.cmd.vol_resize(vol=cli_volume.name, size_blocks=increase_in_blocks)
-        except xcli_errors.IllegalNameForObjectError as ex:
-            logger.exception(ex)
-            raise controller_errors.IllegalObjectID(ex.status)
         except xcli_errors.VolumeBadNameError as ex:
             logger.exception(ex)
             raise controller_errors.ObjectNotFoundError(cli_volume.id)
@@ -261,7 +254,11 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise controller_errors.PermissionDeniedError("create vol : {0}".format(name))
 
     def _get_cli_object_by_wwn(self, volume_id, not_exist_err=False):
-        cli_object = self.client.cmd.vol_list(wwn=volume_id).as_single_element
+        try:
+            cli_object = self.client.cmd.vol_list(wwn=volume_id).as_single_element
+        except xcli_errors.IllegalValueForArgumentError as ex:
+            logger.exception(ex)
+            raise controller_errors.IllegalObjectID(ex.status)
         if not cli_object and not_exist_err:
             raise controller_errors.ObjectNotFoundError(volume_id)
         return cli_object
@@ -308,11 +305,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         return array_snapshot
 
     def get_object_by_id(self, object_id, object_type):
-        try:
-            cli_object = self._get_cli_object_by_wwn(object_id)
-        except xcli_errors.IllegalValueForArgumentError as ex:
-            logger.exception(ex)
-            raise controller_errors.IllegalObjectID(ex.status)
+        cli_object = self._get_cli_object_by_wwn(object_id)
         if not cli_object:
             return None
         if object_type is controller_config.SNAPSHOT_TYPE_NAME:
@@ -344,11 +337,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def delete_snapshot(self, snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
-        try:
-            snapshot_name = self._get_object_name_by_wwn(snapshot_id)
-        except controller_errors.ObjectNotFoundError:
-            raise controller_errors.ObjectNotFoundError(snapshot_id)
-
+        snapshot_name = self._get_object_name_by_wwn(snapshot_id)
         try:
             self.client.cmd.snapshot_delete(snapshot=snapshot_name)
         except xcli_errors.VolumeBadNameError as ex:

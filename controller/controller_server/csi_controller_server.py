@@ -13,8 +13,7 @@ import controller.controller_server.utils as utils
 from controller.array_action import messages
 from controller.array_action.storage_agent import get_agent, detect_array_type
 from controller.common import settings
-from controller.common.csi_logger import get_stdout_logger
-from controller.common.csi_logger import set_log_level
+from controller.common.csi_logger import get_stdout_logger, set_log_level, logging
 from controller.common.node_info import NodeIdInfo
 from controller.common.utils import set_current_thread_name
 from controller.controller_server.errors import ObjectIdError
@@ -23,6 +22,7 @@ from controller.csi_general import csi_pb2
 from controller.csi_general import csi_pb2_grpc
 
 logger = None  # is set in ControllerServicer::__init__
+logger: logging.Logger
 
 
 class ControllerServicer(csi_pb2_grpc.ControllerServicer):
@@ -264,7 +264,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_details(ex.message)
             return csi_pb2.DeleteVolumeResponse()
 
-        except ValidationException as ex:
+        except (ValidationException, controller_errors.IllegalObjectID) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
@@ -331,7 +331,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.NOT_FOUND)
             return csi_pb2.ControllerPublishVolumeResponse()
 
-        except (ValidationException, controller_errors.UnsupportedConnectivityTypeError) as ex:
+        except (ValidationException, controller_errors.IllegalObjectID,
+                controller_errors.UnsupportedConnectivityTypeError) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
@@ -464,7 +465,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 res = utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
                 logger.info("finished create snapshot")
                 return res
-        except (controller_errors.IllegalObjectName,
+        except (controller_errors.IllegalObjectName, controller_errors.IllegalObjectID,
                 controller_errors.PoolParameterIsMissing) as ex:
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
@@ -523,7 +524,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
             context.set_details(ex)
             return csi_pb2.DeleteSnapshotResponse()
-        except ValidationException as ex:
+        except (ValidationException, controller_errors.IllegalObjectID) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
