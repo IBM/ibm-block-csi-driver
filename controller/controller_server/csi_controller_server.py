@@ -1,7 +1,7 @@
 import os.path
 import time
 from concurrent import futures
-from optparse import OptionParser
+from argparse import ArgumentParser
 
 import grpc
 import yaml
@@ -781,17 +781,17 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
 
 def main():
-    parser = OptionParser()
-    parser.add_option("-e", "--csi-endpoint", dest="endpoint", help="grpc endpoint")
-    parser.add_option("-l", "--loglevel", dest="loglevel", help="log level")
-    options, _ = parser.parse_args()
+    parser = ArgumentParser()
+    parser.add_argument("-e", "--csi-endpoint", dest="endpoint", help="grpc endpoint")
+    parser.add_argument("-l", "--loglevel", dest="loglevel", help="log level")
+    arguments, _ = parser.parse_args()
 
     # set logger level and init logger
-    log_level = options.loglevel
+    log_level = arguments.loglevel
     set_log_level(log_level)
 
     # start the server
-    endpoint = options.endpoint
+    endpoint = arguments.endpoint
     curr_server = ControllerServicer(endpoint)
     curr_server.start_server()
 
