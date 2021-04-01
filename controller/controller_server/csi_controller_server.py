@@ -146,11 +146,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return csi_pb2.CreateVolumeResponse()
         except controller_errors.ObjectNotFoundError as ex:
             context.set_code(grpc.StatusCode.NOT_FOUND)
-            context.set_details(ex)
+            context.set_details(ex.message)
             return csi_pb2.CreateVolumeResponse()
         except controller_errors.PermissionDeniedError as ex:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
-            context.set_details(ex)
+            context.set_details(ex.message)
             return csi_pb2.CreateVolumeResponse()
         except controller_errors.VolumeAlreadyExists as ex:
             context.set_details(ex.message)
@@ -255,7 +255,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 except controller_errors.PermissionDeniedError as ex:
                     context.set_code(grpc.StatusCode.PERMISSION_DENIED)
-                    context.set_details(ex)
+                    context.set_details(ex.message)
                     return csi_pb2.DeleteVolumeResponse()
 
         except controller_errors.ObjectIsStillInUseError as ex:
@@ -315,7 +315,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         except controller_errors.PermissionDeniedError as ex:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
-            context.set_details(ex)
+            context.set_details(ex.message)
             return csi_pb2.ControllerPublishVolumeResponse()
 
         except (controller_errors.LunAlreadyInUseError, controller_errors.NoAvailableLunError) as ex:
@@ -381,7 +381,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         except controller_errors.PermissionDeniedError as ex:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
-            context.set_details(ex)
+            context.set_details(ex.message)
             return csi_pb2.ControllerUnpublishVolumeResponse()
 
         except controller_errors.HostNotFoundError as ex:
@@ -471,11 +471,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return csi_pb2.CreateSnapshotResponse()
         except controller_errors.ObjectNotFoundError as ex:
             context.set_code(grpc.StatusCode.NOT_FOUND)
-            context.set_details(ex)
+            context.set_details(ex.message)
             return csi_pb2.CreateSnapshotResponse()
         except controller_errors.PermissionDeniedError as ex:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
-            context.set_details(ex)
+            context.set_details(ex.message)
             return csi_pb2.CreateSnapshotResponse()
         except controller_errors.SnapshotAlreadyExists as ex:
             context.set_details(ex.message)
@@ -521,7 +521,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return csi_pb2.DeleteSnapshotResponse()
         except controller_errors.PermissionDeniedError as ex:
             context.set_code(grpc.StatusCode.PERMISSION_DENIED)
-            context.set_details(ex)
+            context.set_details(ex.message)
             return csi_pb2.DeleteSnapshotResponse()
         except ValidationException as ex:
             logger.exception(ex)
