@@ -43,8 +43,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         with open(path, 'r') as yamlfile:
             self.cfg = yaml.safe_load(yamlfile)  # TODO: add the following when possible : Loader=yaml.FullLoader)
 
-    # TODO: CSI-1358 remove "# pylint: disable=too-many-branches"
-    def CreateVolume(self, request, context):  # pylint: disable=too-many-branches
+    def CreateVolume(self, request, context):
         set_current_thread_name(request.name)
         logger.info("create volume")
         try:
@@ -80,13 +79,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             array_type = detect_array_type(array_addresses)
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
-                # TODO: CSI-1358 - remove try/except
-                try:
-                    volume_final_name = self._get_volume_final_name(request, array_mediator)
-                except controller_errors.IllegalObjectName as ex:
-                    context.set_details(ex.message)
-                    context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                    return csi_pb2.CreateVolumeResponse()
+                volume_final_name = self._get_volume_final_name(request, array_mediator)
 
                 required_bytes = request.capacity_range.required_bytes
                 max_size = array_mediator.maximal_volume_size_in_bytes
@@ -431,13 +424,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             array_type = detect_array_type(array_addresses)
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
-                # TODO: CSI-1358 - remove try/except
-                try:
-                    snapshot_final_name = self._get_snapshot_final_name(request, array_mediator)
-                except controller_errors.IllegalObjectName as ex:
-                    context.set_details(ex.message)
-                    context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                    return csi_pb2.CreateSnapshotResponse()
+                snapshot_final_name = self._get_snapshot_final_name(request, array_mediator)
 
                 volume_name = array_mediator.get_volume_name(vol_id)
                 logger.info("Snapshot name : {}. Volume name : {}".format(snapshot_final_name, volume_name))
