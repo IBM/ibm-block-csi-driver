@@ -784,7 +784,7 @@ def main():
     parser = ArgumentParser()
     parser.add_argument("-e", "--csi-endpoint", dest="endpoint", help="grpc endpoint")
     parser.add_argument("-l", "--loglevel", dest="loglevel", help="log level")
-    arguments, _ = parser.parse_args()
+    arguments = parser.parse_args()
 
     # set logger level and init logger
     log_level = arguments.loglevel
