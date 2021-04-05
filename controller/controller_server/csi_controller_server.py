@@ -44,7 +44,14 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         with open(path, 'r') as yamlfile:
             self.cfg = yaml.safe_load(yamlfile)  # TODO: add the following when possible : Loader=yaml.FullLoader)
 
-    def _create_volume(self, request, context):
+    @handle_requests_safely
+    def CreateVolume(self, request, context):
+        set_current_thread_name(request.name)
+        logger.info("create volume")
+        utils.validate_create_volume_request(request)
+
+        logger.debug("volume name : {}".format(request.name))
+
         source_type, source_id = self._get_source_type_and_id(request)
 
         logger.debug("Source {0} id : {1}".format(source_type, source_id))
@@ -110,16 +117,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             res = utils.generate_csi_create_volume_response(volume, source_type)
             logger.info("finished create volume")
             return res
-
-    @handle_requests_safely
-    def CreateVolume(self, request, context):
-        set_current_thread_name(request.name)
-        logger.info("create volume")
-        utils.validate_create_volume_request(request)
-
-        logger.debug("volume name : {}".format(request.name))
-
-        return self._create_volume(request, context)
 
     def _copy_to_existing_volume_from_source(self, volume, source_id, source_type,
                                              minimum_volume_size, array_mediator, pool):
