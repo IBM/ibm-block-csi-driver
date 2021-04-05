@@ -1,3 +1,5 @@
+from decorator import decorator
+
 import grpc
 
 import controller.array_action.errors as controller_errors
@@ -8,7 +10,7 @@ from controller.csi_general import csi_pb2
 
 logger = get_stdout_logger()
 
-exceptions_to_handlers_map = {
+exceptions_to_status_codes_map = {
     ValidationException: grpc.StatusCode.INVALID_ARGUMENT,
     ObjectIdError: grpc.StatusCode.NOT_FOUND,
     controller_errors.IllegalObjectName: grpc.StatusCode.INVALID_ARGUMENT,
@@ -29,14 +31,13 @@ response_types = {
 }
 
 
-def handle_requests_safely(call):
-    def inner(servicer, request, context):
-        try:
-            return call(servicer, request, context)
-        except Exception as ex:
-            logger.exception(ex)
-            context.set_details(str(ex))
-            status_code = exceptions_to_handlers_map.get(type(ex), grpc.StatusCode.INTERNAL)
-            context.set_code(status_code)
-            return response_types[call.__name__]()
-    return inner
+@decorator
+def handle_requests_safely(call, servicer, request, context):
+    try:
+        return call(servicer, request, context)
+    except Exception as ex:
+        logger.exception(ex)
+        context.set_details(str(ex))
+        status_code = exceptions_to_status_codes_map.get(type(ex), grpc.StatusCode.INTERNAL)
+        context.set_code(status_code)
+        return response_types[call.__name__]()
