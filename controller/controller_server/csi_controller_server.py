@@ -19,7 +19,7 @@ from controller.common.node_info import NodeIdInfo
 from controller.common.utils import set_current_thread_name
 from controller.controller_server.errors import ObjectIdError
 from controller.controller_server.errors import ValidationException
-from controller.controller_server.exception_handler import handle_requests_safely
+from controller.controller_server.exception_handler import handle_common_exceptions
 from controller.csi_general import csi_pb2
 from controller.csi_general import csi_pb2_grpc
 
@@ -44,11 +44,17 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         with open(path, 'r') as yamlfile:
             self.cfg = yaml.safe_load(yamlfile)  # TODO: add the following when possible : Loader=yaml.FullLoader)
 
-    @handle_requests_safely
+    @handle_common_exceptions(csi_pb2.CreateVolumeResponse)
     def CreateVolume(self, request, context):
         set_current_thread_name(request.name)
         logger.info("create volume")
-        utils.validate_create_volume_request(request)
+        try:
+            utils.validate_create_volume_request(request)
+        except ObjectIdError as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.NOT_FOUND)
+            return csi_pb2.CreateVolumeResponse()
 
         logger.debug("volume name : {}".format(request.name))
 
