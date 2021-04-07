@@ -124,7 +124,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.info("finished create volume")
                 return res
         except Exception as ex:
-            if type(ex) in exception_handler.status_codes_by_exception.keys():
+            if type(ex) in exception_handler.status_codes_by_exception:
                 raise
             logger.error("an internal exception occurred")
             logger.exception(ex)

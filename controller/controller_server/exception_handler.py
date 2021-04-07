@@ -29,7 +29,7 @@ def handle_common_exceptions(response_type):
         try:
             return controller_method(servicer, request, context)
         except Exception as ex:
-            if type(ex) not in status_codes_by_exception.keys():
+            if type(ex) not in status_codes_by_exception:
                 raise
             logger.exception(ex)
             context.set_details(str(ex))
