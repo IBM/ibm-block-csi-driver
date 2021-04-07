@@ -91,6 +91,7 @@ class ArrayMediator(ABC):
 
         Raises:
             ObjectNotFound
+            IllegalObjectID
             PermissionDenied
             ObjectIsStillInUse
         """
@@ -161,6 +162,7 @@ class ArrayMediator(ABC):
 
         Raises:
             ObjectNotFound
+            IllegalObjectID
         """
         raise NotImplementedError
 
@@ -270,6 +272,7 @@ class ArrayMediator(ABC):
             None
         Raises:
             ObjectNotFound
+            IllegalObjectID
             PermissionDenied
             ObjectIsStillInUse
         """

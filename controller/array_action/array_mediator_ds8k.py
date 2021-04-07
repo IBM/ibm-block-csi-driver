@@ -384,8 +384,14 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.debug("Searching for volume with id: {0}".format(volume_id))
         try:
             api_volume = self.client.get_volume(volume_id)
-        except exceptions.NotFound:
-            raise array_errors.ObjectNotFoundError(volume_id)
+        except (exceptions.NotFound, exceptions.InternalServerError) as ex:
+            uppercase_message = str(ex.message).upper()
+            if ERROR_CODE_RESOURCE_NOT_EXISTS in uppercase_message:
+                raise array_errors.ObjectNotFoundError(volume_id)
+            elif INCORRECT_ID in uppercase_message:
+                raise array_errors.IllegalObjectID(volume_id)
+            else:
+                raise ex
 
         vol_name = api_volume.name
         logger.debug("found volume name : {0}".format(vol_name))
@@ -496,7 +502,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except exceptions.NotFound:
             if not_exist_err:
                 raise array_errors.ObjectNotFoundError(volume_id)
-        except (exceptions.ClientError, exceptions.Unauthorized) as ex:
+        except (exceptions.ClientError, exceptions.InternalServerError) as ex:
             if INCORRECT_ID in str(ex.message).upper():
                 raise array_errors.IllegalObjectID(volume_id)
 
