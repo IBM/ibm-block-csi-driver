@@ -3,16 +3,16 @@ import grpc
 
 
 def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_source_id=None):
-    vol = Mock()
-    vol.capacity_bytes = size
-    vol.id = wwn
-    vol.name = name
-    vol.array_address = "arr1"
-    vol.pool_name = "pool1"
-    vol.array_type = array_type
-    vol.copy_source_id = copy_source_id
+    volume = Mock()
+    volume.capacity_bytes = size
+    volume.id = wwn
+    volume.name = name
+    volume.array_address = "arr1"
+    volume.pool_name = "pool1"
+    volume.array_type = array_type
+    volume.copy_source_id = copy_source_id
 
-    return vol
+    return volume
 
 
 def get_mock_mediator_response_snapshot(capacity, name, wwn, volume_name, array_type):

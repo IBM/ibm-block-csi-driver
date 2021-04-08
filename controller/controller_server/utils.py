@@ -21,8 +21,8 @@ def get_array_connection_info_from_secret(secrets):
     return user, password, array_addresses
 
 
-def get_vol_id(new_vol):
-    return _get_object_id(new_vol)
+def get_vol_id(new_volume):
+    return _get_object_id(new_volume)
 
 
 def get_snapshot_id(new_snapshot):
@@ -177,7 +177,7 @@ def validate_expand_volume_request(request):
 
 
 def generate_csi_create_volume_response(new_volume, source_type=None):
-    logger.debug("creating volume response for vol : {0}".format(new_volume))
+    logger.debug("creating volume response for volume : {0}".format(new_volume))
 
     volume_context = {"volume_name": new_volume.name,
                       "array_address": ",".join(

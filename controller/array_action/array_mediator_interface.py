@@ -63,7 +63,7 @@ class ArrayMediator(ABC):
             name                            : name of the volume to be created in the storage system
             source_name                     : name of source to create from
             source_capacity_in_bytes        : capacity of source to create from
-            minimum_volume_size_in_bytes    : if source capacity is lower than this value vol will
+            minimum_volume_size_in_bytes    : if source capacity is lower than this value volume will
                                             be increased to this value
             pool_id                         : pool of the volume and source object to find them more efficiently.
 

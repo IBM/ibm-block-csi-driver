@@ -143,20 +143,20 @@ class LunAlreadyInUseError(BaseArrayActionException):
 
 class MappingError(BaseArrayActionException):
 
-    def __init__(self, vol, host, err):
-        self.message = messages.MappingError_message.format(vol, host, err)
+    def __init__(self, volume, host, err):
+        self.message = messages.MappingError_message.format(volume, host, err)
 
 
 class VolumeAlreadyUnmappedError(BaseArrayActionException):
 
-    def __init__(self, vol):
-        self.message = messages.VolumeAlreadyUnmapped_message.format(vol)
+    def __init__(self, volume):
+        self.message = messages.VolumeAlreadyUnmapped_message.format(volume)
 
 
 class UnMappingError(BaseArrayActionException):
 
-    def __init__(self, vol, host, err):
-        self.message = messages.UnMappingError_message.format(vol, host, err)
+    def __init__(self, volume, host, err):
+        self.message = messages.UnMappingError_message.format(volume, host, err)
 
 
 class BadNodeIdError(BaseArrayActionException):
