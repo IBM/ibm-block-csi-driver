@@ -23,17 +23,20 @@ status_codes_by_exception = {
 }
 
 
+def handle_exception(response_type, context, ex):
+    logger.exception(ex)
+    context.set_details(str(ex))
+    status_code = status_codes_by_exception.get(type(ex), grpc.StatusCode.INTERNAL)
+    context.set_code(status_code)
+    return response_type()
+
+
 def handle_common_exceptions(response_type):
     @decorator
-    def decorated_handle_common_exceptions(controller_method, servicer, request, context):
+    def handle_common_exceptions_with_response(controller_method, servicer, request, context):
         try:
             return controller_method(servicer, request, context)
         except Exception as ex:
-            if type(ex) not in status_codes_by_exception:
-                raise
-            logger.exception(ex)
-            context.set_details(str(ex))
-            status_code = status_codes_by_exception.get(type(ex), grpc.StatusCode.INTERNAL)
-            context.set_code(status_code)
-            return response_type()
-    return decorated_handle_common_exceptions
+            return handle_exception(response_type, context, ex)
+
+    return handle_common_exceptions_with_response

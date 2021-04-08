@@ -19,7 +19,7 @@ from controller.common.node_info import NodeIdInfo
 from controller.common.utils import set_current_thread_name
 from controller.controller_server.errors import ObjectIdError
 from controller.controller_server.errors import ValidationException
-from controller.controller_server.exception_handler import handle_common_exceptions, status_codes_by_exception
+from controller.controller_server.exception_handler import handle_common_exceptions, handle_exception
 from controller.csi_general import csi_pb2
 from controller.csi_general import csi_pb2_grpc
 
@@ -123,14 +123,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 res = utils.generate_csi_create_volume_response(volume, source_type)
                 logger.info("finished create volume")
                 return res
-        except Exception as ex:
-            if type(ex) in status_codes_by_exception:
-                raise
-            logger.error("an internal exception occurred")
-            logger.exception(ex)
-            context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details('an internal exception occurred : {}'.format(ex))
-            return csi_pb2.CreateVolumeResponse()
+        except (controller_errors.SpaceEfficiencyNotSupported, controller_errors.PoolDoesNotExist,
+                controller_errors.PoolDoesNotMatchCapabilities, controller_errors.ExpectedSnapshotButFoundVolumeError,
+                controller_errors.VolumeAlreadyExists) as ex:
+            handle_exception(csi_pb2.CreateVolumeResponse, context, ex)
 
     def _copy_to_existing_volume_from_source(self, volume, source_id, source_type,
                                              minimum_volume_size, array_mediator, pool):
