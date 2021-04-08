@@ -38,6 +38,10 @@ class UnsupportedStorageVersionError(BaseArrayActionException):
 # =============================================================================
 # Volume errors
 # =============================================================================
+class InvalidArgumentError(BaseArrayActionException):
+    pass
+
+
 class ObjectNotFoundError(BaseArrayActionException):
 
     def __init__(self, name):
@@ -74,14 +78,14 @@ class IllegalObjectID(BaseArrayActionException):
         self.message = "{0}".format(msg)
 
 
-class PoolDoesNotMatchCapabilities(BaseArrayActionException):
+class PoolDoesNotMatchCapabilities(InvalidArgumentError):
 
     def __init__(self, pool, capabilities, error):
         self.message = messages.PoolDoesNotMatchCapabilities_message.format(pool, capabilities,
                                                                             error)
 
 
-class SpaceEfficiencyNotSupported(BaseArrayActionException):
+class SpaceEfficiencyNotSupported(InvalidArgumentError):
 
     def __init__(self, space_efficiency):
         self.message = messages.SpaceEfficiencyNotSupported_message.format(space_efficiency)
@@ -93,7 +97,7 @@ class VolumeAlreadyExists(BaseArrayActionException):
         self.message = messages.VolumeAlreadyExists_message.format(volume, array)
 
 
-class PoolDoesNotExist(BaseArrayActionException):
+class PoolDoesNotExist(InvalidArgumentError):
 
     def __init__(self, pool, array):
         self.message = messages.PoolDoesNotExist_message.format(pool, array)
@@ -183,7 +187,7 @@ class UnsupportedConnectivityTypeError(BaseArrayActionException):
         self.message = messages.UnsupportedConnectivityTypeError_message.format(connectivity_type)
 
 
-class ExpectedSnapshotButFoundVolumeError(BaseArrayActionException):
+class ExpectedSnapshotButFoundVolumeError(InvalidArgumentError):
 
     def __init__(self, id_or_name, array):
         self.message = messages.ExpectedSnapshotButFoundVolumeError_message.format(id_or_name, array)

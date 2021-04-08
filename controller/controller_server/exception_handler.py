@@ -11,22 +11,16 @@ logger = get_stdout_logger()
 status_codes_by_exception = {
     ValidationException: grpc.StatusCode.INVALID_ARGUMENT,
     controller_errors.IllegalObjectName: grpc.StatusCode.INVALID_ARGUMENT,
-    controller_errors.SpaceEfficiencyNotSupported: grpc.StatusCode.INVALID_ARGUMENT,
-    controller_errors.PoolDoesNotExist: grpc.StatusCode.INVALID_ARGUMENT,
-    controller_errors.PoolDoesNotMatchCapabilities: grpc.StatusCode.INVALID_ARGUMENT,
     controller_errors.PoolParameterIsMissing: grpc.StatusCode.INVALID_ARGUMENT,
-    controller_errors.ExpectedSnapshotButFoundVolumeError: grpc.StatusCode.INVALID_ARGUMENT,
     controller_errors.ObjectNotFoundError: grpc.StatusCode.NOT_FOUND,
     controller_errors.PermissionDeniedError: grpc.StatusCode.PERMISSION_DENIED,
-    controller_errors.VolumeAlreadyExists: grpc.StatusCode.ALREADY_EXISTS,
     controller_errors.NotEnoughSpaceInPool: grpc.StatusCode.RESOURCE_EXHAUSTED
 }
 
 
-def handle_exception(response_type, context, ex):
+def handle_exception(ex, context, status_code, response_type):
     logger.exception(ex)
     context.set_details(str(ex))
-    status_code = status_codes_by_exception.get(type(ex), grpc.StatusCode.INTERNAL)
     context.set_code(status_code)
     return response_type()
 
@@ -37,6 +31,7 @@ def handle_common_exceptions(response_type):
         try:
             return controller_method(servicer, request, context)
         except Exception as ex:
-            return handle_exception(response_type, context, ex)
+            return handle_exception(ex, context, status_codes_by_exception.get(type(ex), grpc.StatusCode.INTERNAL),
+                                    response_type)
 
     return handle_common_exceptions_with_response

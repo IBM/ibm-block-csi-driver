@@ -123,10 +123,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 res = utils.generate_csi_create_volume_response(volume, source_type)
                 logger.info("finished create volume")
                 return res
-        except (controller_errors.SpaceEfficiencyNotSupported, controller_errors.PoolDoesNotExist,
-                controller_errors.PoolDoesNotMatchCapabilities, controller_errors.ExpectedSnapshotButFoundVolumeError,
-                controller_errors.VolumeAlreadyExists) as ex:
-            handle_exception(csi_pb2.CreateVolumeResponse, context, ex)
+        except controller_errors.InvalidArgumentError as ex:
+            handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT, csi_pb2.CreateVolumeResponse)
+        except controller_errors.VolumeAlreadyExists as ex:
+            handle_exception(ex, context, grpc.StatusCode.ALREADY_EXISTS, csi_pb2.CreateVolumeResponse)
 
     def _copy_to_existing_volume_from_source(self, volume, source_id, source_type,
                                              minimum_volume_size, array_mediator, pool):
