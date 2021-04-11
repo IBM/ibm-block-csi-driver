@@ -25,6 +25,14 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 )
 
+func printVersion(configFile *string) {
+	info, err := driver.GetVersionJSON(*configFile)
+	if err != nil {
+		logger.Panicln(err)
+	}
+	logger.Infof(fmt.Sprintf("Node version: %v", info))
+}
+
 func main() {
 	logger.Debugf("Starting CSI node...") // Note - must set this in the first line in order to define the -loglevel in the flags
 	var (
@@ -36,12 +44,9 @@ func main() {
 
 	flag.Parse()
 
+	printVersion(configFile)
+
 	if *version {
-		info, err := driver.GetVersionJSON(*configFile)
-		if err != nil {
-			logger.Panicln(err)
-		}
-		fmt.Println(info)
 		os.Exit(0)
 	}
 

@@ -659,7 +659,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         except Exception as ex:
             logger.exception(ex)
             context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details('an error occured while trying to get plugin name or version')
+            context.set_details('an error occurred while trying to get plugin name or version')
             return csi_pb2.GetPluginInfoResponse()
 
         if not name or not version:
@@ -750,6 +750,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         # controller_server.add_insecure_port('unix://{}'.format(self.server_port))
         controller_server.add_insecure_port(self.endpoint)
 
+        logger.info(f'Controller version: {self.__get_identity_config("version")}')
+
         # start the server
         logger.debug("Listening for connections on endpoint address: {}".format(self.endpoint))
 
@@ -793,8 +795,8 @@ def main():
 
     # start the server
     endpoint = arguments.endpoint
-    curr_server = ControllerServicer(endpoint)
-    curr_server.start_server()
+    controller_servicer = ControllerServicer(endpoint)
+    controller_servicer.start_server()
 
 
 if __name__ == '__main__':
