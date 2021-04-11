@@ -169,15 +169,13 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         )
         self.assertEqual(volume.name, self.volume_response.name)
 
-    def test_create_volume_return_existing(self):
+    def test_create_volume_raise_already_exists(self):
         self.client_mock.get_volumes_by_pool.return_value = [
             self.volume_response,
         ]
         pool_id = self.volume_response.pool
-        volume = self.array.create_volume(
-            self.volume_response.name, "1", 'thin', pool_id,
-        )
-        self.assertEqual(volume.name, self.volume_response.name)
+        with self.assertRaises(array_errors.VolumeAlreadyExists):
+            self.array.create_volume(self.volume_response.name, "1", 'thin', pool_id)
 
     def test_create_volume_failed_with_ClientException(self):
         self.client_mock.create_volume.side_effect = ClientException("500")
@@ -334,8 +332,13 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.map_volume_to_host.assert_called_once_with(host_name, scsi_id[-4:])
 
     def test_unmap_volume_host_not_found(self):
-        self.client_mock.get_host_mappings.side_effect = NotFound("404")
+        self.client_mock.get_host_mappings.side_effect = NotFound("404", message='BE7A0016')
         with self.assertRaises(array_errors.HostNotFoundError):
+            self.array.unmap_volume("fake_name", "fake_host")
+
+    def test_unmap_volume_already_unmapped(self):
+        self.client_mock.get_host_mappings.side_effect = NotFound("404", message='BE7A001F')
+        with self.assertRaises(array_errors.VolumeAlreadyUnmappedError):
             self.array.unmap_volume("fake_name", "fake_host")
 
     def test_unmap_volume_volume_not_found(self):

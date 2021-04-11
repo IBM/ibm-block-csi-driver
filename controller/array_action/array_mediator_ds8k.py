@@ -27,6 +27,8 @@ KNOWN_ERROR_CODE_INVALID_CREDENTIALS = 'BE7A0029'
 ERROR_CODE_RESOURCE_NOT_EXISTS = 'BE7A0001'
 INCORRECT_ID = 'BE7A0005'
 NO_TOKEN_IS_SPECIFIED = 'BE7A001A'
+HOST_DOES_NOT_EXIST = 'BE7A0016'
+MAPPING_DOES_NOT_EXIST = 'BE7A001F'
 ERROR_CODE_VOLUME_NOT_FOUND_FOR_MAPPING = 'BE586015'
 ERROR_CODE_ALREADY_FLASHCOPY = '000000AE'
 ERROR_CODE_VOLUME_NOT_FOUND_OR_ALREADY_PART_OF_CS_RELATIONSHIP = '00000013'
@@ -257,7 +259,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             )
             logger.info("Found volume {}".format(name))
             if api_volume is not None:
-                return api_volume
+                raise array_errors.VolumeAlreadyExists(name, self.identifier)
             else:
                 api_volume = self.client.create_volume(**cli_kwargs)
 
@@ -277,7 +279,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 raise array_errors.VolumeCreationError(name)
         except (exceptions.ClientError, exceptions.ClientException) as ex:
             if ERROR_CODE_CREATE_VOLUME_NOT_ENOUGH_EXTENTS in str(ex.message).upper():
-                raise array_errors.NotEnoughSpaceInPool(pool=pool_id)
+                raise array_errors.NotEnoughSpaceInPool(id_or_name=pool_id)
             else:
                 logger.error(
                     "Failed to create volume {} on array {}, reason is: {}".format(
@@ -461,8 +463,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 logger.debug("Successfully unmapped volume from host with lun {}.".format(lunid))
             else:
                 raise array_errors.ObjectNotFoundError(volume_id)
-        except exceptions.NotFound:
-            raise array_errors.HostNotFoundError(host_name)
+        except exceptions.NotFound as ex:
+            if HOST_DOES_NOT_EXIST in str(ex.message).upper():
+                raise array_errors.HostNotFoundError(host_name)
+            elif MAPPING_DOES_NOT_EXIST in str(ex.message).upper():
+                raise array_errors.VolumeAlreadyUnmappedError(volume_id)
         except exceptions.ClientException as ex:
             raise array_errors.UnmappingError(volume_id, host_name, ex.details)
 

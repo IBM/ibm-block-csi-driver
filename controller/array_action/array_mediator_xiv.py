@@ -223,7 +223,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         except xcli_errors.CommandFailedRuntimeError as ex:
             logger.exception(ex)
             if NO_ALLOCATION_SPACE_ERROR in ex.status:
-                raise array_errors.NotEnoughSpaceInPool(pool=pool)
+                raise array_errors.NotEnoughSpaceInPool(id_or_name=pool)
 
     def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
                                             minimum_volume_size_in_bytes, pool_id=None):
@@ -436,13 +436,13 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def unmap_volume(self, volume_id, host_name):
         logger.debug("un-mapping volume : {0} from host : {1}".format(volume_id, host_name))
 
-        vol_name = self._get_object_name_by_wwn(volume_id)
+        volume_name = self._get_object_name_by_wwn(volume_id)
 
         try:
-            self.client.cmd.unmap_vol(host=host_name, vol=vol_name)
+            self.client.cmd.unmap_vol(host=host_name, vol=volume_name)
         except xcli_errors.VolumeBadNameError as ex:
             logger.exception(ex)
-            raise array_errors.ObjectNotFoundError(vol_name)
+            raise array_errors.ObjectNotFoundError(volume_name)
         except xcli_errors.HostBadNameError as ex:
             logger.exception(ex)
             raise array_errors.HostNotFoundError(host_name)
@@ -453,9 +453,9 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         except xcli_errors.CommandFailedRuntimeError as ex:
             logger.exception(ex)
             if UNDEFINED_MAPPING_ERROR in ex.status:
-                raise array_errors.VolumeAlreadyUnmappedError(vol_name)
+                raise array_errors.VolumeAlreadyUnmappedError(volume_name)
             else:
-                raise array_errors.UnmappingError(vol_name, host_name, ex)
+                raise array_errors.UnmappingError(volume_name, host_name, ex)
 
     def _get_iscsi_targets(self):
         ip_interfaces = self.client.cmd.ipinterface_list()

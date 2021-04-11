@@ -89,8 +89,8 @@ class SpaceEfficiencyNotSupported(BaseArrayActionException):
 
 class VolumeAlreadyExists(BaseArrayActionException):
 
-    def __init__(self, volume, array):
-        self.message = messages.VolumeAlreadyExists_message.format(volume, array)
+    def __init__(self, volume_name, array):
+        self.message = messages.VolumeAlreadyExists_message.format(volume_name, array)
 
 
 class PoolDoesNotExist(BaseArrayActionException):
@@ -143,26 +143,20 @@ class LunAlreadyInUseError(BaseArrayActionException):
 
 class MappingError(BaseArrayActionException):
 
-    def __init__(self, volume, host, err):
-        self.message = messages.MappingError_message.format(volume, host, err)
+    def __init__(self, volume_id_or_name, host, err):
+        self.message = messages.MappingError_message.format(volume_id_or_name, host, err)
 
 
 class VolumeAlreadyUnmappedError(BaseArrayActionException):
 
-    def __init__(self, volume):
-        self.message = messages.VolumeAlreadyUnmapped_message.format(volume)
+    def __init__(self, volume_id_or_name):
+        self.message = messages.VolumeAlreadyUnmapped_message.format(volume_id_or_name)
 
 
 class UnmappingError(BaseArrayActionException):
 
-    def __init__(self, volume, host, err):
-        self.message = messages.UnMappingError_message.format(volume, host, err)
-
-
-class BadNodeIdError(BaseArrayActionException):
-
-    def __init__(self, name):
-        self.message = messages.BadNodeIdError_message.format(name)
+    def __init__(self, volume_id_or_name, host, err):
+        self.message = messages.UnMappingError_message.format(volume_id_or_name, host, err)
 
 
 class VolumeMappedToMultipleHostsError(BaseArrayActionException):
@@ -191,8 +185,8 @@ class ExpectedSnapshotButFoundVolumeError(BaseArrayActionException):
 
 class SnapshotAlreadyExists(BaseArrayActionException):
 
-    def __init__(self, snapshot, array):
-        self.message = messages.SnapshotAlreadyExistsError_message.format(snapshot, array)
+    def __init__(self, snapshot_id_or_name, array):
+        self.message = messages.SnapshotAlreadyExistsError_message.format(snapshot_id_or_name, array)
 
 
 class ObjectIsStillInUseError(BaseArrayActionException):
@@ -210,5 +204,5 @@ class InvalidCliResponseError(BaseArrayActionException):
 
 class NotEnoughSpaceInPool(BaseArrayActionException):
 
-    def __init__(self, pool):
-        self.message = messages.NotEnoughSpaceInPoolError_message.format(pool)
+    def __init__(self, id_or_name):
+        self.message = messages.NotEnoughSpaceInPoolError_message.format(id_or_name)

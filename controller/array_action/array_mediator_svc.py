@@ -285,7 +285,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 if OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message:
                     raise array_errors.ObjectNotFoundError(volume_name)
                 if NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND in ex.my_message:
-                    raise array_errors.NotEnoughSpaceInPool(pool=cli_volume.mdisk_grp_name)
+                    raise array_errors.NotEnoughSpaceInPool(id_or_name=cli_volume.mdisk_grp_name)
                 else:
                     raise ex
 
@@ -395,7 +395,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                     raise array_errors.PoolDoesNotMatchCapabilities(
                         pool, space_efficiency, ex)
                 if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in ex.my_message:
-                    raise array_errors.NotEnoughSpaceInPool(pool=pool)
+                    raise array_errors.NotEnoughSpaceInPool(id_or_name=pool)
                 if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, INVALID_NAME, TOO_MANY_CHARS)):
                     raise array_errors.IllegalObjectName(ex.my_message)
                 raise ex
@@ -747,11 +747,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def unmap_volume(self, volume_id, host_name):
         logger.debug("un-mapping volume : {0} from host : "
                      "{1}".format(volume_id, host_name))
-        vol_name = self._get_volume_name_by_wwn(volume_id)
+        volume_name = self._get_volume_name_by_wwn(volume_id)
 
         cli_kwargs = {
             'host': host_name,
-            'vdisk_id': vol_name
+            'vdisk_id': volume_name
         }
 
         try:
@@ -759,15 +759,15 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 logger.error(msg="Map volume {0} to host {1} failed. Reason "
-                                 "is: {2}".format(vol_name, host_name, ex))
+                                 "is: {2}".format(volume_name, host_name, ex))
                 if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
                     raise array_errors.HostNotFoundError(host_name)
                 if OBJ_NOT_FOUND in ex.my_message:
-                    raise array_errors.ObjectNotFoundError(vol_name)
+                    raise array_errors.ObjectNotFoundError(volume_name)
                 if VOL_ALREADY_UNMAPPED in ex.my_message:
                     raise array_errors.VolumeAlreadyUnmappedError(
-                        vol_name)
-                raise array_errors.UnmappingError(vol_name,
+                        volume_name)
+                raise array_errors.UnmappingError(volume_name,
                                                   host_name, ex)
         except Exception as ex:
             logger.exception(ex)

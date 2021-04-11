@@ -6,9 +6,8 @@ from google.protobuf.timestamp_pb2 import Timestamp
 import controller.controller_server.config as config
 import controller.controller_server.messages as messages
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
-from controller.array_action.errors import HostNotFoundError
 from controller.common.csi_logger import get_stdout_logger
-from controller.controller_server.errors import ValidationException, ObjectIdError
+from controller.controller_server.errors import BadNodeIdError, ObjectIdError, ValidationException
 from controller.csi_general import csi_pb2
 
 logger = get_stdout_logger()
@@ -290,7 +289,7 @@ def get_node_id_info(node_id):
     elif len(split_node) == 2:
         hostname, fc_wwns = split_node
     else:
-        raise HostNotFoundError(node_id)
+        raise BadNodeIdError(node_id)
     logger.debug("node name : {0}, iscsi_iqn : {1}, fc_wwns : {2} ".format(
         hostname, iscsi_iqn, fc_wwns))
     return hostname, fc_wwns, iscsi_iqn

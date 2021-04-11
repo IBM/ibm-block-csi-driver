@@ -35,7 +35,7 @@ class ArrayMediator(ABC):
         This function should create a volume in the storage system.
 
         Args:
-            volume_name      : name of the volume to be created in the stoarge system
+            volume_name      : name of the volume to be created in the storage system
             size_in_bytes : size in bytes of the volume
             space_efficiency  : space efficiency (None for default)
             pool          : pool name to create the volume in
