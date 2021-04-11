@@ -66,13 +66,13 @@ class VolumeDeletionError(BaseArrayActionException):
         self.message = messages.VolumeDeletionError_message.format(volume_id)
 
 
-class IllegalObjectName(BaseArrayActionException):
+class IllegalObjectName(InvalidArgumentError):
 
     def __init__(self, msg):
         self.message = "{0}".format(msg)
 
 
-class IllegalObjectID(BaseArrayActionException):
+class IllegalObjectID(InvalidArgumentError):
 
     def __init__(self, msg):
         self.message = "{0}".format(msg)
@@ -103,7 +103,7 @@ class PoolDoesNotExist(InvalidArgumentError):
         self.message = messages.PoolDoesNotExist_message.format(pool, array)
 
 
-class PoolParameterIsMissing(BaseArrayActionException):
+class PoolParameterIsMissing(InvalidArgumentError):
 
     def __init__(self, array_type):
         self.message = messages.PoolParameterIsMissing.format(array_type)
@@ -181,7 +181,7 @@ class NoIscsiTargetsFoundError(BaseArrayActionException):
         self.message = messages.NoIscsiTargetsFoundError_message.format(endpoint)
 
 
-class UnsupportedConnectivityTypeError(BaseArrayActionException):
+class UnsupportedConnectivityTypeError(InvalidArgumentError):
 
     def __init__(self, connectivity_type):
         self.message = messages.UnsupportedConnectivityTypeError_message.format(connectivity_type)
