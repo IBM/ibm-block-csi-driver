@@ -175,8 +175,8 @@ class TestUtils(unittest.TestCase):
         with self.assertRaises(ValidationException):
             utils.validate_delete_snapshot_request(request)
 
-    @patch("controller.controller_server.utils.get_vol_id")
-    def test_get_create_volume_response(self, get_vol_id):
+    @patch("controller.controller_server.utils.get_volume_id")
+    def test_get_create_volume_response(self, get_volume_id):
         new_volume = Mock()
         new_volume.name = "name"
         new_volume.array_address = ["fqdn1", "fqdn2"]
@@ -186,18 +186,18 @@ class TestUtils(unittest.TestCase):
         new_volume.capacity_bytes = 10
         new_volume.copy_source_id = None
 
-        get_vol_id.return_value = "a9k:name"
+        get_volume_id.return_value = "a9k:name"
         res = utils.generate_csi_create_volume_response(new_volume)
 
         self.assertEqual(10, res.volume.capacity_bytes)
 
-        get_vol_id.side_effect = [Exception("err")]
+        get_volume_id.side_effect = [Exception("err")]
 
         with self.assertRaises(Exception):
             utils.generate_csi_create_volume_response(new_volume)
 
-    @patch("controller.controller_server.utils.get_vol_id")
-    def test_get_create_volume_response_with_single_IP(self, get_vol_id):
+    @patch("controller.controller_server.utils.get_volume_id")
+    def test_get_create_volume_response_with_single_IP(self, get_volume_id):
         new_volume = Mock()
         new_volume.name = "name"
         new_volume.array_address = "9.1.1.1"
@@ -207,14 +207,14 @@ class TestUtils(unittest.TestCase):
         new_volume.capacity_bytes = 10
         new_volume.copy_source_id = None
 
-        get_vol_id.return_value = "svc:name"
+        get_volume_id.return_value = "svc:name"
         res = utils.generate_csi_create_volume_response(new_volume)
 
         self.assertEqual(10, res.volume.capacity_bytes)
         self.assertEqual("9.1.1.1", res.volume.volume_context['array_address'])
 
-    @patch("controller.controller_server.utils.get_vol_id")
-    def test_get_create_volume_response_with_Multiple_IP(self, get_vol_id):
+    @patch("controller.controller_server.utils.get_volume_id")
+    def test_get_create_volume_response_with_Multiple_IP(self, get_volume_id):
         new_volume = Mock()
         new_volume.name = "name"
         new_volume.array_address = ["9.1.1.1", "9.1.1.2"]
@@ -224,7 +224,7 @@ class TestUtils(unittest.TestCase):
         new_volume.capacity_bytes = 10
         new_volume.copy_source_id = None
 
-        get_vol_id.return_value = "svc:name"
+        get_volume_id.return_value = "svc:name"
         res = utils.generate_csi_create_volume_response(new_volume)
 
         self.assertEqual(10, res.volume.capacity_bytes)

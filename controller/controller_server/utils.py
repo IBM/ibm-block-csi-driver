@@ -21,7 +21,7 @@ def get_array_connection_info_from_secret(secrets):
     return user, password, array_addresses
 
 
-def get_vol_id(new_volume):
+def get_volume_id(new_volume):
     return _get_object_id(new_volume)
 
 
@@ -197,7 +197,7 @@ def generate_csi_create_volume_response(new_volume, source_type=None):
 
     res = csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(
         capacity_bytes=new_volume.capacity_bytes,
-        volume_id=get_vol_id(new_volume),
+        volume_id=get_volume_id(new_volume),
         content_source=content_source,
         volume_context=volume_context))
 
