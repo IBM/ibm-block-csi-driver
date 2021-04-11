@@ -750,7 +750,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         # controller_server.add_insecure_port('unix://{}'.format(self.server_port))
         controller_server.add_insecure_port(self.endpoint)
 
-        logger.info(f'Controller version: {self.__get_identity_config("version")}')
+        logger.info("Controller version: {}".format(self.__get_identity_config("version")))
 
         # start the server
         logger.debug("Listening for connections on endpoint address: {}".format(self.endpoint))
