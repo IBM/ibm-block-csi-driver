@@ -153,7 +153,7 @@ class VolumeAlreadyUnmappedError(BaseArrayActionException):
         self.message = messages.VolumeAlreadyUnmapped_message.format(volume)
 
 
-class UnMappingError(BaseArrayActionException):
+class UnmappingError(BaseArrayActionException):
 
     def __init__(self, volume, host, err):
         self.message = messages.UnMappingError_message.format(volume, host, err)

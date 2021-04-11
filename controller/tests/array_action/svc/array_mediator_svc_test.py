@@ -770,7 +770,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_unmap_volume_rmvdiskhostmap_error(svc_errors.CommandExecutionError('CMMVC5842E'),
                                                      array_errors.VolumeAlreadyUnmappedError)
         self._test_unmap_volume_rmvdiskhostmap_error(svc_errors.CommandExecutionError('Failed'),
-                                                     array_errors.UnMappingError)
+                                                     array_errors.UnmappingError)
         self._test_unmap_volume_rmvdiskhostmap_error(Exception, Exception)
 
     def test_unmap_volume_success(self):

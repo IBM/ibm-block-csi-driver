@@ -574,7 +574,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
                                      array_errors.VolumeAlreadyUnmappedError)
 
     def test_unmap_volume_command_runtime_other_error(self):
-        self.unmap_volume_with_error(xcli_errors.CommandFailedRuntimeError, "", array_errors.UnMappingError)
+        self.unmap_volume_with_error(xcli_errors.CommandFailedRuntimeError, "", array_errors.UnmappingError)
 
     def test_unmap_volume_success(self):
         self.mediator.client.cmd.unmap_vol.return_value = None

@@ -355,7 +355,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             })
         ]
         self.client_mock.unmap_volume_from_host.side_effect = ClientException("500")
-        with self.assertRaises(array_errors.UnMappingError):
+        with self.assertRaises(array_errors.UnmappingError):
             self.array.unmap_volume(scsi_id, host_name)
 
     def test_unmap_volume(self):

@@ -767,7 +767,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 if VOL_ALREADY_UNMAPPED in ex.my_message:
                     raise array_errors.VolumeAlreadyUnmappedError(
                         vol_name)
-                raise array_errors.UnMappingError(vol_name,
+                raise array_errors.UnmappingError(vol_name,
                                                   host_name, ex)
         except Exception as ex:
             logger.exception(ex)

@@ -455,7 +455,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             if UNDEFINED_MAPPING_ERROR in ex.status:
                 raise array_errors.VolumeAlreadyUnmappedError(vol_name)
             else:
-                raise array_errors.UnMappingError(vol_name, host_name, ex)
+                raise array_errors.UnmappingError(vol_name, host_name, ex)
 
     def _get_iscsi_targets(self):
         ip_interfaces = self.client.cmd.ipinterface_list()

@@ -464,7 +464,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except exceptions.NotFound:
             raise array_errors.HostNotFoundError(host_name)
         except exceptions.ClientException as ex:
-            raise array_errors.UnMappingError(volume_id, host_name, ex.details)
+            raise array_errors.UnmappingError(volume_id, host_name, ex.details)
 
     def _get_api_volume_from_volumes(self, volume_candidates, volume_name):
         for volume in volume_candidates:

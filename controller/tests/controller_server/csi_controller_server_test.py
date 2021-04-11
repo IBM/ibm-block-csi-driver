@@ -1291,7 +1291,7 @@ class TestControllerServerUnPublishVolume(unittest.TestCase):
         self.servicer.ControllerUnpublishVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
 
-        self.mediator.unmap_volume.side_effect = [array_errors.UnMappingError("", "", "")]
+        self.mediator.unmap_volume.side_effect = [array_errors.UnmappingError("", "", "")]
         storage_agent.return_value = self.storage_agent
         self.servicer.ControllerUnpublishVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
