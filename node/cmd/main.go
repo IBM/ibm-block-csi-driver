@@ -36,17 +36,17 @@ func logVersionInfo(configFile *string) {
 func main() {
 	logger.Debugf("Starting CSI node...") // Note - must set this in the first line in order to define the -loglevel in the flags
 	var (
-		endpoint   = flag.String("csi-endpoint", "unix://csi/csi.sock", "CSI Endpoint")
-		version    = flag.Bool("version", false, "Print the version and exit.")
-		configFile = flag.String("config-file-path", "./config.yaml", "Shared config file.")
-		hostname   = flag.String("hostname", "host-dns-name", "The name of the host the node is running on.")
+		endpoint            = flag.String("csi-endpoint", "unix://csi/csi.sock", "CSI Endpoint")
+		exitAfterLogVersion = flag.Bool("version", false, "Log the version and exit.")
+		configFile          = flag.String("config-file-path", "./config.yaml", "Shared config file.")
+		hostname            = flag.String("hostname", "host-dns-name", "The name of the host the node is running on.")
 	)
 
 	flag.Parse()
 
 	logVersionInfo(configFile)
 
-	if *version {
+	if *exitAfterLogVersion {
 		os.Exit(0)
 	}
 
