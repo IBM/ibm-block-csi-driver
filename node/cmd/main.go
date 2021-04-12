@@ -25,12 +25,12 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 )
 
-func printVersion(configFile *string) {
+func logVersionInfo(configFile *string) {
 	info, err := driver.GetVersionJSON(*configFile)
 	if err != nil {
-		logger.Panicln(err)
+		logger.Errorln(err)
 	}
-	logger.Infof(fmt.Sprintf("Node version: %v", info))
+	logger.Infof(fmt.Sprintf("Node version info: %v", info))
 }
 
 func main() {
@@ -44,7 +44,7 @@ func main() {
 
 	flag.Parse()
 
-	printVersion(configFile)
+	logVersionInfo(configFile)
 
 	if *version {
 		os.Exit(0)
