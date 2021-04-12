@@ -16,7 +16,7 @@ IBM resources
 -   [IBM DS8900 documentation](https://www.ibm.com/docs/en/ds8900) \(ibm.com/docs/en/ds8900\)
 -   [IBM Spectrum® Access for IBM Cloud® Private Blueprint](https://www-01.ibm.com/common/ssi/cgi-bin/ssialias?htmlfid=TSW03569USEN&) \(ibm.com/downloads/cas/KK5PGD8E\)
 
-    Used as the FlexVolume driver based solution for OpenShift® 3.11, using [IBM Storage Enabler for Containers](https://www.ibm.com/docs/en/stgenablercontainers)\(ibm.com/docs/en/stgenablercontainers\)
+    Used as the FlexVolume driver based solution for OpenShift® 3.11, using [IBM Storage Enabler for Containers](https://www.ibm.com/docs/en/stgenablercontainers) \(ibm.com/docs/en/stgenablercontainers\)
 
 -   [IBM Storage for Red Hat® OpenShift Blueprint](http://www.redbooks.ibm.com/abstracts/redp5565.html?Open) \(http://www.redbooks.ibm.com/abstracts/redp5565.html?Open\)
 
