@@ -199,6 +199,14 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.mediator.get_snapshot.assert_called_once_with(snapshot_name, pool_id=None)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_snapshot_with_prefix_too_long_exception(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+        self.request.parameters.update({"snapshot_name_prefix": "a" * 128})
+        self.servicer.CreateSnapshot(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_get_snapshot_name_too_long_success(self, storage_agent):
         self._prepare_create_snapshot_mocks(storage_agent)
         self.mediator.max_snapshot_name_length = 63
