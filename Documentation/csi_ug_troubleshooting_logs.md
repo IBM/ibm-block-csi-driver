@@ -8,7 +8,7 @@ To collect and display logs, related to the different components of IBM® block 
 
 Log collection for CSI pods, daemonset, and StatefulSet
 :   ```
-color:blue;kubectl get all -n *<namespace\>*  -l csi
+kubectl get all -n *<namespace\>*  -l csi
 ```
 
 Log collection for IBM block storage CSI driver controller

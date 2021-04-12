@@ -21,7 +21,7 @@ The following limitations apply when using volume clones with the IBM block stor
 
     **Note:** The size can be expanded after the cloning process.
 
--   A PVC and its clone need to both have the same volume mode \(Filesystem or Block\).
+-   A PVC and its clone need to both have the same volume mode \(**Filesystem** or **Block**\).
 
 ## Volume expansion limitations
 
@@ -30,4 +30,3 @@ The following limitations apply when expanding volumes with the IBM block storag
 -   When using the CSI driver with IBM Spectrum Virtualize Family and IBM DS8000 Family products, during size expansion of a PersistentVolumeClaim \(PVC\), the size remains until all snapshots of the specific PVC are deleted.
 -   When expanding a PVC while not in use by a pod, the volume size immediately increases on the storage side. PVC size only increases, however, after a pod begins to use the PVC.
 -   When expanding a filesystem PVC for a volume that was previously formatted but is now no longer being used by a pod, any copy or replication operations performed on the PVC \(such as snapshots or cloning, and so on\) results in a copy with the newer, larger, size on the storage. However, its filesystem has the original, smaller, size.
-

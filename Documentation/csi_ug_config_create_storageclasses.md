@@ -26,7 +26,7 @@ Create a storage class yaml file in order to define the storage system pool name
 |
     |IBM® DS8000® Family|    -   none \(default value\)
     -   thin
- **Note:** If not specified, the default value is color:blue;none.
+ **Note:** If not specified, the default value is none.
 
 |
 
@@ -41,7 +41,7 @@ Create a storage class yaml file in order to define the storage system pool name
 
         **Note:** For IBM DS8000 Family, the maximum prefix length is five characters.The maximum prefix length for other systems is 20 characters.
 
-        color:blue;For storage systems using Spectrum Virtualize, the CSI\_ prefix is added as default if not specified by the user.
+        For storage systems using Spectrum Virtualize, the CSI\_ prefix is added as default if not specified by the user.
 
     ```screen
     kind: StorageClass

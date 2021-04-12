@@ -15,7 +15,7 @@ When configuring the file, be sure to use the same array secret and array secret
 
     **Note:** For IBM DS8000® Family, the maximum prefix length is five characters.The maximum prefix length for other systems is 20 characters.
 
-    color:blue;For storage systems using Spectrum Virtualize, the CSI\_ prefix is added as default if not specified by the user.
+    For storage systems using Spectrum Virtualize, the CSI\_ prefix is added as default if not specified by the user.
 
 
 ```screen

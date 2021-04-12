@@ -35,7 +35,7 @@ apiVersion: v1
 metadata:
   name: demo-pvc-file-system
 spec:
-  volumeMode: **Filesystem**  color:blue;\# Optional. The default is Filesystem.
+  volumeMode: **Filesystem**  \# Optional. The default is Filesystem.
   accessModes:
   - ReadWriteOnce
   resources:
