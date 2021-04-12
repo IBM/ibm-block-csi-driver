@@ -2,9 +2,10 @@ import unittest
 
 from mock import patch, Mock
 
+import controller.array_action.errors as array_errors
 import controller.controller_server.utils as utils
 from controller.controller_server.csi_controller_server import ControllerServicer
-from controller.controller_server.errors import BadNodeIdError, ObjectIdError, ValidationException
+from controller.controller_server.errors import ObjectIdError, ValidationException
 from controller.csi_general import csi_pb2
 from controller.tests.controller_server.csi_controller_server_test import ProtoBufMock
 
@@ -299,7 +300,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(volume_id, "volume-id")
 
     def test_get_node_id_info(self):
-        with self.assertRaises(BadNodeIdError) as ex:
+        with self.assertRaises(array_errors.HostNotFoundError) as ex:
             utils.get_node_id_info("badnodeformat")
             self.assertTrue("node" in ex.message)
 

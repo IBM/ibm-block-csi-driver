@@ -13,12 +13,6 @@ class ValidationException(BaseControllerServerException):
         self.message = messages.ValidationException_message.format(msg)
 
 
-class BadNodeIdError(BaseControllerServerException):
-
-    def __init__(self, name):
-        self.message = messages.node_id_wrong_format_message.format(name)
-
-
 class ObjectIdError(BaseControllerServerException):
 
     def __init__(self, object_type, object_id):

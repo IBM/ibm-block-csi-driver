@@ -16,7 +16,7 @@ from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger, set_log_level, logging
 from controller.common.node_info import NodeIdInfo
 from controller.common.utils import set_current_thread_name
-from controller.controller_server.errors import BadNodeIdError, ObjectIdError, ValidationException
+from controller.controller_server.errors import ObjectIdError, ValidationException
 from controller.csi_general import csi_pb2
 from controller.csi_general import csi_pb2_grpc
 
@@ -324,7 +324,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return csi_pb2.ControllerPublishVolumeResponse()
 
         except (array_errors.HostNotFoundError, array_errors.ObjectNotFoundError,
-                array_errors.NoIscsiTargetsFoundError, BadNodeIdError, ObjectIdError) as ex:
+                array_errors.NoIscsiTargetsFoundError, ObjectIdError) as ex:
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)
@@ -388,12 +388,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.exception(ex)
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.NOT_FOUND)
-            return csi_pb2.ControllerUnpublishVolumeResponse()
-
-        except BadNodeIdError as ex:
-            logger.exception(ex)
-            context.set_details(ex.message)
-            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.ControllerUnpublishVolumeResponse()
 
         except Exception as ex:

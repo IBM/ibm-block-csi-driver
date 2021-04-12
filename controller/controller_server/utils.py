@@ -3,11 +3,12 @@ from hashlib import sha256
 import base58
 from google.protobuf.timestamp_pb2 import Timestamp
 
+import controller.array_action.errors as array_errors
 import controller.controller_server.config as config
 import controller.controller_server.messages as messages
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.common.csi_logger import get_stdout_logger
-from controller.controller_server.errors import BadNodeIdError, ObjectIdError, ValidationException
+from controller.controller_server.errors import ObjectIdError, ValidationException
 from controller.csi_general import csi_pb2
 
 logger = get_stdout_logger()
@@ -289,7 +290,7 @@ def get_node_id_info(node_id):
     elif len(split_node) == 2:
         hostname, fc_wwns = split_node
     else:
-        raise BadNodeIdError(node_id)
+        raise array_errors.HostNotFoundError(node_id)
     logger.debug("node name : {0}, iscsi_iqn : {1}, fc_wwns : {2} ".format(
         hostname, iscsi_iqn, fc_wwns))
     return hostname, fc_wwns, iscsi_iqn
