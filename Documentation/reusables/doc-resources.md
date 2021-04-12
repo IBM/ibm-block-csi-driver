@@ -1,22 +1,3 @@
-# Publications and related information
-
-The following Portable Document Format \(PDF\) publications and related online information sources are available for the IBM® block storage CSI driver.
-
-To view a PDF file, you need Adobe™ Reader. You can download it at no charge from the [Adobe website](http://get.adobe.com/reader/).
-
-## Publications
-
-|IBM block storage CSI driver publication|Description|PDF download link|
-|----------------------------------------|-----------|-----------------|
-|*Release notes*|This publication describes requirements, compatibility, change log, and known issues information for version 1.4.0.First Edition \(December 2020\) for version 1.4.0.|![PDF icon](PDF_icon.jpg) [Download](PDFs/IBM_block_storage_CSI_driver_1.4.0_RN.pdf)|
-|*User guide*|This publication describes how to prepare for, install, configure, and use IBM block storage CSI driver.Publication number: SC27-9590-07.|![PDF icon](PDF_icon.jpg)[Download](PDFs/IBM_block_storage_CSI_driver_1.4.0_UG.pdf)|
-
-{% reusables.doc-resources %}}
-
-## Related information and publications
-
-For more information about storage systems and orchestration platforms that are supported by IBM® block storage CSI driver, see the following resources.
-
 IBM resources
 
 -   [IBM SAN Volume Controller documentation](https://www.ibm.com/docs/en/sanvolumecontroller)\(ibm.com/docs/en/sanvolumecontroller)
@@ -39,4 +20,3 @@ External resources
 -   [Persistent volumes on Kubernetes](https://kubernetes.io/docs/concepts/storage/volumes/) \(kubernetes.io/docs/concepts/storage/volumes\)
 -   [Kubernetes Documentation](https://kubernetes.io/docs/home/) \(kubernetes.io/docs/home/\)
 -   [Kubernetes Blog](https://kubernetes.io/blog/) \(kubernetes.io//blog\)
-
