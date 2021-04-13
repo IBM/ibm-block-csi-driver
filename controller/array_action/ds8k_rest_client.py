@@ -51,7 +51,7 @@ def scsilun_to_int(lun):
                (pretreated_scsilun & 0xFFFF) << 16
 
 
-class RESTClient():
+class RESTClient:
     """
     driver side client. Used to interaction with pyds8k client as an adaptor.
 
