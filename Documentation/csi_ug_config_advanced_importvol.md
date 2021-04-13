@@ -4,17 +4,17 @@ Use this information to import volumes created externally from the IBM® block s
 
 Before starting to import an existing volume, find the following information in the existing volume in order to include the information in the persistent volume \(PV\) yaml file:
 
--   <parm>volumeHandle</parm>
--   volumeAttributes \(optional\)
+-   `volumeHandle`
+-   `volumeAttributes` \(optional\)
 
     Including:
 
-    -   pool\_name:<Name of Pool where volume is located\>\(Listed as pool\_id: for DS8000® Family systems.\)
-    -   storage\_type: <SVC \| A9K \| DS8K\>
-    -   volume\_name:<Volume name\>
-    -   array\_address:<Array address\>
+    -   `pool\_name`:<Name of Pool where volume is located\>\(Listed as `pool\_id`: for DS8000® Family systems.\)
+    -   `storage\_type`: <SVC \| A9K \| DS8K\>
+    -   `volume\_name`:<Volume name\>
+    -   `array\_address`:<Array address\>
 
-To find the volumeHandle, use one of the following procedures:
+To find the `volumeHandle`, use one of the following procedures:
 
 -   **Through command line \(for Spectrum Virtualize Family\):**
 
@@ -74,11 +74,11 @@ Use this procedure to help build a PV yaml file for your volumes.
 
 1.  Create a persistent volume \(PV\) yaml file.
 
-    **Important:** Be sure to include the storageClassName and controllerPublishSecretRef parameters or errors will occur.
+    **Important:** Be sure to include the `storageClassName` and `controllerPublishSecretRef` parameters or errors will occur.
 
-2.  Take the volume\_name and other optional information \(collected before the procedure\) and insert it into the yaml file.
+2.  Take the `volume\_name` and other optional information \(collected before the procedure\) and insert it into the yaml file.
 
-    ```screen
+    <pre>
     apiVersion: v1
     kind: PersistentVolume
     metadata:
@@ -95,16 +95,16 @@ Use this procedure to help build a PV yaml file for your volumes.
           name: demo-secret
           namespace: default
         driver: block.csi.ibm.com
-        **\# volumeAttributes:
+        <b># volumeAttributes:
           \# pool\_name: ibmc-block-gold
           \# storage\_type: SVC
           \# volume\_name: vol1
           \# array\_address: baremetal10-cluster.xiv.ibm.com
-        volumeHandle: SVC:600507640082000B08000000000004FF**
+        volumeHandle: SVC:600507640082000B08000000000004FF</b>
       \# persistentVolumeReclaimPolicy: Retain
       storageClassName: ibmc-block-gold
       # volumeMode: Filesystem
-    ```
+    </pre>
 
 3.  Create a PersistentVolumeClaim \(PVC\) yaml file.
 
