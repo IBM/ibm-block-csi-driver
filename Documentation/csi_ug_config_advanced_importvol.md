@@ -9,18 +9,16 @@ Before starting to import an existing volume, find the following information in 
 
     Including:
 
-    -   `pool\_name`:<Name of Pool where volume is located\>\(Listed as `pool\_id`: for DS8000® Family systems.\)
-    -   `storage\_type`: <SVC \| A9K \| DS8K\>
-    -   `volume\_name`:<Volume name\>
-    -   `array\_address`:<Array address\>
+    -   `pool_name`:<Name of Pool where volume is located\>\(Listed as `pool_id`: for DS8000® Family systems.\)
+    -   `storage_type`: <SVC \| A9K \| DS8K\>
+    -   `volume_name`:<Volume name\>
+    -   `array_address`:<Array address\>
 
 To find the `volumeHandle`, use one of the following procedures:
 
 -   **Through command line \(for Spectrum Virtualize Family\):**
 
-    ```
-    lsvdisk <volume name\> | grep vdisk_UID
-    ```
+    `    lsvdisk <volume name> | grep vdisk_UID`
 
     ```screen
     lsvdisk vol0 | grep vdisk_UID
@@ -30,9 +28,8 @@ To find the `volumeHandle`, use one of the following procedures:
 
 -   **Through command line \(for FlashSystem A9000 and A9000R\):**
 
-    ```
-    vol_list_extended vol=<volume\_name\>
-    ```
+    `vol_list_extended vol=<volume_name>`
+    
 
     For example, for vol1:
 
@@ -65,7 +62,7 @@ To find the `volumeHandle`, use one of the following procedures:
         The **Volume Properties** form appears.
 
     3.  Use the **ID** number.
-    For more information, see [IBM Hyper-Scale Manager documentation](https://www.ibm.com/docs/en/hyper-scale-manager/) \(ibm.com/docs/en/hyper-scale-manager/).
+    For more information, see [IBM Hyper-Scale Manager documentation](https://www.ibm.com/docs/en/hyper-scale-manager/) \(ibm.com/docs/en/hyper-scale-manager).
 
 
 Use this procedure to help build a PV yaml file for your volumes.
@@ -76,7 +73,7 @@ Use this procedure to help build a PV yaml file for your volumes.
 
     **Important:** Be sure to include the `storageClassName` and `controllerPublishSecretRef` parameters or errors will occur.
 
-2.  Take the `volume\_name` and other optional information \(collected before the procedure\) and insert it into the yaml file.
+2.  Take the `volume_name` and other optional information \(collected before the procedure\) and insert it into the yaml file.
 
     <pre>
     apiVersion: v1
@@ -96,12 +93,12 @@ Use this procedure to help build a PV yaml file for your volumes.
           namespace: default
         driver: block.csi.ibm.com
         <b># volumeAttributes:
-          \# pool\_name: ibmc-block-gold
-          \# storage\_type: SVC
-          \# volume\_name: vol1
-          \# array\_address: baremetal10-cluster.xiv.ibm.com
+          \# pool_name: ibmc-block-gold
+          \# storage_type: SVC
+          \# volume_name: vol1
+          \# array_address: baremetal10-cluster.xiv.ibm.com
         volumeHandle: SVC:600507640082000B08000000000004FF</b>
-      \# persistentVolumeReclaimPolicy: Retain
+      # persistentVolumeReclaimPolicy: Retain
       storageClassName: ibmc-block-gold
       # volumeMode: Filesystem
     </pre>
@@ -110,7 +107,7 @@ Use this procedure to help build a PV yaml file for your volumes.
 
     **Note:**
 
-    -   To include a specific 5 Gi PV, be sure to include the storageClassName.
+    -   To include a specific 5 Gi PV, be sure to include the `storageClassName`.
     -   For more information about creating a PVC yaml file, see [Creating a PersistentVolumeClaim \(PVC\)](csi_ug_config_create_pvc.md).
     ```screen
     apiVersion: v1
@@ -130,15 +127,15 @@ Use this procedure to help build a PV yaml file for your volumes.
 
 4.  Create a project namespace.
 
-    Using OpenShift® web console
-    :   From Red Hat® OpenShift Container Platform **Home** \> **Projects**, click **Create Project**. In the **Create Project** dialog box, enter a Project name \(also referred to as namespace\).
+    **Using OpenShift® web console**
+    From Red Hat® OpenShift Container Platform **Home** \> **Projects**, click **Create Project**. In the **Create Project** dialog box, enter a Project name \(also referred to as namespace\).
 
-        Click **Create** to save.
+    Click **Create** to save.
 
-    Using command-line terminal
-    :   **Note:** This procedure is applicable for both Kubernetes and Red Hat OpenShift. For Red Hat OpenShift, replace kubectl with oc in all relevant commands.
+    **Using command-line terminal**
+    **Note:** This procedure is applicable for both Kubernetes and Red Hat OpenShift. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.
 
-        Use the `kubectl create ns <namespace\>` command to create a project namespace.
+    Use the `kubectl create ns <namespace>` command to create a project namespace.
 
 5.  Create a StatefulSet.
 
