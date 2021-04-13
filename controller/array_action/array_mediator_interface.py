@@ -381,33 +381,17 @@ class ArrayMediator(ABC):
 
     @property
     @abstractmethod
-    def max_volume_name_length(self):
+    def max_object_name_length(self):
         """
-        The max allowed volume name length
-        """
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def max_volume_prefix_length(self):
-        """
-        The max allowed length of a volume name prefix.
+        The max allowed volume or snapshot name length
         """
         raise NotImplementedError
 
     @property
     @abstractmethod
-    def max_snapshot_name_length(self):
+    def max_object_prefix_length(self):
         """
-        The max allowed snapshot name length
-        """
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def max_snapshot_prefix_length(self):
-        """
-        The max allowed length of a snapshot name prefix.
+        The max allowed length of a volume or snapshot name prefix.
         """
         raise NotImplementedError
 

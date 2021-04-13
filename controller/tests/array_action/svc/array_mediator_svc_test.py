@@ -65,8 +65,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_default_object_prefix_length_not_larger_than_max(self):
         prefix_length = len(self.svc.default_object_prefix)
-        self.assertGreaterEqual(self.svc.max_volume_prefix_length, prefix_length)
-        self.assertGreaterEqual(self.svc.max_snapshot_prefix_length, prefix_length)
+        self.assertGreaterEqual(self.svc.max_object_prefix_length, prefix_length)
+        self.assertGreaterEqual(self.svc.max_object_prefix_length, prefix_length)
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def _test_mediator_method_client_error(self, mediator_method, args, client_method, client_error, expected_error,
@@ -512,7 +512,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(SVCArrayMediator.port, 22)
         self.assertEqual(SVCArrayMediator.minimal_volume_size_in_bytes, 512)
         self.assertEqual(SVCArrayMediator.array_type, 'SVC')
-        self.assertEqual(SVCArrayMediator.max_volume_name_length, 63)
+        self.assertEqual(SVCArrayMediator.max_object_name_length, 63)
         self.assertEqual(SVCArrayMediator.max_connections, 2)
         self.assertEqual(SVCArrayMediator.max_lun_retries, 10)
 

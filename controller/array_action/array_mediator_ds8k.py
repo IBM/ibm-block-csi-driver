@@ -111,25 +111,17 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return 8452
 
     @classproperty
-    def max_volume_name_length(self):
+    def max_object_name_length(self):
         return 16
 
     @classproperty
-    def max_volume_prefix_length(self):
+    def max_object_prefix_length(self):
         return 5
 
     @classproperty
     def max_connections(self):
         # max for rest api is 128.
         return 50
-
-    @classproperty
-    def max_snapshot_name_length(self):
-        return self.max_volume_name_length
-
-    @classproperty
-    def max_snapshot_prefix_length(self):
-        return self.max_volume_prefix_length
 
     @classproperty
     def minimal_volume_size_in_bytes(self):
