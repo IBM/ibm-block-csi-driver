@@ -11,10 +11,10 @@ The IBM® block storage CSI driver supports using both file system and raw block
 Use the sections below for creating yaml files for PVCs with file system and raw block volume types. After each yaml file creation, use the `kubectl apply` command.
 
 ```
-kubectl apply -f <filename\>.yaml
+kubectl apply -f <filename>.yaml
 ```
 
-The <ore>persistentvolumeclaim/_<filename\>_ created</pre> message is emitted.
+The <pre>persistentvolumeclaim/_<filename\>_ created</pre> message is emitted.
 
 Use the following sections, according to your PVC needs:
 
@@ -35,7 +35,7 @@ apiVersion: v1
 metadata:
   name: demo-pvc-file-system
 spec:
-  volumeMode: <b>Filesystem</b>  \# Optional. The default is Filesystem.
+  volumeMode: <b>Filesystem</b>  # Optional. The default is Filesystem.
   accessModes:
   - ReadWriteOnce
   resources:
@@ -67,7 +67,7 @@ spec:
 
 To create a PVC from an existing volume snapshot, create a PVC yaml file, similar to the following demo-pvc-from-snapshot.yaml file, with the size of 1 Gb.
 
-```
+<pre>
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -80,11 +80,11 @@ spec:
     requests:
       storage: 1Gi
   storageClassName: demo-storageclass
-  **dataSource:
+  <b>dataSource:
     name: demo-snapshot
     kind: VolumeSnapshot
-    apiGroup: snapshot.storage.k8s.io**
-```
+    apiGroup: snapshot.storage.k8s.io</b>
+</pre>
 
 ## Creating a volume clone from an existing PVC
 
@@ -92,7 +92,7 @@ spec:
 
 To create a volume clone from an existing PVC object, create a PVC yaml file, similar to the following demo-pvc-cloned-pvc.yaml file, with the size of 1 Gb.
 
-```
+<pre>
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
@@ -105,8 +105,8 @@ spec:
     requests:
       storage: 1Gi
   storageClassName: demo-storageclass
-  **dataSource:
+  <b>dataSource:
     name: demo-pvc-file-system
-    kind: PersistentVolumeClaim**
-```
+    kind: PersistentVolumeClaim</b>
+</pre>
 
