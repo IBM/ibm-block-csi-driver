@@ -4,7 +4,7 @@ Use this information to import volumes created externally from the IBM® block s
 
 Before starting to import an existing volume, find the following information in the existing volume in order to include the information in the persistent volume \(PV\) yaml file:
 
--   volumeHandle
+-   <parm>volumeHandle</parm>
 -   volumeAttributes \(optional\)
 
     Including:
@@ -52,7 +52,7 @@ To find the volumeHandle, use one of the following procedures:
 
         The Properties window appears. Use the UID number.
 
-    For more information about Spectrum Virtualize products, find your product information in [IBM Documentation](https://www.ibm.com/docs/)\(ibm.com/docs/\).
+    For more information about Spectrum Virtualize products, find your product information in [IBM Documentation] (https://www.ibm.com/docs/)\(ibm.com/docs/\).
 
 -   **Through the IBM Hyper-Scale Manager user interface for FlashSystem A9000 and A90000R storage systems:**
 

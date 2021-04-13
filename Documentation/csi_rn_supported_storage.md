@@ -1,6 +1,6 @@
 # Supported storage systems
 
-IBM® block storage CSI driver 1.5.0 supports different IBM storage systems as listed in the following table.
+IBM® block storage CSI driver 1.6.0 supports different IBM storage systems as listed in the following table.
 
 |Storage system|Microcode version|
 |--------------|-----------------|
