@@ -6,7 +6,7 @@ from controller.common import settings
 logger = get_stdout_logger()
 
 
-class ConnectionPool(object):
+class ConnectionPool:
     """A simple pool to hold connections."""
 
     def __init__(self, endpoints, username, password, med_class, min_size, max_size):
