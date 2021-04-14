@@ -2,8 +2,6 @@ ValidationException_message = "Validation error has occurred : {0}"
 
 ObjectIdError_message = "Wrong {0} id format : {1}"
 
-more_then_one_mapping_message = "Volume is already mapped to a different host : {0}"
-
 # validation error messages
 invalid_secret_message = "invalid secret was passed"
 secret_missing_message = 'secret is missing'
@@ -20,7 +18,5 @@ wrong_pool_passed_message = 'pool parameter must provide value for it'
 params_are_missing_message = 'parameters are missing'
 volume_id_wrong_format_message = 'volume id has wrong format'
 readonly_not_supported_message = 'readonly parameter is not supported'
-node_id_wrong_format_message = 'node id has wrong format'
 volume_source_id_is_missing = 'volume source {0} id is missing'
 snapshot_src_volume_id_is_missing = 'snapshot source volume id is missing'
-volume_cloning_not_supported_message = 'volume cloning is not supported'

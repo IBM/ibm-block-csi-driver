@@ -1,4 +1,4 @@
-import controller.array_action.errors as controller_errors
+import controller.array_action.errors as array_errors
 from controller.common.csi_logger import get_stdout_logger
 
 logger = get_stdout_logger()
@@ -38,7 +38,7 @@ class SVCListResultsReader:
                 if param_name == ID_PARAM_NAME:
                     self._next_object_id = param_value
                 else:
-                    raise controller_errors.InvalidCliResponseError(
+                    raise array_errors.InvalidCliResponseError(
                         "First param is '{0}'. Expected param name '{1}'".format(line, ID_PARAM_NAME))
 
     def __iter__(self):

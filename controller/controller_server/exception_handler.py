@@ -2,7 +2,7 @@ from decorator import decorator
 
 import grpc
 
-import controller.array_action.errors as controller_errors
+import controller.array_action.errors as array_errors
 from controller.common.csi_logger import get_stdout_logger
 from controller.controller_server.errors import ValidationException
 
@@ -10,11 +10,11 @@ logger = get_stdout_logger()
 
 status_codes_by_exception = {
     ValidationException: grpc.StatusCode.INVALID_ARGUMENT,
-    controller_errors.IllegalObjectName: grpc.StatusCode.INVALID_ARGUMENT,
-    controller_errors.PoolParameterIsMissing: grpc.StatusCode.INVALID_ARGUMENT,
-    controller_errors.ObjectNotFoundError: grpc.StatusCode.NOT_FOUND,
-    controller_errors.PermissionDeniedError: grpc.StatusCode.PERMISSION_DENIED,
-    controller_errors.NotEnoughSpaceInPool: grpc.StatusCode.RESOURCE_EXHAUSTED
+    array_errors.IllegalObjectName: grpc.StatusCode.INVALID_ARGUMENT,
+    array_errors.PoolParameterIsMissing: grpc.StatusCode.INVALID_ARGUMENT,
+    array_errors.ObjectNotFoundError: grpc.StatusCode.NOT_FOUND,
+    array_errors.PermissionDeniedError: grpc.StatusCode.PERMISSION_DENIED,
+    array_errors.NotEnoughSpaceInPool: grpc.StatusCode.RESOURCE_EXHAUSTED
 }
 
 

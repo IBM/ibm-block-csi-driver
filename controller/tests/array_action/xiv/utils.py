@@ -2,23 +2,23 @@ from mock import Mock
 
 
 def get_mock_xiv_volume(size, name, wwn):
-    vol = Mock()
-    vol.capacity = size
-    vol.wwn = wwn
-    vol.name = name
-    vol.pool_name = "vol-name"
-    vol.master_name = ""
-    return vol
+    volume = Mock()
+    volume.capacity = size
+    volume.wwn = wwn
+    volume.name = name
+    volume.pool_name = "volume-name"
+    volume.master_name = ""
+    return volume
 
 
-def get_mock_xiv_snapshot(capacity, name, wwn, vol_name):
-    snap = Mock()
-    snap.capacity = capacity
-    snap.name = name
-    snap.wwn = wwn
-    snap.master_name = vol_name
-    snap.pool_name = "pool_name"
-    return snap
+def get_mock_xiv_snapshot(capacity, name, wwn, volume_name):
+    snapshot = Mock()
+    snapshot.capacity = capacity
+    snapshot.name = name
+    snapshot.wwn = wwn
+    snapshot.master_name = volume_name
+    snapshot.pool_name = "pool_name"
+    return snapshot
 
 
 def get_mock_xiv_host(name, iscsi_ports, fc_ports):
