@@ -3,7 +3,7 @@ from io import StringIO
 
 from pysvc import errors as svc_errors
 from pysvc.unified.client import connect
-from pysvc.unified.response import CLIFailureEr
+from pysvc.unified.response import CLIFailureError
 from retry import retry
 
 import controller.array_action.config as config
@@ -277,7 +277,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 if OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message:
                     raise array_errors.ObjectNotFoundError(volume_name)
                 if NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND in ex.my_message:
-                    raise array_errors.NotEnoughSpaceInPool(pool=cli_volume.mdisk_grp_name)
+                    raise array_errors.NotEnoughSpaceInPool(id_or_name=cli_volume.mdisk_grp_name)
                 raise ex
 
     def expand_volume(self, volume_id, required_bytes):

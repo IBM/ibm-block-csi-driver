@@ -443,8 +443,8 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         except xcli_errors.CommandFailedRuntimeError as ex:
             logger.exception(ex)
             if UNDEFINED_MAPPING_ERROR in ex.status:
-                raise array_errors.VolumeAlreadyUnmappedError(vol_name)
-            raise array_errors.UnMappingError(vol_name, host_name, ex)
+                raise array_errors.VolumeAlreadyUnmappedError(volume_name)
+            raise array_errors.UnmappingError(volume_name, host_name, ex)
 
     def _get_iscsi_targets(self):
         ip_interfaces = self.client.cmd.ipinterface_list()

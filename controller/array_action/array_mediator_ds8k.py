@@ -268,7 +268,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise array_errors.VolumeCreationError(name)
         except (exceptions.ClientError, exceptions.ClientException) as ex:
             if ERROR_CODE_CREATE_VOLUME_NOT_ENOUGH_EXTENTS in str(ex.message).upper():
-                raise array_errors.NotEnoughSpaceInPool(pool=pool_id)
+                raise array_errors.NotEnoughSpaceInPool(id_or_name=pool_id)
             logger.error(
                 "Failed to create volume {} on array {}, reason is: {}".format(
                     name,
@@ -452,7 +452,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except exceptions.NotFound as ex:
             if HOST_DOES_NOT_EXIST in str(ex.message).upper():
                 raise array_errors.HostNotFoundError(host_name)
-            elif MAPPING_DOES_NOT_EXIST in str(ex.message).upper():
+            if MAPPING_DOES_NOT_EXIST in str(ex.message).upper():
                 raise array_errors.VolumeAlreadyUnmappedError(volume_id)
         except exceptions.ClientException as ex:
             raise array_errors.UnmappingError(volume_id, host_name, ex.details)
