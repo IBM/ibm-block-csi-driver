@@ -92,8 +92,7 @@ class SVCListResultsElement:
         if name in self._dict:
             value = self._dict[name]
             return value if isinstance(value, list) else [value]
-        else:
-            return []
+        return []
 
     def add(self, name, value):
         if name in self._dict:
