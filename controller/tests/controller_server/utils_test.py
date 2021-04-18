@@ -2,11 +2,10 @@ import unittest
 
 from mock import patch, Mock
 
+import controller.array_action.errors as array_errors
 import controller.controller_server.utils as utils
-from controller.array_action.errors import HostNotFoundError
 from controller.controller_server.csi_controller_server import ControllerServicer
-from controller.controller_server.errors import ObjectIdError
-from controller.controller_server.errors import ValidationException
+from controller.controller_server.errors import ObjectIdError, ValidationException
 from controller.csi_general import csi_pb2
 from controller.tests.controller_server.csi_controller_server_test import ProtoBufMock
 
@@ -175,57 +174,57 @@ class TestUtils(unittest.TestCase):
         with self.assertRaises(ValidationException):
             utils.validate_delete_snapshot_request(request)
 
-    @patch("controller.controller_server.utils.get_vol_id")
-    def test_get_create_volume_response(self, get_vol_id):
-        new_vol = Mock()
-        new_vol.name = "name"
-        new_vol.array_address = ["fqdn1", "fqdn2"]
+    @patch("controller.controller_server.utils.get_volume_id")
+    def test_get_create_volume_response(self, get_volume_id):
+        new_volume = Mock()
+        new_volume.name = "name"
+        new_volume.array_address = ["fqdn1", "fqdn2"]
 
-        new_vol.pool_name = "pool"
-        new_vol.array_type = "a9k"
-        new_vol.capacity_bytes = 10
-        new_vol.copy_source_id = None
+        new_volume.pool_name = "pool"
+        new_volume.array_type = "a9k"
+        new_volume.capacity_bytes = 10
+        new_volume.copy_source_id = None
 
-        get_vol_id.return_value = "a9k:name"
-        res = utils.generate_csi_create_volume_response(new_vol)
+        get_volume_id.return_value = "a9k:name"
+        res = utils.generate_csi_create_volume_response(new_volume)
 
         self.assertEqual(10, res.volume.capacity_bytes)
 
-        get_vol_id.side_effect = [Exception("err")]
+        get_volume_id.side_effect = [Exception("err")]
 
         with self.assertRaises(Exception):
-            utils.generate_csi_create_volume_response(new_vol)
+            utils.generate_csi_create_volume_response(new_volume)
 
-    @patch("controller.controller_server.utils.get_vol_id")
-    def test_get_create_volume_response_with_single_IP(self, get_vol_id):
-        new_vol = Mock()
-        new_vol.name = "name"
-        new_vol.array_address = "9.1.1.1"
+    @patch("controller.controller_server.utils.get_volume_id")
+    def test_get_create_volume_response_with_single_IP(self, get_volume_id):
+        new_volume = Mock()
+        new_volume.name = "name"
+        new_volume.array_address = "9.1.1.1"
 
-        new_vol.pool_name = "pool"
-        new_vol.array_type = "svc"
-        new_vol.capacity_bytes = 10
-        new_vol.copy_source_id = None
+        new_volume.pool_name = "pool"
+        new_volume.array_type = "svc"
+        new_volume.capacity_bytes = 10
+        new_volume.copy_source_id = None
 
-        get_vol_id.return_value = "svc:name"
-        res = utils.generate_csi_create_volume_response(new_vol)
+        get_volume_id.return_value = "svc:name"
+        res = utils.generate_csi_create_volume_response(new_volume)
 
         self.assertEqual(10, res.volume.capacity_bytes)
         self.assertEqual("9.1.1.1", res.volume.volume_context['array_address'])
 
-    @patch("controller.controller_server.utils.get_vol_id")
-    def test_get_create_volume_response_with_Multiple_IP(self, get_vol_id):
-        new_vol = Mock()
-        new_vol.name = "name"
-        new_vol.array_address = ["9.1.1.1", "9.1.1.2"]
+    @patch("controller.controller_server.utils.get_volume_id")
+    def test_get_create_volume_response_with_Multiple_IP(self, get_volume_id):
+        new_volume = Mock()
+        new_volume.name = "name"
+        new_volume.array_address = ["9.1.1.1", "9.1.1.2"]
 
-        new_vol.pool_name = "pool"
-        new_vol.array_type = "svc"
-        new_vol.capacity_bytes = 10
-        new_vol.copy_source_id = None
+        new_volume.pool_name = "pool"
+        new_volume.array_type = "svc"
+        new_volume.capacity_bytes = 10
+        new_volume.copy_source_id = None
 
-        get_vol_id.return_value = "svc:name"
-        res = utils.generate_csi_create_volume_response(new_vol)
+        get_volume_id.return_value = "svc:name"
+        res = utils.generate_csi_create_volume_response(new_volume)
 
         self.assertEqual(10, res.volume.capacity_bytes)
         self.assertEqual("9.1.1.1,9.1.1.2", res.volume.volume_context['array_address'])
@@ -296,12 +295,12 @@ class TestUtils(unittest.TestCase):
             utils.get_volume_id_info("badvolumeformat")
             self.assertTrue("volume" in ex.message)
 
-        arr_type, vol = utils.get_volume_id_info("xiv:vol")
+        arr_type, volume_id = utils.get_volume_id_info("xiv:volume-id")
         self.assertEqual(arr_type, "xiv")
-        self.assertEqual(vol, "vol")
+        self.assertEqual(volume_id, "volume-id")
 
     def test_get_node_id_info(self):
-        with self.assertRaises(HostNotFoundError) as ex:
+        with self.assertRaises(array_errors.HostNotFoundError) as ex:
             utils.get_node_id_info("badnodeformat")
             self.assertTrue("node" in ex.message)
 

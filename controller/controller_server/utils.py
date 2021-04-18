@@ -3,12 +3,12 @@ from hashlib import sha256
 import base58
 from google.protobuf.timestamp_pb2 import Timestamp
 
+import controller.array_action.errors as array_errors
 import controller.controller_server.config as config
 import controller.controller_server.messages as messages
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
-from controller.array_action.errors import HostNotFoundError
 from controller.common.csi_logger import get_stdout_logger
-from controller.controller_server.errors import ValidationException, ObjectIdError
+from controller.controller_server.errors import ObjectIdError, ValidationException
 from controller.csi_general import csi_pb2
 
 logger = get_stdout_logger()
@@ -21,8 +21,8 @@ def get_array_connection_info_from_secret(secrets):
     return user, password, array_addresses
 
 
-def get_vol_id(new_vol):
-    return _get_object_id(new_vol)
+def get_volume_id(new_volume):
+    return _get_object_id(new_volume)
 
 
 def get_snapshot_id(new_snapshot):
@@ -177,7 +177,7 @@ def validate_expand_volume_request(request):
 
 
 def generate_csi_create_volume_response(new_volume, source_type=None):
-    logger.debug("creating volume response for vol : {0}".format(new_volume))
+    logger.debug("creating volume response for volume : {0}".format(new_volume))
 
     volume_context = {"volume_name": new_volume.name,
                       "array_address": ",".join(
@@ -197,7 +197,7 @@ def generate_csi_create_volume_response(new_volume, source_type=None):
 
     res = csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(
         capacity_bytes=new_volume.capacity_bytes,
-        volume_id=get_vol_id(new_volume),
+        volume_id=get_volume_id(new_volume),
         content_source=content_source,
         volume_context=volume_context))
 
@@ -290,7 +290,7 @@ def get_node_id_info(node_id):
     elif len(split_node) == 2:
         hostname, fc_wwns = split_node
     else:
-        raise HostNotFoundError(node_id)
+        raise array_errors.HostNotFoundError(node_id)
     logger.debug("node name : {0}, iscsi_iqn : {1}, fc_wwns : {2} ".format(
         hostname, iscsi_iqn, fc_wwns))
     return hostname, fc_wwns, iscsi_iqn
