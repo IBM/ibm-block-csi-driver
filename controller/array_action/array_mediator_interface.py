@@ -35,7 +35,7 @@ class ArrayMediator(ABC):
         This function should create a volume in the storage system.
 
         Args:
-            volume_name      : name of the volume to be created in the stoarge system
+            volume_name      : name of the volume to be created in the storage system
             size_in_bytes : size in bytes of the volume
             space_efficiency  : space efficiency (None for default)
             pool          : pool name to create the volume in
@@ -63,7 +63,7 @@ class ArrayMediator(ABC):
             name                            : name of the volume to be created in the storage system
             source_name                     : name of source to create from
             source_capacity_in_bytes        : capacity of source to create from
-            minimum_volume_size_in_bytes    : if source capacity is lower than this value vol will
+            minimum_volume_size_in_bytes    : if source capacity is lower than this value volume will
                                             be increased to this value
             pool_id                         : pool of the volume and source object to find them more efficiently.
 
@@ -381,33 +381,17 @@ class ArrayMediator(ABC):
 
     @property
     @abstractmethod
-    def max_volume_name_length(self):
+    def max_object_name_length(self):
         """
-        The max allowed volume name length
-        """
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def max_volume_prefix_length(self):
-        """
-        The max allowed length of a volume name prefix.
+        The max allowed volume or snapshot name length
         """
         raise NotImplementedError
 
     @property
     @abstractmethod
-    def max_snapshot_name_length(self):
+    def max_object_prefix_length(self):
         """
-        The max allowed snapshot name length
-        """
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def max_snapshot_prefix_length(self):
-        """
-        The max allowed length of a snapshot name prefix.
+        The max allowed length of a volume or snapshot name prefix.
         """
         raise NotImplementedError
 

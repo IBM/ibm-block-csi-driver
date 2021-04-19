@@ -6,7 +6,7 @@ def bytes_to_string(input_as_bytes):
     return input_as_bytes.decode(UTF_8) if input_as_bytes else ""
 
 
-class classproperty(object):
+class classproperty:
 
     def __init__(self, function):
         self._function = function

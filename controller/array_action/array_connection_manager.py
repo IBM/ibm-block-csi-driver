@@ -39,7 +39,7 @@ def _socket_connect_test(host, port, timeout=1):
         return -1
 
 
-class ArrayConnectionManager(object):
+class ArrayConnectionManager:
 
     def __init__(self, user, password, endpoint, array_type=None):  # TODO return the params back.
         self.array_mediator_class_dict = {
