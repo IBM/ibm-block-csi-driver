@@ -113,20 +113,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return 22
 
     @classproperty
-    def max_volume_name_length(self):
+    def max_object_name_length(self):
         return 63
 
     @classproperty
-    def max_volume_prefix_length(self):
+    def max_object_prefix_length(self):
         return 20
-
-    @classproperty
-    def max_snapshot_name_length(self):
-        return self.max_volume_name_length
-
-    @classproperty
-    def max_snapshot_prefix_length(self):
-        return self.max_volume_prefix_length
 
     @classproperty
     def max_connections(self):

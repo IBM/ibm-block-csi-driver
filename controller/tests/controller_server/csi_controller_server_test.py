@@ -209,7 +209,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_get_snapshot_name_too_long_success(self, storage_agent):
         self._prepare_create_snapshot_mocks(storage_agent)
-        self.mediator.max_snapshot_name_length = 63
+        self.mediator.max_object_name_length = 63
         self.request.name = "a" * 128
 
         self.servicer.CreateSnapshot(self.request, self.context)
@@ -504,7 +504,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_get_volume_name_too_long_success(self, storage_agent):
         self._prepare_create_volume_mocks(storage_agent)
-        self.mediator.max_volume_name_length = 63
+        self.mediator.max_object_name_length = 63
 
         self.request.name = "a" * 128
         self.servicer.CreateVolume(self.request, self.context)

@@ -625,41 +625,36 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         return csi_pb2.GetPluginInfoResponse(name=name, vendor_version=version)
 
     def _get_volume_final_name(self, request, array_mediator):
-        return self._get_object_final_name(request, array_mediator.max_volume_prefix_length,
-                                           array_mediator.max_volume_name_length,
+        return self._get_object_final_name(request, array_mediator,
                                            config.VOLUME_TYPE_NAME,
-                                           config.PARAMETERS_VOLUME_NAME_PREFIX,
-                                           array_mediator.default_object_prefix)
+                                           config.PARAMETERS_VOLUME_NAME_PREFIX)
 
     def _get_snapshot_final_name(self, request, array_mediator):
-        name = self._get_object_final_name(request, array_mediator.max_snapshot_prefix_length,
-                                           array_mediator.max_snapshot_name_length,
+        name = self._get_object_final_name(request, array_mediator,
                                            config.SNAPSHOT_TYPE_NAME,
-                                           config.PARAMETERS_SNAPSHOT_NAME_PREFIX,
-                                           array_mediator.default_object_prefix)
+                                           config.PARAMETERS_SNAPSHOT_NAME_PREFIX)
         return name
 
-    def _get_object_final_name(self, request, max_name_prefix_length, max_name_length, object_type,
-                               prefix_param_name, default_prefix):
+    def _get_object_final_name(self, request, array_mediator, object_type, prefix_param_name):
         name = request.name
         prefix = ""
         if request.parameters and (prefix_param_name in request.parameters):
             prefix = request.parameters[prefix_param_name]
-            if len(prefix) > max_name_prefix_length:
+            if len(prefix) > array_mediator.max_object_prefix_length:
                 raise array_errors.IllegalObjectName(
                     "The {} name prefix '{}' is too long, max allowed length is {}".format(
                         object_type,
                         prefix,
-                        max_name_prefix_length
+                        array_mediator.max_object_prefix_length
                     )
                 )
         if not prefix:
-            prefix = default_prefix
+            prefix = array_mediator.default_object_prefix
         full_name = self._join_object_prefix_with_name(prefix, name)
-        if len(full_name) > max_name_length:
+        if len(full_name) > array_mediator.max_object_name_length:
             hashed_name = utils.hash_string(name)
             full_name = self._join_object_prefix_with_name(prefix, hashed_name)
-        return full_name[:max_name_length]
+        return full_name[:array_mediator.max_object_name_length]
 
     def _join_object_prefix_with_name(self, prefix, name):
         if prefix:
