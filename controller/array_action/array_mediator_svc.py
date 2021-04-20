@@ -278,8 +278,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                     raise array_errors.ObjectNotFoundError(volume_name)
                 if NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND in ex.my_message:
                     raise array_errors.NotEnoughSpaceInPool(id_or_name=cli_volume.mdisk_grp_name)
-                else:
-                    raise ex
+                raise ex
 
     def expand_volume(self, volume_id, required_bytes):
         logger.info("Expanding volume with id : {0} to {1} bytes".format(volume_id, required_bytes))
@@ -428,8 +427,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 logger.warning("Failed to delete volume {}".format(volume_name))
                 if (OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message) and not_exist_err:
                     raise array_errors.ObjectNotFoundError(volume_name)
-                else:
-                    raise ex
+                raise ex
         except Exception as ex:
             logger.exception(ex)
             raise ex
@@ -592,17 +590,15 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             if iscsi_host == fc_host:
                 return fc_host, [config.ISCSI_CONNECTIVITY_TYPE,
                                  config.FC_CONNECTIVITY_TYPE]
-            else:
-                raise array_errors.MultipleHostsFoundError(initiators, fc_host)
-        elif iscsi_host:
+            raise array_errors.MultipleHostsFoundError(initiators, fc_host)
+        if iscsi_host:
             logger.debug("found host : {0} with iqn : {1}".format(iscsi_host, initiators.iscsi_iqn))
             return iscsi_host, [config.ISCSI_CONNECTIVITY_TYPE]
-        elif fc_host:
+        if fc_host:
             logger.debug("found host : {0} with fc wwn : {1}".format(fc_host, initiators.fc_wwns))
             return fc_host, [config.FC_CONNECTIVITY_TYPE]
-        else:
-            logger.debug("can not found host by using initiators: {0} ".format(initiators))
-            raise array_errors.HostNotFoundError(initiators)
+        logger.debug("can not found host by using initiators: {0} ".format(initiators))
+        raise array_errors.HostNotFoundError(initiators)
 
     def _get_detailed_hosts_list(self):
         logger.debug("Getting detailed hosts list on array {0}".format(self.endpoint))
@@ -816,8 +812,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if ips_by_iqn and any(ips_by_iqn.values()):
             logger.debug("Found iscsi target IPs by iqn: {}".format(ips_by_iqn))
             return ips_by_iqn
-        else:
-            raise array_errors.NoIscsiTargetsFoundError(self.endpoint)
+        raise array_errors.NoIscsiTargetsFoundError(self.endpoint)
 
     def get_array_fc_wwns(self, host_name):
         logger.debug("Getting the connected fc port wwn value from array "

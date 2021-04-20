@@ -166,8 +166,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             if NO_ALLOCATION_SPACE_ERROR in ex.status:
                 raise array_errors.NotEnoughSpaceInPool(cli_volume.pool_name)
-            else:
-                raise ex
+            raise ex
 
     def expand_volume(self, volume_id, required_bytes):
         logger.info("Expanding volume with id : {0} to {1} bytes".format(volume_id, required_bytes))
@@ -362,7 +361,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         matching_hosts = sorted(matching_hosts_set)
         if not matching_hosts:
             raise array_errors.HostNotFoundError(initiators)
-        elif len(matching_hosts) > 1:
+        if len(matching_hosts) > 1:
             raise array_errors.MultipleHostsFoundError(initiators, matching_hosts)
         return matching_hosts[0], port_types
 
@@ -420,8 +419,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             if LUN_IS_ALREADY_IN_USE_ERROR in ex.status:
                 raise array_errors.LunAlreadyInUseError(lun, host_name)
-            else:
-                raise array_errors.MappingError(vol_name, host_name, ex)
+            raise array_errors.MappingError(vol_name, host_name, ex)
 
         return str(lun)
 
@@ -446,8 +444,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             if UNDEFINED_MAPPING_ERROR in ex.status:
                 raise array_errors.VolumeAlreadyUnmappedError(volume_name)
-            else:
-                raise array_errors.UnmappingError(volume_name, host_name, ex)
+            raise array_errors.UnmappingError(volume_name, host_name, ex)
 
     def _get_iscsi_targets(self):
         ip_interfaces = self.client.cmd.ipinterface_list()
