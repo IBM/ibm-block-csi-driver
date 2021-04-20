@@ -120,7 +120,7 @@ def validate_create_volume_request(request):
 
     logger.debug("validating storage class parameters")
     if request.parameters:
-        if not (config.PARAMETERS_POOL in request.parameters):
+        if config.PARAMETERS_POOL not in request.parameters:
             raise ValidationException(messages.pool_is_missing_message)
 
         if not request.parameters[config.PARAMETERS_POOL]:
