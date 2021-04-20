@@ -174,16 +174,21 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         if not source_id and not volume_copy_source_id:
             return None
         if volume_copy_source_id == source_id:
-            logger.debug(
-                "Volume {0} exists and it is a copy of {1} {2}.".format(volume_name, source_type, source_id))
-            context.set_code(grpc.StatusCode.OK)
-            return utils.generate_csi_create_volume_response(volume, source_type)
-        else:
-            logger.debug(
-                "Volume {0} exists but it is not a copy of {1} {2}.".format(volume_name, source_type, source_id))
-            context.set_details("Volume already exists but it was created from a different source.")
-            context.set_code(grpc.StatusCode.ALREADY_EXISTS)
-            return csi_pb2.CreateVolumeResponse()
+            return self._handle_volume_exists_with_same_source(context, source_id, source_type, volume_name, volume)
+        return self._handle_volume_exists_with_different_source(context, source_id, source_type, volume_name)
+
+    def _handle_volume_exists_with_same_source(self, context, source_id, source_type, volume_name, volume):
+        logger.debug(
+            "Volume {0} exists and it is a copy of {1} {2}.".format(volume_name, source_type, source_id))
+        context.set_code(grpc.StatusCode.OK)
+        return utils.generate_csi_create_volume_response(volume, source_type)
+
+    def _handle_volume_exists_with_different_source(self, context, source_id, source_type, volume_name):
+        logger.debug(
+            "Volume {0} exists but it is not a copy of {1} {2}.".format(volume_name, source_type, source_id))
+        context.set_details("Volume already exists but it was created from a different source.")
+        context.set_code(grpc.StatusCode.ALREADY_EXISTS)
+        return csi_pb2.CreateVolumeResponse()
 
     def DeleteVolume(self, request, context):
         set_current_thread_name(request.volume_id)
