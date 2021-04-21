@@ -39,7 +39,8 @@ UnMappingError_message = "Unmapping error has occurred for volume : {0} and host
 
 VolumeMappedToMultipleHostsError_message = "Volume is already mapped to different hosts {0}"
 
-UnsupportedStorageVersionError_message = 'Unsupported storage system microcode version {}, the version should not be lower than {}'  # noqa
+UnsupportedStorageVersionError_message = ('Unsupported storage system microcode version {}, '
+                                          'the version should not be lower than {}')
 
 VolumeCreationError_message = 'Failed to create volume {}'
 
