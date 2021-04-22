@@ -305,12 +305,12 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             return self._generate_snapshot_response(cli_object)
         return self._generate_volume_response(cli_object)
 
-    def create_snapshot(self, name, volume_name, pool_id=None):
-        logger.info("creating snapshot {0} from volume {1}".format(name, volume_name))
-
+    def create_snapshot(self, name, volume_id, pool_id=None):
+        logger.info("creating snapshot {0} from volume {1}".format(name, volume_id))
+        volume_name = self._get_object_name_by_wwn(volume_id)
         try:
             cli_snapshot = self.client.cmd.snapshot_create(name=name, vol=volume_name).as_single_element
-            logger.info("finished creating cli snapshot {0} from volume {1}".format(name, volume_name))
+            logger.info("finished creating cli snapshot {0} from volume {1}".format(name, volume_id))
             return self._generate_snapshot_response(cli_snapshot)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
@@ -320,11 +320,11 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise array_errors.SnapshotAlreadyExists(name, self.endpoint)
         except xcli_errors.VolumeBadNameError as ex:
             logger.exception(ex)
-            raise array_errors.ObjectNotFoundError(volume_name)
+            raise array_errors.ObjectNotFoundError(volume_id)
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
             raise array_errors.PermissionDeniedError(
-                "create snapshot {0} from volume {1}".format(name, volume_name))
+                "create snapshot {0} from volume {1}".format(name, volume_id))
 
     def delete_snapshot(self, snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))

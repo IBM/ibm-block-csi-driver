@@ -392,13 +392,16 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         secrets = request.secrets
         user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
         try:
-            _, vol_id = utils.get_volume_id_info(source_volume_id)
+            _, volume_id = utils.get_volume_id_info(source_volume_id)
             array_type = detect_array_type(array_addresses)
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
                 snapshot_final_name = self._get_snapshot_final_name(request, array_mediator)
 
-                volume_name = array_mediator.get_volume_name(vol_id)
+                source_volume = array_mediator.get_object_by_id(volume_id, config.VOLUME_TYPE_NAME)
+                volume_name = source_volume.name
+                if pool is None:
+                    pool = source_volume.pool_name
                 logger.info("Snapshot name : {}. Volume name : {}".format(snapshot_final_name, volume_name))
                 snapshot = array_mediator.get_snapshot(
                     snapshot_final_name,
@@ -417,7 +420,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         "Snapshot doesn't exist. Creating a new snapshot {0} from volume {1}".format(
                             snapshot_final_name,
                             volume_name))
-                    snapshot = array_mediator.create_snapshot(snapshot_final_name, volume_name, pool)
+                    snapshot = array_mediator.create_snapshot(snapshot_final_name, volume_id, pool)
 
                 logger.debug("generating create snapshot response")
                 res = utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)

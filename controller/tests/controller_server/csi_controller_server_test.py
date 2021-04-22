@@ -11,7 +11,7 @@ import controller.controller_server.errors as controller_errors
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.controller_server.csi_controller_server import ControllerServicer
 from controller.controller_server.test_settings import volume_name, snapshot_name, snapshot_volume_name, \
-    clone_volume_name
+    clone_volume_name, snapshot_volume_id
 from controller.csi_general import csi_pb2
 from controller.tests import utils
 
@@ -106,8 +106,10 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.request.parameters = {}
         self.capacity_bytes = 10
         self.request.name = snapshot_name
-        self.request.source_volume_id = "A9000:12345678"
-
+        self.request.source_volume_id = "{}:{}".format("A9000", snapshot_volume_id)
+        self.mediator.get_object_by_id = Mock()
+        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(10, snapshot_volume_name,
+                                                                                              "wwn", "xiv")
         self.context = utils.FakeContext()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -118,10 +120,9 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         storage_agent.return_value = self.storage_agent
 
         self.mediator.create_snapshot = Mock()
-        self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, "snapshot", "wwn",
-                                                                                               "snapshot_volume", "xiv")
-        self.mediator.get_volume_name = Mock()
-        self.mediator.get_volume_name.return_value = snapshot_volume_name
+        self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, snapshot_name, "wwn",
+                                                                                               snapshot_volume_name,
+                                                                                               "xiv")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_succeeds(self, storage_agent):
@@ -130,8 +131,8 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.servicer.CreateSnapshot(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.get_snapshot.assert_called_once_with(snapshot_name, pool_id=None)
-        self.mediator.create_snapshot.assert_called_once_with(snapshot_name, snapshot_volume_name, None)
+        self.mediator.get_snapshot.assert_called_once_with(snapshot_name, pool_id="pool1")
+        self.mediator.create_snapshot.assert_called_once_with(snapshot_name, snapshot_volume_id, "pool1")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_belongs_to_wrong_volume(self, storage_agent):
@@ -139,8 +140,6 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.mediator.create_snapshot = Mock()
         self.mediator.get_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, snapshot_name, "wwn",
                                                                                             "wrong_volume_name", "xiv")
-        self.mediator.get_volume_name = Mock()
-        self.mediator.get_volume_name.return_value = snapshot_volume_name
 
         self.servicer.CreateSnapshot(self.request, self.context)
 
@@ -156,8 +155,8 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_source_volume_not_found(self, storage_agent):
         storage_agent.return_value = self.storage_agent
-        self.mediator.get_volume_name = Mock()
-        self.mediator.get_volume_name.side_effect = array_errors.ObjectNotFoundError("volume_id")
+        self.mediator.get_object_by_id = Mock()
+        self.mediator.get_object_by_id.side_effect = array_errors.ObjectNotFoundError("volume_id")
 
         self.servicer.CreateSnapshot(self.request, self.context)
 
@@ -184,7 +183,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
         self.assertTrue("error" in self.context.details)
-        self.mediator.get_snapshot.assert_called_once_with(snapshot_name, pool_id=None)
+        self.mediator.get_snapshot.assert_called_once_with(snapshot_name, pool_id="pool1")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_get_snapshot_illegal_object_name_exception(self, storage_agent):
@@ -196,7 +195,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertTrue(msg in self.context.details)
-        self.mediator.get_snapshot.assert_called_once_with(snapshot_name, pool_id=None)
+        self.mediator.get_snapshot.assert_called_once_with(snapshot_name, pool_id="pool1")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_prefix_too_long_exception(self, storage_agent):
@@ -220,8 +219,6 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def create_snapshot_returns_error(self, storage_agent, create_snapshot, return_code, err):
         storage_agent.return_value = self.storage_agent
-        self.mediator.get_volume_name = Mock()
-        self.mediator.get_volume_name.return_value = snapshot_volume_name
         create_snapshot.side_effect = [err]
         msg = str(err)
 
@@ -229,8 +226,8 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
         self.assertEqual(self.context.code, return_code)
         self.assertTrue(msg in self.context.details)
-        self.mediator.get_snapshot.assert_called_once_with(snapshot_name, pool_id=None)
-        self.mediator.create_snapshot.assert_called_once_with(snapshot_name, snapshot_volume_name, None)
+        self.mediator.get_snapshot.assert_called_once_with(snapshot_name, pool_id="pool1")
+        self.mediator.create_snapshot.assert_called_once_with(snapshot_name, snapshot_volume_id, "pool1")
 
     def test_create_snapshot_with_illegal_object_name_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
@@ -251,18 +248,17 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_name_prefix(self, storage_agent):
         storage_agent.return_value = self.storage_agent
-        self.mediator.get_volume_name = Mock()
-        self.mediator.get_volume_name.return_value = "snapshot_volume"
         self.request.name = "some_name"
         self.request.parameters[config.PARAMETERS_SNAPSHOT_NAME_PREFIX] = "prefix"
         self.mediator.create_snapshot = Mock()
-        self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, "snapshot", "wwn",
-                                                                                               "snapshot_volume", "xiv")
+        self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, snapshot_name, "wwn",
+                                                                                               snapshot_volume_name,
+                                                                                               "xiv")
 
         self.servicer.CreateSnapshot(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.create_snapshot.assert_called_once_with("prefix_some_name", "snapshot_volume", None)
+        self.mediator.create_snapshot.assert_called_once_with("prefix_some_name", snapshot_volume_id, "pool1")
 
 
 class TestControllerServerDeleteSnapshot(AbstractControllerTest):

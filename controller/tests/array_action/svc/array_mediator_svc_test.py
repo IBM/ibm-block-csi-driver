@@ -121,7 +121,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC8710E", array_errors.NotEnoughSpaceInPool)
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC6017E", array_errors.IllegalObjectName, "\xff")
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC6527E", array_errors.IllegalObjectName, "1_volume")
-        self._test_create_volume_mkvolume_cli_failure_error("CMMVC5738E", array_errors.IllegalObjectName, "a"*64)
+        self._test_create_volume_mkvolume_cli_failure_error("CMMVC5738E", array_errors.IllegalObjectName, "a" * 64)
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC6035E", array_errors.VolumeAlreadyExists)
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC5754E", array_errors.PoolDoesNotExist)
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC9292E", array_errors.PoolDoesNotMatchCapabilities)
@@ -372,7 +372,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         target_vol_after_creation = self._get_mapless_target_cli_volume()
         target_vol_after_mapping = self._get_mapped_target_cli_volume()
         target_vol_for_rollback = self._get_mapped_target_cli_volume()
-        vols_to_return = [source_vol_to_copy_from, target_vol_after_creation,
+        vols_to_return = [source_vol_to_copy_from, source_vol_to_copy_from, target_vol_after_creation,
                           target_vol_after_mapping, target_vol_for_rollback]
         return_values = map(self._mock_cli_object, vols_to_return)
         self.svc.client.svcinfo.lsvdisk.side_effect = return_values
@@ -388,7 +388,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             CLIFailureError("Failed")]
 
         with self.assertRaises(CLIFailureError):
-            self.svc.create_snapshot("test_snapshot", "source_volume")
+            self.svc.create_snapshot("test_snapshot", "source_volume", "pool1")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_create_snapshot_create_fcmap_error(self, mock_warning):
@@ -398,7 +398,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             CLIFailureError("Failed")]
 
         with self.assertRaises(CLIFailureError):
-            self.svc.create_snapshot("test_snapshot", "source_volume")
+            self.svc.create_snapshot("test_snapshot", "source_volume", "pool1")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_create_snapshot_start_fcmap_error(self, mock_warning):
@@ -408,12 +408,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
             CLIFailureError("Failed")]
 
         with self.assertRaises(CLIFailureError):
-            self.svc.create_snapshot("test_snapshot", "source_volume")
+            self.svc.create_snapshot("test_snapshot", "source_volume", "pool1")
 
     def test_create_snapshot_success(self):
         self._prepare_mocks_for_create_snapshot()
 
-        snapshot = self.svc.create_snapshot("test_snapshot", "source_volume")
+        snapshot = self.svc.create_snapshot("test_snapshot", "source_volume", "pool1")
 
         self.assertEqual(snapshot.capacity_bytes, 1024)
         self.assertEqual(snapshot.array_type, 'SVC')
@@ -422,7 +422,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_create_snapshot_no_deduplicated_copy_success(self):
         self._prepare_mocks_for_create_snapshot(deduplicated_copy=False)
 
-        snapshot = self.svc.create_snapshot("test_snapshot", "source_volume")
+        snapshot = self.svc.create_snapshot("test_snapshot", "source_volume", "pool1")
 
         self.assertEqual(snapshot.capacity_bytes, 1024)
         self.assertEqual(snapshot.array_type, 'SVC')
