@@ -1,9 +1,7 @@
+import logging
+
 from pyds8k.client.ds8k.v1.client import Client
 from pyds8k.exceptions import NotFound
-
-from controller.common.csi_logger import get_stdout_logger
-
-logger = get_stdout_logger()
 
 
 def _int_lunid_to_hex(lunid):
@@ -77,8 +75,8 @@ class RESTClient:
             self._client.get_io_enclosures()
             return True
         except Exception as ex:
-            logger.info("The client is not valid")
-            logger.exception(ex)
+            logging.info("The client is not valid")
+            logging.exception(ex)
             return False
 
     def get_system(self):
@@ -231,7 +229,7 @@ class RESTClient:
                 host_name=host_name
             )
         except NotFound:
-            logger.debug(
+            logging.debug(
                 'host port {} is not found, creating new...'.format(wwpn)
             )
             return self._client.create_host_port(

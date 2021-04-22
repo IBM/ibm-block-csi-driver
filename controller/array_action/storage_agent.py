@@ -1,10 +1,11 @@
+import logging
 import socket
 from threading import RLock
 from queue import Empty
 from collections import OrderedDict
 from contextlib import contextmanager
+
 from controller.array_action.array_connection_pool import ConnectionPool
-from controller.common.csi_logger import get_stdout_logger
 from controller.common import settings
 from controller.array_action.errors import FailedToFindStorageSystemType
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
@@ -12,7 +13,6 @@ from controller.array_action.array_mediator_svc import SVCArrayMediator
 from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
 import controller.array_action.errors as array_errors
 
-logger = get_stdout_logger()
 _array_agents = {}
 lock = RLock()
 
@@ -30,12 +30,12 @@ array_type_to_mediator = {
 
 
 def detect_array_type(endpoints):
-    logger.debug("detecting array connection type")
+    logging.debug("detecting array connection type")
 
     for storage_type, port in array_type_to_port.items():
         for endpoint in endpoints:
             if _socket_connect_test(endpoint, port) == 0:
-                logger.debug("storage array type is : {0}".format(storage_type))
+                logging.debug("storage array type is : {0}".format(storage_type))
                 return storage_type
 
     raise FailedToFindStorageSystemType(endpoints)
@@ -60,10 +60,10 @@ def _socket_connect_test(host, port, timeout=1):
         sock.close()
         return ret
     except socket.gaierror as e:
-        logger.debug('could not resolve hostname "{HOST}": {ERROR}'.format(HOST=host, ERROR=e))
+        logging.debug('could not resolve hostname "{HOST}": {ERROR}'.format(HOST=host, ERROR=e))
         return -1
     except Exception as e:
-        logger.debug('socket_connect {}'.format(e))
+        logging.debug('socket_connect {}'.format(e))
         return -1
 
 
@@ -74,17 +74,17 @@ def get_agent(username, password, endpoints, array_type=None):
         if found:
             # delete the agent and clear all the connections if password is changed.
             if found.password != password:
-                logger.debug(
+                logging.debug(
                     "The password is changed for endpoint {}, "
                     "remove the cached connection".format(endpoint_key)
                 )
                 del _array_agents[(username, endpoint_key)]
                 del found
             else:
-                logger.debug("Found a cached agent for endpoint {}, reuse it".format(endpoint_key))
+                logging.debug("Found a cached agent for endpoint {}, reuse it".format(endpoint_key))
                 return found
 
-        logger.debug("Creating a new agent for endpoint {}".format(endpoint_key))
+        logging.debug("Creating a new agent for endpoint {}".format(endpoint_key))
         agent = StorageAgent(endpoints, username, password, array_type)
         _array_agents[(username, endpoint_key)] = agent
         return agent
