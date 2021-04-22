@@ -419,6 +419,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(snapshot.array_type, 'SVC')
         self.assertEqual(snapshot.id, 'snap_id')
 
+    def test_create_snapshot_with_different_pool_success(self):
+        self._prepare_mocks_for_create_snapshot()
+
+        self.svc.create_snapshot("test_snapshot", "source_volume", "different_pool")
+        self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
+                                                                 pool='different_pool', thin=True)
+
     def test_create_snapshot_no_deduplicated_copy_success(self):
         self._prepare_mocks_for_create_snapshot(deduplicated_copy=False)
 

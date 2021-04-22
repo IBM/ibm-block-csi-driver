@@ -305,7 +305,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             return self._generate_snapshot_response(cli_object)
         return self._generate_volume_response(cli_object)
 
-    def create_snapshot(self, name, volume_id, pool_id=None):
+    def create_snapshot(self, name, volume_id, pool_id):
         logger.info("creating snapshot {0} from volume {1}".format(name, volume_id))
         volume_name = self._get_object_name_by_wwn(volume_id)
         try:
