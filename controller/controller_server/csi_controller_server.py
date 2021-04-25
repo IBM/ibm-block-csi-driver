@@ -386,7 +386,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateSnapshotResponse()
 
-        pool = request.parameters.get(config.PARAMETERS_POOL)
         source_volume_id = request.source_volume_id
         logger.info("Snapshot base name : {}. Source volume id : {}".format(request.name, source_volume_id))
         secrets = request.secrets
@@ -399,9 +398,10 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 snapshot_final_name = self._get_snapshot_final_name(request, array_mediator)
 
                 source_volume = array_mediator.get_object_by_id(volume_id, config.VOLUME_TYPE_NAME)
+                if not source_volume:
+                    raise array_errors.ObjectNotFoundError(volume_id)
                 volume_name = source_volume.name
-                if pool is None:
-                    pool = source_volume.pool_name
+                pool = request.parameters.get(config.PARAMETERS_POOL, source_volume.pool_name)
                 logger.info("Snapshot name : {}. Volume name : {}".format(snapshot_final_name, volume_name))
                 snapshot = array_mediator.get_snapshot(
                     snapshot_final_name,
@@ -420,7 +420,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         "Snapshot doesn't exist. Creating a new snapshot {0} from volume {1}".format(
                             snapshot_final_name,
                             volume_name))
-                    snapshot = array_mediator.create_snapshot(snapshot_final_name, volume_id, pool)
+                    snapshot = array_mediator.create_snapshot(volume_id, snapshot_final_name, pool)
 
                 logger.debug("generating create snapshot response")
                 res = utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)

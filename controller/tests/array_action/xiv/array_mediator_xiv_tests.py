@@ -257,15 +257,15 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
     def test_create_snapshot_succeeds(self):
         snapshot_name = "snapshot"
-        snapshot_volume_name = "snapshot_volume"
+        snapshot_volume_id = "12345678"
         size_in_blocks_string = "10"
         size_in_bytes = int(size_in_blocks_string) * XIVArrayMediator.BLOCK_SIZE_IN_BYTES
-        xcli_snapshot = self._get_single_snapshot_result_mock(snapshot_name, snapshot_volume_name,
+        xcli_snapshot = self._get_single_snapshot_result_mock(snapshot_name, snapshot_volume_id,
                                                               snapshot_capacity=size_in_blocks_string)
         self.mediator.client.cmd.snapshot_create.return_value = xcli_snapshot
-        res = self.mediator.create_snapshot(snapshot_name, snapshot_volume_name, "pool1")
+        res = self.mediator.create_snapshot(snapshot_volume_id, snapshot_name, "pool1")
         self.assertTrue(res.name == snapshot_name)
-        self.assertTrue(res.volume_name == snapshot_volume_name)
+        self.assertTrue(res.volume_name == snapshot_volume_id)
         self.assertTrue(res.capacity_bytes == size_in_bytes)
         self.assertTrue(res.capacity_bytes == size_in_bytes)
 
@@ -286,12 +286,12 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_create_snapshot_generate_snapshot_response_raise_exception(self, response):
         response.side_effect = Exception("err")
         with self.assertRaises(Exception):
-            self.mediator.create_snapshot("snapshot", "volume", "pool1")
+            self.mediator.create_snapshot("volume_id", "snapshot", "pool1")
 
     def _test_create_snapshot_error(self, xcli_exception, expected_exception):
         self.mediator.client.cmd.snapshot_create.side_effect = [xcli_exception("", "snapshot", "")]
         with self.assertRaises(expected_exception):
-            self.mediator.create_snapshot("snapshot", "volume", "pool1")
+            self.mediator.create_snapshot("volume_id", "snapshot", "pool1")
 
     def _get_single_snapshot_result_mock(self, snapshot_name, snapshot_volume_name, snapshot_capacity="17"):
         snapshot_wwn = "1235678"

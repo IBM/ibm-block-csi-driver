@@ -453,13 +453,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return self._generate_snapshot_response_with_verification(cli_object)
         return self._generate_volume_response(cli_object)
 
-    def _create_similar_volume(self, source_volume_name, target_volume_name, pool_id):
+    def _create_similar_volume(self, source_cli_volume, target_volume_name, pool):
         logger.info("creating target cli volume '{0}' from source volume '{1}'".format(target_volume_name,
-                                                                                       source_volume_name))
-        source_cli_volume = self._get_cli_volume(source_volume_name)
+                                                                                       source_cli_volume.name))
         space_efficiency = _get_cli_volume_space_efficiency(source_cli_volume)
         size_in_bytes = int(source_cli_volume.capacity)
-        self._create_cli_volume(target_volume_name, size_in_bytes, space_efficiency, pool_id)
+        self._create_cli_volume(target_volume_name, size_in_bytes, space_efficiency, pool)
 
     def _create_fcmap(self, source_volume_name, target_volume_name, is_copy):
         logger.info("creating FlashCopy Mapping from '{0}' to '{1}'".format(source_volume_name, target_volume_name))
@@ -548,21 +547,22 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         target_cli_volume = self._delete_unstarted_fcmap_if_exists(target_volume_name)
         self._delete_target_volume_if_exists(target_cli_volume)
 
-    def _create_snapshot(self, target_volume_name, source_volume_name, pool_id):
+    def _create_snapshot(self, target_volume_name, source_cli_volume, pool):
         try:
-            self._create_similar_volume(source_volume_name, target_volume_name, pool_id)
-            return self._create_and_start_fcmap(source_volume_name, target_volume_name, is_copy=False)
+            self._create_similar_volume(source_cli_volume, target_volume_name, pool)
+            return self._create_and_start_fcmap(source_cli_volume.name, target_volume_name, is_copy=False)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.error("Failed to create snapshot '{0}': {1}".format(target_volume_name, ex))
             logger.info("rolling back create snapshot '{0}'".format(target_volume_name))
             self._rollback_create_snapshot(target_volume_name)
             raise ex
 
-    def create_snapshot(self, name, volume_id, pool_id):
-        logger.info("creating snapshot '{0}' from volume '{1}'".format(name, volume_id))
-        volume_name = self._get_volume_name_by_wwn(volume_id)
-        target_cli_volume = self._create_snapshot(name, volume_name, pool_id)
-        logger.info("finished creating snapshot '{0}' from volume '{1}'".format(name, volume_name))
+    def create_snapshot(self, volume_id, snapshot_name, pool):
+        logger.info("creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
+        source_cli_volume = self._get_cli_volume_by_wwn(volume_id)
+        target_cli_volume = self._create_snapshot(snapshot_name, source_cli_volume, pool)
+        volume_name = source_cli_volume.name
+        logger.info("finished creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_name))
         return self._generate_snapshot_response(target_cli_volume, volume_name)
 
     def delete_snapshot(self, snapshot_id):

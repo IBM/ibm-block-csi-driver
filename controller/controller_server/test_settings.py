@@ -1,6 +1,7 @@
 user = "temp"
 password = "temp"
 array = "arr"
+pool = "pool1"
 volume_name = "volume"
 snapshot_name = "snapshot"
 snapshot_volume_id = "12345678"
