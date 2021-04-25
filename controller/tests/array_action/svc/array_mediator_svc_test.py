@@ -388,7 +388,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             CLIFailureError("Failed")]
 
         with self.assertRaises(CLIFailureError):
-            self.svc.create_snapshot("source_volume", "test_snapshot", "pool1")
+            self.svc.create_snapshot("source_volume_id", "test_snapshot", "pool1")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_create_snapshot_create_fcmap_error(self, mock_warning):
@@ -398,7 +398,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             CLIFailureError("Failed")]
 
         with self.assertRaises(CLIFailureError):
-            self.svc.create_snapshot("source_volume", "test_snapshot", "pool1")
+            self.svc.create_snapshot("source_volume_id", "test_snapshot", "pool1")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_create_snapshot_start_fcmap_error(self, mock_warning):
@@ -408,12 +408,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
             CLIFailureError("Failed")]
 
         with self.assertRaises(CLIFailureError):
-            self.svc.create_snapshot("source_volume", "test_snapshot", "pool1")
+            self.svc.create_snapshot("source_volume_id", "test_snapshot", "pool1")
 
     def test_create_snapshot_success(self):
         self._prepare_mocks_for_create_snapshot()
 
-        snapshot = self.svc.create_snapshot("source_volume", "test_snapshot", "pool1")
+        snapshot = self.svc.create_snapshot("source_volume_id", "test_snapshot", "pool1")
 
         self.assertEqual(snapshot.capacity_bytes, 1024)
         self.assertEqual(snapshot.array_type, 'SVC')
@@ -422,14 +422,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_create_snapshot_with_different_pool_success(self):
         self._prepare_mocks_for_create_snapshot()
 
-        self.svc.create_snapshot("source_volume", "test_snapshot", "different_pool")
+        self.svc.create_snapshot("source_volume_id", "test_snapshot", "different_pool")
         self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
                                                                  pool='different_pool', thin=True)
 
     def test_create_snapshot_no_deduplicated_copy_success(self):
         self._prepare_mocks_for_create_snapshot(deduplicated_copy=False)
 
-        snapshot = self.svc.create_snapshot("source_volume", "test_snapshot", "pool1")
+        snapshot = self.svc.create_snapshot("source_volume_id", "test_snapshot", "pool1")
 
         self.assertEqual(snapshot.capacity_bytes, 1024)
         self.assertEqual(snapshot.array_type, 'SVC')
