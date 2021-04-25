@@ -7,8 +7,10 @@ echo `pwd`
 sleep 2
 mkdir -p build/reports && chmod 777 build/reports
 set +e
+echo "./scripts/ci/run_csi_test_client.sh csi-sanity-test `pwd`/build/reports/ $1"
 ./scripts/ci/run_csi_test_client.sh csi-sanity-test `pwd`/build/reports/ $1
 
+echo "_____"
 docker logs csi-controller >& "csi_controller_run.log"
 docker logs csi-node >& "csi_node_run.log"
 docker kill csi-controller
