@@ -200,9 +200,9 @@ class ArrayMediator(ABC):
         """
         This function return snapshot info about the snapshot.
         Args:
-            volume_id : id of the source volume (used to get pool in case pool parameter not given).
-            snapshot_name : name of the snapshot in the storage system.
-            pool: pool of the volume to find the snapshot in (if not given, pool taken from source volume).
+            volume_id : id of the source volume (used to get pool in case pool parameter not given)
+            snapshot_name : name of the snapshot in the storage system
+            pool: pool to find the snapshot in (if not given, pool taken from source volume)
         Returns:
            Snapshot
         Raises:
@@ -236,7 +236,7 @@ class ArrayMediator(ABC):
         Args:
             volume_id : id of the volume to be created from
             snapshot_name : name of the snapshot to be created in the storage system
-            pool : pool to create the snapshot in (and find it if already exist).
+            pool : pool to create the snapshot in (and find it if already exist)
         Returns:
             Snapshot
         Raises:

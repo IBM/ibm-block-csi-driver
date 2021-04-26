@@ -495,7 +495,15 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(Exception):
             self.array.create_snapshot("volume_id", "target_volume", pool=self.volume_response.pool)
 
-    def test_create_snapshot_create_vol_not_found(self):
+    def test_create_snapshot_get_volume_not_found(self):
+        volume = self._prepare_mocks_for_create_snapshot()
+        self.client_mock.create_volume.return_value = volume
+        self.client_mock.get_volume.side_effect = NotFound("404")
+
+        with self.assertRaises(array_errors.ObjectNotFoundError):
+            self.array.create_snapshot("volume_id", "target_volume", pool=self.volume_response.pool)
+
+    def test_create_snapshot_create_flashcopy_volume_not_found(self):
         volume = self._prepare_mocks_for_create_snapshot()
         self.client_mock.create_volume.return_value = volume
         self.client_mock.get_volume.return_value = volume
