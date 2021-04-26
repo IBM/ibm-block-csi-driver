@@ -235,38 +235,42 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_get_snapshot_return_correct_value(self):
         snapshot_name = "snapshot"
         snapshot_volume_name = "snapshot_volume"
+        snapshot_volume_wwn = "123456789"
         xcli_snapshot = self._get_single_snapshot_result_mock(snapshot_name, snapshot_volume_name)
         self.mediator.client.cmd.vol_list.return_value = xcli_snapshot
-        res = self.mediator.get_snapshot(snapshot_name)
+        res = self.mediator.get_snapshot(snapshot_volume_wwn, snapshot_name)
         self.assertTrue(res.name == snapshot_name)
-        self.assertTrue(res.volume_name == snapshot_volume_name)
+        self.assertTrue(res.source_volume_id == snapshot_volume_wwn)
 
     def test_get_snapshot_same_name_volume_exists_error(self):
         snapshot_name = "snapshot"
         snapshot_volume_name = ""
+        snapshot_volume_wwn = "123456789"
         xcli_snapshot = self._get_single_snapshot_result_mock(snapshot_name, snapshot_volume_name)
         self.mediator.client.cmd.vol_list.return_value = xcli_snapshot
         with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
-            self.mediator.get_snapshot(snapshot_name)
+            self.mediator.get_snapshot(snapshot_volume_wwn, snapshot_name)
 
     def test_get_snapshot_raise_illegal_object_name(self):
         snapshot_name = "snapshot"
+        snapshot_volume_wwn = "123456789"
         self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalNameForObjectError("", snapshot_name, "")]
         with self.assertRaises(array_errors.IllegalObjectName):
-            self.mediator.get_snapshot(snapshot_name)
+            self.mediator.get_snapshot(snapshot_volume_wwn, snapshot_name)
 
     def test_create_snapshot_succeeds(self):
         snapshot_name = "snapshot"
-        snapshot_volume_id = "12345678"
+        snapshot_volume_id = "123456789"
+        snapshot_volume_name = "snapshot_volume"
         pool_name = "pool1"
         size_in_blocks_string = "10"
         size_in_bytes = int(size_in_blocks_string) * XIVArrayMediator.BLOCK_SIZE_IN_BYTES
-        xcli_snapshot = self._get_single_snapshot_result_mock(snapshot_name, snapshot_volume_id,
+        xcli_snapshot = self._get_single_snapshot_result_mock(snapshot_name, snapshot_volume_name,
                                                               snapshot_capacity=size_in_blocks_string)
         self.mediator.client.cmd.snapshot_create.return_value = xcli_snapshot
         res = self.mediator.create_snapshot(snapshot_volume_id, snapshot_name, pool_name)
         self.assertTrue(res.name == snapshot_name)
-        self.assertTrue(res.volume_name == snapshot_volume_id)
+        self.assertTrue(res.source_volume_id == snapshot_volume_id)
         self.assertTrue(res.capacity_bytes == size_in_bytes)
         self.assertTrue(res.capacity_bytes == size_in_bytes)
 
@@ -296,8 +300,9 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
     def _get_single_snapshot_result_mock(self, snapshot_name, snapshot_volume_name, snapshot_capacity="17"):
         snapshot_wwn = "1235678"
+        snapshot_volume_wwn = "123456789"
         mock_snapshot = utils.get_mock_xiv_snapshot(snapshot_capacity, snapshot_name, snapshot_wwn,
-                                                    snapshot_volume_name)
+                                                    snapshot_volume_name, snapshot_volume_wwn)
         return Mock(as_single_element=mock_snapshot)
 
     def test_delete_snapshot_return_volume_not_found(self):
@@ -329,11 +334,12 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_get_object_by_id_return_correct_snapshot(self):
         snapshot_name = "snapshot"
         snapshot_volume_name = "snapshot_volume"
+        snapshot_volume_wwn = "123456789"
         xcli_snapshot = self._get_single_snapshot_result_mock(snapshot_name, snapshot_volume_name)
         self.mediator.client.cmd.vol_list.return_value = xcli_snapshot
         res = self.mediator.get_object_by_id("1235678", "snapshot")
         self.assertTrue(res.name == snapshot_name)
-        self.assertTrue(res.volume_name == snapshot_volume_name)
+        self.assertTrue(res.source_volume_id == snapshot_volume_wwn)
 
     def test_get_object_by_id_return_correct_volume(self):
         volume_name = "volume_name"

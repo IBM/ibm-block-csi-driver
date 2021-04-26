@@ -522,7 +522,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                                                                    self.service_address)
         return api_snapshot
 
-    def get_snapshot(self, snapshot_name, pool_id=None):
+    @convert_scsi_id_to_array_id
+    def get_snapshot(self, volume_id, snapshot_name, pool_id=None):
+        if not pool_id:
+            source_api_volume = self._get_api_volume_by_id(volume_id)
+            pool_id = source_api_volume.pool
         api_snapshot = self._get_api_snapshot(snapshot_name, pool_id)
         if api_snapshot is None:
             return None
@@ -534,6 +538,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                                                                                source_api_volume.name))
         space_efficiency = source_api_volume.tp
         size_in_bytes = int(source_api_volume.cap)
+        if not pool_id:
+            pool_id = source_api_volume.pool
         return self._create_api_volume(target_volume_name, size_in_bytes, space_efficiency, pool_id)
 
     def _create_flashcopy(self, source_volume_id, target_volume_id, options):
@@ -566,11 +572,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         self._delete_volume(target_volume_id, not_exist_err=False)
 
     def _create_snapshot(self, target_volume_name, pool_id, source_volume):
-        source_volume_id = source_volume.id
         target_api_volume = self._create_similar_volume(target_volume_name, source_volume, pool_id)
         options = [FLASHCOPY_NO_BACKGROUND_COPY_OPTION, FLASHCOPY_PERSISTENT_OPTION]
         try:
-            return self._create_flashcopy(source_volume_id, target_api_volume.id, options)
+            return self._create_flashcopy(source_volume.id, target_api_volume.id, options)
         except (array_errors.ObjectNotFoundError, array_errors.SnapshotAlreadyExists) as ex:
             logger.error("Failed to create snapshot '{0}': {1}".format(target_volume_name, ex))
             self._delete_target_volume_if_exist(target_api_volume.id)
@@ -580,8 +585,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         flashcopy_as_target = get_flashcopy_as_target_if_exists(api_object)
         if flashcopy_as_target is None or flashcopy_as_target.backgroundcopy != "disabled":
             raise array_errors.ExpectedSnapshotButFoundVolumeError(api_object.name, self.service_address)
-        source_volume_name = self.get_volume_name(flashcopy_as_target.sourcevolume)
-        return self._generate_snapshot_response(api_object, source_volume_name)
+        return self._generate_snapshot_response(api_object, flashcopy_as_target.sourcevolume)
 
     @convert_scsi_id_to_array_id
     def get_object_by_id(self, object_id, object_type):
@@ -595,12 +599,12 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     @convert_scsi_id_to_array_id
     def create_snapshot(self, volume_id, snapshot_name, pool):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
-        source_volume = self._get_api_volume_by_id(volume_id)
-        if source_volume is None:
+        source_api_volume = self._get_api_volume_by_id(volume_id)
+        if source_api_volume is None:
             raise array_errors.ObjectNotFoundError(volume_id)
-        target_api_volume = self._create_snapshot(snapshot_name, pool, source_volume=source_volume)
+        target_api_volume = self._create_snapshot(snapshot_name, pool, source_volume=source_api_volume)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
-        return self._generate_snapshot_response(target_api_volume, source_volume.name)
+        return self._generate_snapshot_response(target_api_volume, volume_id)
 
     def _delete_flashcopy(self, flashcopy_id):
         try:
@@ -667,12 +671,12 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
         logger.debug("Finished validate_supported_space_efficiency.")
 
-    def _generate_snapshot_response(self, api_snapshot, source_volume_name):
+    def _generate_snapshot_response(self, api_snapshot, source_volume_id):
         return Snapshot(capacity_bytes=int(api_snapshot.cap),
                         snapshot_id=self._generate_volume_scsi_identifier(api_snapshot.id),
                         snapshot_name=api_snapshot.name,
                         array_address=self.service_address,
-                        volume_name=source_volume_name,
+                        volume_id=self._generate_volume_scsi_identifier(source_volume_id),
                         is_ready=True,
                         array_type=self.array_type)
 

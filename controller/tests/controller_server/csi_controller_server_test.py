@@ -131,8 +131,8 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.servicer.CreateSnapshot(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.get_snapshot.assert_called_once_with(snapshot_name, pool_id=pool)
-        self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_id, snapshot_name, pool)
+        self.mediator.get_snapshot.assert_called_once_with(snapshot_volume_id, snapshot_name, pool_id=None)
+        self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_id, snapshot_name, None)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_belongs_to_wrong_volume(self, storage_agent):
@@ -151,16 +151,6 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.servicer.CreateSnapshot(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
-
-    @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_snapshot_source_volume_not_found(self, storage_agent):
-        storage_agent.return_value = self.storage_agent
-        self.mediator.get_object_by_id = Mock()
-        self.mediator.get_object_by_id.side_effect = [None]
-
-        self.servicer.CreateSnapshot(self.request, self.context)
-
-        self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_wrong_secrets(self, storage_agent):
@@ -183,7 +173,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
         self.assertTrue("error" in self.context.details)
-        self.mediator.get_snapshot.assert_called_once_with(snapshot_name, pool_id=pool)
+        self.mediator.get_snapshot.assert_called_once_with(snapshot_volume_id, snapshot_name, pool_id=None)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_get_snapshot_illegal_object_name_exception(self, storage_agent):
@@ -195,7 +185,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertTrue(msg in self.context.details)
-        self.mediator.get_snapshot.assert_called_once_with(snapshot_name, pool_id=pool)
+        self.mediator.get_snapshot.assert_called_once_with(snapshot_volume_id, snapshot_name, pool_id=None)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_prefix_too_long_exception(self, storage_agent):
@@ -226,8 +216,8 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
         self.assertEqual(self.context.code, return_code)
         self.assertTrue(msg in self.context.details)
-        self.mediator.get_snapshot.assert_called_once_with(snapshot_name, pool_id=pool)
-        self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_id, snapshot_name, pool)
+        self.mediator.get_snapshot.assert_called_once_with(snapshot_volume_id, snapshot_name, pool_id=None)
+        self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_id, snapshot_name, None)
 
     def test_create_snapshot_with_illegal_object_name_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
@@ -258,7 +248,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.servicer.CreateSnapshot(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_id, "prefix_some_name", pool)
+        self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_id, "prefix_some_name", None)
 
 
 class TestControllerServerDeleteSnapshot(AbstractControllerTest):

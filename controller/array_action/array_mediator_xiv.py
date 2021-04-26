@@ -131,7 +131,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                         cli_snapshot.wwn,
                         cli_snapshot.name,
                         self.endpoint,
-                        cli_snapshot.master_name,
+                        volume_id=cli_snapshot.copy_master_wwn,
                         is_ready=True,
                         array_type=self.array_type)
 
@@ -281,7 +281,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
-    def get_snapshot(self, snapshot_name, pool_id=None):
+    def get_snapshot(self, volume_id, snapshot_name, pool_id=None):
         logger.debug("Get snapshot : {}".format(snapshot_name))
         try:
             cli_snapshot = self.client.cmd.vol_list(vol=snapshot_name).as_single_element

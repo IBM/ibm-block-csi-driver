@@ -210,10 +210,11 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_snapshot(self, snapshot_name, pool_id=None):
+    def get_snapshot(self, volume_id, snapshot_name, pool_id=None):
         """
         This function return snapshot info about the snapshot.
         Args:
+            volume_id : id of the source volume
             snapshot_name : name of the snapshot in the storage system
             pool_id: pool_id of the volume to find the snapshot more efficiently.
         Returns:
@@ -247,9 +248,9 @@ class ArrayMediator(ABC):
         """
         This function should create a snapshot from volume in the storage system.
         Args:
-            volume_id    : id of the volume to be created from
-            snapshot_name           : name of the snapshot to be created in the storage system
-            pool: pool_id of the volume to find the snapshot more efficiently.
+            volume_id : id of the volume to be created from
+            snapshot_name : name of the snapshot to be created in the storage system
+            pool : pool to create the snapshot in (and find it if already exist).
         Returns:
             Snapshot
         Raises:

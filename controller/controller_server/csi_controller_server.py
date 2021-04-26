@@ -396,30 +396,27 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
                 snapshot_final_name = self._get_snapshot_final_name(request, array_mediator)
-
-                source_volume = array_mediator.get_object_by_id(volume_id, config.VOLUME_TYPE_NAME)
-                if not source_volume:
-                    raise array_errors.ObjectNotFoundError(volume_id)
-                volume_name = source_volume.name
-                pool = request.parameters.get(config.PARAMETERS_POOL, source_volume.pool_name)
-                logger.info("Snapshot name : {}. Volume name : {}".format(snapshot_final_name, volume_name))
+                pool = request.parameters.get(config.PARAMETERS_POOL)
+                logger.info("Snapshot name : {}. Volume id : {}".format(snapshot_final_name, volume_id))
                 snapshot = array_mediator.get_snapshot(
+                    volume_id,
                     snapshot_final_name,
                     pool_id=pool
                 )
 
                 if snapshot:
-                    if snapshot.volume_name != volume_name:
+                    if snapshot.source_volume_id != volume_id:
                         context.set_details(
-                            messages.SnapshotWrongVolumeError_message.format(snapshot_final_name, snapshot.volume_name,
-                                                                             volume_name))
+                            messages.SnapshotWrongVolumeError_message.format(snapshot_final_name,
+                                                                             snapshot.source_volume_id,
+                                                                             volume_id))
                         context.set_code(grpc.StatusCode.ALREADY_EXISTS)
                         return csi_pb2.CreateSnapshotResponse()
                 else:
                     logger.debug(
                         "Snapshot doesn't exist. Creating a new snapshot {0} from volume {1}".format(
                             snapshot_final_name,
-                            volume_name))
+                            volume_id))
                     snapshot = array_mediator.create_snapshot(volume_id, snapshot_final_name, pool)
 
                 logger.debug("generating create snapshot response")
