@@ -135,7 +135,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                         is_ready=True,
                         array_type=self.array_type)
 
-    def get_volume(self, volume_name, pool_id=None):
+    def get_volume(self, volume_name, pool=None):
         logger.debug("Get volume : {}".format(volume_name))
         try:
             cli_volume = self.client.cmd.vol_list(vol=volume_name).as_single_element
@@ -152,9 +152,6 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
         array_volume = self._generate_volume_response(cli_volume)
         return array_volume
-
-    def get_volume_name(self, volume_id):
-        return self._get_object_name_by_wwn(volume_id)
 
     def _expand_cli_volume(self, cli_volume, increase_in_blocks):
         try:
@@ -217,7 +214,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                 raise array_errors.NotEnoughSpaceInPool(id_or_name=pool)
 
     def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
-                                            minimum_volume_size_in_bytes, pool_id=None):
+                                            minimum_volume_size_in_bytes, pool=None):
         logger.debug(
             "Copy source {0} data to volume {1}. source capacity {2}. Minimal requested volume capacity {3}".format(
                 name, source_name, source_capacity_in_bytes, minimum_volume_size_in_bytes))
@@ -281,7 +278,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
-    def get_snapshot(self, volume_id, snapshot_name, pool_id=None):
+    def get_snapshot(self, volume_id, snapshot_name, pool=None):
         logger.debug("Get snapshot : {}".format(snapshot_name))
         try:
             cli_snapshot = self.client.cmd.vol_list(vol=snapshot_name).as_single_element
@@ -305,7 +302,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             return self._generate_snapshot_response(cli_object)
         return self._generate_volume_response(cli_object)
 
-    def create_snapshot(self, volume_id, snapshot_name, pool):
+    def create_snapshot(self, volume_id, snapshot_name, pool=None):
         logger.info("creating snapshot {0} from volume {1}".format(snapshot_name, volume_id))
         volume_name = self._get_object_name_by_wwn(volume_id)
         try:

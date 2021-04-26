@@ -55,7 +55,7 @@ class ArrayMediator(ABC):
 
     @abstractmethod
     def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
-                                            minimum_volume_size_in_bytes, pool_id=None):
+                                            minimum_volume_size_in_bytes, pool=None):
         """
         This function should create a volume from source volume or snapshot in the storage system.
 
@@ -65,7 +65,7 @@ class ArrayMediator(ABC):
             source_capacity_in_bytes        : capacity of source to create from
             minimum_volume_size_in_bytes    : if source capacity is lower than this value volume will
                                             be increased to this value
-            pool_id                         : pool of the volume and source object to find them more efficiently.
+            pool                            : pool of the volume and source object to find them more efficiently.
 
         Returns:
             Volume
@@ -98,13 +98,13 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_volume(self, volume_name, pool_id=None):
+    def get_volume(self, volume_name, pool=None):
         """
         This function return volume info about the volume.
 
         Args:
             volume_name: name of the volume on storage system.
-            pool_id: pool_id of the volume to find the volume more efficiently.
+            pool: pool of the volume to find the volume more efficiently.
 
 
         Returns:
@@ -115,20 +115,6 @@ class ArrayMediator(ABC):
             IllegalObjectName
             PermissionDenied
             PoolParameterIsMissing
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def get_volume_name(self, volume_id):
-        """
-        This function return volume name.
-        Args:
-           volume_id : volume id
-        Returns:
-           volume name
-        Raises:
-            ObjectNotFound
-            IllegalObjectID
         """
         raise NotImplementedError
 
@@ -210,13 +196,13 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_snapshot(self, volume_id, snapshot_name, pool_id=None):
+    def get_snapshot(self, volume_id, snapshot_name, pool=None):
         """
         This function return snapshot info about the snapshot.
         Args:
-            volume_id : id of the source volume
-            snapshot_name : name of the snapshot in the storage system
-            pool_id: pool_id of the volume to find the snapshot more efficiently.
+            volume_id : id of the source volume (used to get pool in case pool parameter not given).
+            snapshot_name : name of the snapshot in the storage system.
+            pool: pool of the volume to find the snapshot in (if not given, pool taken from source volume).
         Returns:
            Snapshot
         Raises:
@@ -244,7 +230,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_snapshot(self, volume_id, snapshot_name, pool):
+    def create_snapshot(self, volume_id, snapshot_name, pool=None):
         """
         This function should create a snapshot from volume in the storage system.
         Args:

@@ -119,7 +119,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         ]
         volume = self.array.get_volume(
             self.volume_response.name,
-            pool_id=self.volume_response.pool
+            pool=self.volume_response.pool
         )
         self.assertEqual(volume.name, self.volume_response.name)
 
@@ -130,14 +130,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.array.get_volume(
                 "fake_name",
-                pool_id=self.volume_response.pool
+                pool=self.volume_response.pool
             )
-
-    def test_get_volume_name_raise_illegal_object_id(self):
-        volume = self._prepare_mocks_for_volume()
-        self.client_mock.get_volume.side_effect = [InternalServerError("500", "BE7A0005")]
-        with self.assertRaises(array_errors.IllegalObjectID):
-            self.array.get_volume_name(volume.id)
 
     def test_create_volume_with_default_space_efficiency_success(self):
         self._test_create_volume_with_space_efficiency_success('none')
@@ -457,7 +451,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_get_snapshot_not_exist_return_none(self):
         self.client_mock.get_snapshot.side_effect = [ClientError("400", "BE7A002D")]
-        snapshot = self.array.get_snapshot("volume_id", "fake_name", pool_id=self.volume_response.pool)
+        snapshot = self.array.get_snapshot("volume_id", "fake_name", pool=self.volume_response.pool)
         self.assertIsNone(snapshot)
 
     def test_get_snapshot_get_flashcopy_not_exist_raise_error(self):
@@ -465,11 +459,11 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.get_flashcopies_by_volume.return_value = []
 
         with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
-            self.array.get_snapshot("volume_id", "test_name", pool_id=self.volume_response.pool)
+            self.array.get_snapshot("volume_id", "test_name", pool=self.volume_response.pool)
 
     def test_get_snapshot_success(self):
         target_volume = self._prepare_mocks_for_snapshot()
-        volume = self.array.get_snapshot("volume_id", "test_name", pool_id=self.volume_response.pool)
+        volume = self.array.get_snapshot("volume_id", "test_name", pool=self.volume_response.pool)
         self.assertEqual(volume.name, target_volume.name)
 
     def _prepare_mocks_for_create_snapshot(self):

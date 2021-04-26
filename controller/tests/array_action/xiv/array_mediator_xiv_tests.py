@@ -47,31 +47,6 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.mediator.get_volume("volume")
 
-    def test_get_volume_name_raise_correct_errors(self):
-        error_msg = "ex"
-        self.mediator.client.cmd.vol_list.side_effect = [Exception(error_msg)]
-        with self.assertRaises(Exception) as ex:
-            self.mediator.get_volume_name("volume-wwn")
-
-        self.assertTrue(error_msg in str(ex.exception))
-
-    def test_get_volume_name_return_correct_value(self):
-        volume = utils.get_mock_xiv_volume(10, "volume_name", "wwn")
-        self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=volume)
-        volume_name = self.mediator.get_volume_name("wwn")
-
-        self.assertTrue(volume_name == "volume_name")
-
-    def test_get_volume_name_raise_object_not_found(self):
-        self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=None)
-        with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.mediator.get_volume_name("volume-wwn")
-
-    def test_get_volume_name_raise_illegal_object_id(self):
-        self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalValueForArgumentError("", "volume-wwn", "")]
-        with self.assertRaises(array_errors.IllegalObjectID):
-            self.mediator.get_volume_name("volume-wwn")
-
     @patch("controller.array_action.array_mediator_xiv.XCLIClient")
     def test_connect_errors(self, client):
         client.connect_multiendpoint_ssl.return_value = Mock()

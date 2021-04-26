@@ -183,7 +183,7 @@ def generate_csi_create_volume_response(new_volume, source_type=None):
                       "array_address": ",".join(
                           new_volume.array_address if isinstance(new_volume.array_address, list) else [
                               new_volume.array_address]),
-                      "pool_name": new_volume.pool_name,
+                      "pool_name": new_volume.pool,
                       "storage_type": new_volume.array_type
                       }
     content_source = None

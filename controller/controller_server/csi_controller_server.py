@@ -92,7 +92,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 try:
                     volume = array_mediator.get_volume(
                         volume_final_name,
-                        pool_id=pool,
+                        pool=pool,
                     )
                 except array_errors.ObjectNotFoundError:
                     logger.debug(
@@ -386,6 +386,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateSnapshotResponse()
 
+        pool = request.parameters.get(config.PARAMETERS_POOL)
         source_volume_id = request.source_volume_id
         logger.info("Snapshot base name : {}. Source volume id : {}".format(request.name, source_volume_id))
         secrets = request.secrets
@@ -396,12 +397,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
                 snapshot_final_name = self._get_snapshot_final_name(request, array_mediator)
-                pool = request.parameters.get(config.PARAMETERS_POOL)
+
                 logger.info("Snapshot name : {}. Volume id : {}".format(snapshot_final_name, volume_id))
                 snapshot = array_mediator.get_snapshot(
                     volume_id,
                     snapshot_final_name,
-                    pool_id=pool
+                    pool=pool
                 )
 
                 if snapshot:

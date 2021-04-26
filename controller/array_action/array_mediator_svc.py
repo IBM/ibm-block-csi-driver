@@ -194,12 +194,13 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             source_volume_wwn,
             self.array_type)
 
-    def _generate_snapshot_response(self, cli_snapshot, source_volume_id):
+    def _generate_snapshot_response(self, cli_snapshot):
+        source_volume_wwn = self._get_source_volume_wwn_if_exists(cli_snapshot)
         return Snapshot(int(cli_snapshot.capacity),
                         cli_snapshot.vdisk_UID,
                         cli_snapshot.name,
                         self.endpoint,
-                        volume_id=source_volume_id,
+                        volume_id=source_volume_wwn,
                         is_ready=True,
                         array_type=self.array_type)
 
@@ -210,8 +211,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         fcmap = self._get_fcmap_as_target_if_exists(cli_object.name)
         if fcmap is None or fcmap.copy_rate != '0':
             raise array_errors.ExpectedSnapshotButFoundVolumeError(cli_object.name, self.endpoint)
-        source_volume_id = self._get_wwn_by_volume_name_if_exists(fcmap.source_vdisk_name)
-        return self._generate_snapshot_response(cli_object, source_volume_id)
+        return self._generate_snapshot_response(cli_object)
 
     def _get_cli_volume(self, volume_name, not_exist_err=True):
         try:
@@ -246,19 +246,16 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def _get_fcmaps_as_source_if_exist(self, volume_name):
         return self._get_fcmaps(volume_name, ENDPOINT_TYPE_SOURCE)
 
-    def _get_source_volume_wwn_if_exists(self, target_cli_volume):
-        fcmap = self._get_fcmap_as_target_if_exists(target_cli_volume.name)
+    def _get_source_volume_wwn_if_exists(self, target_cli_object):
+        fcmap = self._get_fcmap_as_target_if_exists(target_cli_object.name)
         if not fcmap:
             return None
         source_volume_name = fcmap.source_vdisk_name
         return self._get_wwn_by_volume_name_if_exists(source_volume_name)
 
-    def get_volume(self, volume_name, pool_id=None):
+    def get_volume(self, volume_name, pool=None):
         cli_volume = self._get_cli_volume(volume_name)
         return self._generate_volume_response(cli_volume)
-
-    def get_volume_name(self, volume_id):
-        return self._get_volume_name_by_wwn(volume_id)
 
     def _get_object_fcmaps(self, object_name):
         all_fcmaps = []
@@ -411,7 +408,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
-                                            minimum_volume_size_in_bytes, pool_id=None):
+                                            minimum_volume_size_in_bytes, pool=None):
         self._copy_to_target_volume(name, source_name)
 
     def create_volume(self, name, size_in_bytes, space_efficiency, pool):
@@ -439,7 +436,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._delete_object(cli_volume)
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
-    def get_snapshot(self, volume_id, snapshot_name, pool_id=None):
+    def get_snapshot(self, volume_id, snapshot_name, pool=None):
         logger.debug("Get snapshot : {}".format(snapshot_name))
         target_cli_volume = self._get_cli_volume_if_exists(snapshot_name)
         if not target_cli_volume:
@@ -560,13 +557,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self._rollback_create_snapshot(target_volume_name)
             raise ex
 
-    def create_snapshot(self, volume_id, snapshot_name, pool):
+    def create_snapshot(self, volume_id, snapshot_name, pool=None):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
-        source_cli_volume = self._get_cli_volume_by_wwn(volume_id)
+        source_cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
         target_cli_volume = self._create_snapshot(snapshot_name, source_cli_volume, pool)
-        volume_name = source_cli_volume.name
-        logger.info("finished creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_name))
-        return self._generate_snapshot_response(target_cli_volume, volume_id)
+        logger.info("finished creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
+        return self._generate_snapshot_response(target_cli_volume)
 
     def delete_snapshot(self, snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))

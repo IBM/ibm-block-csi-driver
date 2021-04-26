@@ -222,7 +222,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             vol_name=api_volume.name,
             array_address=self.service_address,
             copy_source_id=self._get_copy_source_id(api_volume=api_volume),
-            pool_name=api_volume.pool,
+            pool=api_volume.pool,
             array_type=self.array_type
         )
 
@@ -293,13 +293,13 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 raise array_errors.NotEnoughSpaceInPool(api_volume.pool)
 
     def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
-                                            minimum_volume_size_in_bytes, pool_id=None):
+                                            minimum_volume_size_in_bytes, pool=None):
         logger.debug(
             "Copy source {0} data to volume {1}. source capacity {2}. Minimal requested volume capacity {3}".format(
                 name, source_name, source_capacity_in_bytes,
                 minimum_volume_size_in_bytes))
-        api_new_volume = self._get_api_volume_by_name(name, pool_id=pool_id)
-        api_source_object = self._get_api_volume_by_name(source_name, pool_id=pool_id)
+        api_new_volume = self._get_api_volume_by_name(name, pool_id=pool)
+        api_source_object = self._get_api_volume_by_name(source_name, pool_id=pool)
         if minimum_volume_size_in_bytes < source_capacity_in_bytes:
             self._extend_volume(api_volume=api_new_volume,
                                 new_size_in_bytes=source_capacity_in_bytes)
@@ -361,30 +361,13 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         self._delete_object(volume_id)
         logger.info("Finished deleting volume {}".format(volume_id))
 
-    def get_volume(self, name, pool_id=None):
-        logger.debug("Getting volume {} in pool {}".format(name, pool_id))
+    def get_volume(self, name, pool=None):
+        logger.debug("Getting volume {} in pool {}".format(name, pool))
         api_volume = self._get_api_volume_by_name(volume_name=name,
-                                                  pool_id=pool_id)
+                                                  pool_id=pool)
         if api_volume:
             return self._generate_volume_response(api_volume)
         raise array_errors.ObjectNotFoundError(name)
-
-    @convert_scsi_id_to_array_id
-    def get_volume_name(self, volume_id):
-        logger.debug("Searching for volume with id: {0}".format(volume_id))
-        try:
-            api_volume = self.client.get_volume(volume_id)
-        except (exceptions.NotFound, exceptions.InternalServerError) as ex:
-            uppercase_message = str(ex.message).upper()
-            if ERROR_CODE_RESOURCE_NOT_EXISTS in uppercase_message:
-                raise array_errors.ObjectNotFoundError(volume_id)
-            if INCORRECT_ID in uppercase_message:
-                raise array_errors.IllegalObjectID(volume_id)
-            raise ex
-
-        vol_name = api_volume.name
-        logger.debug("found volume name : {0}".format(vol_name))
-        return vol_name
 
     @convert_scsi_id_to_array_id
     def expand_volume(self, volume_id, required_bytes):
@@ -523,11 +506,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return api_snapshot
 
     @convert_scsi_id_to_array_id
-    def get_snapshot(self, volume_id, snapshot_name, pool_id=None):
-        if not pool_id:
+    def get_snapshot(self, volume_id, snapshot_name, pool=None):
+        if not pool:
             source_api_volume = self._get_api_volume_by_id(volume_id)
-            pool_id = source_api_volume.pool
-        api_snapshot = self._get_api_snapshot(snapshot_name, pool_id)
+            pool = source_api_volume.pool
+        api_snapshot = self._get_api_snapshot(snapshot_name, pool)
         if api_snapshot is None:
             return None
         return self._generate_snapshot_response_with_verification(api_snapshot)
@@ -571,11 +554,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def _delete_target_volume_if_exist(self, target_volume_id):
         self._delete_volume(target_volume_id, not_exist_err=False)
 
-    def _create_snapshot(self, target_volume_name, pool_id, source_volume):
-        target_api_volume = self._create_similar_volume(target_volume_name, source_volume, pool_id)
+    def _create_snapshot(self, target_volume_name, pool_id, source_api_volume):
+        target_api_volume = self._create_similar_volume(target_volume_name, source_api_volume, pool_id)
         options = [FLASHCOPY_NO_BACKGROUND_COPY_OPTION, FLASHCOPY_PERSISTENT_OPTION]
         try:
-            return self._create_flashcopy(source_volume.id, target_api_volume.id, options)
+            return self._create_flashcopy(source_api_volume.id, target_api_volume.id, options)
         except (array_errors.ObjectNotFoundError, array_errors.SnapshotAlreadyExists) as ex:
             logger.error("Failed to create snapshot '{0}': {1}".format(target_volume_name, ex))
             self._delete_target_volume_if_exist(target_api_volume.id)
@@ -597,12 +580,12 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return self._generate_volume_response(api_object)
 
     @convert_scsi_id_to_array_id
-    def create_snapshot(self, volume_id, snapshot_name, pool):
+    def create_snapshot(self, volume_id, snapshot_name, pool=None):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         source_api_volume = self._get_api_volume_by_id(volume_id)
         if source_api_volume is None:
             raise array_errors.ObjectNotFoundError(volume_id)
-        target_api_volume = self._create_snapshot(snapshot_name, pool, source_volume=source_api_volume)
+        target_api_volume = self._create_snapshot(snapshot_name, pool, source_api_volume=source_api_volume)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         return self._generate_snapshot_response(target_api_volume, volume_id)
 
