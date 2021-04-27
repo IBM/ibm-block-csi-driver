@@ -194,13 +194,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             source_volume_wwn,
             self.array_type)
 
-    def _generate_snapshot_response(self, cli_snapshot):
-        source_volume_wwn = self._get_source_volume_wwn_if_exists(cli_snapshot)
+    def _generate_snapshot_response(self, cli_snapshot, source_volume_id):
         return Snapshot(int(cli_snapshot.capacity),
                         cli_snapshot.vdisk_UID,
                         cli_snapshot.name,
                         self.endpoint,
-                        volume_id=source_volume_wwn,
+                        volume_id=source_volume_id,
                         is_ready=True,
                         array_type=self.array_type)
 
@@ -211,7 +210,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         fcmap = self._get_fcmap_as_target_if_exists(cli_object.name)
         if fcmap is None or fcmap.copy_rate != '0':
             raise array_errors.ExpectedSnapshotButFoundVolumeError(cli_object.name, self.endpoint)
-        return self._generate_snapshot_response(cli_object)
+        source_volume_id = self._get_wwn_by_volume_name_if_exists(fcmap.source_vdisk_name)
+        return self._generate_snapshot_response(cli_object, source_volume_id)
 
     def _get_cli_volume(self, volume_name, not_exist_err=True):
         try:
@@ -563,7 +563,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         source_cli_volume = self._get_cli_volume(source_volume_name)
         target_cli_volume = self._create_snapshot(snapshot_name, source_cli_volume, pool)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
-        return self._generate_snapshot_response(target_cli_volume)
+        return self._generate_snapshot_response(target_cli_volume, source_cli_volume.vdisk_UID)
 
     def delete_snapshot(self, snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
