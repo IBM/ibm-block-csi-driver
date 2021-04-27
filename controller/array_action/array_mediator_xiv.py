@@ -304,12 +304,12 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def create_snapshot(self, volume_id, snapshot_name, pool=None):
         logger.info("creating snapshot {0} from volume {1}".format(snapshot_name, volume_id))
-        cli_source_volume = self._get_cli_object_by_wwn(volume_id)
-        if pool and pool != cli_source_volume.pool_name:
-            raise array_errors.SnapshotSourcePoolMismatch(snapshot_pool=pool, source_pool=cli_source_volume.pool_name)
+        source_cli_volume = self._get_cli_object_by_wwn(volume_id)
+        if pool and pool != source_cli_volume.pool_name:
+            raise array_errors.SnapshotSourcePoolMismatch(snapshot_pool=pool, source_pool=source_cli_volume.pool_name)
         try:
             cli_snapshot = self.client.cmd.snapshot_create(name=snapshot_name,
-                                                           vol=cli_source_volume.name).as_single_element
+                                                           vol=source_cli_volume.name).as_single_element
             logger.info("finished creating cli snapshot {0} from volume {1}".format(snapshot_name, volume_id))
             return self._generate_snapshot_response(cli_snapshot)
         except xcli_errors.IllegalNameForObjectError as ex:
