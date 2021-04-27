@@ -559,7 +559,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def create_snapshot(self, volume_id, snapshot_name, pool=None):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
-        source_cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
+        source_volume_name = self._get_volume_name_by_wwn(volume_id)
+        source_cli_volume = self._get_cli_volume(source_volume_name)
         target_cli_volume = self._create_snapshot(snapshot_name, source_cli_volume, pool)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         return self._generate_snapshot_response(target_cli_volume)
