@@ -238,7 +238,7 @@ class ArrayMediator(ABC):
         Args:
             volume_id : id of the volume to be created from
             snapshot_name : name of the snapshot to be created in the storage system
-            pool : pool to create the snapshot in (and find it if already exist)
+            pool : pool to create the snapshot in
         Returns:
             Snapshot
         Raises:
