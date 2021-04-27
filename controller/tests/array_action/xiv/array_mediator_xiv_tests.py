@@ -34,8 +34,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=volume)
         res = self.mediator.get_volume("some name")
 
-        self.assertTrue(res.capacity_bytes == volume.capacity * 512)
-        self.assertTrue(res.capacity_bytes == volume.capacity * 512)
+        self.assertEqual(res.capacity_bytes , volume.capacity * 512)
+        self.assertEqual(res.capacity_bytes , volume.capacity * 512)
 
     def test_get_volume_raise_illegal_object_name(self):
         self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalNameForObjectError("", "volume", "")]
@@ -214,8 +214,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
         xcli_snapshot = self._get_single_snapshot_result_mock(snapshot_name, snapshot_volume_name)
         self.mediator.client.cmd.vol_list.return_value = xcli_snapshot
         res = self.mediator.get_snapshot(snapshot_volume_wwn, snapshot_name)
-        self.assertTrue(res.name == snapshot_name)
-        self.assertTrue(res.source_volume_id == snapshot_volume_wwn)
+        self.assertEqual(res.name , snapshot_name)
+        self.assertEqual(res.source_volume_id, snapshot_volume_wwn)
 
     def test_get_snapshot_same_name_volume_exists_error(self):
         snapshot_name = "snapshot"
@@ -235,7 +235,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
     def test_create_snapshot_succeeds(self):
         snapshot_name = "snapshot"
-        snapshot_volume_id = "123456789"
+        snapshot_volume_wwn = "123456789"
         snapshot_volume_name = "snapshot_volume"
         pool_name = "pool1"
         size_in_blocks_string = "10"
@@ -243,11 +243,11 @@ class TestArrayMediatorXIV(unittest.TestCase):
         xcli_snapshot = self._get_single_snapshot_result_mock(snapshot_name, snapshot_volume_name,
                                                               snapshot_capacity=size_in_blocks_string)
         self.mediator.client.cmd.snapshot_create.return_value = xcli_snapshot
-        res = self.mediator.create_snapshot(snapshot_volume_id, snapshot_name, pool_name)
-        self.assertTrue(res.name == snapshot_name)
-        self.assertTrue(res.source_volume_id == snapshot_volume_id)
-        self.assertTrue(res.capacity_bytes == size_in_bytes)
-        self.assertTrue(res.capacity_bytes == size_in_bytes)
+        res = self.mediator.create_snapshot(snapshot_volume_wwn, snapshot_name, pool_name)
+        self.assertEqual(res.name , snapshot_name)
+        self.assertEqual(res.source_volume_id , snapshot_volume_wwn)
+        self.assertEqual(res.capacity_bytes , size_in_bytes)
+        self.assertEqual(res.capacity_bytes , size_in_bytes)
 
     def test_create_snapshot_raise_illegal_name_for_object(self):
         self._test_create_snapshot_error(xcli_errors.IllegalNameForObjectError, array_errors.IllegalObjectName)
@@ -313,8 +313,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
         xcli_snapshot = self._get_single_snapshot_result_mock(snapshot_name, snapshot_volume_name)
         self.mediator.client.cmd.vol_list.return_value = xcli_snapshot
         res = self.mediator.get_object_by_id("1235678", "snapshot")
-        self.assertTrue(res.name == snapshot_name)
-        self.assertTrue(res.source_volume_id == snapshot_volume_wwn)
+        self.assertEqual(res.name , snapshot_name)
+        self.assertEqual(res.source_volume_id , snapshot_volume_wwn)
 
     def test_get_object_by_id_return_correct_volume(self):
         volume_name = "volume_name"
@@ -322,7 +322,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         volume = utils.get_mock_xiv_volume(10, volume_name, volume_wwn)
         self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=volume)
         res = self.mediator.get_object_by_id(volume_wwn, "volume")
-        self.assertTrue(res.name == volume_name)
+        self.assertEqual(res.name , volume_name)
 
     def test_get_object_by_id_same_name_volume_exists_error(self):
         snapshot_name = "snapshot"

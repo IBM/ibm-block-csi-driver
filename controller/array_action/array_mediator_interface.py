@@ -208,6 +208,7 @@ class ArrayMediator(ABC):
         Raises:
             ExpectedSnapshotButFoundVolumeError
             IllegalObjectName
+            IllegalObjectID
             PermissionDenied
             PoolParameterIsMissing
         """

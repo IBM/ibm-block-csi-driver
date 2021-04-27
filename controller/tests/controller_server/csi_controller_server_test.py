@@ -11,7 +11,7 @@ import controller.controller_server.errors as controller_errors
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.controller_server.csi_controller_server import ControllerServicer
 from controller.controller_server.test_settings import volume_name, snapshot_name, snapshot_volume_name, \
-    clone_volume_name, snapshot_volume_id, pool
+    clone_volume_name, snapshot_volume_wwn, pool
 from controller.csi_general import csi_pb2
 from controller.tests import utils
 
@@ -106,7 +106,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.request.parameters = {}
         self.capacity_bytes = 10
         self.request.name = snapshot_name
-        self.request.source_volume_id = "{}:{}".format("A9000", snapshot_volume_id)
+        self.request.source_volume_id = "{}:{}".format("A9000", snapshot_volume_wwn)
         self.mediator.get_object_by_id = Mock()
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(10, snapshot_volume_name,
                                                                                               "wwn", "xiv")
@@ -131,8 +131,8 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.servicer.CreateSnapshot(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.get_snapshot.assert_called_once_with(snapshot_volume_id, snapshot_name, pool=None)
-        self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_id, snapshot_name, None)
+        self.mediator.get_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name, pool=None)
+        self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name, None)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_belongs_to_wrong_volume(self, storage_agent):
@@ -173,7 +173,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
         self.assertTrue("error" in self.context.details)
-        self.mediator.get_snapshot.assert_called_once_with(snapshot_volume_id, snapshot_name, pool=None)
+        self.mediator.get_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name, pool=None)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_get_snapshot_illegal_object_name_exception(self, storage_agent):
@@ -185,7 +185,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertTrue(msg in self.context.details)
-        self.mediator.get_snapshot.assert_called_once_with(snapshot_volume_id, snapshot_name, pool=None)
+        self.mediator.get_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name, pool=None)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_prefix_too_long_exception(self, storage_agent):
@@ -216,8 +216,12 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
         self.assertEqual(self.context.code, return_code)
         self.assertTrue(msg in self.context.details)
-        self.mediator.get_snapshot.assert_called_once_with(snapshot_volume_id, snapshot_name, pool=None)
-        self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_id, snapshot_name, None)
+        self.mediator.get_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name, pool=None)
+        self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name, None)
+
+    def test_create_snapshot_with_not_found_exception(self):
+        self.create_snapshot_returns_error(return_code=grpc.StatusCode.NOT_FOUND,
+                                           err=array_errors.ObjectNotFoundError("source_volume"))
 
     def test_create_snapshot_with_illegal_object_name_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
@@ -248,7 +252,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.servicer.CreateSnapshot(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_id, "prefix_some_name", None)
+        self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_wwn, "prefix_some_name", None)
 
 
 class TestControllerServerDeleteSnapshot(AbstractControllerTest):
@@ -351,8 +355,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.maximal_volume_size_in_bytes = 10
         self.mediator.minimal_volume_size_in_bytes = 2
 
-        self.pool = 'pool1'
-        self.request.parameters = {"pool": self.pool}
+        self.request.parameters = {"pool": pool}
         self.capacity_bytes = 10
         self.request.capacity_range = Mock()
         self.request.capacity_range.required_bytes = self.capacity_bytes
@@ -377,8 +380,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.get_volume.assert_called_once_with(volume_name, pool='pool1')
-        self.mediator.create_volume.assert_called_once_with(volume_name, 10, None, 'pool1')
+        self.mediator.get_volume.assert_called_once_with(volume_name, pool=pool)
+        self.mediator.create_volume.assert_called_once_with(volume_name, 10, None, pool)
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
 
@@ -391,8 +394,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.servicer.CreateVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.get_volume.assert_called_once_with(volume_name, pool='pool1')
-        self.mediator.create_volume.assert_called_once_with(volume_name, 10, "not_none", 'pool1')
+        self.mediator.get_volume.assert_called_once_with(volume_name, pool=pool)
+        self.mediator.create_volume.assert_called_once_with(volume_name, 10, "not_none", pool)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_idempotent_no_source_succeeds(self, storage_agent):
@@ -402,7 +405,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.get_volume.assert_called_once_with(volume_name, pool='pool1')
+        self.mediator.get_volume.assert_called_once_with(volume_name, pool=pool)
         self.mediator.create_volume.assert_not_called()
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
@@ -465,7 +468,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
         self.assertTrue("error" in self.context.details)
-        self.mediator.get_volume.assert_called_once_with(volume_name, pool='pool1')
+        self.mediator.get_volume.assert_called_once_with(volume_name, pool=pool)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_get_volume_illegal_object_name_exception(self, storage_agent):
@@ -477,7 +480,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertTrue(msg in self.context.details)
-        self.mediator.get_volume.assert_called_once_with(volume_name, pool='pool1')
+        self.mediator.get_volume.assert_called_once_with(volume_name, pool=pool)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_prefix_too_long_exception(self, storage_agent):
@@ -507,8 +510,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
         self.assertEqual(self.context.code, return_code)
         self.assertTrue(msg in self.context.details)
-        self.mediator.get_volume.assert_called_once_with(volume_name, pool='pool1')
-        self.mediator.create_volume.assert_called_once_with(volume_name, self.capacity_bytes, None, self.pool)
+        self.mediator.get_volume.assert_called_once_with(volume_name, pool=pool)
+        self.mediator.create_volume.assert_called_once_with(volume_name, self.capacity_bytes, None, pool)
 
     def test_create_volume_with_illegal_object_name_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
@@ -667,7 +670,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.copy_to_existing_volume_from_source.assert_called_once_with(volume_name, snapshot_name,
                                                                                   snapshot_capacity_bytes,
                                                                                   self.capacity_bytes,
-                                                                                  'pool1')
+                                                                                  pool)
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, snapshot_id)
 
@@ -767,7 +770,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.copy_to_existing_volume_from_source.assert_called_once_with(volume_name, clone_volume_name,
                                                                                   volume_capacity_bytes,
                                                                                   self.capacity_bytes,
-                                                                                  'pool1')
+                                                                                  pool)
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, volume_id)
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
 
@@ -806,7 +809,6 @@ class TestControllerServerDeleteVolume(AbstractControllerTest):
 
         self.servicer = ControllerServicer(self.fqdn)
 
-        self.pool = 'pool1'
         self.request.volume_id = "xiv:volume-id"
 
         self.context = utils.FakeContext()

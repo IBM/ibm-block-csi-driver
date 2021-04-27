@@ -95,9 +95,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
         cli_volume_mock = Mock(as_single_element=self._get_cli_volume())
         self.svc.client.svcinfo.lsvdisk.return_value = cli_volume_mock
         volume = self.svc.get_volume("test_volume")
-        self.assertTrue(volume.capacity_bytes == 1024)
-        self.assertTrue(volume.pool == 'pool_name')
-        self.assertTrue(volume.array_type == 'SVC')
+        self.assertEqual(volume.capacity_bytes, 1024)
+        self.assertEqual(volume.pool, 'pool_name')
+        self.assertEqual(volume.array_type, 'SVC')
 
     def test_get_volume_raise_exception(self):
         self._test_mediator_method_client_error(self.svc.get_volume, ("volume",),

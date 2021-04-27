@@ -461,9 +461,19 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.array.get_snapshot("volume_id", "test_name", pool=self.volume_response.pool)
 
+    def test_get_snapshot_failed_with_incorrect_id(self):
+        self.client_mock.get_volume.side_effect = InternalServerError("500", message="BE7A0005")
+        with self.assertRaises(array_errors.IllegalObjectID):
+            self.array.get_snapshot("volume_id", "test_name", pool=None)
+
     def test_get_snapshot_success(self):
         target_volume = self._prepare_mocks_for_snapshot()
         volume = self.array.get_snapshot("volume_id", "test_name", pool=self.volume_response.pool)
+        self.assertEqual(volume.name, target_volume.name)
+
+    def test_get_snapshot_no_pool_success(self):
+        target_volume = self._prepare_mocks_for_snapshot()
+        volume = self.array.get_snapshot("volume_id", "test_name", pool=None)
         self.assertEqual(volume.name, target_volume.name)
 
     def _prepare_mocks_for_create_snapshot(self):
