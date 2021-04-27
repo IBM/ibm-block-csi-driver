@@ -227,6 +227,10 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                            err=array_errors.IllegalObjectName("snapshot"))
 
+    def test_create_snapshot_with_snapshot_source_pool_mismatch_exception(self):
+        self.create_snapshot_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
+                                           err=array_errors.SnapshotSourcePoolMismatch("snapshot_pool", "source_pool"))
+
     def test_create_snapshot_with_snapshot_exists_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.ALREADY_EXISTS,
                                            err=array_errors.SnapshotAlreadyExists("snapshot", "endpoint"))

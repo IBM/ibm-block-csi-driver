@@ -66,3 +66,5 @@ NotEnoughSpaceInPoolError_message = "Not enough space in pool {0}"
 
 SizeOutOfRangeError_message = "requested size is out of limits. requested: {0}," \
                               " max_in_byte: {1}"
+
+SnapshotSourcePoolMismatchError_message = "Snapshot pool : {0} does not match the source volume pool : {1}"

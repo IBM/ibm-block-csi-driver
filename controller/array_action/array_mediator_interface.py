@@ -50,6 +50,7 @@ class ArrayMediator(ABC):
             IllegalObjectName
             VolumeNameIsNotSupported
             PermissionDenied
+            SnapshotSourcePoolMismatch
         """
         raise NotImplementedError
 

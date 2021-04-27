@@ -237,17 +237,24 @@ class TestArrayMediatorXIV(unittest.TestCase):
         snapshot_name = "snapshot"
         snapshot_volume_wwn = "123456789"
         snapshot_volume_name = "snapshot_volume"
-        pool_name = "pool1"
         size_in_blocks_string = "10"
         size_in_bytes = int(size_in_blocks_string) * XIVArrayMediator.BLOCK_SIZE_IN_BYTES
         xcli_snapshot = self._get_single_snapshot_result_mock(snapshot_name, snapshot_volume_name,
                                                               snapshot_capacity=size_in_blocks_string)
         self.mediator.client.cmd.snapshot_create.return_value = xcli_snapshot
-        res = self.mediator.create_snapshot(snapshot_volume_wwn, snapshot_name, pool_name)
+        res = self.mediator.create_snapshot(snapshot_volume_wwn, snapshot_name)
         self.assertEqual(res.name, snapshot_name)
         self.assertEqual(res.source_volume_id, snapshot_volume_wwn)
         self.assertEqual(res.capacity_bytes, size_in_bytes)
         self.assertEqual(res.capacity_bytes, size_in_bytes)
+
+    def test_create_snapshot_raise_snapshot_source_pool_mismatch(self):
+        snapshot_name = "snapshot"
+        snapshot_volume_wwn = "123456789"
+        xcli_volume = self._get_cli_volume()
+        self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=xcli_volume)
+        with self.assertRaises(array_errors.SnapshotSourcePoolMismatch):
+            self.mediator.create_snapshot(snapshot_volume_wwn, snapshot_name, "different_pool")
 
     def test_create_snapshot_raise_illegal_name_for_object(self):
         self._test_create_snapshot_error(xcli_errors.IllegalNameForObjectError, array_errors.IllegalObjectName)
@@ -271,7 +278,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def _test_create_snapshot_error(self, xcli_exception, expected_exception):
         self.mediator.client.cmd.snapshot_create.side_effect = [xcli_exception("", "snapshot", "")]
         with self.assertRaises(expected_exception):
-            self.mediator.create_snapshot("volume_id", "snapshot", "pool1")
+            self.mediator.create_snapshot("volume_id", "snapshot", None)
 
     def _get_single_snapshot_result_mock(self, snapshot_name, snapshot_volume_name, snapshot_capacity="17"):
         snapshot_wwn = "1235678"
