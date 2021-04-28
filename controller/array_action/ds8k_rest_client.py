@@ -25,10 +25,7 @@ def int_to_scsilun(lun):
     pretreated_lun = int(lun)
     if pretreated_lun < 256:
         return _int_lunid_to_hex(pretreated_lun)
-    else:
-        return '{0:x}'.format(
-            (pretreated_lun >> 16 & 0xFFFF) | (pretreated_lun & 0xFFFF) << 16
-        )
+    return '{0:x}'.format((pretreated_lun >> 16 & 0xFFFF) | (pretreated_lun & 0xFFFF) << 16)
 
 
 def scsilun_to_int(lun):
@@ -46,12 +43,11 @@ def scsilun_to_int(lun):
     pretreated_scsilun = int(lun, 16)
     if pretreated_scsilun < 256:
         return pretreated_scsilun
-    else:
-        return (pretreated_scsilun >> 16 & 0xFFFF) | \
-               (pretreated_scsilun & 0xFFFF) << 16
+    return (pretreated_scsilun >> 16 & 0xFFFF) | \
+           (pretreated_scsilun & 0xFFFF) << 16
 
 
-class RESTClient(object):
+class RESTClient:
     """
     driver side client. Used to interaction with pyds8k client as an adaptor.
 

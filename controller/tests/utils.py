@@ -6,20 +6,19 @@ class ProtoBufMock(MagicMock):
     def HasField(self, field):
         return hasattr(self, field)
 
-
 def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_source_id=None, space_efficiency=None,
                                       default_space_efficiency=None):
-    vol = Mock()
-    vol.capacity_bytes = size
-    vol.id = wwn
-    vol.name = name
-    vol.array_address = "arr1"
-    vol.pool_name = "pool1"
-    vol.array_type = array_type
-    vol.copy_source_id = copy_source_id
-    vol.space_efficiency = space_efficiency
-    vol.default_space_efficiency = default_space_efficiency
-    return vol
+    volume = Mock()
+    volume.capacity_bytes = size
+    volume.id = wwn
+    volume.name = name
+    volume.array_address = "arr1"
+    volume.pool_name = "pool1"
+    volume.array_type = array_type
+    volume.copy_source_id = copy_source_id
+    volume.space_efficiency = space_efficiency
+    volume.default_space_efficiency = default_space_efficiency
+    return volume
 
 
 def get_mock_mediator_response_snapshot(capacity, name, wwn, volume_name, array_type):

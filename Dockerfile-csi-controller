@@ -15,7 +15,7 @@
 FROM registry.access.redhat.com/ubi8/python-38:1-43.16099467811
 MAINTAINER IBM Storage
 
-ARG VERSION=1.5.0
+ARG VERSION=1.6.0
 ARG BUILD_NUMBER=0
 
 ###Required Labels

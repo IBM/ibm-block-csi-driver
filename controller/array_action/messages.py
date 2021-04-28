@@ -31,17 +31,16 @@ NoAvailableLunError_message = "No available lun was found for host : {0}"
 
 LunAlreadyInUse_message = "Lun : {0} is already mapped for host : {1}"
 
-MappingError_message = "Mapping error has occurred while mapping vol : {0} to host : {1}. error : {2}"
+MappingError_message = "Mapping error has occurred while mapping volume : {0} to host : {1}. error : {2}"
 
 VolumeAlreadyUnmapped_message = "Volume: {0} is already unmapped."
 
-UnMappingError_message = "Unmapping error has occurred for vol : {0} and host : {1}. error : {2}"
-
-BadNodeIdError_message = "Bad node id format for node id : {0}"
+UnMappingError_message = "Unmapping error has occurred for volume : {0} and host : {1}. error : {2}"
 
 VolumeMappedToMultipleHostsError_message = "Volume is already mapped to different hosts {0}"
 
-UnsupportedStorageVersionError_message = 'Unsupported storage system microcode version {}, the version should not be lower than {}'  # noqa
+UnsupportedStorageVersionError_message = ('Unsupported storage system microcode version {}, '
+                                          'the version should not be lower than {}')
 
 VolumeCreationError_message = 'Failed to create volume {}'
 

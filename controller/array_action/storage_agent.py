@@ -107,7 +107,7 @@ def clear_agents():
             pass
 
 
-class StorageAgent(object):
+class StorageAgent:
     """
     StorageAgent is an agent which caches several mediators of the same storage for reuse cross threads.
     """
