@@ -243,6 +243,7 @@ class ArrayMediator(ABC):
             SnapshotAlreadyExists
             ObjectNotFound
             IllegalObjectName
+            IllegalObjectID
             PermissionDenied
             NotEnoughSpaceInPool
             SnapshotSourcePoolMismatch
