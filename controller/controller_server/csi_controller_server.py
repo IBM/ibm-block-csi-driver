@@ -425,7 +425,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.info("finished create snapshot")
                 return res
         except (array_errors.IllegalObjectName, array_errors.IllegalObjectID,
-                array_errors.PoolParameterIsMissing, array_errors.SnapshotSourcePoolMismatch) as ex:
+                array_errors.SnapshotSourcePoolMismatch) as ex:
             context.set_details(ex.message)
             context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             return csi_pb2.CreateSnapshotResponse()

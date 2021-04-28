@@ -210,7 +210,6 @@ class ArrayMediator(ABC):
             IllegalObjectName
             IllegalObjectID
             PermissionDenied
-            PoolParameterIsMissing
         """
         raise NotImplementedError
 
@@ -245,7 +244,6 @@ class ArrayMediator(ABC):
             ObjectNotFound
             IllegalObjectName
             PermissionDenied
-            PoolParameterIsMissing
             NotEnoughSpaceInPool
             SnapshotSourcePoolMismatch
         """
