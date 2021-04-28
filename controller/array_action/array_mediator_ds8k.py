@@ -100,13 +100,13 @@ def get_array_space_efficiency(space_efficiency):
             return ARRAY_SPACE_EFFICIENCY_THIN
     return ARRAY_SPACE_EFFICIENCY_NONE
 
+
 def _get_parameter_space_efficiency(array_space_efficiency):
     if array_space_efficiency == ARRAY_SPACE_EFFICIENCY_THIN:
         return config.SPACE_EFFICIENCY_THIN
     if array_space_efficiency == ARRAY_SPACE_EFFICIENCY_NONE:
         return config.SPACE_EFFICIENCY_NONE
-    else:
-        raise array_errors.SpaceEfficiencyNotSupported(array_space_efficiency)
+    raise array_errors.SpaceEfficiencyNotSupported(array_space_efficiency)
 
 
 class DS8KArrayMediator(ArrayMediatorAbstract):

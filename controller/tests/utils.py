@@ -6,6 +6,7 @@ class ProtoBufMock(MagicMock):
     def HasField(self, field):
         return hasattr(self, field)
 
+
 def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_source_id=None, space_efficiency=None,
                                       default_space_efficiency=None):
     volume = Mock()

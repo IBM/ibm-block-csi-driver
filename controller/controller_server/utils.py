@@ -272,7 +272,7 @@ def _get_supported_capability(volume_capability):
             mount=csi_pb2.VolumeCapability.MountVolume(fs_type=volume_capability.mount.fs_type),
             access_mode=access_mode)
 
-    elif volume_capability.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_BLOCK):
+    if volume_capability.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_BLOCK):
         return csi_pb2.VolumeCapability(
             mount=csi_pb2.VolumeCapability.BlockVolume(),
             access_mode=access_mode)
@@ -424,7 +424,7 @@ def hash_string(string):
 
 def _validate_parameter_match_volume(parameter_value, value_from_volume, error_message_format, cmp=eq):
     if parameter_value and not cmp(parameter_value, value_from_volume):
-            raise ValidationException(error_message_format.format(parameter_value, value_from_volume))
+        raise ValidationException(error_message_format.format(parameter_value, value_from_volume))
 
 
 def validate_parameters_match_volume(parameters, volume):

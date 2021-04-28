@@ -78,7 +78,7 @@ class IllegalObjectID(InvalidArgumentError):
         self.message = "{0}".format(msg)
 
 
-class PoolDoesNotMatchCapabilities(InvalidArgumentError):
+class PoolDoesNotMatchSpaceEfficiency(InvalidArgumentError):
 
     def __init__(self, pool, space_efficiency, error):
         self.message = messages.PoolDoesNotMatchSpaceEfficiency_message.format(pool, space_efficiency,
