@@ -370,6 +370,18 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(CLIFailureError):
             self.svc.create_snapshot("source_volume_id", "test_snapshot", "pool1")
 
+    def _test_create_snapshot_lsvdisk_cli_failure_error(self, volume_id, snapshot_name, error_message_id,
+                                                        expected_error, pool=None):
+        self._test_mediator_method_client_cli_failure_error(self.svc.create_snapshot, (volume_id, snapshot_name, pool),
+                                                            self.svc.client.svcinfo.lsvdisk, error_message_id,
+                                                            expected_error)
+
+    def test_create_snapshot_lsvdisk_cli_failure_errors(self):
+        self._test_create_snapshot_lsvdisk_cli_failure_error("\xff", "snapshot_name", 'CMMVC6017E',
+                                                             array_errors.IllegalObjectID)
+        self._test_create_snapshot_lsvdisk_cli_failure_error("!@#", "snapshot_name", 'CMMVC5741E',
+                                                             array_errors.IllegalObjectID)
+
     def test_create_snapshot_source_not_found_error(self):
         self.svc.client.svcinfo.lsvdisk.side_effect = [Mock(as_single_element=None)]
         with self.assertRaises(array_errors.ObjectNotFoundError):
