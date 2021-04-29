@@ -14,7 +14,7 @@
 
 FROM golang:1.11
 
-ARG CSI_PARAMS='csi_params'
+ARG CSI_PARAMS=csi_params
 
 RUN git clone https://github.com/kubernetes-csi/csi-test /usr/local/go/src/github.com/kubernetes-csi/csi-test
 RUN make -C /usr/local/go/src/github.com/kubernetes-csi/csi-test
