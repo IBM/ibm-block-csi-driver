@@ -1,7 +1,4 @@
 import controller.array_action.errors as array_errors
-from controller.common.csi_logger import get_stdout_logger
-
-logger = get_stdout_logger()
 
 ID_PARAM_NAME = "id"
 

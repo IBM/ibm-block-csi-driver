@@ -1,3 +1,4 @@
+import logging
 from abc import ABC
 from retry import retry
 
@@ -5,10 +6,7 @@ import controller.array_action.errors as array_errors
 from controller.array_action.array_mediator_interface import ArrayMediator
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.errors import NoConnectionAvailableException, UnsupportedConnectivityTypeError
-from controller.common.csi_logger import get_stdout_logger
 from controller.controller_server import utils
-
-logger = get_stdout_logger()
 
 
 class ArrayMediatorAbstract(ArrayMediator, ABC):
@@ -17,7 +15,7 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
     def map_volume_by_initiators(self, vol_id, initiators):
         host_name, connectivity_types = self.get_host_by_host_identifiers(initiators)
 
-        logger.debug(
+        logging.debug(
             "hostname : {}, connectivity_types  : {}".format(host_name,
                                                              connectivity_types))
 
@@ -32,24 +30,24 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
 
         mappings = self.get_volume_mappings(vol_id)
         if len(mappings) >= 1:
-            logger.debug(
+            logging.debug(
                 "{0} mappings have been found for volume. the mappings are: {1}".format(len(mappings), mappings))
             if len(mappings) == 1:
                 mapping = list(mappings)[0]
                 if mapping == host_name:
-                    logger.debug("idempotent case - volume is already mapped to host.")
+                    logging.debug("idempotent case - volume is already mapped to host.")
                     return mappings[mapping], connectivity_type, array_initiators
             raise array_errors.VolumeMappedToMultipleHostsError(mappings)
 
-        logger.debug(
+        logging.debug(
             "no mappings were found for volume. mapping volume : {0} to host : {1}".format(
                 vol_id, host_name))
 
         try:
             lun = self.map_volume(vol_id, host_name)
-            logger.debug("lun : {}".format(lun))
+            logging.debug("lun : {}".format(lun))
         except array_errors.LunAlreadyInUseError as ex:
-            logger.warning(
+            logging.warning(
                 "Lun was already in use. re-trying the operation. {0}".format(
                     ex))
             for i in range(self.max_lun_retries - 1):
@@ -57,7 +55,7 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
                     lun = self.map_volume(vol_id, host_name)
                     break
                 except array_errors.LunAlreadyInUseError as inner_ex:
-                    logger.warning(
+                    logging.warning(
                         "re-trying map volume. try #{0}. {1}".format(i,
                                                                      inner_ex))
             else:  # will get here only if the for statement is false.

@@ -1,9 +1,8 @@
 from queue import Queue, Full, Empty
 from threading import RLock
-from controller.common.csi_logger import get_stdout_logger
-from controller.common import settings
+import logging
 
-logger = get_stdout_logger()
+from controller.common import settings
 
 
 class ConnectionPool:
@@ -33,7 +32,7 @@ class ConnectionPool:
                 self.current_size -= 1
 
     def create(self):
-        logger.debug("Creating a new connection for endpoint {}".format(self.endpoint_key))
+        logging.debug("Creating a new connection for endpoint {}".format(self.endpoint_key))
         return self.med_class(self.username, self.password, self.endpoints)
 
     def get(self, block=True, timeout=None):
@@ -60,11 +59,11 @@ class ConnectionPool:
                 with self.lock:
                     self.current_size -= 1
                 try:
-                    logger.debug("The connection for storage {} is inactive, close it".format(self.endpoint_key))
+                    logging.debug("The connection for storage {} is inactive, close it".format(self.endpoint_key))
                     item.disconnect()
                 except Exception as ex:
                     # failed to disconnect the mediator, delete the stale client.
-                    logger.error(
+                    logging.error(
                         "Failed to disconnect the connection for storage {} before use, "
                         "reason is {}".format(self.endpoint_key, ex)
                     )
@@ -82,8 +81,8 @@ class ConnectionPool:
             try:
                 created = self.create()
             except Exception as ex:
-                logger.error("Failed to create array connection")
-                logger.exception(ex)
+                logging.error("Failed to create array connection")
+                logging.exception(ex)
                 with self.lock:
                     self.current_size -= 1
                 raise ex
@@ -113,7 +112,7 @@ class ConnectionPool:
                 item.disconnect()
             except Exception as ex:
                 # failed to disconnect the mediator, delete the stale client.
-                logger.error(
+                logging.error(
                     "Failed to disconnect the connection for storage {} after use, "
                     "reason is {}".format(self.endpoint_key, ex)
                 )

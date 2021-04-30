@@ -1,12 +1,10 @@
+import logging
 from decorator import decorator
 
 import grpc
 
 import controller.array_action.errors as array_errors
-from controller.common.csi_logger import get_stdout_logger
 from controller.controller_server.errors import ValidationException
-
-logger = get_stdout_logger()
 
 status_codes_by_exception = {
     ValidationException: grpc.StatusCode.INVALID_ARGUMENT,
@@ -19,7 +17,7 @@ status_codes_by_exception = {
 
 
 def handle_exception(ex, context, status_code, response_type):
-    logger.exception(ex)
+    logging.exception(ex)
     context.set_details(str(ex))
     context.set_code(status_code)
     return response_type()
