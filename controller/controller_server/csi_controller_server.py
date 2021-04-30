@@ -315,7 +315,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         try:
             try:
                 utils.validate_unpublish_volume_request(request)
-            except ValidationException as ex:
+            except (ValidationException, ObjectIdError) as ex:
                 logger.exception(ex)
                 context.set_details(ex.message)
                 context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
@@ -364,9 +364,48 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def ValidateVolumeCapabilities(self, request, context):
         logger.info("ValidateVolumeCapabilities")
-        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        logger.info("finished ValidateVolumeCapabilities")
-        return csi_pb2.ValidateVolumeCapabilitiesResponse()
+        try:
+            utils.validate_validate_volume_capabilities_request(request)
+
+            secrets = request.secrets
+            user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
+            array_type, volume_id = utils.get_volume_id_info(request.volume_id)
+            space_efficiency = request.parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
+
+            with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
+                array_mediator.validate_supported_space_efficiency(space_efficiency)
+
+                volume = array_mediator.get_object_by_id(object_id=volume_id, object_type=config.VOLUME_TYPE_NAME)
+
+            if not volume:
+                raise array_errors.ObjectNotFoundError(volume_id)
+
+            logger.debug("volume found : {}".format(volume))
+
+            if request.volume_context:
+                utils.validate_volume_context_match_volume(request.volume_context, volume)
+
+            utils.validate_parameters_match_volume(request.parameters, volume)
+
+            logger.info("finished ValidateVolumeCapabilities")
+            return utils.generate_csi_validate_volume_capabilities_response(request.volume_context,
+                                                                            request.volume_capabilities,
+                                                                            request.parameters)
+        except (array_errors.ObjectNotFoundError, ObjectIdError) as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.NOT_FOUND)
+            return csi_pb2.ValidateVolumeCapabilitiesResponse(message=ex.message)
+        except (ValidationException, array_errors.SpaceEfficiencyNotSupported) as ex:
+            logger.exception(ex)
+            context.set_details(ex.message)
+            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
+            return csi_pb2.ValidateVolumeCapabilitiesResponse(message=ex.message)
+        except Exception as ex:
+            logger.exception(ex)
+            context.set_details(ex)
+            context.set_code(grpc.StatusCode.INTERNAL)
+            return csi_pb2.ValidateVolumeCapabilitiesResponse(message=ex)
 
     def ListVolumes(self, request, context):
         logger.info("ListVolumes")

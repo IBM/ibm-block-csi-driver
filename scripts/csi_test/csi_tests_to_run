@@ -1,3 +1,4 @@
+ValidateVolumeCapabilities
 ControllerGetCapabilities
 CreateVolume
 DeleteVolume
