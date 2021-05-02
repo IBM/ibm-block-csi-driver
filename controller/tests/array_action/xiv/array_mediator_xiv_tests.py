@@ -269,6 +269,12 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self._test_create_snapshot_error(xcli_errors.OperationForbiddenForUserCategoryError,
                                          array_errors.PermissionDeniedError)
 
+    def test_create_snapshot_raise_illegal_object_id(self):
+        self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalValueForArgumentError("",
+                                                                                                  "snapshot-wwn", "")]
+        with self.assertRaises(array_errors.IllegalObjectID):
+            self.mediator.create_snapshot("volume_id", "snapshot", "pool1")
+
     @patch.object(XIVArrayMediator, "_generate_snapshot_response")
     def test_create_snapshot_generate_snapshot_response_raise_exception(self, response):
         response.side_effect = Exception("err")

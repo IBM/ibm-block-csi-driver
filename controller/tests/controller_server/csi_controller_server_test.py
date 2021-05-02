@@ -240,6 +240,10 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
                                            err=array_errors.ExpectedSnapshotButFoundVolumeError("snapshot",
                                                                                                 "endpoint"))
 
+    def test_create_snapshot_with_illegal_object_id_exception(self):
+        self.create_snapshot_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
+                                           err=array_errors.IllegalObjectID("snapshot_id"))
+
     def test_create_snapshot_with_other_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INTERNAL, err=Exception("error"))
 
