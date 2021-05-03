@@ -165,27 +165,30 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self._test_create_object_with_get_array_type_exception(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_snapshot_get_snapshot_exception(self, storage_agent):
+    def get_snapshot_returns_error(self, storage_agent, exception, grpc_status, message):
         storage_agent.return_value = self.storage_agent
-        self.mediator.get_snapshot.side_effect = [Exception("error")]
+        self.mediator.get_snapshot.side_effect = [exception]
 
         self.servicer.CreateSnapshot(self.request, self.context)
 
-        self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
-        self.assertTrue("error" in self.context.details)
+        self.assertEqual(self.context.code, grpc_status)
+        self.assertTrue(message in self.context.details)
         self.mediator.get_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name, pool=None)
 
-    @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_snapshot_with_get_snapshot_illegal_object_name_exception(self, storage_agent):
-        storage_agent.return_value = self.storage_agent
-        self.mediator.get_snapshot.side_effect = [array_errors.IllegalObjectName("snapshot")]
-        msg = array_errors.IllegalObjectName("snapshot").message
+    def test_create_snapshot_get_snapshot_exception(self):
+        self.get_snapshot_returns_error(exception=Exception("error"),
+                                        grpc_status=grpc.StatusCode.INTERNAL,
+                                        message="error")
 
-        self.servicer.CreateSnapshot(self.request, self.context)
+    def test_create_snapshot_with_get_snapshot_illegal_object_name_exception(self):
+        self.get_snapshot_returns_error(exception=array_errors.IllegalObjectName("snapshot"),
+                                        grpc_status=grpc.StatusCode.INVALID_ARGUMENT,
+                                        message=array_errors.IllegalObjectName("snapshot").message)
 
-        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
-        self.assertTrue(msg in self.context.details)
-        self.mediator.get_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name, pool=None)
+    def test_create_snapshot_with_get_snapshot_illegal_object_id_exception(self):
+        self.get_snapshot_returns_error(exception=array_errors.IllegalObjectID("volume-id"),
+                                        grpc_status=grpc.StatusCode.INVALID_ARGUMENT,
+                                        message=array_errors.IllegalObjectID("volume-id").message)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_prefix_too_long_exception(self, storage_agent):
@@ -242,7 +245,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
     def test_create_snapshot_with_illegal_object_id_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
-                                           err=array_errors.IllegalObjectID("snapshot_id"))
+                                           err=array_errors.IllegalObjectID("volume-id"))
 
     def test_create_snapshot_with_other_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INTERNAL, err=Exception("error"))
