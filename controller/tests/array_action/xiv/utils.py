@@ -11,11 +11,12 @@ def get_mock_xiv_volume(size, name, wwn):
     return volume
 
 
-def get_mock_xiv_snapshot(capacity, name, wwn, volume_name):
+def get_mock_xiv_snapshot(capacity, name, wwn, volume_name, volume_wwn):
     snapshot = Mock()
     snapshot.capacity = capacity
     snapshot.name = name
     snapshot.wwn = wwn
+    snapshot.copy_master_wwn = volume_wwn
     snapshot.master_name = volume_name
     snapshot.pool_name = "pool_name"
     return snapshot

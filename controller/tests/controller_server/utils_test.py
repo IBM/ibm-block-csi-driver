@@ -180,7 +180,7 @@ class TestUtils(unittest.TestCase):
         new_volume.name = "name"
         new_volume.array_address = ["fqdn1", "fqdn2"]
 
-        new_volume.pool_name = "pool"
+        new_volume.pool = "pool"
         new_volume.array_type = "a9k"
         new_volume.capacity_bytes = 10
         new_volume.copy_source_id = None
@@ -201,7 +201,7 @@ class TestUtils(unittest.TestCase):
         new_volume.name = "name"
         new_volume.array_address = "9.1.1.1"
 
-        new_volume.pool_name = "pool"
+        new_volume.pool = "pool"
         new_volume.array_type = "svc"
         new_volume.capacity_bytes = 10
         new_volume.copy_source_id = None
@@ -218,7 +218,7 @@ class TestUtils(unittest.TestCase):
         new_volume.name = "name"
         new_volume.array_address = ["9.1.1.1", "9.1.1.2"]
 
-        new_volume.pool_name = "pool"
+        new_volume.pool = "pool"
         new_volume.array_type = "svc"
         new_volume.capacity_bytes = 10
         new_volume.copy_source_id = None
