@@ -18,7 +18,7 @@
 		* [1.0.0 (November 2019)](csi_rn_changelog_1.0.0.md)
 	* [Limitations](csi_rn_limitations.md)
 	* [Known issues](csi_rn_knownissues.md)
-* [Introduction](csi_overview.md)
+* [Overview](csi_overview.md)
 * [Installation](csi_ug_install_intro.md)
 	* [Compatibility and requirements](csi_ug_requirements.md)
 	* [Installing the operator and driver](csi_ug_install_operator.dita)
