@@ -21,7 +21,7 @@
 * [Overview](csi_overview.md)
 * [Installation](csi_ug_install_intro.md)
 	* [Compatibility and requirements](csi_ug_requirements.md)
-	* [Installing the operator and driver](csi_ug_install_operator.dita)
+	* [Installing the operator and driver](csi_ug_install_operator.md)
 		* [Installing the driver using OpenShift web console](csi_ug_install_operator_openshift.md)
 		* [Installing the driver using CLIs](csi_ug_install_operator_github.md)
 	* [Uninstalling](csi_ug_uninstall.md)
