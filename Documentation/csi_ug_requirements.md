@@ -1,12 +1,12 @@
 # Compatibility and requirements
 
-For the complete and up-to-date information about the compatibility and requirements for using the IBM® block storage CSI driver, refer to its latest release notes. The release notes detail supported operating system and container platform versions, as well as microcode versions of the supported storage systems. You can find the latest release notes on [IBM block storage CSI driver Knowledge Center website](https://www.ibm.com/support/knowledgecenter/SSRQ8T)\(ibm.com®/support/knowledgecenter/SSRQ8T\).
+For the complete and up-to-date information about the compatibility and requirements for using the IBM® block storage CSI driver, refer to its latest release notes. The release notes detail supported operating system and container platform versions, as well as microcode versions of the supported storage systems. You can find the latest release notes on [IBM block storage CSI driver Knowledge Center website](https://www.ibm.com/support/knowledgecenter/SSRQ8T) (ibm.com®/support/knowledgecenter/SSRQ8T\).
 
 Before beginning the installation of the CSI \(Container Storage Interface\) driver, be sure to verify that you comply with the following prerequisites.
 
 For IBM Cloud® Satellite users, see [cloud.ibm.com/docs/satellite](https://cloud.ibm.com/docs/satellite) for full system requirements.
 
-**Important:** When using Satellite, complete the following checks, configurations, and the installation process before assigning the hosts to your locations.In addition, **do not** create a Kubernetes cluster. This is done through Satellite.
+**Important:** When using Satellite, complete the following checks, configurations, and the installation process before assigning the hosts to your locations.<br />In addition, **do not** create a Kubernetes cluster. This is done through Satellite.
 
 -   The CSI driver requires the following ports to be opened on the worker nodes OS firewall:
     -   **For all iSCSI users**
@@ -17,7 +17,7 @@ For IBM Cloud® Satellite users, see [cloud.ibm.com/docs/satellite](https://clou
 
         Port 7778
 
-    -   **IBM Spectrum® Virtualize Familyincludes IBM® SAN Volume Controller and IBM FlashSystem® family members built with IBM Spectrum® Virtualize \(FlashSystem 5010, 5030, 5100, 7200, 9100, 9200, 9200R\)**
+    -   **IBM Spectrum® Virtualize Family includes IBM® SAN Volume Controller and IBM FlashSystem® family members built with IBM Spectrum® Virtualize \(including FlashSystem 5xxx, 7200, 9100, 9200, 9200R\)**
 
         Port 22
 
@@ -31,9 +31,9 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
 
 1.  **For RHEL OS users:** Ensure iSCSI connectivity. If using RHCOS or if the packages are already installed, skip this step and continue to step [2](#config_multipath).
 
-2.  Configure Linux® multipath devices on the host.
+<a name="config_multipath">2.</a>  Configure Linux® multipath devices on the host.
 
-    **Important:** Be sure to configure each worker with storage connectivity according to your storage system instructions. For more information, find your storage system documentation on [IBM Knowledge Center](http://www.ibm.com/support/knowledgecenter)\(ibm.com/support/knowledgecenter\).
+    **Important:** Be sure to configure each worker with storage connectivity according to your storage system instructions. For more information, find your storage system documentation in [IBM Documentation](http://www.ibm.com/docs/) (ibm.com/docs/).
 
     1.  **Additional configuration steps for OpenShift® Container Platform users \(RHEL and RHCOS\).** Other users can continue to step [3](#enable_vol_snapshots).
 
@@ -45,9 +45,7 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
 
         This file can be used for both Fibre Channel and iSCSI configurations. To support iSCSI, uncomment the last two lines in the file.
 
-        **Important:** The 99-ibm-attach.yaml configuration file overrides any files that already exist on your system. Only use this file if the files mentioned are not already created.
-
-        If one or more have been created, edit this yaml file, as necessary.
+        **Important:** The 99-ibm-attach.yaml configuration file overrides any files that already exist on your system. Only use this file if the files mentioned are not already created.<br />If one or more have been created, edit this yaml file, as necessary.
 
         Apply the yaml file.
 
@@ -55,9 +53,9 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
         oc apply -f 99-ibm-attach.yaml
         ```
 
-3.  If needed, enable support for volume snapshots \(FlashCopy® function\) on your Kubernetes cluster.
+<a name="enable_vol_snapshots">3.</a>  If needed, enable support for volume snapshots \(FlashCopy® function\) on your Kubernetes cluster.
 
-    For more information and instructions, see the Kubernetes blog post, [Kubernetes 1.17 Feature: Kubernetes Volume Snapshot Moves to Beta](https://kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/)\(kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/\).
+    For more information and instructions, see the Kubernetes blog post, [Kubernetes 1.17 Feature: Kubernetes Volume Snapshot Moves to Beta](https://kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/) (kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/\).
 
     -   Install both the Snapshot CRDs and the Common Snapshot Controller once per cluster.
 

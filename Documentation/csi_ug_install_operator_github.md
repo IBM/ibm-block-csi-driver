@@ -6,22 +6,22 @@ The operator for IBM® block storage CSI driver can be installed directly from G
 2.  Download the manifest from GitHub.
 
     ```
-    curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.5.0/deploy/installer/generated/ibm-block-csi-operator.yaml > ibm-block-csi-operator.yaml
+    curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.6.0/deploy/installer/generated/ibm-block-csi-operator.yaml > ibm-block-csi-operator.yaml
     ```
 
 3.  **Optional:** Update the image fields in the ibm-block-csi-operator.yaml.
 
     **Note:** Updating the namespace to a user-defined namespace might be necessary to ensure consistency and avoid trouble with operator installation.
 
-4.  Create a project namespace, using the `kubectl create ns <namespace\>` command.
+4.  Create a project namespace, using the `kubectl create ns <namespace>` command.
 
 5.  Install the operator, while using a user-defined namespace.
 
     ```
-    kubectl -n <namespace\> apply -f ibm-block-csi-operator.yaml
+    kubectl -n <namespace> apply -f ibm-block-csi-operator.yaml
     ```
 
-6.  Verify that the operator is running. \(make sure that the Status is Running.\)
+6.  Verify that the operator is running. \(make sure that the Status is _Running_.\)
 
     ```screen
     $ kubectl get pod -l app.kubernetes.io/name=ibm-block-csi-operator -n <namespace\>
@@ -34,7 +34,7 @@ The operator for IBM® block storage CSI driver can be installed directly from G
     1.  Download the manifest from GitHub.
 
         ```
-        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.5.0/deploy/crds/csi.ibm.com_v1_ibmblockcsi_cr.yaml > csi.ibm.com_v1_ibmblockcsi_cr.yaml
+        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.6.0/deploy/crds/csi.ibm.com_v1_ibmblockcsi_cr.yaml > csi.ibm.com_v1_ibmblockcsi_cr.yaml
         ```
 
     2.  **Optional:** Update the image repository field, tag field, or both in the csi.ibm.com\_v1\_ibmblockcsi\_cr.yaml.
@@ -44,7 +44,7 @@ The operator for IBM® block storage CSI driver can be installed directly from G
     3.  Install the csi.ibm.com\_v1\_ibmblockcsi\_cr.yaml.
 
         ```
-        kubectl -n <namespace\> apply -f csi.ibm.com_v1_ibmblockcsi_cr.yaml
+        kubectl -n <namespace> apply -f csi.ibm.com_v1_ibmblockcsi_cr.yaml
         ```
 
 
