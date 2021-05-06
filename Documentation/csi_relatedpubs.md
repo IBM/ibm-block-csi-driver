@@ -6,7 +6,7 @@ IBM resources
 
 -   [IBM SAN Volume Controller documentation](https://www.ibm.com/docs/en/sanvolumecontroller) \(ibm.com/docs/en/sanvolumecontroller)
 -   [IBM Spectrum Scale documentation](https://www.ibm.com/docs/en/spectrum-scale)\(ibm.com/docs/en/spectrum-scale\)
--   [IBM FlashSystem® 5200, 5000, 5100, Storwize® V5100 and V5000E documentation](http://www.ibm.com/docs/en/f555sv-and-v) \(ibm.com/docs/en/f555sv-and-v\)
+-   [IBM FlashSystem® 5xxx family, Storwize® V5100 and V5000E documentation](http://www.ibm.com/docs/en/f555sv-and-v) \(ibm.com/docs/en/f555sv-and-v\)
 -   [IBM FlashSystem™ 7200 and Storwize V7000 documentation](https://www.ibm.com/docs/en/flashsystem-7x00) \(ibm.com/docs/en/flashsystem-7x00\)
 -   [IBM Spectrum Virtualize as Software Only documentation](https://www.ibm.com/docs/en/spectrumvirtualsoftw) \(ibm.com/docs/en/spectrumvirtualsoftw\)
 -   [IBM FlashSystem 9200 and 9100 documentation](https://www.ibm.com/docs/en/flashsystem-9x00) \(ibm.com/docs/en/flashsystem-9x00\)

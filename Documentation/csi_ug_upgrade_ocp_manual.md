@@ -4,7 +4,7 @@ When using the Red Hat® OpenShift® Container Platform, the CSI \(Container Sto
 
 1.  From Red Hat OpenShift Container Platform **Operators** \> **Installed Operators** see the status of the **ibm-block-csi-operator**.
 
-    If the **Status** is UpgradePending, click on the operator.
+    If the **Status** is _UpgradePending_, click on the operator.
 
 2.  From the **Subscription Overview** view, click on **1 requires approval**.
 
@@ -32,7 +32,7 @@ When using the Red Hat® OpenShift® Container Platform, the CSI \(Container Sto
 
 11. From the **Subscription** tab, check the upgrade status and the installed version.
 
-12. Check the **Overview** tab and that the **Controller Image Tab** and **Node Image Tag** are showing the most up-to-date version of the driver and the **Status** is Running.
+12. Check the **Overview** tab and that the **Controller Image Tab** and **Node Image Tag** are showing the most up-to-date version of the driver and the **Status** is _Running_.
 
 
 **Parent topic:**[Upgrading the driver using the OpenShift web console](csi_ug_upgrade_openshift.md)

@@ -11,11 +11,9 @@ In order to enable creation and deletion of volume snapshots for your storage sy
 
 When configuring the file, be sure to use the same array secret and array secret namespace as defined in [Creating a Secret](csi_ug_config_create_secret.md).
 
--   The snapshot\_name\_prefix parameter is optional.
+-   The `snapshot_name_prefix` parameter is optional.
 
-    **Note:** For IBM DS8000® Family, the maximum prefix length is five characters.The maximum prefix length for other systems is 20 characters.
-
-    For storage systems using Spectrum Virtualize, the CSI\_ prefix is added as default if not specified by the user.
+    **Note:** For IBM DS8000® Family, the maximum prefix length is five characters.<br/>The maximum prefix length for other systems is 20 characters.<br/>For storage systems using Spectrum Virtualize, the `CSI_` prefix is added as default if not specified by the user.
 
 
 ```screen
@@ -28,13 +26,13 @@ deletionPolicy: Delete
 parameters:
   csi.storage.k8s.io/snapshotter-secret-name: demo-secret
   csi.storage.k8s.io/snapshotter-secret-namespace: default
-  snapshot\_name\_prefix: demoSnapshot   \# Optional.
-  pool: demo-pool                      \# Mandatory only for DS8000 Family.
+  snapshot_name_prefix: demoSnapshot   # Optional.
+  pool: demo-pool                      # Mandatory only for DS8000 Family.
 ```
 
-After the YAML file is created, apply it by using the kubectl apply -f command.
+After the YAML file is created, apply it by using the `kubectl apply -f` command.
 
 ```
-kubectl apply -f <filename\>.yaml
+kubectl apply -f <filename>.yaml
 ```
 

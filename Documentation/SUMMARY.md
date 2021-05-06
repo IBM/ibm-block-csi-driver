@@ -28,7 +28,7 @@
 		* [Uninstalling the driver using the OpenShift web console](csi_ug_uninstall_openshift.md)
 		* [Uninstalling the driver using CLIs](csi_ug_uninstall_cli.md)
 	* [Upgrading the CSI driver](csi_ug_upgrade.md)
-		* [Installing the driver using the OpenShift web console](csi_ug_upgrade_openshift.md)
+		* [Upgrading the driver using the OpenShift web console](csi_ug_upgrade_openshift.md)
 		* [Manual upgrade with OpenShift](csi_ug_upgrade_ocp_manual.md)
 * [CSI driver configuration](csi_ug_config.md)
 	* [Creating a Secret](csi_ug_config_create_secret.md)

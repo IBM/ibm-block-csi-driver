@@ -14,14 +14,14 @@ Use the sections below for creating yaml files for PVCs with file system and raw
 kubectl apply -f <filename>.yaml
 ```
 
-The <pre>persistentvolumeclaim/_<filename\>_ created</pre> message is emitted.
+The `persistentvolumeclaim/<filename> created` message is emitted.
 
 Use the following sections, according to your PVC needs:
 
--   [Creating PVC for volume with file system](#create_pvc_fs)
--   [Creating PVC for raw block volume](#create_pvc_raw)
--   [Creating PVC from volume snapshot](#create_pvc_snapshot)
--   [Creating a volume clone from an existing PVC](#create_clone)
+-   [Creating PVC for volume with file system](#Creating-PVC-for-volume-with-Filesystem)
+-   [Creating PVC for raw block volume](#Creating-PVC-for-raw-block-volume)
+-   [Creating PVC from volume snapshot](#Creating-PVC-from-volume-snapshot)
+-   [Creating a volume clone from an existing PVC](#Creating-a-volume-clone-from-an-existing-PVC)
 
 ## Creating PVC for volume with Filesystem
 
@@ -48,20 +48,20 @@ spec:
 
 Create a PVC yaml file, similar to the following demo-pvc-raw-block.yaml file, with the size of 1 Gb.
 
-```
+<pre>
 kind: PersistentVolumeClaim
 apiVersion: v1
 metadata:
   name: demo-pvc-raw-block
 spec:
-  volumeMode: **Block**
+  volumeMode: <b>Block</b>
   accessModes:
   - ReadWriteOnce
   resources:
     requests:
       storage: 1Gi
   storageClassName: demo-storageclass
-```
+</pre>
 
 ## Creating PVC from volume snapshot
 

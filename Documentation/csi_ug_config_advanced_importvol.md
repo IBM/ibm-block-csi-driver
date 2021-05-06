@@ -9,10 +9,10 @@ Before starting to import an existing volume, find the following information in 
 
     Including:
 
-    -   `pool_name`:<Name of Pool where volume is located\>\(Listed as `pool_id`: for DS8000® Family systems.\)
+    -   `pool_name`:_<Name of Pool where volume is located\>_ (Listed as `pool_id` for DS8000® Family systems.\)
     -   `storage_type`: <SVC \| A9K \| DS8K\>
-    -   `volume_name`:<Volume name\>
-    -   `array_address`:<Array address\>
+    -   `volume_name`:_<Volume name\>_
+    -   `array_address`:_<Array address\>_
 
 To find the `volumeHandle`, use one of the following procedures:
 
@@ -23,7 +23,6 @@ To find the `volumeHandle`, use one of the following procedures:
     ```screen
     lsvdisk vol0 | grep vdisk_UID
     vdisk_UID 600507640082000B08000000000004FF
-    
     ```
 
 -   **Through command line \(for FlashSystem A9000 and A9000R\):**
@@ -49,7 +48,7 @@ To find the `volumeHandle`, use one of the following procedures:
 
         The Properties window appears. Use the UID number.
 
-    For more information about Spectrum Virtualize products, find your product information in [IBM Documentation] (https://www.ibm.com/docs/)\(ibm.com/docs/\).
+    For more information about Spectrum Virtualize products, find your product information in [IBM Documentation](https://www.ibm.com/docs/) (ibm.com/docs/\).
 
 -   **Through the IBM Hyper-Scale Manager user interface for FlashSystem A9000 and A90000R storage systems:**
 
@@ -57,11 +56,12 @@ To find the `volumeHandle`, use one of the following procedures:
 
         The **Volumes** table is displayed.
 
-    2.  Select the Volume.
+    2.  Select the `Volume`.
 
         The **Volume Properties** form appears.
 
     3.  Use the **ID** number.
+    
     For more information, see [IBM Hyper-Scale Manager documentation](https://www.ibm.com/docs/en/hyper-scale-manager/) \(ibm.com/docs/en/hyper-scale-manager).
 
 
@@ -109,6 +109,7 @@ Use this procedure to help build a PV yaml file for your volumes.
 
     -   To include a specific 5 Gi PV, be sure to include the `storageClassName`.
     -   For more information about creating a PVC yaml file, see [Creating a PersistentVolumeClaim \(PVC\)](csi_ug_config_create_pvc.md).
+    
     ```screen
     apiVersion: v1
     kind: PersistentVolumeClaim
@@ -128,11 +129,12 @@ Use this procedure to help build a PV yaml file for your volumes.
 4.  Create a project namespace.
 
     **Using OpenShift® web console**
-    From Red Hat® OpenShift Container Platform **Home** \> **Projects**, click **Create Project**. In the **Create Project** dialog box, enter a Project name \(also referred to as namespace\).
+      From Red Hat® OpenShift Container Platform **Home** \> **Projects**, click **Create Project**. In the **Create Project** dialog box, enter a Project name \(also referred to as namespace\).
 
     Click **Create** to save.
 
     **Using command-line terminal**
+    
     **Note:** This procedure is applicable for both Kubernetes and Red Hat OpenShift. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.
 
     Use the `kubectl create ns <namespace>` command to create a project namespace.
