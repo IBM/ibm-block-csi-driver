@@ -10,7 +10,7 @@ The following functional CSI \(Container Storage Interface\) component features 
     -   Controller
     -   Node
 -   RWO \(read/write once\) access mode
--   Both xfs and Ext4 file system types
+-   Both `xfs` and `Ext4` file system types
 
 **Parent topic:**[Change log](csi_rn_changelog.md)
 
