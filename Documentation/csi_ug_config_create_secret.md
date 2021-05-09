@@ -11,7 +11,7 @@ Use one of the following procedures to create and apply the secret:
 
 The `management_address` field can contain more than one address, with each value separated by a comma.
 
-{{% ibm-block-csi-driver deploy.kubernetes.examples.demo-secret %}}
+{% deploy kubernetes.examples.demo-secret %}
 
     ```
     kind: Secret
