@@ -17,3 +17,4 @@ For details about volume provisioning with Kubernetes, refer to [Persistent volu
 
 ![This image shows CSI driver integration with IBM block storage.](k8s_cluster_1.1.0.jpg "Integration of IBM block storage systems and CSI driver in a Kubernetes environment")
 
+{% Documentation reusables doc-resources %}
