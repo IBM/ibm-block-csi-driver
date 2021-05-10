@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//IBM//DTD DITA IBM Reference//EN"
+ "ibm-reference.dtd">
+<?Pub Sty _display FontColor="red"?>
+<?Pub Inc?>
+<reference id="hsg_bookconventions" xml:lang="en-us">
+<title>Conventions used in this guide</title>
+<shortdesc>These notices are used in this guide to highlight key information.</shortdesc>
+<refbody>
+<section>
+<note>These notices provide important tips, guidance, or advice.</note>
+<note type="important">These notices provide information or advice that might help you avoid
+inconvenient or difficult situations.</note>
+<note type="attention">These notices indicate possible damage to programs, devices, or data. An
+attention notice appears before the instruction or situation in which damage can occur.</note></section>
+</refbody>
+</reference>
+<?Pub *0000001446?>

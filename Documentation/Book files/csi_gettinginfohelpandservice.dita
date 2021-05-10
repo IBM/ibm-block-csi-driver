@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--Arbortext, Inc., 1988-2011, v.4002--><!DOCTYPE topic PUBLIC "-//IBM//DTD DITA IBM Topic//EN" "ibm-topic.dtd">
+<?Pub Sty _display FontColor="red"?><?Pub Inc?><topic id="xiv_gettinginfohelpandservice" xml:lang="en-us">
+<!--This topic is used in the front matter of the publication. Index entries should not be defined.-->
+<?Pub Caret -2?>
+<title>Getting information, help, and service</title>
+<body>
+<p>If you need help, service, technical assistance, or want more information about <tm trademark="IBM" tmtype="reg">IBM</tm> products, you can find various sources to assist you. You can view the following websites to get information about <tm trademark="IBM" tmtype="reg">IBM</tm> products and services and to find the latest technical information and support.<ul>
+<li><xref href="https://ibm-systems-storage.slack.com/archives/CU9DVSEKT" format="html" scope="external">#get-help_csi</xref> Slack channel</li>
+<li><xref format="html" href="http://www.ibm.com" scope="external"><tm tmtype="reg" trademark="IBM">IBM</tm> website</xref> (<tm tmtype="reg" trademark="ibm.com">ibm.com</tm>)</li>
+<li><xref format="html" href="https://www.ibm.com/support/entry/portal/support?brandind=Hardware~System_Storage" scope="external"><tm tmtype="reg" trademark="IBM">IBM</tm> Support Portal website</xref> (<tm trademark="ibm.com" tmtype="reg">ibm.com</tm>/support/entry/portal/support?brandind=Hardware~System_Storage)</li>
+<li><xref format="html" href="http://www.ibm.com/planetwide" scope="external"><tm tmtype="reg" trademark="IBM">IBM</tm> Directory of Worldwide Contacts website</xref> (<tm trademark="ibm.com" tmtype="reg">ibm.com</tm>/planetwide)<p>Use
+the Directory of Worldwide Contacts to find the appropriate phone number for initiating voice call
+support. Select the Software option, when using voice response system.</p><p>When asked, provide
+your Internal Customer Number (ICN) and/or the serial number of the storage system that requires
+support. Your call will then be routed to the relevant support team, to whom you can provide the
+specifics of your problem.</p></li>
+</ul></p>
+</body>
+</topic><?Pub *0000001092?><?tm 1607940997875 10 ibm.com||IBM ?>

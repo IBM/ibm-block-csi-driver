@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//IBM//DTD DITA IBM Topic//EN"
+ "ibm-topic.dtd">
+<?Pub Inc?>
+<topic id="isis_ug_audience" xml:lang="en-us">
+<title>Who should use this guide</title>
+<titlealts>
+<navtitle>Who should use this guide</navtitle>
+<searchtitle>Who should use this guide</searchtitle>
+</titlealts>
+<shortdesc>This guide is intended for system administrators who are familiar with container-based
+application delivery, orchestration methods, and with the specific <tm tmtype="reg" trademark="IBM"
+>IBM</tm> storage system that is in use.</shortdesc><?Pub Caret 89?>
+<?tm 1335790516 1?>
+</topic>
+<?Pub *0000000679?>
