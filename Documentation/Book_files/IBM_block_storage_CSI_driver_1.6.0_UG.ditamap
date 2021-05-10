@@ -41,7 +41,7 @@ driver</titleline><titleline>1.6.0</titleline></ibmbooklibrary>
 <preface href="csi_ug_about_this_guide.dita" navtitle="About this guide">
 <topicref href="csi_ug_audience.dita" navtitle="Who should use this guide"/>
 <topicref href="csi_bookconventions.dita" navtitle="Conventions used in this guide"/>
-<topicref href="../csi_relatedpubs.md" navtitle="Related information and publications"/>
+<topicref href="csi_relatedpubs.dita" navtitle="Related information and publications"/>
 <topicref href="csi_gettinginfohelpandservice.dita"
 navtitle="Getting information, help, and service"/>
 <topicref href="csi_howtoorderpubs.dita" navtitle="IBM Publications Center" type="reference"/>
@@ -51,8 +51,8 @@ navtitle="Feedback"/>
 </ibmfrontmatter>
 <chapter format="ditamap" href="csi_ug_content.ditamap"/>
 <ibmbackmatter>
-<notices href="storage_csi_notices.dita" navtitle="Notices">
-<topicref href="csi_trademarks.dita" navtitle="Trademarks"/>
+<notices href="../storage_csi_notices.md" navtitle="Notices" format="markdown">
+<topicref href="../csi_trademarks.md" navtitle="Trademarks" format="markdown"/>
 </notices>
 <backbooklists/>
 </ibmbackmatter>
