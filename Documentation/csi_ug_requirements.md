@@ -29,13 +29,13 @@ For IBM Cloud® Satellite users, see [cloud.ibm.com/docs/satellite](https://clou
 
 Perform these steps for each worker node in Kubernetes cluster to prepare your environment for installing the CSI \(Container Storage Interface\) driver.
 
-1.  **For RHEL OS users:** Ensure iSCSI connectivity. If using RHCOS or if the packages are already installed, skip this step and continue to step [2](#config_multipath).
+1. **For RHEL OS users:** Ensure iSCSI connectivity. If using RHCOS or if the packages are already installed, skip this step and continue to step 2.
 
-<a name="config_multipath">2.</a> Configure Linux® multipath devices on the host.
+2. Configure Linux® multipath devices on the host.
 
 **Important:** Be sure to configure each worker with storage connectivity according to your storage system instructions. For more information, find your storage system documentation in [IBM Documentation](http://www.ibm.com/docs/) (ibm.com/docs/).
 
-**Additional configuration steps for OpenShift® Container Platform users \(RHEL and RHCOS\).** Other users can continue to step [3](#enable_vol_snapshots).
+**Additional configuration steps for OpenShift® Container Platform users \(RHEL and RHCOS\).** Other users can continue to step 3.
 
 Download and save the following yaml file:
 
@@ -48,11 +48,11 @@ This file can be used for both Fibre Channel and iSCSI configurations. To suppor
 
 Apply the yaml file.
 
-    ```
+    
     oc apply -f 99-ibm-attach.yaml
-    ```
+    
 
-<a name="enable_vol_snapshots">3.</a>  If needed, enable support for volume snapshots \(FlashCopy® function\) on your Kubernetes cluster.
+3. If needed, enable support for volume snapshots \(FlashCopy® function\) on your Kubernetes cluster.
 
 For more information and instructions, see the Kubernetes blog post, [Kubernetes 1.17 Feature: Kubernetes Volume Snapshot Moves to Beta](https://kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/) (kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/\).
 
