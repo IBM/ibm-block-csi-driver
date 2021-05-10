@@ -1,4 +1,6 @@
+import json
 from hashlib import sha256
+import re
 
 import base58
 from google.protobuf.timestamp_pb2 import Timestamp
@@ -14,36 +16,136 @@ from controller.csi_general import csi_pb2
 logger = get_stdout_logger()
 
 
-def get_array_connection_info_from_secret(secrets):
-    user = secrets[config.SECRET_USERNAME_PARAMETER]
-    password = secrets[config.SECRET_PASSWORD_PARAMETER]
-    array_addresses = secrets[config.SECRET_ARRAY_PARAMETER].split(",")
+def _is_topology_match(secret_topologies, node_topologies):
+    is_match = False
+    for topologies in secret_topologies:
+        logger.debug(
+            "Comparing topologies: object topologies: {},"
+            " node topologies: {}".format(topologies, node_topologies))
+        if all(item in node_topologies.items() for item in topologies.items()):
+            is_match = True
+    return is_match
+
+
+def get_volume_topologies(request):
+    if request.HasField(config.REQUEST_ACCESSIBILITY_REQUIREMENTS_FIELD):
+        accessibility_requirements = request.accessibility_requirements
+        if accessibility_requirements.preferred:
+            return accessibility_requirements.preferred[0].segments
+
+
+def get_secret_by_topologies(secret_config_string, node_topologies):
+    secret_config = json.loads(secret_config_string)
+    for secret_uid, secret_info in secret_config.items():
+        secret_topologies = secret_info.get(config.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
+        if _is_topology_match(secret_topologies, node_topologies):
+            return secret_info, secret_uid
+
+
+def get_secret_by_uid(secret_config_string, secret_uid):
+    secret_config = json.loads(secret_config_string)
+    return secret_config.get(secret_uid)
+
+
+def get_pool_by_uid(pools, uid):
+    pools = json.loads(pools)
+    return pools.get(uid)
+
+
+def _get_secret_from_request(secrets, topologies=None, secret_uid=None):
+    secret_config = secrets.get(config.SECRET_CONFIG_PARAMETER)
+    secret = secrets
+    if secret_config:
+        if secret_uid:
+            secret = get_secret_by_uid(secret_config_string=secret_config, secret_uid=secret_uid)
+        elif topologies:
+            logger.info("Chosen volume topologies: {}".format(topologies))
+            secret, secret_uid = get_secret_by_topologies(secret_config_string=secret_config,
+                                                          node_topologies=topologies)
+        else:
+            raise ValidationException(messages.invalid_secret_message)
+    return secret, secret_uid
+
+
+def _get_array_connection_info_from_secret(secret):
+    user = secret[config.SECRET_USERNAME_PARAMETER]
+    password = secret[config.SECRET_PASSWORD_PARAMETER]
+    array_addresses = secret[config.SECRET_ARRAY_PARAMETER].split(",")
     return user, password, array_addresses
 
 
-def get_volume_id(new_volume):
-    return _get_object_id(new_volume)
+def get_array_connection_info_from_secrets(secrets, topologies=None, secret_uid=None):
+    secret, secret_uid = _get_secret_from_request(secrets, topologies, secret_uid)
+    user, password, array_addresses = _get_array_connection_info_from_secret(secret)
+    return user, password, array_addresses, secret_uid
+
+
+def get_pool_from_parameters(parameters, secret_uid):
+    pools_by_system = parameters.get(config.PARAMETERS_POOLS_BY_SYSTEM)
+    if pools_by_system and secret_uid:
+        return get_pool_by_uid(pools=pools_by_system, uid=secret_uid)
+    return parameters.get(config.PARAMETERS_POOL)
+
+
+def get_volume_id(new_volume, secret_uid):
+    return _get_object_id(new_volume, secret_uid)
 
 
 def get_snapshot_id(new_snapshot):
     return _get_object_id(new_snapshot)
 
 
-def _get_object_id(obj):
+def _get_object_id(obj, secret_uid=None):
+    if secret_uid:
+        return config.PARAMETERS_OBJECT_ID_DELIMITER.join((obj.array_type, secret_uid, obj.id))
     return config.PARAMETERS_OBJECT_ID_DELIMITER.join((obj.array_type, obj.id))
 
 
-def validate_secret(secret):
+def _validate_secret_uid(uid):
+    if not re.match(config.SECRET_VALIDATION_REGEX, uid.lstrip()):
+        raise ValidationException(messages.invalid_secret_message)
+    if len(uid) > config.SECRET_UID_MAX_LENGTH:
+        raise ValidationException(messages.parameter_length_is_too_long.format(uid, config.SECRET_UID_MAX_LENGTH))
+
+
+def _validate_secret(secret):
+    if not (config.SECRET_USERNAME_PARAMETER in secret and
+            config.SECRET_PASSWORD_PARAMETER in secret and
+            config.SECRET_ARRAY_PARAMETER in secret):
+        raise ValidationException(messages.invalid_secret_message)
+
+
+def _validate_topologies(topologies):
+    for topology_key, topology_value in topologies.items():
+        split_topology = topology_key.split(config.PARAMETERS_TOPOLOGY_DELIMITER)
+        if len(split_topology) != 2:
+            raise ValidationException(messages.invalid_topology_key_message.format(topology_key))
+        prefix, suffix = split_topology
+        if not re.match(config.SECRET_VALIDATION_REGEX, suffix.lstrip()):
+            raise ValidationException(messages.invalid_topology_key_message.format(suffix))
+        if prefix not in config.TOPOLOGY_PREFIXES:
+            raise ValidationException(messages.invalid_topology_key_message.format(prefix))
+        if not re.match(config.SECRET_VALIDATION_REGEX, topology_value.lstrip()):
+            raise ValidationException(messages.invalid_topology_VALUE_message.format(topology_value))
+
+
+def _validate_secret_config(secret_config):
+    for uid, secret_info in secret_config.items():
+        _validate_secret_uid(uid)
+        _validate_secret(secret_info)
+        topologies = secret_info.get(config.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
+        if topologies:
+            _validate_topologies(topologies)
+
+
+def validate_secrets(secrets):
     logger.debug("validating secrets")
-    if secret:
-        if not (config.SECRET_USERNAME_PARAMETER in secret and
-                config.SECRET_PASSWORD_PARAMETER in secret and
-                config.SECRET_ARRAY_PARAMETER in secret):
-            raise ValidationException(messages.invalid_secret_message)
-
-    else:
+    if not secrets:
         raise ValidationException(messages.secret_missing_message)
-
+    if secrets.get(config.SECRET_CONFIG_PARAMETER):
+        _validate_secret_config(secrets.get(config.SECRET_CONFIG_PARAMETER))
+    else:
+        _validate_secret(secrets)
     logger.debug("secret validation finished")
 
 
@@ -116,7 +218,7 @@ def validate_create_volume_request(request):
 
     logger.debug("validating secrets")
     if request.secrets:
-        validate_secret(request.secrets)
+        validate_secrets(request.secrets)
 
     logger.debug("validating storage class parameters")
     if request.parameters:
@@ -141,7 +243,7 @@ def validate_create_snapshot_request(request):
         raise ValidationException(messages.name_should_not_be_empty_message)
     logger.debug("validating secrets")
     if request.secrets:
-        validate_secret(request.secrets)
+        validate_secrets(request.secrets)
     logger.debug("validating source volume id")
     if not request.source_volume_id:
         raise ValidationException(messages.snapshot_src_volume_id_is_missing)
@@ -154,7 +256,7 @@ def validate_delete_snapshot_request(request):
         raise ValidationException(messages.name_should_not_be_empty_message)
     logger.debug("validating secrets")
     if request.secrets:
-        validate_secret(request.secrets)
+        validate_secrets(request.secrets)
     logger.debug("request validation finished.")
 
 
@@ -171,12 +273,12 @@ def validate_expand_volume_request(request):
     else:
         raise ValidationException(messages.no_capacity_range_message)
 
-    validate_secret(request.secrets)
+    validate_secrets(request.secrets)
 
     logger.debug("expand volume validation finished")
 
 
-def generate_csi_create_volume_response(new_volume, source_type=None):
+def generate_csi_create_volume_response(new_volume, secret_uid=None, source_type=None):
     logger.debug("creating volume response for volume : {0}".format(new_volume))
 
     volume_context = {"volume_name": new_volume.name,
@@ -197,7 +299,7 @@ def generate_csi_create_volume_response(new_volume, source_type=None):
 
     res = csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(
         capacity_bytes=new_volume.capacity_bytes,
-        volume_id=get_volume_id(new_volume),
+        volume_id=get_volume_id(new_volume, secret_uid),
         content_source=content_source,
         volume_context=volume_context))
 
@@ -238,7 +340,7 @@ def validate_delete_volume_request(request):
 
     logger.debug("validating secrets")
     if request.secrets:
-        validate_secret(request.secrets)
+        validate_secrets(request.secrets)
 
     logger.debug("delete volume validation finished")
 
@@ -255,7 +357,7 @@ def validate_publish_volume_request(request):
 
     logger.debug("validating secrets")
     if request.secrets:
-        validate_secret(request.secrets)
+        validate_secrets(request.secrets)
     else:
         raise ValidationException(messages.secret_missing_message)
 
@@ -273,12 +375,15 @@ def get_snapshot_id_info(snapshot_id):
 def get_object_id_info(full_object_id, object_type):
     logger.debug("getting {0} info for id : {1}".format(object_type, full_object_id))
     splitted_object_id = full_object_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)
-    if len(splitted_object_id) != 2:
+    secret_uid = None
+    if len(splitted_object_id) == 2:
+        array_type, object_id = splitted_object_id
+    elif len(splitted_object_id) == 3:
+        array_type, secret_uid, object_id = splitted_object_id
+    else:
         raise ObjectIdError(object_type, full_object_id)
-
-    array_type, object_id = splitted_object_id
     logger.debug("volume id : {0}, array type :{1}".format(object_id, array_type))
-    return array_type, object_id
+    return array_type, object_id, secret_uid
 
 
 def get_node_id_info(node_id):
@@ -344,7 +449,7 @@ def validate_unpublish_volume_request(request):
 
     logger.debug("validating secrets")
     if request.secrets:
-        validate_secret(request.secrets)
+        validate_secrets(request.secrets)
     else:
         raise ValidationException(messages.secret_missing_message)
 

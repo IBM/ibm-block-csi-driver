@@ -24,7 +24,7 @@ class AbstractControllerTest(unittest.TestCase):
         self.detect_array_type = detect_array_type_patcher.start()
         self.detect_array_type.return_value = "a9k"
         self.addCleanup(detect_array_type_patcher.stop)
-        self.request = Mock()
+        self.request = ProtoBufMock()
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
 
     @abc.abstractmethod

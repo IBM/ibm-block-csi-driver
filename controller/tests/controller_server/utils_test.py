@@ -6,6 +6,7 @@ import controller.array_action.errors as array_errors
 import controller.controller_server.utils as utils
 from controller.controller_server.csi_controller_server import ControllerServicer
 from controller.controller_server.errors import ObjectIdError, ValidationException
+from controller.controller_server.test_settings import pool, user, password, array
 from controller.csi_general import csi_pb2
 from controller.tests.controller_server.csi_controller_server_test import ProtoBufMock
 
@@ -22,32 +23,80 @@ class TestUtils(unittest.TestCase):
                                       "publish_context_fc_initiators": "fc_wwns"}
                        }
 
-    def test_validate_secrets(self):
-        username = "user"
-        password = "pass"
-        mgmt = "mg"
-        secrets = {"username": username, "password": password, "management_address": mgmt}
-
-        utils.validate_secret(secrets)
-
+    def _test_validate_secrets_validation_errors(self, secrets):
         with self.assertRaises(ValidationException):
-            utils.validate_secret(None)
+            utils.validate_secrets(secrets)
 
-        secrets = {"username": username, "password": password}
-        with self.assertRaises(ValidationException):
-            utils.validate_secret(secrets)
+    def test_validate_secrets_success(self):
+        secrets = {"username": user, "password": password, "management_address": array}
+        utils.validate_secrets(secrets)
 
-        secrets = {"username": username, "management_address": mgmt}
-        with self.assertRaises(ValidationException):
-            utils.validate_secret(secrets)
+    def test_validate_secrets_with_no_secret(self):
+        self._test_validate_secrets_validation_errors(None)
 
-        secrets = {"password": password, "management_address": mgmt}
-        with self.assertRaises(ValidationException):
-            utils.validate_secret(secrets)
+    def test_validate_secrets_with_no_management_address(self):
+        secrets = {"username": user, "password": password}
+        self._test_validate_secrets_validation_errors(secrets)
 
+    def test_validate_secrets_with_no_password(self):
+        secrets = {"username": user, "management_address": array}
+        self._test_validate_secrets_validation_errors(secrets)
+
+    def test_validate_secrets_with_no_username(self):
+        secrets = {"password": password, "management_address": array}
+        self._test_validate_secrets_validation_errors(secrets)
+
+    def test_validate_secrets_with_empty_dict(self):
         secrets = {}
-        with self.assertRaises(ValidationException):
-            utils.validate_secret(secrets)
+        self._test_validate_secrets_validation_errors(secrets)
+
+    def test_validate_secrets_with_config(self):
+        secrets = {"config": {"u1": {"username": user, "password": password, "management_address": array}}}
+        utils.validate_secrets(secrets)
+
+    def test_validate_secrets_with_config_invalid_seret(self):
+        secrets = {"config": {"u1": {"username": user, "management_address": array}}}
+        self._test_validate_secrets_validation_errors(secrets)
+
+    def _test_validate_secrets_with_config_valid_uid(self, uid):
+        secrets = {"config": {uid: {"username": user, "password": password, "management_address": array}}}
+        utils.validate_secrets(secrets)
+
+    def test_validate_secrets_with_config_valid_uid(self):
+        self._test_validate_secrets_with_config_valid_uid("u i_d.")
+        self._test_validate_secrets_with_config_valid_uid("a" * 90)
+
+    def _test_validate_secrets_with_config_invalid_uid(self, uid):
+        secrets = {"config": {uid: {"username": user, "password": password, "management_address": array}}}
+        self._test_validate_secrets_validation_errors(secrets)
+
+    def test_validate_secrets_with_config_invalid_uid(self):
+        self._test_validate_secrets_with_config_invalid_uid("u-1")
+        self._test_validate_secrets_with_config_invalid_uid("u:1")
+        self._test_validate_secrets_with_config_invalid_uid("u1+")
+        self._test_validate_secrets_with_config_invalid_uid("u1*")
+        self._test_validate_secrets_with_config_invalid_uid("u-1(")
+        self._test_validate_secrets_with_config_invalid_uid("u/1")
+        self._test_validate_secrets_with_config_invalid_uid("u=1")
+        self._test_validate_secrets_with_config_invalid_uid(" ")
+        self._test_validate_secrets_with_config_invalid_uid("a" * 91)
+
+    def test_validate_secrets_with_config_and_topologies(self):
+        secrets = {"config": {"u1": {"username": user, "password": password, "management_address": array,
+                                     "supported_topologies": {"topology.kubernetes.io/test": "zone1",
+                                                              "topology.block.csi.ibm.com/test": "dev1"}}}}
+        utils.validate_secrets(secrets)
+
+    def _test_validate_secrets_with_config_invalid_topology(self, topology="topology.kubernetes.io/test", value="test"):
+        secrets = {"config": {"u1": {"username": user, "password": password, "management_address": array,
+                                     "supported_topologies": {topology: value}}}}
+        self._test_validate_secrets_validation_errors(secrets)
+
+    def test_validate_secrets_with_config_invalid_topology(self):
+        self._test_validate_secrets_with_config_invalid_topology(topology="topology.kubernetes.io")
+        self._test_validate_secrets_with_config_invalid_topology(topology="topology.kubernetes/test")
+        self._test_validate_secrets_with_config_invalid_topology(topology="topology.kubernetes.io/t-est")
+        self._test_validate_secrets_with_config_invalid_topology(value="a*")
 
     def test_validate_file_system_volume_capabilities(self):
         cap = Mock()
@@ -102,15 +151,15 @@ class TestUtils(unittest.TestCase):
 
         utils.validate_csi_volume_capabilties([caps])
 
-    @patch('controller.controller_server.utils.validate_secret')
+    @patch('controller.controller_server.utils.validate_secrets')
     @patch('controller.controller_server.utils.validate_csi_volume_capabilties')
-    def test_validate_create_volume_request(self, valiate_capabilities, validate_secret):
+    def test_validate_create_volume_request(self, valiate_capabilities, validate_secrets):
         request = Mock()
         request.name = ""
 
         with self.assertRaises(ValidationException) as ex:
             utils.validate_create_volume_request(request)
-            self.assertTrue("name" in ex.message)
+            self.assertTrue("name" in str(ex))
 
         request.name = "name"
 
@@ -118,55 +167,55 @@ class TestUtils(unittest.TestCase):
 
         with self.assertRaises(ValidationException) as ex:
             utils.validate_create_volume_request(request)
-            self.assertTrue("size" in ex.message)
+            self.assertTrue("size" in str(ex))
 
         request.capacity_range.required_bytes = 10
         valiate_capabilities.side_effect = ValidationException("msg")
 
         with self.assertRaises(ValidationException) as ex:
             utils.validate_create_volume_request(request)
-            self.assertTrue("msg" in ex.message)
+            self.assertTrue("msg" in str(ex))
 
         valiate_capabilities.side_effect = None
 
-        validate_secret.side_effect = ValidationException(" other msg")
+        validate_secrets.side_effect = ValidationException(" other msg")
 
         with self.assertRaises(ValidationException) as ex:
             utils.validate_create_volume_request(request)
-            self.assertTrue("other msg" in ex.message)
+            self.assertTrue("other msg" in str(ex))
 
-        validate_secret.side_effect = None
+        validate_secrets.side_effect = None
 
         request.parameters = {"capabilities": ""}
 
         with self.assertRaises(ValidationException) as ex:
             utils.validate_create_volume_request(request)
-            self.assertTrue("parameters" in ex.message)
+            self.assertTrue("parameters" in str(ex))
 
         request.parameters = {}
 
         with self.assertRaises(ValidationException) as ex:
             utils.validate_create_volume_request(request)
-            self.assertTrue("parameters" in ex.message)
+            self.assertTrue("parameters" in str(ex))
 
         request.parameters = None
 
         with self.assertRaises(ValidationException) as ex:
             utils.validate_create_volume_request(request)
-            self.assertTrue("parameters" in ex.message)
+            self.assertTrue("parameters" in str(ex))
 
-        request.parameters = {"pool": "pool1", "SpaceEfficiency": "thin "}
+        request.parameters = {"pool": pool, "SpaceEfficiency": "thin "}
         request.volume_content_source = None
 
         utils.validate_create_volume_request(request)
 
-        request.parameters = {"pool": "pool1"}
+        request.parameters = {"pool": pool}
         utils.validate_create_volume_request(request)
 
         request.capacity_range.required_bytes = 0
         utils.validate_create_volume_request(request)
 
-    @patch('controller.controller_server.utils.validate_secret', Mock())
+    @patch('controller.controller_server.utils.validate_secrets', Mock())
     def test_validate_delete_snapshot_request(self):
         request = Mock()
         request.snapshot_id = ""
@@ -180,7 +229,7 @@ class TestUtils(unittest.TestCase):
         new_volume.name = "name"
         new_volume.array_address = ["fqdn1", "fqdn2"]
 
-        new_volume.pool = "pool"
+        new_volume.pool = pool
         new_volume.array_type = "a9k"
         new_volume.capacity_bytes = 10
         new_volume.copy_source_id = None
@@ -201,7 +250,7 @@ class TestUtils(unittest.TestCase):
         new_volume.name = "name"
         new_volume.array_address = "9.1.1.1"
 
-        new_volume.pool = "pool"
+        new_volume.pool = pool
         new_volume.array_type = "svc"
         new_volume.capacity_bytes = 10
         new_volume.copy_source_id = None
@@ -218,7 +267,7 @@ class TestUtils(unittest.TestCase):
         new_volume.name = "name"
         new_volume.array_address = ["9.1.1.1", "9.1.1.2"]
 
-        new_volume.pool = "pool"
+        new_volume.pool = pool
         new_volume.array_type = "svc"
         new_volume.capacity_bytes = 10
         new_volume.copy_source_id = None
@@ -229,7 +278,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(10, res.volume.capacity_bytes)
         self.assertEqual("9.1.1.1,9.1.1.2", res.volume.volume_context['array_address'])
 
-    @patch('controller.controller_server.utils.validate_secret')
+    @patch('controller.controller_server.utils.validate_secrets')
     @patch('controller.controller_server.utils.validate_csi_volume_capability')
     def test_validate_publish_volume_request(self, validate_capabilities, validate_secrets):
         request = Mock()
@@ -237,72 +286,72 @@ class TestUtils(unittest.TestCase):
 
         with self.assertRaises(ValidationException) as ex:
             utils.validate_publish_volume_request(request)
-            self.assertTrue("readonly" in ex.message)
+            self.assertTrue("readonly" in str(ex))
 
         request.readonly = False
         validate_capabilities.side_effect = [ValidationException("msg1")]
 
         with self.assertRaises(ValidationException) as ex:
             utils.validate_publish_volume_request(request)
-            self.assertTrue("msg1" in ex.message)
+            self.assertTrue("msg1" in str(ex))
 
         validate_capabilities.side_effect = None
         request.secrets = []
 
         with self.assertRaises(ValidationException) as ex:
             utils.validate_publish_volume_request(request)
-            self.assertTrue("secrets" in ex.message)
+            self.assertTrue("secrets" in str(ex))
 
         request.secrets = ["secret"]
         validate_secrets.side_effect = [ValidationException("msg2")]
 
         with self.assertRaises(ValidationException) as ex:
             utils.validate_publish_volume_request(request)
-            self.assertTrue("msg2" in ex.message)
+            self.assertTrue("msg2" in str(ex))
 
         validate_secrets.side_effect = None
 
         utils.validate_publish_volume_request(request)
 
-    @patch('controller.controller_server.utils.validate_secret')
-    def test_validate_unpublish_volume_request(self, validate_secret):
+    @patch('controller.controller_server.utils.validate_secrets')
+    def test_validate_unpublish_volume_request(self, validate_secrets):
         request = Mock()
         request.volume_id = "somebadvolumename"
 
         with self.assertRaises(ValidationException) as ex:
             utils.validate_unpublish_volume_request(request)
-            self.assertTrue("volume" in ex.message)
+            self.assertTrue("volume" in str(ex))
 
         request.volume_id = "xiv:volume"
 
         request.secrets = []
         with self.assertRaises(ValidationException) as ex:
             utils.validate_unpublish_volume_request(request)
-            self.assertTrue("secret" in ex.message)
+            self.assertTrue("secret" in str(ex))
 
         request.secrets = ["secret"]
-        validate_secret.side_effect = [ValidationException("msg2")]
+        validate_secrets.side_effect = [ValidationException("msg2")]
         with self.assertRaises(ValidationException) as ex:
             utils.validate_unpublish_volume_request(request)
-            self.assertTrue("msg2" in ex.message)
+            self.assertTrue("msg2" in str(ex))
 
-        validate_secret.side_effect = None
+        validate_secrets.side_effect = None
 
         utils.validate_unpublish_volume_request(request)
 
     def test_get_volume_id_info(self):
         with self.assertRaises(ObjectIdError) as ex:
             utils.get_volume_id_info("badvolumeformat")
-            self.assertTrue("volume" in ex.message)
+            self.assertTrue("volume" in str(ex))
 
-        arr_type, volume_id = utils.get_volume_id_info("xiv:volume-id")
+        arr_type, volume_id, _ = utils.get_volume_id_info("xiv:volume-id")
         self.assertEqual(arr_type, "xiv")
         self.assertEqual(volume_id, "volume-id")
 
     def test_get_node_id_info(self):
         with self.assertRaises(array_errors.HostNotFoundError) as ex:
             utils.get_node_id_info("badnodeformat")
-            self.assertTrue("node" in ex.message)
+            self.assertTrue("node" in str(ex))
 
         hostname, fc_wwns, iscsi_iqn = utils.get_node_id_info("hostabc;;iqn.ibm")
         self.assertEqual(hostname, "hostabc")
