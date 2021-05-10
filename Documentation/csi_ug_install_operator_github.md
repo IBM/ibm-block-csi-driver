@@ -48,5 +48,3 @@ The operator for IBM® block storage CSI driver can be installed directly from G
         ```
 
 
-**Parent topic:**[Installing the operator and driver](csi_ug_install_operator.md)
-

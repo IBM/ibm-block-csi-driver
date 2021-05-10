@@ -9,5 +9,4 @@ IBM® block storage CSI driver 1.1.0 provided a range of enhancements:
 -   Raw block volume support for Kubernetes
 -   Automatic iSCSI login
 
-**Parent topic:**[Change log](csi_rn_changelog.md)
 

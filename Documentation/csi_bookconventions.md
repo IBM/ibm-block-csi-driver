@@ -8,5 +8,3 @@ These notices are used in this guide to highlight key information.
 
 **Attention:** These notices indicate possible damage to programs, devices, or data. An attention notice appears before the instruction or situation in which damage can occur.
 
-**Parent topic:**[About this guide](csi_ug_about_this_guide.md)
-

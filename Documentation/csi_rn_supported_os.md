@@ -10,5 +10,4 @@ The following table lists operating systems required for deployment of the IBM®
 <sup>1</sup>IBM Power Systems architecture is only supported on Spectrum Virtualize Family storage systems.
 <sup>2</sup>IBM Z and IBM Power Systems architectures are only supported using CLI installation.
 
-**Parent topic:**[Compatibility and requirements](csi_rn_compatibility.md)
 

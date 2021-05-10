@@ -13,5 +13,4 @@ When using the Red Hat® OpenShift® Container Platform, the operator for IBM bl
 -   **[Installing the driver using CLIs](csi_ug_install_operator_github.md)**  
 The operator for IBM block storage CSI driver can be installed directly from GitHub by using CLIs. Installing the CSI \(Container Storage Interface\) driver is part of the operator installation process.
 
-**Parent topic:**[Installation](csi_ug_install_intro.md)
 

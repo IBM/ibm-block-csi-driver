@@ -8,5 +8,4 @@ To expand an existing volume, open the relevant PersistentVolumeClaim \(PVC\) ya
 
 Be sure to use the `kubectl apply` command in order to apply your changes.
 
-**Parent topic:**[CSI driver configuration](csi_ug_config.md)
 

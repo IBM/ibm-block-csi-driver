@@ -12,5 +12,4 @@ Use this information to uninstall the IBM CSI \(Container Storage Interface\) op
 -   **[Uninstalling the driver using CLIs](csi_ug_uninstall_cli.md)**  
 Use this information to uninstall the IBM CSI \(Container Storage Interface\) operator and driver from a command line terminal.
 
-**Parent topic:**[Installation](csi_ug_install_intro.md)
 

@@ -50,6 +50,4 @@ Information concerning non-IBM products was obtained from the suppliers of those
 
 All statements regarding IBM's future direction or intent are subject to change or withdrawal without notice, and represent goals and objectives only.
 
--   **[Trademarks](csi_trademarks.md)**  
-
 

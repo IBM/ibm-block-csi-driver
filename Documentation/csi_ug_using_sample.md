@@ -33,5 +33,3 @@ Use this information to run a stateful container on StatefulSet volumes using ei
 5.  Create a StatefulSet, as described in [Creating a StatefulSet](csi_ug_config_create_statefulset.md).
 
 
-**Parent topic:**[Using IBM block storage CSI driver](csi_ug_using.md)
-

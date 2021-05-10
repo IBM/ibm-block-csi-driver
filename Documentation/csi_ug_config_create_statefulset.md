@@ -124,5 +124,4 @@ spec:
           claimName: demo-pvc-raw-block
 </pre>
 
-**Parent topic:**[CSI driver configuration](csi_ug_config.md)
 

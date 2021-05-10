@@ -175,5 +175,3 @@ Use this procedure to help build a PV yaml file for your volumes.
     ```
 
 
-**Parent topic:**[Advanced configuration](csi_ug_config_advanced.md)
-

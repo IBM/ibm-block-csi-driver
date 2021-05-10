@@ -13,5 +13,4 @@ To manually upgrade the CSI \(Container Storage Interface\) driver from a previo
 -   **[Upgrading the driver using the OpenShift web console](csi_ug_upgrade_openshift.md)**  
 When using the Red Hat OpenShift Container Platform, the operator for IBM block storage CSI driver can be upgraded directly from OpenShift web console, through the OperatorHub.
 
-**Parent topic:**[Installation](csi_ug_install_intro.md)
 

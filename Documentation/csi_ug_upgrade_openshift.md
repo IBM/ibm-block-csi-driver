@@ -9,5 +9,4 @@ When the Subscription **Approval** policy for the Operator for IBM block storage
 -   **[Manual upgrade with OpenShift](csi_ug_upgrade_ocp_manual.md)**  
 When using the Red Hat OpenShift Container Platform, the CSI \(Container Storage Interface\) driver can be manually updated through the OpenShift web console.
 
-**Parent topic:**[Upgrading the CSI driver](csi_ug_upgrade.md)
 

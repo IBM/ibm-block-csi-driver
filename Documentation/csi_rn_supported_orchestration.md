@@ -13,5 +13,4 @@ The following table details orchestration platforms suitable for deployment of t
 
 **Note:** As of this document's publication date, IBM Cloud® Satellite only supports RHEL 7 on x86 architecture for Red Hat OpenShift. For the latest support information, see [cloud.ibm.com/docs/satellite](https://cloud.ibm.com/docs/satellite).
 
-**Parent topic:**[Compatibility and requirements](csi_rn_compatibility.md)
 

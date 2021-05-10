@@ -68,5 +68,4 @@ The instructions and relevant yaml files to enable volume snapshots can be found
     2.  For Fibre Channel, configure the relevant zoning from the storage to the host.
 
 
-**Parent topic:**[Installation](csi_ug_install_intro.md)
 

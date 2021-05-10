@@ -1,6 +1,6 @@
-# 1.5.0 \(March 2021\)
+# 1.6.0 \(June 2021\)
 
-IBM® block storage CSI driver 1.5.0 provides a range of enhancements and resolves the following issues:
+IBM® block storage CSI driver 1.6.0 provides a range of enhancements and resolves the following issues:
 
 -   New support for IBM Cloud® Satellite
 -   Added automatic seamless upgrade capabilities
@@ -11,5 +11,4 @@ IBM® block storage CSI driver 1.5.0 provides a range of enhancements and resolv
 |---------|--------|-----------|
 |**CSI-TBD**|Moderate|**Fixed:** TBD|
 
-**Parent topic:**[Change log](csi_rn_changelog.md)
 

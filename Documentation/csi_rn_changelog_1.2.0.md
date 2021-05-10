@@ -8,5 +8,4 @@ IBM® block storage CSI driver 1.2.0 provided a range of enhancements:
 -   Additional support of IBM Z® for Red Hat OpenShift 4.3
 -   New operator installation support from OperatorHub.io
 
-**Parent topic:**[Change log](csi_rn_changelog.md)
 

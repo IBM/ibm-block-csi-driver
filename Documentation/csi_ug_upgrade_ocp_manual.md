@@ -35,5 +35,3 @@ When using the Red Hat® OpenShift® Container Platform, the CSI \(Container Sto
 12. Check the **Overview** tab and that the **Controller Image Tab** and **Node Image Tag** are showing the most up-to-date version of the driver and the **Status** is _Running_.
 
 
-**Parent topic:**[Upgrading the driver using the OpenShift web console](csi_ug_upgrade_openshift.md)
-

@@ -13,5 +13,4 @@ IBM® block storage CSI driver 1.4.0 provided a range of enhancements and resolv
 |**CSI-1842**|Service|**Fixed:** When creating a new volume on a DS8000® Family storage system, if an error occurs during PersistentVolumeClaim \(PVC\) attachment, the attachment retry may fail.|
 |**CSI-645**|Low|**Fixed:** In some cases, during high-scale operations, such as pod creation with many PersistentVolumeClaims \(PVCs\), the "ibm-block-csi-controller-0" controller pod restarts.|
 
-**Parent topic:**[Change log](csi_rn_changelog.md)
 

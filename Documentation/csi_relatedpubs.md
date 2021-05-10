@@ -1,6 +1,6 @@
 # Related information and publications
 
-For more information about storage systems and orchestration platforms that are supported by IBM® block storage CSI driver, see the following resources.
+For more information about storage systems and orchestration platforms that are supported by IBM® block storage CSI driver, see the the resources listed in this section.
 
 IBM resources
 

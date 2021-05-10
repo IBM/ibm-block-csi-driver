@@ -8,5 +8,4 @@ The registered trademark Linux® is used pursuant to a sublicense from the Linux
 
 Red Hat®, and OpenShift® are trademarks or registered trademarks of Red Hat, Inc. or its subsidiaries in the United States and other countries.
 
-**Parent topic:**[Notices](storage_csi_notices.md)
 

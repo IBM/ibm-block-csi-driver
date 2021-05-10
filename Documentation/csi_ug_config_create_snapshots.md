@@ -43,5 +43,4 @@ When creating volume snapshots, be sure to follow all of the snapshot configurat
     -   **Ready to Use:** Indicates the volume snapshot is ready to use.
     -   **Restore Size:** Indicates the minimum volume size required when restoring (provisioning) a volume from this snapshot.
 
-**Parent topic:**[CSI driver configuration](csi_ug_config.md)
 

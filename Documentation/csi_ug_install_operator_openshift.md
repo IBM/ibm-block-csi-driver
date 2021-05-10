@@ -47,5 +47,3 @@ The Red Hat OpenShift Container Platform uses the following `SecurityContextCons
     Wait until the **Status** is _Running_.
 
 
-**Parent topic:**[Installing the operator and driver](csi_ug_install_operator.md)
-

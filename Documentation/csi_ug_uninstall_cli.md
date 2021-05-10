@@ -18,5 +18,3 @@ Perform the following steps in order to uninstall the CSI driver and operator fr
     ```
 
 
-**Parent topic:**[Uninstalling](csi_ug_uninstall.md)
-

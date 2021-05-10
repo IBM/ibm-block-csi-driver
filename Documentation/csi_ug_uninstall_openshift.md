@@ -22,5 +22,4 @@ Use this information to uninstall the IBM® CSI \(Container Storage Interface\) 
 6.  From the **Installed Operators** page, click on the **more** menu for the **Operator for IBM block storage CSI driver** and select **Uninstall Operator**.
 
 
-**Parent topic:**[Uninstalling](csi_ug_uninstall.md)
 
