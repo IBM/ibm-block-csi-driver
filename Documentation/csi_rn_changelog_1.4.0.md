@@ -1,4 +1,4 @@
-# 1.4.0 \(December 2020\)
+# 1.4.0 (December 2020)
 
 IBM® block storage CSI driver 1.4.0 provided a range of enhancements and resolved the following issues:
 

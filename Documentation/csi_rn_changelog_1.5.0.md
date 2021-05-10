@@ -1,4 +1,4 @@
-# 1.5.0 \(March 2021\)
+# 1.5.0 (March 2021)
 
 IBM® block storage CSI driver 1.5.0 provided a range of enhancements and resolved the following issues:
 

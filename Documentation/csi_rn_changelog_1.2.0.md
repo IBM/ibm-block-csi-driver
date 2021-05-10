@@ -1,4 +1,4 @@
-# 1.2.0 \(June 2020\)
+# 1.2.0 (June 2020)
 
 IBM® block storage CSI driver 1.2.0 provided a range of enhancements:
 

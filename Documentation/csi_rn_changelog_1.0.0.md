@@ -1,4 +1,4 @@
-# 1.0.0 \(November 2019\)
+# 1.0.0 (November 2019)
 
 IBM® block storage CSI driver 1.0.0 was the initial release of this new driver, supporting a range of functional CSI \(Container Storage Interface\) component features.
 
