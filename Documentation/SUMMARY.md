@@ -50,6 +50,6 @@
 	* [Miscellaneous troubleshooting](csi_ug_troubleshooting_misc.md)
 * [Notices](storage_csi_notices.md)
 	* [Trademarks](csi_trademarks.md)
-* [Publications and related information](Book_files\csi_block_storage_kc_pdfs.dita)
+* [Publications and related information](Book_files/csi_block_storage_kc_pdfs.dita)
 
 	
