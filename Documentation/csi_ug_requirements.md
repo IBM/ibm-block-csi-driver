@@ -1,6 +1,6 @@
 # Compatibility and requirements
 
-For the complete and up-to-date information about the compatibility and requirements for using the IBM® block storage CSI driver, refer to its latest release notes. The release notes detail supported operating system and container platform versions, as well as microcode versions of the supported storage systems. You can find the latest release notes on [IBM block storage CSI driver Knowledge Center website](https://www.ibm.com/support/knowledgecenter/SSRQ8T) (ibm.com®/support/knowledgecenter/SSRQ8T\).
+For the complete and up-to-date information about the compatibility and requirements for using the IBM® block storage CSI driver, refer to its latest release notes. The [release notes](csi_block_storage_kc_rn.md) detail supported operating system and container platform versions, as well as microcode versions of the supported storage systems.
 
 Before beginning the installation of the CSI \(Container Storage Interface\) driver, be sure to verify that you comply with the following prerequisites.
 
@@ -39,9 +39,8 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
 
 Download and save the following yaml file:
 
-    ```
     curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/master/deploy/99-ibm-attach.yaml > 99-ibm-attach.yaml
-    ```
+
 
 This file can be used for both Fibre Channel and iSCSI configurations. To support iSCSI, uncomment the last two lines in the file.
 
