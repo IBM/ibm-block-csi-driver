@@ -10,7 +10,7 @@ trademark="Notes" tmtype="reg">Notes</tm> content map</title>
 <topicref href="../csi_rn_supported_storage.md" format="markdown"/>
 <topicref href="../csi_rn_supported_os.md" format="markdown"/>
 <topicref href="../csi_rn_supported_orchestration.md" format="markdown"/>
-<topicref href="../csi_rn_changelog.md" navtitle="Change log">
+<topicref href="../csi_rn_changelog.md" navtitle="Change log" format="markdown">
 <topicref href="../csi_rn_changelog_1.6.0.md" navtitle="1.6.0 (June 2021)" format="markdown"/>
 <topicref href="../csi_rn_changelog_1.5.0.md" navtitle="1.5.0 (March 2021)" format="markdown"/>
 <topicref href="../csi_rn_changelog_1.4.0.md" navtitle="1.4.0 (December 2020)" format="markdown"/>

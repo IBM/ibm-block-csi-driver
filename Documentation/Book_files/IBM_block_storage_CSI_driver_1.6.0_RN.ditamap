@@ -35,13 +35,12 @@ driver</titleline><titleline>1.6.0</titleline></ibmbooklibrary>
 </ibmfrontmatter>
 <chapter format="markdown" href="../csi_overview.md" navtitle="Overview" scope="local"/>
 <chapter format="ditamap" href="csi_rn_content.ditamap"/>
-<chapter href="../csi_relatedpubs.md" navtitle="Related information and publications"
-format="markdown"/>
+<chapter href="../csi_relatedpubs.md" navtitle="Related information and publications" format="markdown"/>
 <chapter format="markdown" href="../csi_gettinginfohelpandservice.md"
 navtitle="Getting information, help, and service"/>
 <ibmbackmatter>
-<notices href="../storage_csi_notices.md" navtitle="Notices">
-<topicref href="../csi_trademarks.md" navtitle="Trademarks"/>
+<notices href="../storage_csi_notices.md" navtitle="Notices" format="markdown">
+<topicref href="../csi_trademarks.md" navtitle="Trademarks" format="markdown"/>
 </notices>
 </ibmbackmatter>
 </ibmbook><?Pub *0000003083?><?tm 1593075443111 2 Notes||IBM ?>
