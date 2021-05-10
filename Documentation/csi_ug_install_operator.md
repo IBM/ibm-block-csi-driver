@@ -6,6 +6,7 @@ The CSI operator and driver can be downloaded in one of the following ways:
 
 -   Using the OpenShift web console.
 -   Using CLIs.
+-   Using OperatorHub.io
 -   Using the IBM Cloud® Satellite web console. For more information, see [cloud.ibm.com/docs/satellite](https://cloud.ibm.com/docs/satellite).
 
 -   **[Installing the driver using the OpenShift web console](csi_ug_install_operator_openshift.md)**  
