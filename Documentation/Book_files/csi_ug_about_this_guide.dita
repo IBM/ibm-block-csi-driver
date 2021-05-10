@@ -8,8 +8,8 @@
 <navtitle>About this guide</navtitle>
 <searchtitle>About this guide</searchtitle>
 </titlealts>
-<shortdesc>This guide describes how to install, configure, and use the <ph
-conref="csi_reusabletext.dita#csi_reusabletext/csi_full"/>.</shortdesc><?Pub Caret 108?>
+<shortdesc>This guide describes how to install, configure, and use the IBM block storage CSI
+driver.</shortdesc><?Pub Caret 108?>
 <?tm 1335790251 1?>
 </topic>
 <?Pub *0000000607?>

@@ -5,9 +5,9 @@
 <?Pub Inc?>
 <topic id="editionnotice" xml:lang="en-us">
 <title>Edition notice</title>
-<shortdesc>Publication number: SC27-9590-09. This publication applies to version 1.5.0 of <ph
-conref="csi_reusabletext.dita#csi_reusabletext/csi_full"/> and to all subsequent releases and
-modifications until otherwise indicated in a newer publication.</shortdesc>
+<shortdesc>Publication number: SC27-9590-10. This publication applies to version 1.6.0 of IBM block
+storage CSI driver and to all subsequent releases and modifications until otherwise indicated in a
+newer publication.</shortdesc>
 <?Pub Caret 32?>
 <?tm 1378208468 1?>
 </topic>
