@@ -8,8 +8,8 @@ To view a PDF file, you need Adobe™ Reader. You can download it at no charge f
 
 |IBM block storage CSI driver publication|Description|PDF download link|
 |----------------------------------------|-----------|-----------------|
-|*Release notes*|This publication describes requirements, compatibility, change log, and known issues information for version 1.6.0.<br />First Edition \(June 2021\) for version 1.6.0.|![PDF icon](PDF_icon.jpg) [Download](PDFs/IBM_block_storage_CSI_driver_1.6.0_RN.pdf)|
-|*User guide*|This publication describes how to prepare for, install, configure, and use IBM block storage CSI driver.<br />Publication number: SC27-9590-07.|![PDF icon](PDF_icon.jpg)[Download](PDFs/IBM_block_storage_CSI_driver_1.6.0_UG.pdf)|
+|*Release notes*|This publication describes requirements, compatibility, change log, and known issues information for version 1.6.0.<br />First Edition \(June 2021\) for version 1.6.0.|![PDF icon](PDF_icon.jpg) [Download](pdf/IBM_block_storage_CSI_driver_1.6.0_RN.pdf)|
+|*User guide*|This publication describes how to prepare for, install, configure, and use IBM block storage CSI driver.<br />Publication number: SC27-9590-10.|![PDF icon](PDF_icon.jpg)[Download](pdf/IBM_block_storage_CSI_driver_1.6.0_UG.pdf)|
 
 {% ibm-block-csi-driver reusables.doc-resources %}
 
