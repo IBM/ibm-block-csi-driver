@@ -3,7 +3,7 @@
 <?Pub Sty _display FontColor="red"?><?Pub Inc?><ibmbook xml:lang="en-us">
 <ibmbooktitle>
 <ibmbooklibrary><titleline><tm trademark="IBM" tmtype="reg">IBM</tm> block storage CSI
-driver</titleline><titleline>1.5.0</titleline></ibmbooklibrary>
+driver</titleline><titleline>1.6.0</titleline></ibmbooklibrary>
 <ibmmainbooktitle><titleline>Release <tm trademark="Notes" tmtype="reg">Notes</tm></titleline></ibmmainbooktitle>
 </ibmbooktitle>
 <bookmeta>
@@ -33,13 +33,15 @@ driver</titleline><titleline>1.5.0</titleline></ibmbooklibrary>
 <toc outputclass="onecolumn" />
 </frontbooklists>
 </ibmfrontmatter>
-<chapter format="dita" href="csi_rn_overview.dita" navtitle="Overview" scope="local" />
+<chapter format="markdown" href="../csi_overview.md" navtitle="Overview" scope="local"/>
 <chapter format="ditamap" href="csi_rn_content.ditamap"/>
-<chapter href="csi_relatedpubs.dita" navtitle="Related information and publications" format="dita" />
-<chapter format="dita" href="csi_gettinginfohelpandservice.dita" navtitle="Getting information, help, and service" />
+<chapter href="../csi_relatedpubs.md" navtitle="Related information and publications"
+format="markdown"/>
+<chapter format="markdown" href="../csi_gettinginfohelpandservice.md"
+navtitle="Getting information, help, and service"/>
 <ibmbackmatter>
-<notices href="storage_csi_notices.dita" navtitle="Notices">
-<topicref href="csi_trademarks.dita" navtitle="Trademarks"/>
+<notices href="../storage_csi_notices.md" navtitle="Notices">
+<topicref href="../csi_trademarks.md" navtitle="Trademarks"/>
 </notices>
 </ibmbackmatter>
 </ibmbook><?Pub *0000003083?><?tm 1593075443111 2 Notes||IBM ?>
