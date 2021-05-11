@@ -54,13 +54,13 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
 
 3. If needed, enable support for volume snapshots \(FlashCopy® function\) on your Kubernetes cluster.
 
- For more information and instructions, see the Kubernetes blog post, [Kubernetes 1.17 Feature: Kubernetes Volume Snapshot Moves to Beta](https://kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/) (kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/\).
+  For more information and instructions, see the Kubernetes blog post, [Kubernetes 1.17 Feature: Kubernetes Volume Snapshot Moves to Beta](https://kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/) (kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/\).
 
- Install both the Snapshot CRDs and the Common Snapshot Controller once per cluster.
+  Install both the Snapshot CRDs and the Common Snapshot Controller once per cluster.
 
- The instructions and relevant yaml files to enable volume snapshots can be found at: [https://github.com/kubernetes-csi/external-snapshotter\#usage](https://github.com/kubernetes-csi/external-snapshotter#usage)
+  The instructions and relevant yaml files to enable volume snapshots can be found at: [https://github.com/kubernetes-csi/external-snapshotter\#usage](https://github.com/kubernetes-csi/external-snapshotter#usage)
 
-4.  Configure storage system connectivity.
+4. Configure storage system connectivity.
 
     1.  Define the host of each Kubernetes node on the relevant storage systems with the valid WWPN \(for Fibre Channel\) or IQN \(for iSCSI\) of the node.
 
