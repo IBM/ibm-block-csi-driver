@@ -13,7 +13,7 @@ The following are examples of different types of secret names that can be given 
 |Storage system name|Secret name|
 |-------------------|-----------|
 |IBM FlashSystem® A9000<br />IBM FlashSystem A9000R|a9000-array1|
-|IBM Spectrum Virtualize Family including IBM SAN Volume Controller and IBM FlashSystem family members built with IBM Spectrum Virtualize \(including FlashSystem 5xxx, 7200, 9100, 9200, 9200R\)|storwize-array1|
+|IBM Spectrum Virtualize Family including IBM SAN Volume Controller and<br />IBM FlashSystem family members built with IBM Spectrum Virtualize<br />(including FlashSystem 5xxx, 7200, 9100, 9200, 9200R\)|storwize-array1|
 |IBM DS8000® Family products|DS8000-array1|
 
 **Note:** This procedure is applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.
