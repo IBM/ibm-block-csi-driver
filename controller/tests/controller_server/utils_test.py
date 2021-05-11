@@ -51,52 +51,50 @@ class TestUtils(unittest.TestCase):
         self._test_validate_secrets_validation_errors(secrets)
 
     def test_validate_secrets_with_config(self):
-        secrets = {"config": {"u1": {"username": user, "password": password, "management_address": array}}}
+        secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array}}
+                                 ).replace("\'", "\"")}
         utils.validate_secrets(secrets)
 
     def test_validate_secrets_with_config_invalid_seret(self):
-        secrets = {"config": {"u1": {"username": user, "management_address": array}}}
+        secrets = {"config": str({"u1": {"username": user, "management_address": array}}).replace("\'", "\"")}
         self._test_validate_secrets_validation_errors(secrets)
 
     def _test_validate_secrets_with_config_valid_uid(self, uid):
-        secrets = {"config": {uid: {"username": user, "password": password, "management_address": array}}}
+        secrets = {"config": str({uid: {"username": user, "password": password, "management_address": array}}
+                                 ).replace("\'", "\"")}
         utils.validate_secrets(secrets)
 
     def test_validate_secrets_with_config_valid_uid(self):
         self._test_validate_secrets_with_config_valid_uid("u i_d.")
         self._test_validate_secrets_with_config_valid_uid("a" * 90)
 
-    def _test_validate_secrets_with_config_invalid_uid(self, uid):
-        secrets = {"config": {uid: {"username": user, "password": password, "management_address": array}}}
-        self._test_validate_secrets_validation_errors(secrets)
-
-    def test_validate_secrets_with_config_invalid_uid(self):
-        self._test_validate_secrets_with_config_invalid_uid("u-1")
-        self._test_validate_secrets_with_config_invalid_uid("u:1")
-        self._test_validate_secrets_with_config_invalid_uid("u1+")
-        self._test_validate_secrets_with_config_invalid_uid("u1*")
-        self._test_validate_secrets_with_config_invalid_uid("u-1(")
-        self._test_validate_secrets_with_config_invalid_uid("u/1")
-        self._test_validate_secrets_with_config_invalid_uid("u=1")
-        self._test_validate_secrets_with_config_invalid_uid(" ")
-        self._test_validate_secrets_with_config_invalid_uid("a" * 91)
-
     def test_validate_secrets_with_config_and_topologies(self):
-        secrets = {"config": {"u1": {"username": user, "password": password, "management_address": array,
-                                     "supported_topologies": {"topology.kubernetes.io/test": "zone1",
-                                                              "topology.block.csi.ibm.com/test": "dev1"}}}}
+        secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array,
+                                         "supported_topologies": [{"topology.kubernetes.io/test": "zone1",
+                                                                   "topology.block.csi.ibm.com/test": "dev1"}]}}
+                                 ).replace("\'", "\"")}
         utils.validate_secrets(secrets)
 
-    def _test_validate_secrets_with_config_invalid_topology(self, topology="topology.kubernetes.io/test", value="test"):
-        secrets = {"config": {"u1": {"username": user, "password": password, "management_address": array,
-                                     "supported_topologies": {topology: value}}}}
+    def _test_validate_secrets_with_config_invalid_parameters(self, uid="u1", topology="topology.kubernetes.io/test",
+                                                              value="test"):
+        secrets = {"config": str({uid: {"username": user, "password": password, "management_address": array,
+                                        "supported_topologies": [{topology: value}]}}).replace("\'", "\"")}
         self._test_validate_secrets_validation_errors(secrets)
 
-    def test_validate_secrets_with_config_invalid_topology(self):
-        self._test_validate_secrets_with_config_invalid_topology(topology="topology.kubernetes.io")
-        self._test_validate_secrets_with_config_invalid_topology(topology="topology.kubernetes/test")
-        self._test_validate_secrets_with_config_invalid_topology(topology="topology.kubernetes.io/t-est")
-        self._test_validate_secrets_with_config_invalid_topology(value="a*")
+    def test_validate_secrets_with_config_invalid_parameters(self):
+        self._test_validate_secrets_with_config_invalid_parameters(uid="u-1")
+        self._test_validate_secrets_with_config_invalid_parameters(uid="u:1")
+        self._test_validate_secrets_with_config_invalid_parameters(uid="u1+")
+        self._test_validate_secrets_with_config_invalid_parameters(uid="u1*")
+        self._test_validate_secrets_with_config_invalid_parameters(uid="u-1(")
+        self._test_validate_secrets_with_config_invalid_parameters(uid="u/1")
+        self._test_validate_secrets_with_config_invalid_parameters(uid="u=1")
+        self._test_validate_secrets_with_config_invalid_parameters(uid=" ")
+        self._test_validate_secrets_with_config_invalid_parameters(uid="a" * 91)
+        self._test_validate_secrets_with_config_invalid_parameters(topology="topology.kubernetes.io")
+        self._test_validate_secrets_with_config_invalid_parameters(topology="topology.kubernetes/test")
+        self._test_validate_secrets_with_config_invalid_parameters(topology="topology.kubernetes.io/t-est")
+        self._test_validate_secrets_with_config_invalid_parameters(value="a*")
 
     def test_validate_file_system_volume_capabilities(self):
         cap = Mock()

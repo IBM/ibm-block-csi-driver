@@ -103,9 +103,10 @@ def _get_object_id(obj, secret_uid=None):
 
 def _validate_secret_uid(uid):
     if not re.match(config.SECRET_VALIDATION_REGEX, uid.lstrip()):
-        raise ValidationException(messages.invalid_secret_message)
+        raise ValidationException(messages.invalid_uid_value_message.format(uid))
     if len(uid) > config.SECRET_UID_MAX_LENGTH:
-        raise ValidationException(messages.parameter_length_is_too_long.format(uid, config.SECRET_UID_MAX_LENGTH))
+        raise ValidationException(
+            messages.parameter_length_is_too_long.format("secret_uid", uid, config.SECRET_UID_MAX_LENGTH))
 
 
 def _validate_secret(secret):
@@ -115,21 +116,23 @@ def _validate_secret(secret):
         raise ValidationException(messages.invalid_secret_message)
 
 
-def _validate_topologies(topologies):
-    for topology_key, topology_value in topologies.items():
-        split_topology = topology_key.split(config.PARAMETERS_TOPOLOGY_DELIMITER)
-        if len(split_topology) != 2:
-            raise ValidationException(messages.invalid_topology_key_message.format(topology_key))
-        prefix, suffix = split_topology
-        if not re.match(config.SECRET_VALIDATION_REGEX, suffix.lstrip()):
-            raise ValidationException(messages.invalid_topology_key_message.format(suffix))
-        if prefix not in config.TOPOLOGY_PREFIXES:
-            raise ValidationException(messages.invalid_topology_key_message.format(prefix))
-        if not re.match(config.SECRET_VALIDATION_REGEX, topology_value.lstrip()):
-            raise ValidationException(messages.invalid_topology_VALUE_message.format(topology_value))
+def _validate_topologies(secret_topologies):
+    for topologies in secret_topologies:
+        for topology_key, topology_value in topologies.items():
+            split_topology = topology_key.split(config.PARAMETERS_TOPOLOGY_DELIMITER)
+            if len(split_topology) != 2:
+                raise ValidationException(messages.invalid_topology_key_message.format(topology_key))
+            prefix, suffix = split_topology
+            if not re.match(config.SECRET_VALIDATION_REGEX, suffix.lstrip()):
+                raise ValidationException(messages.invalid_topology_key_message.format(suffix))
+            if prefix not in config.TOPOLOGY_PREFIXES:
+                raise ValidationException(messages.invalid_topology_key_message.format(prefix))
+            if not re.match(config.SECRET_VALIDATION_REGEX, topology_value.lstrip()):
+                raise ValidationException(messages.invalid_topology_value_message.format(topology_value))
 
 
-def _validate_secret_config(secret_config):
+def _validate_secret_config(secret_config_string):
+    secret_config = json.loads(secret_config_string)
     for uid, secret_info in secret_config.items():
         _validate_secret_uid(uid)
         _validate_secret(secret_info)
@@ -222,10 +225,12 @@ def validate_create_volume_request(request):
 
     logger.debug("validating storage class parameters")
     if request.parameters:
-        if config.PARAMETERS_POOL not in request.parameters:
+        if (config.PARAMETERS_POOL not in request.parameters) and (
+                config.PARAMETERS_POOLS_BY_SYSTEM not in request.parameters):
             raise ValidationException(messages.pool_is_missing_message)
 
-        if not request.parameters[config.PARAMETERS_POOL]:
+        if not (request.parameters.get(config.PARAMETERS_POOL) or request.parameters.get(
+                config.PARAMETERS_POOLS_BY_SYSTEM)):
             raise ValidationException(messages.wrong_pool_passed_message)
     else:
         raise ValidationException(messages.params_are_missing_message)

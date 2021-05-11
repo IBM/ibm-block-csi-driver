@@ -5,7 +5,8 @@ ObjectIdError_message = "Wrong {0} id format : {1}"
 # validation error messages
 invalid_secret_message = "invalid secret was passed"
 invalid_topology_key_message = "invalid topology key was passed: {}"
-invalid_topology_VALUE_message = "invalid topology value was passed: {}"
+invalid_topology_value_message = "invalid topology value was passed: {}"
+invalid_uid_value_message = "invalid uid value was passed: {}"
 secret_missing_message = 'secret is missing'
 capabilities_not_set_message = "capabilities were not set"
 unsupported_fs_type_message = "unsupported fs_type : {}"
@@ -22,4 +23,4 @@ volume_id_wrong_format_message = 'volume id has wrong format'
 readonly_not_supported_message = 'readonly parameter is not supported'
 volume_source_id_is_missing = 'volume source {0} id is missing'
 snapshot_src_volume_id_is_missing = 'snapshot source volume id is missing'
-parameter_length_is_too_long = 'parameter: {} is too long, max length is: {}'
+parameter_length_is_too_long = '{} parameter: {} is too long, max length is: {}'

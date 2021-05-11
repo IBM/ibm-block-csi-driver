@@ -44,24 +44,52 @@ class AbstractControllerTest(unittest.TestCase):
         self.assertIn("name", context.details)
         self.assertEqual(res, self.get_create_object_response_method()())
 
-    def _test_create_object_with_wrong_secrets(self, storage_agent):
-        storage_agent.return_value = self.storage_agent
+    def _test_create_object_with_wrong_secret(self, secret, message="secret"):
         context = utils.FakeContext()
 
-        self.request.secrets = {"password": "pass", "management_address": "mg"}
+        self.request.secrets = secret
         self.get_create_object_method()(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "username is missing in secrets")
-        self.assertIn("secret", context.details)
+        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
+        self.assertIn(message, context.details)
 
-        self.request.secrets = {"username": "user", "management_address": "mg"}
-        self.get_create_object_method()(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "password is missing in secrets")
-        self.assertIn("secret", context.details)
+    def _test_create_object_with_wrong_secrets_config(self, message, uid="u1",
+                                                      topology_key="topology.kubernetes.io/test",
+                                                      topology_value="test"):
+        secrets = {"config": str({uid: {"username": "user", "password": "password", "management_address": "array",
+                                        "supported_topologies": [{topology_key: topology_value}]}}).replace("\'", "\"")}
+        self._test_create_object_with_wrong_secret(secrets, message=message)
 
-        self.request.secrets = {"username": "user", "password": "pass"}
-        self.get_create_object_method()(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT, "mgmt address is missing in secrets")
-        self.assertIn("secret", context.details)
+    def _test_create_object_with_secrets_config_invalid_uid(self, invalid_symbols):
+        for symbol in invalid_symbols:
+            self._test_create_object_with_wrong_secrets_config(message="uid", uid=symbol)
+
+    def _test_create_object_with_secrets_config_invalid_topology_key(self, topology_key):
+        self._test_create_object_with_wrong_secrets_config(message="topology key", topology_key=topology_key)
+
+    def _test_create_object_with_secret_config_invalid_topology_value(self, topology_value):
+        self._test_create_object_with_wrong_secrets_config(message="topology value", topology_value=topology_value)
+
+    def _test_create_object_with_secrets_config_invalid_parameters(self):
+        self._test_create_object_with_secrets_config_invalid_uid(invalid_symbols="-:+*/= ")
+        self._test_create_object_with_wrong_secrets_config(message="uid", uid="a" * 91)
+        self._test_create_object_with_secrets_config_invalid_topology_key(topology_key="topology.kubernetes.io")
+        self._test_create_object_with_secrets_config_invalid_topology_key(topology_key="topology.kubernetes/test")
+        self._test_create_object_with_secrets_config_invalid_topology_key(topology_key="topology.kubernetes.io/t-est")
+        self._test_create_object_with_secret_config_invalid_topology_value(topology_value="a*")
+
+    def _test_create_object_with_wrong_secrets(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+
+        secret = {"password": "pass", "management_address": "mg"}
+        self._test_create_object_with_wrong_secret(secret)
+
+        secret = {"username": "user", "management_address": "mg"}
+        self._test_create_object_with_wrong_secret(secret)
+
+        secret = {"username": "user", "password": "pass"}
+        self._test_create_object_with_wrong_secret(secret)
+
+        self._test_create_object_with_secrets_config_invalid_parameters()
 
         self.request.secrets = []
 
