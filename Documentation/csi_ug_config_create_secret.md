@@ -13,7 +13,6 @@ The `management_address` field can contain more than one address, with each valu
 
 {% deploy kubernetes.examples.demo-secret %}
 
-    ```
     kind: Secret
     apiVersion: v1
     metadata:
@@ -25,13 +24,12 @@ The `management_address` field can contain more than one address, with each valu
       username: demo-username                      # Array username
     data:
       password: ZGVtby1wYXNzd29yZA==               # base64 array password
-    ```
+    
 
 2.  Apply the secret using the following command:
 
-    ```
-    kubectl apply -f demo-secret.yaml
-    ```
+    `kubectl apply -f demo-secret.yaml`
+    
 
     The `secret/<NAME> created` message is emitted.
 
