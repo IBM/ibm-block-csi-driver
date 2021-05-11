@@ -24,7 +24,7 @@
 	* [Installing the operator and driver](csi_ug_install_operator.md)
 		* [Installing the driver using OpenShift web console](csi_ug_install_operator_openshift.md)
 		* [Installing the driver using CLIs](csi_ug_install_operator_github.md)
-		*[Installing the driver using OperatorHub.io](csi_ug_install_operator_operatorhub.md)
+		* [Installing the driver using OperatorHub.io](csi_ug_install_operator_operatorhub.md)
 	* [Uninstalling](csi_ug_uninstall.md)
 		* [Uninstalling the driver using the OpenShift web console](csi_ug_uninstall_openshift.md)
 		* [Uninstalling the driver using CLIs](csi_ug_uninstall_cli.md)
