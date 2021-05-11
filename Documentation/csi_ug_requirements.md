@@ -42,11 +42,11 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
     curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/master/deploy/99-ibm-attach.yaml > 99-ibm-attach.yaml
 
 
- This file can be used for both Fibre Channel and iSCSI configurations. To support iSCSI, uncomment the last two lines in the file.
+  This file can be used for both Fibre Channel and iSCSI configurations. To support iSCSI, uncomment the last two lines in the file.
 
- **Important:** The 99-ibm-attach.yaml configuration file overrides any files that already exist on your system. Only use this file if the files mentioned are not already created.<br />If one or more have been created, edit this yaml file, as necessary.
+  **Important:** The 99-ibm-attach.yaml configuration file overrides any files that already exist on your system. Only use this file if the files mentioned are not already created.<br />If one or more have been created, edit this yaml file, as necessary.
 
- Apply the yaml file.
+  Apply the yaml file.
 
     
     oc apply -f 99-ibm-attach.yaml
