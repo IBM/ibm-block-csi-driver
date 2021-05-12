@@ -14,7 +14,7 @@ Use the following procedure to create and apply the storage classes.
 
     _**<a name="spaceefficiency">Table:</a>** `SpaceEfficiency` parameter definitions per storage system type_
 
-    <table>
+    <table><thead><b><a name="spaceefficiency">Table:</a></b>  <i><code>SpaceEfficiency</code> parameter definitions per storage system type</i></thead>
       <tbody>
         <tr>
           <th>Storage system type</th>
@@ -26,7 +26,7 @@ Use the following procedure to create and apply the storage classes.
         </tr>
         <tr>
           <td>IBM Spectrum® Virtualize Family</td>
-          <td><ul><li>`thick` (default value)</li><li>`thin`</li><li>`compressed`</li><li>`deduplicated`</li>**Note:** If not specified, the default value is `thick`.</td>
+          <td><ul><li><code>thick</code> (default value)</li><li>`thin`</li><li>`compressed`</li><li>`deduplicated`</li>**Note:** If not specified, the default value is `thick`.</td>
         </tr>
       </tbody>
      </table> 
