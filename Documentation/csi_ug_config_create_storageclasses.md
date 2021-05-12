@@ -14,6 +14,24 @@ Use the following procedure to create and apply the storage classes.
 
     _**<a name="spaceefficiency">Table:</a>** `SpaceEfficiency` parameter definitions per storage system type_
 
+    <table>
+      <tbody>
+        <tr>
+          <th>Storage system type</th>
+          <th>SpaceEfficiency parameter options</th>
+         </tr>
+         <tr>
+          <td>IBM FlashSystem® A9000 and A9000R</td>
+          <td>Always includes deduplication and compression. No need to specify during configuration.</td>
+        </tr>
+        <tr>
+          <td>IBM Spectrum® Virtualize Family</td>
+          <td><ul><li>`thick` (default value)</li><li>`thin`</li><li>`compressed`</li><li>`deduplicated`</li>**Note:** If not specified, the default value is `thick`.</td>
+        </tr>
+      </tbody>
+     </table> 
+
+
       | Storage system type | SpaceEfficiency parameter options |
       | --------------- | -------------------- |
       |IBM FlashSystem® A9000 and A9000R|Always includes deduplication and compression. No need to specify during configuration.|
