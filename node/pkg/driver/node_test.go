@@ -1134,6 +1134,8 @@ func TestNodeGetCapabilities(t *testing.T) {
 }
 
 func TestNodeGetInfo(t *testing.T) {
+	topologySegments := map[string]string{"topology.kubernetes.io/zone": "testZone"}
+
 	testCases := []struct {
 		name              string
 		return_iqn        string
@@ -1213,6 +1215,8 @@ func TestNodeGetInfo(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fake_nodeutils := mocks.NewMockNodeUtilsInterface(mockCtrl)
+			d := newTestNodeService(fake_nodeutils, nil, nil)
+			fake_nodeutils.EXPECT().GetTopologyLabels(context.TODO(), d.Hostname).Return(topologySegments, nil)
 			fake_nodeutils.EXPECT().IsPathExists(driver.FCPath).Return(tc.fcExists)
 			if tc.fcExists {
 				fake_nodeutils.EXPECT().ParseFCPorts().Return(tc.return_fcs, tc.return_fc_err)
@@ -1227,9 +1231,9 @@ func TestNodeGetInfo(t *testing.T) {
 			if (tc.iscsiExists || tc.fcExists) && tc.return_fc_err == nil {
 				fake_nodeutils.EXPECT().GenerateNodeID("test-host", tc.return_fcs, tc.return_iqn).Return(tc.expNodeId, tc.return_nodeId_err)
 			}
-			d := newTestNodeService(fake_nodeutils, nil, nil)
 
-			expResponse := &csi.NodeGetInfoResponse{NodeId: tc.expNodeId}
+			expTopology := &csi.Topology{Segments: topologySegments}
+			expResponse := &csi.NodeGetInfoResponse{NodeId: tc.expNodeId, AccessibleTopology: expTopology}
 
 			res, err := d.NodeGetInfo(context.TODO(), req)
 			if tc.expErr != nil {
@@ -1241,7 +1245,7 @@ func TestNodeGetInfo(t *testing.T) {
 					}
 				}
 			} else {
-				if res.NodeId != expResponse.NodeId {
+				if !reflect.DeepEqual(res, expResponse) {
 					t.Fatalf("Expected res : {%v}, and got {%v}", expResponse, res)
 				}
 			}

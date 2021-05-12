@@ -17,6 +17,7 @@
 package driver
 
 import (
+	"context"
 	"fmt"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"io/ioutil"
@@ -26,9 +27,17 @@ import (
 	"strconv"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"k8s.io/utils/mount"
+)
+
+var (
+	getOpts = metav1.GetOptions{}
 )
 
 const (
@@ -68,6 +77,7 @@ type NodeUtilsInterface interface {
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
 	GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN string) (string, error)
+	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
 }
 
 type NodeUtils struct {
@@ -409,4 +419,30 @@ func (n NodeUtils) GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN str
 	}
 
 	return nodeId.String(), nil
+}
+
+func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error) {
+	kubeConfig, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	client, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	node, err := client.CoreV1().Nodes().Get(ctx, nodeName, getOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	topologyLabels := make(map[string]string)
+	for k, v := range node.Labels {
+		if strings.HasPrefix(k, "topology.kubernetes.io") ||
+			strings.HasPrefix(k, "topology.block.csi.ibm.com") {
+			topologyLabels[k] = v
+		}
+	}
+	return topologyLabels, nil
 }
