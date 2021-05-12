@@ -12,13 +12,11 @@ Use the following procedure to create and apply the storage classes.
 
     Use the `SpaceEfficiency` parameters for each storage system, as defined in [the following table](#spaceefficiency). These values are not case-sensitive.
 
-    _**<a name="spaceefficiency">Table:</a>** `SpaceEfficiency` parameter definitions per storage system type_
-
-    <table><thead><b><a name="spaceefficiency">Table:</a></b>  <i><code>SpaceEfficiency</code> parameter definitions per storage system type</i></thead>
+    <table><thead><b><a name="spaceefficiency">Table:</a></b>  <i> <code>SpaceEfficiency</code> parameter definitions per storage system type</i></thead>
       <tbody>
         <tr>
-          <th>Storage system type</th>
-          <th>SpaceEfficiency parameter options</th>
+          <th><b>Storage system type</b></th>
+          <th><b>SpaceEfficiency parameter options</b></th>
          </tr>
          <tr>
           <td>IBM FlashSystem® A9000 and A9000R</td>
@@ -26,7 +24,23 @@ Use the following procedure to create and apply the storage classes.
         </tr>
         <tr>
           <td>IBM Spectrum® Virtualize Family</td>
-          <td><ul><li><code>thick</code> (default value)</li><li>`thin`</li><li>`compressed`</li><li>`deduplicated`</li>**Note:** If not specified, the default value is `thick`.</td>
+          <td>
+            <ul>
+            <li><code>thick</code> (default value)</li>
+            <li><code>thin</code></li><li><code>compressed</code></li>
+            <li><code>deduplicated</code></li>
+            <b>Note:</b> If not specified, the default value is <code>thick</code>.</li>
+            </ul></td>
+        </tr>
+        <tr>
+          <td>IBM® DS8000® Family</td>
+          <td>
+            <ul>
+            <li><code>none</code> (default value)</li>
+            <li><code>thin</code></li>
+            <b>Note:</b> If not specified, the default value is none.</li>
+            </ul>
+            </td>
         </tr>
       </tbody>
      </table> 
