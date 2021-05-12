@@ -38,5 +38,5 @@ IBM resources
 External resources
 -   [Persistent volumes on Kubernetes](https://kubernetes.io/docs/concepts/storage/volumes/) \(kubernetes.io/docs/concepts/storage/volumes\)
 -   [Kubernetes Documentation](https://kubernetes.io/docs/home/) \(kubernetes.io/docs/home/\)
--   [Kubernetes Blog](https://kubernetes.io/blog/) \(kubernetes.io/blog\)
+-   [Kubernetes Blog](https://kubernetes.io/blog/) \(kubernetes.io/blog)
 

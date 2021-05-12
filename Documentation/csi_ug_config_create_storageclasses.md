@@ -46,44 +46,36 @@ Use the following procedure to create and apply the storage classes.
      </table> 
 
 
-      | Storage system type | SpaceEfficiency parameter options |
-      | --------------- | -------------------- |
-      |IBM FlashSystem® A9000 and A9000R|Always includes deduplication and compression. No need to specify during configuration.|
-      |IBM Spectrum® Virtualize Family| <ul><li>`thick` (default value)</li><li>`thin`</li><li>`compressed`</li><li>`deduplicated`</li>**Note:** If not specified, the default value is `thick`.|
-      |IBM® DS8000® Family|    -   `none` \(default value\)<br /> - `thin`<br /><br />**Note:** If not specified, the default value is none.|
+    - The IBM DS8000 Family `pool` value is the pool ID and not the pool name as is used in other storage systems.
+    - The `pool` value should be a name of an existing pool on the storage system.
+    - The `allowVolumeExpansion` parameter is optional but is necessary for using volume expansion. The default value is _false_.
 
-      -   The IBM DS8000 Family `pool` value is the pool ID and not the pool name as is used in other storage systems.
-      -   The `pool` value should be a name of an existing pool on the storage system.
-      -   The `allowVolumeExpansion` parameter is optional but is necessary for using volume expansion. The default value is _false_.
+    **Note:** Be sure to set the value to true to allow volume expansion.
 
-          **Note:** Be sure to set the value to true to allow volume expansion.
+    - The `csi.storage.k8s.io/fstype` parameter is optional. The values that are allowed are _ext4_ or _xfs_. The default value is _ext4_.
+    - The `volume_name_prefix` parameter is optional.
 
-      -   The `csi.storage.k8s.io/fstype` parameter is optional. The values that are allowed are _ext4_ or _xfs_. The default value is _ext4_.
-      -   The `volume_name_prefix` parameter is optional.
+    **Note:** For IBM DS8000 Family, the maximum prefix length is five characters.The maximum prefix length for other systems is 20 characters.<br />For storage systems using Spectrum Virtualize, the `CSI_` prefix is added as default if not specified by the user.
 
-          **Note:** For IBM DS8000 Family, the maximum prefix length is five characters.The maximum prefix length for other systems is 20 characters.<br />For storage systems using Spectrum Virtualize, the `CSI_` prefix is added as default if not specified by the user.
-
-          ```screen
-          kind: StorageClass
-          apiVersion: storage.k8s.io/v1
-          metadata:
-            name: demo-storageclass
-          provisioner: block.csi.ibm.com
-          parameters:
-            SpaceEfficiency: deduplicated   # Optional.
-            pool: demo-pool
-          
-            csi.storage.k8s.io/provisioner-secret-name: demo-secret
-            csi.storage.k8s.io/provisioner-secret-namespace: default
-            csi.storage.k8s.io/controller-publish-secret-name: demo-secret
-            csi.storage.k8s.io/controller-publish-secret-namespace: default
-            csi.storage.k8s.io/controller-expand-secret-name: demo-secret
-            csi.storage.k8s.io/controller-expand-secret-namespace: default
-          
-            csi.storage.k8s.io/fstype: xfs   # Optional. Values ext4\xfs. The default is ext4.
-            volume_name_prefix: demoPVC      # Optional.
-          allowVolumeExpansion: true
-          ```
+        kind: StorageClass
+        apiVersion: storage.k8s.io/v1
+        metadata:
+          name: demo-storageclass
+        provisioner: block.csi.ibm.com
+        parameters:
+          SpaceEfficiency: deduplicated   # Optional.
+          pool: demo-pool
+        
+          csi.storage.k8s.io/provisioner-secret-name: demo-secret
+          csi.storage.k8s.io/provisioner-secret-namespace: default
+          csi.storage.k8s.io/controller-publish-secret-name: demo-secret
+          csi.storage.k8s.io/controller-publish-secret-namespace: default
+          csi.storage.k8s.io/controller-expand-secret-name: demo-secret
+          csi.storage.k8s.io/controller-expand-secret-namespace: default
+        
+          csi.storage.k8s.io/fstype: xfs   # Optional. Values ext4\xfs. The default is ext4.
+          volume_name_prefix: demoPVC      # Optional.
+        allowVolumeExpansion: true
 
 2.  Apply the storage class.
 
