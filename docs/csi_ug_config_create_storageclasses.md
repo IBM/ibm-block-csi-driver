@@ -12,16 +12,16 @@ Use the following procedure to create and apply the storage classes.
 
     Use the `SpaceEfficiency` parameters for each storage system, as defined in [the following table](#spaceefficiency). These values are not case-sensitive.
 
-    |Storage system|SpaceEfficiency parameter options|
-    |--------------|-----------------|
-    |IBM FlashSystem™ A9000 and A9000R|Always includes deduplication and compression. No need to specify during configuration.|
-    |IBM Spectrum Virtualize™ Family|7.8 and above, 8.x|
-    |IBM DS8000® Family|8.x and higher with same API interface|
+|Storage system|SpaceEfficiency parameter options|
+|--------------|-----------------|
+|IBM FlashSystem™ A9000 and A9000R|Always includes deduplication and compression. No need to specify during configuration.|
+|IBM Spectrum Virtualize™ Family|7.8 and above, 8.x|
+|IBM DS8000® Family|8.x and higher with same API interface|
 
-    |Operating system|Architecture|
-    |----------------|------------|
-    |Red Hat® Entrprise Linux® \(RHEL\) 7.x|x86, IBM Z®|
-    |Red Hat Enterprise Linux CoreOS \(RHCOS\)|x86, IBM Z®<sup>2</sup>, IBM Power Systems™<sup>1</sup>|
+|Operating system|Architecture|
+|----------------|------------|
+|Red Hat® Entrprise Linux® \(RHEL\) 7.x|x86, IBM Z®|
+|Red Hat Enterprise Linux CoreOS \(RHCOS\)|x86, IBM Z®<sup>2</sup>, IBM Power Systems™<sup>1</sup>|
 
     <table><thead><b><a name="spaceefficiency">Table:</a></b>  <i> <code>SpaceEfficiency</code> parameter definitions per storage system type</i></thead>
       <tbody>
