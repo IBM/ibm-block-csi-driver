@@ -18,10 +18,10 @@ Use the following procedure to create and apply the storage classes.
     |IBM Spectrum Virtualize™ Family|7.8 and above, 8.x|
     |IBM DS8000® Family|8.x and higher with same API interface|
 
-|Operating system|Architecture|
-|----------------|------------|
-|Red Hat® Entrprise Linux® \(RHEL\) 7.x|x86, IBM Z®|
-|Red Hat Enterprise Linux CoreOS \(RHCOS\)|x86, IBM Z®<sup>2</sup>, IBM Power Systems™<sup>1</sup>|
+    |Operating system|Architecture|
+    |----------------|------------|
+    |Red Hat® Entrprise Linux® \(RHEL\) 7.x|x86, IBM Z®|
+    |Red Hat Enterprise Linux CoreOS \(RHCOS\)|x86, IBM Z®<sup>2</sup>, IBM Power Systems™<sup>1</sup>|
 
     <table><thead><b><a name="spaceefficiency">Table:</a></b>  <i> <code>SpaceEfficiency</code> parameter definitions per storage system type</i></thead>
       <tbody>
