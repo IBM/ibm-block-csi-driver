@@ -19,9 +19,9 @@ The `persistentvolumeclaim/<filename> created` message is emitted.
 Use the following sections, according to your PVC needs:
 
 - [Creating PVC for volume with file system](#PVC-fs)
-- [Creating PVC for raw block volume](#Creating-PVC-for-raw-block-volume)
-- [Creating PVC from volume snapshot](#Creating-PVC-from-volume-snapshot)
-- [Creating a volume clone from an existing PVC](#Creating-a-volume-clone-from-an-existing-PVC)
+- [Creating PVC for raw block volume](#PVC-block)
+- [Creating PVC from volume snapshot](#PVC-vol-snapshot)
+- [Creating a volume clone from an existing PVC](#vol-clone-PVC)
 
 ## <a name=PVC-fs></a>Creating PVC for volume with Filesystem
 
@@ -44,7 +44,7 @@ spec:
   storageClassName: demo-storageclass
 </pre>
 
-## Creating PVC for raw block volume
+## <a name=PVC-block></a>Creating PVC for raw block volume
 
 Create a PVC yaml file, similar to the following demo-pvc-raw-block.yaml file, with the size of 1 Gb.
 
@@ -63,7 +63,7 @@ spec:
   storageClassName: demo-storageclass
 </pre>
 
-## Creating PVC from volume snapshot
+## <a name=PVC-vol-snapshot></a>Creating PVC from volume snapshot
 
 To create a PVC from an existing volume snapshot, create a PVC yaml file, similar to the following demo-pvc-from-snapshot.yaml file, with the size of 1 Gb.
 
@@ -86,7 +86,7 @@ spec:
     apiGroup: snapshot.storage.k8s.io</b>
 </pre>
 
-## Creating a volume clone from an existing PVC
+## <a name=vol-clone-PVC></a>Creating a volume clone from an existing PVC
 
 **Note:** IBM FlashCopy® function is referred to as the more generic volume snapshots and cloning within this documentation set. Not all supported products use the FlashCopy function terminology.
 
