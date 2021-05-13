@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//IBM//DTD DITA IBM Topic//EN"
+ "ibm-topic.dtd">
+<?Pub Sty _display FontColor="red"?>
+<topic id="specialnotice" xml:lang="en-us">
+<title>Note</title>
+<body>
+<p>Before using this document and the product it supports, read the information in <xref
+href="../storage_csi_notices.md" scope="local"/>.</p><?Pub Caret 81?>
+</body>
+</topic>
+<?Pub *0000000495?>

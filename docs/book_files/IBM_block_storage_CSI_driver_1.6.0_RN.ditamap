@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE ibmbook PUBLIC "-//IBM//DTD DITA IBM BookMap//EN" "..\..\dita\dtd\ibmbook.dtd">
+<?Pub Sty _display FontColor="red"?><?Pub Inc?><ibmbook xml:lang="en-us">
+<ibmbooktitle>
+<ibmbooklibrary><titleline><tm trademark="IBM" tmtype="reg">IBM</tm> block storage CSI
+driver</titleline><titleline>1.6.0</titleline></ibmbooklibrary>
+<ibmmainbooktitle><titleline>Release <tm trademark="Notes" tmtype="reg">Notes</tm></titleline></ibmmainbooktitle>
+</ibmbooktitle>
+<bookmeta>
+<publisherinformation>
+<organization>International Business Machines</organization>
+<printlocation>Printed in USA</printlocation>
+</publisherinformation>
+<audience />
+<prodinfo>
+<prodname>IBM block storage CSI driver</prodname></prodinfo>
+<bookid>
+<edition>First</edition>
+</bookid>
+<bookrights>
+<copyrfirst>
+<year>2021</year>
+</copyrfirst>
+<bookowner>
+<organization>IBM</organization>
+</bookowner>
+</bookrights>
+</bookmeta>
+<?Pub Caret -2?>
+<ibmfrontmatter>
+<editionnotices href="csi_rn_edition_notice.dita" navtitle="Edition notice" />
+<frontbooklists>
+<toc outputclass="onecolumn" />
+</frontbooklists>
+</ibmfrontmatter>
+<chapter format="markdown" href="../csi_overview.md" navtitle="Overview" scope="local"/>
+<chapter format="ditamap" href="csi_rn_content.ditamap"/>
+<chapter href="../csi_relatedpubs.md" navtitle="Related information and publications" format="markdown"/>
+<chapter format="markdown" href="../csi_gettinginfohelpandservice.md"
+navtitle="Getting information, help, and service"/>
+<ibmbackmatter>
+<notices href="../storage_csi_notices.md" navtitle="Notices" format="markdown">
+<topicref href="../csi_trademarks.md" navtitle="Trademarks" format="markdown"/>
+</notices>
+</ibmbackmatter>
+</ibmbook><?Pub *0000003083?><?tm 1593075443111 2 Notes||IBM ?>

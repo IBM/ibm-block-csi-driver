@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE ibmbook PUBLIC "-//IBM//DTD DITA IBM BookMap//EN"
+ "..\..\dita\dtd\ibmbook.dtd">
+<?Pub Sty _display FontColor="red"?>
+<ibmbook xml:lang="en-us">
+<chapter format="markdown" href="../csi_overview.md" scope="local"/>
+<chapter href="../csi_ug_install_intro.md" format="markdown">
+<topicref href="../csi_ug_requirements.md" format="markdown"/>
+<topicref href="../csi_ug_install_operator.md" format="markdown">
+<topicref href="../csi_ug_install_operator_openshift.md" navtitle="Installing the operator with OpenShift" format="markdown"/>
+<topicref href="../csi_ug_install_operator_github.md" navtitle="Installing the operator from GitHub" format="markdown"/>
+<topicref href="../csi_ug_install_operator_operatorhub.md" navtitle="installing the operator from OperatorHub.io" format="markdown"/>
+</topicref>
+<topicref href="../csi_ug_uninstall.md" navtitle="Uninstalling" format="markdown">
+<topicref href="../csi_ug_uninstall_openshift.md" navtitle="Uninstalling via CLI commands" format="markdown"/>
+<topicref href="../csi_ug_uninstall_cli.md" navtitle="Uninstalling via CLI commands" format="markdown"/>
+</topicref>
+<topicref href="../csi_ug_upgrade.md" navtitle="Upgrading the CSI driver" format="markdown">
+<topicref href="../csi_ug_upgrade_openshift.md" navtitle="Installing the driver using the OpenShift web console" format="markdown"/>
+<topicref href="../csi_ug_upgrade_ocp_manual.md" navtitle="Installing the driver using the OpenShift web console" format="markdown"/>
+</topicref>
+</chapter>
+<chapter href="../csi_ug_config.md" format="markdown">
+<topicref href="../csi_ug_config_create_secret.md" format="markdown"/>
+<topicref href="../csi_ug_config_create_storageclasses.md" format="markdown"/>
+<topicref href="../csi_ug_config_create_pvc.md" navtitle="Creating PersistentVolumeClaim (PVC)" format="markdown"/>
+<topicref href="../csi_ug_config_create_statefulset.md"
+navtitle="Creating PersistentVolumeClaim (PVC)" format="markdown"/>
+<topicref href="../csi_ug_config_enable_snapshot.md" navtitle="Creating a VolumeSnapshotClass" format="markdown"/>
+<topicref href="../csi_ug_config_create_snapshots.md" navtitle="Creating Volume Snapshots" format="markdown"/>
+<topicref href="../csi_ug_config_expandvol.md" navtitle="Expanding a volume" product="volexpand" format="markdown"/>
+<topicref href="../csi_ug_config_advanced.md" navtitle="Advanced configuration" format="markdown">
+<topicref href="../csi_ug_config_advanced_importvol.md" navtitle="Advanced configuration" format="markdown"/>
+</topicref>
+</chapter>
+<chapter href="../csi_ug_using.md" format="markdown" navtitle="Using IBM block storage CSI driver">
+<topicref href="../csi_ug_using_sample.md"
+navtitle="Sample configurations for running a stateful container" format="markdown"/>
+</chapter>
+<chapter href="../csi_ug_troubleshooting.md" format="markdown">
+<topicref href="../csi_ug_troubleshooting_logs.md" navtitle="Detecting errors" format="markdown"/>
+<topicref href="../csi_ug_troubleshooting_detect_errors.md" navtitle="Detecting errors" format="markdown"/>
+<topicref href="../csi_ug_troubleshooting_node_crash.md"
+navtitle="Recovering a pod volume attachment from a crashed Kubernetes node" format="markdown"/>
+<topicref href="../csi_ug_troubleshooting_misc.md" navtitle="Detecting errors" format="markdown"/>
+</chapter>
+</ibmbook>
+<?Pub *0000016021?>

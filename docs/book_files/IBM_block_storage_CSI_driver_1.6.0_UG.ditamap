@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE ibmbook PUBLIC "-//IBM//DTD DITA IBM BookMap//EN"
+ "..\..\dita\dtd\ibmbook.dtd">
+<?Pub Sty _display FontColor="red"?>
+<?Pub Inc?>
+<ibmbook xml:lang="en-us">
+<ibmbooktitle>
+<ibmbooklibrary><titleline>IBM block storage CSI
+driver</titleline><titleline>1.6.0</titleline></ibmbooklibrary>
+<ibmmainbooktitle><titleline>User Guide</titleline></ibmmainbooktitle>
+</ibmbooktitle>
+<bookmeta>
+<publisherinformation>
+<organization>International Business Machines</organization>
+<printlocation>Printed in USA</printlocation>
+</publisherinformation>
+<audience/>
+<prodinfo><prodname/>
+</prodinfo>
+<bookid>
+<booknumber>SC27-9590-10</booknumber>
+</bookid>
+<bookrights>
+<copyrfirst>
+<year>2021</year>
+</copyrfirst>
+<bookowner>
+<organization>IBM</organization>
+</bookowner>
+</bookrights>
+</bookmeta>
+<?Pub Caret 106?>
+<ibmfrontmatter>
+<specialnotices href="csi_ug_special_notice.dita" navtitle="Note" type="topic"/>
+<editionnotices href="csi_ug_edition_notice.dita" navtitle="Edition notice" type="topic"/>
+<frontbooklists>
+<toc outputclass="onecolumn"/>
+<figurelist outputclass="onecolumn"/>
+<tablelist outputclass="onecolumn"/>
+</frontbooklists>
+<preface href="csi_ug_about_this_guide.dita" navtitle="About this guide">
+<topicref href="csi_ug_audience.dita" navtitle="Who should use this guide"/>
+<topicref href="csi_bookconventions.dita" navtitle="Conventions used in this guide"/>
+<topicref href="csi_relatedpubs.dita" navtitle="Related information and publications"/>
+<topicref href="csi_gettinginfohelpandservice.dita"
+navtitle="Getting information, help, and service"/>
+<topicref href="csi_howtoorderpubs.dita" navtitle="IBM Publications Center" type="reference"/>
+<topicref href="sending_comments.dita"
+navtitle="Feedback"/>
+</preface>
+</ibmfrontmatter>
+<chapter format="ditamap" href="csi_ug_content.ditamap"/>
+<ibmbackmatter>
+<notices href="../storage_csi_notices.md" navtitle="Notices" format="markdown">
+<topicref href="../csi_trademarks.md" navtitle="Trademarks" format="markdown"/>
+</notices>
+<backbooklists/>
+</ibmbackmatter>
+</ibmbook>
+<?Pub *0000002452?>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//IBM//DTD DITA IBM Topic//EN"
+ "ibm-topic.dtd">
+<?Pub Sty _display FontColor="red"?>
+<?Pub Inc?>
+<topic id="editionnotice" xml:lang="en-us">
+<title>Edition notice</title>
+<shortdesc>Publication number: SC27-9590-10. This publication applies to version 1.6.0 of IBM block
+storage CSI driver and to all subsequent releases and modifications until otherwise indicated in a
+newer publication.</shortdesc>
+<?Pub Caret 32?>
+<?tm 1378208468 1?>
+</topic>
+<?Pub *0000000622?>

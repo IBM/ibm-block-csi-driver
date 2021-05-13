@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//IBM//DTD DITA IBM Reference//EN" "ibm-reference.dtd">
+<reference id="sec_kc_pdfs.dita" xml:lang="en-us">
+<title>Publications and related information</title>
+<shortdesc>The following Portable Document Format (PDF) publications and related online information
+sources are available for the <tm tmtype="reg" trademark="IBM">IBM</tm> block storage CSI
+driver.</shortdesc>
+<refbody>
+<section>
+<p>To view a PDF file, you need <tm tmtype="tm" trademark="Adobe">Adobe</tm> Reader. You can
+download it at no charge from the <xref format="html" href="http://get.adobe.com/reader/" scope="external"><tm tmtype="tm" trademark="Adobe">Adobe</tm> website</xref>.</p>
+</section>
+<section>
+<title>Publications</title>
+<table>
+<tgroup cols="3">
+<colspec colname="col1" colwidth="24*" />
+<colspec colname="col2" colwidth="35*" />
+<colspec colname="COLSPEC0" colwidth="27*" />
+<thead>
+<row valign="bottom">
+<entry colname="col1">
+<tm tmtype="reg" trademark="IBM">IBM</tm> block storage CSI driver publication</entry>
+<entry colname="col2">Description</entry>
+<entry colname="COLSPEC0">PDF download link</entry>
+</row>
+</thead>
+<tbody>
+<row>
+<entry colname="col1"><cite>Release notes</cite></entry>
+<entry colname="col2">This publication describes requirements, compatibility, change log, and known
+issues information for version 1.6.0.<p>First Edition (June 2021) for version 1.6.0.</p></entry>
+<entry colname="COLSPEC0">
+<xref format="pdf" href="pdf/IBM_block_storage_CSI_driver_1.6.0_RN.pdf" scope="external"
+>Download</xref></entry>
+</row>
+<row>
+<entry colname="col1"><cite>User guide</cite></entry>
+<entry colname="col2">This publication describes how to prepare for, install, configure, and use <tm
+tmtype="reg" trademark="IBM">IBM</tm> block storage CSI driver.<p>Publication number:
+SC27-9590-10.</p></entry>
+<entry colname="COLSPEC0">
+<xref format="pdf" href="pdf/IBM_block_storage_CSI_driver_1.6.0_UG.pdf" scope="external"
+>Download</xref>
+</entry>
+</row>
+</tbody>
+</tgroup>
+<?Pub Caret -2?>
+</table>
+</section>
+<section>
+<title>Related information</title>
+<p>For more information storage systems and orchestration platforms that are supported by <tm
+tmtype="reg" trademark="IBM">IBM</tm> block storage CSI driver., see the following resources.<dl
+conref="csi_relatedpubs.dita#csi_ug_relatedpubs/related_pubs"><dlentry/></dl></p>
+</section>
+</refbody>
+
+</reference><?Pub *0000002830?><?tm 1607946158097 8 IBM||Adobe ?>

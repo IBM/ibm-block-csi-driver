@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//IBM//DTD DITA IBM Topic//EN" "ibm-topic.dtd">
+<?Pub Sty _display FontColor="red"?><?Pub Inc?><topic id="csi_ug_relatedpubs" xml:lang="en-us">
+<title>Related information and publications</title>
+<titlealts>
+<navtitle>Related information and publications</navtitle>
+<searchtitle>Related information and publications</searchtitle>
+</titlealts>
+<body>
+<dl id="related_pubs">
+<dlentry>
+<dt>IBM resources</dt>
+<dd>
+<ul>
+<li><xref href="https://www.ibm.com/docs/en/sanvolumecontroller" scope="external" format="html"><tm
+tmtype="reg" trademark="IBM">IBM</tm> SAN Volume Controller documentation</xref><!--<ph audience="pdfonly"> (ibm.com/docs/en/sanvolumecontroller)</ph>-->
+<?Pub Caret -2?>
+</li>
+<li><xref href="https://www.ibm.com/docs/en/spectrum-scale)" scope="external" format="html"><tm
+tmtype="reg" trademark="IBM">IBM</tm> Spectrum Scale
+documentation</xref><!--<ph audience="pdfonly"> (ibm.com/docs/en/spectrum-scale)</ph>-->
+</li>
+<li><xref href="http://www.ibm.com/docs/en/flashsystem-5x00" scope="external" format="html">IBM
+FlashSystem® 5xxx family, Storwize® V5100 and V5000E
+documentation</xref><!--<ph audience="pdfonly"> (ibm.com/docs/en/flashsystem-5x00)</ph>-->
+</li>
+<li><xref href="https://www.ibm.com/docs/en/flashsystem-7x00" scope="external" format="html"><tm
+tmtype="reg" trademark="IBM">IBM</tm>
+<tm trademark="FlashSystem" tmtype="tm" tmclass="IGNORE">FlashSystem</tm> 7200 and <tm
+trademark="Storwize" tmtype="reg">Storwize</tm> V7000
+documentation</xref><!--<ph audience="pdfonly"> (ibm.com/docs/en/flashsystem-7x00)</ph>-->
+</li>
+<li><xref href="https://www.ibm.com/docs/en/spectrumvirtualsoftw" format="html" scope="external"><tm
+tmtype="reg" trademark="IBM">IBM</tm> Spectrum Virtualize as Software Only
+documentation</xref><!--<ph audience="pdfonly"> (ibm.com/docs/en/spectrumvirtualsoftw)</ph>-->
+</li>
+<li><xref href="https://www.ibm.com/docs/en/flashsystem-9x00" format="html" scope="external"><tm
+tmtype="reg" trademark="IBM FlashSystem">IBM FlashSystem</tm> 9200 and 9100
+documentation</xref><!--<ph audience="pdfonly"> (ibm.com/docs/en/flashsystem-9x00)</ph>-->
+</li>
+<li><xref href="https://www.ibm.com/docs/en/flashsystem-a9000" scope="external" format="html"><tm
+tmtype="reg" trademark="IBM FlashSystem">IBM FlashSystem</tm> A9000
+documentation</xref><!--<ph audience="pdfonly"> (ibm.com/docs/en/flashsystem-a9000)</ph>-->
+</li>
+<li><xref href="https://www.ibm.com/docs/en/flashsystem-a9000r" scope="external" format="html"><tm
+tmtype="reg" trademark="IBM FlashSystem">IBM FlashSystem</tm> A9000R
+documentation</xref><!--<ph audience="pdfonly"> (ibm.com/docs/en/flashsystem-a9000r)</ph>-->
+</li>
+<li><xref href="https://www.ibm.com/docs/en/ds8880" scope="external" format="html"><tm
+trademark="IBM" tmtype="reg">IBM</tm> DS8880 documentation</xref>
+<!--<ph audience="pdfonly">(ibm.com/docs/en/ds8880)</ph>--></li>
+<li><xref href="https://www.ibm.com/docs/en/ds8900" scope="external" format="html"><tm
+trademark="IBM" tmtype="reg">IBM</tm> DS8900 documentation</xref>
+<!--<ph audience="pdfonly">(ibm.com/docs/en/ds8900)</ph>--></li>
+<li><xref href="https://www-01.ibm.com/common/ssi/cgi-bin/ssialias?htmlfid=TSW03569USEN&amp;"
+scope="external" format="html"><tm trademark="IBM Spectrum" tmtype="reg">IBM Spectrum</tm> Access
+for <tm trademark="IBM Cloud" tmtype="reg">IBM Cloud</tm> Private Blueprint</xref>
+<!--<ph audience="pdfonly">(<tm trademark="ibm.com" tmtype="reg" tmclass="IGNORE">ibm.com</tm>/downloads/cas/KK5PGD8E)</ph>--><p>Used
+as the FlexVolume driver-based solution for <tm trademark="OpenShift" tmtype="reg">OpenShift</tm>
+3.11, using <xref href="https://www.ibm.com/docs/en/stgenablercontainers" format="html"
+scope="external"><tm trademark="IBM" tmtype="reg">IBM</tm> Storage Enabler for Containers</xref>
+<!--<ph audience="pdfonly">(ibm.com/docs/en/stgenablercontainers)</ph>--></p></li>
+<li><xref href="http://www.redbooks.ibm.com/abstracts/redp5565.html?Open" format="html"
+scope="external"><tm trademark="IBM" tmtype="reg">IBM</tm> Storage for <tm trademark="Red Hat"
+tmtype="reg">Red Hat</tm>
+<tm trademark="OpenShift" tmtype="reg">OpenShift</tm> Blueprint</xref>
+<!--<ph audience="pdfonly">(http://www.redbooks.ibm.com/abstracts/redp5565.html?Open)</ph>--></li>
+<li><xref href="http://www.redbooks.ibm.com/abstracts/redp5613.html?Open" format="html"
+scope="external">Using the IBM Block Storage CSI driver in a Red Hat OpenShift environment</xref>
+<!--<ph audience="pdfonly">(http://www.redbooks.ibm.com/abstracts/redp5613.html?Open)</ph>--></li>
+</ul>
+</dd>
+</dlentry>
+<dlentry>
+<dt>External resources</dt>
+<dd>
+<ul>
+<li><xref format="html" href="https://kubernetes.io/docs/concepts/storage/volumes/" scope="external"
+>Persistent volumes on Kubernetes</xref>
+<!--<ph audience="pdfonly"> (kubernetes.io/docs/concepts/storage/volumes)</ph>--></li>
+<li><xref format="html" href="https://kubernetes.io/docs/home/" scope="external">Kubernetes
+Documentation</xref>
+<!--<ph audience="pdfonly"> (kubernetes.io/docs/home/)</ph>--></li>
+<li><xref href="https://kubernetes.io/blog/" format="html" scope="external">Kubernetes Blog</xref>
+<!--<ph audience="pdfonly"> (kubernetes.io//blog)</ph>--></li>
+</ul>
+</dd>
+</dlentry>
+</dl>
+</body>
+</topic><?Pub *0000004746?><?tm 1607942089931 42 ibm.com||Storwize||Red Hat||OpenShift||IBM Spectrum||IBM FlashSystem||IBM Cloud||IBM||FlashSystem ?>
