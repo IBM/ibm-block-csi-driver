@@ -12,7 +12,7 @@ Update the capabilities, pools, and array secrets, as needed.
 
 Use the `SpaceEfficiency` parameters for each storage system, as defined in [the following table](#spaceefficiency). These values are not case-sensitive.
 
-_**Table:** `SpaceEfficiency` parameter definitions per storage system type_
+_<a name=spaceefficiency>**Table:**</a> `SpaceEfficiency` parameter definitions per storage system type_
 
 |Storage system type|SpaceEfficiency parameter options|
 |-------------------|---------------------------------|
