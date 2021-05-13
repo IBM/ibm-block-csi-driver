@@ -12,11 +12,11 @@ Use the following procedure to create and apply the storage classes.
 
     Use the `SpaceEfficiency` parameters for each storage system, as defined in [the following table](#spaceefficiency). These values are not case-sensitive.
 
-|Storage system|SpaceEfficiency parameter options|
-|--------------|-----------------|
-|IBM FlashSystem™ A9000 and A9000R|Always includes deduplication and compression. No need to specify during configuration.|
-|IBM Spectrum Virtualize™ Family|7.8 and above, 8.x|
-|IBM DS8000® Family|8.x and higher with same API interface|
+|Storage system type|SpaceEfficiency parameter options|
+|-------------------|---------------------------------|
+|IBM FlashSystem® A9000 and A9000R|Always includes deduplication and compression. No need to specify during configuration.|
+|IBM Spectrum® Virtualize Family|- thick (default value) <br />- thin<br />- compressed<br />- deduplicated<br />**Note:** If not specified, the default value is thick.|
+|IBM® DS8000® Family| - none (default value)<br />- thin<br />**Note:** If not specified, the default value is none.|
 
 |Operating system|Architecture|
 |----------------|------------|
