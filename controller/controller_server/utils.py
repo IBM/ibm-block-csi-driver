@@ -1,4 +1,4 @@
-import json
+import ast
 from hashlib import sha256
 import re
 
@@ -31,11 +31,13 @@ def get_volume_topologies(request):
     if request.HasField(config.REQUEST_ACCESSIBILITY_REQUIREMENTS_FIELD):
         accessibility_requirements = request.accessibility_requirements
         if accessibility_requirements.preferred:
-            return accessibility_requirements.preferred[0].segments
+            topologies = accessibility_requirements.preferred[0].segments
+            logger.info("Chosen volume topologies: {}".format(topologies))
+            return topologies
 
 
 def get_secret_by_topologies(secret_config_string, node_topologies):
-    secret_config = json.loads(secret_config_string)
+    secret_config = ast.literal_eval(secret_config_string)
     for secret_uid, secret_info in secret_config.items():
         secret_topologies = secret_info.get(config.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
         if _is_topology_match(secret_topologies, node_topologies):
@@ -43,23 +45,22 @@ def get_secret_by_topologies(secret_config_string, node_topologies):
 
 
 def get_secret_by_uid(secret_config_string, secret_uid):
-    secret_config = json.loads(secret_config_string)
+    secret_config = ast.literal_eval(secret_config_string)
     return secret_config.get(secret_uid)
 
 
 def get_pool_by_uid(pools, uid):
-    pools = json.loads(pools)
+    pools = ast.literal_eval(pools)
     return pools.get(uid)
 
 
-def _get_secret_from_request(secrets, topologies=None, secret_uid=None):
+def _get_secret_from_secrets(secrets, topologies=None, secret_uid=None):
     secret_config = secrets.get(config.SECRET_CONFIG_PARAMETER)
     secret = secrets
     if secret_config:
         if secret_uid:
             secret = get_secret_by_uid(secret_config_string=secret_config, secret_uid=secret_uid)
         elif topologies:
-            logger.info("Chosen volume topologies: {}".format(topologies))
             secret, secret_uid = get_secret_by_topologies(secret_config_string=secret_config,
                                                           node_topologies=topologies)
         else:
@@ -75,12 +76,12 @@ def _get_array_connection_info_from_secret(secret):
 
 
 def get_array_connection_info_from_secrets(secrets, topologies=None, secret_uid=None):
-    secret, secret_uid = _get_secret_from_request(secrets, topologies, secret_uid)
+    secret, secret_uid = _get_secret_from_secrets(secrets, topologies, secret_uid)
     user, password, array_addresses = _get_array_connection_info_from_secret(secret)
     return user, password, array_addresses, secret_uid
 
 
-def get_pool_from_parameters(parameters, secret_uid):
+def get_pool_from_parameters(parameters, secret_uid=None):
     pools_by_system = parameters.get(config.PARAMETERS_POOLS_BY_SYSTEM)
     if pools_by_system and secret_uid:
         return get_pool_by_uid(pools=pools_by_system, uid=secret_uid)
@@ -132,7 +133,7 @@ def _validate_topologies(secret_topologies):
 
 
 def _validate_secret_config(secret_config_string):
-    secret_config = json.loads(secret_config_string)
+    secret_config = ast.literal_eval(secret_config_string)
     for uid, secret_info in secret_config.items():
         _validate_secret_uid(uid)
         _validate_secret(secret_info)
@@ -225,13 +226,11 @@ def validate_create_volume_request(request):
 
     logger.debug("validating storage class parameters")
     if request.parameters:
-        if (config.PARAMETERS_POOL not in request.parameters) and (
-                config.PARAMETERS_POOLS_BY_SYSTEM not in request.parameters):
+        if config.PARAMETERS_POOL in request.parameters:
+            if not request.parameters[config.PARAMETERS_POOL]:
+                raise ValidationException(messages.wrong_pool_passed_message)
+        elif config.PARAMETERS_POOLS_BY_SYSTEM not in request.parameters:
             raise ValidationException(messages.pool_is_missing_message)
-
-        if not (request.parameters.get(config.PARAMETERS_POOL) or request.parameters.get(
-                config.PARAMETERS_POOLS_BY_SYSTEM)):
-            raise ValidationException(messages.wrong_pool_passed_message)
     else:
         raise ValidationException(messages.params_are_missing_message)
 

@@ -18,6 +18,7 @@ from controller.common.node_info import NodeIdInfo
 from controller.common.utils import set_current_thread_name
 from controller.controller_server.errors import ObjectIdError, ValidationException
 from controller.controller_server.exception_handler import handle_common_exceptions, handle_exception
+from controller.controller_server import messages as controller_messages
 from controller.csi_general import csi_pb2
 from controller.csi_general import csi_pb2_grpc
 
@@ -72,9 +73,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 topologies=topologies)
             logger.info("chosen array_addresses: {}".format(array_addresses))
             pool = utils.get_pool_from_parameters(parameters=request.parameters, secret_uid=secret_uid)
-
+            if not pool:
+                raise ValidationException(controller_messages.wrong_pool_passed_message)
             space_efficiency = request.parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
-
             # TODO : pass multiple array addresses
             array_type = detect_array_type(array_addresses)
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
@@ -406,6 +407,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 secrets,
                 secret_uid=secret_uid)
             pool = utils.get_pool_from_parameters(parameters=request.parameters, secret_uid=secret_uid)
+
             array_type = detect_array_type(array_addresses)
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)

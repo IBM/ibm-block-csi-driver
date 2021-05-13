@@ -56,26 +56,14 @@ class AbstractControllerTest(unittest.TestCase):
                                                       topology_key="topology.kubernetes.io/test",
                                                       topology_value="test"):
         secrets = {"config": str({uid: {"username": "user", "password": "password", "management_address": "array",
-                                        "supported_topologies": [{topology_key: topology_value}]}}).replace("\'", "\"")}
+                                        "supported_topologies": [{topology_key: topology_value}]}})}
         self._test_create_object_with_wrong_secret(secrets, message=message)
 
-    def _test_create_object_with_secrets_config_invalid_uid(self, invalid_symbols):
-        for symbol in invalid_symbols:
-            self._test_create_object_with_wrong_secrets_config(message="uid", uid=symbol)
-
-    def _test_create_object_with_secrets_config_invalid_topology_key(self, topology_key):
-        self._test_create_object_with_wrong_secrets_config(message="topology key", topology_key=topology_key)
-
-    def _test_create_object_with_secret_config_invalid_topology_value(self, topology_value):
-        self._test_create_object_with_wrong_secrets_config(message="topology value", topology_value=topology_value)
-
     def _test_create_object_with_secrets_config_invalid_parameters(self):
-        self._test_create_object_with_secrets_config_invalid_uid(invalid_symbols="-:+*/= ")
-        self._test_create_object_with_wrong_secrets_config(message="uid", uid="a" * 91)
-        self._test_create_object_with_secrets_config_invalid_topology_key(topology_key="topology.kubernetes.io")
-        self._test_create_object_with_secrets_config_invalid_topology_key(topology_key="topology.kubernetes/test")
-        self._test_create_object_with_secrets_config_invalid_topology_key(topology_key="topology.kubernetes.io/t-est")
-        self._test_create_object_with_secret_config_invalid_topology_value(topology_value="a*")
+        self._test_create_object_with_wrong_secrets_config(message="uid", uid="u-")
+        self._test_create_object_with_wrong_secrets_config(message="topology key",
+                                                           topology_key="topology.kubernetes.io")
+        self._test_create_object_with_wrong_secrets_config(message="topology value", topology_value="a*")
 
     def _test_create_object_with_wrong_secrets(self, storage_agent):
         storage_agent.return_value = self.storage_agent
@@ -146,21 +134,41 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
     def _prepare_create_snapshot_mocks(self, storage_agent):
         storage_agent.return_value = self.storage_agent
-
+        self.mediator.get_snapshot = Mock()
+        self.mediator.get_snapshot.return_value = None
         self.mediator.create_snapshot = Mock()
         self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, snapshot_name, "wwn",
                                                                                                snapshot_volume_name,
                                                                                                "xiv")
 
-    @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_snapshot_succeeds(self, storage_agent):
+    def _test_create_snapshot_succeeds(self, storage_agent, expected_pool=None):
         self._prepare_create_snapshot_mocks(storage_agent)
 
         self.servicer.CreateSnapshot(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.get_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name, pool=None)
-        self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name, None)
+        self.mediator.get_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name, pool=expected_pool)
+        self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name, expected_pool)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_snapshot_succeeds(self, storage_agent):
+        self._test_create_snapshot_succeeds(storage_agent)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_snapshot_with_pool_parameter_succeeds(self, storage_agent):
+        self.request.parameters = {"pool": pool}
+        self._test_create_snapshot_succeeds(storage_agent, expected_pool=pool)
+
+    def _test_create_snapshot_with_pools_by_system_parameter(self, storage_agent, uid, expected_pool):
+        self.request.source_volume_id = "{}:{}:{}".format("A9000", uid, snapshot_volume_wwn)
+        self.request.parameters = {"pools_by_system": str({"u1": pool, "u2": "other_pool"})}
+        self._test_create_snapshot_succeeds(storage_agent, expected_pool=expected_pool)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_snapshot_with_pools_by_system_parameter_succeeds(self, storage_agent):
+        self._test_create_snapshot_with_pools_by_system_parameter(storage_agent, "u1", pool)
+        self._test_create_snapshot_with_pools_by_system_parameter(storage_agent, "u2", "other_pool")
+        self._test_create_snapshot_with_pools_by_system_parameter(storage_agent, None, None)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_belongs_to_wrong_volume(self, storage_agent):
@@ -292,6 +300,12 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
 
 class TestControllerServerDeleteSnapshot(AbstractControllerTest):
+    def get_create_object_method(self):
+        return self.servicer.DeleteSnapshot
+
+    def get_create_object_response_method(self):
+        return csi_pb2.DeleteSnapshotResponse
+
     def setUp(self):
         super().setUp()
         self.fqdn = "fqdn"
@@ -317,22 +331,7 @@ class TestControllerServerDeleteSnapshot(AbstractControllerTest):
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_delete_snapshot_with_wrong_secrets(self, storage_agent):
-        storage_agent.return_value = self.storage_agent
-
-        self.request.secrets = {"password": "pass", "management_address": "mg"}
-        self.servicer.DeleteSnapshot(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT, "username is missing in secrets")
-        self.assertIn("secret", self.context.details)
-
-        self.request.secrets = {"username": "user", "management_address": "mg"}
-        self.servicer.DeleteSnapshot(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT, "password is missing in secrets")
-        self.assertIn("secret", self.context.details)
-
-        self.request.secrets = {"username": "user", "password": "pass"}
-        self.servicer.DeleteSnapshot(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT, "mgmt address is missing in secrets")
-        self.assertIn("secret", self.context.details)
+        self._test_create_object_with_wrong_secrets(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_delete_snapshot_with_array_connection_exception(self, storage_agent):
@@ -410,16 +409,31 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.create_volume = Mock()
         self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "volume", "wwn", "xiv")
 
-    @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_volume_succeeds(self, storage_agent):
+    def _test_create_volume_succeeds(self, storage_agent, expected_pool=pool):
         self._prepare_create_volume_mocks(storage_agent)
 
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.get_volume.assert_called_once_with(volume_name, pool=pool)
-        self.mediator.create_volume.assert_called_once_with(volume_name, 10, None, pool)
+        self.mediator.get_volume.assert_called_once_with(volume_name, pool=expected_pool)
+        self.mediator.create_volume.assert_called_once_with(volume_name, 10, None, expected_pool)
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_succeeds(self, storage_agent):
+        self._test_create_volume_succeeds(storage_agent)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_with_topologies_succeeds(self, storage_agent):
+        self.request.secrets = {
+            "config": str({"u2": {"username": "user", "password": "password", "management_address": "array",
+                                  "supported_topologies": [
+                                      {"topology.kubernetes.io/test": "topology_value"}]}})}
+        self.request.accessibility_requirements.preferred = [
+            ProtoBufMock(segments={"topology.kubernetes.io/test": "topology_value",
+                                   "topology.kubernetes.io/test2": "topology_value2"})]
+        self.request.parameters = {"pools_by_system": str({"u1": pool, "u2": "other_pool"})}
+        self._test_create_volume_succeeds(storage_agent, expected_pool="other_pool")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_space_efficiency_succeeds(self, storage_agent):
@@ -449,6 +463,13 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_wrong_secrets(self, a_enter):
         self._test_create_object_with_wrong_secrets(a_enter)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_no_pool(self, storage_agent):
+        self._prepare_create_volume_mocks(storage_agent)
+        self.request.parameters = {"pools_by_system": str({"u1": pool, "u2": "other_pool"})}
+        self.servicer.CreateVolume(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_wrong_parameters(self, storage_agent):
@@ -828,6 +849,12 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
 class TestControllerServerDeleteVolume(AbstractControllerTest):
 
+    def get_create_object_method(self):
+        return self.servicer.DeleteVolume
+
+    def get_create_object_response_method(self):
+        return csi_pb2.DeleteVolumeResponse
+
     def setUp(self):
         super().setUp()
         self.fqdn = "fqdn"
@@ -851,22 +878,7 @@ class TestControllerServerDeleteVolume(AbstractControllerTest):
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_delete_volume_with_wrong_secrets(self, storage_agent):
-        storage_agent.return_value = self.storage_agent
-
-        self.request.secrets = {"password": "pass", "management_address": "mg"}
-        self.servicer.DeleteVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT, "username is missing in secrets")
-        self.assertIn("secret", self.context.details)
-
-        self.request.secrets = {"username": "user", "management_address": "mg"}
-        self.servicer.DeleteVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT, "password is missing in secrets")
-        self.assertIn("secret", self.context.details)
-
-        self.request.secrets = {"username": "user", "password": "pass"}
-        self.servicer.DeleteVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT, "mgmt address is missing in secrets")
-        self.assertIn("secret", self.context.details)
+        self._test_create_object_with_wrong_secrets(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_delete_volume_invalid_volume_id(self, storage_agent):
@@ -920,9 +932,16 @@ class TestControllerServerDeleteVolume(AbstractControllerTest):
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
 
-class TestControllerServerPublishVolume(unittest.TestCase):
+class TestControllerServerPublishVolume(AbstractControllerTest):
+
+    def get_create_object_method(self):
+        return self.servicer.ControllerPublishVolume
+
+    def get_create_object_response_method(self):
+        return csi_pb2.ControllerPublishVolumeResponse
 
     def setUp(self):
+        super().setUp()
         self.fqdn = "fqdn"
         self.hostname = "hostname"
         self.mediator = XIVArrayMediator("user", "password", self.fqdn)
@@ -981,6 +1000,10 @@ class TestControllerServerPublishVolume(unittest.TestCase):
 
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertIn("msg", self.context.details)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_publish_volume_with_wrong_secrets(self, storage_agent):
+        self._test_create_object_with_wrong_secrets(storage_agent)
 
     def test_publish_volume_wrong_volume_id(self):
         self.request.volume_id = "some-wrong-id-format"
@@ -1226,9 +1249,16 @@ class TestControllerServerPublishVolume(unittest.TestCase):
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
 
 
-class TestControllerServerUnPublishVolume(unittest.TestCase):
+class TestControllerServerUnPublishVolume(AbstractControllerTest):
+
+    def get_create_object_method(self):
+        return self.servicer.ControllerUnpublishVolume
+
+    def get_create_object_response_method(self):
+        return csi_pb2.ControllerUnpublishVolumeResponse
 
     def setUp(self):
+        super().setUp()
         self.fqdn = "fqdn"
         self.hostname = "hostname"
         self.mediator = XIVArrayMediator("user", "password", self.fqdn)
@@ -1270,6 +1300,10 @@ class TestControllerServerUnPublishVolume(unittest.TestCase):
 
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertIn("msg", self.context.details)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_unpublish_volume_with_wrong_secrets(self, storage_agent):
+        self._test_create_object_with_wrong_secrets(storage_agent)
 
     def test_unpublish_volume_wrong_volume_id(self):
         self.request.volume_id = "some-wrong-id-format"

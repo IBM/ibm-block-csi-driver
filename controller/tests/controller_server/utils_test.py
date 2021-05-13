@@ -52,16 +52,16 @@ class TestUtils(unittest.TestCase):
 
     def test_validate_secrets_with_config(self):
         secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array}}
-                                 ).replace("\'", "\"")}
+                                 )}
         utils.validate_secrets(secrets)
 
-    def test_validate_secrets_with_config_invalid_seret(self):
-        secrets = {"config": str({"u1": {"username": user, "management_address": array}}).replace("\'", "\"")}
+    def test_validate_secrets_with_config_invalid_secret(self):
+        secrets = {"config": str({"u1": {"username": user, "management_address": array}})}
         self._test_validate_secrets_validation_errors(secrets)
 
     def _test_validate_secrets_with_config_valid_uid(self, uid):
         secrets = {"config": str({uid: {"username": user, "password": password, "management_address": array}}
-                                 ).replace("\'", "\"")}
+                                 )}
         utils.validate_secrets(secrets)
 
     def test_validate_secrets_with_config_valid_uid(self):
@@ -72,13 +72,13 @@ class TestUtils(unittest.TestCase):
         secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array,
                                          "supported_topologies": [{"topology.kubernetes.io/test": "zone1",
                                                                    "topology.block.csi.ibm.com/test": "dev1"}]}}
-                                 ).replace("\'", "\"")}
+                                 )}
         utils.validate_secrets(secrets)
 
     def _test_validate_secrets_with_config_invalid_parameters(self, uid="u1", topology="topology.kubernetes.io/test",
                                                               value="test"):
         secrets = {"config": str({uid: {"username": user, "password": password, "management_address": array,
-                                        "supported_topologies": [{topology: value}]}}).replace("\'", "\"")}
+                                        "supported_topologies": [{topology: value}]}})}
         self._test_validate_secrets_validation_errors(secrets)
 
     def test_validate_secrets_with_config_invalid_parameters(self):
@@ -95,6 +95,44 @@ class TestUtils(unittest.TestCase):
         self._test_validate_secrets_with_config_invalid_parameters(topology="topology.kubernetes/test")
         self._test_validate_secrets_with_config_invalid_parameters(topology="topology.kubernetes.io/t-est")
         self._test_validate_secrets_with_config_invalid_parameters(value="a*")
+
+    def _test_get_pool_from_parameters(self, parameters, pool_expected=pool, uid=None):
+        pool_respond = utils.get_pool_from_parameters(parameters, uid)
+        self.assertEqual(pool_respond, pool_expected)
+
+    def _test_get_array_connection_info_from_secrets(self, secrets, topologies=None, secret_uid=None):
+        response = utils.get_array_connection_info_from_secrets(
+            secrets=secrets,
+            topologies=topologies,
+            secret_uid=secret_uid)
+        user_response, password_response, array_addresses_response, secret_uid_response = response
+        self.assertEqual(user_response, user)
+        self.assertEqual(password_response, password)
+        self.assertEqual(array_addresses_response[0], array)
+        if topologies or secret_uid:
+            self.assertIsNotNone(secret_uid_response)
+        else:
+            self.assertIsNone(secret_uid_response)
+
+    def test_get_array_connection_info_from_secrets(self):
+        secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array}})}
+        self._test_get_array_connection_info_from_secrets(secrets, secret_uid="u1")
+        secrets = {"username": user, "password": password, "management_address": array}
+        self._test_get_array_connection_info_from_secrets(secrets)
+        secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array,
+                                         "supported_topologies": [{"topology.kubernetes.io/test": "zone1"}]}})}
+        self._test_get_array_connection_info_from_secrets(secrets,
+                                                          topologies={"topology.kubernetes.io/test": "zone1",
+                                                                      "topology.block.csi.ibm.com/test": "dev1"})
+
+    def test_get_pool_from_parameters(self):
+        parameters = {"pool": pool}
+        self._test_get_pool_from_parameters(parameters)
+        self._test_get_pool_from_parameters(parameters, uid="u1")
+        parameters = {"pools_by_system": str({"u1": pool, "u2": "other_pool"})}
+        self._test_get_pool_from_parameters(parameters, uid="u1")
+        self._test_get_pool_from_parameters(parameters, pool_expected="other_pool", uid="u2")
+        self._test_get_pool_from_parameters(parameters, pool_expected=None)
 
     def test_validate_file_system_volume_capabilities(self):
         cap = Mock()
