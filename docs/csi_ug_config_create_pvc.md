@@ -18,12 +18,12 @@ The `persistentvolumeclaim/<filename> created` message is emitted.
 
 Use the following sections, according to your PVC needs:
 
--   [Creating PVC for volume with file system](#Creating-PVC-for-volume-with-Filesystem)
--   [Creating PVC for raw block volume](#Creating-PVC-for-raw-block-volume)
--   [Creating PVC from volume snapshot](#Creating-PVC-from-volume-snapshot)
--   [Creating a volume clone from an existing PVC](#Creating-a-volume-clone-from-an-existing-PVC)
+- [Creating PVC for volume with file system](#PVC-fs)
+- [Creating PVC for raw block volume](#Creating-PVC-for-raw-block-volume)
+- [Creating PVC from volume snapshot](#Creating-PVC-from-volume-snapshot)
+- [Creating a volume clone from an existing PVC](#Creating-a-volume-clone-from-an-existing-PVC)
 
-## Creating PVC for volume with Filesystem
+## <a name=PVC-fs></a>Creating PVC for volume with Filesystem
 
 Create a PVC yaml file, similar to the following demo-pvc-file-system.yaml file, with the size of 1 Gb.
 
