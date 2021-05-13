@@ -29,6 +29,7 @@ Use the following procedure to create and apply the storage classes.
 
   **Note:** For IBM DS8000 Family, the maximum prefix length is five characters.The maximum prefix length for other systems is 20 characters.<br />For storage systems using Spectrum Virtualize, the `CSI_` prefix is added as default if not specified by the user.
 
+    ```
     kind: StorageClass
     apiVersion: storage.k8s.io/v1
     metadata:
@@ -48,6 +49,7 @@ Use the following procedure to create and apply the storage classes.
       csi.storage.k8s.io/fstype: xfs   # Optional. Values ext4\xfs. The default is ext4.
       volume_name_prefix: demoPVC      # Optional.
     allowVolumeExpansion: true
+    ```
 
 2. Apply the storage class.
 
