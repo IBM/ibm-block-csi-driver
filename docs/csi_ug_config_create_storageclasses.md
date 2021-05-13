@@ -6,28 +6,30 @@ Use the following procedure to create and apply the storage classes.
 
 **Note:** This procedure is applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.
 
-1. Create a storage class yaml file, similar to the following demo-storageclass.yaml.
+Create a storage class yaml file, similar to the following demo-storageclass.yaml.
 
-   Update the capabilities, pools, and array secrets, as needed.
+Update the capabilities, pools, and array secrets, as needed.
 
-   Use the `SpaceEfficiency` parameters for each storage system, as defined in [the following table](#spaceefficiency). These values are not case-sensitive.
+Use the `SpaceEfficiency` parameters for each storage system, as defined in [the following table](#spaceefficiency). These values are not case-sensitive.
 
-  |Storage system type|SpaceEfficiency parameter options|
-  |-------------------|---------------------------------|
-  |IBM FlashSystem® A9000 and A9000R|Always includes deduplication and compression. No need to specify during configuration.|
-  |IBM Spectrum® Virtualize Family|- thick (default value) <br />- thin<br />- compressed<br />- deduplicated<br />**Note:** If not specified, the default value is thick.|
-  |IBM® DS8000® Family| - none (default value)<br />- thin<br />**Note:** If not specified, the default value is none.|
+_**Table:** `SpaceEfficiency` parameter definitions per storage system type_
 
-  - The IBM DS8000 Family `pool` value is the pool ID and not the pool name as is used in other storage systems.
-  - The `pool` value should be a name of an existing pool on the storage system.
-  - The `allowVolumeExpansion` parameter is optional but is necessary for using volume expansion. The default value is _false_.
+|Storage system type|SpaceEfficiency parameter options|
+|-------------------|---------------------------------|
+|IBM FlashSystem® A9000 and A9000R|Always includes deduplication and compression. No need to specify during configuration.|
+|IBM Spectrum® Virtualize Family|- thick (default value) <br />- thin<br />- compressed<br />- deduplicated<br />**Note:** If not specified, the default value is thick.|
+|IBM® DS8000® Family| - none (default value)<br />- thin<br />**Note:** If not specified, the default value is none.|
 
-  **Note:** Be sure to set the value to true to allow volume expansion.
+- The IBM DS8000 Family `pool` value is the pool ID and not the pool name as is used in other storage systems.
+- The `pool` value should be a name of an existing pool on the storage system.
+- The `allowVolumeExpansion` parameter is optional but is necessary for using volume expansion. The default value is _false_.
 
-  - The `csi.storage.k8s.io/fstype` parameter is optional. The values that are allowed are _ext4_ or _xfs_. The default value is _ext4_.
-  - The `volume_name_prefix` parameter is optional.
+**Note:** Be sure to set the value to true to allow volume expansion.
 
-  **Note:** For IBM DS8000 Family, the maximum prefix length is five characters.The maximum prefix length for other systems is 20 characters.<br />For storage systems using Spectrum Virtualize, the `CSI_` prefix is added as default if not specified by the user.
+- The `csi.storage.k8s.io/fstype` parameter is optional. The values that are allowed are _ext4_ or _xfs_. The default value is _ext4_.
+- The `volume_name_prefix` parameter is optional.
+
+**Note:** For IBM DS8000 Family, the maximum prefix length is five characters.The maximum prefix length for other systems is 20 characters.<br />For storage systems using Spectrum Virtualize, the `CSI_` prefix is added as default if not specified by the user.
 
     ```
     kind: StorageClass
@@ -51,12 +53,12 @@ Use the following procedure to create and apply the storage classes.
     allowVolumeExpansion: true
     ```
 
-2. Apply the storage class.
+Apply the storage class.
 
   ```
   kubectl apply -f demo-storageclass.yaml
   ```
 
-   The `storageclass.storage.k8s.io/demo-storageclass created` message is emitted.
+The `storageclass.storage.k8s.io/demo-storageclass created` message is emitted.
 
 
