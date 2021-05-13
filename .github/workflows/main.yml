@@ -1,0 +1,13 @@
+on:
+  push:
+    branches:
+    - task/CSI-2625_add_another_stage_before_merge
+jobs:
+  create-cluster:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Kubernetes KinD Cluster
+        uses: container-tools/kind-action@v1
+      - name: check the kind cluster
+        run: |
+          kubectl get pods -A
