@@ -689,12 +689,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         volume_expansion_type = csi_pb2.PluginCapability.VolumeExpansion.Type
         capabilities = self.__get_identity_config("capabilities")
         capability_list = []
-        service_capability = capabilities.get('Service')
+        service_capabilities = capabilities.get('Service')
         volume_expansion_capability = capabilities.get('VolumeExpansion')
-        if service_capability:
-            capability_list.append(
-                csi_pb2.PluginCapability(
-                    service=csi_pb2.PluginCapability.Service(type=service_type.Value(service_capability))))
+        if service_capabilities:
+            for service_capability in service_capabilities:
+                capability_list.append(
+                    csi_pb2.PluginCapability(
+                        service=csi_pb2.PluginCapability.Service(type=service_type.Value(service_capability))))
         if volume_expansion_capability:
             capability_list.append(
                 csi_pb2.PluginCapability(
