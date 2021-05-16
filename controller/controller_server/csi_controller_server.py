@@ -204,6 +204,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         set_current_thread_name(request.volume_id)
         logger.info("DeleteVolume")
         secrets = request.secrets
+
         try:
             utils.validate_delete_volume_request(request)
 
@@ -407,7 +408,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 secrets,
                 secret_uid=secret_uid)
             pool = utils.get_pool_from_parameters(parameters=request.parameters, secret_uid=secret_uid)
-
             array_type = detect_array_type(array_addresses)
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
@@ -539,7 +539,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             user, password, array_addresses, _ = utils.get_array_connection_info_from_secrets(secrets,
                                                                                               secret_uid=secret_uid)
-
             with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
 
