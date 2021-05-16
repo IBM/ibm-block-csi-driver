@@ -448,7 +448,7 @@ def validate_unpublish_volume_request(request):
     logger.debug("validating unpublish volume request")
 
     logger.debug("validating volume id")
-    if len(request.volume_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)) != 2:
+    if len(request.volume_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)) not in (2, 3):
         raise ValidationException(messages.volume_id_wrong_format_message)
 
     logger.debug("validating secrets")

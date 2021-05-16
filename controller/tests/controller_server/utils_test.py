@@ -375,6 +375,10 @@ class TestUtils(unittest.TestCase):
 
         utils.validate_unpublish_volume_request(request)
 
+        request.volume_id = "xiv:u2:volume"
+
+        utils.validate_unpublish_volume_request(request)
+
     def test_get_volume_id_info(self):
         with self.assertRaises(ObjectIdError) as ex:
             utils.get_volume_id_info("badvolumeformat")
