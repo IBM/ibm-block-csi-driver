@@ -90,6 +90,8 @@ class TestUtils(unittest.TestCase):
         self._test_validate_secrets_with_config_invalid_parameters(uid="u/1")
         self._test_validate_secrets_with_config_invalid_parameters(uid="u=1")
         self._test_validate_secrets_with_config_invalid_parameters(uid=" ")
+        self._test_validate_secrets_with_config_invalid_parameters(uid="")
+        self._test_validate_secrets_with_config_invalid_parameters(uid=None)
         self._test_validate_secrets_with_config_invalid_parameters(uid="a" * 91)
         self._test_validate_secrets_with_config_invalid_parameters(topology="topology.kubernetes.io")
         self._test_validate_secrets_with_config_invalid_parameters(topology="topology.kubernetes/test")
@@ -105,14 +107,14 @@ class TestUtils(unittest.TestCase):
             secrets=secrets,
             topologies=topologies,
             secret_uid=secret_uid)
-        user_response, password_response, array_addresses_response, secret_uid_response = response
-        self.assertEqual(user_response, user)
-        self.assertEqual(password_response, password)
-        self.assertEqual(array_addresses_response[0], array)
+        secret = response
+        self.assertEqual(secret.user, user)
+        self.assertEqual(secret.password, password)
+        self.assertEqual(secret.array_addresses[0], array)
         if topologies or secret_uid:
-            self.assertIsNotNone(secret_uid_response)
+            self.assertIsNotNone(secret.uid)
         else:
-            self.assertIsNone(secret_uid_response)
+            self.assertIsNone(secret.uid)
 
     def test_get_array_connection_info_from_secrets(self):
         secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array}})}
