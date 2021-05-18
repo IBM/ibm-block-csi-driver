@@ -116,7 +116,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 if source_id:
                     self._copy_to_existing_volume_from_source(volume, source_id,
                                                               source_type, required_bytes,
-                                                              array_mediator, pool)
+                                                              array_mediator)
                     volume.copy_source_id = source_id
 
                 res = utils.generate_csi_create_volume_response(volume, source_type)
@@ -128,18 +128,17 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             handle_exception(ex, context, grpc.StatusCode.ALREADY_EXISTS, csi_pb2.CreateVolumeResponse)
 
     def _copy_to_existing_volume_from_source(self, volume, source_id, source_type,
-                                             minimum_volume_size, array_mediator, pool):
-        volume_name = volume.name
+                                             minimum_volume_size, array_mediator):
+        volume_id = volume.id
         try:
             source_object = array_mediator.get_object_by_id(source_id, source_type)
             if not source_object:
                 self._rollback_create_volume_from_source(array_mediator, volume.id)
                 raise array_errors.ObjectNotFoundError(source_id)
-            source_name = source_object.name
             source_capacity = source_object.capacity_bytes
-            logger.debug("Copy {0} {1} data to volume {2}.".format(source_type, source_id, volume_name))
-            array_mediator.copy_to_existing_volume_from_source(volume_name, source_name,
-                                                               source_capacity, minimum_volume_size, pool)
+            logger.debug("Copy {0} {1} data to volume {2}.".format(source_type, source_id, volume_id))
+            array_mediator.copy_to_existing_volume_from_source(volume_id, source_id,
+                                                               source_capacity, minimum_volume_size)
             logger.debug("Copy volume from {0} finished".format(source_type))
         except array_errors.ObjectNotFoundError as ex:
             logger.error("Volume not found while copying {0} data to volume".format(source_type))

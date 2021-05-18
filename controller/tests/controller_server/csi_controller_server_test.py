@@ -675,10 +675,9 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
                                                                                                 "a9k")
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.copy_to_existing_volume_from_source.assert_called_once_with(volume_name, snapshot_name,
+        self.mediator.copy_to_existing_volume_from_source.assert_called_once_with('wwn2', snapshot_id,
                                                                                   snapshot_capacity_bytes,
-                                                                                  self.capacity_bytes,
-                                                                                  pool)
+                                                                                  self.capacity_bytes)
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, snapshot_id)
 
@@ -775,10 +774,9 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
                                                                                               "a9k")
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.copy_to_existing_volume_from_source.assert_called_once_with(volume_name, clone_volume_name,
+        self.mediator.copy_to_existing_volume_from_source.assert_called_once_with('wwn2', volume_id,
                                                                                   volume_capacity_bytes,
-                                                                                  self.capacity_bytes,
-                                                                                  pool)
+                                                                                  self.capacity_bytes)
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, volume_id)
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
 

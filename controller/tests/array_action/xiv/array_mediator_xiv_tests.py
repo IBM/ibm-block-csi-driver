@@ -68,10 +68,10 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.close.assert_called_once_with()
 
     @staticmethod
-    def _get_cli_volume():
+    def _get_cli_volume(name='mock_volume'):
         return Munch({
             'wwn': '123',
-            'name': 'mock_volume',
+            'name': name,
             'pool_name': 'fake_pool',
             'capacity': '512'})
 
@@ -116,34 +116,35 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(Exception):
             self.mediator.create_volume("volume", 10, None, "pool1")
 
-    def test_copy_to_existing_volume_from_snapshot_succeeds_with_resize(self):
+    def _test_copy_to_existing_volume_from_snapshot(self, src_snapshot_capacity_in_bytes,
+                                                             min_volume_size_in_bytes):
         volume_name = "volume"
         src_snapshot_name = "snapshot"
-        src_snapshot_capacity_in_bytes = 500
-        min_volume_size_in_bytes = 1000
         self.mediator.client.cmd.vol_format = Mock()
         self.mediator.client.cmd.vol_copy = Mock()
         self.mediator.client.cmd.vol_resize = Mock()
+        target_volume = self._get_cli_volume(name=volume_name)
+        source_volume = self._get_cli_volume(name=src_snapshot_name)
+        self.mediator.client.cmd.vol_list.side_effect = [Mock(as_single_element=target_volume),
+                                                         Mock(as_single_element=source_volume)]
         self.mediator.copy_to_existing_volume_from_source(volume_name, src_snapshot_name,
                                                           src_snapshot_capacity_in_bytes, min_volume_size_in_bytes)
-        volume_size_in_blocks = 1
+
         self.mediator.client.cmd.vol_format.assert_called_once_with(vol=volume_name)
         self.mediator.client.cmd.vol_copy.assert_called_once_with(vol_src=src_snapshot_name, vol_trg=volume_name)
-        self.mediator.client.cmd.vol_resize.assert_called_once_with(vol=volume_name,
-                                                                    size_blocks=volume_size_in_blocks)
+
+    def test_copy_to_existing_volume_from_snapshot_succeeds_with_resize(self):
+        volume_size_in_blocks = 1
+        volume_name = "volume"
+        self._test_copy_to_existing_volume_from_snapshot(src_snapshot_capacity_in_bytes=500,
+                                                                  min_volume_size_in_bytes=1000)
+
+        self.mediator.client.cmd.vol_resize.assert_called_once_with(vol=volume_name, size_blocks=volume_size_in_blocks)
 
     def test_copy_to_existing_volume_from_snapshot_succeeds_without_resize(self):
-        volume_name = "volume"
-        src_snapshot_name = "snapshot"
-        src_snapshot_capacity_in_bytes = 1000
-        min_volume_size_in_bytes = 500
-        self.mediator.client.cmd.vol_format = Mock()
-        self.mediator.client.cmd.vol_copy = Mock()
-        self.mediator.client.cmd.vol_resize = Mock()
-        self.mediator.copy_to_existing_volume_from_source(volume_name, src_snapshot_name,
-                                                          src_snapshot_capacity_in_bytes, min_volume_size_in_bytes)
-        self.mediator.client.cmd.vol_format.assert_called_once_with(vol=volume_name)
-        self.mediator.client.cmd.vol_copy.assert_called_once_with(vol_src=src_snapshot_name, vol_trg=volume_name)
+        self._test_copy_to_existing_volume_from_snapshot(src_snapshot_capacity_in_bytes=1000,
+                                                                  min_volume_size_in_bytes=500)
+
         self.mediator.client.cmd.vol_resize.assert_not_called()
 
     def test_copy_to_existing_volume_from_snapshot_failed_illegal_name(self):
