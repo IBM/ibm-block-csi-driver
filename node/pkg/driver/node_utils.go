@@ -425,7 +425,8 @@ func (n NodeUtils) GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN str
 func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error) {
 	kubeConfig, err := rest.InClusterConfig()
 	if err != nil {
-		return nil, err
+		logger.Infof("unable to load in-cluster configuration: %v", err)
+		return nil, nil
 	}
 
 	client, err := kubernetes.NewForConfig(kubeConfig)
