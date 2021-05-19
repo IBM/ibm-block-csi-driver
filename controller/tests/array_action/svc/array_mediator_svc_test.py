@@ -748,7 +748,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                    array_errors.ObjectNotFoundError)
         self._test_map_volume_mkvdiskhostmap_error(svc_errors.CommandExecutionError('CMMVC5754E'),
                                                    array_errors.HostNotFoundError)
-        self._test_map_volume_mkvdiskhostmap_error(svc_errors.CommandExecutionError('CMMVC5878E'),
+        self._test_map_volume_mkvdiskhostmap_error(svc_errors.CommandExecutionError('CMMVC5879E'),
                                                    array_errors.LunAlreadyInUseError)
         self._test_map_volume_mkvdiskhostmap_error(svc_errors.CommandExecutionError('Failed'),
                                                    array_errors.MappingError)
