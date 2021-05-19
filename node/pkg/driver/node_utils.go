@@ -426,6 +426,7 @@ func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[
 	kubeConfig, err := rest.InClusterConfig()
 	if err != nil {
 		logger.Infof("unable to load in-cluster configuration: %v", err)
+		logger.Info("skipping topology retrieval. we might not be in a k8s cluster")
 		return nil, nil
 	}
 
