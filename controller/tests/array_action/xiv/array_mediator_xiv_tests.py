@@ -117,7 +117,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
             self.mediator.create_volume("volume", 10, None, "pool1")
 
     def _test_copy_to_existing_volume_from_snapshot(self, src_snapshot_capacity_in_bytes,
-                                                             min_volume_size_in_bytes):
+                                                    min_volume_size_in_bytes):
         volume_name = "volume"
         src_snapshot_name = "snapshot"
         self.mediator.client.cmd.vol_format = Mock()
@@ -137,13 +137,13 @@ class TestArrayMediatorXIV(unittest.TestCase):
         volume_size_in_blocks = 1
         volume_name = "volume"
         self._test_copy_to_existing_volume_from_snapshot(src_snapshot_capacity_in_bytes=500,
-                                                                  min_volume_size_in_bytes=1000)
+                                                         min_volume_size_in_bytes=1000)
 
         self.mediator.client.cmd.vol_resize.assert_called_once_with(vol=volume_name, size_blocks=volume_size_in_blocks)
 
     def test_copy_to_existing_volume_from_snapshot_succeeds_without_resize(self):
         self._test_copy_to_existing_volume_from_snapshot(src_snapshot_capacity_in_bytes=1000,
-                                                                  min_volume_size_in_bytes=500)
+                                                         min_volume_size_in_bytes=500)
 
         self.mediator.client.cmd.vol_resize.assert_not_called()
 
