@@ -43,7 +43,7 @@ def handle_common_exceptions(response_type):
         try:
             return controller_method(servicer, request, context)
         except Exception as ex:
-            return handle_exception(ex, context, status_codes_by_exception.get(type(ex), grpc.StatusCode.INTERNAL),
-                                    response_type)
+            status_code = status_codes_by_exception.get(type(ex), grpc.StatusCode.INTERNAL)
+            return handle_exception(ex, context, status_code, response_type)
 
     return handle_common_exceptions_with_response
