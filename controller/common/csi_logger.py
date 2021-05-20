@@ -31,3 +31,5 @@ def set_log_level(log_level_to_set):
     """
     if log_level_to_set:
         logger_properties['log_level'] = log_level_to_set.upper()
+        csi_logger = logging.getLogger("csi_logger")
+        csi_logger.setLevel(logger_properties['log_level'])
