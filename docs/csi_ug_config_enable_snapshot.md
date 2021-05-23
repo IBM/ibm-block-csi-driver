@@ -28,7 +28,7 @@ parameters:
   csi.storage.k8s.io/snapshotter-secret-name: demo-secret
   csi.storage.k8s.io/snapshotter-secret-namespace: default
   snapshot_name_prefix: demoSnapshot   # Optional.
-  pool: demo-pool                      # Mandatory only for DS8000 Family.
+  pool: demo-pool                      # Optional. Use to create the snapshot on a different pool than the source.
 ```
 
 After the YAML file is created, apply it by using the `kubectl apply -f` command.
