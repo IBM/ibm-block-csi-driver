@@ -14,11 +14,12 @@ SECRET_PASSWORD_PARAMETER = "password"
 SECRET_ARRAY_PARAMETER = "management_address"
 SECRET_CONFIG_PARAMETER = "config"
 SECRET_SUPPORTED_TOPOLOGIES_PARAMETER = "supported_topologies"
-SECRET_UID_MAX_LENGTH = 90
-SECRET_VALIDATION_REGEX = '[a-zA-Z0-9 _.]+$'
+# SECRET_UID_MAX_LENGTH = max string response - length of volume wwn - max length of array type key - delimiters
+SECRET_UID_MAX_LENGTH = 128 - 32 - 4 - 2
+SECRET_VALIDATION_REGEX = '^[a-zA-Z0-9][a-zA-Z0-9-_.]*[a-zA-Z0-9]$'
 
 PARAMETERS_POOL = "pool"
-PARAMETERS_POOLS_BY_SYSTEM = "pools_by_system"
+PARAMETERS_BY_SYSTEM = "by_system"
 PARAMETERS_SPACE_EFFICIENCY = "SpaceEfficiency"
 PARAMETERS_VOLUME_NAME_PREFIX = "volume_name_prefix"
 PARAMETERS_SNAPSHOT_NAME_PREFIX = "snapshot_name_prefix"

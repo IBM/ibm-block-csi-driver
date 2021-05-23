@@ -161,7 +161,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
     def _test_create_snapshot_with_pools_by_system_parameter(self, storage_agent, uid, expected_pool):
         self.request.source_volume_id = "{}:{}:{}".format("A9000", uid, snapshot_volume_wwn)
-        self.request.parameters = {"pools_by_system": str({"u1": pool, "u2": "other_pool"})}
+        self.request.parameters = {"by_system": str({"u1": {"pool": pool}, "u2": {"pool": "other_pool"}})}
         self._test_create_snapshot_succeeds(storage_agent, expected_pool=expected_pool)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -195,10 +195,6 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_array_connection_exception(self, storage_agent):
         self._test_create_object_with_array_connection_exception(storage_agent)
-
-    @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_snapshot_with_get_array_type_exception(self, storage_agent):
-        self._test_create_object_with_get_array_type_exception(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def _test_create_snapshot_get_snapshot_raise_error(self, storage_agent, exception, grpc_status):
@@ -432,7 +428,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.request.accessibility_requirements.preferred = [
             ProtoBufMock(segments={"topology.kubernetes.io/test": "topology_value",
                                    "topology.kubernetes.io/test2": "topology_value2"})]
-        self.request.parameters = {"pools_by_system": str({"u1": pool, "u2": "other_pool"})}
+        self.request.parameters = {"by_system": str({"u1": {"pool": pool}, "u2": {"pool": "other_pool"}})}
         self._test_create_volume_succeeds(storage_agent, expected_pool="other_pool")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -594,25 +590,59 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INTERNAL,
                                          err=Exception("error"))
 
-    def _test_create_volume_prefix(self, prefix, final_name):
+    def _test_create_volume_parameters(self, final_name="default_some_name", space_efficiency=None):
         self.mediator.default_object_prefix = "default"
         self.request.name = "some_name"
-        self.request.parameters[config.PARAMETERS_VOLUME_NAME_PREFIX] = prefix
         self.mediator.create_volume = Mock()
         self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "volume", "wwn", "xiv")
+        self.mediator.validate_supported_space_efficiency = Mock()
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.create_volume.assert_called_once_with(final_name, 10, None, pool)
+        self.mediator.create_volume.assert_called_once_with(final_name, 10, space_efficiency, pool)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_name_prefix(self, storage_agent):
         storage_agent.return_value = self.storage_agent
-        self._test_create_volume_prefix("prefix", "prefix_some_name")
+        self.request.parameters[config.PARAMETERS_VOLUME_NAME_PREFIX] = "prefix"
+        self._test_create_volume_parameters("prefix_some_name")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_no_name_prefix(self, storage_agent):
         storage_agent.return_value = self.storage_agent
-        self._test_create_volume_prefix("", "default_some_name")
+        self.request.parameters[config.PARAMETERS_VOLUME_NAME_PREFIX] = ""
+        self._test_create_volume_parameters()
+
+    def _test_create_volume_with_parameters_by_system_prefix(self, get_array_connection_info_from_secrets, prefix,
+                                                             final_name="default_some_name",
+                                                             space_efficiency=None):
+        get_array_connection_info_from_secrets.side_effect = [utils.get_mock_array_connection_info()]
+        self.request.parameters = {config.PARAMETERS_BY_SYSTEM: str(
+            {"u1": {config.PARAMETERS_VOLUME_NAME_PREFIX: prefix, config.PARAMETERS_POOL: pool,
+                    config.PARAMETERS_SPACE_EFFICIENCY: space_efficiency}})}
+        self._test_create_volume_parameters(final_name, space_efficiency)
+
+    @patch("controller.controller_server.utils.get_array_connection_info_from_secrets")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_with_parameters_by_system_no_name_prefix(self, storage_agent,
+                                                                    get_array_connection_info_from_secrets):
+        storage_agent.return_value = self.storage_agent
+        self._test_create_volume_with_parameters_by_system_prefix(get_array_connection_info_from_secrets, "")
+
+    @patch("controller.controller_server.utils.get_array_connection_info_from_secrets")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_with_parameters_by_system_name_prefix(self, storage_agent,
+                                                                 get_array_connection_info_from_secrets):
+        storage_agent.return_value = self.storage_agent
+        self._test_create_volume_with_parameters_by_system_prefix(get_array_connection_info_from_secrets, "prefix",
+                                                                  "prefix_some_name")
+
+    @patch("controller.controller_server.utils.get_array_connection_info_from_secrets")
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_with_parameters_by_system_space_efficiency(self, storage_agent,
+                                                                      get_array_connection_info_from_secrets):
+        storage_agent.return_value = self.storage_agent
+        self._test_create_volume_with_parameters_by_system_prefix(get_array_connection_info_from_secrets, "",
+                                                                  space_efficiency="not_none")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_required_bytes_zero(self, storage_agent):

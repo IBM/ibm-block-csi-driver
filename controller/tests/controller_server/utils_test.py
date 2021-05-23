@@ -65,7 +65,7 @@ class TestUtils(unittest.TestCase):
         utils.validate_secrets(secrets)
 
     def test_validate_secrets_with_config_valid_uid(self):
-        self._test_validate_secrets_with_config_valid_uid("u i_d.")
+        self._test_validate_secrets_with_config_valid_uid("ui_.d")
         self._test_validate_secrets_with_config_valid_uid("a" * 90)
 
     def test_validate_secrets_with_config_and_topologies(self):
@@ -82,25 +82,15 @@ class TestUtils(unittest.TestCase):
         self._test_validate_secrets_validation_errors(secrets)
 
     def test_validate_secrets_with_config_invalid_parameters(self):
-        self._test_validate_secrets_with_config_invalid_parameters(uid="u-1")
-        self._test_validate_secrets_with_config_invalid_parameters(uid="u:1")
-        self._test_validate_secrets_with_config_invalid_parameters(uid="u1+")
-        self._test_validate_secrets_with_config_invalid_parameters(uid="u1*")
-        self._test_validate_secrets_with_config_invalid_parameters(uid="u-1(")
-        self._test_validate_secrets_with_config_invalid_parameters(uid="u/1")
-        self._test_validate_secrets_with_config_invalid_parameters(uid="u=1")
-        self._test_validate_secrets_with_config_invalid_parameters(uid=" ")
-        self._test_validate_secrets_with_config_invalid_parameters(uid="")
-        self._test_validate_secrets_with_config_invalid_parameters(uid=None)
-        self._test_validate_secrets_with_config_invalid_parameters(uid="a" * 91)
-        self._test_validate_secrets_with_config_invalid_parameters(topology="topology.kubernetes.io")
-        self._test_validate_secrets_with_config_invalid_parameters(topology="topology.kubernetes/test")
-        self._test_validate_secrets_with_config_invalid_parameters(topology="topology.kubernetes.io/t-est")
-        self._test_validate_secrets_with_config_invalid_parameters(value="a*")
+        uids = ["-u1", "u:1", "u1+", "u1*", "u-1(", "u/1", "u=1", " ", "", None, "a" * 91]
+        for uid in uids:
+            self._test_validate_secrets_with_config_invalid_parameters(uid=uid)
 
-    def _test_get_pool_from_parameters(self, parameters, pool_expected=pool, uid=None):
-        pool_respond = utils.get_pool_from_parameters(parameters, uid)
-        self.assertEqual(pool_respond, pool_expected)
+        topologies = ["topology.kubernetes.io", "topology.kubernetes/test", "topology.kubernetes.io/-test"]
+        for topology in topologies:
+            self._test_validate_secrets_with_config_invalid_parameters(topology=topology)
+
+        self._test_validate_secrets_with_config_invalid_parameters(value="a*")
 
     def _test_get_array_connection_info_from_secrets(self, secrets, topologies=None, secret_uid=None):
         response = utils.get_array_connection_info_from_secrets(
@@ -127,14 +117,18 @@ class TestUtils(unittest.TestCase):
                                                           topologies={"topology.kubernetes.io/test": "zone1",
                                                                       "topology.block.csi.ibm.com/test": "dev1"})
 
+    def _test_get_pool_from_parameters(self, parameters, expected_pool=pool, uid=None):
+        volume_parameters = utils.get_volume_parameters(parameters, uid)
+        self.assertEqual(volume_parameters.pool, expected_pool)
+
     def test_get_pool_from_parameters(self):
         parameters = {"pool": pool}
         self._test_get_pool_from_parameters(parameters)
         self._test_get_pool_from_parameters(parameters, uid="u1")
-        parameters = {"pools_by_system": str({"u1": pool, "u2": "other_pool"})}
+        parameters = {"by_system": str({"u1": {"pool": pool}, "u2": {"pool": "other_pool"}})}
         self._test_get_pool_from_parameters(parameters, uid="u1")
-        self._test_get_pool_from_parameters(parameters, pool_expected="other_pool", uid="u2")
-        self._test_get_pool_from_parameters(parameters, pool_expected=None)
+        self._test_get_pool_from_parameters(parameters, expected_pool="other_pool", uid="u2")
+        self._test_get_pool_from_parameters(parameters, expected_pool=None)
 
     def test_validate_file_system_volume_capabilities(self):
         cap = Mock()
@@ -386,9 +380,9 @@ class TestUtils(unittest.TestCase):
             utils.get_volume_id_info("badvolumeformat")
             self.assertTrue("volume" in str(ex))
 
-        arr_type, volume_id, _ = utils.get_volume_id_info("xiv:volume-id")
-        self.assertEqual(arr_type, "xiv")
-        self.assertEqual(volume_id, "volume-id")
+        volume_id_info = utils.get_volume_id_info("xiv:volume-id")
+        self.assertEqual(volume_id_info.array_type, "xiv")
+        self.assertEqual(volume_id_info.volume_id, "volume-id")
 
     def test_get_node_id_info(self):
         with self.assertRaises(array_errors.HostNotFoundError) as ex:

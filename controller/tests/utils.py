@@ -1,6 +1,8 @@
 from mock import Mock
 import grpc
 
+from controller.controller_server.controller_types import ArrayConnectionInfo
+
 
 def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_source_id=None):
     volume = Mock()
@@ -26,6 +28,12 @@ def get_mock_mediator_response_snapshot(capacity, name, wwn, volume_name, array_
     snapshot.is_ready = True
 
     return snapshot
+
+
+def get_mock_array_connection_info(user="user", password="pass", array_addresses=None, uid="u1"):
+    if array_addresses is None:
+        array_addresses = ["arr1"]
+    return ArrayConnectionInfo(user=user, password=password, array_addresses=array_addresses, uid=uid)
 
 
 class FakeContext:
