@@ -54,8 +54,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         source_type, source_id = self._get_source_type_and_id(request)
 
         logger.debug("Source {0} id : {1}".format(source_type, source_id))
+        secrets = request.secrets
         try:
-            secrets = request.secrets
             user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
 
             pool = request.parameters[config.PARAMETERS_POOL]
@@ -118,8 +118,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 return res
         except array_errors.InvalidArgumentError as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT, csi_pb2.CreateVolumeResponse)
-        except array_errors.VolumeAlreadyExists as ex:
-            return handle_exception(ex, context, grpc.StatusCode.ALREADY_EXISTS, csi_pb2.CreateVolumeResponse)
 
     def _copy_to_existing_volume_from_source(self, volume, source_id, source_type,
                                              minimum_volume_size, array_mediator, pool):
@@ -243,9 +241,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def ControllerUnpublishVolume(self, request, context):
         set_current_thread_name(request.volume_id)
         logger.info("ControllerUnpublishVolume")
+        utils.validate_unpublish_volume_request(request)
         try:
-            utils.validate_unpublish_volume_request(request)
-
             array_type, vol_id = utils.get_volume_id_info(request.volume_id)
 
             node_id_info = NodeIdInfo(request.node_id)
@@ -260,6 +257,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             logger.info("finished ControllerUnpublishVolume")
             return csi_pb2.ControllerUnpublishVolumeResponse()
+
         except array_errors.VolumeAlreadyUnmappedError:
             logger.debug("Idempotent case. volume is already unmapped.")
             return csi_pb2.ControllerUnpublishVolumeResponse()

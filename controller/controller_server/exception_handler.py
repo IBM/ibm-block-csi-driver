@@ -10,6 +10,10 @@ logger = get_stdout_logger()
 
 status_codes_by_exception = {
     ValidationException: grpc.StatusCode.INVALID_ARGUMENT,
+    array_errors.InvalidArgumentError: grpc.StatusCode.INVALID_ARGUMENT,
+    array_errors.PoolDoesNotExist: grpc.StatusCode.INVALID_ARGUMENT,
+    array_errors.PoolDoesNotMatchCapabilities: grpc.StatusCode.INVALID_ARGUMENT,
+    array_errors.SpaceEfficiencyNotSupported: grpc.StatusCode.INVALID_ARGUMENT,
     array_errors.IllegalObjectName: grpc.StatusCode.INVALID_ARGUMENT,
     array_errors.IllegalObjectID: grpc.StatusCode.INVALID_ARGUMENT,
     array_errors.PoolParameterIsMissing: grpc.StatusCode.INVALID_ARGUMENT,
@@ -27,6 +31,7 @@ status_codes_by_exception = {
     array_errors.NoAvailableLunError: grpc.StatusCode.RESOURCE_EXHAUSTED,
     array_errors.NotEnoughSpaceInPool: grpc.StatusCode.RESOURCE_EXHAUSTED,
     array_errors.SnapshotAlreadyExists: grpc.StatusCode.ALREADY_EXISTS,
+    array_errors.VolumeAlreadyExists: grpc.StatusCode.ALREADY_EXISTS
 }
 
 
