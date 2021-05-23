@@ -13,7 +13,7 @@ import controller.controller_server.utils as utils
 from controller.array_action import messages
 from controller.array_action.storage_agent import get_agent, detect_array_type
 from controller.common import settings
-from controller.common.csi_logger import get_stdout_logger, set_log_level, logging
+from controller.common.csi_logger import get_stdout_logger, set_log_level
 from controller.common.node_info import NodeIdInfo
 from controller.common.utils import set_current_thread_name
 from controller.controller_server.errors import ObjectIdError, ValidationException
@@ -21,8 +21,7 @@ from controller.controller_server.exception_handler import handle_common_excepti
 from controller.csi_general import csi_pb2
 from controller.csi_general import csi_pb2_grpc
 
-logger = None  # is set in ControllerServicer::__init__
-logger: logging.Logger
+logger = get_stdout_logger()
 
 
 class ControllerServicer(csi_pb2_grpc.ControllerServicer):
@@ -31,9 +30,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     """
 
     def __init__(self, array_endpoint):
-        # init logger
-        global logger
-        logger = get_stdout_logger()
 
         self.endpoint = array_endpoint
 
@@ -743,13 +739,9 @@ def main():
     parser.add_argument("-l", "--loglevel", dest="loglevel", help="log level")
     arguments = parser.parse_args()
 
-    # set logger level and init logger
-    log_level = arguments.loglevel
-    set_log_level(log_level)
+    set_log_level(arguments.loglevel)
 
-    # start the server
-    endpoint = arguments.endpoint
-    controller_servicer = ControllerServicer(endpoint)
+    controller_servicer = ControllerServicer(arguments.endpoint)
     controller_servicer.start_server()
 
 
