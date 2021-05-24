@@ -44,10 +44,10 @@ class AbstractControllerTest(unittest.TestCase):
         self.assertIn("name", context.details)
         self.assertEqual(res, self.get_create_object_response_method()())
 
-    def _test_create_object_with_wrong_secret(self, secret, message="secret"):
+    def _test_create_object_with_wrong_secrets_parameters(self, secrets, message="secrets"):
         context = utils.FakeContext()
 
-        self.request.secrets = secret
+        self.request.secrets = secrets
         self.get_create_object_method()(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertIn(message, context.details)
@@ -57,7 +57,7 @@ class AbstractControllerTest(unittest.TestCase):
                                                       topology_value="test"):
         secrets = {"config": str({system_id: {"username": "user", "password": "password", "management_address": "array",
                                               "supported_topologies": [{topology_key: topology_value}]}})}
-        self._test_create_object_with_wrong_secret(secrets, message=message)
+        self._test_create_object_with_wrong_secrets_parameters(secrets, message=message)
 
     def _test_create_object_with_secrets_config_invalid_parameters(self):
         self._test_create_object_with_wrong_secrets_config(message="system id", system_id="u-")
@@ -65,14 +65,14 @@ class AbstractControllerTest(unittest.TestCase):
     def _test_create_object_with_wrong_secrets(self, storage_agent):
         storage_agent.return_value = self.storage_agent
 
-        secret = {"password": "pass", "management_address": "mg"}
-        self._test_create_object_with_wrong_secret(secret)
+        secrets = {"password": "pass", "management_address": "mg"}
+        self._test_create_object_with_wrong_secrets_parameters(secrets)
 
-        secret = {"username": "user", "management_address": "mg"}
-        self._test_create_object_with_wrong_secret(secret)
+        secrets = {"username": "user", "management_address": "mg"}
+        self._test_create_object_with_wrong_secrets_parameters(secrets)
 
-        secret = {"username": "user", "password": "pass"}
-        self._test_create_object_with_wrong_secret(secret)
+        secrets = {"username": "user", "password": "pass"}
+        self._test_create_object_with_wrong_secrets_parameters(secrets)
 
         self._test_create_object_with_secrets_config_invalid_parameters()
 

@@ -3,11 +3,11 @@ ValidationException_message = "Validation error has occurred : {0}"
 ObjectIdError_message = "Wrong {0} id format : {1}"
 
 # validation error messages
-invalid_secret_message = "invalid secret was passed"
+invalid_secrets_message = "invalid secrets was passed"
 invalid_topology_key_message = "invalid topology key was passed: {}"
 invalid_topology_value_message = "invalid topology value was passed: {}"
 invalid_system_id_value_message = "invalid system id value was passed: {}"
-secret_missing_message = 'secret is missing'
+secrets_missing_message = 'secrets is missing'
 capabilities_not_set_message = "capabilities were not set"
 unsupported_fs_type_message = "unsupported fs_type : {}"
 unsupported_volume_access_type_message = "unsupported volume access type"

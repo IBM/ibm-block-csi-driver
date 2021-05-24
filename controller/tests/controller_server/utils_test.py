@@ -328,7 +328,7 @@ class TestUtils(unittest.TestCase):
             utils.validate_publish_volume_request(request)
             self.assertTrue("secrets" in str(ex))
 
-        request.secrets = ["secret"]
+        request.secrets = ["secrets"]
         validate_secrets.side_effect = [ValidationException("msg2")]
 
         with self.assertRaises(ValidationException) as ex:
@@ -353,9 +353,9 @@ class TestUtils(unittest.TestCase):
         request.secrets = []
         with self.assertRaises(ValidationException) as ex:
             utils.validate_unpublish_volume_request(request)
-            self.assertTrue("secret" in str(ex))
+            self.assertTrue("secrets" in str(ex))
 
-        request.secrets = ["secret"]
+        request.secrets = ["secrets"]
         validate_secrets.side_effect = [ValidationException("msg2")]
         with self.assertRaises(ValidationException) as ex:
             utils.validate_unpublish_volume_request(request)

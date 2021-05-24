@@ -59,7 +59,7 @@ def _get_system_info_from_secrets(secrets, topologies=None, system_id=None):
             system_secrets, system_id = get_secret_by_topologies(raw_secret_config=secret_config,
                                                                  node_topologies=topologies)
         else:
-            raise ValidationException(messages.invalid_secret_message)
+            raise ValidationException(messages.invalid_secrets_message)
     return system_secrets, system_id
 
 
@@ -128,7 +128,7 @@ def _validate_secrets(secrets):
     if not (config.SECRET_USERNAME_PARAMETER in secrets and
             config.SECRET_PASSWORD_PARAMETER in secrets and
             config.SECRET_ARRAY_PARAMETER in secrets):
-        raise ValidationException(messages.invalid_secret_message)
+        raise ValidationException(messages.invalid_secrets_message)
 
 
 def _validate_secrets_config(secret_config_string):
@@ -138,13 +138,13 @@ def _validate_secrets_config(secret_config_string):
             _validate_secret_id(system_id)
             _validate_secrets(secret_info)
         else:
-            raise ValidationException(messages.invalid_secret_message)
+            raise ValidationException(messages.invalid_secrets_message)
 
 
 def validate_secrets(secrets):
     logger.debug("validating secrets")
     if not secrets:
-        raise ValidationException(messages.secret_missing_message)
+        raise ValidationException(messages.secrets_missing_message)
     secret_config = secrets.get(config.SECRET_CONFIG_PARAMETER)
     if secret_config:
         _validate_secrets_config(secret_config)
@@ -363,7 +363,7 @@ def validate_publish_volume_request(request):
     if request.secrets:
         validate_secrets(request.secrets)
     else:
-        raise ValidationException(messages.secret_missing_message)
+        raise ValidationException(messages.secrets_missing_message)
 
     logger.debug("publish volume request validation finished.")
 
@@ -387,7 +387,7 @@ def get_object_id_info(full_object_id, object_type):
     else:
         raise ObjectIdError(object_type, full_object_id)
     logger.debug("volume id : {0}, array type :{1}".format(object_id, array_type))
-    return VolumeIdInfo(array_type=array_type, volume_id=object_id, system_id=system_id)
+    return VolumeIdInfo(array_type=array_type, system_id=system_id, volume_id=object_id)
 
 
 def get_node_id_info(node_id):
@@ -456,7 +456,7 @@ def validate_unpublish_volume_request(request):
     if request.secrets:
         validate_secrets(request.secrets)
     else:
-        raise ValidationException(messages.secret_missing_message)
+        raise ValidationException(messages.secrets_missing_message)
 
     logger.debug("unpublish volume request validation finished.")
 

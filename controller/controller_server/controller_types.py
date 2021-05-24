@@ -12,8 +12,8 @@ class ArrayConnectionInfo:
 @dataclass
 class VolumeIdInfo:
     array_type: str
-    volume_id: str
     system_id: str
+    volume_id: str
 
 
 @dataclass
