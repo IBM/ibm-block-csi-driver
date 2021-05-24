@@ -216,7 +216,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 return csi_pb2.DeleteVolumeResponse()
             system_id = volume_id_info.system_id
             array_type = volume_id_info.array_type
-            volume_id = volume_id_info.volume_id
+            volume_id = volume_id_info.object_id
             array_connection_info = utils.get_array_connection_info_from_secrets(secrets, system_id=system_id)
 
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
@@ -268,7 +268,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             volume_id_info = utils.get_volume_id_info(request.volume_id)
             system_id = volume_id_info.system_id
             array_type = volume_id_info.array_type
-            volume_id = volume_id_info.volume_id
+            volume_id = volume_id_info.object_id
             node_id_info = NodeIdInfo(request.node_id)
             node_name = node_id_info.node_name
             initiators = node_id_info.initiators
@@ -339,7 +339,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             volume_id_info = utils.get_volume_id_info(request.volume_id)
             system_id = volume_id_info.system_id
             array_type = volume_id_info.array_type
-            volume_id = volume_id_info.volume_id
+            volume_id = volume_id_info.object_id
             node_id_info = NodeIdInfo(request.node_id)
             node_name = node_id_info.node_name
             initiators = node_id_info.initiators
@@ -411,7 +411,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             volume_id_info = utils.get_volume_id_info(source_volume_id)
             system_id = volume_id_info.system_id
             array_type = volume_id_info.array_type
-            volume_id = volume_id_info.volume_id
+            volume_id = volume_id_info.object_id
             array_connection_info = utils.get_array_connection_info_from_secrets(secrets, system_id=system_id)
             snapshot_parameters = utils.get_snapshot_parameters(parameters=request.parameters,
                                                                 system_id=array_connection_info.system_id)
@@ -477,13 +477,13 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         try:
             utils.validate_delete_snapshot_request(request)
             try:
-                volume_id_info = utils.get_snapshot_id_info(request.snapshot_id)
+                snapshot_id_info = utils.get_snapshot_id_info(request.snapshot_id)
             except ObjectIdError as ex:
                 logger.warning("Snapshot id is invalid. error : {}".format(ex))
                 return csi_pb2.DeleteSnapshotResponse()
-            system_id = volume_id_info.system_id
-            array_type = volume_id_info.array_type
-            snapshot_id = volume_id_info.volume_id
+            system_id = snapshot_id_info.system_id
+            array_type = snapshot_id_info.array_type
+            snapshot_id = snapshot_id_info.object_id
             array_connection_info = utils.get_array_connection_info_from_secrets(secrets, system_id=system_id)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
@@ -545,7 +545,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 return csi_pb2.ControllerExpandVolumeResponse()
             system_id = volume_id_info.system_id
             array_type = volume_id_info.array_type
-            volume_id = volume_id_info.volume_id
+            volume_id = volume_id_info.object_id
             array_connection_info = utils.get_array_connection_info_from_secrets(secrets, system_id=system_id)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
@@ -756,7 +756,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             else:
                 return None, None
             volume_id_info = utils.get_object_id_info(source_id, source_type)
-            object_id = volume_id_info.volume_id
+            object_id = volume_id_info.object_id
         return source_type, object_id
 
 

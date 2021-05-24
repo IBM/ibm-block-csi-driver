@@ -10,7 +10,7 @@ import controller.controller_server.config as config
 import controller.controller_server.messages as messages
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.common.csi_logger import get_stdout_logger
-from controller.controller_server.controller_types import ArrayConnectionInfo, VolumeIdInfo, ObjectParameters
+from controller.controller_server.controller_types import ArrayConnectionInfo, ObjectIdInfo, ObjectParameters
 from controller.controller_server.errors import ObjectIdError, ValidationException
 from controller.csi_general import csi_pb2
 
@@ -387,7 +387,7 @@ def get_object_id_info(full_object_id, object_type):
     else:
         raise ObjectIdError(object_type, full_object_id)
     logger.debug("volume id : {0}, array type :{1}".format(object_id, array_type))
-    return VolumeIdInfo(array_type=array_type, system_id=system_id, volume_id=object_id)
+    return ObjectIdInfo(array_type=array_type, system_id=system_id, object_id=object_id)
 
 
 def get_node_id_info(node_id):

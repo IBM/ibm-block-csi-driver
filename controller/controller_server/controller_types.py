@@ -10,10 +10,10 @@ class ArrayConnectionInfo:
 
 
 @dataclass
-class VolumeIdInfo:
+class ObjectIdInfo:
     array_type: str
     system_id: str
-    volume_id: str
+    object_id: str
 
 
 @dataclass

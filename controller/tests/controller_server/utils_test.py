@@ -376,7 +376,7 @@ class TestUtils(unittest.TestCase):
 
         volume_id_info = utils.get_volume_id_info("xiv:volume-id")
         self.assertEqual(volume_id_info.array_type, "xiv")
-        self.assertEqual(volume_id_info.volume_id, "volume-id")
+        self.assertEqual(volume_id_info.object_id, "volume-id")
 
     def test_get_node_id_info(self):
         with self.assertRaises(array_errors.HostNotFoundError) as ex:
