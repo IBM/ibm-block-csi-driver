@@ -3,21 +3,21 @@ from dataclasses import dataclass
 
 @dataclass
 class ArrayConnectionInfo:
+    array_addresses: list
     user: str
     password: str
-    array_addresses: list
-    uid: str = None
+    system_id: str = None
 
 
 @dataclass
 class VolumeIdInfo:
     array_type: str
     volume_id: str
-    secret_uid: str
+    system_id: str
 
 
 @dataclass
-class VolumeParameters:
+class ObjectParameters:
     pool: str
     space_efficiency: str
     prefix: str

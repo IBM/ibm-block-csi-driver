@@ -10,7 +10,7 @@ import controller.controller_server.config as config
 import controller.controller_server.messages as messages
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.common.csi_logger import get_stdout_logger
-from controller.controller_server.controller_types import ArrayConnectionInfo, VolumeIdInfo, VolumeParameters
+from controller.controller_server.controller_types import ArrayConnectionInfo, VolumeIdInfo, ObjectParameters
 from controller.controller_server.errors import ObjectIdError, ValidationException
 from controller.csi_general import csi_pb2
 
@@ -36,79 +36,79 @@ def get_volume_topologies(request):
             return topologies
 
 
-def get_secret_by_topologies(secret_config_string, node_topologies):
-    secret_config = ast.literal_eval(secret_config_string)
-    for secret_uid, secret_info in secret_config.items():
+def get_secret_by_topologies(raw_secret_config, node_topologies):
+    secret_config = ast.literal_eval(raw_secret_config)
+    for system_id, secret_info in secret_config.items():
         secret_topologies = secret_info.get(config.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
         if _is_topology_match(secret_topologies, node_topologies):
-            return secret_info, secret_uid
+            return secret_info, system_id
 
 
-def get_secret_by_uid(secret_config_string, secret_uid):
+def get_secrets_by_system_id(secret_config_string, system_id):
     secret_config = ast.literal_eval(secret_config_string)
-    return secret_config.get(secret_uid)
+    return secret_config.get(system_id)
 
 
-def _get_secret_from_secrets(secrets, topologies=None, secret_uid=None):
+def _get_system_info_from_secrets(secrets, topologies=None, system_id=None):
     secret_config = secrets.get(config.SECRET_CONFIG_PARAMETER)
-    secret = secrets
+    system_secrets = secrets
     if secret_config:
-        if secret_uid:
-            secret = get_secret_by_uid(secret_config_string=secret_config, secret_uid=secret_uid)
+        if system_id:
+            system_secrets = get_secrets_by_system_id(secret_config_string=secret_config, system_id=system_id)
         elif topologies:
-            secret, secret_uid = get_secret_by_topologies(secret_config_string=secret_config,
-                                                          node_topologies=topologies)
+            system_secrets, system_id = get_secret_by_topologies(raw_secret_config=secret_config,
+                                                                 node_topologies=topologies)
         else:
             raise ValidationException(messages.invalid_secret_message)
-    return secret, secret_uid
+    return system_secrets, system_id
 
 
-def _get_array_connection_info_from_secret(secret):
-    user = secret[config.SECRET_USERNAME_PARAMETER]
-    password = secret[config.SECRET_PASSWORD_PARAMETER]
-    array_addresses = secret[config.SECRET_ARRAY_PARAMETER].split(config.PARAMETERS_ARRAY_ADDRESSES_DELIMITER)
+def _get_array_connection_info_from_secrets(secrets):
+    user = secrets[config.SECRET_USERNAME_PARAMETER]
+    password = secrets[config.SECRET_PASSWORD_PARAMETER]
+    array_addresses = secrets[config.SECRET_ARRAY_PARAMETER].split(config.PARAMETERS_ARRAY_ADDRESSES_DELIMITER)
     return user, password, array_addresses
 
 
-def get_array_connection_info_from_secrets(secrets, topologies=None, secret_uid=None):
-    secret, secret_uid = _get_secret_from_secrets(secrets, topologies, secret_uid)
-    user, password, array_addresses = _get_array_connection_info_from_secret(secret)
-    return ArrayConnectionInfo(user=user, password=password, array_addresses=array_addresses, uid=secret_uid)
+def get_array_connection_info_from_secrets(secrets, topologies=None, system_id=None):
+    system_secrets, system_id = _get_system_info_from_secrets(secrets, topologies, system_id)
+    user, password, array_addresses = _get_array_connection_info_from_secrets(system_secrets)
+    return ArrayConnectionInfo(array_addresses=array_addresses, user=user, password=password, system_id=system_id)
 
 
-def get_volume_parameters(parameters, secret_uid):
-    return get_object_parameters(parameters, config.PARAMETERS_VOLUME_NAME_PREFIX, secret_uid)
+def get_volume_parameters(parameters, system_id):
+    return get_object_parameters(parameters, config.PARAMETERS_VOLUME_NAME_PREFIX, system_id)
 
 
-def get_snapshot_parameters(parameters, secret_uid):
-    return get_object_parameters(parameters, config.PARAMETERS_SNAPSHOT_NAME_PREFIX, secret_uid)
+def get_snapshot_parameters(parameters, system_id):
+    return get_object_parameters(parameters, config.PARAMETERS_SNAPSHOT_NAME_PREFIX, system_id)
 
 
-def get_object_parameters(parameters, prefix_param_name, secret_uid):
-    raw_capabilities_by_system = parameters.get(config.PARAMETERS_BY_SYSTEM)
-    system_capabilities = {}
-    if raw_capabilities_by_system and secret_uid:
-        capabilities_by_system = ast.literal_eval(raw_capabilities_by_system)
-        system_capabilities = capabilities_by_system.get(secret_uid, {})
-    return VolumeParameters(
-        pool=system_capabilities.get(config.PARAMETERS_POOL, parameters.get(config.PARAMETERS_POOL)),
-        space_efficiency=system_capabilities.get(config.PARAMETERS_SPACE_EFFICIENCY,
-                                                 parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)),
-        prefix=system_capabilities.get(prefix_param_name,
-                                       parameters.get(prefix_param_name)))
+def get_object_parameters(parameters, prefix_param_name, system_id):
+    raw_parameters_by_system = parameters.get(config.PARAMETERS_BY_SYSTEM)
+    system_parameters = {}
+    if raw_parameters_by_system and system_id:
+        parameters_by_system = ast.literal_eval(raw_parameters_by_system)
+        system_parameters = parameters_by_system.get(system_id, {})
+    return ObjectParameters(
+        pool=system_parameters.get(config.PARAMETERS_POOL, parameters.get(config.PARAMETERS_POOL)),
+        space_efficiency=system_parameters.get(config.PARAMETERS_SPACE_EFFICIENCY,
+                                               parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)),
+        prefix=system_parameters.get(prefix_param_name,
+                                     parameters.get(prefix_param_name)))
 
 
-def get_volume_id(new_volume, secret_uid):
-    return _get_object_id(new_volume, secret_uid)
+def get_volume_id(new_volume, system_id):
+    return _get_object_id(new_volume, system_id)
 
 
 def get_snapshot_id(new_snapshot):
     return _get_object_id(new_snapshot)
 
 
-def _get_object_id(obj, secret_uid=None):
-    if secret_uid:
-        return config.PARAMETERS_OBJECT_ID_DELIMITER.join((obj.array_type, secret_uid, obj.id))
+def _get_object_id(obj, system_id=None):
+    if system_id:
+        return config.PARAMETERS_OBJECT_ID_DELIMITER.join((obj.array_type, system_id, obj.id))
     return config.PARAMETERS_OBJECT_ID_DELIMITER.join((obj.array_type, obj.id))
 
 
@@ -116,44 +116,27 @@ def _is_imported_string_valid(imported_string):
     return re.match(config.SECRET_VALIDATION_REGEX, imported_string) and imported_string == imported_string.strip()
 
 
-def _validate_secret_uid(uid):
-    if not _is_imported_string_valid(uid):
-        raise ValidationException(messages.invalid_uid_value_message.format(uid))
-    if len(uid) > config.SECRET_UID_MAX_LENGTH:
+def _validate_secret_id(secret_id):
+    if not _is_imported_string_valid(secret_id):
+        raise ValidationException(messages.invalid_system_id_value_message.format(secret_id))
+    if len(secret_id) > config.SECRET_SYSTEM_ID_MAX_LENGTH:
         raise ValidationException(
-            messages.parameter_length_is_too_long.format("secret_uid", uid, config.SECRET_UID_MAX_LENGTH))
+            messages.parameter_length_is_too_long.format("system_id", secret_id, config.SECRET_SYSTEM_ID_MAX_LENGTH))
 
 
-def _validate_secrets(secret):
-    if not (config.SECRET_USERNAME_PARAMETER in secret and
-            config.SECRET_PASSWORD_PARAMETER in secret and
-            config.SECRET_ARRAY_PARAMETER in secret):
+def _validate_secrets(secrets):
+    if not (config.SECRET_USERNAME_PARAMETER in secrets and
+            config.SECRET_PASSWORD_PARAMETER in secrets and
+            config.SECRET_ARRAY_PARAMETER in secrets):
         raise ValidationException(messages.invalid_secret_message)
 
 
-def _validate_topologies(secret_topologies):
-    if secret_topologies:
-        for topologies in secret_topologies:
-            for topology_key, topology_value in topologies.items():
-                split_topology = topology_key.split(config.PARAMETERS_TOPOLOGY_DELIMITER)
-                if len(split_topology) != 2:
-                    raise ValidationException(messages.invalid_topology_key_message.format(topology_key))
-                key_prefix, key_name = split_topology
-                if not _is_imported_string_valid(key_name):
-                    raise ValidationException(messages.invalid_topology_key_message.format(key_name))
-                if key_prefix not in config.TOPOLOGY_PREFIXES:
-                    raise ValidationException(messages.invalid_topology_key_message.format(key_prefix))
-                if not _is_imported_string_valid(topology_value):
-                    raise ValidationException(messages.invalid_topology_value_message.format(topology_value))
-
-
-def _validate_secret_config(secret_config_string):
-    secret_config = ast.literal_eval(secret_config_string)
-    for uid, secret_info in secret_config.items():
-        if uid and secret_info:
-            _validate_secret_uid(uid)
+def _validate_secrets_config(secret_config_string):
+    secrets_config = ast.literal_eval(secret_config_string)
+    for system_id, secret_info in secrets_config.items():
+        if system_id and secret_info:
+            _validate_secret_id(system_id)
             _validate_secrets(secret_info)
-            _validate_topologies(secret_info.get(config.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER))
         else:
             raise ValidationException(messages.invalid_secret_message)
 
@@ -164,10 +147,10 @@ def validate_secrets(secrets):
         raise ValidationException(messages.secret_missing_message)
     secret_config = secrets.get(config.SECRET_CONFIG_PARAMETER)
     if secret_config:
-        _validate_secret_config(secret_config)
+        _validate_secrets_config(secret_config)
     else:
         _validate_secrets(secrets)
-    logger.debug("secret validation finished")
+    logger.debug("secrets validation finished")
 
 
 def validate_csi_volume_capability(cap):
@@ -299,7 +282,7 @@ def validate_expand_volume_request(request):
     logger.debug("expand volume validation finished")
 
 
-def generate_csi_create_volume_response(new_volume, secret_uid=None, source_type=None):
+def generate_csi_create_volume_response(new_volume, system_id=None, source_type=None):
     logger.debug("creating volume response for volume : {0}".format(new_volume))
 
     volume_context = {"volume_name": new_volume.name,
@@ -320,7 +303,7 @@ def generate_csi_create_volume_response(new_volume, secret_uid=None, source_type
 
     res = csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(
         capacity_bytes=new_volume.capacity_bytes,
-        volume_id=get_volume_id(new_volume, secret_uid),
+        volume_id=get_volume_id(new_volume, system_id),
         content_source=content_source,
         volume_context=volume_context))
 
@@ -396,15 +379,15 @@ def get_snapshot_id_info(snapshot_id):
 def get_object_id_info(full_object_id, object_type):
     logger.debug("getting {0} info for id : {1}".format(object_type, full_object_id))
     splitted_object_id = full_object_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)
-    secret_uid = None
+    system_id = None
     if len(splitted_object_id) == 2:
         array_type, object_id = splitted_object_id
     elif len(splitted_object_id) == 3:
-        array_type, secret_uid, object_id = splitted_object_id
+        array_type, system_id, object_id = splitted_object_id
     else:
         raise ObjectIdError(object_type, full_object_id)
     logger.debug("volume id : {0}, array type :{1}".format(object_id, array_type))
-    return VolumeIdInfo(array_type=array_type, volume_id=object_id, secret_uid=secret_uid)
+    return VolumeIdInfo(array_type=array_type, volume_id=object_id, system_id=system_id)
 
 
 def get_node_id_info(node_id):

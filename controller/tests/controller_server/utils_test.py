@@ -4,6 +4,7 @@ from mock import patch, Mock
 
 import controller.array_action.errors as array_errors
 import controller.controller_server.utils as utils
+from controller.controller_server import config
 from controller.controller_server.csi_controller_server import ControllerServicer
 from controller.controller_server.errors import ObjectIdError, ValidationException
 from controller.controller_server.test_settings import pool, user, password, array
@@ -59,14 +60,14 @@ class TestUtils(unittest.TestCase):
         secrets = {"config": str({"u1": {"username": user, "management_address": array}})}
         self._test_validate_secrets_validation_errors(secrets)
 
-    def _test_validate_secrets_with_config_valid_uid(self, uid):
-        secrets = {"config": str({uid: {"username": user, "password": password, "management_address": array}}
+    def _test_validate_secrets_with_config_valid_system_id(self, system_id):
+        secrets = {"config": str({system_id: {"username": user, "password": password, "management_address": array}}
                                  )}
         utils.validate_secrets(secrets)
 
-    def test_validate_secrets_with_config_valid_uid(self):
-        self._test_validate_secrets_with_config_valid_uid("ui_.d")
-        self._test_validate_secrets_with_config_valid_uid("a" * 90)
+    def test_validate_secrets_with_config_valid_system_id(self):
+        self._test_validate_secrets_with_config_valid_system_id("ui_.d")
+        self._test_validate_secrets_with_config_valid_system_id("a" * 90)
 
     def test_validate_secrets_with_config_and_topologies(self):
         secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array,
@@ -75,40 +76,32 @@ class TestUtils(unittest.TestCase):
                                  )}
         utils.validate_secrets(secrets)
 
-    def _test_validate_secrets_with_config_invalid_parameters(self, uid="u1", topology="topology.kubernetes.io/test",
-                                                              value="test"):
-        secrets = {"config": str({uid: {"username": user, "password": password, "management_address": array,
-                                        "supported_topologies": [{topology: value}]}})}
+    def _test_validate_secrets_with_config_invalid_system_id(self, system_id="u1"):
+        secrets = {"config": str({system_id: {"username": user, "password": password, "management_address": array,
+                                              "supported_topologies": [{"topology.kubernetes.io/test": "test"}]}})}
         self._test_validate_secrets_validation_errors(secrets)
 
     def test_validate_secrets_with_config_invalid_parameters(self):
-        uids = ["-u1", "u:1", "u1+", "u1*", "u-1(", "u/1", "u=1", " ", "", None, "a" * 91]
-        for uid in uids:
-            self._test_validate_secrets_with_config_invalid_parameters(uid=uid)
+        system_ids = ["-u1", "u:1", "u1+", "u1*", "u-1(", "u/1", "u=1", " ", "", None, "a" * 91]
+        for system_id in system_ids:
+            self._test_validate_secrets_with_config_invalid_system_id(system_id=system_id)
 
-        topologies = ["topology.kubernetes.io", "topology.kubernetes/test", "topology.kubernetes.io/-test"]
-        for topology in topologies:
-            self._test_validate_secrets_with_config_invalid_parameters(topology=topology)
-
-        self._test_validate_secrets_with_config_invalid_parameters(value="a*")
-
-    def _test_get_array_connection_info_from_secrets(self, secrets, topologies=None, secret_uid=None):
-        response = utils.get_array_connection_info_from_secrets(
+    def _test_get_array_connection_info_from_secrets(self, secrets, topologies=None, system_id=None):
+        array_connection_info = utils.get_array_connection_info_from_secrets(
             secrets=secrets,
             topologies=topologies,
-            secret_uid=secret_uid)
-        secret = response
-        self.assertEqual(secret.user, user)
-        self.assertEqual(secret.password, password)
-        self.assertEqual(secret.array_addresses[0], array)
-        if topologies or secret_uid:
-            self.assertIsNotNone(secret.uid)
+            system_id=system_id)
+        self.assertEqual(array_connection_info.user, user)
+        self.assertEqual(array_connection_info.password, password)
+        self.assertEqual(array_connection_info.array_addresses[0], array)
+        if topologies or system_id:
+            self.assertIsNotNone(array_connection_info.system_id)
         else:
-            self.assertIsNone(secret.uid)
+            self.assertIsNone(array_connection_info.system_id)
 
     def test_get_array_connection_info_from_secrets(self):
         secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array}})}
-        self._test_get_array_connection_info_from_secrets(secrets, secret_uid="u1")
+        self._test_get_array_connection_info_from_secrets(secrets, system_id="u1")
         secrets = {"username": user, "password": password, "management_address": array}
         self._test_get_array_connection_info_from_secrets(secrets)
         secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array,
@@ -117,17 +110,18 @@ class TestUtils(unittest.TestCase):
                                                           topologies={"topology.kubernetes.io/test": "zone1",
                                                                       "topology.block.csi.ibm.com/test": "dev1"})
 
-    def _test_get_pool_from_parameters(self, parameters, expected_pool=pool, uid=None):
-        volume_parameters = utils.get_volume_parameters(parameters, uid)
+    def _test_get_pool_from_parameters(self, parameters, expected_pool=pool, system_id=None):
+        volume_parameters = utils.get_volume_parameters(parameters, system_id)
         self.assertEqual(volume_parameters.pool, expected_pool)
 
     def test_get_pool_from_parameters(self):
-        parameters = {"pool": pool}
+        parameters = {config.PARAMETERS_POOL: pool}
         self._test_get_pool_from_parameters(parameters)
-        self._test_get_pool_from_parameters(parameters, uid="u1")
-        parameters = {"by_system": str({"u1": {"pool": pool}, "u2": {"pool": "other_pool"}})}
-        self._test_get_pool_from_parameters(parameters, uid="u1")
-        self._test_get_pool_from_parameters(parameters, expected_pool="other_pool", uid="u2")
+        self._test_get_pool_from_parameters(parameters, system_id="u1")
+        parameters = {config.PARAMETERS_BY_SYSTEM: str(
+            {"u1": {config.PARAMETERS_POOL: pool}, "u2": {config.PARAMETERS_POOL: "other_pool"}})}
+        self._test_get_pool_from_parameters(parameters, system_id="u1")
+        self._test_get_pool_from_parameters(parameters, expected_pool="other_pool", system_id="u2")
         self._test_get_pool_from_parameters(parameters, expected_pool=None)
 
     def test_validate_file_system_volume_capabilities(self):
@@ -236,12 +230,12 @@ class TestUtils(unittest.TestCase):
             utils.validate_create_volume_request(request)
             self.assertTrue("parameters" in str(ex))
 
-        request.parameters = {"pool": pool, "SpaceEfficiency": "thin "}
+        request.parameters = {config.PARAMETERS_POOL: pool, config.PARAMETERS_SPACE_EFFICIENCY: "thin "}
         request.volume_content_source = None
 
         utils.validate_create_volume_request(request)
 
-        request.parameters = {"pool": pool}
+        request.parameters = {config.PARAMETERS_POOL: pool}
         utils.validate_create_volume_request(request)
 
         request.capacity_range.required_bytes = 0

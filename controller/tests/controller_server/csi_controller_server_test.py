@@ -52,18 +52,15 @@ class AbstractControllerTest(unittest.TestCase):
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertIn(message, context.details)
 
-    def _test_create_object_with_wrong_secrets_config(self, message, uid="u1",
+    def _test_create_object_with_wrong_secrets_config(self, message, system_id="u1",
                                                       topology_key="topology.kubernetes.io/test",
                                                       topology_value="test"):
-        secrets = {"config": str({uid: {"username": "user", "password": "password", "management_address": "array",
-                                        "supported_topologies": [{topology_key: topology_value}]}})}
+        secrets = {"config": str({system_id: {"username": "user", "password": "password", "management_address": "array",
+                                              "supported_topologies": [{topology_key: topology_value}]}})}
         self._test_create_object_with_wrong_secret(secrets, message=message)
 
     def _test_create_object_with_secrets_config_invalid_parameters(self):
-        self._test_create_object_with_wrong_secrets_config(message="uid", uid="u-")
-        self._test_create_object_with_wrong_secrets_config(message="topology key",
-                                                           topology_key="topology.kubernetes.io")
-        self._test_create_object_with_wrong_secrets_config(message="topology value", topology_value="a*")
+        self._test_create_object_with_wrong_secrets_config(message="system id", system_id="u-")
 
     def _test_create_object_with_wrong_secrets(self, storage_agent):
         storage_agent.return_value = self.storage_agent
@@ -156,12 +153,13 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_pool_parameter_succeeds(self, storage_agent):
-        self.request.parameters = {"pool": pool}
+        self.request.parameters = {config.PARAMETERS_POOL: pool}
         self._test_create_snapshot_succeeds(storage_agent, expected_pool=pool)
 
-    def _test_create_snapshot_with_pools_by_system_parameter(self, storage_agent, uid, expected_pool):
-        self.request.source_volume_id = "{}:{}:{}".format("A9000", uid, snapshot_volume_wwn)
-        self.request.parameters = {"by_system": str({"u1": {"pool": pool}, "u2": {"pool": "other_pool"}})}
+    def _test_create_snapshot_with_pools_by_system_parameter(self, storage_agent, system_id, expected_pool):
+        self.request.source_volume_id = "{}:{}:{}".format("A9000", system_id, snapshot_volume_wwn)
+        self.request.parameters = {config.PARAMETERS_BY_SYSTEM: str(
+            {"u1": {config.PARAMETERS_POOL: pool}, "u2": {config.PARAMETERS_POOL: "other_pool"}})}
         self._test_create_snapshot_succeeds(storage_agent, expected_pool=expected_pool)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -386,7 +384,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.maximal_volume_size_in_bytes = 10
         self.mediator.minimal_volume_size_in_bytes = 2
 
-        self.request.parameters = {"pool": pool}
+        self.request.parameters = {config.PARAMETERS_POOL: pool}
         self.capacity_bytes = 10
         self.request.capacity_range = Mock()
         self.request.capacity_range.required_bytes = self.capacity_bytes
@@ -428,7 +426,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.request.accessibility_requirements.preferred = [
             ProtoBufMock(segments={"topology.kubernetes.io/test": "topology_value",
                                    "topology.kubernetes.io/test2": "topology_value2"})]
-        self.request.parameters = {"by_system": str({"u1": {"pool": pool}, "u2": {"pool": "other_pool"}})}
+        self.request.parameters = {config.PARAMETERS_BY_SYSTEM: str(
+            {"u1": {config.PARAMETERS_POOL: pool}, "u2": {config.PARAMETERS_POOL: "other_pool"}})}
         self._test_create_volume_succeeds(storage_agent, expected_pool="other_pool")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -471,7 +470,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     def test_create_volume_with_wrong_parameters(self, storage_agent):
         storage_agent.return_value = self.storage_agent
 
-        self.request.parameters = {"pool": pool}
+        self.request.parameters = {config.PARAMETERS_POOL: pool}
         self.servicer.CreateVolume(self.request, self.context)
         self.assertNotEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
 
