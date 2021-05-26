@@ -7,6 +7,7 @@ invalid_secrets_message = "invalid secrets was passed"
 invalid_topology_key_message = "invalid topology key was passed: {}"
 invalid_topology_value_message = "invalid topology value was passed: {}"
 invalid_system_id_value_message = "invalid system id value was passed: {}"
+invalid_non_json_parameter_message = "invalid non json parameter was passed: {}."
 secrets_missing_message = 'secrets is missing'
 capabilities_not_set_message = "capabilities were not set"
 unsupported_fs_type_message = "unsupported fs_type : {}"

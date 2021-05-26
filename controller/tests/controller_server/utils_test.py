@@ -1,3 +1,4 @@
+import json
 import unittest
 
 from mock import patch, Mock
@@ -10,6 +11,7 @@ from controller.controller_server.errors import ObjectIdError, ValidationExcepti
 from controller.controller_server.test_settings import pool, user, password, array
 from controller.csi_general import csi_pb2
 from controller.tests.controller_server.csi_controller_server_test import ProtoBufMock
+from controller.tests.utils import get_mock_secret_config
 
 
 class TestUtils(unittest.TestCase):
@@ -52,50 +54,35 @@ class TestUtils(unittest.TestCase):
         self._test_validate_secrets_validation_errors(secrets)
 
     def test_validate_secrets_with_config(self):
-        secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array,
-                                         "supported_topologies": [{"test": "zone1"}]}}
-                                 )}
+        secrets = get_mock_secret_config()
         utils.validate_secrets(secrets)
 
     def test_validate_secrets_with_config_invalid_secret(self):
-        secrets = {"config": str({"u1": {"username": user, "management_address": array,
-                                         "supported_topologies": [{"test": "zone1"}]}})}
+        secrets = get_mock_secret_config(password=None)
         self._test_validate_secrets_validation_errors(secrets)
 
     def test_validate_secrets_with_config_no_topologies(self):
-        secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array}})}
+        secrets = get_mock_secret_config(supported_topologies=None)
         self._test_validate_secrets_validation_errors(secrets)
-        secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array,
-                                         "supported_topologies": []}})}
+        secrets = get_mock_secret_config(supported_topologies=[])
         self._test_validate_secrets_validation_errors(secrets)
-        secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array,
-                                         "supported_topologies": [{}]}})}
+        secrets = get_mock_secret_config(supported_topologies=[{}])
         self._test_validate_secrets_validation_errors(secrets)
 
     def _test_validate_secrets_with_config_valid_system_id(self, system_id):
-        secrets = {"config": str({system_id: {"username": user, "password": password, "management_address": array,
-                                              "supported_topologies": [{"test": "zone1"}]}}
-                                 )}
+        secrets = get_mock_secret_config(system_id=system_id)
         utils.validate_secrets(secrets)
 
     def test_validate_secrets_with_config_valid_system_id(self):
         self._test_validate_secrets_with_config_valid_system_id("ui_.d")
         self._test_validate_secrets_with_config_valid_system_id("a" * 90)
 
-    def test_validate_secrets_with_config_and_topologies(self):
-        secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array,
-                                         "supported_topologies": [{"test1": "zone1",
-                                                                   "test2": "dev1"}]}}
-                                 )}
-        utils.validate_secrets(secrets)
-
     def _test_validate_secrets_with_config_invalid_system_id(self, system_id):
-        secrets = {"config": str({system_id: {"username": user, "password": password, "management_address": array,
-                                              "supported_topologies": [{"test": "test"}]}})}
+        secrets = get_mock_secret_config(system_id=system_id)
         self._test_validate_secrets_validation_errors(secrets)
 
     def test_validate_secrets_with_config_invalid_parameters(self):
-        system_ids = ["-u1", "u:1", "u1+", "u1*", "u-1(", "u/1", "u=1", " ", "", None, "a" * 91]
+        system_ids = ["-u1", "u:1", "u1+", "u1*", "u-1(", "u/1", "u=1", " ", "", "a" * 91]
         for system_id in system_ids:
             self._test_validate_secrets_with_config_invalid_system_id(system_id=system_id)
 
@@ -113,12 +100,11 @@ class TestUtils(unittest.TestCase):
             self.assertIsNone(array_connection_info.system_id)
 
     def test_get_array_connection_info_from_secrets(self):
-        secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array}})}
+        secrets = get_mock_secret_config()
         self._test_get_array_connection_info_from_secrets(secrets, system_id="u1")
         secrets = {"username": user, "password": password, "management_address": array}
         self._test_get_array_connection_info_from_secrets(secrets)
-        secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array,
-                                         "supported_topologies": [{"topology.kubernetes.io/test": "zone1"}]}})}
+        secrets = get_mock_secret_config(supported_topologies=[{"topology.kubernetes.io/test": "zone1"}])
         self._test_get_array_connection_info_from_secrets(secrets,
                                                           topologies={"topology.kubernetes.io/test": "zone1",
                                                                       "topology.block.csi.ibm.com/test": "dev1"})
@@ -131,7 +117,7 @@ class TestUtils(unittest.TestCase):
         parameters = {config.PARAMETERS_POOL: pool}
         self._test_get_pool_from_parameters(parameters)
         self._test_get_pool_from_parameters(parameters, system_id="u1")
-        parameters = {config.PARAMETERS_BY_SYSTEM: str(
+        parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
             {"u1": {config.PARAMETERS_POOL: pool}, "u2": {config.PARAMETERS_POOL: "other_pool"}})}
         self._test_get_pool_from_parameters(parameters, system_id="u1")
         self._test_get_pool_from_parameters(parameters, expected_pool="other_pool", system_id="u2")

@@ -1,6 +1,6 @@
-import ast
-from hashlib import sha256
+import json
 import re
+from hashlib import sha256
 
 import base58
 from google.protobuf.timestamp_pb2 import Timestamp
@@ -15,6 +15,14 @@ from controller.controller_server.errors import ObjectIdError, ValidationExcepti
 from controller.csi_general import csi_pb2
 
 logger = get_stdout_logger()
+
+
+def _parse_raw_input(raw_input):
+    try:
+        parsed_input = json.loads(raw_input)
+    except json.decoder.JSONDecodeError:
+        raise ValidationException(messages.invalid_non_json_parameter_message.format(raw_input))
+    return parsed_input
 
 
 def _is_topology_match(system_topologies, node_topologies):
@@ -36,16 +44,14 @@ def get_volume_topologies(request):
             return topologies
 
 
-def get_system_info_by_topologies(raw_secrets_config, node_topologies):
-    secrets_config = ast.literal_eval(raw_secrets_config)
+def get_system_info_by_topologies(secrets_config, node_topologies):
     for system_id, system_info in secrets_config.items():
         system_topologies = system_info.get(config.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
         if _is_topology_match(system_topologies, node_topologies):
             return system_info, system_id
 
 
-def _get_system_info_by_system_id(raw_secrets_config, system_id):
-    secrets_config = ast.literal_eval(raw_secrets_config)
+def _get_system_info_by_system_id(secrets_config, system_id):
     return secrets_config.get(system_id)
 
 
@@ -53,10 +59,11 @@ def _get_system_info_from_secrets(secrets, topologies=None, system_id=None):
     raw_secrets_config = secrets.get(config.SECRET_CONFIG_PARAMETER)
     system_info = secrets
     if raw_secrets_config:
+        secrets_config = _parse_raw_input(raw_input=raw_secrets_config)
         if system_id:
-            system_info = _get_system_info_by_system_id(raw_secrets_config=raw_secrets_config, system_id=system_id)
+            system_info = _get_system_info_by_system_id(secrets_config=secrets_config, system_id=system_id)
         elif topologies:
-            system_info, system_id = get_system_info_by_topologies(raw_secrets_config=raw_secrets_config,
+            system_info, system_id = get_system_info_by_topologies(secrets_config=secrets_config,
                                                                    node_topologies=topologies)
         else:
             raise ValidationException(messages.invalid_secrets_message)
@@ -87,14 +94,15 @@ def get_object_parameters(parameters, prefix_param_name, system_id):
     raw_parameters_by_system = parameters.get(config.PARAMETERS_BY_SYSTEM)
     system_parameters = {}
     if raw_parameters_by_system and system_id:
-        parameters_by_system = ast.literal_eval(raw_parameters_by_system)
+        parameters_by_system = _parse_raw_input(raw_input=raw_parameters_by_system)
         system_parameters = parameters_by_system.get(system_id, {})
+    default_pool = parameters.get(config.PARAMETERS_POOL)
+    default_space_efficiency = parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
+    default_prefix = parameters.get(prefix_param_name)
     return ObjectParameters(
-        pool=system_parameters.get(config.PARAMETERS_POOL, parameters.get(config.PARAMETERS_POOL)),
-        space_efficiency=system_parameters.get(config.PARAMETERS_SPACE_EFFICIENCY,
-                                               parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)),
-        prefix=system_parameters.get(prefix_param_name,
-                                     parameters.get(prefix_param_name)))
+        pool=system_parameters.get(config.PARAMETERS_POOL, default_pool),
+        space_efficiency=system_parameters.get(config.PARAMETERS_SPACE_EFFICIENCY, default_space_efficiency),
+        prefix=system_parameters.get(prefix_param_name, default_prefix))
 
 
 def get_volume_id(new_volume, system_id):
@@ -112,7 +120,7 @@ def _get_object_id(obj, system_id=None):
 
 
 def _is_imported_string_valid(imported_string):
-    return re.match(config.SECRET_VALIDATION_REGEX, imported_string) and imported_string == imported_string.strip()
+    return imported_string and re.match(config.SECRET_VALIDATION_REGEX, imported_string)
 
 
 def _validate_system_id(system_id):
@@ -139,8 +147,7 @@ def _validate_topologies(topologies):
         raise ValidationException(messages.invalid_secrets_message)
 
 
-def _validate_secrets_config(raw_secrets_config):
-    secrets_config = ast.literal_eval(raw_secrets_config)
+def _validate_secrets_config(secrets_config):
     for system_id, system_info in secrets_config.items():
         if system_id and system_info:
             _validate_topologies(system_info.get(config.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER))
@@ -156,7 +163,8 @@ def validate_secrets(secrets):
         raise ValidationException(messages.secrets_missing_message)
     raw_secrets_config = secrets.get(config.SECRET_CONFIG_PARAMETER)
     if raw_secrets_config:
-        _validate_secrets_config(raw_secrets_config)
+        secrets_config = _parse_raw_input(raw_secrets_config)
+        _validate_secrets_config(secrets_config)
     else:
         _validate_secrets(secrets)
     logger.debug("secrets validation finished")

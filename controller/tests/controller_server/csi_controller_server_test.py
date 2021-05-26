@@ -1,4 +1,5 @@
 import abc
+import json
 import unittest
 
 # from unittest import mock as umock
@@ -52,16 +53,6 @@ class AbstractControllerTest(unittest.TestCase):
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertIn(message, context.details)
 
-    def _test_create_object_with_wrong_secrets_config(self, message, system_id="u1",
-                                                      topology_key="topology.kubernetes.io/test",
-                                                      topology_value="test"):
-        secrets = {"config": str({system_id: {"username": "user", "password": "password", "management_address": "array",
-                                              "supported_topologies": [{topology_key: topology_value}]}})}
-        self._test_create_object_with_wrong_secrets_parameters(secrets, message=message)
-
-    def _test_create_object_with_secrets_config_invalid_parameters(self):
-        self._test_create_object_with_wrong_secrets_config(message="system id", system_id="u-")
-
     def _test_create_object_with_wrong_secrets(self, storage_agent):
         storage_agent.return_value = self.storage_agent
 
@@ -74,7 +65,8 @@ class AbstractControllerTest(unittest.TestCase):
         secrets = {"username": "user", "password": "pass"}
         self._test_create_object_with_wrong_secrets_parameters(secrets)
 
-        self._test_create_object_with_secrets_config_invalid_parameters()
+        secrets = utils.get_mock_secret_config(system_id="u-")
+        self._test_create_object_with_wrong_secrets_parameters(secrets, message="system id")
 
         self.request.secrets = []
 
@@ -158,7 +150,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
     def _test_create_snapshot_with_pools_by_system_parameter(self, storage_agent, system_id, expected_pool):
         self.request.source_volume_id = "{}:{}:{}".format("A9000", system_id, snapshot_volume_wwn)
-        self.request.parameters = {config.PARAMETERS_BY_SYSTEM: str(
+        self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
             {"u1": {config.PARAMETERS_POOL: pool}, "u2": {config.PARAMETERS_POOL: "other_pool"}})}
         self._test_create_snapshot_succeeds(storage_agent, expected_pool=expected_pool)
 
@@ -419,14 +411,12 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_topologies_succeeds(self, storage_agent):
-        self.request.secrets = {
-            "config": str({"u2": {"username": "user", "password": "password", "management_address": "array",
-                                  "supported_topologies": [
-                                      {"topology.kubernetes.io/test": "topology_value"}]}})}
+        self.request.secrets = utils.get_mock_secret_config(system_id="u2", supported_topologies=[
+            {"topology.kubernetes.io/test": "topology_value"}])
         self.request.accessibility_requirements.preferred = [
             ProtoBufMock(segments={"topology.kubernetes.io/test": "topology_value",
                                    "topology.kubernetes.io/test2": "topology_value2"})]
-        self.request.parameters = {config.PARAMETERS_BY_SYSTEM: str(
+        self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
             {"u1": {config.PARAMETERS_POOL: pool}, "u2": {config.PARAMETERS_POOL: "other_pool"}})}
         self._test_create_volume_succeeds(storage_agent, expected_pool="other_pool")
 
@@ -615,7 +605,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
                                                              final_name="default_some_name",
                                                              space_efficiency=None):
         get_array_connection_info_from_secrets.side_effect = [utils.get_mock_array_connection_info()]
-        self.request.parameters = {config.PARAMETERS_BY_SYSTEM: str(
+        self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
             {"u1": {config.PARAMETERS_VOLUME_NAME_PREFIX: prefix, config.PARAMETERS_POOL: pool,
                     config.PARAMETERS_SPACE_EFFICIENCY: space_efficiency}})}
         self._test_create_volume_parameters(final_name, space_efficiency)
