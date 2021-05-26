@@ -28,7 +28,7 @@ def _parse_raw_input(raw_input):
 def _is_topology_match(system_topologies, node_topologies):
     for topologies in system_topologies:
         logger.debug(
-            "Comparing topologies: volume topologies: {},"
+            "Comparing topologies: system topologies: {},"
             " node topologies: {}".format(topologies, node_topologies))
         if topologies.items() <= node_topologies.items():
             return True
