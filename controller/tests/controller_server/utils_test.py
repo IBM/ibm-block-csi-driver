@@ -52,16 +52,29 @@ class TestUtils(unittest.TestCase):
         self._test_validate_secrets_validation_errors(secrets)
 
     def test_validate_secrets_with_config(self):
-        secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array}}
+        secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array,
+                                         "supported_topologies": [{"test": "zone1"}]}}
                                  )}
         utils.validate_secrets(secrets)
 
     def test_validate_secrets_with_config_invalid_secret(self):
-        secrets = {"config": str({"u1": {"username": user, "management_address": array}})}
+        secrets = {"config": str({"u1": {"username": user, "management_address": array,
+                                         "supported_topologies": [{"test": "zone1"}]}})}
+        self._test_validate_secrets_validation_errors(secrets)
+
+    def test_validate_secrets_with_config_no_topologies(self):
+        secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array}})}
+        self._test_validate_secrets_validation_errors(secrets)
+        secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array,
+                                         "supported_topologies": []}})}
+        self._test_validate_secrets_validation_errors(secrets)
+        secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array,
+                                         "supported_topologies": [{}]}})}
         self._test_validate_secrets_validation_errors(secrets)
 
     def _test_validate_secrets_with_config_valid_system_id(self, system_id):
-        secrets = {"config": str({system_id: {"username": user, "password": password, "management_address": array}}
+        secrets = {"config": str({system_id: {"username": user, "password": password, "management_address": array,
+                                              "supported_topologies": [{"test": "zone1"}]}}
                                  )}
         utils.validate_secrets(secrets)
 
@@ -71,14 +84,14 @@ class TestUtils(unittest.TestCase):
 
     def test_validate_secrets_with_config_and_topologies(self):
         secrets = {"config": str({"u1": {"username": user, "password": password, "management_address": array,
-                                         "supported_topologies": [{"topology.kubernetes.io/test": "zone1",
-                                                                   "topology.block.csi.ibm.com/test": "dev1"}]}}
+                                         "supported_topologies": [{"test1": "zone1",
+                                                                   "test2": "dev1"}]}}
                                  )}
         utils.validate_secrets(secrets)
 
-    def _test_validate_secrets_with_config_invalid_system_id(self, system_id="u1"):
+    def _test_validate_secrets_with_config_invalid_system_id(self, system_id):
         secrets = {"config": str({system_id: {"username": user, "password": password, "management_address": array,
-                                              "supported_topologies": [{"topology.kubernetes.io/test": "test"}]}})}
+                                              "supported_topologies": [{"test": "test"}]}})}
         self._test_validate_secrets_validation_errors(secrets)
 
     def test_validate_secrets_with_config_invalid_parameters(self):

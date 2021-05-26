@@ -17,8 +17,8 @@ from controller.csi_general import csi_pb2
 logger = get_stdout_logger()
 
 
-def _is_topology_match(secret_topologies, node_topologies):
-    for topologies in secret_topologies:
+def _is_topology_match(system_topologies, node_topologies):
+    for topologies in system_topologies:
         logger.debug(
             "Comparing topologies: volume topologies: {},"
             " node topologies: {}".format(topologies, node_topologies))
@@ -36,44 +36,43 @@ def get_volume_topologies(request):
             return topologies
 
 
-def get_secret_by_topologies(raw_secret_config, node_topologies):
-    secret_config = ast.literal_eval(raw_secret_config)
-    for system_id, secret_info in secret_config.items():
-        secret_topologies = secret_info.get(config.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
-        if _is_topology_match(secret_topologies, node_topologies):
-            return secret_info, system_id
+def get_system_info_by_topologies(raw_secrets_config, node_topologies):
+    secrets_config = ast.literal_eval(raw_secrets_config)
+    for system_id, system_info in secrets_config.items():
+        system_topologies = system_info.get(config.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
+        if _is_topology_match(system_topologies, node_topologies):
+            return system_info, system_id
 
 
-def get_secrets_by_system_id(secret_config_string, system_id):
-    secret_config = ast.literal_eval(secret_config_string)
-    return secret_config.get(system_id)
+def _get_system_info_by_system_id(raw_secrets_config, system_id):
+    secrets_config = ast.literal_eval(raw_secrets_config)
+    return secrets_config.get(system_id)
 
 
 def _get_system_info_from_secrets(secrets, topologies=None, system_id=None):
-    secret_config = secrets.get(config.SECRET_CONFIG_PARAMETER)
-    system_secrets = secrets
-    if secret_config:
+    raw_secrets_config = secrets.get(config.SECRET_CONFIG_PARAMETER)
+    system_info = secrets
+    if raw_secrets_config:
         if system_id:
-            system_secrets = get_secrets_by_system_id(secret_config_string=secret_config, system_id=system_id)
+            system_info = _get_system_info_by_system_id(raw_secrets_config=raw_secrets_config, system_id=system_id)
         elif topologies:
-            system_secrets, system_id = get_secret_by_topologies(raw_secret_config=secret_config,
-                                                                 node_topologies=topologies)
+            system_info, system_id = get_system_info_by_topologies(raw_secrets_config=raw_secrets_config,
+                                                                   node_topologies=topologies)
         else:
             raise ValidationException(messages.invalid_secrets_message)
-    return system_secrets, system_id
+    return system_info, system_id
 
 
-def _get_array_connection_info_from_secrets(secrets):
+def _get_array_connection_info_from_system_info(secrets, system_id):
     user = secrets[config.SECRET_USERNAME_PARAMETER]
     password = secrets[config.SECRET_PASSWORD_PARAMETER]
     array_addresses = secrets[config.SECRET_ARRAY_PARAMETER].split(config.PARAMETERS_ARRAY_ADDRESSES_DELIMITER)
-    return user, password, array_addresses
+    return ArrayConnectionInfo(array_addresses=array_addresses, user=user, password=password, system_id=system_id)
 
 
 def get_array_connection_info_from_secrets(secrets, topologies=None, system_id=None):
-    system_secrets, system_id = _get_system_info_from_secrets(secrets, topologies, system_id)
-    user, password, array_addresses = _get_array_connection_info_from_secrets(system_secrets)
-    return ArrayConnectionInfo(array_addresses=array_addresses, user=user, password=password, system_id=system_id)
+    system_info, system_id = _get_system_info_from_secrets(secrets, topologies, system_id)
+    return _get_array_connection_info_from_system_info(system_info, system_id)
 
 
 def get_volume_parameters(parameters, system_id):
@@ -116,12 +115,12 @@ def _is_imported_string_valid(imported_string):
     return re.match(config.SECRET_VALIDATION_REGEX, imported_string) and imported_string == imported_string.strip()
 
 
-def _validate_secret_id(secret_id):
-    if not _is_imported_string_valid(secret_id):
-        raise ValidationException(messages.invalid_system_id_value_message.format(secret_id))
-    if len(secret_id) > config.SECRET_SYSTEM_ID_MAX_LENGTH:
+def _validate_system_id(system_id):
+    if not _is_imported_string_valid(system_id):
+        raise ValidationException(messages.invalid_system_id_value_message.format(system_id))
+    if len(system_id) > config.SECRET_SYSTEM_ID_MAX_LENGTH:
         raise ValidationException(
-            messages.parameter_length_is_too_long.format("system_id", secret_id, config.SECRET_SYSTEM_ID_MAX_LENGTH))
+            messages.parameter_length_is_too_long.format("system id", system_id, config.SECRET_SYSTEM_ID_MAX_LENGTH))
 
 
 def _validate_secrets(secrets):
@@ -131,12 +130,22 @@ def _validate_secrets(secrets):
         raise ValidationException(messages.invalid_secrets_message)
 
 
-def _validate_secrets_config(secret_config_string):
-    secrets_config = ast.literal_eval(secret_config_string)
-    for system_id, secret_info in secrets_config.items():
-        if system_id and secret_info:
-            _validate_secret_id(system_id)
-            _validate_secrets(secret_info)
+def _validate_topologies(topologies):
+    if topologies:
+        for topology in topologies:
+            if not topology:
+                raise ValidationException(messages.invalid_secrets_message)
+    else:
+        raise ValidationException(messages.invalid_secrets_message)
+
+
+def _validate_secrets_config(raw_secrets_config):
+    secrets_config = ast.literal_eval(raw_secrets_config)
+    for system_id, system_info in secrets_config.items():
+        if system_id and system_info:
+            _validate_topologies(system_info.get(config.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER))
+            _validate_system_id(system_id)
+            _validate_secrets(system_info)
         else:
             raise ValidationException(messages.invalid_secrets_message)
 
@@ -145,9 +154,9 @@ def validate_secrets(secrets):
     logger.debug("validating secrets")
     if not secrets:
         raise ValidationException(messages.secrets_missing_message)
-    secret_config = secrets.get(config.SECRET_CONFIG_PARAMETER)
-    if secret_config:
-        _validate_secrets_config(secret_config)
+    raw_secrets_config = secrets.get(config.SECRET_CONFIG_PARAMETER)
+    if raw_secrets_config:
+        _validate_secrets_config(raw_secrets_config)
     else:
         _validate_secrets(secrets)
     logger.debug("secrets validation finished")
