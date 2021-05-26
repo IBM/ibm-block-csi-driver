@@ -2,7 +2,7 @@
 
 This document provides advanced technical information. Use it to help with advanced configuration settings and troubleshooting that you may need while installing and using the IBM block storage CSI driver.
 
-**NOTE:** This is not a complete users guide. For full documentation, see [IBM block storage CSI driver documentation](www.ibm.com/docs/en/blockstg-csi-driver).
+**NOTE:** This is not a complete user guide. For full documentation, see [IBM block storage CSI driver documentation](https://www.ibm.com/docs/en/blockstg-csi-driver).
 
 - [Compatibility and Requirements](#Compatibility-and-Requirements)
 - [Running a stateful container with file system configurations](#Running-a-stateful-container-with-file-system-configurations)
@@ -182,14 +182,14 @@ This document provides advanced technical information. Use it to help with advan
 
     5.  View the PV mounted on this host.
 
-        **Note:** All PV mountpoints look like: /var/lib/kubelet/pods/\*/volumes/kubernetes.io~csi/pvc-\*/mount
+        **Note:** All PV mountpoints look like: `/var/lib/kubelet/pods/\*/volumes/kubernetes.io~csi/pvc-\*/mount`
 
         ```screen
         $>[k8s-node1]  df | egrep pvc
         /dev/mapper/mpathz      1038336    32944   1005392   4% /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-828ce909-6eb2-11ea-abc8-005056a49b44/mount
         ```
 
-    6.  Details about the driver internal metadata file .stageInfo.json is stored in the k8s PV node stage path /var/lib/kubelet/plugins/kubernetes.io/csi/pv/<PVC-ID\>/globalmount/.stageInfo.json. The CSI driver creates the metadata file during the NodeStage API and is used at later stages by the NodePublishVolume, NodeUnPublishVolume and NodeUnStage CSI APIs later on.
+    6.  Details about the driver internal metadata file .stageInfo.json is stored in the k8s PV node stage path `/var/lib/kubelet/plugins/kubernetes.io/csi/pv/<PVC-ID>/globalmount/.stageInfo.json`. The CSI driver creates the metadata file during the NodeStage API and is used at later stages by the NodePublishVolume, NodeUnPublishVolume and NodeUnStage CSI APIs later on.
 
         ```screen
         $> cat /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-828ce909-6eb2-11ea-abc8-005056a49b44/globalmount/.stageInfo.json
@@ -205,11 +205,11 @@ This document provides advanced technical information. Use it to help with advan
         statefulset/demo-statefulset-file-system deleted
         ```
 
-    2.  Wait until the pod is deleted. Once deleted, the '"demo-statefulset-file-system" not found' is returned.
+    2.  Wait until the pod is deleted. Once deleted, the `"demo-statefulset-file-system" not found` is returned.
 
         ```screen
         $> kubectl get statefulset/demo-statefulset-file-system
-        Error from server (NotFound): statefulsets.apps <StatefulSet name\> not found
+        Error from server (NotFound): statefulsets.apps <StatefulSet name> not found
         ```
 
     3.  Verify that the multipath was deleted and that the PV mountpoint no longer exists by establishing an SSH connection and logging into the worker node.
@@ -310,7 +310,7 @@ This document provides advanced technical information. Use it to help with advan
     statefulset.apps/demo-statefulset-raw-block created
     ```
 
-    ```screen
+    <pre>
     $> cat demo-statefulset-raw-block.yaml
     
     kind: StatefulSet
@@ -333,9 +333,9 @@ This document provides advanced technical information. Use it to help with advan
             image: registry.access.redhat.com/ubi8/ubi:latest
             command: \[ "/bin/sh", "-c", "--" \]
             args: \[ "while true; do sleep 30; done;" \]
-            **volumeDevices:
+            <b>volumeDevices:
               - name: demo-volume-raw-block
-                devicePath: "/dev/block"**
+                devicePath: "/dev/block"</b>
           volumes:
           - name: demo-volume-raw-block
             persistentVolumeClaim:
@@ -343,11 +343,11 @@ This document provides advanced technical information. Use it to help with advan
     ​
     #      nodeSelector:
     #        kubernetes.io/hostname: HOSTNAME
-    ```
+    </pre>
 
 6.  Check the newly created pod.
 
-    Display the newly created pod \(make sure the pod status is Running\).
+    Display the newly created pod \(make sure the pod status is _Running_).
 
     ```
     kubectl get pod demo-statefulset-raw-block-0
@@ -378,7 +378,7 @@ This document provides advanced technical information. Use it to help with advan
         statefulset/demo-statefulset-raw-block deleted
         ```
 
-    2.  Wait until the pod is deleted. Once deleted, the '"demo-statefulset-file-system" not found' is returned.
+    2.  Wait until the pod is deleted. Once deleted, the `"demo-statefulset-file-system" not found` is returned.
 
         ```screen
         $> kubectl get statefulset/demo-statefulset-raw-block
@@ -417,13 +417,13 @@ This document provides advanced technical information. Use it to help with advan
 ### Log collection for CSI pods, daemonset, and StatefulSet
 
 ```
-kubectl get all -n *<namespace\>*  -l csi
+kubectl get all -n <namespace>  -l csi
 ```
 
 For example:
 
 ```screen
-$> kubectl get all -n *<namespace\>* -l csi
+$> kubectl get all -n <namespace> -l csi
 NAME READY STATUS RESTARTS AGE
 pod/ibm-block-csi-controller-0 6/6 Running 0 2h
 pod/ibm-block-csi-node-nbtsg 3/3 Running 0 2h
@@ -448,24 +448,24 @@ statefulset.apps/ibm-block-csi-controller 1 1 2h
 Verify that the CSI driver is running. \(Make sure the csi-controller pod status is Running\).
 
 ```screen
-$> kubectl get all -n *<namespace\>* -l csi
-NAME READY STATUS RESTARTS AGE
-pod/ibm-block-csi-controller-0 6/6 Running 0 2h
-pod/ibm-block-csi-node-nbtsg 3/3 Running 0 2h
-pod/ibm-block-csi-node-wd5tm 3/3 Running 0 2h
-pod/ibm-block-csi-operator-7684549698-hzmfh 1/1 Running 0 2h
+$> kubectl get all -n <namespace> -l csi
+NAME                                        READY STATUS  RESTARTS  AGE
+pod/ibm-block-csi-controller-0              6/6   Running 0         2h
+pod/ibm-block-csi-node-nbtsg                3/3   Running 0         2h
+pod/ibm-block-csi-node-wd5tm                3/3   Running 0         2h
+pod/ibm-block-csi-operator-7684549698-hzmfh 1/1   Running 0         2h
 
-NAME DESIRED CURRENT READY UP-TO-DATE AVAILABLE NODE SELECTOR AGE
-daemonset.apps/ibm-block-csi-node 2 2 2 2 2 <none> 2h
+NAME                              DESIRED CURRENT READY UP-TO-DATE  AVAILABLE NODE SELECTOR AGE
+daemonset.apps/ibm-block-csi-node 2        2      2     2           2         <none>        2h
 
-NAME DESIRED CURRENT UP-TO-DATE AVAILABLE AGE
-deployment.apps/ibm-block-csi-operator 1 1 1 1 2h
+NAME                                    DESIRED CURRENT UP-TO-DATE  AVAILABLE AGE
+deployment.apps/ibm-block-csi-operator  1       1       1           1         2h
 
-NAME DESIRED CURRENT READY AGE
-replicaset.apps/ibm-block-csi-operator-7684549698 1 1 1 2h
+NAME                                              DESIRED CURRENT READY AGE
+replicaset.apps/ibm-block-csi-operator-7684549698 1       1       1     2h
 
-NAME DESIRED CURRENT AGE
-statefulset.apps/ibm-block-csi-controller 1 1 2h
+NAME                                      DESIRED CURRENT AGE
+statefulset.apps/ibm-block-csi-controller 1       1       2h
 ```
 
 ### Multipath troubleshooting
@@ -501,7 +501,7 @@ Use this information to help pinpoint potential causes for multipath failures.
     `-vda3   252:3    0  30G  0 part  /sysroot
     ```
 
-    To display device attachment information, together with SCSI ID information, use the sudo lsblk -S command.
+    To display device attachment information, together with SCSI ID information, use the `sudo lsblk -S` command.
 
     ```screen
     NAME HCTL       TYPE VENDOR   MODEL             REV TRAN
@@ -511,7 +511,7 @@ Use this information to help pinpoint potential causes for multipath failures.
 
 -   **Check for multipath daemon availability \(FC and iSCSI\)**
 
-    Check for multipath daemon availability, using the systemctl status multipathd command.
+    Check for multipath daemon availability, using the `systemctl status multipathd` command.
 
     ```screen
     multipathd.service - Device-Mapper Multipath Device Controller
@@ -528,7 +528,7 @@ Use this information to help pinpoint potential causes for multipath failures.
 
 -   **Check for iSCSI daemon availability**
 
-    Check for iSCSI daemon availability, using the systemctl status iscsid command.
+    Check for iSCSI daemon availability, using the `systemctl status iscsid` command.
 
     ```screen
     iscsid.service - Open-iSCSI
@@ -551,7 +551,7 @@ Use this information to help pinpoint potential causes for multipath failures.
 Use the following command for general troubleshooting:
 
 ```
-kubectl get -n *<namespace\>*  csidriver,sa,clusterrole,clusterrolebinding,statefulset,pod,daemonset | grep ibm-block-csi
+kubectl get -n <namespace>  csidriver,sa,clusterrole,clusterrolebinding,statefulset,pod,daemonset | grep ibm-block-csi
 ```
 
 For example:
@@ -588,7 +588,7 @@ daemonset.extensions/ibm-block-csi-node 2 2 2 2 2 <none> 2h
 
 If an error during automatic iSCSI login occurs, perform the following steps for manual login:
 
-**Note:** These procedures are applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace kubectl with oc in all relevant commands.
+**Note:** These procedures are applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.
 
 **Note:** This procedure is applicable for both RHEL and RHCOS users. When using RHCOS, use the following:
 
