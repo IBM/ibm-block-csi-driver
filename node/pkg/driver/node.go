@@ -705,6 +705,12 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	var fcWWNs []string
 	var err error
 
+	topologyLabels, err := d.NodeUtils.GetTopologyLabels(ctx, d.Hostname)
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	logger.Debugf("discovered topology labels : %v", topologyLabels)
+
 	fcExists := d.NodeUtils.IsPathExists(FCPath)
 	if fcExists {
 		fcWWNs, err = d.NodeUtils.ParseFCPorts()
@@ -731,7 +737,8 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	logger.Debugf("node id is : %s", nodeId)
 
 	return &csi.NodeGetInfoResponse{
-		NodeId: nodeId,
+		NodeId:             nodeId,
+		AccessibleTopology: &csi.Topology{Segments: topologyLabels},
 	}, nil
 }
 
