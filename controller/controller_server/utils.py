@@ -17,12 +17,12 @@ from controller.csi_general import csi_pb2
 logger = get_stdout_logger()
 
 
-def _parse_raw_input(raw_input):
+def _parse_raw_json(raw_json):
     try:
-        parsed_input = json.loads(raw_input)
+        parsed_json = json.loads(raw_json)
     except json.decoder.JSONDecodeError:
-        raise ValidationException(messages.invalid_non_json_parameter_message.format(raw_input))
-    return parsed_input
+        raise ValidationException(messages.invalid_json_parameter_message.format(raw_json))
+    return parsed_json
 
 
 def _is_topology_match(system_topologies, node_topologies):
@@ -49,24 +49,21 @@ def get_system_info_by_topologies(secrets_config, node_topologies):
         system_topologies = system_info.get(config.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
         if _is_topology_match(system_topologies, node_topologies):
             return system_info, system_id
-
-
-def _get_system_info_by_system_id(secrets_config, system_id):
-    return secrets_config.get(system_id)
+    raise ValidationException(messages.no_way_to_identify_system_from_secrets_config_message)
 
 
 def _get_system_info_from_secrets(secrets, topologies=None, system_id=None):
     raw_secrets_config = secrets.get(config.SECRET_CONFIG_PARAMETER)
     system_info = secrets
     if raw_secrets_config:
-        secrets_config = _parse_raw_input(raw_input=raw_secrets_config)
+        secrets_config = _parse_raw_json(raw_json=raw_secrets_config)
         if system_id:
-            system_info = _get_system_info_by_system_id(secrets_config=secrets_config, system_id=system_id)
+            system_info = secrets_config.get(system_id)
         elif topologies:
             system_info, system_id = get_system_info_by_topologies(secrets_config=secrets_config,
                                                                    node_topologies=topologies)
         else:
-            raise ValidationException(messages.invalid_secrets_message)
+            raise ValidationException(messages.no_way_to_identify_system_from_secrets_config_message)
     return system_info, system_id
 
 
@@ -94,7 +91,7 @@ def get_object_parameters(parameters, prefix_param_name, system_id):
     raw_parameters_by_system = parameters.get(config.PARAMETERS_BY_SYSTEM)
     system_parameters = {}
     if raw_parameters_by_system and system_id:
-        parameters_by_system = _parse_raw_input(raw_input=raw_parameters_by_system)
+        parameters_by_system = _parse_raw_json(raw_json=raw_parameters_by_system)
         system_parameters = parameters_by_system.get(system_id, {})
     default_pool = parameters.get(config.PARAMETERS_POOL)
     default_space_efficiency = parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
@@ -119,13 +116,14 @@ def _get_object_id(obj, system_id=None):
     return config.PARAMETERS_OBJECT_ID_DELIMITER.join((obj.array_type, obj.id))
 
 
-def _is_imported_string_valid(imported_string):
-    return imported_string and re.match(config.SECRET_VALIDATION_REGEX, imported_string)
+def _is_system_id_valid(system_id):
+    return system_id and re.match(config.SECRET_VALIDATION_REGEX, system_id)
 
 
 def _validate_system_id(system_id):
-    if not _is_imported_string_valid(system_id):
-        raise ValidationException(messages.invalid_system_id_value_message.format(system_id))
+    if not _is_system_id_valid(system_id):
+        raise ValidationException(
+            messages.invalid_system_id_message.format(system_id, config.SECRET_VALIDATION_REGEX))
     if len(system_id) > config.SECRET_SYSTEM_ID_MAX_LENGTH:
         raise ValidationException(
             messages.parameter_length_is_too_long.format("system id", system_id, config.SECRET_SYSTEM_ID_MAX_LENGTH))
@@ -135,16 +133,15 @@ def _validate_secrets(secrets):
     if not (config.SECRET_USERNAME_PARAMETER in secrets and
             config.SECRET_PASSWORD_PARAMETER in secrets and
             config.SECRET_ARRAY_PARAMETER in secrets):
-        raise ValidationException(messages.invalid_secrets_message)
+        raise ValidationException(messages.secrets_missing_connectivity_info_message)
 
 
 def _validate_topologies(topologies):
     if topologies:
-        for topology in topologies:
-            if not topology:
-                raise ValidationException(messages.invalid_secrets_message)
+        if not all(topologies):
+            raise ValidationException(messages.secrets_missing_topologies_message)
     else:
-        raise ValidationException(messages.invalid_secrets_message)
+        raise ValidationException(messages.secrets_missing_topologies_message)
 
 
 def _validate_secrets_config(secrets_config):
@@ -154,16 +151,16 @@ def _validate_secrets_config(secrets_config):
             _validate_system_id(system_id)
             _validate_secrets(system_info)
         else:
-            raise ValidationException(messages.invalid_secrets_message)
+            raise ValidationException(messages.invalid_secrets_config_message)
 
 
 def validate_secrets(secrets):
     logger.debug("validating secrets")
     if not secrets:
-        raise ValidationException(messages.secrets_missing_message)
+        raise ValidationException(messages.secret_missing_message)
     raw_secrets_config = secrets.get(config.SECRET_CONFIG_PARAMETER)
     if raw_secrets_config:
-        secrets_config = _parse_raw_input(raw_secrets_config)
+        secrets_config = _parse_raw_json(raw_secrets_config)
         _validate_secrets_config(secrets_config)
     else:
         _validate_secrets(secrets)
@@ -380,7 +377,7 @@ def validate_publish_volume_request(request):
     if request.secrets:
         validate_secrets(request.secrets)
     else:
-        raise ValidationException(messages.secrets_missing_message)
+        raise ValidationException(messages.secret_missing_message)
 
     logger.debug("publish volume request validation finished.")
 
@@ -473,7 +470,7 @@ def validate_unpublish_volume_request(request):
     if request.secrets:
         validate_secrets(request.secrets)
     else:
-        raise ValidationException(messages.secrets_missing_message)
+        raise ValidationException(messages.secret_missing_message)
 
     logger.debug("unpublish volume request validation finished.")
 

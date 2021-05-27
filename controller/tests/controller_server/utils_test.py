@@ -75,14 +75,15 @@ class TestUtils(unittest.TestCase):
 
     def test_validate_secrets_with_config_valid_system_id(self):
         self._test_validate_secrets_with_config_valid_system_id("ui_.d")
-        self._test_validate_secrets_with_config_valid_system_id("a" * 90)
+        self._test_validate_secrets_with_config_valid_system_id("a" * config.SECRET_SYSTEM_ID_MAX_LENGTH)
 
     def _test_validate_secrets_with_config_invalid_system_id(self, system_id):
         secrets = get_mock_secret_config(system_id=system_id)
         self._test_validate_secrets_validation_errors(secrets)
 
     def test_validate_secrets_with_config_invalid_parameters(self):
-        system_ids = ["-u1", "u:1", "u1+", "u1*", "u-1(", "u/1", "u=1", " ", "", "a" * 91]
+        system_ids = ["-u1", "u:1", "u1+", "u1*", "u-1(", "u/1", "u=1", " ", "",
+                      "a" * (config.SECRET_SYSTEM_ID_MAX_LENGTH + 1)]
         for system_id in system_ids:
             self._test_validate_secrets_with_config_invalid_system_id(system_id=system_id)
 

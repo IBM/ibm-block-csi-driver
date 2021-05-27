@@ -148,17 +148,17 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.request.parameters = {config.PARAMETERS_POOL: pool}
         self._test_create_snapshot_succeeds(storage_agent, expected_pool=pool)
 
-    def _test_create_snapshot_with_pools_by_system_parameter(self, storage_agent, system_id, expected_pool):
+    def _test_create_snapshot_with_by_system_id_parameter(self, storage_agent, system_id, expected_pool):
         self.request.source_volume_id = "{}:{}:{}".format("A9000", system_id, snapshot_volume_wwn)
         self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
             {"u1": {config.PARAMETERS_POOL: pool}, "u2": {config.PARAMETERS_POOL: "other_pool"}})}
         self._test_create_snapshot_succeeds(storage_agent, expected_pool=expected_pool)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_snapshot_with_pools_by_system_parameter_succeeds(self, storage_agent):
-        self._test_create_snapshot_with_pools_by_system_parameter(storage_agent, "u1", pool)
-        self._test_create_snapshot_with_pools_by_system_parameter(storage_agent, "u2", "other_pool")
-        self._test_create_snapshot_with_pools_by_system_parameter(storage_agent, None, None)
+    def test_create_snapshot_with_by_system_id_parameter_succeeds(self, storage_agent):
+        self._test_create_snapshot_with_by_system_id_parameter(storage_agent, "u1", pool)
+        self._test_create_snapshot_with_by_system_id_parameter(storage_agent, "u2", "other_pool")
+        self._test_create_snapshot_with_by_system_id_parameter(storage_agent, None, None)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_belongs_to_wrong_volume(self, storage_agent):
@@ -452,7 +452,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_no_pool(self, storage_agent):
         self._prepare_create_volume_mocks(storage_agent)
-        self.request.parameters = {"pools_by_system": str({"u1": pool, "u2": "other_pool"})}
+        self.request.parameters = {"by_system_id": json.dumps({"u1": pool, "u2": "other_pool"})}
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
 
