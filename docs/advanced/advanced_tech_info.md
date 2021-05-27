@@ -87,7 +87,7 @@ This document provides advanced technical information. Use it to help with advan
     statefulset.apps/demo-statefulset-file-system created
     ```
 
-    ```screen
+    <pre>
     $> cat demo-statefulset-file-system.yaml
     kind: StatefulSet
     apiVersion: apps/v1
@@ -109,16 +109,16 @@ This document provides advanced technical information. Use it to help with advan
             image: registry.access.redhat.com/ubi8/ubi:latest
             command: \[ "/bin/sh", "-c", "--" \]
             args: \[ "while true; do sleep 30; done;" \]
-            **volumeMounts:
+            <b>volumeMounts:
               - name: demo-volume-file-system
-                mountPath: "/data"**
+                mountPath: "/data"</b>
           volumes:
           - name: demo-volume-file-system
             persistentVolumeClaim:
               claimName: demo-pvc-file-system​
     #      nodeSelector:
     #        kubernetes.io/hostname: HOSTNAME
-    ```
+    </pre>
 
 6.  Check the newly created pod.
 
