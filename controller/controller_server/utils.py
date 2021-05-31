@@ -239,7 +239,7 @@ def validate_create_volume_request(request):
     if request.parameters:
         if config.PARAMETERS_POOL in request.parameters:
             if not request.parameters[config.PARAMETERS_POOL]:
-                raise ValidationException(messages.empty_pool_passed_message)
+                raise ValidationException(messages.pool_should_not_be_empty_message)
         elif not request.parameters.get(config.PARAMETERS_BY_SYSTEM):
             raise ValidationException(messages.pool_is_missing_message)
     else:

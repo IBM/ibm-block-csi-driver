@@ -70,7 +70,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                             system_id=array_connection_info.system_id)
             pool = volume_parameters.pool
             if not pool:
-                raise ValidationException(controller_messages.empty_pool_passed_message)
+                raise ValidationException(controller_messages.pool_should_not_be_empty_message)
             space_efficiency = volume_parameters.space_efficiency
             # TODO : pass multiple array addresses
             array_type = detect_array_type(array_connection_info.array_addresses)
