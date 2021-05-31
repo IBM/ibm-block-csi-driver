@@ -49,7 +49,7 @@ def get_system_info_by_topologies(secrets_config, node_topologies):
         system_topologies = system_info.get(config.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
         if _is_topology_match(system_topologies, node_topologies):
             return system_info, system_id
-    raise ValidationException(messages.no_way_to_identify_system_from_secrets_config_message)
+    raise ValidationException(messages.no_system_match_requested_topologies.format(node_topologies))
 
 
 def _get_system_info_from_secrets(secrets, topologies=None, system_id=None):
@@ -63,7 +63,7 @@ def _get_system_info_from_secrets(secrets, topologies=None, system_id=None):
             system_info, system_id = get_system_info_by_topologies(secrets_config=secrets_config,
                                                                    node_topologies=topologies)
         else:
-            raise ValidationException(messages.no_way_to_identify_system_from_secrets_config_message)
+            raise ValidationException(messages.insufficient_data_to_choose_a_storage_system_message)
     return system_info, system_id
 
 
@@ -133,7 +133,7 @@ def _validate_secrets(secrets):
     if not (config.SECRET_USERNAME_PARAMETER in secrets and
             config.SECRET_PASSWORD_PARAMETER in secrets and
             config.SECRET_ARRAY_PARAMETER in secrets):
-        raise ValidationException(messages.secrets_missing_connectivity_info_message)
+        raise ValidationException(messages.secret_missing_connectivity_info_message)
 
 
 def _validate_topologies(topologies):
@@ -231,18 +231,15 @@ def validate_create_volume_request(request):
     else:
         raise ValidationException(messages.no_capacity_range_message)
 
-    logger.debug("validating volume capabilities")
     validate_csi_volume_capabilties(request.volume_capabilities)
 
-    logger.debug("validating secrets")
-    if request.secrets:
-        validate_secrets(request.secrets)
+    validate_secrets(request.secrets)
 
     logger.debug("validating storage class parameters")
     if request.parameters:
         if config.PARAMETERS_POOL in request.parameters:
             if not request.parameters[config.PARAMETERS_POOL]:
-                raise ValidationException(messages.wrong_pool_passed_message)
+                raise ValidationException(messages.empty_pool_passed_message)
         elif not request.parameters.get(config.PARAMETERS_BY_SYSTEM):
             raise ValidationException(messages.pool_is_missing_message)
     else:
@@ -259,9 +256,7 @@ def validate_create_snapshot_request(request):
     logger.debug("validating snapshot name")
     if not request.name:
         raise ValidationException(messages.name_should_not_be_empty_message)
-    logger.debug("validating secrets")
-    if request.secrets:
-        validate_secrets(request.secrets)
+    validate_secrets(request.secrets)
     logger.debug("validating source volume id")
     if not request.source_volume_id:
         raise ValidationException(messages.snapshot_src_volume_id_is_missing)
@@ -272,9 +267,7 @@ def validate_delete_snapshot_request(request):
     logger.debug("validating delete snapshot request")
     if not request.snapshot_id:
         raise ValidationException(messages.name_should_not_be_empty_message)
-    logger.debug("validating secrets")
-    if request.secrets:
-        validate_secrets(request.secrets)
+    validate_secrets(request.secrets)
     logger.debug("request validation finished.")
 
 
@@ -356,9 +349,7 @@ def validate_delete_volume_request(request):
     if request.volume_id == "":
         raise ValidationException("Volume id cannot be empty")
 
-    logger.debug("validating secrets")
-    if request.secrets:
-        validate_secrets(request.secrets)
+    validate_secrets(request.secrets)
 
     logger.debug("delete volume validation finished")
 
@@ -370,14 +361,9 @@ def validate_publish_volume_request(request):
     if request.readonly:
         raise ValidationException(messages.readonly_not_supported_message)
 
-    logger.debug("validating volume capabilities")
     validate_csi_volume_capability(request.volume_capability)
 
-    logger.debug("validating secrets")
-    if request.secrets:
-        validate_secrets(request.secrets)
-    else:
-        raise ValidationException(messages.secret_missing_message)
+    validate_secrets(request.secrets)
 
     logger.debug("publish volume request validation finished.")
 
@@ -466,11 +452,7 @@ def validate_unpublish_volume_request(request):
                                                                                    config.MAXIMUM_VOLUME_ID_PARTS}:
         raise ValidationException(messages.volume_id_wrong_format_message)
 
-    logger.debug("validating secrets")
-    if request.secrets:
-        validate_secrets(request.secrets)
-    else:
-        raise ValidationException(messages.secret_missing_message)
+    validate_secrets(request.secrets)
 
     logger.debug("unpublish volume request validation finished.")
 

@@ -45,7 +45,7 @@ class AbstractControllerTest(unittest.TestCase):
         self.assertIn("name", context.details)
         self.assertEqual(res, self.get_create_object_response_method()())
 
-    def _test_create_object_with_wrong_secrets_parameters(self, secrets, message="secrets"):
+    def _test_create_object_with_wrong_secrets_parameters(self, secrets, message="secret"):
         context = utils.FakeContext()
 
         self.request.secrets = secrets
@@ -65,7 +65,7 @@ class AbstractControllerTest(unittest.TestCase):
         secrets = {"username": "user", "password": "pass"}
         self._test_create_object_with_wrong_secrets_parameters(secrets)
 
-        secrets = utils.get_mock_secret_config(system_id="u-")
+        secrets = utils.get_fake_secret_config(system_id="u-")
         self._test_create_object_with_wrong_secrets_parameters(secrets, message="system id")
 
         self.request.secrets = []
@@ -411,7 +411,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_topologies_succeeds(self, storage_agent):
-        self.request.secrets = utils.get_mock_secret_config(system_id="u2", supported_topologies=[
+        self.request.secrets = utils.get_fake_secret_config(system_id="u2", supported_topologies=[
             {"topology.kubernetes.io/test": "topology_value"}])
         self.request.accessibility_requirements.preferred = [
             ProtoBufMock(segments={"topology.kubernetes.io/test": "topology_value",
@@ -604,7 +604,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     def _test_create_volume_with_parameters_by_system_prefix(self, get_array_connection_info_from_secrets, prefix,
                                                              final_name="default_some_name",
                                                              space_efficiency=None):
-        get_array_connection_info_from_secrets.side_effect = [utils.get_mock_array_connection_info()]
+        get_array_connection_info_from_secrets.side_effect = [utils.get_fake_array_connection_info()]
         self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
             {"u1": {config.PARAMETERS_VOLUME_NAME_PREFIX: prefix, config.PARAMETERS_POOL: pool,
                     config.PARAMETERS_SPACE_EFFICIENCY: space_efficiency}})}

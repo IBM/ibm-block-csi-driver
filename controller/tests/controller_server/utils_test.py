@@ -11,7 +11,7 @@ from controller.controller_server.errors import ObjectIdError, ValidationExcepti
 from controller.controller_server.test_settings import pool, user, password, array
 from controller.csi_general import csi_pb2
 from controller.tests.controller_server.csi_controller_server_test import ProtoBufMock
-from controller.tests.utils import get_mock_secret_config
+from controller.tests.utils import get_fake_secret_config
 
 
 class TestUtils(unittest.TestCase):
@@ -54,23 +54,23 @@ class TestUtils(unittest.TestCase):
         self._test_validate_secrets_validation_errors(secrets)
 
     def test_validate_secrets_with_config(self):
-        secrets = get_mock_secret_config()
+        secrets = get_fake_secret_config()
         utils.validate_secrets(secrets)
 
     def test_validate_secrets_with_config_invalid_secret(self):
-        secrets = get_mock_secret_config(password=None)
+        secrets = get_fake_secret_config(password=None)
         self._test_validate_secrets_validation_errors(secrets)
 
     def test_validate_secrets_with_config_no_topologies(self):
-        secrets = get_mock_secret_config(supported_topologies=None)
+        secrets = get_fake_secret_config(supported_topologies=None)
         self._test_validate_secrets_validation_errors(secrets)
-        secrets = get_mock_secret_config(supported_topologies=[])
+        secrets = get_fake_secret_config(supported_topologies=[])
         self._test_validate_secrets_validation_errors(secrets)
-        secrets = get_mock_secret_config(supported_topologies=[{}])
+        secrets = get_fake_secret_config(supported_topologies=[{}])
         self._test_validate_secrets_validation_errors(secrets)
 
     def _test_validate_secrets_with_config_valid_system_id(self, system_id):
-        secrets = get_mock_secret_config(system_id=system_id)
+        secrets = get_fake_secret_config(system_id=system_id)
         utils.validate_secrets(secrets)
 
     def test_validate_secrets_with_config_valid_system_id(self):
@@ -78,7 +78,7 @@ class TestUtils(unittest.TestCase):
         self._test_validate_secrets_with_config_valid_system_id("a" * config.SECRET_SYSTEM_ID_MAX_LENGTH)
 
     def _test_validate_secrets_with_config_invalid_system_id(self, system_id):
-        secrets = get_mock_secret_config(system_id=system_id)
+        secrets = get_fake_secret_config(system_id=system_id)
         self._test_validate_secrets_validation_errors(secrets)
 
     def test_validate_secrets_with_config_invalid_parameters(self):
@@ -101,11 +101,11 @@ class TestUtils(unittest.TestCase):
             self.assertIsNone(array_connection_info.system_id)
 
     def test_get_array_connection_info_from_secrets(self):
-        secrets = get_mock_secret_config()
+        secrets = get_fake_secret_config()
         self._test_get_array_connection_info_from_secrets(secrets, system_id="u1")
         secrets = {"username": user, "password": password, "management_address": array}
         self._test_get_array_connection_info_from_secrets(secrets)
-        secrets = get_mock_secret_config(supported_topologies=[{"topology.kubernetes.io/test": "zone1"}])
+        secrets = get_fake_secret_config(supported_topologies=[{"topology.kubernetes.io/test": "zone1"}])
         self._test_get_array_connection_info_from_secrets(secrets,
                                                           topologies={"topology.kubernetes.io/test": "zone1",
                                                                       "topology.block.csi.ibm.com/test": "dev1"})
@@ -322,12 +322,6 @@ class TestUtils(unittest.TestCase):
             self.assertTrue("msg1" in str(ex))
 
         validate_capabilities.side_effect = None
-        request.secrets = []
-
-        with self.assertRaises(ValidationException) as ex:
-            utils.validate_publish_volume_request(request)
-            self.assertTrue("secrets" in str(ex))
-
         request.secrets = ["secrets"]
         validate_secrets.side_effect = [ValidationException("msg2")]
 
@@ -349,11 +343,6 @@ class TestUtils(unittest.TestCase):
             self.assertTrue("volume" in str(ex))
 
         request.volume_id = "xiv:volume"
-
-        request.secrets = []
-        with self.assertRaises(ValidationException) as ex:
-            utils.validate_unpublish_volume_request(request)
-            self.assertTrue("secrets" in str(ex))
 
         request.secrets = ["secrets"]
         validate_secrets.side_effect = [ValidationException("msg2")]
