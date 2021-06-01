@@ -20,8 +20,8 @@ logger = get_stdout_logger()
 def _parse_raw_json(raw_json):
     try:
         parsed_json = json.loads(raw_json)
-    except json.decoder.JSONDecodeError:
-        raise ValidationException(messages.invalid_json_parameter_message.format(raw_json))
+    except json.decoder.JSONDecodeError as ex:
+        raise ValidationException(messages.invalid_json_parameter_message.format(raw_json, ex))
     return parsed_json
 
 
@@ -44,7 +44,7 @@ def get_volume_topologies(request):
             return topologies
 
 
-def get_system_info_by_topologies(secrets_config, node_topologies):
+def _get_system_info_for_topologies(secrets_config, node_topologies):
     for system_id, system_info in secrets_config.items():
         system_topologies = system_info.get(config.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
         if _is_topology_match(system_topologies, node_topologies):
@@ -60,8 +60,8 @@ def _get_system_info_from_secrets(secrets, topologies=None, system_id=None):
         if system_id:
             system_info = secrets_config.get(system_id)
         elif topologies:
-            system_info, system_id = get_system_info_by_topologies(secrets_config=secrets_config,
-                                                                   node_topologies=topologies)
+            system_info, system_id = _get_system_info_for_topologies(secrets_config=secrets_config,
+                                                                     node_topologies=topologies)
         else:
             raise ValidationException(messages.insufficient_data_to_choose_a_storage_system_message)
     return system_info, system_id
@@ -133,23 +133,24 @@ def _validate_secrets(secrets):
     if not (config.SECRET_USERNAME_PARAMETER in secrets and
             config.SECRET_PASSWORD_PARAMETER in secrets and
             config.SECRET_ARRAY_PARAMETER in secrets):
-        raise ValidationException(messages.secret_missing_connectivity_info_message)
+        raise ValidationException(messages.secret_missing_connection_info_message)
 
 
 def _validate_topologies(topologies):
     if topologies:
         if not all(topologies):
-            raise ValidationException(messages.secrets_missing_topologies_message)
+            raise ValidationException(messages.secret_missing_topologies_message)
     else:
-        raise ValidationException(messages.secrets_missing_topologies_message)
+        raise ValidationException(messages.secret_missing_topologies_message)
 
 
 def _validate_secrets_config(secrets_config):
     for system_id, system_info in secrets_config.items():
         if system_id and system_info:
-            _validate_topologies(system_info.get(config.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER))
             _validate_system_id(system_id)
             _validate_secrets(system_info)
+            supported_topologies = system_info.get(config.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
+            _validate_topologies(supported_topologies)
         else:
             raise ValidationException(messages.invalid_secrets_config_message)
 
