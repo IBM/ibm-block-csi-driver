@@ -111,7 +111,7 @@ This document provides advanced technical information. Use it to help with advan
             args: \[ "while true; do sleep 30; done;" \]
             <b>volumeMounts:
               - name: demo-volume-file-system
-                mountPath: "/data"</b>
+                mountPath: "data"</b>
           volumes:
           - name: demo-volume-file-system
             persistentVolumeClaim:
