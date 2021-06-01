@@ -4,7 +4,6 @@ Create a VolumeSnapshotClass YAML file to enable creation and deletion of volume
 
 **Note:**
 
--   VolumeSnapshotClass is not available for use on IBM FlashSystem A9000 and A9000R storage systems.
 -   IBM® FlashCopy® function is referred to as the more generic volume snapshots and cloning within this documentation set. Not all supported products use the FlashCopy function terminology.
 -   For volume snapshot support, the minimum orchestration platform version requirements are Red Hat® OpenShift® 4.4 and Kubernetes 1.17.
 
@@ -15,7 +14,8 @@ When configuring the file, be sure to use the same array secret and array secret
 -   The `snapshot_name_prefix` parameter is optional.
 
     **Note:** For IBM DS8000® Family, the maximum prefix length is five characters.<br/>The maximum prefix length for other systems is 20 characters.<br/>For storage systems using Spectrum Virtualize, the `CSI_` prefix is added as default if not specified by the user.
-
+    
+-   The `pool` parameter is not available on IBM FlashSystem A9000 and A9000R storage systems. For these storage systems the snapshot must be created on the same pool as the source.
 
 ```screen
 apiVersion: snapshot.storage.k8s.io/v1beta1
