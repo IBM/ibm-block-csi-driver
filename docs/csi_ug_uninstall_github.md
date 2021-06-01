@@ -2,8 +2,6 @@
 
 Use this information to uninstall the IBM® CSI (Container Storage Interface) operator and driver using GitHub.
 
-**Note:** If using the Red Hat® OpenShift® Container Platform, follow the instructions detailed in [Uninstalling the driver using the OpenShift web console](csi_ug_uninstall_openshift.md).
-
 Perform the following steps in order to uninstall the CSI driver and operator from a command line terminal.
 1.  Delete the IBMBlockCSI custom resource.
 
