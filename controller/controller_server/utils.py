@@ -152,7 +152,7 @@ def _validate_secrets_config(secrets_config):
             supported_topologies = system_info.get(config.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
             _validate_topologies(supported_topologies)
         else:
-            raise ValidationException(messages.invalid_secrets_config_message)
+            raise ValidationException(messages.invalid_secret_config_message)
 
 
 def validate_secrets(secrets):

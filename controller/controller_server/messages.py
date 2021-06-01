@@ -3,7 +3,7 @@ ValidationException_message = "Validation error has occurred : {0}"
 ObjectIdError_message = "Wrong {0} id format : {1}"
 
 # validation error messages
-invalid_secrets_config_message = "got an invalid secret config"
+invalid_secret_config_message = "got an invalid secret config"
 insufficient_data_to_choose_a_storage_system_message = "insufficient data to choose a storage system"
 no_system_match_requested_topologies = "no system match requested topologies: {}"
 secret_missing_connection_info_message = "secret is missing connection info"

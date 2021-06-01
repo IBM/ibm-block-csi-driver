@@ -1,4 +1,4 @@
-from controller.common.settings import ARRAY_TYPE_XIV, ARRAY_TYPE_DS8K, ARRAY_TYPE_SVC
+from controller.common.settings import ALL_ARRAY_TYPES
 from controller.csi_general import csi_pb2
 
 SUPPORTED_FS_TYPES = ["ext4", "xfs"]
@@ -12,7 +12,7 @@ VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_BLOCK = 'block'
 
 MAX_RESPONSE_STRING_LENGTH = 128
 VOLUME_WWN_LENGTH = 32
-MAX_ARRAY_TYPE_LENGTH = max(map(len, [ARRAY_TYPE_XIV, ARRAY_TYPE_DS8K, ARRAY_TYPE_SVC]))
+MAX_ARRAY_TYPE_LENGTH = max(map(len, ALL_ARRAY_TYPES))
 NUMBER_OF_DELIMITERS_IN_VOLUME_ID = 2
 
 SECRET_USERNAME_PARAMETER = "username"
