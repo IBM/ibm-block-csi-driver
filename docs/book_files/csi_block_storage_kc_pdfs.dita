@@ -52,8 +52,8 @@ SC27-9590-10.</p></entry>
 <section>
 <title>Related information</title>
 <p>For more information storage systems and orchestration platforms that are supported by <tm
-tmtype="reg" trademark="IBM">IBM</tm> block storage CSI driver., see the following resources.<dl
-conref="csi_relatedpubs.dita#csi_ug_relatedpubs/related_pubs"><dlentry/></dl></p>
+tmtype="reg" trademark="IBM">IBM</tm> block storage CSI driver, see the following resources.<dl
+conref="csi_relatedpubs.dita#csi_ug_relatedpubs/related_pubs"><dlentry><dt/><dd/></dlentry></dl></p>
 </section>
 </refbody>
 
