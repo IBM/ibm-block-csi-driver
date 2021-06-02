@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE reference PUBLIC "-//OASIS//DTD DITA Reference//EN" "reference.dtd">
+<reference id="reference_oc5_z3x_5pb">
+    <title>IBM block storage CSI driver documentation</title>
+    <shortdesc>IBM block storage CSI driver is based on an open-source IBM project, included as a
+part of IBM Storage orchestration for containers. IBM Storage orchestration for containers enables
+enterprises to implement a modern container-driven hybrid multicloud environment that can reduce IT
+costs and enhance business agility, while continuing to derive value from existing systems. </shortdesc>
+    <refbody> </refbody>
+</reference>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE map PUBLIC "-//IBM//DTD DITA IBM Map//EN"
+ "ibm-map.dtd">
+<?Pub Sty _display FontColor="red"?>
+<?Pub Inc?>
+<map xml:lang="en-us">
+<title>1.6.0</title>
+<?Pub Caret -2?>
+<topicmeta>
+<copyright>
+<copyryear year="2020"/>
+<copyrholder>IBM Corp.</copyrholder>
+</copyright>
+</topicmeta>
+<topicref format="dita" href="welcome.dita" navtitle="Welcome"/>
+<topicref format="dita" href="csi_block_storage_kc_whatsnew.dita" navtitle="What's new"/>
+<topicref format="markdown" href="csi_block_storage_kc_rn.md" navtitle="Release notes">
+<topicref format="ditamap" href="csi_rn_content.ditamap"
+navtitle="IBM block storage CSI driver Release Notes" scope="local"/>
+</topicref>
+<topicref format="ditamap" href="csi_ug_content.ditamap" scope="local"/>
+<topicref format="markdown" href="storage_csi_notices.md" navtitle="Notices" scope="local">
+<topicref format="markdown" href="csi_trademarks.md" navtitle="Trademarks" scope="local"/>
+</topicref>
+<topicref format="dita" href="csi_block_storage_kc_pdfs.dita"
+navtitle="Publications and related information" scope="local" type="reference"/>
+<topicref processing-role="resource-only" href="redirect.properties" navtitle="redirect topic"
+toc="no"/>
+</map>
+<?Pub *0000001520?>
