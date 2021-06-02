@@ -12,6 +12,7 @@ from controller.array_action.array_mediator_svc import SVCArrayMediator
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.array_action.errors import FailedToFindStorageSystemType
 from controller.array_action.storage_agent import StorageAgent, get_agent, clear_agents, get_agents, detect_array_type
+from controller.controller_server.controller_types import ArrayConnectionInfo
 
 
 def _fake_socket_connect_test(host, port):
@@ -66,10 +67,10 @@ class TestStorageAgent(unittest.TestCase):
 
     def test_get_agent_return_new(self):
         self.assertEqual(len(get_agents()), 0)
-        agent = get_agent("", "", ["ds8k_host", ])
+        agent = get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="", password=""))
         self.assertIsInstance(agent, StorageAgent)
         self.assertEqual(len(get_agents()), 1)
-        get_agent("test", "test", ["ds8k_host", ])
+        get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test", password="test"))
         self.assertEqual(len(get_agents()), 2)
 
     def test_get_agent_return_existing(self):
@@ -77,9 +78,9 @@ class TestStorageAgent(unittest.TestCase):
         password = "test_password"
         endpoints = ["ds8k_host", ]
         self.assertEqual(len(get_agents()), 0)
-        agent = get_agent(name, password, endpoints)
+        agent = get_agent(ArrayConnectionInfo(array_addresses=endpoints, user=name, password=password))
         self.assertEqual(len(get_agents()), 1)
-        new_agent = get_agent(name, password, endpoints)
+        new_agent = get_agent(ArrayConnectionInfo(array_addresses=endpoints, user=name, password=password))
         self.assertEqual(len(get_agents()), 1)
         self.assertEqual(id(agent), id(new_agent))
 
@@ -87,9 +88,9 @@ class TestStorageAgent(unittest.TestCase):
         name = "test_name"
         endpoints = ["ds8k_host", ]
         self.assertEqual(len(get_agents()), 0)
-        agent = get_agent(name, "pa", endpoints)
+        agent = get_agent(ArrayConnectionInfo(array_addresses=endpoints, user=name, password="pa"))
         self.assertEqual(len(get_agents()), 1)
-        new_agent = get_agent(name, "pb", endpoints)
+        new_agent = get_agent(ArrayConnectionInfo(array_addresses=endpoints, user=name, password="pb"))
         self.assertEqual(len(get_agents()), 1)
         self.assertNotEqual(id(agent), id(new_agent))
 
@@ -162,7 +163,7 @@ class TestStorageAgent(unittest.TestCase):
     def test_get_multiple_mediators_parallelly_in_different_threads(self):
 
         def verify_mediator(current_size):
-            agent = get_agent("test", "test", ["ds8k_host", ])
+            agent = get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test", password="test"))
             with agent.get_mediator() as mediator:
                 self.assertIsInstance(mediator, DS8KArrayMediator)
                 self.assertEqual(agent.conn_pool.current_size, current_size)
@@ -170,9 +171,9 @@ class TestStorageAgent(unittest.TestCase):
                 self.assertEqual(self.client_mock.get_system.call_count, current_size + 1)
                 sleep(0.2)
 
-        t1 = Thread(target=verify_mediator, args=(1, ))
-        t2 = Thread(target=verify_mediator, args=(2, ))
-        t3 = Thread(target=verify_mediator, args=(3, ))
+        t1 = Thread(target=verify_mediator, args=(1,))
+        t2 = Thread(target=verify_mediator, args=(2,))
+        t3 = Thread(target=verify_mediator, args=(3,))
 
         t1.start()
         t2.start()
@@ -181,7 +182,9 @@ class TestStorageAgent(unittest.TestCase):
         t2.join()
         t3.join()
 
-        self.assertEqual(get_agent("test", "test", ["ds8k_host", ]).conn_pool.current_size, 3)
+        self.assertEqual(get_agent(
+            ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test", password="test")).conn_pool.current_size,
+                         3)
 
     def test_get_mediator_timeout(self):
         self._test_get_mediator_timeout()
@@ -196,16 +199,19 @@ class TestStorageAgent(unittest.TestCase):
             timeout = 0.1
 
         def blocking_action():
-            with get_agent("test", "test", ["ds8k_host", ]).get_mediator():
+            with get_agent(
+                    ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test", password="test")).get_mediator():
                 sleep(0.2)
 
         def new_action(in_q):
             if is_timeout:
                 with self.assertRaises(array_errors.NoConnectionAvailableException):
-                    with get_agent("test", "test", ["ds8k_host", ]).get_mediator(timeout=timeout):
+                    with get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test",
+                                                       password="test")).get_mediator(timeout=timeout):
                         in_q.put(True)
             else:
-                with get_agent("test", "test", ["ds8k_host", ]).get_mediator(timeout=timeout):
+                with get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test",
+                                                   password="test")).get_mediator(timeout=timeout):
                     in_q.put(True)
 
         # max_size for ds8k is 10
@@ -215,7 +221,7 @@ class TestStorageAgent(unittest.TestCase):
 
         # all the clients are in use, the new action waits for an available one.
         q = Queue()
-        new_thread = Thread(target=new_action, args=(q, ))
+        new_thread = Thread(target=new_action, args=(q,))
         new_thread.start()
         new_thread.join()
 
