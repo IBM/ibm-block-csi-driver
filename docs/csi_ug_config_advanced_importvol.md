@@ -48,7 +48,7 @@ To find the `volumeHandle`, use one of the following procedures:
 
         The Properties window appears. Use the UID number.
 
-    For more information about Spectrum Virtualize products, find your product information in [IBM Documentation](https://www.ibm.com/docs/) (ibm.com/docs/).
+    For more information about Spectrum Virtualize products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).
 
 -   **Through the IBM Hyper-Scale Manager user interface for FlashSystem A9000 and A90000R storage systems:**
 
@@ -62,7 +62,7 @@ To find the `volumeHandle`, use one of the following procedures:
 
     3.  Use the **ID** number.
     
-    For more information, see [IBM Hyper-Scale Manager documentation](https://www.ibm.com/docs/en/hyper-scale-manager/) (ibm.com/docs/en/hyper-scale-manager).
+    For more information, see [IBM Hyper-Scale Manager documentation](https://www.ibm.com/docs/en/hyper-scale-manager/).
 
 
 Use this procedure to help build a PV yaml file for your volumes.

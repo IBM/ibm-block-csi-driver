@@ -33,7 +33,7 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
 
 2. Configure Linux® multipath devices on the host.
 
-   **Important:** Be sure to configure each worker with storage connectivity according to your storage system instructions. For more information, find your storage system documentation in [IBM Documentation](http://www.ibm.com/docs/) (ibm.com/docs/).
+   **Important:** Be sure to configure each worker with storage connectivity according to your storage system instructions. For more information, find your storage system documentation in [IBM Documentation](http://www.ibm.com/docs/).
 
    **Additional configuration steps for OpenShift® Container Platform users (RHEL and RHCOS).** Other users can continue to step 3.
 
@@ -53,7 +53,7 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
     
 3. If needed, enable support for volume snapshots (FlashCopy® function) on your Kubernetes cluster.
 
-   For more information and instructions, see the Kubernetes blog post, [Kubernetes 1.17 Feature: Kubernetes Volume Snapshot Moves to Beta](https://kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/) (kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/).
+   For more information and instructions, see the Kubernetes blog post, [Kubernetes 1.17 Feature: Kubernetes Volume Snapshot Moves to Beta](https://kubernetes.io/blog/2019/12/09/kubernetes-1-17-feature-cis-volume-snapshot-beta/).
 
    Install both the Snapshot CRDs and the Common Snapshot Controller once per cluster.
 
