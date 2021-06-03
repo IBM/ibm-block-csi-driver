@@ -27,7 +27,7 @@ TOO_MANY_CHARS = 'CMMVC5738E'
 VALUE_TOO_LONG = 'CMMVC5703E'
 INVALID_FILTER_VALUE = 'CMMVC5741E'
 SPECIFIED_OBJ_NOT_EXIST = 'CMMVC5804E'
-VOL_ALREADY_MAPPED = 'CMMVC5878E'
+LUN_ALREADY_IN_USE = 'CMMVC5879E'
 VOL_ALREADY_UNMAPPED = 'CMMVC5842E'
 OBJ_ALREADY_EXIST = 'CMMVC6035E'
 FCMAP_ALREADY_EXIST = 'CMMVC6466E'
@@ -722,7 +722,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                     raise array_errors.HostNotFoundError(host_name)
                 if SPECIFIED_OBJ_NOT_EXIST in ex.my_message:
                     raise array_errors.ObjectNotFoundError(vol_name)
-                if VOL_ALREADY_MAPPED in ex.my_message:
+                if LUN_ALREADY_IN_USE in ex.my_message:
                     raise array_errors.LunAlreadyInUseError(lun,
                                                             host_name)
                 raise array_errors.MappingError(vol_name, host_name, ex)
