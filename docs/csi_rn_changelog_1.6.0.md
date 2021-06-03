@@ -10,5 +10,3 @@ IBM® block storage CSI driver 1.6.0 provides a range of enhancements and resolv
 |Ticket ID|Severity|Description|
 |---------|--------|-----------|
 |**CSI-TBD**|Moderate|**Fixed:** TBD|
-
-
