@@ -1,6 +1,6 @@
 # Manual upgrade with OpenShift
 
-When using the Red Hat® OpenShift® Container Platform, the CSI \(Container Storage Interface\) driver can be manually updated through the OpenShift web console.
+When using the Red Hat® OpenShift® Container Platform, the CSI (Container Storage Interface) driver can be manually updated through the OpenShift web console.
 
 1.  From Red Hat OpenShift Container Platform **Operators** \> **Installed Operators** see the status of the **ibm-block-csi-operator**.
 

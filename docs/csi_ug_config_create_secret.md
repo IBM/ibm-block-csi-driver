@@ -1,6 +1,6 @@
 # Creating a Secret
 
-Create an array secret YAML file in order to define the storage credentials \(username and password\) and address.
+Create an array secret YAML file in order to define the storage credentials (username and password) and address.
 
 **Important:** When your storage system password is changed, be sure to also change the passwords in the corresponding secrets, particularly when LDAP is used on the storage systems.<br />Failing to do so causes mismatched passwords across the storage systems and the secrets, causingthe user to be locked out of the storage systems.
 

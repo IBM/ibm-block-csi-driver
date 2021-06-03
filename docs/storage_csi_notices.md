@@ -14,7 +14,7 @@ IBM may have patents or pending patent applications covering subject matter desc
  Armonk, NY 10504-1785  
  USA*
 
-For license inquiries regarding double-byte character set \(DBCS\) information, contact the IBM Intellectual Property Department in your country or send inquiries, in writing, to:
+For license inquiries regarding double-byte character set (DBCS) information, contact the IBM Intellectual Property Department in your country or send inquiries, in writing, to:
 
 *Intellectual Property Licensing  
  Legal and Intellectual Property Law  
@@ -24,7 +24,7 @@ For license inquiries regarding double-byte character set \(DBCS\) information, 
 
 INTERNATIONAL BUSINESS MACHINES CORPORATION PROVIDES THIS PUBLICATION "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE. Some states do not allow disclaimer of express or implied warranties in certain transactions, therefore, this statement may not apply to you.
 
-This information could include technical inaccuracies or typographical errors. Changes are periodically made to the information herein; these changes will be incorporated in new editions of the publication. IBM may make improvements and/or changes in the product\(s\) and/or the program\(s\) described in this publication at any time without notice.
+This information could include technical inaccuracies or typographical errors. Changes are periodically made to the information herein; these changes will be incorporated in new editions of the publication. IBM may make improvements and/or changes in the product(s) and/or the program(s) described in this publication at any time without notice.
 
 
 
@@ -32,7 +32,7 @@ Any references in this information to non-IBM Web sites are provided for conveni
 
 IBM may use or distribute any of the information you supply in any way it believes appropriate without incurring any obligation to you.
 
-Licensees of this program who wish to have information about it for the purpose of enabling: \(i\) the exchange of information between independently created programs and other programs \(including this one\) and \(ii\) the mutual use of the information which has been exchanged, should contact:
+Licensees of this program who wish to have information about it for the purpose of enabling: (i) the exchange of information between independently created programs and other programs (including this one) and (ii) the mutual use of the information which has been exchanged, should contact:
 
 *IBM Director of Licensing  
  IBM Corporation  

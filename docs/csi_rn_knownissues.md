@@ -1,6 +1,6 @@
 # Known issues
 
-This section details the known issues in IBM® block storage CSI driver 1.6.0, along with possible solutions or workarounds \(if available\).
+This section details the known issues in IBM® block storage CSI driver 1.6.0, along with possible solutions or workarounds (if available).
 
 The following severity levels apply to known issues:
 

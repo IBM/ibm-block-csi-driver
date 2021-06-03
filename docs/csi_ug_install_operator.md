@@ -1,6 +1,6 @@
 # Installing the operator and driver
 
-Install the operator for IBM® block storage CSI driver in order to deploy, install, and manage the CSI \(Container Storage Interface\) driver.
+Install the operator for IBM® block storage CSI driver in order to deploy, install, and manage the CSI (Container Storage Interface) driver.
 
 The CSI operator and driver can be downloaded in one of the following ways:
 

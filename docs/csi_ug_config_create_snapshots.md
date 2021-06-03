@@ -1,6 +1,6 @@
 # Creating a VolumeSnapshot
 
-Create a VolumeSnapshot yaml file for a specific PersistentVolumeClaim (PVC\).
+Create a VolumeSnapshot yaml file for a specific PersistentVolumeClaim (PVC).
 
 VolumeSnapshotClass needs to be present before a VolumeSnapshot can be created. For more information, see [Creating a VolumeSnapshotClass](csi_ug_config_enable_snapshot.md).
 
@@ -11,9 +11,9 @@ VolumeSnapshotClass needs to be present before a VolumeSnapshot can be created. 
 
 When creating volume snapshots, be sure to follow all of the snapshot configurations, found in [Compatibility and requirements](csi_ug_requirements.md) before snapshot creation.
 
-1.  Create a snapshot for a specific PersistentVolumeClaim \(PVC\) using the demo-snapshot.yaml.
+1.  Create a snapshot for a specific PersistentVolumeClaim (PVC) using the demo-snapshot.yaml.
 
-    For more information about PVC configuration, see [Creating a PersistentVolumeClaim \(PVC\)](csi_ug_config_create_pvc.md).
+    For more information about PVC configuration, see [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
 
     ```screen
     apiVersion: snapshot.storage.k8s.io/v1beta1

@@ -5,7 +5,7 @@ Use this information to help pinpoint potential causes for stateful pod failure.
 **Note:** These procedures are applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace   `kubectl`  with `oc` in all relevant commands.
 
 -   [General troubleshooting](#general_troubleshooting)
--   [Error during pod creation](#error_during_pod_creation) \(for volumes using StatefulSet only\)
+-   [Error during pod creation](#error_during_pod_creation) (for volumes using StatefulSet only)
 
 ## General troubleshooting
 Use the following command for general troubleshooting:
@@ -15,9 +15,9 @@ kubectl get -n <namespace>  csidriver,sa,clusterrole,clusterrolebinding,stateful
 ```
 
 ## Error during pod creation
-**Note:** This troubleshooting procedure is relevant for volumes using file system types only \(not for volumes using raw block volume types\).
+**Note:** This troubleshooting procedure is relevant for volumes using file system types only (not for volumes using raw block volume types).
 
-If the following error occurs during stateful application pod creation \(the pod status is _ContainerCreating_):
+If the following error occurs during stateful application pod creation (the pod status is _ContainerCreating_):
 
 ```screen
     -8e73-005056a49b44" : rpc error: code = Internal desc = 'fsck' found errors on device /dev/dm-26 but could not correct them: fsck from util-linux 2.23.2

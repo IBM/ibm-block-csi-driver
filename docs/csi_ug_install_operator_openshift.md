@@ -1,6 +1,6 @@
 # Installing the driver using the OpenShift web console
 
-When using the Red Hat® OpenShift® Container Platform, the operator for IBM® block storage CSI driver can be installed directly from OpenShift web console, through the OperatorHub. Installing the CSI \(Container Storage Interface\) driver is part of the operator installation process.
+When using the Red Hat® OpenShift® Container Platform, the operator for IBM® block storage CSI driver can be installed directly from OpenShift web console, through the OperatorHub. Installing the CSI (Container Storage Interface) driver is part of the operator installation process.
 
 The Red Hat OpenShift Container Platform uses the following `SecurityContextConstraints` for the following `serviceAccounts`:
 
@@ -12,7 +12,7 @@ The Red Hat OpenShift Container Platform uses the following `SecurityContextCons
 |ibm-block-csi-controller-sa|anyuid|
 |ibm-block-csi-node-sa|privileged|
 
-<a name="create_namespace">1.</a>  From Red Hat OpenShift Container Platform **Home** \> **Projects**, click **Create Project**. In the **Create Project** dialog box, enter a Project name \(also referred to as namespace\). Click **Create** to save.
+<a name="create_namespace">1.</a>  From Red Hat OpenShift Container Platform **Home** \> **Projects**, click **Create Project**. In the **Create Project** dialog box, enter a Project name (also referred to as namespace). Click **Create** to save.
 
 2.  From **Operators** \> **OperatorHub**. Select the namespace from **Projects:<namespace>**, as defined in step [1](#create_namespace).
 

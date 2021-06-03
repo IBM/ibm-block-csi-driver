@@ -1,6 +1,6 @@
-# Creating a PersistentVolumeClaim \(PVC\)
+# Creating a PersistentVolumeClaim (PVC)
 
-Create a PersistentVolumeClaim \(PVC\) yaml file for a persistent volume \(PV\).
+Create a PersistentVolumeClaim (PVC) yaml file for a persistent volume (PV).
 
 The IBM® block storage CSI driver supports using both file system and raw block volume types.
 

@@ -6,7 +6,7 @@ This is an overview of actions that you can take to pinpoint a potential cause f
 
 **Note:** This procedures is applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.
 
-1.  Verify that the CSI driver is running. \(Make sure the `csi-controller` pod status is _Running_\).
+1.  Verify that the CSI driver is running. (Make sure the `csi-controller` pod status is _Running_).
 
     ```
     $> kubectl get all -n <namespace> -l csi
@@ -18,6 +18,6 @@ This is an overview of actions that you can take to pinpoint a potential cause f
     kubectl describe -n <namespace> pod/ibm-block-csi-controller-0
     ```
 
-    View the logs \(see [Log collection](csi_ug_troubleshooting_logs.md)\).
+    View the logs (see [Log collection](csi_ug_troubleshooting_logs.md)).
 
 

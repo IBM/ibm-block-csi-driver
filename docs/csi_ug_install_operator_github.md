@@ -1,8 +1,8 @@
 # Installing the driver using GitHub
 
-The operator for IBM® block storage CSI driver can be installed directly using GitHub. Installing the CSI \(Container Storage Interface\) driver is part of the operator installation process.
+The operator for IBM® block storage CSI driver can be installed directly using GitHub. Installing the CSI (Container Storage Interface) driver is part of the operator installation process.
 
-1.  Use the following steps to install the operator and driver, using [GitHub](https://github.com/IBM/ibm-block-csi-operator) (github.com/IBM/ibm-block-csi-operator\).
+1.  Use the following steps to install the operator and driver, using [GitHub](https://github.com/IBM/ibm-block-csi-operator) (github.com/IBM/ibm-block-csi-operator).
 2.  Download the manifest from GitHub.
 
     ```
@@ -21,7 +21,7 @@ The operator for IBM® block storage CSI driver can be installed directly using 
     kubectl -n <namespace> apply -f ibm-block-csi-operator.yaml
     ```
 
-6.  Verify that the operator is running. \(make sure that the Status is _Running_.\)
+6.  Verify that the operator is running. (make sure that the Status is _Running_.)
 
     ```screen
     $ kubectl get pod -l app.kubernetes.io/name=ibm-block-csi-operator -n <namespace\>
