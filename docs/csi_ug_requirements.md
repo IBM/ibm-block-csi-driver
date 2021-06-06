@@ -1,6 +1,6 @@
 # Compatibility and requirements
 
-For the complete and up-to-date information about the compatibility and requirements for using the IBM® block storage CSI driver, refer to its latest release notes. The [release notes](csi_block_storage_kc_rn.md) detail supported operating system and container platform versions, as well as microcode versions of the supported storage systems.
+For the complete and up-to-date information about the compatibility and requirements for using the IBM® block storage CSI driver, refer to its latest release notes. The release notes detail supported operating system and container platform versions, as well as microcode versions of the supported storage systems.
 
 Before beginning the installation of the CSI (Container Storage Interface) driver, be sure to verify that you comply with the following prerequisites.
 
