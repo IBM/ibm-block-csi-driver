@@ -1,4 +1,4 @@
-# Installing the driver using the OpenShift web console
+# Installing the driver with the OpenShift web console
 
 When using the Red Hat® OpenShift® Container Platform, the operator for IBM® block storage CSI driver can be installed directly from OpenShift web console, through the OperatorHub. Installing the CSI (Container Storage Interface) driver is part of the operator installation process.
 

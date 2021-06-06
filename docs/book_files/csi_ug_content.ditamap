@@ -17,8 +17,8 @@
 format="markdown"/>
 </topicref>
 <topicref href="../csi_ug_upgrade.md" navtitle="Upgrading the CSI driver" format="markdown">
-<topicref href="../csi_ug_upgrade_openshift.md" navtitle="Installing the driver using the OpenShift web console" format="markdown"/>
-<topicref href="../csi_ug_upgrade_ocp_manual.md" navtitle="Installing the driver using the OpenShift web console" format="markdown"/>
+<topicref href="../csi_ug_upgrade_openshift.md" navtitle="Installing the driver with the OpenShift web console" format="markdown"/>
+<topicref href="../csi_ug_upgrade_ocp_manual.md" navtitle="Installing the driver with the OpenShift web console" format="markdown"/>
 </topicref>
 </chapter>
 <chapter href="../csi_ug_config.md" format="markdown">

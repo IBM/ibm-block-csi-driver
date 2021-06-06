@@ -1,4 +1,4 @@
-# Installing the driver using GitHub
+# Installing the driver with GitHub
 
 The operator for IBM® block storage CSI driver can be installed directly using GitHub. Installing the CSI (Container Storage Interface) driver is part of the operator installation process.
 

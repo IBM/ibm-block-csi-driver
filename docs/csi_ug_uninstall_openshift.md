@@ -1,4 +1,4 @@
-# Uninstalling the driver using the OpenShift web console
+# Uninstalling the driver with the OpenShift web console
 
 Use this information to uninstall the IBM® CSI (Container Storage Interface) operator and driver through the Red Hat® OpenShift® Container Platform web console.
 

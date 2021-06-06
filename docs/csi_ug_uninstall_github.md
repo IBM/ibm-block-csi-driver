@@ -1,4 +1,4 @@
-# Uninstalling the driver using GitHub
+# Uninstalling the driver with GitHub
 
 Use this information to uninstall the IBM® CSI (Container Storage Interface) operator and driver using GitHub.
 
