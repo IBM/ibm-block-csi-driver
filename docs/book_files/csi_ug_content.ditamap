@@ -15,9 +15,11 @@
 <topicref href="../csi_ug_uninstall_openshift.md" navtitle="Uninstalling via CLI commands" format="markdown"/>
 <topicref href="../csi_ug_uninstall_github.md" navtitle="Uninstalling via CLI commands"
 format="markdown"/>
+<topicref href="../csi_ug_uninstall_operatorhub.md" navtitle="Uninstalling via CLI commands"
+format="markdown"/>
 </topicref>
 <topicref href="../csi_ug_upgrade.md" navtitle="Upgrading the CSI driver" format="markdown">
-<topicref href="../csi_ug_upgrade_openshift.md" navtitle="Installing the driver with the OpenShift web console" format="markdown"/>
+<!--<topicref href="../csi_ug_upgrade_openshift.md" navtitle="Installing the driver with the OpenShift web console" format="markdown"/>-->
 <topicref href="../csi_ug_upgrade_ocp_manual.md" navtitle="Installing the driver with the OpenShift web console" format="markdown"/>
 </topicref>
 </chapter>
