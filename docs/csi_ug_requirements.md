@@ -57,7 +57,7 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
 
    Install both the Snapshot CRDs and the Common Snapshot Controller once per cluster.
 
-   The instructions and relevant yaml files to enable volume snapshots can be found at: [https://github.com/kubernetes-csi/external-snapshotter\#usage](https://github.com/kubernetes-csi/external-snapshotter#usage)
+   The instructions and relevant yaml files to enable volume snapshots can be found at: [https://github.com/kubernetes-csi/external-snapshotter#usage](https://github.com/kubernetes-csi/external-snapshotter#usage)
 
 4. Configure storage system connectivity.
 

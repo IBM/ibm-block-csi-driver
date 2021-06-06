@@ -12,9 +12,9 @@ The Red Hat OpenShift Container Platform uses the following `SecurityContextCons
 |ibm-block-csi-controller-sa|anyuid|
 |ibm-block-csi-node-sa|privileged|
 
-<a name="create_namespace">1.</a>  From Red Hat OpenShift Container Platform **Home** \> **Projects**, click **Create Project**. In the **Create Project** dialog box, enter a Project name (also referred to as namespace). Click **Create** to save.
+<a name="create_namespace">1.</a>  From Red Hat OpenShift Container Platform **Home** > **Projects**, click **Create Project**. In the **Create Project** dialog box, enter a Project name (also referred to as namespace). Click **Create** to save.
 
-2.  From **Operators** \> **OperatorHub**. Select the namespace from **Projects:<namespace>**, as defined in step [1](#create_namespace).
+2.  From **Operators** > **OperatorHub**. Select the namespace from **Projects:<namespace>**, as defined in step [1](#create_namespace).
 
 3.  Search for IBM block storage CSI driver.
 
@@ -28,11 +28,11 @@ The Red Hat OpenShift Container Platform uses the following `SecurityContextCons
 
 7.  Click **Install**.
 
-8.  From **Operators** \> **Installed Operators**, check the status of the Operator for IBM block storage CSI driver.
+8.  From **Operators** > **Installed Operators**, check the status of the Operator for IBM block storage CSI driver.
 
     Wait until the **Status** is _Up to date_ and then _Succeeded_.
 
-    **Note:** While waiting for the **Status** to change from _Up to date_ to _Succeeded_, you can check the pod progress and readiness status from **Workloads** \> **Pods**.
+    **Note:** While waiting for the **Status** to change from _Up to date_ to _Succeeded_, you can check the pod progress and readiness status from **Workloads** > **Pods**.
 
 9.  After the operator installation progress is complete, click the installed Operator for IBM block storage CSI driver.
 

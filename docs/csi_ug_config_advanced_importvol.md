@@ -9,10 +9,10 @@ Before starting to import an existing volume, find the following information in 
 
     Including:
 
-    -   `pool_name`:_<Name of Pool where volume is located\>_ (Listed as `pool_id` for DS8000® Family systems.)
-    -   `storage_type`: <SVC \| A9K \| DS8K\>
-    -   `volume_name`:_<Volume name\>_
-    -   `array_address`:_<Array address\>_
+    -   `pool_name`:_<Name of Pool where volume is located>_ (Listed as `pool_id` for DS8000® Family systems.)
+    -   `storage_type`: <SVC | A9K | DS8K>
+    -   `volume_name`:_<Volume name>_
+    -   `array_address`:_<Array address>_
 
 To find the `volumeHandle`, use one of the following procedures:
 
@@ -40,11 +40,11 @@ To find the `volumeHandle`, use one of the following procedures:
 
 -   **Through the Spectrum Virtualize management GUI:**
 
-    1.  Select **Volumes** \> **Volumes** from the side bar.
+    1.  Select **Volumes** > **Volumes** from the side bar.
 
         The **Volumes** page appears.
 
-    2.  Browse to the volume that the port is on and right-click \> **Properties**.
+    2.  Browse to the volume that the port is on and right-click > **Properties**.
 
         The Properties window appears. Use the UID number.
 
@@ -52,7 +52,7 @@ To find the `volumeHandle`, use one of the following procedures:
 
 -   **Through the IBM Hyper-Scale Manager user interface for FlashSystem A9000 and A90000R storage systems:**
 
-    1.  Select **Pools and Volumes Views** \> **Volumes** from the side bar.
+    1.  Select **Pools and Volumes Views** > **Volumes** from the side bar.
 
         The **Volumes** table is displayed.
 
@@ -93,10 +93,10 @@ Use this procedure to help build a PV yaml file for your volumes.
           namespace: default
         driver: block.csi.ibm.com
         <b># volumeAttributes:
-          \# pool_name: ibmc-block-gold
-          \# storage_type: SVC
-          \# volume_name: vol1
-          \# array_address: baremetal10-cluster.xiv.ibm.com
+          # pool_name: ibmc-block-gold
+          # storage_type: SVC
+          # volume_name: vol1
+          # array_address: baremetal10-cluster.xiv.ibm.com
         volumeHandle: SVC:600507640082000B08000000000004FF</b>
       # persistentVolumeReclaimPolicy: Retain
       storageClassName: ibmc-block-gold
@@ -129,7 +129,7 @@ Use this procedure to help build a PV yaml file for your volumes.
 4.  Create a project namespace.
 
     **Using OpenShift® web console**
-      From Red Hat® OpenShift Container Platform **Home** \> **Projects**, click **Create Project**. In the **Create Project** dialog box, enter a Project name (also referred to as namespace).
+      From Red Hat® OpenShift Container Platform **Home** > **Projects**, click **Create Project**. In the **Create Project** dialog box, enter a Project name (also referred to as namespace).
 
     Click **Create** to save.
 

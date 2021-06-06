@@ -2,7 +2,7 @@
 
 When using the Red Hat® OpenShift® Container Platform, the CSI (Container Storage Interface) driver can be manually updated through the OpenShift web console.
 
-1.  From Red Hat OpenShift Container Platform **Operators** \> **Installed Operators** see the status of the **ibm-block-csi-operator**.
+1.  From Red Hat OpenShift Container Platform **Operators** > **Installed Operators** see the status of the **ibm-block-csi-operator**.
 
     If the **Status** is _UpgradePending_, click on the operator.
 
@@ -16,9 +16,9 @@ When using the Red Hat® OpenShift® Container Platform, the CSI (Container Stor
 
 5.  From the **Subscription** tab, check the upgrade status and the installed version.
 
-6.  From **Operators** \> **Installed Operators** \> **Operator for IBM block storage CSI driver**, click **Create Instance**.
+6.  From **Operators** > **Installed Operators** > **Operator for IBM block storage CSI driver**, click **Create Instance**.
 
-7.  Check the **Subscriptions** \> **Subscription Overview** tab see the Operator status.
+7.  Check the **Subscriptions** > **Subscription Overview** tab see the Operator status.
 
     Wait for the **Upgrade Status** to be **Upgrading** and **1 requires approval** appears.
 
