@@ -334,9 +334,6 @@ def validate_expand_volume_request(request):
 
     validate_secrets(request.secrets)
 
-    if request.volume_capability:
-        validate_csi_volume_capability(request.volume_capability)
-
     logger.debug("expand volume validation finished")
 
 
