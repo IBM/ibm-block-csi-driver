@@ -191,7 +191,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             vol_id=cli_volume.vdisk_UID,
             vol_name=cli_volume.name,
             array_address=self.endpoint,
-            pool_name=cli_volume.mdisk_grp_name,
+            pool=cli_volume.mdisk_grp_name,
             copy_source_id=source_volume_wwn,
             array_type=self.array_type,
             space_efficiency=space_efficiency,

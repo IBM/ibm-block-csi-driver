@@ -228,7 +228,8 @@ class TestUtils(unittest.TestCase):
             utils.validate_create_volume_request(request)
             self.assertTrue("parameters" in str(ex))
 
-        request.parameters = {controller_config.PARAMETERS_POOL: pool, controller_config.PARAMETERS_SPACE_EFFICIENCY: "thin "}
+        request.parameters = {controller_config.PARAMETERS_POOL: pool,
+                              controller_config.PARAMETERS_SPACE_EFFICIENCY: "thin "}
         request.volume_content_source = None
 
         utils.validate_create_volume_request(request)
@@ -440,13 +441,13 @@ class TestUtils(unittest.TestCase):
 
     def test_validate_parameters_match_volume_pool_fail(self):
         with self.assertRaises(ValidationException):
-            self._test_validate_parameters_match_volume(volume_field="pool_name",
+            self._test_validate_parameters_match_volume(volume_field="pool",
                                                         volume_value="test_pool",
                                                         parameter_field=controller_config.PARAMETERS_POOL,
                                                         parameter_value="fake_pool")
 
     def test_validate_parameters_match_volume_pool_success(self):
-        self._test_validate_parameters_match_volume(volume_field="pool_name",
+        self._test_validate_parameters_match_volume(volume_field="pool",
                                                     volume_value="test_pool",
                                                     parameter_field=controller_config.PARAMETERS_POOL,
                                                     parameter_value="test_pool")

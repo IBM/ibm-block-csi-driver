@@ -381,13 +381,15 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         try:
             utils.validate_validate_volume_capabilities_request(request)
 
-            secrets = request.secrets
-            user, password, array_addresses = utils.get_array_connection_info_from_secret(secrets)
-            array_type, volume_id = utils.get_volume_id_info(request.volume_id)
-            space_efficiency = request.parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
+            volume_id_info = utils.get_volume_id_info(request.volume_id)
+            system_id = volume_id_info.system_id
+            array_type = volume_id_info.array_type
+            volume_id = volume_id_info.object_id
 
-            with get_agent(user, password, array_addresses, array_type).get_mediator() as array_mediator:
-                array_mediator.validate_supported_space_efficiency(space_efficiency)
+            array_connection_info = utils.get_array_connection_info_from_secrets(request.secrets,
+                                                                                 system_id=system_id)
+
+            with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
 
                 volume = array_mediator.get_object_by_id(object_id=volume_id, object_type=config.VOLUME_TYPE_NAME)
 

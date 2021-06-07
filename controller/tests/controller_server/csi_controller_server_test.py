@@ -112,19 +112,12 @@ class CommonControllerTest:
     def _test_request_with_wrong_parameters(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
-        self.request.parameters = {"pool": "pool1"}
-        self.get_tested_method()(self.request, context)
-        self.assertNotEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
+        parameters = [{}, {"": ""}, {"pool": ""}]
 
-        self.request.parameters = {"": ""}
-        self.get_tested_method()(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
-        self.assertTrue("pool parameter" in context.details)
-
-        self.request.parameters = {"pool": "pool1", "SpaceEfficiency": "thin"}
-        self.get_tested_method()(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
-        self.assertTrue("not supported" in context.details)
+        for request_parameters in parameters:
+            self.request.parameters = request_parameters
+            self.get_tested_method()(self.request, context)
+            self.assertEqual(grpc.StatusCode.INVALID_ARGUMENT, context.code)
 
 
 class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
@@ -928,7 +921,13 @@ class TestDeleteVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
 
-class TestPublishVolume(BaseControllerSetUp):
+class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
+
+    def get_tested_method(self):
+        return self.servicer.ControllerPublishVolume
+
+    def get_tested_method_response_class(self):
+        return csi_pb2.ControllerPublishVolumeResponse
 
     def setUp(self):
         super().setUp()
@@ -973,7 +972,7 @@ class TestPublishVolume(BaseControllerSetUp):
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_publish_volume_with_wrong_secrets(self, storage_agent):
-        self._test_create_object_with_wrong_secrets(storage_agent)
+        self._test_request_with_wrong_secrets(storage_agent)
 
     def test_publish_volume_wrong_volume_id(self):
         self.request.volume_id = "some-wrong-id-format"
@@ -1219,7 +1218,13 @@ class TestPublishVolume(BaseControllerSetUp):
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
 
 
-class TestUnpublishVolume(BaseControllerSetUp):
+class TestUnpublishVolume(BaseControllerSetUp, CommonControllerTest):
+
+    def get_tested_method(self):
+        return self.servicer.ControllerUnpublishVolume
+
+    def get_tested_method_response_class(self):
+        return csi_pb2.ControllerUnpublishVolumeResponse
 
     def setUp(self):
         super().setUp()
@@ -1255,7 +1260,7 @@ class TestUnpublishVolume(BaseControllerSetUp):
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_unpublish_volume_with_wrong_secrets(self, storage_agent):
-        self._test_create_object_with_wrong_secrets(storage_agent)
+        self._test_request_with_wrong_secrets(storage_agent)
 
     def test_unpublish_volume_wrong_volume_id(self):
         self.request.volume_id = "some-wrong-id-format"
@@ -1667,7 +1672,7 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
                                    config.PARAMETERS_SPACE_EFFICIENCY: "not_none"}
         volume_response = utils.get_mock_mediator_response_volume(10, "prefix_vol", "wwn2", "a9k",
                                                                   space_efficiency="not_none")
-        volume_response.pool_name = "pool2"
+        volume_response.pool = "pool2"
         self.mediator.get_object_by_id.return_value = volume_response
         self.mediator.validate_supported_space_efficiency = Mock()
 

@@ -3,14 +3,13 @@ import json
 import grpc
 from mock import Mock, MagicMock
 
+from controller.controller_server.controller_types import ArrayConnectionInfo
+from controller.controller_server.test_settings import user as test_user, password as test_password, array as test_array
+
 
 class ProtoBufMock(MagicMock):
     def HasField(self, field):
         return hasattr(self, field)
-
-
-from controller.controller_server.controller_types import ArrayConnectionInfo
-from controller.controller_server.test_settings import user as test_user, password as test_password, array as test_array
 
 
 def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_source_id=None, space_efficiency=None,

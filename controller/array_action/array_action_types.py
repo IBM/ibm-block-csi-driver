@@ -1,5 +1,3 @@
-class Volume:
-    def __init__(self, vol_size_bytes, vol_id, vol_name, array_address, pool, copy_source_id, array_type):
 class MembersPrintable:
     def __str__(self):
         return "<{}: {}>".format(self.__class__.__name__,

@@ -11,8 +11,8 @@ import controller.controller_server.config as config
 import controller.controller_server.messages as messages
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.common.csi_logger import get_stdout_logger
-from controller.controller_server.controller_types import ArrayConnectionInfo, ObjectIdInfo, ObjectParameters
 from controller.common.settings import NAME_PREFIX_SEPARATOR
+from controller.controller_server.controller_types import ArrayConnectionInfo, ObjectIdInfo, ObjectParameters
 from controller.controller_server.errors import ObjectIdError, ValidationException
 from controller.csi_general import csi_pb2
 
@@ -227,6 +227,7 @@ def _validate_pool_parameter(parameters):
     elif not parameters.get(config.PARAMETERS_BY_SYSTEM):
         raise ValidationException(messages.pool_is_missing_message)
 
+
 def _validate_object_id(object_id, object_type=config.VOLUME_TYPE_NAME,
                         message=messages.volume_id_should_not_be_empty_message):
     logger.debug("validating volume id")
@@ -235,7 +236,7 @@ def _validate_object_id(object_id, object_type=config.VOLUME_TYPE_NAME,
     if config.PARAMETERS_OBJECT_ID_DELIMITER not in object_id:
         raise ObjectIdError(object_type, object_id)
     if len(object_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)) not in {config.MINIMUM_VOLUME_ID_PARTS,
-                                                                                   config.MAXIMUM_VOLUME_ID_PARTS}:
+                                                                           config.MAXIMUM_VOLUME_ID_PARTS}:
         raise ValidationException(messages.volume_id_wrong_format_message)
 
 
@@ -261,7 +262,7 @@ def validate_create_volume_request(request):
     if request.parameters:
         _validate_pool_parameter(request.parameters)
     else:
-        raise ValidationException(messages.params_are_missing_message)
+        raise ValidationException(messages.pool_is_missing_message)
 
     logger.debug("validating volume copy source")
     validate_create_volume_source(request)
@@ -300,6 +301,8 @@ def validate_validate_volume_capabilities_request(request):
 
     if request.parameters:
         _validate_pool_parameter(request.parameters)
+    else:
+        raise ValidationException(messages.pool_is_missing_message)
 
     validate_csi_volume_capabilities(request.volume_capabilities)
 
@@ -454,7 +457,7 @@ def _get_context_from_volume(volume):
     return {config.VOLUME_CONTEXT_VOLUME_NAME: volume.name,
             config.VOLUME_CONTEXT_ARRAY_ADDRESS: ",".join(
                 volume.array_address if isinstance(volume.array_address, list) else [volume.array_address]),
-            config.VOLUME_CONTEXT_POOL: volume.pool_name,
+            config.VOLUME_CONTEXT_POOL: volume.pool,
             config.VOLUME_CONTEXT_STORAGE_TYPE: volume.array_type
             }
 
@@ -564,7 +567,7 @@ def validate_parameters_match_volume(parameters, volume):
 
     logger.debug("validating pool parameter matches volume's")
     pool = parameters.get(config.PARAMETERS_POOL)
-    _validate_parameter_match_volume(pool, volume.pool_name, messages.pool_not_match_volume_message)
+    _validate_parameter_match_volume(pool, volume.pool, messages.pool_not_match_volume_message)
 
     logger.debug("validating prefix parameter matches volume's")
     prefix = parameters.get(config.PARAMETERS_VOLUME_NAME_PREFIX)
