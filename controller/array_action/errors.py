@@ -193,6 +193,12 @@ class SnapshotAlreadyExists(BaseArrayActionException):
         self.message = messages.SnapshotAlreadyExistsError_message.format(snapshot_id_or_name, array)
 
 
+class SnapshotSourcePoolMismatch(BaseArrayActionException):
+
+    def __init__(self, snapshot_pool, source_pool):
+        self.message = messages.SnapshotSourcePoolMismatchError_message.format(snapshot_pool, source_pool)
+
+
 class ObjectIsStillInUseError(BaseArrayActionException):
 
     def __init__(self, id_or_name, used_by: list):

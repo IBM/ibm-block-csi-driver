@@ -1,3 +1,5 @@
+import json
+import re
 from hashlib import sha256
 from operator import eq
 
@@ -9,6 +11,7 @@ import controller.controller_server.config as config
 import controller.controller_server.messages as messages
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.common.csi_logger import get_stdout_logger
+from controller.controller_server.controller_types import ArrayConnectionInfo, ObjectIdInfo, ObjectParameters
 from controller.common.settings import NAME_PREFIX_SEPARATOR
 from controller.controller_server.errors import ObjectIdError, ValidationException
 from controller.csi_general import csi_pb2
@@ -16,37 +19,155 @@ from controller.csi_general import csi_pb2
 logger = get_stdout_logger()
 
 
-def get_array_connection_info_from_secret(secrets):
+def _parse_raw_json(raw_json):
+    try:
+        parsed_json = json.loads(raw_json)
+    except json.decoder.JSONDecodeError as ex:
+        raise ValidationException(messages.invalid_json_parameter_message.format(raw_json, ex))
+    return parsed_json
+
+
+def _is_topology_match(system_topologies, node_topologies):
+    for topologies in system_topologies:
+        logger.debug(
+            "Comparing topologies: system topologies: {},"
+            " node topologies: {}".format(topologies, node_topologies))
+        if topologies.items() <= node_topologies.items():
+            return True
+    return False
+
+
+def get_volume_topologies(request):
+    if request.HasField(config.REQUEST_ACCESSIBILITY_REQUIREMENTS_FIELD):
+        accessibility_requirements = request.accessibility_requirements
+        if accessibility_requirements.preferred:
+            topologies = accessibility_requirements.preferred[0].segments
+            logger.info("Chosen volume topologies: {}".format(topologies))
+            return topologies
+
+
+def _get_system_info_for_topologies(secrets_config, node_topologies):
+    for system_id, system_info in secrets_config.items():
+        system_topologies = system_info.get(config.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
+        if _is_topology_match(system_topologies, node_topologies):
+            return system_info, system_id
+    raise ValidationException(messages.no_system_match_requested_topologies.format(node_topologies))
+
+
+def _get_system_info_from_secrets(secrets, topologies=None, system_id=None):
+    raw_secrets_config = secrets.get(config.SECRET_CONFIG_PARAMETER)
+    system_info = secrets
+    if raw_secrets_config:
+        secrets_config = _parse_raw_json(raw_json=raw_secrets_config)
+        if system_id:
+            system_info = secrets_config.get(system_id)
+        elif topologies:
+            system_info, system_id = _get_system_info_for_topologies(secrets_config=secrets_config,
+                                                                     node_topologies=topologies)
+        else:
+            raise ValidationException(messages.insufficient_data_to_choose_a_storage_system_message)
+    return system_info, system_id
+
+
+def _get_array_connection_info_from_system_info(secrets, system_id):
     user = secrets[config.SECRET_USERNAME_PARAMETER]
     password = secrets[config.SECRET_PASSWORD_PARAMETER]
-    array_addresses = secrets[config.SECRET_ARRAY_PARAMETER].split(",")
-    return user, password, array_addresses
+    array_addresses = secrets[config.SECRET_ARRAY_PARAMETER].split(config.PARAMETERS_ARRAY_ADDRESSES_DELIMITER)
+    return ArrayConnectionInfo(array_addresses=array_addresses, user=user, password=password, system_id=system_id)
 
 
-def get_volume_id(new_volume):
-    return _get_object_id(new_volume)
+def get_array_connection_info_from_secrets(secrets, topologies=None, system_id=None):
+    system_info, system_id = _get_system_info_from_secrets(secrets, topologies, system_id)
+    return _get_array_connection_info_from_system_info(system_info, system_id)
+
+
+def get_volume_parameters(parameters, system_id):
+    return get_object_parameters(parameters, config.PARAMETERS_VOLUME_NAME_PREFIX, system_id)
+
+
+def get_snapshot_parameters(parameters, system_id):
+    return get_object_parameters(parameters, config.PARAMETERS_SNAPSHOT_NAME_PREFIX, system_id)
+
+
+def get_object_parameters(parameters, prefix_param_name, system_id):
+    raw_parameters_by_system = parameters.get(config.PARAMETERS_BY_SYSTEM)
+    system_parameters = {}
+    if raw_parameters_by_system and system_id:
+        parameters_by_system = _parse_raw_json(raw_json=raw_parameters_by_system)
+        system_parameters = parameters_by_system.get(system_id, {})
+    default_pool = parameters.get(config.PARAMETERS_POOL)
+    default_space_efficiency = parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
+    default_prefix = parameters.get(prefix_param_name)
+    return ObjectParameters(
+        pool=system_parameters.get(config.PARAMETERS_POOL, default_pool),
+        space_efficiency=system_parameters.get(config.PARAMETERS_SPACE_EFFICIENCY, default_space_efficiency),
+        prefix=system_parameters.get(prefix_param_name, default_prefix))
+
+
+def get_volume_id(new_volume, system_id):
+    return _get_object_id(new_volume, system_id)
 
 
 def get_snapshot_id(new_snapshot):
     return _get_object_id(new_snapshot)
 
 
-def _get_object_id(obj):
+def _get_object_id(obj, system_id=None):
+    if system_id:
+        return config.PARAMETERS_OBJECT_ID_DELIMITER.join((obj.array_type, system_id, obj.id))
     return config.PARAMETERS_OBJECT_ID_DELIMITER.join((obj.array_type, obj.id))
+
+
+def _is_system_id_valid(system_id):
+    return system_id and re.match(config.SECRET_VALIDATION_REGEX, system_id)
+
+
+def _validate_system_id(system_id):
+    if not _is_system_id_valid(system_id):
+        raise ValidationException(
+            messages.invalid_system_id_message.format(system_id, config.SECRET_VALIDATION_REGEX))
+    if len(system_id) > config.SECRET_SYSTEM_ID_MAX_LENGTH:
+        raise ValidationException(
+            messages.parameter_length_is_too_long.format("system id", system_id, config.SECRET_SYSTEM_ID_MAX_LENGTH))
+
+
+def _validate_secrets(secrets):
+    if not (config.SECRET_USERNAME_PARAMETER in secrets and
+            config.SECRET_PASSWORD_PARAMETER in secrets and
+            config.SECRET_ARRAY_PARAMETER in secrets):
+        raise ValidationException(messages.secret_missing_connection_info_message)
+
+
+def _validate_topologies(topologies):
+    if topologies:
+        if not all(topologies):
+            raise ValidationException(messages.secret_missing_topologies_message)
+    else:
+        raise ValidationException(messages.secret_missing_topologies_message)
+
+
+def _validate_secrets_config(secrets_config):
+    for system_id, system_info in secrets_config.items():
+        if system_id and system_info:
+            _validate_system_id(system_id)
+            _validate_secrets(system_info)
+            supported_topologies = system_info.get(config.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
+            _validate_topologies(supported_topologies)
+        else:
+            raise ValidationException(messages.invalid_secret_config_message)
 
 
 def validate_secrets(secrets):
     logger.debug("validating secrets")
-    if secrets:
-        if not (config.SECRET_USERNAME_PARAMETER in secrets and
-                config.SECRET_PASSWORD_PARAMETER in secrets and
-                config.SECRET_ARRAY_PARAMETER in secrets):
-            raise ValidationException(messages.invalid_secret_message)
-
-    else:
+    if not secrets:
         raise ValidationException(messages.secret_missing_message)
-
-    logger.debug("secret validation finished")
+    raw_secrets_config = secrets.get(config.SECRET_CONFIG_PARAMETER)
+    if raw_secrets_config:
+        secrets_config = _parse_raw_json(raw_secrets_config)
+        _validate_secrets_config(secrets_config)
+    else:
+        _validate_secrets(secrets)
+    logger.debug("secrets validation finished")
 
 
 def validate_csi_volume_capability(cap):
@@ -100,12 +221,11 @@ def _validate_source_info(source, source_type):
 
 def _validate_pool_parameter(parameters):
     logger.debug("validating pool parameter")
-    if config.PARAMETERS_POOL not in parameters:
+    if config.PARAMETERS_POOL in parameters:
+        if not parameters[config.PARAMETERS_POOL]:
+            raise ValidationException(messages.pool_should_not_be_empty_message)
+    elif not parameters.get(config.PARAMETERS_BY_SYSTEM):
         raise ValidationException(messages.pool_is_missing_message)
-
-    if not parameters[config.PARAMETERS_POOL]:
-        raise ValidationException(messages.wrong_pool_passed_message)
-
 
 def _validate_object_id(object_id, object_type=config.VOLUME_TYPE_NAME,
                         message=messages.volume_id_should_not_be_empty_message):
@@ -114,6 +234,9 @@ def _validate_object_id(object_id, object_type=config.VOLUME_TYPE_NAME,
         raise ValidationException(message)
     if config.PARAMETERS_OBJECT_ID_DELIMITER not in object_id:
         raise ObjectIdError(object_type, object_id)
+    if len(object_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)) not in {config.MINIMUM_VOLUME_ID_PARTS,
+                                                                                   config.MAXIMUM_VOLUME_ID_PARTS}:
+        raise ValidationException(messages.volume_id_wrong_format_message)
 
 
 def validate_create_volume_request(request):
@@ -131,7 +254,6 @@ def validate_create_volume_request(request):
     else:
         raise ValidationException(messages.no_capacity_range_message)
 
-    logger.debug("validating volume capabilities")
     validate_csi_volume_capabilities(request.volume_capabilities)
 
     validate_secrets(request.secrets)
@@ -215,7 +337,7 @@ def validate_expand_volume_request(request):
     logger.debug("expand volume validation finished")
 
 
-def generate_csi_create_volume_response(new_volume, source_type=None):
+def generate_csi_create_volume_response(new_volume, system_id=None, source_type=None):
     logger.debug("creating create volume response for volume : {0}".format(new_volume))
 
     volume_context = _get_context_from_volume(new_volume)
@@ -231,7 +353,7 @@ def generate_csi_create_volume_response(new_volume, source_type=None):
 
     res = csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(
         capacity_bytes=new_volume.capacity_bytes,
-        volume_id=get_volume_id(new_volume),
+        volume_id=get_volume_id(new_volume, system_id),
         content_source=content_source,
         volume_context=volume_context))
 
@@ -340,12 +462,15 @@ def _get_context_from_volume(volume):
 def get_object_id_info(full_object_id, object_type):
     logger.debug("getting {0} info for id : {1}".format(object_type, full_object_id))
     splitted_object_id = full_object_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)
-    if len(splitted_object_id) != 2:
+    system_id = None
+    if len(splitted_object_id) == 2:
+        array_type, object_id = splitted_object_id
+    elif len(splitted_object_id) == 3:
+        array_type, system_id, object_id = splitted_object_id
+    else:
         raise ObjectIdError(object_type, full_object_id)
-
-    array_type, object_id = splitted_object_id
     logger.debug("volume id : {0}, array type :{1}".format(object_id, array_type))
-    return array_type, object_id
+    return ObjectIdInfo(array_type=array_type, system_id=system_id, object_id=object_id)
 
 
 def get_node_id_info(node_id):

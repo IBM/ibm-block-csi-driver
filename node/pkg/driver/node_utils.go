@@ -17,6 +17,7 @@
 package driver
 
 import (
+	"context"
 	"fmt"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"io/ioutil"
@@ -26,9 +27,18 @@ import (
 	"strconv"
 	"strings"
 
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"k8s.io/utils/mount"
+)
+
+var (
+	getOpts          = metav1.GetOptions{}
+	topologyPrefixes = [...]string{"topology.kubernetes.io", "topology.block.csi.ibm.com"}
 )
 
 const (
@@ -68,6 +78,7 @@ type NodeUtilsInterface interface {
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
 	GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN string) (string, error)
+	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
 }
 
 type NodeUtils struct {
@@ -409,4 +420,33 @@ func (n NodeUtils) GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN str
 	}
 
 	return nodeId.String(), nil
+}
+
+func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error) {
+	kubeConfig, err := rest.InClusterConfig()
+	if err != nil {
+		logger.Infof("unable to load in-cluster configuration: %v", err)
+		logger.Info("skipping topology retrieval. we might not be in a k8s cluster")
+		return nil, nil
+	}
+
+	client, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	node, err := client.CoreV1().Nodes().Get(ctx, nodeName, getOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	topologyLabels := make(map[string]string)
+	for key, value := range node.Labels {
+		for _, prefix := range topologyPrefixes {
+			if strings.HasPrefix(key, prefix) {
+				topologyLabels[key] = value
+			}
+		}
+	}
+	return topologyLabels, nil
 }
