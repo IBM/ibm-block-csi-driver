@@ -7,7 +7,7 @@ Use this information to upgrade the IBM® block storage CSI driver.
 
         To check if your operator is running at the latest release level, from the OpenShift web console, browse to **Operators** > **Installed Operators**. Check the status of the Operator for IBM block storage CSI driver. Ensure that the **Upgrade Status** is _Up to date_.
     
-    **Note:** For more information about automatic upgrades, see https://olm.operatorframework.io/docs/concepts/crds/subscription/.
+  **Note:** For more information about automatic upgrades, see https://olm.operatorframework.io/docs/concepts/crds/subscription/.
 
 - To manually upgrade the CSI driver with the OpenShift web console, see [Manual upgrade with OpenShift](csi_ug_upgrade_ocp_manual.md).
 
