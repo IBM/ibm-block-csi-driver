@@ -15,13 +15,14 @@ Use the following steps to install the operator and driver, with [GitHub](https:
 
 3.  Create a project namespace, using the `kubectl create ns <namespace>` command.
 
-4.  Install the operator, while using a user-defined namespace.
+4.  Install the operator.
+
+    1. Install the operator, using a user-defined namespace.
 
     ```
     kubectl -n <namespace> apply -f ibm-block-csi-operator.yaml
     ```
-
-5.  Verify that the operator is running. (make sure that the Status is _Running_.)
+    2. Verify that the operator is running. (Make sure that the Status is _Running_.)
 
     ```screen
     $ kubectl get pod -l app.kubernetes.io/name=ibm-block-csi-operator -n <namespace>
