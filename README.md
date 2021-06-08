@@ -2,10 +2,10 @@
 The Container Storage Interface (CSI) Driver for IBM block storage systems enables container orchestrators such as Kubernetes to manage the life cycle of persistent storage.
 
 Supported container platforms (and architectures):
-  - OpenShift v4.6 (x86, IBM Z, and IBM Power Systems)
   - OpenShift v4.7 (x86, IBM Z, and IBM Power Systems)
-  - Kubernetes v1.19 (x86)
+  - OpenShift v4.8 (x86, IBM Z, and IBM Power Systems)
   - Kubernetes v1.20 (x86)
+  - Kubernetes v1.21 (x86)
 
 Supported IBM storage systems:
   - IBM Spectrum Virtualize Family including IBM SAN Volume Controller (SVC) and IBM FlashSystem® family members built with IBM Spectrum® Virtualize (FlashSystem 5010, 5030, 5100, 5200, 7200, 9100, 9200, 9200R)
@@ -16,7 +16,7 @@ Supported operating systems (and architectures):
   - RHEL 7.x (x86)
   - RHCOS (x86, IBM Z, and IBM Power Systems)
 
-Full documentation can be found on the [IBM Knowledge Center](https://www.ibm.com/support/knowledgecenter/SSRQ8T).
+Full documentation can be found on the [IBM Knowledge Center](https://www.ibm.com/docs/en/stg-block-csi-driver).
 
 <br/>
 <br/>
@@ -40,7 +40,7 @@ yum -y install xfsprogs                # Only if XFS file system is required
 #### 2. Configure Linux® multipath devices on the host.
 
 **Important:** Be sure to configure each worker with storage connectivity according to your storage system instructions. 
-For more information, find your storage system documentation on [IBM Knowledge Center](https://www.ibm.com/support/knowledgecenter).
+For more information, find your storage system documentation on [IBM Knowledge Center](https://www.ibm.com/docs/en).
 
 ##### 2.1 Additional configuration steps for OpenShift® Container Platform users (RHEL and RHCOS). Other users can continue to step 3.
 
@@ -125,19 +125,24 @@ $ kubectl -n <namespace> apply -f csi.ibm.com_v1_ibmblockcsi_cr.yaml
 
 ```bash
 $ kubectl get all -n <namespace>  -l csi
-NAME                             READY   STATUS    RESTARTS   AGE
-pod/ibm-block-csi-controller-0   6/6     Running   0          9m36s
-pod/ibm-block-csi-node-jvmvh     3/3     Running   0          9m36s
-pod/ibm-block-csi-node-tsppw     3/3     Running   0          9m36s
+NAME                                            READY   STATUS    RESTARTS   AGE
+pod/ibm-block-csi-controller-0                  6/6     Running   0          9m36s
+pod/ibm-block-csi-node-jvmvh                    3/3     Running   0          9m36s
+pod/ibm-block-csi-node-tsppw                    3/3     Running   0          9m36s
+pod/ibm-block-csi-operator-5bb7996b86-xntss     1/1     Running   0          10m
 
 NAME                                DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
 daemonset.apps/ibm-block-csi-node   2         2         2       2            2           <none>          9m36s
 
+NAME                                     READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/ibm-block-csi-operator   1/1     1            1           10m
+
+NAME                                                DESIRED   CURRENT   READY                                                                                                                                 AGE
+replicaset.apps/ibm-block-csi-operator-5bb7996b86   1         1         1                                                                                                                                     11d
+
 NAME                                        READY   AGE
 statefulset.apps/ibm-block-csi-controller   1/1     9m36s
 ```
-
-
 
 <br/>
 <br/>
@@ -224,13 +229,9 @@ $ kubectl apply -f demo-storageclass-gold-pvc.yaml
 storageclass.storage.k8s.io/gold created
 ```
 
-
-
-
 <br/>
 <br/>
 <br/>
-
 
 ## Driver usage
 Create PVC demo-pvc-file-system using `demo-pvc-file-system.yaml`:
