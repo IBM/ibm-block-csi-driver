@@ -17,6 +17,6 @@ The following severity levels apply to known issues:
 
 |Ticket ID|Severity|Description|
 |---------|--------|-----------|
-|**CSI-2157**|Service|In extremely rare cases, too many Fibre Channel worker node connections may result in a failure when the CSI driver attempts to attach a pod. As a result, the `Host for node: \{0\} was not found, ensure all host ports are configured on storage` error message may be found in the IBM block storage CSI driver controller logs.<br />**Workaround:** Ensure that all host ports are properly configured on the storage system. If the issue continues and the CSI driver can still not attach a pod, contact IBM Support.|
+|**CSI-2157**|Service|In extremely rare cases, too many Fibre Channel worker node connections may result in a failure when the CSI driver attempts to attach a pod. As a result, the `Host for node: {0} was not found, ensure all host ports are configured on storage` error message may be found in the IBM block storage CSI driver controller logs.<br />**Workaround:** Ensure that all host ports are properly configured on the storage system. If the issue continues and the CSI driver can still not attach a pod, contact IBM Support.|
 |**CSI-702**|Service|Modifying the controller or node **affinity** settings may not take effect.<br />**Workaround:** If needed, delete the controller StatefulSet and/or the DaemonSet node after modifying the **affinity** settings in the IBMBlockCSI custom resource.|
 
