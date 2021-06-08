@@ -11,7 +11,7 @@ The CSI operator and driver can be uninstalled in one of the following ways:
 - With OperatorHub.io (see [Uninstalling the driver with OperatorHub.io](csi_ug_uninstall_operatorhub.md)).
 - With the IBM Cloud® Satellite web console.
   
-  To uninstall from IBM Cloud® Satellite web console, **Remove** the CSI driver subscription. For more information, see [cloud.ibm.com/docs/satellite](cloud.ibm.com/docs/satellite).
+  To uninstall from IBM Cloud® Satellite web console, **Remove** the CSI driver subscription. For more information, see [cloud.ibm.com/docs/satellite](https://cloud.ibm.com/docs/satellite).
 
 
 
