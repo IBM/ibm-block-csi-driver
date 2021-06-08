@@ -22,6 +22,7 @@ Use the following steps to install the operator and driver, with [GitHub](https:
     ```
     kubectl -n <namespace> apply -f ibm-block-csi-operator.yaml
     ```
+    
     2. Verify that the operator is running. (Make sure that the Status is _Running_.)
 
     ```screen
