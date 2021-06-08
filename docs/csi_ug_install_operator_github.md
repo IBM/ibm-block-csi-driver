@@ -3,35 +3,35 @@
 The operator for IBM® block storage CSI driver can be installed directly with GitHub. Installing the CSI (Container Storage Interface) driver is part of the operator installation process.
 
 Use the following steps to install the operator and driver, with [GitHub](https://github.com/IBM/ibm-block-csi-operator) (github.com/IBM/ibm-block-csi-operator).
-1.  Download the manifest from GitHub.
+1.  Create a project namespace, using the `kubectl create ns <namespace>` command.
 
-    ```
-    curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.6.0/deploy/installer/generated/ibm-block-csi-operator.yaml > ibm-block-csi-operator.yaml
-    ```
+2.  Install the operator.
 
-2.  **Optional:** Update the image fields in the ibm-block-csi-operator.yaml.
+    1. Download the manifest from GitHub.
 
-    **Note:** Updating the namespace to a user-defined namespace might be necessary to ensure consistency and avoid trouble with operator installation.
+        ```
+        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.6.0/deploy/installer/generated/ibm-block-csi-operator.yaml > ibm-block-csi-operator.yaml
+        ```
 
-3.  Create a project namespace, using the `kubectl create ns <namespace>` command.
+    2.  **Optional:** Update the image fields in the ibm-block-csi-operator.yaml.
 
-4.  Install the operator.
+        **Note:** Updating the namespace to a user-defined namespace might be necessary to ensure consistency and avoid trouble with operator installation.
 
-    1. Install the operator, using a user-defined namespace.
+    3. Install the operator, using a user-defined namespace.
 
-    ```
-    kubectl -n <namespace> apply -f ibm-block-csi-operator.yaml
-    ```
-    
-    2. Verify that the operator is running. (Make sure that the Status is _Running_.)
+        ```
+        kubectl -n <namespace> apply -f ibm-block-csi-operator.yaml
+        ```
 
-    ```screen
-    $ kubectl get pod -l app.kubernetes.io/name=ibm-block-csi-operator -n <namespace>
-    NAME                                    READY   STATUS    RESTARTS   AGE
-    ibm-block-csi-operator-5bb7996b86-xntss 1/1     Running   0          10m
-    ```
+    4. Verify that the operator is running. (Make sure that the Status is _Running_.)
 
-6.  Install the IBM block storage CSI driver by creating an IBMBlockCSI custom resource.
+        ```screen
+        $ kubectl get pod -l app.kubernetes.io/name=ibm-block-csi-operator -n <namespace>
+        NAME                                    READY   STATUS    RESTARTS   AGE
+        ibm-block-csi-operator-5bb7996b86-xntss 1/1     Running   0          10m
+        ```
+
+3.  Install the IBM block storage CSI driver by creating an IBMBlockCSI custom resource.
 
     1.  Download the manifest from GitHub.
 
