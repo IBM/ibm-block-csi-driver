@@ -137,8 +137,8 @@ daemonset.apps/ibm-block-csi-node   2         2         2       2            2  
 NAME                                     READY   UP-TO-DATE   AVAILABLE   AGE
 deployment.apps/ibm-block-csi-operator   1/1     1            1           10m
 
-NAME                                                DESIRED   CURRENT   READY                                                                                                                                 AGE
-replicaset.apps/ibm-block-csi-operator-5bb7996b86   1         1         1                                                                                                                                     11d
+NAME                                                DESIRED   CURRENT   READY   AGE
+replicaset.apps/ibm-block-csi-operator-5bb7996b86   1         1         1       10m
 
 NAME                                        READY   AGE
 statefulset.apps/ibm-block-csi-controller   1/1     9m36s
