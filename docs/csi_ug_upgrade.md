@@ -13,5 +13,7 @@ Use this information to upgrade the IBM® block storage CSI driver.
 
 - To manually upgrade the CSI (Container Storage Interface) driver from a previous version with GitHub, perform step 1 and step 4 of the [installation procedure](csi_ug_install_operator_github.md) for the latest version.
 
+  **Note:** In some cases, step 2 may be necessary to perform as well.
+
 
 
