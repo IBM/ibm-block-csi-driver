@@ -17,11 +17,11 @@ _<a name=spaceefficiency>**Table:**</a> `SpaceEfficiency` parameter definitions 
 |Storage system type|SpaceEfficiency parameter options|
 |-------------------|---------------------------------|
 |IBM FlashSystem® A9000 and A9000R|Always includes deduplication and compression. No need to specify during configuration.|
-|IBM Spectrum® Virtualize Family|- thick (default value) <br />- thin<br />- compressed<br />- deduplicated<br />**Note:** If not specified, the default value is thick.|
+|IBM Spectrum® Virtualize Family|- thick (default value)<br />- thin<br />- compressed<br />- deduplicated<br />**Note:** If not specified, the default value is thick.|
 |IBM® DS8000® Family| - none (default value)<br />- thin<br />**Note:** If not specified, the default value is none.|
 
 - The IBM DS8000 Family `pool` value is the pool ID and not the pool name as is used in other storage systems.
-- The `pool` value should be a name of an existing pool on the storage system.
+- Be sure that the `pool` value is the name of an existing pool on the storage system.
 - The `allowVolumeExpansion` parameter is optional but is necessary for using volume expansion. The default value is _false_.
 
 **Note:** Be sure to set the value to true to allow volume expansion.
@@ -29,7 +29,7 @@ _<a name=spaceefficiency>**Table:**</a> `SpaceEfficiency` parameter definitions 
 - The `csi.storage.k8s.io/fstype` parameter is optional. The values that are allowed are _ext4_ or _xfs_. The default value is _ext4_.
 - The `volume_name_prefix` parameter is optional.
 
-**Note:** For IBM DS8000 Family, the maximum prefix length is five characters.The maximum prefix length for other systems is 20 characters.<br />For storage systems using Spectrum Virtualize, the `CSI_` prefix is added as default if not specified by the user.
+**Note:** For IBM DS8000 Family, the maximum prefix length is five characters. The maximum prefix length for other systems is 20 characters.<br />For storage systems that use Spectrum Virtualize, the `CSI_` prefix is added as default if not specified by the user.
 
     
       kind: StorageClass
