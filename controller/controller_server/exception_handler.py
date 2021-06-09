@@ -9,12 +9,16 @@ from controller.controller_server.errors import ValidationException
 logger = get_stdout_logger()
 
 status_codes_by_exception = {
+    NotImplementedError: grpc.StatusCode.UNIMPLEMENTED,
     ValidationException: grpc.StatusCode.INVALID_ARGUMENT,
+    array_errors.IllegalObjectID: grpc.StatusCode.INVALID_ARGUMENT,
     array_errors.IllegalObjectName: grpc.StatusCode.INVALID_ARGUMENT,
     array_errors.PoolParameterIsMissing: grpc.StatusCode.INVALID_ARGUMENT,
     array_errors.ObjectNotFoundError: grpc.StatusCode.NOT_FOUND,
+    array_errors.HostNotFoundError: grpc.StatusCode.NOT_FOUND,
     array_errors.PermissionDeniedError: grpc.StatusCode.PERMISSION_DENIED,
-    array_errors.NotEnoughSpaceInPool: grpc.StatusCode.RESOURCE_EXHAUSTED
+    array_errors.NotEnoughSpaceInPool: grpc.StatusCode.RESOURCE_EXHAUSTED,
+    array_errors.ObjectIsStillInUseError: grpc.StatusCode.FAILED_PRECONDITION
 }
 
 
@@ -31,7 +35,7 @@ def handle_common_exceptions(response_type):
         try:
             return controller_method(servicer, request, context)
         except Exception as ex:
-            return handle_exception(ex, context, status_codes_by_exception.get(type(ex), grpc.StatusCode.INTERNAL),
-                                    response_type)
+            status_code = status_codes_by_exception.get(type(ex), grpc.StatusCode.INTERNAL)
+            return handle_exception(ex, context, status_code, response_type)
 
     return handle_common_exceptions_with_response
