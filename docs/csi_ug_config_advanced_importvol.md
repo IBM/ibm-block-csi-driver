@@ -25,18 +25,18 @@ To find the `volumeHandle`, use one of the following procedures:
     vdisk_UID 600507640082000B08000000000004FF
     ```
 
--   **Through command line (for FlashSystem A9000 and A9000R):**
+-    **Through command line (for FlashSystem A9000 and A9000R):**
 
-     `vol_list_extended vol=<volume_name>`
+      `vol_list_extended vol=<volume_name>`
     
 
-      For example, for vol1:
+       For example, for vol1:
 
-      ```screen
-      A9000>> vol_list_extended vol=vol1
-      Name   WWN                                Product Serial Number     
-      vol1   6001738CFC9035E8000000000091F0C0   60035E8000000000091F0C0 
-      ```
+       ```screen
+       A9000>> vol_list_extended vol=vol1
+       Name   WWN                                Product Serial Number     
+       vol1   6001738CFC9035E8000000000091F0C0   60035E8000000000091F0C0 
+       ```
 
 -   **Through the Spectrum Virtualize management GUI:**
 
