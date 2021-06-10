@@ -12,8 +12,8 @@ The following are examples of different types of secret names that can be given 
 
 |Storage system name|Secret name|
 |-------------------|-----------|
-|IBM FlashSystem® A9000<br />IBM FlashSystem A9000R|a9000-array1|
-|IBM Spectrum Virtualize Family including IBM SAN Volume Controller and<br />IBM FlashSystem family members built with IBM Spectrum Virtualize<br />(including FlashSystem 5xxx, 7200, 9100, 9200, 9200R)|storwize-array1|
+|IBM FlashSystem® A9000 <br />IBM FlashSystem A9000R|a9000-array1|
+|IBM Spectrum Virtualize Family including IBM SAN Volume Controller and <br />IBM FlashSystem family members built with IBM Spectrum Virtualize <br />(including FlashSystem 5xxx, 7200, 9100, 9200, 9200R)|storwize-array1|
 |IBM DS8000® Family products|DS8000-array1|
 
 **Note:** This procedure is applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.
@@ -24,7 +24,11 @@ Use this information to run a stateful container on StatefulSet volumes using ei
 
 2.  Create a storage class, as described in [Creating a StorageClass](csi_ug_config_create_storageclasses.md).
 
-    **Remember:** The `SpaceEfficiency` values for Spectrum Virtualize Family are: thick, thin, compressed, or deduplicated. These values are not case specific.<br />For DS8000 Family systems, the default value is standard, but can be set to thin, if required. These values are not case specific. For more information, see [Creating a StorageClass](csi_ug_config_create_storageclasses.md).<br />This parameter is not applicable for IBM FlashSystem A9000 and A9000R systems. These systems always include deduplication and compression.
+    **Remember:** The `SpaceEfficiency` values for Spectrum Virtualize Family are: thick, thin, compressed, or deduplicated. These values are not case specific.
+    
+    For DS8000 Family systems, the default value is standard, but can be set to thin, if required. These values are not case specific. For more information, see [Creating a StorageClass](csi_ug_config_create_storageclasses.md).
+    
+    This parameter is not applicable for IBM FlashSystem A9000 and A9000R systems. These systems always include deduplication and compression.
 
 3.  Create a PVC with the size of 1 Gb, as described in [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
 
