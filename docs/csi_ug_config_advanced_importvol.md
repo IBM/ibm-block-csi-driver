@@ -30,7 +30,7 @@ To find the `volumeHandle`, use one of the following procedures:
       `vol_list_extended vol=<volume_name>`
     
 
-       For example, for vol1:
+      For example, for vol1:
 
        ```screen
        A9000>> vol_list_extended vol=vol1
