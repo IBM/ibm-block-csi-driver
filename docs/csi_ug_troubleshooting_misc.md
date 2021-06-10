@@ -2,7 +2,7 @@
 
 Use this information to help pinpoint potential causes for stateful pod failure.
 
-**Note:** These procedures are applicable for both Kubernetes and Red Hat&reg;� OpenShift&reg;�. For Red Hat OpenShift, replace   `kubectl`  with `oc` in all relevant commands.
+**Note:** These procedures are applicable for both Kubernetes and Red Hat&reg; OpenShift&reg;. For Red Hat OpenShift, replace   `kubectl`  with `oc` in all relevant commands.
 
 ## General troubleshooting
 Use the following command for general troubleshooting:
