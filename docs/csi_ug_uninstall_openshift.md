@@ -3,7 +3,7 @@
 Use this information to uninstall the IBM® CSI (Container Storage Interface) operator and driver through the Red Hat® OpenShift® Container Platform web console.
 
 Perform the following steps in order to uninstall the CSI driver and operator through Red Hat OpenShift Container Platform web console.
-1.  From the web console go to **Operators** > **Installed Operators**. Select the Project namespace, where installed, from **Projects:** **<namespace>**.
+1.  From the web console go to **Operators** > **Installed Operators**. Select the Project namespace, where installed, from `Projects: <namespace>`.
 
 2.  Select **Operator for IBM block storage CSI driver**.
 
