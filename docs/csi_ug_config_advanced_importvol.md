@@ -30,13 +30,13 @@ To find the `volumeHandle`, use one of the following procedures:
     `vol_list_extended vol=<volume_name>`
     
 
-    For example, for vol1:
+     For example, for vol1:
 
-    ```screen
-    A9000>> vol_list_extended vol=vol1
-    Name   WWN                                Product Serial Number     
-    vol1   6001738CFC9035E8000000000091F0C0   60035E8000000000091F0C0 
-    ```
+     ```screen
+     A9000>> vol_list_extended vol=vol1
+     Name   WWN                                Product Serial Number     
+     vol1   6001738CFC9035E8000000000091F0C0   60035E8000000000091F0C0 
+     ```
 
 -   **Through the Spectrum Virtualize management GUI:**
 
