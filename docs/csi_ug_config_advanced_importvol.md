@@ -11,57 +11,57 @@ Before starting to import an existing volume, find the following information in 
 
     -   `pool_name`:_<Name of Pool where volume is located>_ (Listed as `pool_id` for DS8000® Family systems.)
     -   `storage_type`: <SVC | A9K | DS8K>
-    -   `volume_name`:_<Volume name>_
-    -   `array_address`:_<Array address>_
+    -   `volume_name`: _Volume name_
+    -   `array_address`: _Array address_
 
 To find the `volumeHandle`, use one of the following procedures:
 
--   **Through command line (for Spectrum Virtualize Family):**
+**Through command line (for Spectrum Virtualize Family):**
 
-    `    lsvdisk <volume name> | grep vdisk_UID`
-
-    ```screen
-    lsvdisk vol0 | grep vdisk_UID
-    vdisk_UID 600507640082000B08000000000004FF
-    ```
-
--    **Through command line (for FlashSystem A9000 and A9000R):**
-
-      `vol_list_extended vol=<volume_name>`
-
-      For example, for vol1:
-
-        ```
-        A9000>> vol_list_extended vol=vol1
-        Name   WWN                                Product Serial Number     
-        vol1   6001738CFC9035E8000000000091F0C0   60035E8000000000091F0C0 
-        ```
-
--   **Through the Spectrum Virtualize management GUI:**
-
-    1.  Select **Volumes** > **Volumes** from the side bar.
-
-        The **Volumes** page appears.
-
-    2.  Browse to the volume that the port is on and right-click > **Properties**.
-
-        The Properties window appears. Use the UID number.
-
-    For more information about Spectrum Virtualize products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).
-
--   **Through the IBM Hyper-Scale Manager user interface for FlashSystem A9000 and A90000R storage systems:**
-
-    1.  Select **Pools and Volumes Views** > **Volumes** from the side bar.
-
-        The **Volumes** table is displayed.
-
-    2.  Select the `Volume`.
-
-        The **Volume Properties** form appears.
-
-    3.  Use the **ID** number.
+`lsvdisk <volume name> | grep vdisk_UID`
     
-    For more information, see [IBM Hyper-Scale Manager documentation](https://www.ibm.com/docs/en/hyper-scale-manager/).
+  ```
+  lsvdisk vol0 | grep vdisk_UID
+  vdisk_UID 600507640082000B08000000000004FF
+  ```
+
+**Through command line (for FlashSystem A9000 and A9000R):**
+
+`vol_list_extended vol=<volume_name>`
+
+For example, for vol1:
+
+  ```
+  A9000>> vol_list_extended vol=vol1
+  Name   WWN                                Product Serial Number     
+  vol1   6001738CFC9035E8000000000091F0C0   60035E8000000000091F0C0 
+  ```
+
+**Through the Spectrum Virtualize management GUI:**
+
+  1.  Select **Volumes** > **Volumes** from the side bar.
+
+      The **Volumes** page appears.
+
+  2.  Browse to the volume that the port is on and right-click > **Properties**.
+
+      The Properties window appears. Use the UID number.
+
+      For more information about Spectrum Virtualize products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).
+
+**Through the IBM Hyper-Scale Manager user interface for FlashSystem A9000 and A90000R storage systems:**
+
+  1.  Select **Pools and Volumes Views** > **Volumes** from the side bar.
+
+      The **Volumes** table is displayed.
+
+  2.  Select the `Volume`.
+
+      The **Volume Properties** form appears.
+
+  3.  Use the **ID** number.
+    
+      For more information, see [IBM Hyper-Scale Manager documentation](https://www.ibm.com/docs/en/hyper-scale-manager/).
 
 
 Use this procedure to help build a PV yaml file for your volumes.
