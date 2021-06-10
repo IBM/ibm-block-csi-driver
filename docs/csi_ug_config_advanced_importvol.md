@@ -9,12 +9,15 @@ Before starting to import an existing volume, find the following information in 
 
     Including:
 
-    -   `pool_name`:_<Name of Pool where volume is located>_ (Listed as `pool_id` for DS8000® Family systems.)
+    -   `pool_name`: _Name of Pool where volume is located_ (Listed as `pool_id` for DS8000® Family systems.)
     -   `storage_type`: <SVC | A9K | DS8K>
     -   `volume_name`: _Volume name_
     -   `array_address`: _Array address_
 
 To find the `volumeHandle`, use one of the following procedures:
+
+#### Through command (test)
+dkjfl
 
 **Through command line (for Spectrum Virtualize Family):**
 
