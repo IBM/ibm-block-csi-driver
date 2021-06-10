@@ -17,8 +17,8 @@ _<a name=spaceefficiency>**Table:**</a> `SpaceEfficiency` parameter definitions 
 |Storage system type|SpaceEfficiency parameter options|
 |-------------------|---------------------------------|
 |IBM FlashSystem® A9000 and A9000R|Always includes deduplication and compression. No need to specify during configuration.|
-|IBM Spectrum® Virtualize Family|- thick (default value)<br />- thin<br />- compressed<br />- deduplicated<br />**Note:** If not specified, the default value is thick.|
-|IBM® DS8000® Family| - none (default value)<br />- thin<br />**Note:** If not specified, the default value is none.|
+|IBM Spectrum® Virtualize Family|- thick (default value)<br />- thin<br />- compressed<br />- deduplicated<br /><br />**Note:** If not specified, the default value is thick.|
+|IBM® DS8000® Family| - none (default value)<br />- thin<br /><br />**Note:** If not specified, the default value is none.|
 
 - The IBM DS8000 Family `pool` value is the pool ID and not the pool name as is used in other storage systems.
 - Be sure that the `pool` value is the name of an existing pool on the storage system.
