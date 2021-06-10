@@ -127,12 +127,13 @@ Use this procedure to help build a PV yaml file for your volumes.
 
 4.  Create a project namespace.
 
-    **Using OpenShift® web console**
+    - **With OpenShift® web console**
+
       From Red Hat® OpenShift Container Platform **Home** > **Projects**, click **Create Project**. In the **Create Project** dialog box, enter a Project name (also referred to as namespace).
 
     Click **Create** to save.
 
-    **Using command-line terminal**
+    - **With GitHub**
     
     **Note:** This procedure is applicable for both Kubernetes and Red Hat OpenShift. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.
 
