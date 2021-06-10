@@ -20,7 +20,7 @@ Use the following sections, according to your PVC needs:
 
 - Creating PVC for volume with file system
 - Creating PVC for raw block volume
-- [Creating PVC from volume snapshot
+- Creating PVC from volume snapshot
 - Creating a volume clone from an existing PVC
 
 ## <a name=PVC-fs></a>Creating PVC for volume with Filesystem
@@ -109,4 +109,3 @@ spec:
     name: demo-pvc-file-system
     kind: PersistentVolumeClaim</b>
 </pre>
-
