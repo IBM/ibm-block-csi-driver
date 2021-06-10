@@ -65,83 +65,68 @@ For more information and instructions, see the Kubernetes blog post, [Kubernetes
 
 ##### 4.2. For Fibre Channel, configure the relevant zoning from the storage to the host.
 
-
 <br/>
 <br/>
 <br/>
-
 
 ## Installation
 
-### Install the operator
+### Installing the driver with GitHub
 
+The operator for IBM® block storage CSI driver can be installed directly with GitHub. Installing the CSI (Container Storage Interface) driver is part of the operator installation process.
 
-#### 1. Download the manifest from GitHub.
+Use the following steps to install the operator and driver, with [GitHub](https://github.com/IBM/ibm-block-csi-operator).
+
+**Note:** Before you begin, you may need to create a user-defined namespace. Create the project namespace, using the `kubectl create ns <namespace>` command.
+
+#### 1.  Install the operator.
+
+##### 1. Download the manifest from GitHub.
+
+	```
+	curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.6.0/deploy/installer/generated/ibm-block-csi-operator.yaml > ibm-block-csi-operator.yaml
+	```
+
+##### 2.  **Optional:** Update the image fields in the ibm-block-csi-operator.yaml.
+
+##### 3. Install the operator, using a user-defined namespace.
+
+	```
+	kubectl -n <namespace> apply -f ibm-block-csi-operator.yaml
+	```
+
+##### 4. Verify that the operator is running. (Make sure that the Status is _Running_.)
+
+	```screen
+	$ kubectl get pod -l app.kubernetes.io/name=ibm-block-csi-operator -n <namespace>
+	NAME                                    READY   STATUS    RESTARTS   AGE
+	ibm-block-csi-operator-5bb7996b86-xntss 1/1     Running   0          10m
+	```
+
+#### 2.  Install the IBM block storage CSI driver by creating an IBMBlockCSI custom resource.
+
+##### 1.  Download the manifest from GitHub.
+
+	```
+	curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.6.0/deploy/crds/csi.ibm.com_v1_ibmblockcsi_cr.yaml > csi.ibm.com_v1_ibmblockcsi_cr.yaml
+	```
+
+##### 2.  **Optional:** Update the image repository field, tag field, or both in the csi.ibm.com_v1_ibmblockcsi_cr.yaml.
+
+##### 3.  Install the csi.ibm.com_v1_ibmblockcsi_cr.yaml.
+
+	```
+	kubectl -n <namespace> apply -f csi.ibm.com_v1_ibmblockcsi_cr.yaml
+	```
+##### 4. Verify the driver is running:
 
 ```bash
-curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/master/deploy/installer/generated/ibm-block-csi-operator.yaml > ibm-block-csi-operator.yaml
-```
-
-#### 2. (Optional): If required, update the image fields in the ibm-block-csi-operator.yaml.
-**Note**: Updating the namespace to a user-defined namespace may be necessary in order to ensure consistency and avoid trouble installing the operator.
-
-#### 3. Create a namespace.
-
-```bash
-$ kubectl create ns <namespace>
-```
-
-#### 4. Install the operator, while using a user-defined namespace.
-
-```bash
-$ kubectl -n <namespace> apply -f ibm-block-csi-operator.yaml
-```
-
-### Verify the operator is running:
-
-```bash
-$ kubectl get pod -l app.kubernetes.io/name=ibm-block-csi-operator -n <namespace>
+$ kubectl get pods -n <namespace> -l csi
 NAME                                    READY   STATUS    RESTARTS   AGE
+ibm-block-csi-controller-0              6/6     Running   0          9m36s
+ibm-block-csi-node-jvmvh                3/3     Running   0          9m36s
+ibm-block-csi-node-tsppw                3/3     Running   0          9m36s
 ibm-block-csi-operator-5bb7996b86-xntss 1/1     Running   0          10m
-```
-
-### Create an IBMBlockCSI custom resource
-
-
-#### 1. Download the manifest from GitHub.
-```bash
-curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/master/deploy/crds/csi.ibm.com_v1_ibmblockcsi_cr.yaml > csi.ibm.com_v1_ibmblockcsi_cr.yaml
-```
-
-#### 2. (Optional): If required, update the image fields in the csi.ibm.com_v1_ibmblockcsi_cr.yaml.
-
-#### 3. Install the csi.ibm.com_v1_ibmblockcsi_cr.yaml.
-
-```bash
-$ kubectl -n <namespace> apply -f csi.ibm.com_v1_ibmblockcsi_cr.yaml
-```
-
-### Verify the driver is running:
-
-```bash
-$ kubectl get all -n <namespace>  -l csi
-NAME                                            READY   STATUS    RESTARTS   AGE
-pod/ibm-block-csi-controller-0                  6/6     Running   0          9m36s
-pod/ibm-block-csi-node-jvmvh                    3/3     Running   0          9m36s
-pod/ibm-block-csi-node-tsppw                    3/3     Running   0          9m36s
-pod/ibm-block-csi-operator-5bb7996b86-xntss     1/1     Running   0          10m
-
-NAME                                DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR   AGE
-daemonset.apps/ibm-block-csi-node   2         2         2       2            2           <none>          9m36s
-
-NAME                                     READY   UP-TO-DATE   AVAILABLE   AGE
-deployment.apps/ibm-block-csi-operator   1/1     1            1           10m
-
-NAME                                                DESIRED   CURRENT   READY   AGE
-replicaset.apps/ibm-block-csi-operator-5bb7996b86   1         1         1       10m
-
-NAME                                        READY   AGE
-statefulset.apps/ibm-block-csi-controller   1/1     9m36s
 ```
 
 <br/>
@@ -328,7 +313,7 @@ No resources found.
 
 ## Upgrading
 
-In order to upgrade the CSI operator and driver from a previous version, perform [step 1](#1-download-the-manifest-from-github) and [step 4](#4-install-the-operator-while-using-a-user-defined-namespace) from [Installation](#Installation).
+To manually upgrade the CSI (Container Storage Interface) driver from a previous version with GitHub, perform [step 2](#1--install-the-operator) of the installation procedure for the latest version.
 
 ## Uninstalling
 
