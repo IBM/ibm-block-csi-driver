@@ -16,24 +16,20 @@ Before starting to import an existing volume, find the following information in 
 
 To find the `volumeHandle`, use one of the following procedures:
 
-##
-### Through command (test)
-dkjfl
+- Through command line (for Spectrum Virtualize Family):
 
-**Through command line (for Spectrum Virtualize Family):**
-
-`lsvdisk <volume name> | grep vdisk_UID`
+  `lsvdisk <volume name> | grep vdisk_UID`
     
   ```
   lsvdisk vol0 | grep vdisk_UID
   vdisk_UID 600507640082000B08000000000004FF
   ```
 
-**Through command line (for FlashSystem A9000 and A9000R):**
+- Through command line (for FlashSystem A9000 and A9000R):
 
-`vol_list_extended vol=<volume_name>`
+  `vol_list_extended vol=<volume_name>`
 
-For example, for vol1:
+  For example, for `vol1`:
 
   ```
   A9000>> vol_list_extended vol=vol1
@@ -41,7 +37,7 @@ For example, for vol1:
   vol1   6001738CFC9035E8000000000091F0C0   60035E8000000000091F0C0 
   ```
 
-**Through the Spectrum Virtualize management GUI:**
+- Through the Spectrum Virtualize management GUI:
 
   1.  Select **Volumes** > **Volumes** from the side bar.
 
@@ -53,7 +49,7 @@ For example, for vol1:
 
       For more information about Spectrum Virtualize products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).
 
-**Through the IBM Hyper-Scale Manager user interface for FlashSystem A9000 and A90000R storage systems:**
+- Through the IBM Hyper-Scale Manager user interface for FlashSystem A9000 and A90000R storage systems:
 
   1.  Select **Pools and Volumes Views** > **Volumes** from the side bar.
 
