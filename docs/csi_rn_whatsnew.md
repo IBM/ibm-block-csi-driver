@@ -2,7 +2,7 @@
 
 IBM® block storage CSI driver 1.6.0 introduces a range of enhancements and fixes, as detailed in the following sections.
 
-**General availability date**: 30 June 2021
+**General availability date**: 18 June 2021
 
 ## Additional supported orchestration platforms for deployment
 
