@@ -36,7 +36,7 @@
 	* [Creating a StorageClass](csi_ug_config_create_storageclasses.md)
 	* [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md)
 	* [Creating a StatefulSet](csi_ug_config_create_statefulset.md)
-	* [Creating a VolumeSnapshotClass](csi_ug_config_enable_snapshot.md)
+	* [Creating a VolumeSnapshotClass](csi_ug_config_create_vol_snapshotclass.md)
 	* [Creating a VolumeSnapshot](csi_ug_config_create_snapshots.md)
 	* [Expanding a PersistentVolumeClaim (PVC)](csi_ug_config_expandvol.md)
 	* [Advanced configuration](csi_ug_config_advanced.md)

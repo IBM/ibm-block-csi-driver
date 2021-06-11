@@ -2,7 +2,7 @@
 
 Create a VolumeSnapshot yaml file for a specific PersistentVolumeClaim (PVC).
 
-VolumeSnapshotClass needs to be present before a VolumeSnapshot can be created. For more information, see [Creating a VolumeSnapshotClass](csi_ug_config_enable_snapshot.md).
+VolumeSnapshotClass needs to be present before a VolumeSnapshot can be created. For more information, see [Creating a VolumeSnapshotClass](csi_ug_config_create_vol_snapshotclass.md).
 
 **Note:**
 
