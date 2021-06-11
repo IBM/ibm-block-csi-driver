@@ -18,7 +18,7 @@ The Red Hat OpenShift Container Platform uses the following `SecurityContextCons
 
 3. Search for IBM block storage CSI driver.
 
-4. Select the **Operator for IBM block storage CSI driver** and click **Install**.<br />The **Operator Installation** form appears.
+4. Select the **Operator for IBM block storage CSI driver** and click **Install**. <br /><br />The **Operator Installation** form appears.
 
 5. Set the **Installation Mode** to the project namespace selected previously, in step 2, under **A specific namespace on the cluster**.
 

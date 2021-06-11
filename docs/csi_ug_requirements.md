@@ -6,7 +6,7 @@ Before beginning the installation of the CSI (Container Storage Interface) drive
 
 For IBM Cloud® Satellite users, see [cloud.ibm.com/docs/satellite](https://cloud.ibm.com/docs/satellite) for full system requirements.
 
-**Important:** When using Satellite, complete the following checks, configurations, and the installation process before assigning the hosts to your locations.<br />In addition, **do not** create a Kubernetes cluster. This is done through Satellite.
+**Important:** When using Satellite, complete the following checks, configurations, and the installation process before assigning the hosts to your locations. </br>In addition, **do not** create a Kubernetes cluster. This is done through Satellite.
 
 -   The CSI driver requires the following ports to be opened on the worker nodes OS firewall:
     -   **For all iSCSI users**
@@ -45,7 +45,7 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
 
    This file can be used for both Fibre Channel and iSCSI configurations. To support iSCSI, uncomment the last two lines in the file.
 
-   **Important:** The 99-ibm-attach.yaml configuration file overrides any files that already exist on your system. Only use this file if the files mentioned are not already created.<br />If one or more have been created, edit this yaml file, as necessary.
+   **Important:** The 99-ibm-attach.yaml configuration file overrides any files that already exist on your system. Only use this file if the files mentioned are not already created. <br />If one or more have been created, edit this yaml file, as necessary.
 
    Apply the yaml file.
 
