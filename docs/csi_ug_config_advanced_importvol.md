@@ -78,8 +78,8 @@ Use this procedure to help build a PV yaml file for your volumes.
     apiVersion: v1
     kind: PersistentVolume
     metadata:
-      #annotations:
-        #pv.kubernetes.io/provisioned-by: block.csi.ibm.com
+      # annotations:
+        # pv.kubernetes.io/provisioned-by: block.csi.ibm.com
       name: vol1-pv
     spec:
       accessModes:
@@ -113,7 +113,8 @@ Use this procedure to help build a PV yaml file for your volumes.
     apiVersion: v1
     kind: PersistentVolumeClaim
     metadata:
-      volume.beta.kubernetes.io/storage-provisioner: block.csi.ibm.com
+      # annotations:
+        # pv.kubernetes.io/provisioned-by: block.csi.ibm.com
       name: vol1-pvc
     spec:
       accessModes:
