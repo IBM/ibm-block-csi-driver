@@ -31,7 +31,7 @@ format="markdown"/>
 navtitle="Creating PersistentVolumeClaim (PVC)" format="markdown"/>
 <topicref href="../csi_ug_config_create_vol_snapshotclass.md" navtitle="Creating a VolumeSnapshotClass" format="markdown"/>
 <topicref href="../csi_ug_config_create_snapshots.md" navtitle="Creating Volume Snapshots" format="markdown"/>
-<topicref href="../csi_ug_config_expandvol.md" navtitle="Expanding a volume" product="volexpand" format="markdown"/>
+<topicref href="../csi_ug_config_expand_pvc.md" navtitle="Expanding a volume" product="volexpand" format="markdown"/>
 <topicref href="../csi_ug_config_advanced.md" navtitle="Advanced configuration" format="markdown">
 <topicref href="../csi_ug_config_advanced_importvol.md" navtitle="Advanced configuration" format="markdown"/>
 </topicref>

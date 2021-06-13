@@ -38,7 +38,7 @@
 	* [Creating a StatefulSet](csi_ug_config_create_statefulset.md)
 	* [Creating a VolumeSnapshotClass](csi_ug_config_create_vol_snapshotclass.md)
 	* [Creating a VolumeSnapshot](csi_ug_config_create_snapshots.md)
-	* [Expanding a PersistentVolumeClaim (PVC)](csi_ug_config_expandvol.md)
+	* [Expanding a PersistentVolumeClaim (PVC)](csi_ug_config_expand_pvc.md)
 	* [Advanced configuration](csi_ug_config_advanced.md)
 		* [Importing an existing volume](csi_ug_config_advanced_importvol.md)
 * [Using IBM block storage CSI driver](csi_ug_using.md)

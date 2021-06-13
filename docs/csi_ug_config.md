@@ -12,7 +12,7 @@ Multiple yaml files per type can be created (with different configurations), acc
 -   [Creating a StatefulSet](csi_ug_config_create_statefulset.md)
 -   [Creating a VolumeSnapshotClass](csi_ug_config_create_vol_snapshotclass.md)
 -   [Creating a VolumeSnapshot](csi_ug_config_create_snapshots.md)
--   [Expanding a PersistentVolumeClaim (PVC)](csi_ug_config_expandvol.md)
+-   [Expanding a PersistentVolumeClaim (PVC)](csi_ug_config_expand_pvc.md)
 -   [Advanced configuration](csi_ug_config_advanced.md)
 
 
