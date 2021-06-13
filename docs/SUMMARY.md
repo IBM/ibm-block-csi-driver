@@ -51,5 +51,3 @@
 * [Notices](storage_csi_notices.md)
 	* [Trademarks](csi_trademarks.md)
 * [Publications and related information](book_files/csi_block_storage_kc_pdfs.md)
-
-	

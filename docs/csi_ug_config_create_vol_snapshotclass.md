@@ -37,3 +37,4 @@ After the YAML file is created, apply it by using the `kubectl apply -f` command
 kubectl apply -f <filename>.yaml
 ```
 
+test-remove
