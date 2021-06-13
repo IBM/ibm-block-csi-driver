@@ -1,4 +1,4 @@
-# Uninstalling
+# Uninstalling the operator and driver
 
 Use this information to uninstall the IBM® CSI (Container Storage Interface) operator and driver.
 

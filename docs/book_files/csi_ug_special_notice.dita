@@ -6,7 +6,7 @@
 <title>Note</title>
 <body>
 <p>Before using this document and the product it supports, read the information in <xref
-href="../storage_csi_notices.md" scope="local"/>.</p><?Pub Caret 81?>
+href="storage_csi_notices.md" scope="local" format="markdown"/>.</p><?Pub Caret 81?>
 </body>
 </topic>
 <?Pub *0000000495?>
