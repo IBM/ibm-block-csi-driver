@@ -140,6 +140,10 @@ Use this procedure to help build a PV yaml file for your volumes.
 
       Use the `kubectl create ns <namespace>` command to create a project namespace.
 
+    - **With IBM Cloud Satellite**
+
+        For information regarding creating a project namespace from within the IBM Cloud Satellite web console, see [cloud.ibm.com/docs/satellite](https://cloud.ibm.com/docs/satellite).
+
 5.  Create a StatefulSet.
 
     For more information about creating a StatefulSet, see [Creating a StatefulSet](csi_ug_config_create_statefulset.md).
