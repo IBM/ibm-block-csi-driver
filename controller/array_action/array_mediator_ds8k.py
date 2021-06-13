@@ -478,6 +478,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except (exceptions.ClientError, exceptions.InternalServerError) as ex:
             if INCORRECT_ID in str(ex.message).upper():
                 raise array_errors.IllegalObjectID(volume_id)
+        return None
 
     def _get_flashcopy_process(self, flashcopy_id, not_exist_err=True):
         logger.info("Getting flashcopy {}".format(flashcopy_id))
@@ -491,6 +492,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except Exception as ex:
             logger.exception(ex)
             raise ex
+        return None
 
     def _get_api_snapshot(self, snapshot_name, pool_id=None):
         logger.debug("Get snapshot : {} in pool: {}".format(snapshot_name, pool_id))

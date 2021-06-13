@@ -132,6 +132,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT, csi_pb2.CreateVolumeResponse)
         except array_errors.VolumeAlreadyExists as ex:
             handle_exception(ex, context, grpc.StatusCode.ALREADY_EXISTS, csi_pb2.CreateVolumeResponse)
+        return None
 
     def _copy_to_existing_volume_from_source(self, volume, source_id, source_type,
                                              minimum_volume_size, array_mediator, pool):
