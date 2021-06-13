@@ -45,7 +45,7 @@ Follow the following procedure to recover from a crashed node (see a [full examp
     kubectl delete pod <pod name> --grace-period=0 --force
     ```
 
-5.  Verify that the pod is now in a Running state and that the pod has moved to worker-node1.
+5.  Verify that the pod is now in a _Running_ state and that the pod has moved to worker-node1.
 
 <a name="full_example">For example:</a>
 

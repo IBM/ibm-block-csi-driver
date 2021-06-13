@@ -85,7 +85,7 @@ scope="external">Using the IBM Block Storage CSI driver in a Red Hat OpenShift e
 Documentation</xref>
 <ph audience="pdfonly"> (kubernetes.io/docs/home/)</ph></li>
 <li><xref href="https://kubernetes.io/blog/" format="html" scope="external">Kubernetes Blog</xref>
-<ph audience="pdfonly"> (kubernetes.io//blog)</ph></li>
+<ph audience="pdfonly"> (kubernetes.io/blog)</ph></li>
 </ul>
 </dd>
 </dlentry>

@@ -19,5 +19,3 @@ This is an overview of actions that you can take to pinpoint a potential cause f
     ```
 
     View the logs (see [Log collection](csi_ug_troubleshooting_logs.md)).
-
-
