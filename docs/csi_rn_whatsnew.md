@@ -1,6 +1,6 @@
 # What's new in 1.6.0
 
-IBM® block storage CSI driver 1.6.0 introduces a range of enhancements and fixes, as detailed in the following sections.
+IBM® block storage CSI driver 1.6.0 introduces the enhancements detailed in the following section.
 
 **General availability date**: 18 June 2021
 
