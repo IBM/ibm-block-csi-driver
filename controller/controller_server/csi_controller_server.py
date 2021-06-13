@@ -200,7 +200,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         set_current_thread_name(request.volume_id)
         logger.info("DeleteVolume")
         secrets = request.secrets
-
         utils.validate_delete_volume_request(request)
 
         try:
@@ -208,6 +207,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         except ObjectIdError as ex:
             logger.warning("volume id is invalid. error : {}".format(ex))
             return csi_pb2.DeleteVolumeResponse()
+
         system_id = volume_id_info.system_id
         array_type = volume_id_info.array_type
         volume_id = volume_id_info.object_id
@@ -235,9 +235,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def ControllerPublishVolume(self, request, context):
         set_current_thread_name(request.volume_id)
         logger.info("ControllerPublishVolume")
+        utils.validate_publish_volume_request(request)
         try:
-            utils.validate_publish_volume_request(request)
-
             volume_id_info = utils.get_volume_id_info(request.volume_id)
             system_id = volume_id_info.system_id
             array_type = volume_id_info.array_type
@@ -276,9 +275,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         set_current_thread_name(request.volume_id)
         logger.info("ControllerUnpublishVolume")
         utils.validate_unpublish_volume_request(request)
-
         try:
-
             volume_id_info = utils.get_volume_id_info(request.volume_id)
             system_id = volume_id_info.system_id
             array_type = volume_id_info.array_type
@@ -318,12 +315,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def CreateSnapshot(self, request, context):
         set_current_thread_name(request.name)
         logger.info("Create snapshot")
-        try:
-            utils.validate_create_snapshot_request(request)
-        except ValidationException as ex:
-            return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
-                                    csi_pb2.CreateSnapshotResponse)
-
+        utils.validate_create_snapshot_request(request)
         source_volume_id = request.source_volume_id
         logger.info("Snapshot base name : {}. Source volume id : {}".format(request.name, source_volume_id))
         secrets = request.secrets
@@ -378,8 +370,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         set_current_thread_name(request.snapshot_id)
         logger.info("Delete snapshot")
         secrets = request.secrets
+        utils.validate_delete_snapshot_request(request)
         try:
-            utils.validate_delete_snapshot_request(request)
             try:
                 snapshot_id_info = utils.get_snapshot_id_info(request.snapshot_id)
             except ObjectIdError as ex:
@@ -417,10 +409,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         set_current_thread_name(request.volume_id)
         logger.info("ControllerExpandVolume")
         secrets = request.secrets
-
+        utils.validate_expand_volume_request(request)
         try:
-            utils.validate_expand_volume_request(request)
-
             try:
                 volume_id_info = utils.get_volume_id_info(request.volume_id)
             except ObjectIdError as ex:
