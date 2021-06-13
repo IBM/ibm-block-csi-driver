@@ -35,8 +35,8 @@ driver</titleline><titleline>1.6.0</titleline></ibmbooklibrary>
 </ibmfrontmatter>
 <chapter format="markdown" href="../content/csi_overview.md" navtitle="Overview" scope="local"/>
 <chapter format="ditamap" href="csi_rn_content.ditamap"/>
-<chapter href="../csi_relatedpubs.md" navtitle="Related information and publications" format="markdown"/>
-<chapter format="markdown" href="../csi_gettinginfohelpandservice.md"
+<chapter href="csi_relatedpubs.dita" navtitle="Related information and publications" format="dita"/>
+<chapter format="dita" href="csi_gettinginfohelpandservice.dita"
 navtitle="Getting information, help, and service"/>
 <ibmbackmatter>
 <notices href="../book_files/storage_csi_notices.md" navtitle="Notices" format="markdown">
