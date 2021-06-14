@@ -602,7 +602,7 @@ If an error during automatic iSCSI login occurs, perform the following steps for
 
     ```screen
     $> iscsiadm -m discoverydb -t st -p ${STORAGE-SYSTEM-iSCSI-PORT-IP1}:3260 --discover
-    $> iscsiadm -m node  -p ${STORAGE-SYSTEM-iSCSI-PORT-IP1} --login
+    $> iscsiadm -m node -p ${STORAGE-SYSTEM-iSCSI-PORT-IP1} --login
     
     $> iscsiadm -m discoverydb -t st -p ${STORAGE-SYSTEM-iSCSI-PORT-IP2}:3260 --discover
     $> iscsiadm -m node  -p ${STORAGE-SYSTEM-iSCSI-PORT-IP2} --login
@@ -613,4 +613,3 @@ If an error during automatic iSCSI login occurs, perform the following steps for
     ```screen
     $> iscsiadm -m session -rescanRescanning session [sid: 1, target: {storage system IQN},portal: {storage system iSCSI port IP},{port number}
     ```
-
