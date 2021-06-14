@@ -380,7 +380,7 @@ No resources found.
 
 ## Upgrading
 
-To manually upgrade the CSI (Container Storage Interface) driver from a previous version with GitHub, perform [step 1](#installing-the-driver) of the installation procedure for the latest version.
+To manually upgrade the CSI (Container Storage Interface) driver from a previous version with GitHub, perform step 1 of the [installation procedure](#installing-the-driver) for the latest version.
 
 ## Uninstalling the driver
 
