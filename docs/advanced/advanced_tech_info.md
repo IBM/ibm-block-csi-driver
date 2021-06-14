@@ -605,7 +605,7 @@ If an error during automatic iSCSI login occurs, perform the following steps for
     $> iscsiadm -m node -p ${STORAGE-SYSTEM-iSCSI-PORT-IP1} --login
     
     $> iscsiadm -m discoverydb -t st -p ${STORAGE-SYSTEM-iSCSI-PORT-IP2}:3260 --discover
-    $> iscsiadm -m node  -p ${STORAGE-SYSTEM-iSCSI-PORT-IP2} --login
+    $> iscsiadm -m node -p ${STORAGE-SYSTEM-iSCSI-PORT-IP2} --login
     ```
 
 3.  Verify that the login was successful and display all targets that you logged into. The portal value must be the iSCSI target IP address.
