@@ -81,21 +81,21 @@ Use the following steps to install the operator and driver, with [GitHub](https:
 
 #### 1.  Install the operator.
 
-##### 1. Download the manifest from GitHub.
+##### 1.1. Download the manifest from GitHub.
 
 ```
 curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.6.0/deploy/installer/generated/ibm-block-csi-operator.yaml > ibm-block-csi-operator.yaml
 ```
 
-##### 2.  **Optional:** Update the image fields in the ibm-block-csi-operator.yaml.
+##### 1.2.  **Optional:** Update the image fields in the ibm-block-csi-operator.yaml.
 
-##### 3. Install the operator, using a user-defined namespace.
+##### 1.3. Install the operator, using a user-defined namespace.
 
 ```
 kubectl -n <namespace> apply -f ibm-block-csi-operator.yaml
 ```
 
-##### 4. Verify that the operator is running. (Make sure that the Status is _Running_.)
+##### 1.4. Verify that the operator is running. (Make sure that the Status is _Running_.)
 
 ```screen
 $ kubectl get pod -l app.kubernetes.io/name=ibm-block-csi-operator -n <namespace>
@@ -105,20 +105,20 @@ ibm-block-csi-operator-5bb7996b86-xntss 1/1     Running   0          10m
 
 #### 2.  Install the IBM block storage CSI driver by creating an IBMBlockCSI custom resource.
 
-##### 1.  Download the manifest from GitHub.
+##### 2.1.  Download the manifest from GitHub.
 
 ```
 curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.6.0/deploy/crds/csi.ibm.com_v1_ibmblockcsi_cr.yaml > csi.ibm.com_v1_ibmblockcsi_cr.yaml
 ```
 
-##### 2.  **Optional:** Update the image repository field, tag field, or both in the csi.ibm.com_v1_ibmblockcsi_cr.yaml.
+##### 2.2.  **Optional:** Update the image repository field, tag field, or both in the csi.ibm.com_v1_ibmblockcsi_cr.yaml.
 
-##### 3.  Install the csi.ibm.com_v1_ibmblockcsi_cr.yaml.
+##### 2.3.  Install the csi.ibm.com_v1_ibmblockcsi_cr.yaml.
 
 ```bash
 kubectl -n <namespace> apply -f csi.ibm.com_v1_ibmblockcsi_cr.yaml
 ```
-##### 4. Verify the driver is running:
+##### 2.4. Verify the driver is running:
 
 ```bash
 $ kubectl get pods -n <namespace> -l csi
