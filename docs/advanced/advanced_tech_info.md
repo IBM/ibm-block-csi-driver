@@ -551,7 +551,7 @@ Use this information to help pinpoint potential causes for multipath failures.
 Use the following command for general troubleshooting:
 
 ```
-kubectl get -n <namespace>  csidriver,sa,clusterrole,clusterrolebinding,statefulset,pod,daemonset | grep ibm-block-csi
+kubectl get -n <namespace> csidriver,sa,clusterrole,clusterrolebinding,statefulset,pod,daemonset | grep ibm-block-csi
 ```
 
 For example:
@@ -602,10 +602,10 @@ If an error during automatic iSCSI login occurs, perform the following steps for
 
     ```screen
     $> iscsiadm -m discoverydb -t st -p ${STORAGE-SYSTEM-iSCSI-PORT-IP1}:3260 --discover
-    $> iscsiadm -m node  -p ${STORAGE-SYSTEM-iSCSI-PORT-IP1} --login
+    $> iscsiadm -m node -p ${STORAGE-SYSTEM-iSCSI-PORT-IP1} --login
     
     $> iscsiadm -m discoverydb -t st -p ${STORAGE-SYSTEM-iSCSI-PORT-IP2}:3260 --discover
-    $> iscsiadm -m node  -p ${STORAGE-SYSTEM-iSCSI-PORT-IP2} --login
+    $> iscsiadm -m node -p ${STORAGE-SYSTEM-iSCSI-PORT-IP2} --login
     ```
 
 3.  Verify that the login was successful and display all targets that you logged into. The portal value must be the iSCSI target IP address.
@@ -613,5 +613,3 @@ If an error during automatic iSCSI login occurs, perform the following steps for
     ```screen
     $> iscsiadm -m session -rescanRescanning session [sid: 1, target: {storage system IQN},portal: {storage system iSCSI port IP},{port number}
     ```
-
-
