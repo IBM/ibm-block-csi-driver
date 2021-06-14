@@ -99,7 +99,7 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
 
 The operator for IBM® block storage CSI driver can be installed directly with GitHub. Installing the CSI (Container Storage Interface) driver is part of the operator installation process.
 
-Use the following steps to install the operator and driver, with [GitHub](https://github.com/IBM/ibm-block-csi-operator) (github.com/IBM/ibm-block-csi-operator).
+Use the following steps to install the operator and driver, with [GitHub](https://github.com/IBM/ibm-block-csi-operator).
 
 **Note:** Before you begin, you may need to create a user-defined namespace. Create the project namespace, using the `kubectl create ns <namespace>` command.
 
@@ -278,7 +278,7 @@ The `storageclass.storage.k8s.io/demo-storageclass created` message is emitted.
 <br/>
 
 ## Driver usage
-## <a name=PVC-fs></a>Creating PVC for volume with Filesystem
+### <a name=PVC-fs></a>Creating PVC for volume with Filesystem
 
 Create a PVC yaml file, similar to the following demo-pvc-file-system.yaml file, with the size of 1 Gb.
 
@@ -305,6 +305,7 @@ kubectl apply -f <filename>.yaml
 ```
 The `persistentvolumeclaim/<filename> created` message is emitted.
 
+### Creating a StatefulSet with file system volumes
 
 Create a StatefulSet yaml file, similar to the following demo-statefulset-file-system.yaml file.
 
