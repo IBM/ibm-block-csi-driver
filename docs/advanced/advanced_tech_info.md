@@ -551,7 +551,7 @@ Use this information to help pinpoint potential causes for multipath failures.
 Use the following command for general troubleshooting:
 
 ```
-kubectl get -n <namespace>  csidriver,sa,clusterrole,clusterrolebinding,statefulset,pod,daemonset | grep ibm-block-csi
+kubectl get -n <namespace> csidriver,sa,clusterrole,clusterrolebinding,statefulset,pod,daemonset | grep ibm-block-csi
 ```
 
 For example:
@@ -613,5 +613,4 @@ If an error during automatic iSCSI login occurs, perform the following steps for
     ```screen
     $> iscsiadm -m session -rescanRescanning session [sid: 1, target: {storage system IQN},portal: {storage system iSCSI port IP},{port number}
     ```
-
 
