@@ -9,7 +9,7 @@ Create a VolumeSnapshotClass YAML file to enable creation and deletion of volume
 
 In order to enable creation and deletion of volume snapshots for your storage system, create a VolumeSnapshotClass YAML file, similar to the following demo-snapshotclass.yaml.
 
-When configuring the file, be sure to use the same array secret and array secret namespace as defined in [Creating a Secret](../installation/csi_ug_config_create_secret.md).
+When configuring the file, be sure to use the same array secret and array secret namespace as defined in [Creating a Secret](csi_ug_config_create_secret.md).
 
 -   The `snapshot_name_prefix` parameter is optional.
 
