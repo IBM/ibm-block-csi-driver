@@ -2,7 +2,7 @@ identity:
    name: block.csi.ibm.com
    version: 1.6.0
    capabilities: 
-      Service: CONTROLLER_SERVICE
+      Service: [CONTROLLER_SERVICE, VOLUME_ACCESSIBILITY_CONSTRAINTS]
       VolumeExpansion: ONLINE
 
 controller:

@@ -1,5 +1,10 @@
+import json
+
 from mock import Mock
 import grpc
+
+from controller.controller_server.controller_types import ArrayConnectionInfo
+from controller.controller_server.test_settings import user as test_user, password as test_password, array as test_array
 
 
 def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_source_id=None):
@@ -26,6 +31,29 @@ def get_mock_mediator_response_snapshot(capacity, name, wwn, volume_name, array_
     snapshot.is_ready = True
 
     return snapshot
+
+
+def get_fake_array_connection_info(user="user", password="pass", array_addresses=None, system_id="u1"):
+    if array_addresses is None:
+        array_addresses = ["arr1"]
+    return ArrayConnectionInfo(array_addresses=array_addresses, user=user, password=password, system_id=system_id)
+
+
+def get_fake_secret_config(system_id="u1", username=test_user, password=test_password, management_address=test_array,
+                           supported_topologies="default"):
+    if supported_topologies == "default":
+        supported_topologies = [{"test": "test"}]
+    system_info = {}
+    if username:
+        system_info.update({"username": username})
+    if password:
+        system_info.update({"password": password})
+    if management_address:
+        system_info.update({"management_address": management_address})
+    if supported_topologies:
+        system_info.update({"supported_topologies": supported_topologies})
+    config = {system_id: system_info}
+    return {"config": json.dumps(config)}
 
 
 class FakeContext:
