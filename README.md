@@ -16,21 +16,22 @@ The following table details orchestration platforms suitable for deployment of t
 
 **Note:** As of this document's publication date, IBM Cloud® Satellite only supports RHEL 7 on x86 architecture for Red Hat OpenShift. For the latest support information, see [cloud.ibm.com/docs/satellite](https://cloud.ibm.com/docs/satellite).
 
-## Supported orchestration platforms
+## Supported storage systems
 
-The following table details orchestration platforms suitable for deployment of the IBM® block storage CSI driver.
+IBM® block storage CSI driver 1.6.0 supports different IBM storage systems as listed in the following table.
 
-|Orchestration platform|Version|Architecture|
-|----------------------|-------|------------|
-|Kubernetes|1.20|x86|
-|Kubernetes|1.21|x86|
-|Red Hat® OpenShift®|4.7|x86, IBM Z®, IBM Power Systems™<sup>1</sup>|
-|Red Hat OpenShift|4.8|x86, IBM Z, IBM Power Systems<sup>1</sup>|
+|Storage system|Microcode version|
+|--------------|-----------------|
+|IBM FlashSystem™ A9000|12.x|
+|IBM FlashSystem A9000R|12.x|
+|IBM Spectrum Virtualize™ Family including IBM SAN Volume Controller (SVC) and IBM FlashSystem® family members built with IBM Spectrum® Virtualize (including FlashSystem 5xxx, 7200, 9100, 9200, 9200R)|7.8 and above, 8.x|
+|IBM Spectrum Virtualize as software only|7.8 and above, 8.x|
+|IBM DS8000® Family|8.x and higher with same API interface|
 
-<sup>1</sup>IBM Power Systems architecture is only supported on Spectrum Virtualize Family storage systems.
+**Note:**
 
-**Note:** As of this document's publication date, IBM Cloud® Satellite only supports RHEL 7 on x86 architecture for Red Hat OpenShift. For the latest support information, see [cloud.ibm.com/docs/satellite](https://cloud.ibm.com/docs/satellite).
-
+-   Newer microcode versions may also be compatible. When a newer microcode version becomes available, contact IBM Support to inquire whether the new microcode version is compatible with the current version of the CSI driver.
+-   The IBM Spectrum Virtualize Family and IBM SAN Volume Controller storage systems run the IBM Spectrum Virtualize software. In addition, IBM Spectrum Virtualize package is available as a deployable solution that can be run on any compatible hardware.
 
 ## Supported operating systems
 
@@ -43,8 +44,6 @@ The following table lists operating systems required for deployment of the IBM®
 
 <sup>1</sup>IBM Power Systems architecture is only supported on Spectrum Virtualize Family storage systems.      <br />
 <sup>2</sup>IBM Z and IBM Power Systems architectures are only supported using CLI installation.
-
-
 
 For full product information, see [IBM block storage CSI driver documentation](https://www.ibm.com/docs/en/stg-block-csi-driver).
 
