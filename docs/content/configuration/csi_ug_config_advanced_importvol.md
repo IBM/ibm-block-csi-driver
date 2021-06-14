@@ -126,25 +126,7 @@ Use this procedure to help build a PV yaml file for your volumes.
       volumeName: vol1-pv
     ```
 
-4.  Create a project namespace.
-
-    - **With OpenShift® web console**
-
-      From Red Hat® OpenShift Container Platform **Home** > **Projects**, click **Create Project**. In the **Create Project** dialog box, enter a Project name (also referred to as namespace).
-
-      Click **Create** to save.
-
-    - **With GitHub**
-    
-      **Note:** This procedure is applicable for both Kubernetes and Red Hat OpenShift. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.
-
-      Use the `kubectl create ns <namespace>` command to create a project namespace.
-
-    - **With IBM Cloud Satellite**
-
-        For information regarding creating a project namespace from within the IBM Cloud Satellite web console, see [cloud.ibm.com/docs/satellite](https://cloud.ibm.com/docs/satellite).
-
-5.  Create a StatefulSet.
+4.  Create a StatefulSet.
 
     For more information about creating a StatefulSet, see [Creating a StatefulSet](csi_ug_config_create_statefulset.md).
 
