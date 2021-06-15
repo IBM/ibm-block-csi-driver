@@ -417,7 +417,7 @@ This document provides advanced technical information. Use it to help with advan
 ### Log collection for CSI pods, daemonset, and StatefulSet
 
 ```
-kubectl get all -n <namespace>  -l csi
+kubectl get all -n <namespace> -l csi
 ```
 
 For example:
