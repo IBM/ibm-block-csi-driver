@@ -246,11 +246,11 @@ This document provides advanced technical information. Use it to help with advan
 
 ## Running a stateful container with raw block volume configurations
 
-1.  Create an array secret, as described in [Creating a Secret](csi_ug_config_create_secret.md).
+1.  Create an array secret, as described in [Creating a Secret](../content/configuration/csi_ug_config_create_secret.md).
 
-2.  Create a storage class, as described in [Creating a StorageClass](csi_ug_config_create_storageclasses.md).
+2.  Create a storage class, as described in [Creating a StorageClass](../content/configuration/csi_ug_config_create_storageclasses.md).
 
-3.  Create a PVC with the size of 1 Gb, as described in [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
+3.  Create a PVC with the size of 1 Gb, as described in [Creating a PersistentVolumeClaim (PVC)](../content/configuration/csi_ug_config_create_pvc.md).
 
 4.  Display the existing PVC and the created persistent volume (PV).
 
