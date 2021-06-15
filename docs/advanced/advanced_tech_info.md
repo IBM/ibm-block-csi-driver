@@ -223,8 +223,8 @@ This document provides advanced technical information. Use it to help with advan
         $> kubectl create -f demo-statefulset-file-system.yaml
         statefulset/demo-statefulset-file-system created
         
-        $> kubectl exec demo-statefulset-file-system-0 ls /data/FILE
-        File
+        $> kubectl exec demo-statefulset-file-system-0 -- ls /data/FILE
+        /data/FILE
         ```
 
 10. Delete StatefulSet and the PVC.
