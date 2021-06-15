@@ -9,22 +9,21 @@ Use one of the following procedures to create and apply the secret:
 ## Creating an array secret file
 1. Create the secret file, similar to the following demo-secret.yaml:
 
-   The `management_address` field can contain more than one address, with each value separated by a comma.
+    The `management_address` field can contain more than one address, with each value separated by a comma.
 
-    
     ```
-    kind: Secret
-    apiVersion: v1
-    metadata:
-      name:  demo-secret
-      namespace: default
-    type: Opaque
-    stringData:
-      management_address: demo-management-address  # Array management addresses
-      username: demo-username                      # Array username
-    data:
-      password: ZGVtby1wYXNzd29yZA==               # base64 array password
-    ```
+     kind: Secret
+     apiVersion: v1
+     metadata:
+       name:  demo-secret
+       namespace: default
+     type: Opaque
+     stringData:
+       management_address: demo-management-address  # Array management addresses
+       username: demo-username                      # Array username
+     data:
+       password: ZGVtby1wYXNzd29yZA==               # base64 array password
+     ```
        
 2. Apply the secret using the following command:
 
