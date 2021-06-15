@@ -135,17 +135,17 @@ This document provides advanced technical information. Use it to help with advan
     The PV should be mounted inside the pod at `/data`.
 
     ```
-    $> kubectl exec demo-statefulset-file-system-0​​ touch /data/FILE
-    $> kubectl exec demo-statefulset-file-system-0​​ ls /data/FILE
+    $> kubectl exec demo-statefulset-file-system-0 touch /data/FILE
+    $> kubectl exec demo-statefulset-file-system-0 ls /data/FILE
     /data/FILE
     ```
 
 8.  Log into the worker node that has the running pod and display the newly attached volume on the node.
 
-    1.  Verify which worker node is running the `pod demo-statefulset-file-system-0​​`.
+    1.  Verify which worker node is running the `pod demo-statefulset-file-system-0`.
 
         ```screen
-        $> kubectl describe pod demo-statefulset-file-system-0​​| grep "^Node:"
+        $> kubectl describe pod demo-statefulset-file-system-0 | grep "^Node:"
         Node: k8s-node1/hostname
         ```
 
@@ -340,7 +340,7 @@ This document provides advanced technical information. Use it to help with advan
           - name: demo-volume-raw-block
             persistentVolumeClaim:
               claimName: demo-pvc-raw-block
-    ​
+    
     #      nodeSelector:
     #        kubernetes.io/hostname: HOSTNAME
     </pre>
