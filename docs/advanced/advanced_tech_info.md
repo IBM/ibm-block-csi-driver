@@ -135,9 +135,8 @@ This document provides advanced technical information. Use it to help with advan
     The PV should be mounted inside the pod at `/data`.
 
     ```
-    $> kubectl exec demo-statefulset-file-system-0 touch /data/FILE
-    $> kubectl exec demo-statefulset-file-system-0 ls /data/FILE
-    /data/FILE
+    kubectl exec demo-statefulset-file-system-0 -- touch /data/FILE
+    kubectl exec demo-statefulset-file-system-0 -- ls /data/FILE
     ```
 
 8.  Log into the worker node that has the running pod and display the newly attached volume on the node.
