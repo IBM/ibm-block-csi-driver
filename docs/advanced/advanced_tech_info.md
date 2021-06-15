@@ -188,12 +188,6 @@ This document provides advanced technical information. Use it to help with advan
         /dev/mapper/mpathz      1038336    32944   1005392   4% /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-828ce909-6eb2-11ea-abc8-005056a49b44/mount
         ```
 
-    6.  Details about the driver internal metadata file .stageInfo.json is stored in the k8s PV node stage path `/var/lib/kubelet/plugins/kubernetes.io/csi/pv/<PVC-ID>/globalmount/.stageInfo.json`. The CSI driver creates the metadata file during the NodeStage API and is used at later stages by the NodePublishVolume, NodeUnPublishVolume and NodeUnStage CSI APIs later on.
-
-        ```screen
-        $> cat /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-828ce909-6eb2-11ea-abc8-005056a49b44/globalmount/.stageInfo.json
-        {"connectivity":"iscsi","mpathDevice":"dm-3","sysDevices":",sdb,sdc"}
-        ```
 
 9.  Delete StatefulSet and then recreate, in order to validate data (/data/FILE) remains in the persistent volume.
 
