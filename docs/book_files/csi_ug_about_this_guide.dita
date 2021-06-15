@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE topic PUBLIC "-//IBM//DTD DITA IBM Topic//EN"
+ "ibm-topic.dtd">
+<?Pub Inc?>
+<topic id="isis_ug_about_this_guide" xml:lang="en-us">
+<title>About this guide</title>
+<titlealts>
+<navtitle>About this guide</navtitle>
+<searchtitle>About this guide</searchtitle>
+</titlealts>
+<shortdesc>This guide describes how to install, configure, and use the IBM block storage CSI
+driver.</shortdesc><?Pub Caret 108?>
+<?tm 1335790251 1?>
+</topic>
+<?Pub *0000000607?>
