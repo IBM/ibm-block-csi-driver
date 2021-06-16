@@ -66,9 +66,8 @@ def scsi_id_to_volume_id(scsi_id):
 
 def try_convert_firsts_arg(converter, args, num_of_args):
     if args:
-        converted = []
-        for index in range(num_of_args):
-            converted.append(converter(args[index]))
+        args_to_convert = args[:num_of_args]
+        converted = map(converter, args_to_convert)
         return tuple(converted) + args[num_of_args:]
     return ()
 
