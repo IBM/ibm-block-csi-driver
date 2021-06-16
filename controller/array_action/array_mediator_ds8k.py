@@ -515,11 +515,12 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             return None
         return self._generate_snapshot_response_with_verification(api_snapshot)
 
-    def _create_similar_volume(self, target_volume_name, source_api_volume, pool_id):
+    def _create_similar_volume(self, target_volume_name, source_api_volume, space_efficiency, pool_id):
         logger.info(
             "creating target api volume '{0}' from source volume '{1}'".format(target_volume_name,
                                                                                source_api_volume.name))
-        space_efficiency = source_api_volume.tp
+        if not space_efficiency:
+            space_efficiency = source_api_volume.tp
         size_in_bytes = int(source_api_volume.cap)
         if not pool_id:
             pool_id = source_api_volume.pool
@@ -554,8 +555,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def _delete_target_volume_if_exist(self, target_volume_id):
         self._delete_volume(target_volume_id, not_exist_err=False)
 
-    def _create_snapshot(self, target_volume_name, source_api_volume, pool_id):
-        target_api_volume = self._create_similar_volume(target_volume_name, source_api_volume, pool_id)
+    def _create_snapshot(self, target_volume_name, source_api_volume, space_efficiency, pool_id):
+        target_api_volume = self._create_similar_volume(target_volume_name, source_api_volume, space_efficiency,
+                                                        pool_id)
         options = [FLASHCOPY_NO_BACKGROUND_COPY_OPTION, FLASHCOPY_PERSISTENT_OPTION]
         try:
             return self._create_flashcopy(source_api_volume.id, target_api_volume.id, options)
@@ -580,12 +582,12 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return self._generate_volume_response(api_object)
 
     @convert_scsi_id_to_array_id
-    def create_snapshot(self, volume_id, snapshot_name, pool=None):
+    def create_snapshot(self, volume_id, snapshot_name, space_efficiency=None, pool=None):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         source_api_volume = self._get_api_volume_by_id(volume_id)
         if source_api_volume is None:
             raise array_errors.ObjectNotFoundError(volume_id)
-        target_api_volume = self._create_snapshot(snapshot_name, source_api_volume, pool)
+        target_api_volume = self._create_snapshot(snapshot_name, source_api_volume, space_efficiency, pool)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         return self._generate_snapshot_response(target_api_volume, volume_id)
 

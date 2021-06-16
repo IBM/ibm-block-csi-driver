@@ -534,18 +534,38 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_create_snapshot_failed_with_incorrect_id(self):
         self.client_mock.get_volume.side_effect = InternalServerError("500", message="BE7A0005")
         with self.assertRaises(array_errors.IllegalObjectID):
-            self.array.create_snapshot("volume_id", "test_name", pool=None)
+            self.array.create_snapshot("volume_id", "test_name")
 
-    def test_create_snapshot_success(self):
+    def _prepare_mocks_for_create_snapshot_successfully(self):
         volume = self._prepare_mocks_for_create_snapshot()
         self.client_mock.create_volume.return_value = volume
         self.client_mock.get_volume.return_value = volume
         self.client_mock.create_flashcopy.return_value = self.flashcopy_response
         self.client_mock.get_flashcopies.return_value = self.flashcopy_response
-        snapshot = self.array.create_snapshot("volume_id", "target_volume", pool=self.volume_response.pool)
+        return volume
+
+    def test_create_snapshot_success(self):
+        volume = self._prepare_mocks_for_create_snapshot_successfully()
+        snapshot = self.array.create_snapshot("volume_id", "target_volume")
 
         self.assertEqual(snapshot.name, volume.name)
         self.assertEqual(snapshot.id, self.array._generate_volume_scsi_identifier(volume.id))
+        self.client_mock.create_volume.assert_called_once_with(name='target_volume', capacity_in_bytes=1073741824,
+                                                               pool_id='fake_pool', tp='none')
+
+    def test_create_snapshot_with_different_pool_success(self):
+        self._prepare_mocks_for_create_snapshot_successfully()
+
+        self.array.create_snapshot("volume_id", "target_volume", pool="different_pool")
+        self.client_mock.create_volume.assert_called_once_with(name='target_volume', capacity_in_bytes=1073741824,
+                                                               pool_id='different_pool', tp='none')
+
+    def test_create_snapshot_with_different_space_efficiency_success(self):
+        self._prepare_mocks_for_create_snapshot_successfully()
+
+        self.array.create_snapshot("volume_id", "target_volume", space_efficiency="thin")
+        self.client_mock.create_volume.assert_called_once_with(name='target_volume', capacity_in_bytes=1073741824,
+                                                               pool_id='fake_pool', tp='ese')
 
     def test_create_snapshot_not_valid(self):
         volume = self._prepare_mocks_for_create_snapshot()
