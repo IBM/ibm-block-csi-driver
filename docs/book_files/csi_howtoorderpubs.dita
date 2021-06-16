@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--Arbortext, Inc., 1988-2011, v.4002--><!DOCTYPE reference PUBLIC "-//IBM//DTD DITA IBM Reference//EN" "ibm-reference.dtd">
+<?Pub Sty _display FontColor="red"?><?Pub Inc?><reference id="xiv_howtoorderpubs" xml:lang="en-us">
+<title><tm trademark="IBM" tmtype="reg">IBM</tm> Publications Center</title><?Pub Caret -2?>
+<shortdesc>The <tm tmtype="reg" trademark="IBM">IBM</tm> Publications Center is a worldwide central
+repository for <tm tmtype="reg" trademark="IBM">IBM</tm> product publications and marketing
+material.</shortdesc>
+<refbody>
+<section>
+<p>The <xref format="html" href="http://www.ibm.com/shop/publications/order" scope="external"><tm trademark="IBM" tmtype="reg">IBM</tm> Publications Center website</xref> (<tm trademark="ibm.com" tmtype="reg">ibm.com</tm>/shop/publications/order) offers customized search functions to help you find the publications that you need. You can view or download publications at no charge.</p>
+</section>
+</refbody>
+
+</reference><?Pub *0000000959?><?tm 1607940997978 6 ibm.com||IBM ?>

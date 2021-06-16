@@ -38,6 +38,10 @@ class UnsupportedStorageVersionError(BaseArrayActionException):
 # =============================================================================
 # Volume errors
 # =============================================================================
+class InvalidArgumentError(BaseArrayActionException):
+    pass
+
+
 class ObjectNotFoundError(BaseArrayActionException):
 
     def __init__(self, name):
@@ -62,26 +66,26 @@ class VolumeDeletionError(BaseArrayActionException):
         self.message = messages.VolumeDeletionError_message.format(volume_id)
 
 
-class IllegalObjectName(BaseArrayActionException):
+class IllegalObjectName(InvalidArgumentError):
 
     def __init__(self, msg):
         self.message = "{0}".format(msg)
 
 
-class IllegalObjectID(BaseArrayActionException):
+class IllegalObjectID(InvalidArgumentError):
 
     def __init__(self, msg):
         self.message = "{0}".format(msg)
 
 
-class PoolDoesNotMatchCapabilities(BaseArrayActionException):
+class PoolDoesNotMatchCapabilities(InvalidArgumentError):
 
     def __init__(self, pool, capabilities, error):
         self.message = messages.PoolDoesNotMatchCapabilities_message.format(pool, capabilities,
                                                                             error)
 
 
-class SpaceEfficiencyNotSupported(BaseArrayActionException):
+class SpaceEfficiencyNotSupported(InvalidArgumentError):
 
     def __init__(self, space_efficiency):
         self.message = messages.SpaceEfficiencyNotSupported_message.format(space_efficiency)
@@ -89,17 +93,17 @@ class SpaceEfficiencyNotSupported(BaseArrayActionException):
 
 class VolumeAlreadyExists(BaseArrayActionException):
 
-    def __init__(self, volume, array):
-        self.message = messages.VolumeAlreadyExists_message.format(volume, array)
+    def __init__(self, volume_name, array):
+        self.message = messages.VolumeAlreadyExists_message.format(volume_name, array)
 
 
-class PoolDoesNotExist(BaseArrayActionException):
+class PoolDoesNotExist(InvalidArgumentError):
 
     def __init__(self, pool, array):
         self.message = messages.PoolDoesNotExist_message.format(pool, array)
 
 
-class PoolParameterIsMissing(BaseArrayActionException):
+class PoolParameterIsMissing(InvalidArgumentError):
 
     def __init__(self, array_type):
         self.message = messages.PoolParameterIsMissing.format(array_type)
@@ -143,26 +147,20 @@ class LunAlreadyInUseError(BaseArrayActionException):
 
 class MappingError(BaseArrayActionException):
 
-    def __init__(self, vol, host, err):
-        self.message = messages.MappingError_message.format(vol, host, err)
+    def __init__(self, volume_id_or_name, host, err):
+        self.message = messages.MappingError_message.format(volume_id_or_name, host, err)
 
 
 class VolumeAlreadyUnmappedError(BaseArrayActionException):
 
-    def __init__(self, vol):
-        self.message = messages.VolumeAlreadyUnmapped_message.format(vol)
+    def __init__(self, volume_id_or_name):
+        self.message = messages.VolumeAlreadyUnmapped_message.format(volume_id_or_name)
 
 
-class UnMappingError(BaseArrayActionException):
+class UnmappingError(BaseArrayActionException):
 
-    def __init__(self, vol, host, err):
-        self.message = messages.UnMappingError_message.format(vol, host, err)
-
-
-class BadNodeIdError(BaseArrayActionException):
-
-    def __init__(self, name):
-        self.message = messages.BadNodeIdError_message.format(name)
+    def __init__(self, volume_id_or_name, host, err):
+        self.message = messages.UnMappingError_message.format(volume_id_or_name, host, err)
 
 
 class VolumeMappedToMultipleHostsError(BaseArrayActionException):
@@ -177,13 +175,13 @@ class NoIscsiTargetsFoundError(BaseArrayActionException):
         self.message = messages.NoIscsiTargetsFoundError_message.format(endpoint)
 
 
-class UnsupportedConnectivityTypeError(BaseArrayActionException):
+class UnsupportedConnectivityTypeError(InvalidArgumentError):
 
     def __init__(self, connectivity_type):
         self.message = messages.UnsupportedConnectivityTypeError_message.format(connectivity_type)
 
 
-class ExpectedSnapshotButFoundVolumeError(BaseArrayActionException):
+class ExpectedSnapshotButFoundVolumeError(InvalidArgumentError):
 
     def __init__(self, id_or_name, array):
         self.message = messages.ExpectedSnapshotButFoundVolumeError_message.format(id_or_name, array)
@@ -191,8 +189,14 @@ class ExpectedSnapshotButFoundVolumeError(BaseArrayActionException):
 
 class SnapshotAlreadyExists(BaseArrayActionException):
 
-    def __init__(self, snapshot, array):
-        self.message = messages.SnapshotAlreadyExistsError_message.format(snapshot, array)
+    def __init__(self, snapshot_id_or_name, array):
+        self.message = messages.SnapshotAlreadyExistsError_message.format(snapshot_id_or_name, array)
+
+
+class SnapshotSourcePoolMismatch(BaseArrayActionException):
+
+    def __init__(self, snapshot_pool, source_pool):
+        self.message = messages.SnapshotSourcePoolMismatchError_message.format(snapshot_pool, source_pool)
 
 
 class ObjectIsStillInUseError(BaseArrayActionException):
@@ -210,5 +214,5 @@ class InvalidCliResponseError(BaseArrayActionException):
 
 class NotEnoughSpaceInPool(BaseArrayActionException):
 
-    def __init__(self, pool):
-        self.message = messages.NotEnoughSpaceInPoolError_message.format(pool)
+    def __init__(self, id_or_name):
+        self.message = messages.NotEnoughSpaceInPoolError_message.format(id_or_name)

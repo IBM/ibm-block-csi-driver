@@ -1,16 +1,17 @@
 import socket
-from threading import RLock
-from queue import Empty
 from collections import OrderedDict
 from contextlib import contextmanager
-from controller.array_action.array_connection_pool import ConnectionPool
-from controller.common.csi_logger import get_stdout_logger
-from controller.common import settings
-from controller.array_action.errors import FailedToFindStorageSystemType
-from controller.array_action.array_mediator_xiv import XIVArrayMediator
-from controller.array_action.array_mediator_svc import SVCArrayMediator
-from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
+from queue import Empty
+from threading import RLock
+
 import controller.array_action.errors as array_errors
+from controller.array_action.array_connection_pool import ConnectionPool
+from controller.array_action.array_mediator_ds8k import DS8KArrayMediator
+from controller.array_action.array_mediator_svc import SVCArrayMediator
+from controller.array_action.array_mediator_xiv import XIVArrayMediator
+from controller.array_action.errors import FailedToFindStorageSystemType
+from controller.common import settings
+from controller.common.csi_logger import get_stdout_logger
 
 logger = get_stdout_logger()
 _array_agents = {}
@@ -67,7 +68,10 @@ def _socket_connect_test(host, port, timeout=1):
         return -1
 
 
-def get_agent(username, password, endpoints, array_type=None):
+def get_agent(array_connection_info, array_type=None):
+    endpoints = array_connection_info.array_addresses
+    username = array_connection_info.user
+    password = array_connection_info.password
     endpoint_key = settings.ENDPOINTS_SEPARATOR.join(endpoints)
     with lock:
         found = _array_agents.get((username, endpoint_key), None)
@@ -107,7 +111,7 @@ def clear_agents():
             pass
 
 
-class StorageAgent(object):
+class StorageAgent:
     """
     StorageAgent is an agent which caches several mediators of the same storage for reuse cross threads.
     """

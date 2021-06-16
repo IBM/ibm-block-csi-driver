@@ -35,7 +35,7 @@ class ArrayMediator(ABC):
         This function should create a volume in the storage system.
 
         Args:
-            volume_name      : name of the volume to be created in the stoarge system
+            volume_name      : name of the volume to be created in the storage system
             size_in_bytes : size in bytes of the volume
             space_efficiency  : space efficiency (None for default)
             pool          : pool name to create the volume in
@@ -55,7 +55,7 @@ class ArrayMediator(ABC):
 
     @abstractmethod
     def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
-                                            minimum_volume_size_in_bytes, pool_id=None):
+                                            minimum_volume_size_in_bytes, pool=None):
         """
         This function should create a volume from source volume or snapshot in the storage system.
 
@@ -63,9 +63,9 @@ class ArrayMediator(ABC):
             name                            : name of the volume to be created in the storage system
             source_name                     : name of source to create from
             source_capacity_in_bytes        : capacity of source to create from
-            minimum_volume_size_in_bytes    : if source capacity is lower than this value vol will
+            minimum_volume_size_in_bytes    : if source capacity is lower than this value volume will
                                             be increased to this value
-            pool_id                         : pool of the volume and source object to find them more efficiently.
+            pool                            : pool of the volume and source object to find them more efficiently.
 
         Returns:
             Volume
@@ -91,19 +91,20 @@ class ArrayMediator(ABC):
 
         Raises:
             ObjectNotFound
+            IllegalObjectID
             PermissionDenied
             ObjectIsStillInUse
         """
         raise NotImplementedError
 
     @abstractmethod
-    def get_volume(self, volume_name, pool_id=None):
+    def get_volume(self, volume_name, pool=None):
         """
         This function return volume info about the volume.
 
         Args:
             volume_name: name of the volume on storage system.
-            pool_id: pool_id of the volume to find the volume more efficiently.
+            pool: pool of the volume to find the volume more efficiently.
 
 
         Returns:
@@ -114,20 +115,6 @@ class ArrayMediator(ABC):
             IllegalObjectName
             PermissionDenied
             PoolParameterIsMissing
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def get_volume_name(self, volume_id):
-        """
-        This function return volume name.
-        Args:
-           volume_id : volume id
-        Returns:
-           volume name
-        Raises:
-            ObjectNotFound
-            IllegalObjectID
         """
         raise NotImplementedError
 
@@ -161,6 +148,7 @@ class ArrayMediator(ABC):
 
         Raises:
             ObjectNotFound
+            IllegalObjectID
         """
         raise NotImplementedError
 
@@ -208,19 +196,20 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_snapshot(self, snapshot_name, pool_id=None):
+    def get_snapshot(self, volume_id, snapshot_name, pool=None):
         """
         This function return snapshot info about the snapshot.
         Args:
+            volume_id : id of the source volume (used to get pool in case pool parameter not given)
             snapshot_name : name of the snapshot in the storage system
-            pool_id: pool_id of the volume to find the snapshot more efficiently.
+            pool: pool to find the snapshot in (if not given, pool taken from source volume)
         Returns:
            Snapshot
         Raises:
             ExpectedSnapshotButFoundVolumeError
             IllegalObjectName
+            IllegalObjectID
             PermissionDenied
-            PoolParameterIsMissing
         """
         raise NotImplementedError
 
@@ -241,22 +230,23 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_snapshot(self, name, volume_name, pool_id=None):
+    def create_snapshot(self, volume_id, snapshot_name, pool=None):
         """
         This function should create a snapshot from volume in the storage system.
         Args:
-            name           : name of the snapshot to be created in the storage system
-            volume_name    : name of the volume to be created from
-            pool_id: pool_id of the volume to find the snapshot more efficiently.
+            volume_id : id of the volume to be created from
+            snapshot_name : name of the snapshot to be created in the storage system
+            pool : pool to create the snapshot in (if not given, pool taken from source volume)
         Returns:
             Snapshot
         Raises:
             SnapshotAlreadyExists
             ObjectNotFound
             IllegalObjectName
+            IllegalObjectID
             PermissionDenied
-            PoolParameterIsMissing
             NotEnoughSpaceInPool
+            SnapshotSourcePoolMismatch
         """
         raise NotImplementedError
 
@@ -270,6 +260,7 @@ class ArrayMediator(ABC):
             None
         Raises:
             ObjectNotFound
+            IllegalObjectID
             PermissionDenied
             ObjectIsStillInUse
         """
@@ -378,33 +369,17 @@ class ArrayMediator(ABC):
 
     @property
     @abstractmethod
-    def max_volume_name_length(self):
+    def max_object_name_length(self):
         """
-        The max allowed volume name length
-        """
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def max_volume_prefix_length(self):
-        """
-        The max allowed length of a volume name prefix.
+        The max allowed volume or snapshot name length
         """
         raise NotImplementedError
 
     @property
     @abstractmethod
-    def max_snapshot_name_length(self):
+    def max_object_prefix_length(self):
         """
-        The max allowed snapshot name length
-        """
-        raise NotImplementedError
-
-    @property
-    @abstractmethod
-    def max_snapshot_prefix_length(self):
-        """
-        The max allowed length of a snapshot name prefix.
+        The max allowed length of a volume or snapshot name prefix.
         """
         raise NotImplementedError
 

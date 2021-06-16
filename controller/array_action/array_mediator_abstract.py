@@ -1,7 +1,7 @@
 from abc import ABC
 from retry import retry
 
-import controller.array_action.errors as controller_errors
+import controller.array_action.errors as array_errors
 from controller.array_action.array_mediator_interface import ArrayMediator
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.errors import NoConnectionAvailableException, UnsupportedConnectivityTypeError
@@ -39,16 +39,16 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
                 if mapping == host_name:
                     logger.debug("idempotent case - volume is already mapped to host.")
                     return mappings[mapping], connectivity_type, array_initiators
-            raise controller_errors.VolumeMappedToMultipleHostsError(mappings)
+            raise array_errors.VolumeMappedToMultipleHostsError(mappings)
 
         logger.debug(
-            "no mappings were found for volume. mapping vol : {0} to host : {1}".format(
+            "no mappings were found for volume. mapping volume : {0} to host : {1}".format(
                 vol_id, host_name))
 
         try:
             lun = self.map_volume(vol_id, host_name)
             logger.debug("lun : {}".format(lun))
-        except controller_errors.LunAlreadyInUseError as ex:
+        except array_errors.LunAlreadyInUseError as ex:
             logger.warning(
                 "Lun was already in use. re-trying the operation. {0}".format(
                     ex))
@@ -56,7 +56,7 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
                 try:
                     lun = self.map_volume(vol_id, host_name)
                     break
-                except controller_errors.LunAlreadyInUseError as inner_ex:
+                except array_errors.LunAlreadyInUseError as inner_ex:
                     logger.warning(
                         "re-trying map volume. try #{0}. {1}".format(i,
                                                                      inner_ex))

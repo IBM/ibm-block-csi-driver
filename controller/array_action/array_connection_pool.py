@@ -6,7 +6,7 @@ from controller.common import settings
 logger = get_stdout_logger()
 
 
-class ConnectionPool(object):
+class ConnectionPool:
     """A simple pool to hold connections."""
 
     def __init__(self, endpoints, username, password, med_class, min_size, max_size):
@@ -57,19 +57,18 @@ class ConnectionPool(object):
                 item = self.channel.get(block=False)
                 if item.is_active():
                     return item
-                else:
-                    with self.lock:
-                        self.current_size -= 1
-                    try:
-                        logger.debug("The connection for storage {} is inactive, close it".format(self.endpoint_key))
-                        item.disconnect()
-                    except Exception as ex:
-                        # failed to disconnect the mediator, delete the stale client.
-                        logger.error(
-                            "Failed to disconnect the connection for storage {} before use, "
-                            "reason is {}".format(self.endpoint_key, ex)
-                        )
-                        del item
+                with self.lock:
+                    self.current_size -= 1
+                try:
+                    logger.debug("The connection for storage {} is inactive, close it".format(self.endpoint_key))
+                    item.disconnect()
+                except Exception as ex:
+                    # failed to disconnect the mediator, delete the stale client.
+                    logger.error(
+                        "Failed to disconnect the connection for storage {} before use, "
+                        "reason is {}".format(self.endpoint_key, ex)
+                    )
+                    del item
             except Empty:
                 break
 

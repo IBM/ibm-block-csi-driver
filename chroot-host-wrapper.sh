@@ -8,5 +8,5 @@ if [ ! -d "${DIR}" ]; then
     exit 1
 fi
 
-exec chroot $DIR /usr/bin/env -i PATH="/sbin:/bin:/usr/bin" ${ME} "${@:1}"
+exec chroot $DIR /usr/bin/env -i PATH="/sbin:/bin:/usr/bin:/usr/sbin" ${ME} "${@:1}"
 
