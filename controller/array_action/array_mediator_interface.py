@@ -72,8 +72,8 @@ class ArrayMediator(ABC):
         Raises:
             ObjectNotFoundError
             IllegalObjectName
+            IllegalObjectID
             PermissionDenied
-            PoolParameterIsMissing
         """
         raise NotImplementedError
 

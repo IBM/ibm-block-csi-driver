@@ -217,7 +217,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                                             minimum_volume_size_in_bytes):
         logger.debug(
             "Copy source {0} data to volume {1}. source capacity {2}. Minimal requested volume capacity {3}".format(
-                volume_id, source_id, source_capacity_in_bytes, minimum_volume_size_in_bytes))
+                source_id, volume_id, source_capacity_in_bytes, minimum_volume_size_in_bytes))
         try:
             name = self._get_object_name_by_wwn(volume_id=volume_id)
             source_name = self._get_object_name_by_wwn(volume_id=source_id)
@@ -242,7 +242,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise array_errors.ObjectNotFoundError(volume_id)
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
-            raise array_errors.PermissionDeniedError("create volume : {0}".format(volume_id))
+            raise array_errors.PermissionDeniedError("copy to {0} from source".format(volume_id))
 
     def _get_cli_object_by_wwn(self, volume_id, not_exist_err=False):
         try:
