@@ -17,7 +17,8 @@ from controller.common.csi_logger import get_stdout_logger, set_log_level
 from controller.common.node_info import NodeIdInfo
 from controller.common.utils import set_current_thread_name
 from controller.controller_server.errors import ObjectIdError, ValidationException
-from controller.controller_server.exception_handler import handle_common_exceptions, handle_exception
+from controller.controller_server.exception_handler import handle_common_exceptions, handle_exception, \
+    build_non_ok_response
 from controller.controller_server import messages as controller_messages
 from controller.csi_general import csi_pb2
 from controller.csi_general import csi_pb2_grpc
@@ -83,9 +84,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 if required_bytes > max_size:
                     message = messages.SizeOutOfRangeError_message.format(required_bytes, max_size)
                     logger.error(message)
-                    context.set_details(message)
-                    context.set_code(grpc.StatusCode.OUT_OF_RANGE)
-                    return csi_pb2.CreateVolumeResponse()
+                    return build_non_ok_response(message, context, grpc.StatusCode.OUT_OF_RANGE,
+                                                 csi_pb2.CreateVolumeResponse)
 
                 if required_bytes == 0:
                     required_bytes = min_size
@@ -107,9 +107,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug("volume found : {}".format(volume))
 
                     if not source_id and volume.capacity_bytes != request.capacity_range.required_bytes:
-                        context.set_details("Volume was already created with different size.")
-                        context.set_code(grpc.StatusCode.ALREADY_EXISTS)
-                        return csi_pb2.CreateVolumeResponse()
+                        message = "Volume was already created with different size."
+                        return build_non_ok_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
+                                                     csi_pb2.CreateVolumeResponse)
 
                     copy_source_res = self._handle_existing_volume_source(volume, source_id, source_type,
                                                                           array_connection_info.system_id,
@@ -191,9 +191,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     def _handle_volume_exists_with_different_source(self, context, source_id, source_type, volume_name):
         logger.debug(
             "Volume {0} exists but it is not a copy of {1} {2}.".format(volume_name, source_type, source_id))
-        context.set_details("Volume already exists but it was created from a different source.")
-        context.set_code(grpc.StatusCode.ALREADY_EXISTS)
-        return csi_pb2.CreateVolumeResponse()
+        message = "Volume already exists but it was created from a different source."
+        return build_non_ok_response(message, context, grpc.StatusCode.ALREADY_EXISTS, csi_pb2.CreateVolumeResponse)
 
     @handle_common_exceptions(csi_pb2.DeleteVolumeResponse)
     def DeleteVolume(self, request, context):
@@ -293,7 +292,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             logger.info("finished ControllerUnpublishVolume")
             return csi_pb2.ControllerUnpublishVolumeResponse()
-
+        except ObjectIdError as ex:
+            return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
+                                    array_errors.VolumeAlreadyUnmappedError)
         except array_errors.VolumeAlreadyUnmappedError:
             logger.debug("Idempotent case. volume is already unmapped.")
             return csi_pb2.ControllerUnpublishVolumeResponse()
@@ -341,12 +342,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 if snapshot:
                     if snapshot.source_volume_id != volume_id:
-                        context.set_details(
-                            messages.SnapshotWrongVolumeError_message.format(snapshot_final_name,
-                                                                             snapshot.source_volume_id,
-                                                                             volume_id))
-                        context.set_code(grpc.StatusCode.ALREADY_EXISTS)
-                        return csi_pb2.CreateSnapshotResponse()
+                        message = messages.SnapshotWrongVolumeError_message.format(snapshot_final_name,
+                                                                                   snapshot.source_volume_id,
+                                                                                   volume_id)
+                        return build_non_ok_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
+                                                     csi_pb2.CreateSnapshotResponse)
                 else:
                     logger.debug(
                         "Snapshot doesn't exist. Creating a new snapshot {0} from volume {1}".format(
@@ -358,7 +358,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 res = utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
                 logger.info("finished create snapshot")
                 return res
-        except array_errors.SnapshotSourcePoolMismatch as ex:
+        except (ObjectIdError, array_errors.SnapshotSourcePoolMismatch) as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
                                     csi_pb2.CreateSnapshotResponse)
         except array_errors.SnapshotAlreadyExists as ex:
@@ -411,13 +411,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         secrets = request.secrets
         utils.validate_expand_volume_request(request)
         try:
-            try:
-                volume_id_info = utils.get_volume_id_info(request.volume_id)
-            except ObjectIdError as ex:
-                logger.warning("volume id is invalid. error : {}".format(ex))
-                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-                return csi_pb2.ControllerExpandVolumeResponse()
-
+            volume_id_info = utils.get_volume_id_info(request.volume_id)
+        except ObjectIdError as ex:
+            return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
+                                    csi_pb2.ControllerExpandVolumeResponse)
+        try:
             system_id = volume_id_info.system_id
             array_type = volume_id_info.array_type
             volume_id = volume_id_info.object_id
@@ -440,9 +438,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 if required_bytes > max_size:
                     message = messages.SizeOutOfRangeError_message.format(required_bytes, max_size)
                     logger.error(message)
-                    context.set_code(grpc.StatusCode.OUT_OF_RANGE)
-                    context.set_details(message)
-                    return csi_pb2.ControllerExpandVolumeResponse()
+                    return build_non_ok_response(message, context, grpc.StatusCode.OUT_OF_RANGE,
+                                                 csi_pb2.ControllerExpandVolumeResponse)
 
                 logger.debug("expanding volume {0}".format(volume_id))
                 array_mediator.expand_volume(
@@ -491,9 +488,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         if not name or not version:
             logger.error("plugin name or version cannot be empty")
-            context.set_code(grpc.StatusCode.INTERNAL)
-            context.set_details("plugin name or version cannot be empty")
-            return csi_pb2.GetPluginInfoResponse()
+            message = "plugin name or version cannot be empty"
+            return build_non_ok_response(message, context, grpc.StatusCode.INTERNAL, csi_pb2.GetPluginInfoResponse)
 
         logger.info("finished GetPluginInfo")
         return csi_pb2.GetPluginInfoResponse(name=name, vendor_version=version)
