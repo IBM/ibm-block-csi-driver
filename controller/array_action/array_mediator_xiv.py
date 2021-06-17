@@ -242,7 +242,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise array_errors.ObjectNotFoundError(volume_id)
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
-            raise array_errors.PermissionDeniedError("copy to {0} from source".format(volume_id))
+            raise array_errors.PermissionDeniedError("copy to {0} from source: {1}".format(volume_id, source_id))
 
     def _get_cli_object_by_wwn(self, volume_id, not_exist_err=False):
         try:
