@@ -624,11 +624,21 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                      FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET_OPTION
                      ])
 
-    def test_copy_to_existing_volume_raise_not_found(self):
+    def _test_copy_to_existing_volume_raise_errors(self, client_method, client_error, expected_error):
         self._prepare_mocks_for_copy_to_existing_volume()
-        self.client_mock.extend_volume.side_effect = NotFound("404")
-        with self.assertRaises(array_errors.ObjectNotFoundError):
+        client_method.side_effect = client_error
+        with self.assertRaises(expected_error):
             self.array.copy_to_existing_volume_from_source("test_name", "source_name", 3, 2)
+
+    def test_copy_to_existing_volume_raise_not_found(self):
+        self._test_copy_to_existing_volume_raise_errors(client_method=self.client_mock.extend_volume,
+                                                        client_error=NotFound("404"),
+                                                        expected_error=array_errors.ObjectNotFoundError)
+
+    def test_copy_to_existing_volume_raise_illegal_object_id(self):
+        self._test_copy_to_existing_volume_raise_errors(client_method=self.client_mock.get_volume,
+                                                        client_error=InternalServerError("500", "BE7A0005"),
+                                                        expected_error=array_errors.IllegalObjectID)
 
     def test_get_object_by_id_snapshot(self):
         snapshot = self._prepare_mocks_for_snapshot()

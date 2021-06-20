@@ -71,7 +71,6 @@ class ArrayMediator(ABC):
 
         Raises:
             ObjectNotFoundError
-            IllegalObjectName
             IllegalObjectID
             PermissionDenied
         """

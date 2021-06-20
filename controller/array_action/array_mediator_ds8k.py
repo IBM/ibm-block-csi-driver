@@ -64,11 +64,11 @@ def scsi_id_to_volume_id(scsi_id):
     return scsi_id[-4:]
 
 
-def try_convert_first_arg(converter, args, num_of_args):
+def try_convert_first_args(converter, args, args_amount):
     if args:
-        args_to_convert = args[:num_of_args]
+        args_to_convert = args[:args_amount]
         converted = map(converter, args_to_convert)
-        return tuple(converted) + args[num_of_args:]
+        return tuple(converted) + args[args_amount:]
     return ()
 
 
@@ -83,7 +83,7 @@ def is_snapshot(api_volume):
 def convert_scsi_ids_to_array_ids(args_amount=1):
     @decorator
     def convert_scsi_id_to_array_id(mediator_method, self, *args):
-        args = try_convert_first_arg(scsi_id_to_volume_id, args, args_amount)
+        args = try_convert_first_args(scsi_id_to_volume_id, args, args_amount)
         return mediator_method(self, *args)
 
     return convert_scsi_id_to_array_id
