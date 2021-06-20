@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--Arbortext, Inc., 1988-2011, v.4002-->
+<!DOCTYPE task PUBLIC "-//IBM//DTD DITA IBM Task//EN"
+ "ibm-task.dtd">
+<?Pub Sty _display FontColor="red"?>
+<?Pub Inc?>
+<task id="sending_comments" xml:lang="en-us">
+<title>Sending comments</title>
+<titlealts>
+<navtitle>Feedback</navtitle>
+</titlealts>
+<shortdesc>Your feedback is important in helping to provide the most
+accurate and highest quality information.</shortdesc>
+<prolog><metadata>
+<keywords><indexterm>comments, sending</indexterm><indexterm>feedback,
+sending</indexterm></keywords>
+</metadata></prolog>
+<!--Include this topic in your PDF books to provide instructions for the 
+reader on how to send comments about the publication to IBM. Embed this file
+in the About this publication or About this information preface section, in 
+accordance with IBM Style guidelines. For more information about front matter 
+guidelines, see the IBM Style Guidelines at:
+http://d25web1.torolab.ibm.com/function/idtools/sguidenew.nsf/e9030c90308b9f1a852564c8005a303b/0253024e39d9299f852573ef00522543?OpenDocument
+IMPORTANT: The traditional Reader Comment Form section located at the end of each book 
+must be removed.
+-->
+<taskbody>
+<steps-unordered>
+<stepsection>To submit any comments about this publication or any
+other IBM storage product documentation:</stepsection>
+<step>
+<cmd>Send your comments by email to <xref format="mailto"
+href="mailto:ibmdocs@us.ibm.com?subject=IBM%20Systems%20Storage%20publications" scope="external"
+>ibmdocs@us.ibm.com</xref>. Be sure to include the following information:</cmd>
+<info>
+<ul>
+<li>Exact publication title and version</li>
+<li>Publication form number (for example, GA32-1234-00)</li>
+<li>Page, table, or illustration numbers that you are commenting on</li>
+<li>A detailed description of any information that should be changed</li>
+</ul>
+</info>
+</step><?Pub Caret 33?>
+</steps-unordered>
+</taskbody>
+<?tm 1314299723 0?>
+</task>
+<?Pub *0000001965?>

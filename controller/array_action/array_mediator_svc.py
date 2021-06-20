@@ -172,6 +172,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         for cluster in self.client.svcinfo.lssystem():
             if cluster['location'] == 'local':
                 return cluster
+        return None
 
     @property
     def identifier(self):
@@ -231,6 +232,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         except Exception as ex:
             logger.exception(ex)
             raise ex
+        return None
 
     def _get_cli_volume_if_exists(self, volume_name):
         cli_volume = self._get_cli_volume(volume_name, not_exist_err=False)
@@ -391,6 +393,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         except Exception as ex:
             logger.exception(ex)
             raise ex
+        return None
 
     @retry(svc_errors.StorageArrayClientException, tries=5, delay=1)
     def _rollback_copy_to_target_volume(self, target_volume_name):
