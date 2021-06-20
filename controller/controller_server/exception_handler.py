@@ -22,15 +22,20 @@ status_codes_by_exception = {
 }
 
 
-def build_non_ok_response(message, context, status_code, response_type):
+def _build_non_ok_response(message, context, status_code, response_type):
     context.set_details(message)
     context.set_code(status_code)
     return response_type()
 
 
+def build_error_response(message, context, status_code, response_type):
+    logger.error(message)
+    return _build_non_ok_response(message, context, status_code, response_type)
+
+
 def handle_exception(ex, context, status_code, response_type):
     logger.exception(ex)
-    return build_non_ok_response(str(ex), context, status_code, response_type)
+    return _build_non_ok_response(str(ex), context, status_code, response_type)
 
 
 def handle_common_exceptions(response_type):
