@@ -18,7 +18,7 @@ The following table details orchestration platforms suitable for deployment of t
 
 ## Supported storage systems
 
-IBM® block storage CSI driver 1.7.0 supports different IBM storage systems as listed in the following table.
+IBM® block storage CSI driver 1.6.0 supports different IBM storage systems as listed in the following table.
 
 |Storage system|Microcode version|
 |--------------|-----------------|
@@ -107,7 +107,7 @@ Use the following steps to install the operator and driver, with [GitHub](https:
     1. Download the manifest from GitHub.
 
         ```
-        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.7.0/deploy/installer/generated/ibm-block-csi-operator.yaml > ibm-block-csi-operator.yaml
+        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.6.0/deploy/installer/generated/ibm-block-csi-operator.yaml > ibm-block-csi-operator.yaml
         ```
 
     2.  **Optional:** Update the image fields in the ibm-block-csi-operator.yaml.
@@ -131,7 +131,7 @@ Use the following steps to install the operator and driver, with [GitHub](https:
     1.  Download the manifest from GitHub.
 
         ```
-        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.7.0/deploy/crds/csi.ibm.com_v1_ibmblockcsi_cr.yaml > csi.ibm.com_v1_ibmblockcsi_cr.yaml
+        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.6.0/deploy/crds/csi.ibm.com_v1_ibmblockcsi_cr.yaml > csi.ibm.com_v1_ibmblockcsi_cr.yaml
         ```
 
     2.  **Optional:** Update the image repository field, tag field, or both in the csi.ibm.com_v1_ibmblockcsi_cr.yaml.
