@@ -766,7 +766,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.assertIn("invalid_snapshot_id", self.context.details)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_volume_from_source_illegal_object_name(self, storage_agent):
+    def test_create_volume_from_source_illegal_object_id(self, storage_agent):
         array_exception = array_errors.IllegalObjectID("")
         self._test_create_volume_from_snapshot_error(storage_agent, array_exception,
                                                      grpc.StatusCode.INVALID_ARGUMENT)

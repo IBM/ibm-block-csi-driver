@@ -82,11 +82,11 @@ def is_snapshot(api_volume):
 
 def convert_scsi_ids_to_array_ids(args_amount=1):
     @decorator
-    def convert_scsi_id_to_array_id(mediator_method, self, *args):
+    def convert_first_args_of_method(mediator_method, self, *args):
         args = try_convert_first_args(scsi_id_to_volume_id, args, args_amount)
         return mediator_method(self, *args)
 
-    return convert_scsi_id_to_array_id
+    return convert_first_args_of_method
 
 
 def get_flashcopy_as_target_if_exists(api_volume):
