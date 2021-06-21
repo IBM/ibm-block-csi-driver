@@ -19,16 +19,16 @@ package driver_test
 import (
 	"errors"
 	"fmt"
-	gomock "github.com/golang/mock/gomock"
-	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
-	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
-	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
-	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"io/ioutil"
 	"os"
 	"reflect"
 	"syscall"
 	"testing"
+
+	gomock "github.com/golang/mock/gomock"
+	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
+	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
+	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
 var (
@@ -126,10 +126,10 @@ func TestParseFCPortsName(t *testing.T) {
 			file_contents: []string{"wrong content"},
 			expErr:        fmt.Errorf(driver.ErrorWhileTryingToReadFC, "wrong content"),
 		},
-		{
-			name:   "fc unsupported",
-			expErr: fmt.Errorf(driver.ErrorUnsupportedConnectivityType, device_connectivity.ConnectionTypeFC),
-		},
+		//{
+		//	name:   "fc unsupported",
+		//	expErr: fmt.Errorf(driver.ErrorUnsupportedConnectivityType, device_connectivity.ConnectionTypeFC),
+		//},
 		{
 			name:          "one FC port",
 			file_contents: []string{"0x10000000c9934d9f"},
