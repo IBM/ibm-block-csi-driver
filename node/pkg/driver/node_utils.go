@@ -19,13 +19,14 @@ package driver
 import (
 	"context"
 	"fmt"
-	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"io/ioutil"
-	"k8s.io/apimachinery/pkg/util/errors"
 	"os"
 	"path"
 	"strconv"
 	"strings"
+
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
+	"k8s.io/apimachinery/pkg/util/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -199,7 +200,7 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 
 	fpaths, err := n.Executer.FilepathGlob(FCPortPath)
 	if fpaths == nil {
-		err = fmt.Errorf(ErrorUnsupportedConnectivityType, device_connectivity.ConnectionTypeFC)
+		return fpaths, nil
 	}
 	if err != nil {
 		return nil, err
