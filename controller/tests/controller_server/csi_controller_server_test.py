@@ -833,9 +833,10 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
             self.storage_agent.get_mediator.return_value.__exit__.side_effect = [copy_exception]
         self.mediator.delete_volume = Mock()
 
-        self.servicer.CreateVolume(self.request, self.context)
+        response = self.servicer.CreateVolume(self.request, self.context)
         self.mediator.delete_volume.assert_called_with(target_volume_id)
         self.assertEqual(self.context.code, return_code)
+        self.assertIsInstance(response, csi_pb2.CreateVolumeResponse)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_clone_volume_success(self, storage_agent):
