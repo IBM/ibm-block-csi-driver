@@ -218,14 +218,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
         return Mock(as_single_element=cli_object)
 
     @staticmethod
-    def _get_cli_volume():
+    def _get_cli_volume(se_copy='yes', deduplicated_copy='no'):
         return Munch({'vdisk_UID': 'vol_id',
                       'name': 'source_volume',
                       'capacity': '1024',
                       'mdisk_grp_name': 'pool_name',
                       'FC_id': '',
-                      'se_copy': 'yes',
-                      'deduplicated_copy': 'no',
+                      'se_copy': se_copy,
+                      'deduplicated_copy': deduplicated_copy,
                       'compressed_copy': 'no'
                       })
 
@@ -342,12 +342,16 @@ class TestArrayMediatorSVC(unittest.TestCase):
         volume = self.svc.get_object_by_id("volume_id", "volume")
         self.assertEqual(volume.name, "volume_id")
 
-    def _prepare_mocks_for_create_snapshot(self, deduplicated_copy=True):
+    def _prepare_mocks_for_create_snapshot(self, support_deduplicated_copy=True, source_with_deduplicated_copy=False):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         self.svc.client.svctask.mkfcmap.return_value = Mock()
-
-        source_vol_to_copy_from = self._get_cli_volume()
-        if not deduplicated_copy:
+        if source_with_deduplicated_copy:
+            se_copy = 'no'
+            deduplicated_copy = 'yes'
+            source_vol_to_copy_from = self._get_cli_volume(se_copy=se_copy, deduplicated_copy=deduplicated_copy)
+        else:
+            source_vol_to_copy_from = self._get_cli_volume()
+        if not support_deduplicated_copy:
             del source_vol_to_copy_from.deduplicated_copy
         target_vol_after_creation = self._get_mapless_target_cli_volume()
         target_vol_after_mapping = self._get_mapped_target_cli_volume()
@@ -423,15 +427,22 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
                                                                  pool='different_pool', thin=True)
 
-    def test_create_snapshot_with_different_space_efficiency_success(self):
-        self._prepare_mocks_for_create_snapshot()
+    def test_create_snapshot_with_specified_source_volume_space_efficiency_success(self):
+        self._prepare_mocks_for_create_snapshot(source_with_deduplicated_copy=True)
 
-        self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency="compressed")
+        self.svc.create_snapshot("source_volume_id", "test_snapshot")
         self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
-                                                                 pool='pool_name', compressed=True)
+                                                                 pool='pool_name', compressed=True, deduplicated=True)
+
+    def test_create_snapshot_with_different_space_efficiency_success(self):
+        self._prepare_mocks_for_create_snapshot(source_with_deduplicated_copy=True)
+
+        self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency="thin")
+        self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
+                                                                 pool='pool_name', thin=True)
 
     def test_create_snapshot_no_deduplicated_copy_success(self):
-        self._prepare_mocks_for_create_snapshot(deduplicated_copy=False)
+        self._prepare_mocks_for_create_snapshot(support_deduplicated_copy=False)
 
         snapshot = self.svc.create_snapshot("source_volume_id", "test_snapshot", "pool1")
 

@@ -96,7 +96,7 @@ def get_flashcopy_as_target_if_exists(api_volume):
 def get_array_space_efficiency(space_efficiency):
     if space_efficiency:
         space_efficiency_lower = space_efficiency.lower()
-        if space_efficiency_lower == config.SPACE_EFFICIENCY_THIN:
+        if space_efficiency_lower == config.SPACE_EFFICIENCY_THIN or space_efficiency == ARRAY_SPACE_EFFICIENCY_THIN:
             return ARRAY_SPACE_EFFICIENCY_THIN
     return ARRAY_SPACE_EFFICIENCY_NONE
 
@@ -521,7 +521,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.info(
             "creating target api volume '{0}' from source volume '{1}'".format(target_volume_name,
                                                                                source_api_volume.name))
-        if not space_efficiency:
+        if space_efficiency is None:
             space_efficiency = source_api_volume.tp
         size_in_bytes = int(source_api_volume.cap)
         if not pool:
