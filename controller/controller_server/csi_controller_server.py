@@ -1,7 +1,7 @@
 import os.path
 import time
-from concurrent import futures
 from argparse import ArgumentParser
+from concurrent import futures
 
 import grpc
 import yaml
@@ -16,10 +16,10 @@ from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger, set_log_level
 from controller.common.node_info import NodeIdInfo
 from controller.common.utils import set_current_thread_name
+from controller.controller_server import messages as controller_messages
 from controller.controller_server.errors import ObjectIdError, ValidationException
 from controller.controller_server.exception_handler import handle_common_exceptions, handle_exception, \
     build_error_response
-from controller.controller_server import messages as controller_messages
 from controller.csi_general import csi_pb2
 from controller.csi_general import csi_pb2_grpc
 
@@ -359,7 +359,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                 res = utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
                 logger.info("finished create snapshot")
                 return res
-        except (ObjectIdError, array_errors.SnapshotSourcePoolMismatch) as ex:
+        except (ObjectIdError, array_errors.SnapshotSourcePoolMismatch, array_errors.SpaceEfficiencyNotSupported) as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
                                     csi_pb2.CreateSnapshotResponse)
         except array_errors.SnapshotAlreadyExists as ex:

@@ -273,6 +273,10 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                            err=array_errors.IllegalObjectID("volume-id"))
 
+    def test_create_snapshot_with_space_efficiency_not_supported_exception(self):
+        self.create_snapshot_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
+                                           err=array_errors.SpaceEfficiencyNotSupported(["fake"]))
+
     def test_create_snapshot_with_other_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INTERNAL, err=Exception("error"))
 
