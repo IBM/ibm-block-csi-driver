@@ -8,7 +8,7 @@ from pysvc.unified.response import CLIFailureError
 import controller.array_action.config as config
 import controller.array_action.errors as array_errors
 from controller.array_action.array_mediator_svc import SVCArrayMediator, build_kwargs_from_parameters, \
-    HOST_ID_PARAM, HOST_NAME_PARAM, HOST_ISCSI_NAMES_PARAM, HOST_WWPNS_PARAM, FCMAP_STATUS_DONE
+    HOST_ID_PARAM, HOST_NAME_PARAM, HOST_ISCSI_NAMES_PARAM, HOST_WWPNS_PARAM, FCMAP_STATUS_DONE, YES
 from controller.array_action.svc_cli_result_reader import SVCListResultsElement
 from controller.common.node_info import Initiators
 
@@ -138,17 +138,17 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(volume.id, 'vol_id')
 
     def test_create_volume_with_thin_space_efficiency_success(self):
-        self._test_create_volume_success("thin")
+        self._test_create_volume_success(config.SPACE_EFFICIENCY_THIN)
         self.svc.client.svctask.mkvolume.assert_called_with(name="test_volume", unit="b", size=1024, pool="pool_name",
                                                             thin=True)
 
     def test_create_volume_with_compressed_space_efficiency_success(self):
-        self._test_create_volume_success("compressed")
+        self._test_create_volume_success(config.SPACE_EFFICIENCY_COMPRESSED)
         self.svc.client.svctask.mkvolume.assert_called_with(name="test_volume", unit="b", size=1024, pool="pool_name",
                                                             compressed=True)
 
     def test_create_volume_with_deduplicated_space_efficiency_success(self):
-        self._test_create_volume_success("deduplicated")
+        self._test_create_volume_success(config.SPACE_EFFICIENCY_DEDUPLICATED)
         self.svc.client.svctask.mkvolume.assert_called_with(name="test_volume", unit="b", size=1024, pool="pool_name",
                                                             compressed=True, deduplicated=True)
 
@@ -160,7 +160,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_create_volume_with_default_space_efficiency_success("")
 
     def test_create_volume_with_thick_space_efficiency_success(self):
-        self._test_create_volume_with_default_space_efficiency_success("thick")
+        self._test_create_volume_with_default_space_efficiency_success(config.SPACE_EFFICIENCY_THICK)
 
     def _test_delete_volume_rmvolume_cli_failure_error(self, error_message_id, expected_error, volume_name="volume"):
         self._test_mediator_method_client_cli_failure_error(self.svc.delete_volume, (volume_name,),
@@ -218,7 +218,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
         return Mock(as_single_element=cli_object)
 
     @staticmethod
-    def _get_cli_volume(se_copy='yes', deduplicated_copy='no'):
+    def _get_cli_volume(enable_deduplicated_copy=True):
+        se_copy = YES
+        deduplicated_copy = 'no'
+        compressed_copy = 'no'
+        if enable_deduplicated_copy:
+            se_copy = "no"
+            deduplicated_copy = YES
+            compressed_copy = YES
         return Munch({'vdisk_UID': 'vol_id',
                       'name': 'source_volume',
                       'capacity': '1024',
@@ -226,7 +233,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                       'FC_id': '',
                       'se_copy': se_copy,
                       'deduplicated_copy': deduplicated_copy,
-                      'compressed_copy': 'no'
+                      'compressed_copy': compressed_copy
                       })
 
     @classmethod
@@ -345,12 +352,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def _prepare_mocks_for_create_snapshot(self, support_deduplicated_copy=True, source_with_deduplicated_copy=False):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         self.svc.client.svctask.mkfcmap.return_value = Mock()
-        if source_with_deduplicated_copy:
-            se_copy = 'no'
-            deduplicated_copy = 'yes'
-            source_vol_to_copy_from = self._get_cli_volume(se_copy=se_copy, deduplicated_copy=deduplicated_copy)
-        else:
-            source_vol_to_copy_from = self._get_cli_volume()
+        source_vol_to_copy_from = self._get_cli_volume(enable_deduplicated_copy=source_with_deduplicated_copy)
         if not support_deduplicated_copy:
             del source_vol_to_copy_from.deduplicated_copy
         target_vol_after_creation = self._get_mapless_target_cli_volume()
@@ -505,13 +507,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_validate_supported_space_efficiency_success(self):
         no_space_efficiency = ""
         self.svc.validate_supported_space_efficiency(no_space_efficiency)
-        thin_space_efficiency = "thin"
+        thin_space_efficiency = config.SPACE_EFFICIENCY_THIN
         self.svc.validate_supported_space_efficiency(thin_space_efficiency)
-        thick_space_efficiency = "thick"
+        thick_space_efficiency = config.SPACE_EFFICIENCY_THICK
         self.svc.validate_supported_space_efficiency(thick_space_efficiency)
-        compressed_space_efficiency = "compressed"
+        compressed_space_efficiency = config.SPACE_EFFICIENCY_COMPRESSED
         self.svc.validate_supported_space_efficiency(compressed_space_efficiency)
-        deduplicated_space_efficiency = "deduplicated"
+        deduplicated_space_efficiency = config.SPACE_EFFICIENCY_DEDUPLICATED
         self.svc.validate_supported_space_efficiency(deduplicated_space_efficiency)
 
     def test_build_kwargs_from_parameters(self):
