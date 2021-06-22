@@ -564,7 +564,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_create_snapshot_with_different_request_parameter_empty_space_efficiency_success(self):
         self._test_create_snapshot_with_space_efficiency_success(source_volume_space_efficiency="ese",
-                                                                 space_efficiency_called="none",
+                                                                 space_efficiency_called="ese",
                                                                  space_efficiency_parameter="")
 
     def test_create_snapshot_not_valid(self):

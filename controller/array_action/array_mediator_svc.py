@@ -457,7 +457,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def _create_similar_volume(self, source_cli_volume, target_volume_name, space_efficiency, pool):
         logger.info("creating target cli volume '{0}' from source volume '{1}'".format(target_volume_name,
                                                                                        source_cli_volume.name))
-        if space_efficiency is None:
+        if not space_efficiency:
             space_efficiency = _get_cli_volume_space_efficiency(source_cli_volume)
         size_in_bytes = int(source_cli_volume.capacity)
         if not pool:

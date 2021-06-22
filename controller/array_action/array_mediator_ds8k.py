@@ -521,7 +521,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.info(
             "creating target api volume '{0}' from source volume '{1}'".format(target_volume_name,
                                                                                source_api_volume.name))
-        if space_efficiency is None:
+        if not space_efficiency:
             space_efficiency = source_api_volume.tp
         size_in_bytes = int(source_api_volume.cap)
         if not pool:
