@@ -545,10 +545,10 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                                                             space_efficiency_called, space_efficiency_parameter=None):
         self._prepare_mocks_for_create_snapshot(tp=source_volume_space_efficiency)
 
-        if space_efficiency_parameter is not None:
-            self.array.create_snapshot("volume_id", "target_volume", space_efficiency=space_efficiency_parameter)
-        else:
+        if space_efficiency_parameter is None:
             self.array.create_snapshot("volume_id", "target_volume")
+        else:
+            self.array.create_snapshot("volume_id", "target_volume", space_efficiency=space_efficiency_parameter)
 
         self.client_mock.create_volume.assert_called_with(name='target_volume', capacity_in_bytes=1073741824,
                                                           pool_id='fake_pool', tp=space_efficiency_called)
