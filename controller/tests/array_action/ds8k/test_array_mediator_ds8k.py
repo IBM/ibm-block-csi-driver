@@ -487,7 +487,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.create_volume.side_effect = ClientException("500")
 
         with self.assertRaises(array_errors.VolumeCreationError):
-            self.array.create_snapshot("volume_id", "target_volume", pool=self.volume_response.pool)
+            self.array.create_snapshot("volume_id", "target_volume", space_efficiency=None,
+                                       pool=self.volume_response.pool)
 
     def test_create_snapshot_create_fcrel_error(self):
         self.client_mock.create_volume = Mock()
@@ -495,38 +496,42 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.create_flashcopy.side_effect = ClientException("500")
 
         with self.assertRaises(Exception):
-            self.array.create_snapshot("volume_id", "target_volume", pool=self.volume_response.pool)
+            self.array.create_snapshot("volume_id", "target_volume", space_efficiency=None,
+                                       pool=self.volume_response.pool)
 
     def test_create_snapshot_get_volume_not_found(self):
         self.client_mock.create_volume = Mock()
         self.client_mock.get_volume.side_effect = NotFound("404")
 
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.array.create_snapshot("volume_id", "target_volume", pool=self.volume_response.pool)
+            self.array.create_snapshot("volume_id", "target_volume", space_efficiency=None,
+                                       pool=self.volume_response.pool)
 
     def test_create_snapshot_create_flashcopy_volume_not_found(self):
         self._prepare_mocks_for_create_snapshot()
         self.client_mock.create_flashcopy.side_effect = ClientException("500", message="00000013")
 
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.array.create_snapshot("volume_id", "target_volume", pool=self.volume_response.pool)
+            self.array.create_snapshot("volume_id", "target_volume", space_efficiency=None,
+                                       pool=self.volume_response.pool)
 
     def test_create_snapshot_already_exist(self):
         self._prepare_mocks_for_create_snapshot()
         self.client_mock.create_flashcopy.side_effect = ClientException("500", message="000000AE")
 
         with self.assertRaises(array_errors.SnapshotAlreadyExists):
-            self.array.create_snapshot("volume_id", "target_volume", pool=self.volume_response.pool)
+            self.array.create_snapshot("volume_id", "target_volume", space_efficiency=None,
+                                       pool=self.volume_response.pool)
 
     def test_create_snapshot_failed_with_incorrect_id(self):
         self.client_mock.get_volume.side_effect = InternalServerError("500", message="BE7A0005")
         with self.assertRaises(array_errors.IllegalObjectID):
-            self.array.create_snapshot("volume_id", "test_name")
+            self.array.create_snapshot("volume_id", "test_name", space_efficiency=None, pool=None)
 
     def test_create_snapshot_success(self):
         self._prepare_mocks_for_create_snapshot()
         snapshot_response = self.snapshot_response
-        snapshot = self.array.create_snapshot("volume_id", "target_volume")
+        snapshot = self.array.create_snapshot("volume_id", "target_volume", space_efficiency=None, pool=None)
 
         self.assertEqual(snapshot.name, snapshot_response.name)
         self.assertEqual(snapshot.id, self.array._generate_volume_scsi_identifier(snapshot_response.id))
@@ -536,7 +541,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_create_snapshot_with_different_pool_success(self):
         self._prepare_mocks_for_create_snapshot()
 
-        self.array.create_snapshot("volume_id", "target_volume", pool="different_pool")
+        self.array.create_snapshot("volume_id", "target_volume", space_efficiency=None, pool="different_pool")
 
         self.client_mock.create_volume.assert_called_once_with(name='target_volume', capacity_in_bytes=1073741824,
                                                                pool_id='different_pool', tp='none')
@@ -546,9 +551,10 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self._prepare_mocks_for_create_snapshot(tp=source_volume_space_efficiency)
 
         if space_efficiency_parameter is None:
-            self.array.create_snapshot("volume_id", "target_volume")
+            self.array.create_snapshot("volume_id", "target_volume", space_efficiency=None, pool=None)
         else:
-            self.array.create_snapshot("volume_id", "target_volume", space_efficiency=space_efficiency_parameter)
+            self.array.create_snapshot("volume_id", "target_volume", space_efficiency=space_efficiency_parameter,
+                                       pool=None)
 
         self.client_mock.create_volume.assert_called_with(name='target_volume', capacity_in_bytes=1073741824,
                                                           pool_id='fake_pool', tp=space_efficiency_called)
@@ -577,7 +583,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
              })
         self.client_mock.get_flashcopies.return_value = flashcopy_response
         with self.assertRaises(ValueError) as ar_context:
-            self.array.create_snapshot("volume_id", "target_volume", pool=self.volume_response.pool)
+            self.array.create_snapshot("volume_id", "target_volume", space_efficiency=None,
+                                       pool=self.volume_response.pool)
         self.assertIn("invalid", str(ar_context.exception))
 
     def _prepare_mocks_for_snapshot(self):
