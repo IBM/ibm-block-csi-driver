@@ -240,7 +240,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         deduplicated_copy = 'no'
         compressed_copy = 'no'
         if enable_deduplicated_copy:
-            se_copy = "no"
+            se_copy = 'no'
             deduplicated_copy = YES
             compressed_copy = YES
         return Munch({'vdisk_UID': 'vol_id',
