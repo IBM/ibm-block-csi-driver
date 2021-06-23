@@ -200,7 +200,7 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 
 	fpaths, err := n.Executer.FilepathGlob(FCPortPath)
 	if fpaths == nil {
-		return fpaths, nil
+		err = fmt.Errorf(ErrorUnsupportedConnectivityType, device_connectivity.ConnectionTypeFC)
 	}
 	if err != nil {
 		return nil, err
