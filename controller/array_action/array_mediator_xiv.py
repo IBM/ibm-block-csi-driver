@@ -142,7 +142,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                         is_ready=True,
                         array_type=self.array_type)
 
-    def _get_cli_object_by_name(self,volume_name):
+    def _get_cli_object_by_name(self, volume_name):
         try:
             return self.client.cmd.vol_list(vol=volume_name).as_single_element
         except xcli_errors.IllegalNameForObjectError as ex:
