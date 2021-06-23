@@ -235,11 +235,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
         return Mock(as_single_element=cli_object)
 
     @staticmethod
-    def _get_cli_volume(enable_deduplicated_copy=True):
+    def _get_cli_volume(with_deduplicated_copy=True):
         se_copy = YES
         deduplicated_copy = 'no'
         compressed_copy = 'no'
-        if enable_deduplicated_copy:
+        if with_deduplicated_copy:
             se_copy = 'no'
             deduplicated_copy = YES
             compressed_copy = YES
