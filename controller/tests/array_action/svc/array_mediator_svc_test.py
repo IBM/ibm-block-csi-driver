@@ -218,11 +218,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
         return Mock(as_single_element=cli_object)
 
     @staticmethod
-    def _get_cli_volume(enable_deduplicated_copy=True):
+    def _get_cli_volume(deduplicated_copy=True):
         se_copy = YES
         deduplicated_copy = 'no'
         compressed_copy = 'no'
-        if enable_deduplicated_copy:
+        if deduplicated_copy:
             se_copy = "no"
             deduplicated_copy = YES
             compressed_copy = YES
@@ -352,7 +352,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def _prepare_mocks_for_create_snapshot(self, support_deduplicated_copy=True, source_with_deduplicated_copy=False):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         self.svc.client.svctask.mkfcmap.return_value = Mock()
-        source_vol_to_copy_from = self._get_cli_volume(enable_deduplicated_copy=source_with_deduplicated_copy)
+        source_vol_to_copy_from = self._get_cli_volume(deduplicated_copy=source_with_deduplicated_copy)
         if not support_deduplicated_copy:
             del source_vol_to_copy_from.deduplicated_copy
         target_vol_after_creation = self._get_mapless_target_cli_volume()
