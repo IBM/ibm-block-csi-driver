@@ -214,12 +214,15 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                 raise array_errors.NotEnoughSpaceInPool(id_or_name=pool)
         return None
 
-    def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
-                                            minimum_volume_size_in_bytes, pool=None):
+    def copy_to_existing_volume_from_source(self, volume_id, source_id, source_capacity_in_bytes,
+                                            minimum_volume_size_in_bytes):
         logger.debug(
             "Copy source {0} data to volume {1}. source capacity {2}. Minimal requested volume capacity {3}".format(
-                name, source_name, source_capacity_in_bytes, minimum_volume_size_in_bytes))
+                source_id, volume_id, source_capacity_in_bytes, minimum_volume_size_in_bytes))
         try:
+            name = self._get_object_name_by_wwn(volume_id=volume_id)
+            source_name = self._get_object_name_by_wwn(volume_id=source_id)
+
             logger.debug("Formatting volume {0}".format(name))
             self.client.cmd.vol_format(vol=name)
             logger.debug("Copying source {0} data to volume {1}.".format(source_name, name))
@@ -234,13 +237,13 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise array_errors.IllegalObjectName(ex.status)
         except xcli_errors.SourceVolumeBadNameError as ex:
             logger.exception(ex)
-            raise array_errors.ObjectNotFoundError(source_name)
+            raise array_errors.ObjectNotFoundError(source_id)
         except (xcli_errors.VolumeBadNameError, xcli_errors.TargetVolumeBadNameError) as ex:
             logger.exception(ex)
-            raise array_errors.ObjectNotFoundError(name)
+            raise array_errors.ObjectNotFoundError(volume_id)
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
-            raise array_errors.PermissionDeniedError("create volume : {0}".format(name))
+            raise array_errors.PermissionDeniedError("copy to {0} from source: {1}".format(volume_id, source_id))
 
     def _get_cli_object_by_wwn(self, volume_id, not_exist_err=False):
         try:
