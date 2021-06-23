@@ -366,10 +366,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
         volume = self.svc.get_object_by_id("volume_id", "volume")
         self.assertEqual(volume.name, "volume_id")
 
-    def _prepare_mocks_for_create_snapshot(self, support_deduplicated_copy=True, source_with_deduplicated_copy=False):
+    def _prepare_mocks_for_create_snapshot(self, support_deduplicated_copy=True, source_has_deduplicated_copy=False):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         self.svc.client.svctask.mkfcmap.return_value = Mock()
-        source_vol_to_copy_from = self._get_cli_volume(source_with_deduplicated_copy)
+        source_vol_to_copy_from = self._get_cli_volume(source_has_deduplicated_copy)
         if not support_deduplicated_copy:
             del source_vol_to_copy_from.deduplicated_copy
         target_vol_after_creation = self._get_mapless_target_cli_volume()
@@ -447,14 +447,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                                  pool='different_pool', thin=True)
 
     def test_create_snapshot_with_specified_source_volume_space_efficiency_success(self):
-        self._prepare_mocks_for_create_snapshot(source_with_deduplicated_copy=True)
+        self._prepare_mocks_for_create_snapshot(source_has_deduplicated_copy=True)
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool=None)
         self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
                                                                  pool='pool_name', compressed=True, deduplicated=True)
 
     def test_create_snapshot_with_different_space_efficiency_success(self):
-        self._prepare_mocks_for_create_snapshot(source_with_deduplicated_copy=True)
+        self._prepare_mocks_for_create_snapshot(source_has_deduplicated_copy=True)
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency="thin", pool=None)
         self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,

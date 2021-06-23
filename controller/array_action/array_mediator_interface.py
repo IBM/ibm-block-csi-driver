@@ -234,8 +234,8 @@ class ArrayMediator(ABC):
         Args:
             volume_id           : id of the volume to be created from
             snapshot_name       : name of the snapshot to be created in the storage system
-            space_efficiency    : space efficiency (if not given, space efficiency taken from source volume)
-            pool                : pool to create the snapshot in (if not given, pool taken from source volume)
+            space_efficiency    : space efficiency (if empty/None, space efficiency taken from source volume)
+            pool                : pool to create the snapshot in (if empty/None, pool taken from source volume)
         Returns:
             Snapshot
         Raises:
