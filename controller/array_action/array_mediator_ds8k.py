@@ -230,16 +230,16 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             array_type=self.array_type
         )
 
-    def _create_api_volume(self, name, size_in_bytes, space_efficiency, pool_id):
+    def _create_api_volume(self, name, size_in_bytes, array_space_efficiency, pool_id):
         logger.info("Creating volume with name: {}, size: {}, in pool: {}, with parameters: {}".format(
-            name, size_in_bytes, pool_id, space_efficiency))
+            name, size_in_bytes, pool_id, array_space_efficiency))
         try:
             cli_kwargs = {}
             cli_kwargs.update({
                 'name': name,
                 'capacity_in_bytes': size_in_bytes,
                 'pool_id': pool_id,
-                'tp': get_array_space_efficiency(space_efficiency),
+                'tp': array_space_efficiency,
 
             })
             logger.debug(
@@ -283,7 +283,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise array_errors.VolumeCreationError(name)
 
     def create_volume(self, volume_name, size_in_bytes, space_efficiency, pool):
-        api_volume = self._create_api_volume(volume_name, size_in_bytes, space_efficiency, pool)
+        array_space_efficiency = get_array_space_efficiency(space_efficiency)
+        api_volume = self._create_api_volume(volume_name, size_in_bytes, array_space_efficiency, pool)
         return self._generate_volume_response(api_volume)
 
     def _extend_volume(self, api_volume, new_size_in_bytes):
@@ -525,12 +526,14 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.info(
             "creating target api volume '{0}' from source volume '{1}'".format(target_volume_name,
                                                                                source_api_volume.name))
-        if not space_efficiency:
-            space_efficiency = source_api_volume.tp
+        if space_efficiency:
+            array_space_efficiency = get_array_space_efficiency(space_efficiency)
+        else:
+            array_space_efficiency = source_api_volume.tp
         size_in_bytes = int(source_api_volume.cap)
         if not pool:
             pool = source_api_volume.pool
-        return self._create_api_volume(target_volume_name, size_in_bytes, space_efficiency, pool)
+        return self._create_api_volume(target_volume_name, size_in_bytes, array_space_efficiency, pool)
 
     def _create_flashcopy(self, source_volume_id, target_volume_id, options):
         logger.info(
