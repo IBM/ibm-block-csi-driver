@@ -100,7 +100,7 @@ def get_flashcopy_as_target_if_exists(api_volume):
 def get_array_space_efficiency(space_efficiency):
     if space_efficiency:
         space_efficiency_lower = space_efficiency.lower()
-        if space_efficiency_lower == config.SPACE_EFFICIENCY_THIN or space_efficiency == ARRAY_SPACE_EFFICIENCY_THIN:
+        if space_efficiency_lower == config.SPACE_EFFICIENCY_THIN:
             return ARRAY_SPACE_EFFICIENCY_THIN
     return ARRAY_SPACE_EFFICIENCY_NONE
 
