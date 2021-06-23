@@ -114,6 +114,13 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def _convert_size_blocks_to_bytes(self, size_in_blocks):
         return int(size_in_blocks) * self.BLOCK_SIZE_IN_BYTES
 
+    def _get_copy_source_object_wwn(self, cli_object):
+        if hasattr(cli_object, "copy_master_wwn"):
+            return cli_object.copy_master_wwn
+        source_name = cli_object.master_name
+        cli_source = self._get_cli_object_by_name(source_name)
+        return cli_source.wwn
+
     def _generate_volume_response(self, cli_volume):
         # vol_copy_type and copy_master_wwn were added in a9k. In xiv they didn't exist
         is_copy = hasattr(cli_volume, "vol_copy_type") and cli_volume.vol_copy_type == "Copy"
@@ -131,17 +138,20 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                         cli_snapshot.wwn,
                         cli_snapshot.name,
                         self.endpoint,
-                        volume_id=cli_snapshot.copy_master_wwn,
+                        volume_id=self._get_copy_source_object_wwn(cli_snapshot),
                         is_ready=True,
                         array_type=self.array_type)
 
-    def get_volume(self, volume_name, pool=None):
-        logger.debug("Get volume : {}".format(volume_name))
+    def _get_cli_object_by_name(self,volume_name):
         try:
-            cli_volume = self.client.cmd.vol_list(vol=volume_name).as_single_element
+            return self.client.cmd.vol_list(vol=volume_name).as_single_element
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise array_errors.IllegalObjectName(ex.status)
+
+    def get_volume(self, volume_name, pool=None):
+        logger.debug("Get volume : {}".format(volume_name))
+        cli_volume = self._get_cli_object_by_name(volume_name)
 
         logger.debug("cli volume returned : {}".format(cli_volume))
         if not cli_volume:
