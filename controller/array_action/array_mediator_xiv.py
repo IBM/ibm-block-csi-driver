@@ -114,12 +114,16 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def _convert_size_blocks_to_bytes(self, size_in_blocks):
         return int(size_in_blocks) * self.BLOCK_SIZE_IN_BYTES
 
-    def _get_copy_source_object_wwn(self, cli_object):
-        if hasattr(cli_object, "copy_master_wwn"):
-            return cli_object.copy_master_wwn
-        source_name = cli_object.master_name
-        cli_source = self._get_cli_object_by_name(source_name)
-        return cli_source.wwn
+    @staticmethod
+    def _is_gen3(cli_object):
+        return not hasattr(cli_object, "copy_master_wwn")
+
+    def _get_source_object_wwn(self, cli_object):
+        if self._is_gen3(cli_object):
+            source_name = cli_object.master_name
+            cli_source = self._get_cli_object_by_name(source_name)
+            return cli_source.wwn
+        return cli_object.copy_master_wwn
 
     def _generate_volume_response(self, cli_volume):
         # vol_copy_type and copy_master_wwn were added in a9k. In xiv they didn't exist
@@ -138,7 +142,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                         cli_snapshot.wwn,
                         cli_snapshot.name,
                         self.endpoint,
-                        volume_id=self._get_copy_source_object_wwn(cli_snapshot),
+                        volume_id=self._get_source_object_wwn(cli_snapshot),
                         is_ready=True,
                         array_type=self.array_type)
 
