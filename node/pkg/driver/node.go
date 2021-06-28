@@ -712,9 +712,8 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	}
 	logger.Debugf("discovered topology labels : %v", topologyLabels)
 
-	fcExists := d.NodeUtils.IsPathExists(FCPath)
-	fpaths, _ := d.executer.FilepathGlob(FCPortPath)
-	if fcExists && fpaths != nil {
+	fcExists := d.NodeUtils.IsFCExists()
+	if fcExists {
 		fcWWNs, err = d.NodeUtils.ParseFCPorts()
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())

@@ -19,6 +19,7 @@ package driver
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -68,6 +69,8 @@ type NodeUtilsInterface interface {
 	ClearStageInfoFile(filePath string) error
 	StageInfoFileIsExist(filePath string) bool
 	IsPathExists(filePath string) bool
+	IsFCExists() bool
+	IsDirHasContent(filePath string) bool
 	IsDirectory(filePath string) bool
 	RemoveFileOrDirectory(filePath string) error
 	MakeDir(dirPath string) error
@@ -238,6 +241,25 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 	}
 
 	return fcPorts, nil
+}
+
+func (n NodeUtils) IsFCExists() bool {
+	if n.IsPathExists(FCPath) {
+		return n.IsDirHasContent(FCPath)
+	}
+	return false
+}
+
+func (n NodeUtils) IsDirHasContent(path string) bool {
+	f, _ := os.Open(path)
+	defer f.Close()
+
+	_, err := f.Readdir(1)
+
+	if err == io.EOF {
+		return false
+	}
+	return true
 }
 
 func (n NodeUtils) IsPathExists(path string) bool {
