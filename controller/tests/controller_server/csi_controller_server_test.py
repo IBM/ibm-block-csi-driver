@@ -743,10 +743,9 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
                                                                                                 "a9k")
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.copy_to_existing_volume_from_source.assert_called_once_with(volume_name, snapshot_name,
+        self.mediator.copy_to_existing_volume_from_source.assert_called_once_with('wwn2', snapshot_id,
                                                                                   snapshot_capacity_bytes,
-                                                                                  self.capacity_bytes,
-                                                                                  pool)
+                                                                                  self.capacity_bytes)
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, snapshot_id)
 
@@ -767,8 +766,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.assertIn("invalid_snapshot_id", self.context.details)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_volume_from_source_illegal_object_name(self, storage_agent):
-        array_exception = array_errors.IllegalObjectName("")
+    def test_create_volume_from_source_illegal_object_id(self, storage_agent):
+        array_exception = array_errors.IllegalObjectID("")
         self._test_create_volume_from_snapshot_error(storage_agent, array_exception,
                                                      grpc.StatusCode.INVALID_ARGUMENT)
 
@@ -844,10 +843,9 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
                                                                                               "a9k")
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.copy_to_existing_volume_from_source.assert_called_once_with(volume_name, clone_volume_name,
+        self.mediator.copy_to_existing_volume_from_source.assert_called_once_with('wwn2', volume_id,
                                                                                   volume_capacity_bytes,
-                                                                                  self.capacity_bytes,
-                                                                                  pool)
+                                                                                  self.capacity_bytes)
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, volume_id)
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
 
