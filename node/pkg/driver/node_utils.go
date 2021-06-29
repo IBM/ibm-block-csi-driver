@@ -54,6 +54,7 @@ const (
 	resizeFsTimeoutMilliseconds = 30 * 1000
 	TimeOutMultipathdCmd        = 10 * 1000
 	multipathdCmd               = "multipathd"
+	MIN_FILES_IN_NON_EMPTY_DIR  = 1
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
@@ -70,7 +71,6 @@ type NodeUtilsInterface interface {
 	StageInfoFileIsExist(filePath string) bool
 	IsPathExists(filePath string) bool
 	IsFCExists() bool
-	IsDirHasContent(filePath string) bool
 	IsDirectory(filePath string) bool
 	RemoveFileOrDirectory(filePath string) error
 	MakeDir(dirPath string) error
@@ -244,22 +244,16 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 }
 
 func (n NodeUtils) IsFCExists() bool {
-	if n.IsPathExists(FCPath) {
-		return n.IsDirHasContent(FCPath)
-	}
-	return false
+	return n.IsPathExists(FCPath) && !n.isEmptyDir(FCPath)
 }
 
-func (n NodeUtils) IsDirHasContent(path string) bool {
+func (n NodeUtils) isEmptyDir(path string) bool {
 	f, _ := os.Open(path)
 	defer f.Close()
 
-	_, err := f.Readdir(1)
+	_, err := f.Readdir(MIN_FILES_IN_NON_EMPTY_DIR)
 
-	if err == io.EOF {
-		return false
-	}
-	return true
+	return err != io.EOF
 }
 
 func (n NodeUtils) IsPathExists(path string) bool {
