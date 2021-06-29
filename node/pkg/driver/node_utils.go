@@ -54,7 +54,7 @@ const (
 	resizeFsTimeoutMilliseconds = 30 * 1000
 	TimeOutMultipathdCmd        = 10 * 1000
 	multipathdCmd               = "multipathd"
-	MIN_FILES_IN_NON_EMPTY_DIR  = 1
+	minFilesInNonEmptyDir       = 1
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
@@ -251,9 +251,17 @@ func (n NodeUtils) isEmptyDir(path string) bool {
 	f, _ := os.Open(path)
 	defer f.Close()
 
-	_, err := f.Readdir(MIN_FILES_IN_NON_EMPTY_DIR)
+	_, err := f.Readdir(minFilesInNonEmptyDir)
 
-	return err != io.EOF
+	if err != nil {
+		if err != io.EOF {
+			logger.Warningf("Check is directory %s empty returned error %s", path, err.Error())
+			return true
+		}
+		return true
+	}
+
+	return false
 }
 
 func (n NodeUtils) IsPathExists(path string) bool {
