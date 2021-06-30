@@ -1,0 +1,184 @@
+name: CSI IBM Driver CI
+on:
+  push:
+    branches:
+      - develop
+      - master
+  pull_request:
+    branches:
+      - develop
+      - master
+jobs:
+  prepare_env:
+   name: "prepare env"
+   runs-on: ubuntu-latest
+   steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Setup dependencies
+        run: |
+          scripts/ci/setup_ci_dependencies.sh
+      - name: Save dependencies files
+        uses: actions/upload-artifact@v2
+        with:
+          name: ci-dependencies
+          path: |
+            /home/runner/.bash_profile
+          retention-days: 1
+      - uses: FranzDiebold/github-env-vars-action@v2
+  CSI-controller-static_code_analysis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: CSI-controller- static code analysis
+        run: |
+          ./scripts/run_static_code_analysis.sh
+  Unit_testing_coverage:
+    runs-on: ubuntu-latest
+    name: "Unit testing + coverage ${{ matrix.csiblock-component }}"
+    strategy:
+      matrix:
+       include:
+         - csiblock-component: controller
+           command-to-run: "./scripts/run_unitests.sh"
+         - csiblock-component: node
+           command-to-run: "make test-xunit-in-container"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: CSI-${{ matrix.csiblock-component }}- Unit testing + coverage
+        run: |
+          mkdir -p build/reports && chmod 777 build/reports
+          $command_to_run `pwd`/build/reports
+        env:
+          command_to_run: ${{ matrix.command-to-run }}
+
+  CSI-deployment-k8s_yamls_validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: CSI-deployment- k8s yamls validation
+        run: |
+          ./scripts/run_yamlcheck.sh
+  CSI-Build-and-push-images:
+    runs-on: ubuntu-latest
+    needs:
+      - CSI-controller-static_code_analysis
+      - Unit_testing_coverage
+      - CSI-deployment-k8s_yamls_validation
+    strategy:
+      matrix:
+        image_type: ['node', 'controller']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+      - name: Set up Docker Buildx
+        id: buildx
+        uses: docker/setup-buildx-action@v1.3.0
+      - uses: FranzDiebold/github-env-vars-action@v2
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: 'csiblock1'
+          password: '${{ secrets.CSIBLOCK_DOCKERHUB_PASSWORD }}'
+      - name: Cache Docker layers
+        uses: actions/cache@v2
+        with:
+          path: /tmp/.buildx-${{ matrix.image_type }}
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+      - name: Create github branch parameter
+        id: tested_github_branch
+        run: |
+          docker_image_branch_tag=`echo $CI_ACTION_REF_NAME| sed 's|/|.|g'`
+          echo "::set-output name=docker_image_branch_tag::${docker_image_branch_tag}"
+      - name: Build and push ${{ matrix.image_type }}
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          platforms: linux/amd64,linux/ppc64le,linux/s390x
+          push: true
+          tags: |
+            csiblock1/ibm-block-csi-${{ matrix.image_type }}:${{ steps.tested_github_branch.outputs.docker_image_branch_tag }}_${{ github.run_number }}
+            csiblock1/ibm-block-csi-${{ matrix.image_type }}:${{ steps.tested_github_branch.outputs.docker_image_branch_tag }}
+            csiblock1/ibm-block-csi-${{ matrix.image_type }}:latest
+          file: Dockerfile-csi-${{ matrix.image_type }}
+          cache-from: type=local,src=/tmp/.buildx-${{ matrix.image_type }}
+          cache-to: type=local,dest=/tmp/.buildx-new-${{ matrix.image_type }}
+        # Temp fix
+        # https://github.com/docker/build-push-action/issues/252
+        # https://github.com/moby/buildkit/issues/1896
+      - name: Move cache
+        run: |
+          [[ -G /tmp/.buildx-${{ matrix.image_type }} ]] && rm -rf /tmp/.buildx-${{ matrix.image_type }}
+          mv /tmp/.buildx-new-${{ matrix.image_type }} /tmp/.buildx-${{ matrix.image_type }}
+    outputs:
+      driver_images_tag: "${{ steps.tested_github_branch.outputs.docker_image_branch_tag }}_${{ github.run_number }}"
+          
+  create-cluster:
+    runs-on: ubuntu-latest
+    needs: CSI-Build-and-push-images
+    env:
+      csiblock_dockerhub_password: ${{ secrets.CSIBLOCK_DOCKERHUB_PASSWORD }}
+      controller_repository_for_test: csiblock1/ibm-block-csi-controller
+      node_repository_for_test: csiblock1/ibm-block-csi-node
+      operator_image_repository_for_test: csiblock1/ibm-block-csi-operator
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          path: driver
+      - uses: FranzDiebold/github-env-vars-action@v2
+      - name: Retrieve ci dependencies
+        uses: actions/download-artifact@v2
+        with:
+          name: ci-dependencies
+          path: /home/runner
+      - name: Get the operator github branch
+        id: operator_github_branch
+        run: |
+          driver/scripts/ci/get_operator_github_branch.sh
+        env:
+          github_token: ${{ secrets.CSIBLOCK_GITHUB_TOKEN }}
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1.1.0
+        with:
+          version: v0.11.1
+      - name: Wait for k8s cluster to be ready
+        run: |
+          driver/scripts/ci/wait_for_k8s_ready.sh
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          repository: IBM/ibm-block-csi-operator
+          ref: "${{ steps.operator_github_branch.outputs.operator_branch }}"
+          path: operator
+      - name: Deploy ibm block csi driver
+        run: |
+          driver/scripts/ci/deploy_driver.sh
+        env:
+          driver_images_tag: "${{ needs.CSI-Build-and-push-images.outputs.driver_images_tag }}"
+          operator_image_tag_for_test: "${{ steps.operator_github_branch.outputs.docker_image_branch_tag }}"
+          operator_file: "operator/deploy/installer/generated/ibm-block-csi-operator.yaml"
+          cr_file: "operator/deploy/crds/csi.ibm.com_v1_ibmblockcsi_cr.yaml"
+      - name: Wait for csi ibm block driver to be ready
+        run: |
+          driver/scripts/ci/wait_for_driver_to_be_ready.sh
+      - name: Save driver pods logs
+        if: always()
+        run: |
+          driver/scripts/ci/save_driver_pods_logs.sh
+      - name: Upload driver pods logs
+        if: always()
+        uses: actions/upload-artifact@v2
+        with:
+          name: Driver logs
+          path: |
+            /tmp/driver_*.txt
+          retention-days: 7
