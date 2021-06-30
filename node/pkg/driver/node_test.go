@@ -20,15 +20,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/golang/mock/gomock"
-	"github.com/ibm/ibm-block-csi-driver/node/mocks"
-	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"path"
 	"path/filepath"
 	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/golang/mock/gomock"
+	"github.com/ibm/ibm-block-csi-driver/node/mocks"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 	"google.golang.org/grpc/codes"
@@ -1217,7 +1218,7 @@ func TestNodeGetInfo(t *testing.T) {
 			fake_nodeutils := mocks.NewMockNodeUtilsInterface(mockCtrl)
 			d := newTestNodeService(fake_nodeutils, nil, nil)
 			fake_nodeutils.EXPECT().GetTopologyLabels(context.TODO(), d.Hostname).Return(topologySegments, nil)
-			fake_nodeutils.EXPECT().IsPathExists(driver.FCPath).Return(tc.fcExists)
+			fake_nodeutils.EXPECT().IsFCExists().Return(tc.fcExists)
 			if tc.fcExists {
 				fake_nodeutils.EXPECT().ParseFCPorts().Return(tc.return_fcs, tc.return_fc_err)
 			}

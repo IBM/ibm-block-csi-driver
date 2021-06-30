@@ -19,13 +19,15 @@ package driver
 import (
 	"context"
 	"fmt"
-	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
+	"io"
 	"io/ioutil"
-	"k8s.io/apimachinery/pkg/util/errors"
 	"os"
 	"path"
 	"strconv"
 	"strings"
+
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
+	"k8s.io/apimachinery/pkg/util/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -52,6 +54,7 @@ const (
 	resizeFsTimeoutMilliseconds = 30 * 1000
 	TimeOutMultipathdCmd        = 10 * 1000
 	multipathdCmd               = "multipathd"
+	minFilesInNonEmptyDir       = 1
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
@@ -67,6 +70,7 @@ type NodeUtilsInterface interface {
 	ClearStageInfoFile(filePath string) error
 	StageInfoFileIsExist(filePath string) bool
 	IsPathExists(filePath string) bool
+	IsFCExists() bool
 	IsDirectory(filePath string) bool
 	RemoveFileOrDirectory(filePath string) error
 	MakeDir(dirPath string) error
@@ -237,6 +241,26 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 	}
 
 	return fcPorts, nil
+}
+
+func (n NodeUtils) IsFCExists() bool {
+	return n.IsPathExists(FCPath) && !n.isEmptyDir(FCPath)
+}
+
+func (n NodeUtils) isEmptyDir(path string) bool {
+	f, _ := os.Open(path)
+	defer f.Close()
+
+	_, err := f.Readdir(minFilesInNonEmptyDir)
+
+	if err != nil {
+		if err != io.EOF {
+			logger.Warningf("Check is directory %s empty returned error %s", path, err.Error())
+		}
+		return true
+	}
+
+	return false
 }
 
 func (n NodeUtils) IsPathExists(path string) bool {
