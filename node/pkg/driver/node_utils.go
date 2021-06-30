@@ -256,7 +256,6 @@ func (n NodeUtils) isEmptyDir(path string) bool {
 	if err != nil {
 		if err != io.EOF {
 			logger.Warningf("Check is directory %s empty returned error %s", path, err.Error())
-			return true
 		}
 		return true
 	}
