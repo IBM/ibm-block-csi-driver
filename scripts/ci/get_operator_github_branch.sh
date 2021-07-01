@@ -6,13 +6,12 @@ operator_branch=develop
 DOCKER_HUB_USERNAME=csiblock1
 DOCKER_HUB_PASSWORD=$csiblock_dockerhub_password
 wanted_image_tag=`echo $CI_ACTION_REF_NAME | sed 's|/|.|g'`
+export image_tags=`docker-hub tags --orgname csiblock1 --reponame ibm-block-csi-operator --all-pages | grep $wanted_image_tag | awk '{print$2}'`
 
-does_docker_image_has_tag=false
-image_tags=`docker-hub tags --orgname csiblock1 --reponame ibm-block-csi-operator --all-pages | grep $wanted_image_tag | awk '{print$2}'`
 for tag in $image_tags
 do
   if [[ "$tag" == "$wanted_image_tag" ]]; then
-    does_docker_image_has_tag=true
+    does_operator_branch_has_image=true
   fi
 done
 
