@@ -17,7 +17,7 @@ while [ $driver_is_ready == "false" ]; do
   else
     amount_of_seconds_that_driver_pods_are_running=0
   fi
-  kubectl get pod -A -l csi | grep -iv running | grep -iv name
+  kubectl get pod -A -l csi
   sleep 1
 done
 echo Driver is running
