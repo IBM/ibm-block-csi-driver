@@ -3,18 +3,18 @@ set +o pipefail
 
 does_operator_branch_has_image=false
 operator_branch=develop
+DOCKER_HUB_USERNAME=csiblock1
+DOCKER_HUB_PASSWORD=$csiblock_dockerhub_password
+wanted_image_tag=`echo $CI_ACTION_REF_NAME | sed 's|/|.|g'`
 
-token=`curl -X POST -H "Content-Type: application/json" -d '{"username": "csiblock1", "password": "'$csiblock_dockerhub_password'"}' https://hub.docker.com/v2/users/login | jq .token`
-token=`echo ${token//\"}`
-image_tags=`curl -s -H "Authorization: JWT ${token}" https://hub.docker.com/v2/namespaces/csiblock1/repositories/ibm-block-csi-operator/images | jq .results[0] | jq .tags | jq -c '.[]' | jq .tag`
+does_docker_image_has_tag=false
+image_tags=`docker-hub tags --orgname csiblock1 --reponame ibm-block-csi-operator --all-pages | grep $wanted_image_tag | awk '{print$2}'`
 for tag in $image_tags
 do
-  tag=`echo ${tag//\"}`
-  if [ "$tag" == `echo $CI_ACTION_REF_NAME | sed 's|/|.|g'` ]; then
-    does_operator_branch_has_image=true
+  if [[ "$tag" == "$wanted_image_tag" ]]; then
+    does_docker_image_has_tag=true
   fi
 done
-
 
 if [ $does_operator_branch_has_image == "true" ]; then
   operator_branches=`curl -H "Authorization: token $github_token" https://api.github.com/repos/IBM/ibm-block-csi-operator/branches | jq -c '.[]' | jq -r .name`

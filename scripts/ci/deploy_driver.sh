@@ -1,8 +1,8 @@
 #!/bin/bash -xel
 set +o pipefail
 
-if [ "$driver_images_tag" == "develop" ]; then
-  driver_images_tag=latest
+if [ "$operator_image_tag_for_test" == "develop" ]; then
+  operator_image_tag_for_test=latest
 fi
 operator_image_for_test=$operator_image_repository_for_test:$operator_image_tag_for_test
 
