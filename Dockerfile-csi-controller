@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM registry.access.redhat.com/ubi8/python-38:1-43.16099467811
+FROM registry.access.redhat.com/ubi8/python-38:1-63
 MAINTAINER IBM Storage
 
-ARG VERSION=1.5.0
+ARG VERSION=1.5.1
 ARG BUILD_NUMBER=0
 
 ###Required Labels
