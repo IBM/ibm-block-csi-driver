@@ -169,8 +169,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except (exceptions.ClientError, exceptions.Unauthorized) as e:
             # BE7A002D=Authentication has failed because the user name and
             # password combination that you have entered is not valid.
-            if ERROR_CODE_INVALID_CREDENTIALS or KNOWN_ERROR_CODE_INVALID_CREDENTIALS in str(
-                    e.message).upper():
+            error_message = str(e.message).upper()
+            if ERROR_CODE_INVALID_CREDENTIALS in error_message or KNOWN_ERROR_CODE_INVALID_CREDENTIALS in error_message:
                 raise array_errors.CredentialsError(self.service_address)
             raise ConnectionError()
         except exceptions.ClientException as e:
@@ -260,8 +260,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             logger.info("finished creating volume {}".format(name))
             return self.client.get_volume(api_volume.id)
         except (exceptions.NotFound, exceptions.InternalServerError) as ex:
-            if ERROR_CODE_RESOURCE_NOT_EXISTS or INCORRECT_ID in str(ex.message).upper():
+            error_message = str(ex.message).upper()
+            if ERROR_CODE_RESOURCE_NOT_EXISTS in error_message or INCORRECT_ID in error_message:
                 raise array_errors.PoolDoesNotExist(pool_id, self.identifier)
+            if ERROR_CODE_CREATE_VOLUME_NOT_ENOUGH_EXTENTS in error_message:
+                raise array_errors.NotEnoughSpaceInPool(pool_id)
             logger.error(
                 "Failed to create volume {} on array {}, reason is: {}".format(
                     name,
@@ -271,8 +274,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             )
             raise array_errors.VolumeCreationError(name)
         except (exceptions.ClientError, exceptions.ClientException) as ex:
-            if ERROR_CODE_CREATE_VOLUME_NOT_ENOUGH_EXTENTS in str(ex.message).upper():
-                raise array_errors.NotEnoughSpaceInPool(id_or_name=pool_id)
             logger.error(
                 "Failed to create volume {} on array {}, reason is: {}".format(
                     name,
@@ -465,7 +466,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             volume_candidates = []
             volume_candidates.extend(self.client.get_volumes_by_pool(pool_id))
         except (exceptions.NotFound, exceptions.InternalServerError) as ex:
-            if ERROR_CODE_RESOURCE_NOT_EXISTS or INCORRECT_ID in str(ex.message).upper():
+            error_message = str(ex.message).upper()
+            if ERROR_CODE_RESOURCE_NOT_EXISTS in error_message or INCORRECT_ID in error_message:
                 raise array_errors.PoolDoesNotExist(pool_id, self.identifier)
             raise ex
 
