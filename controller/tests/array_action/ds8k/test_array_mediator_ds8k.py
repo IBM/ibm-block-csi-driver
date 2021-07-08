@@ -312,6 +312,11 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.array.map_volume("fake_name", "fake_host")
 
+    def test_map_volume_out_of_space(self):
+        self.client_mock.map_volume_to_host.side_effect = InternalServerError("500", "[BE74121B]")
+        with self.assertRaises(array_errors.NotEnoughSpaceInPool):
+            self.array.map_volume("fake_name", "fake_host")
+
     def test_map_volume_failed_with_ClientException(self):
         self.client_mock.map_volume_to_host.side_effect = ClientException("500")
         with self.assertRaises(array_errors.MappingError):

@@ -328,6 +328,9 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                                                            vol=source_cli_volume.name).as_single_element
             logger.info("finished creating cli snapshot {0} from volume {1}".format(snapshot_name, volume_id))
             return self._generate_snapshot_response(cli_snapshot)
+        except xcli_errors.MaxVolumesReachedError as ex:
+            logger.exception(ex)
+            raise array_errors.NotEnoughSpaceInPool(volume_id)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise array_errors.IllegalObjectName(ex.status)
