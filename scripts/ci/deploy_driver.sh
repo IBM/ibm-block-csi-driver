@@ -11,10 +11,11 @@ docker exec -i $kind_node_name apt-get update
 docker exec -i $kind_node_name apt -y install open-iscsi
 
 cd $(dirname $cr_file)
-sudo yq eval ".spec.controller.repository |= env(controller_repository_for_test)" $(basename $cr_file) -i
-sudo yq eval ".spec.controller.tag |= env(driver_images_tag)" $(basename $cr_file) -i
-sudo yq eval ".spec.node.repository |= env(node_repository_for_test)" $(basename $cr_file) -i
-sudo yq eval ".spec.node.tag |= env(driver_images_tag)" $(basename $cr_file) -i
+chmod 777 $(basename $cr_file)
+yq eval ".spec.controller.repository |= env(controller_repository_for_test)" $(basename $cr_file) -i
+yq eval ".spec.controller.tag |= env(driver_images_tag)" $(basename $cr_file) -i
+yq eval ".spec.node.repository |= env(node_repository_for_test)" $(basename $cr_file) -i
+yq eval ".spec.node.tag |= env(driver_images_tag)" $(basename $cr_file) -i
 cd -
 
 cd $(dirname $operator_file)
