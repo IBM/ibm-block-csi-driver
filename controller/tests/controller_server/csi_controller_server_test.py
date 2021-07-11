@@ -653,7 +653,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.create_volume.assert_not_called()
 
     def test_create_volume_with_no_space_in_pool(self):
-        self.create_volume_returns_error(return_code=grpc.StatusCode.RESOURCE_EXHAUSTED,
+        self.create_volume_returns_error(return_code=grpc.StatusCode.INTERNAL,
                                          err=array_errors.NotEnoughSpaceInPool("pool"))
 
     def _prepare_idempotent_tests(self):
