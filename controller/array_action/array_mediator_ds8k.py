@@ -416,7 +416,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise array_errors.HostNotFoundError(host_name)
         except exceptions.InternalServerError as ex:
             if ERROR_CODE_MAP_VOLUME_NOT_ENOUGH_EXTENTS in str(ex.message).upper():
-                raise array_errors.NotEnoughExtentsInPool(volume_id)
+                raise array_errors.NoAvailableLunError(volume_id)
             raise array_errors.MappingError(volume_id, host_name, ex.details)
         except exceptions.ClientException as ex:
             # [BE586015] addLunMappings Volume group operation failure: volume does not exist.

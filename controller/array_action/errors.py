@@ -216,9 +216,3 @@ class NotEnoughSpaceInPool(BaseArrayActionException):
 
     def __init__(self, id_or_name):
         self.message = messages.NotEnoughSpaceInPoolError_message.format(id_or_name)
-
-
-class NotEnoughExtentsInPool(BaseArrayActionException):
-
-    def __init__(self, id_or_name):
-        self.message = messages.NotEnoughExtentsInPoolError_message.format(id_or_name)
