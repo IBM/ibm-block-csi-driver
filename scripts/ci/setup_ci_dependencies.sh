@@ -7,9 +7,7 @@ echo docker-hub > dev-requirements.txt
 cat >>/home/runner/.bash_profile <<'EOL'
 yq() {
   docker run --rm -e operator_image_for_test=$operator_image_for_test\
-                  -e controller_repository_for_test=$controller_repository_for_test\
-                  -e node_repository_for_test=$node_repository_for_test\
-                  -e driver_images_tag=$driver_images_tag\
+                  -e cr_image_value=$cr_image_value\
                   -i -v "${PWD}":/workdir mikefarah/yq "$@"
 }
 EOL

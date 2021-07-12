@@ -12,10 +12,16 @@ docker exec -i $kind_node_name apt -y install open-iscsi
 
 cd $(dirname $cr_file)
 chmod 547 $(basename $cr_file)
-yq eval ".spec.controller.repository |= env(controller_repository_for_test)" $(basename $cr_file) -i
-yq eval ".spec.controller.tag |= env(driver_images_tag)" $(basename $cr_file) -i
-yq eval ".spec.node.repository |= env(node_repository_for_test)" $(basename $cr_file) -i
-yq eval ".spec.node.tag |= env(driver_images_tag)" $(basename $cr_file) -i
+declare -A cr_image_fields=(
+    [".spec.controller.repository"]="$controller_repository_for_test"
+    [".spec.controller.tag"]="$driver_images_tag"
+    ["node_repository_for_test"]="$node_repository_for_test"
+    [".spec.node.tag"]="$driver_images_tag"
+)
+for image_field in ${!cr_image_fields[@]}; do
+    cr_image_value=${cr_image_fields[${image_field}]}
+    yq eval "${image_field} |= env(test)" $(basename $cr_file) -i
+done
 cd -
 
 cd $(dirname $operator_file)
