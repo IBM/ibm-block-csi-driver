@@ -16,6 +16,6 @@ declare -a pod_types=(
 
 for pod_type in "${pod_types[@]}"
 do
-    get_pod_logs_or_events $pod_type logs "-c ibm-block-csi-$pod_name"
-    get_pod_logs_or_events $pod_type describe ""
+    run_action_on_pod $pod_type logs "-c ibm-block-csi-$pod_name"
+    run_action_on_pod $pod_type describe ""
 done
