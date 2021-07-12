@@ -13,3 +13,8 @@ yq() {
                   -i -v "${PWD}":/workdir mikefarah/yq "$@"
 }
 EOL
+
+source /home/runner/.bash_profile
+cd common
+image_version=`yq eval .identity.version config.yaml`
+echo "::set-output name=image_version::${image_version}"
