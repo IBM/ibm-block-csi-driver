@@ -19,6 +19,7 @@ logger = get_stdout_logger()
 LUN_IS_ALREADY_IN_USE_ERROR = "LUN is already in use"
 UNDEFINED_MAPPING_ERROR = "The requested mapping is not defined"
 NO_ALLOCATION_SPACE_ERROR = "No space to allocate to the volume"
+MAXIMUM_SNAPSHOTS_REACHED_ERROR = "The maximum allowed number of snapshots is already reached"
 
 
 class XIVArrayMediator(ArrayMediatorAbstract):
@@ -344,6 +345,11 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise array_errors.PermissionDeniedError(
                 "create snapshot {0} from volume {1}".format(snapshot_name, volume_id))
+        except xcli_errors.CommandFailedRuntimeError as ex:
+            logger.exception(ex)
+            if MAXIMUM_SNAPSHOTS_REACHED_ERROR in ex.status:
+                raise array_errors.MaximumSnapshotsReached(pool)
+            raise
 
     def delete_snapshot(self, snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
