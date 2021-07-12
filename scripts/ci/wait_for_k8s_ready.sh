@@ -1,16 +1,21 @@
 #!/bin/bash -xe
 set +o pipefail
 
-echo "Wait for all the pods to be in running state"
-while [ "$(kubectl get pod -A | grep 0/ | grep -iv name | wc -l)" -gt 0 ]; do
-  echo Some pods did not start thier containers
-  kubectl get pod -A | grep 0/ | grep -iv name
-  sleep 5
+is_kubernetes_cluster_ready (){
+  pods=`kubectl get pods -A | awk '{print$3}' | grep -iv ready`
+  all_the_containers_are_runninig=true
+  for pod in $pods; do
+    running_containers=`echo $pod | awk -F / '{print$1}'`
+    wanted_containers=`echo $pod | awk -F / '{print$2}'`
+    if [ $running_containers != $wanted_containers ]; then
+      all_the_containers_are_runninig=false
+      break
+    fi
+  done
+  echo $all_the_containers_are_runninig
+}
+
+while [[ `is_kubernetes_cluster_ready` == "false" ]]; do
+        kubectl get pods -A
 done
-while [ "$(kubectl get pod -A | grep -iv running | grep -iv name | wc -l)" -gt 0 ]; do
-  echo Some pods are still not in running state
-  kubectl get pod -A | grep -iv running | grep -iv name
-  sleep 5
-done
-echo Cluster is ready
-kubectl get pod -A
+
