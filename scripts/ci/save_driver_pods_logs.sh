@@ -1,9 +1,11 @@
 #!/bin/bash -x
 
-get_pod_logs_or_events (){
+run_action_on_pod (){
     pod_name=$1
-    information_type=$2
-    kubectl $information_type $(kubectl get pod -l csi | grep $pod_name | awk '{print$1}') -c ibm-block-csi-$pod_name > /tmp/driver_$(kubectl get pod -l csi | grep $pod_name | awk '{print$1}')_$information_type.txt
+    action=$2
+    extra_args=$3
+    get_all_pods_by_type="kubectl get pod -l csi | grep $pod_name | awk '{print$1}'"
+    kubectl $action $($get_all_pods_by_type) $extra_args -c ibm-block-csi-$pod_name > /tmp/driver_$($get_all_pods_by_type)_$action.txt
 }
 
 declare -a pod_types=(
@@ -14,6 +16,6 @@ declare -a pod_types=(
 
 for pod_type in "${pod_types[@]}"
 do
-    get_pod_logs_or_events $pod_type logs
-    get_pod_logs_or_events $pod_type describe
+    get_pod_logs_or_events $pod_type logs "-c ibm-block-csi-$pod_name"
+    get_pod_logs_or_events $pod_type describe ""
 done

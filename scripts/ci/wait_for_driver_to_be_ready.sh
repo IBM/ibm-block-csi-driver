@@ -10,7 +10,7 @@ while [ "$(kubectl get pod -A -l csi | grep controller | wc -l)" -eq 0 ]; do
 done
 while [ $driver_is_ready == "false" ]; do
   if [ "$(kubectl get pod -A -l csi | grep -iv running | grep -iv name | wc -l)" -eq 0 ]; then
-    ((actual_driver_running_time_in_seconds++))
+    ((++actual_driver_running_time_in_seconds))
     if [ $actual_driver_running_time_in_seconds -eq $minimum_driver_running_time_in_seconds ]; then
       driver_is_ready=true
     fi
