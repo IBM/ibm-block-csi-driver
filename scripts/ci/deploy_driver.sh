@@ -20,7 +20,7 @@ declare -A cr_image_fields=(
 )
 for image_field in ${!cr_image_fields[@]}; do
     cr_image_value=${cr_image_fields[${image_field}]}
-    yq eval "${image_field} |= env(test)" $(basename $cr_file) -i
+    yq eval "${image_field} |= env(cr_image_value)" $(basename $cr_file) -i
 done
 cd -
 
