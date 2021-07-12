@@ -22,7 +22,7 @@ jobs:
       - name: Setup dependencies
         id: setup_dependencies
         run: |
-          scripts/ci/setup_ci_dependencies.sh
+          scripts/ci/github_actions/driver/setup_ci_dependencies.sh
       - uses: actions/cache@v2
         with:
           path: ${{ env.pythonLocation }}
@@ -167,7 +167,7 @@ jobs:
       - name: Get the operator github branch
         id: operator_github_branch
         run: |
-          driver/scripts/ci/get_operator_github_branch.sh
+          driver/scripts/ci/github_actions/driver/get_operator_github_branch.sh
         env:
           github_token: ${{ secrets.CSIBLOCK_GITHUB_TOKEN }}
       - name: Create k8s Kind Cluster
@@ -176,7 +176,7 @@ jobs:
           version: v0.11.1
       - name: Wait for k8s cluster to be ready
         run: |
-          driver/scripts/ci/wait_for_k8s_ready.sh
+          driver/scripts/ci/github_actions/driver/wait_for_k8s_ready.sh
       - name: Checkout
         uses: actions/checkout@v2
         with:
@@ -185,7 +185,7 @@ jobs:
           path: operator
       - name: Deploy ibm block csi driver
         run: |
-          driver/scripts/ci/deploy_driver.sh
+          driver/scripts/ci/github_actions/driver/deploy_driver.sh
         env:
           driver_images_tag: "${{ needs.CSI-Build-and-push-images.outputs.driver_images_tag }}"
           operator_image_tag_for_test: "${{ steps.operator_github_branch.outputs.docker_image_branch_tag }}"
@@ -193,11 +193,11 @@ jobs:
           cr_file: "operator/deploy/crds/csi.ibm.com_v1_ibmblockcsi_cr.yaml"
       - name: Wait for csi ibm block driver to be ready
         run: |
-          driver/scripts/ci/wait_for_driver_to_be_ready.sh
+          driver/scripts/ci/github_actions/driver/wait_for_driver_to_be_ready.sh
       - name: Save driver pods logs
         if: always()
         run: |
-          driver/scripts/ci/save_driver_pods_logs.sh
+          driver/scripts/ci/github_actions/driver/save_driver_pods_logs.sh
       - name: Upload driver pods logs
         if: always()
         uses: actions/upload-artifact@v2
