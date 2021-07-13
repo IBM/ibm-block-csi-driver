@@ -2,7 +2,7 @@
 set +o pipefail
 
 is_pod_ready (){
-  pods=$1
+  pods=$@
   are_all_pods_ready=false
   for pod in $pods; do
     running_containers_count=`echo $pod | awk -F / '{print$1}'`
@@ -12,6 +12,7 @@ is_pod_ready (){
       break
     fi
   done
+  echo $are_all_pods_ready
 }
 
 is_kubernetes_cluster_ready (){
