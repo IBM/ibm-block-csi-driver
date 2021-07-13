@@ -19,7 +19,7 @@ is_kubernetes_cluster_ready (){
   all_containers_are_running=false
   are_all_pods_ready=false
   are_all_pods_ready=$(is_pod_ready $pods)
-  if [[ "$are_all_pods_ready" == "false" ]]: then
+  if [ $are_all_pods_ready == "false" ]; then
     all_containers_are_running=true
   fi
   
