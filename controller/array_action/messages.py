@@ -64,6 +64,8 @@ InvalidCliResponseError_message = "Invalid CLI response. Details : {0}"
 
 NotEnoughSpaceInPoolError_message = "Not enough space in pool {0}"
 
+MaximumVolumesReachedError_message = "The maximum number of volumes is already reached {0}"
+
 MaximumSnapshotsReachedError_message = "The maximum number of snapshots is already reached {0}"
 
 SizeOutOfRangeError_message = "requested size is out of limits. requested: {0}," \

@@ -246,6 +246,7 @@ class ArrayMediator(ABC):
             NotEnoughSpaceInPool
             SnapshotSourcePoolMismatch
             MaximumSnapshotsReached
+            MaximumVolumesReached
         """
         raise NotImplementedError
 

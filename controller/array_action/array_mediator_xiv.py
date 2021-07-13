@@ -331,7 +331,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             return self._generate_snapshot_response(cli_snapshot)
         except xcli_errors.MaxVolumesReachedError as ex:
             logger.exception(ex)
-            raise array_errors.NotEnoughSpaceInPool(volume_id)
+            raise array_errors.MaximumVolumesReached(volume_id)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise array_errors.IllegalObjectName(ex.status)

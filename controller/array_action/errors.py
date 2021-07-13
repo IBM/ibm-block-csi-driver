@@ -218,6 +218,12 @@ class NotEnoughSpaceInPool(BaseArrayActionException):
         self.message = messages.NotEnoughSpaceInPoolError_message.format(id_or_name)
 
 
+class MaximumVolumesReached(BaseArrayActionException):
+
+    def __init__(self, id_or_name):
+        self.message = messages.MaximumVolumesReachedError_message.format(id_or_name)
+
+
 class MaximumSnapshotsReached(BaseArrayActionException):
 
     def __init__(self, id_or_name):

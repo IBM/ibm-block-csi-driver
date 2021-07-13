@@ -266,7 +266,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
             self.mediator.create_snapshot(snapshot_volume_wwn, snapshot_name, "different_pool")
 
     def test_create_snapshot_raise_max_volumes_reached(self):
-        self._test_create_snapshot_error(xcli_errors.MaxVolumesReachedError, array_errors.NotEnoughSpaceInPool)
+        self._test_create_snapshot_error(xcli_errors.MaxVolumesReachedError, array_errors.MaximumVolumesReached)
 
     def test_create_snapshot_raise_illegal_name_for_object(self):
         self._test_create_snapshot_error(xcli_errors.IllegalNameForObjectError, array_errors.IllegalObjectName)
