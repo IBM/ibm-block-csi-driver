@@ -15,7 +15,7 @@ chmod 547 $(basename $cr_file)
 declare -A cr_image_fields=(
     [".spec.controller.repository"]="$controller_repository_for_test"
     [".spec.controller.tag"]="$driver_images_tag"
-    ["node_repository_for_test"]="$node_repository_for_test"
+    [".node_repository_for_test"]="$node_repository_for_test"
     [".spec.node.tag"]="$driver_images_tag"
 )
 for image_field in ${!cr_image_fields[@]}; do

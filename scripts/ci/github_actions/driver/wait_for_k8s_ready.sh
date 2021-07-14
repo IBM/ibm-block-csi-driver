@@ -1,7 +1,7 @@
 #!/bin/bash -xe
 set +o pipefail
 
-is_pod_ready (){
+is_pods_ready (){
   pods=$@
   are_all_pods_ready=false
   for pod in $pods; do
@@ -18,8 +18,7 @@ is_pod_ready (){
 is_kubernetes_cluster_ready (){
   pods=`kubectl get pods -A | awk '{print$3}' | grep -iv ready`
   all_containers_are_running=false
-  are_all_pods_ready=false
-  are_all_pods_ready=$(is_pod_ready $pods)
+  are_all_pods_ready=$(is_pods_ready $pods)
   if [ $are_all_pods_ready == "false" ]; then
     all_containers_are_running=true
   fi
