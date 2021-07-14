@@ -19,7 +19,6 @@ logger = get_stdout_logger()
 LUN_IS_ALREADY_IN_USE_ERROR = "LUN is already in use"
 UNDEFINED_MAPPING_ERROR = "The requested mapping is not defined"
 NO_ALLOCATION_SPACE_ERROR = "No space to allocate to the volume"
-MAXIMUM_SNAPSHOTS_REACHED_ERROR = "The maximum allowed number of snapshots is already reached"
 
 
 class XIVArrayMediator(ArrayMediatorAbstract):
