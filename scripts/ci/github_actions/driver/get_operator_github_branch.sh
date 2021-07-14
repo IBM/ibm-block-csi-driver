@@ -1,7 +1,7 @@
 #!/bin/bash -xe
 set +o pipefail
 
-does_operator_branch_has_image=false
+is_operator_branch_image_exists=false
 operator_branch=develop
 DOCKER_HUB_USERNAME=csiblock1
 DOCKER_HUB_PASSWORD=$csiblock_dockerhub_password
@@ -12,11 +12,11 @@ export image_tags=`docker-hub tags --orgname csiblock1 --reponame ibm-block-csi-
 for tag in $image_tags
 do
   if [[ "$tag" == "$target_image_tag" ]]; then
-    does_operator_branch_has_image=true
+    is_operator_branch_image_exists=true
   fi
 done
 
-if [ $does_operator_branch_has_image == "true" ]; then
+if [ $is_operator_branch_image_exists == "true" ]; then
   operator_branches=`curl -H "Authorization: token $github_token" https://api.github.com/repos/IBM/ibm-block-csi-operator/branches | jq -c '.[]' | jq -r .name`
   for branch_name in $operator_branches
   do
