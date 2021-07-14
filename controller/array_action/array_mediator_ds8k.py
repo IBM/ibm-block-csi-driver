@@ -29,6 +29,7 @@ INCORRECT_ID = 'BE7A0005'
 NO_TOKEN_IS_SPECIFIED = 'BE7A001A'
 HOST_DOES_NOT_EXIST = 'BE7A0016'
 MAPPING_DOES_NOT_EXIST = 'BE7A001F'
+ERROR_CODE_MAP_VOLUME_NOT_ENOUGH_EXTENTS = 'BE74121B'
 ERROR_CODE_VOLUME_NOT_FOUND_FOR_MAPPING = 'BE586015'
 ERROR_CODE_ALREADY_FLASHCOPY = '000000AE'
 ERROR_CODE_VOLUME_NOT_FOUND_OR_ALREADY_PART_OF_CS_RELATIONSHIP = '00000013'
@@ -413,6 +414,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             return lun
         except exceptions.NotFound:
             raise array_errors.HostNotFoundError(host_name)
+        except exceptions.InternalServerError as ex:
+            if ERROR_CODE_MAP_VOLUME_NOT_ENOUGH_EXTENTS in str(ex.message).upper():
+                raise array_errors.NoAvailableLunError(volume_id)
+            raise array_errors.MappingError(volume_id, host_name, ex.details)
         except exceptions.ClientException as ex:
             # [BE586015] addLunMappings Volume group operation failure: volume does not exist.
             if ERROR_CODE_VOLUME_NOT_FOUND_FOR_MAPPING in str(ex.message).upper():

@@ -362,6 +362,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         except array_errors.SnapshotAlreadyExists as ex:
             return handle_exception(ex, context, grpc.StatusCode.ALREADY_EXISTS,
                                     csi_pb2.CreateSnapshotResponse)
+        except array_errors.NotEnoughSpaceInPool as ex:
+            return handle_exception(ex, context, grpc.StatusCode.RESOURCE_EXHAUSTED,
+                                    csi_pb2.CreateSnapshotResponse)
 
     @handle_common_exceptions(csi_pb2.DeleteSnapshotResponse)
     def DeleteSnapshot(self, request, context):
