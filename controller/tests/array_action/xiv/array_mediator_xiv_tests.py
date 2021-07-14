@@ -265,9 +265,6 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(array_errors.SnapshotSourcePoolMismatch):
             self.mediator.create_snapshot(snapshot_volume_wwn, snapshot_name, "different_pool")
 
-    def test_create_snapshot_raise_max_volumes_reached(self):
-        self._test_create_snapshot_error(xcli_errors.MaxVolumesReachedError, array_errors.MaximumVolumesReached)
-
     def test_create_snapshot_raise_illegal_name_for_object(self):
         self._test_create_snapshot_error(xcli_errors.IllegalNameForObjectError, array_errors.IllegalObjectName)
 
@@ -280,12 +277,6 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_create_snapshot_raise_permission_error(self):
         self._test_create_snapshot_error(xcli_errors.OperationForbiddenForUserCategoryError,
                                          array_errors.PermissionDeniedError)
-
-    def test_create_snapshot_raise_maximum_snapshots_reached_error(self):
-        self.mediator.client.cmd.snapshot_create.side_effect = [
-            xcli_errors.CommandFailedRuntimeError("", "The maximum allowed number of snapshots is already reached", "")]
-        with self.assertRaises(array_errors.MaximumSnapshotsReached):
-            self.mediator.create_snapshot("volume_id", "snapshot", None)
 
     def test_create_snapshot_raise_illegal_object_id(self):
         self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalValueForArgumentError("",

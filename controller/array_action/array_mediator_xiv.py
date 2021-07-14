@@ -329,9 +329,6 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                                                            vol=source_cli_volume.name).as_single_element
             logger.info("finished creating cli snapshot {0} from volume {1}".format(snapshot_name, volume_id))
             return self._generate_snapshot_response(cli_snapshot)
-        except xcli_errors.MaxVolumesReachedError as ex:
-            logger.exception(ex)
-            raise array_errors.MaximumVolumesReached(volume_id)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise array_errors.IllegalObjectName(ex.status)
@@ -345,11 +342,6 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise array_errors.PermissionDeniedError(
                 "create snapshot {0} from volume {1}".format(snapshot_name, volume_id))
-        except xcli_errors.CommandFailedRuntimeError as ex:
-            logger.exception(ex)
-            if MAXIMUM_SNAPSHOTS_REACHED_ERROR in ex.status:
-                raise array_errors.MaximumSnapshotsReached(pool)
-            raise
 
     def delete_snapshot(self, snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))

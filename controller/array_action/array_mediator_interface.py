@@ -245,8 +245,6 @@ class ArrayMediator(ABC):
             PermissionDenied
             NotEnoughSpaceInPool
             SnapshotSourcePoolMismatch
-            MaximumSnapshotsReached
-            MaximumVolumesReached
         """
         raise NotImplementedError
 
