@@ -22,6 +22,7 @@ no_capacity_range_message = 'no capacity range set'
 pool_is_missing_message = 'pool parameter is missing.'
 pool_should_not_be_empty_message = 'pool should not be empty'
 params_are_missing_message = 'parameters are missing'
+system_id_mismatch_message = "system id : {0} does not match the management identifier : {1}"
 volume_id_wrong_format_message = 'volume id has wrong format'
 readonly_not_supported_message = 'readonly parameter is not supported'
 volume_source_id_is_missing = 'volume source {0} id is missing'

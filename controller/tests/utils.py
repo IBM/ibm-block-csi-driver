@@ -1,7 +1,7 @@
 import json
 
-from mock import Mock
 import grpc
+from mock import Mock
 
 from controller.controller_server.controller_types import ArrayConnectionInfo
 from controller.controller_server.test_settings import user as test_user, password as test_password, array as test_array
@@ -33,7 +33,7 @@ def get_mock_mediator_response_snapshot(capacity, name, wwn, volume_name, array_
     return snapshot
 
 
-def get_fake_array_connection_info(user="user", password="pass", array_addresses=None, system_id="u1"):
+def get_fake_array_connection_info(user="user", password="pass", array_addresses=None, system_id="id123"):
     if array_addresses is None:
         array_addresses = ["arr1"]
     return ArrayConnectionInfo(array_addresses=array_addresses, user=user, password=password, system_id=system_id)

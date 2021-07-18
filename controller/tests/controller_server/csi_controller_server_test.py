@@ -2,7 +2,6 @@ import abc
 import json
 import unittest
 
-# from unittest import mock as umock
 import grpc
 from mock import patch, Mock, MagicMock, call
 
@@ -375,7 +374,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
         self.mediator.maximal_volume_size_in_bytes = 10
         self.mediator.minimal_volume_size_in_bytes = 2
-
+        self.mediator._identifier = "id123"
         self.request.parameters = {config.PARAMETERS_POOL: pool}
         self.capacity_bytes = 10
         self.request.capacity_range = Mock()
@@ -411,13 +410,13 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_topologies_succeeds(self, storage_agent):
-        self.request.secrets = utils.get_fake_secret_config(system_id="u2", supported_topologies=[
+        self.request.secrets = utils.get_fake_secret_config(system_id="id123", supported_topologies=[
             {"topology.kubernetes.io/test": "topology_value"}])
         self.request.accessibility_requirements.preferred = [
             ProtoBufMock(segments={"topology.kubernetes.io/test": "topology_value",
                                    "topology.kubernetes.io/test2": "topology_value2"})]
         self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
-            {"u1": {config.PARAMETERS_POOL: pool}, "u2": {config.PARAMETERS_POOL: "other_pool"}})}
+            {"other_id": {config.PARAMETERS_POOL: pool}, "id123": {config.PARAMETERS_POOL: "other_pool"}})}
         self._test_create_volume_succeeds(storage_agent, expected_pool="other_pool")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -606,8 +605,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
                                                              space_efficiency=None):
         get_array_connection_info_from_secrets.side_effect = [utils.get_fake_array_connection_info()]
         self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
-            {"u1": {config.PARAMETERS_VOLUME_NAME_PREFIX: prefix, config.PARAMETERS_POOL: pool,
-                    config.PARAMETERS_SPACE_EFFICIENCY: space_efficiency}})}
+            {"id123": {config.PARAMETERS_VOLUME_NAME_PREFIX: prefix, config.PARAMETERS_POOL: pool,
+                       config.PARAMETERS_SPACE_EFFICIENCY: space_efficiency}})}
         self._test_create_volume_parameters(final_name, space_efficiency)
 
     @patch("controller.controller_server.utils.get_array_connection_info_from_secrets")
