@@ -91,6 +91,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     required_bytes = min_size
                     logger.debug("requested size is 0 so the default size will be used : {0} ".format(
                         required_bytes))
+
+                if system_id and system_id != array_mediator.identifier:
+                    raise ValidationException(
+                        controller_messages.system_id_mismatch_message.format(system_id, array_mediator.identifier))
+
                 try:
                     volume = array_mediator.get_volume(
                         volume_final_name,
@@ -100,9 +105,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
-                    if system_id and system_id != array_mediator.identifier:
-                        raise ValidationException(
-                            controller_messages.system_id_mismatch_message.format(system_id, array_mediator.identifier))
                     array_mediator.validate_supported_space_efficiency(space_efficiency)
                     volume = array_mediator.create_volume(volume_final_name, required_bytes, space_efficiency,
                                                           pool)
@@ -115,7 +117,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                     csi_pb2.CreateVolumeResponse)
 
                     copy_source_res = self._handle_existing_volume_source(volume, source_id, source_type,
-                                                                          system_id,
+                                                                          array_mediator.identifier,
                                                                           context)
                     if copy_source_res:
                         return copy_source_res
@@ -126,9 +128,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                               array_mediator)
                     volume.copy_source_id = source_id
 
-                if not system_id:
-                    system_id = array_mediator.identifier
-                res = utils.generate_csi_create_volume_response(volume, system_id, source_type)
+                res = utils.generate_csi_create_volume_response(volume, array_mediator.identifier, source_type)
                 logger.info("finished create volume")
                 return res
         except array_errors.InvalidArgumentError as ex:
