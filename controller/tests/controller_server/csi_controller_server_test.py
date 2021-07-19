@@ -403,21 +403,35 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.mediator.create_volume.assert_called_once_with(volume_name, 10, None, expected_pool)
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
+        self.assertIn(self.mediator._identifier, response_volume.volume.volume_id)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_succeeds(self, storage_agent):
         self._test_create_volume_succeeds(storage_agent)
 
-    @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_volume_with_topologies_succeeds(self, storage_agent):
-        self.request.secrets = utils.get_fake_secret_config(system_id="id123", supported_topologies=[
+    def _prepare_create_volume_with_topologies(self, system_id="id123"):
+        self.request.secrets = utils.get_fake_secret_config(system_id=system_id, supported_topologies=[
             {"topology.kubernetes.io/test": "topology_value"}])
         self.request.accessibility_requirements.preferred = [
             ProtoBufMock(segments={"topology.kubernetes.io/test": "topology_value",
                                    "topology.kubernetes.io/test2": "topology_value2"})]
         self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
-            {"other_id": {config.PARAMETERS_POOL: pool}, "id123": {config.PARAMETERS_POOL: "other_pool"}})}
+            {"other_id": {config.PARAMETERS_POOL: pool}, system_id: {config.PARAMETERS_POOL: "other_pool"}})}
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_with_topologies_succeeds(self, storage_agent):
+        self._prepare_create_volume_with_topologies()
         self._test_create_volume_succeeds(storage_agent, expected_pool="other_pool")
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_with_topologies_system_id_mismatch(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+        self._prepare_create_volume_with_topologies("wrong_id")
+
+        self.servicer.CreateVolume(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
+        self.assertIn("management identifier", self.context.details)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_space_efficiency_succeeds(self, storage_agent):
