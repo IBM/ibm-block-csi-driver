@@ -374,7 +374,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
         self.mediator.maximal_volume_size_in_bytes = 10
         self.mediator.minimal_volume_size_in_bytes = 2
-        self.mediator._identifier = "id123"
+        self.mediator._identifier = "system_id_stub"
         self.request.parameters = {config.PARAMETERS_POOL: pool}
         self.capacity_bytes = 10
         self.request.capacity_range = Mock()
@@ -409,24 +409,24 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
     def test_create_volume_succeeds(self, storage_agent):
         self._test_create_volume_succeeds(storage_agent)
 
-    def _prepare_create_volume_with_topologies(self, system_id="id123"):
+    def _prepare_create_volume_with_topologies(self, system_id="system_id_stub"):
         self.request.secrets = utils.get_fake_secret_config(system_id=system_id, supported_topologies=[
             {"topology.kubernetes.io/test": "topology_value"}])
         self.request.accessibility_requirements.preferred = [
             ProtoBufMock(segments={"topology.kubernetes.io/test": "topology_value",
                                    "topology.kubernetes.io/test2": "topology_value2"})]
         self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
-            {"other_id": {config.PARAMETERS_POOL: pool}, system_id: {config.PARAMETERS_POOL: "other_pool"}})}
+            {"other_system_id": {config.PARAMETERS_POOL: "other_pool"}, system_id: {config.PARAMETERS_POOL: pool}})}
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_topologies_succeeds(self, storage_agent):
         self._prepare_create_volume_with_topologies()
-        self._test_create_volume_succeeds(storage_agent, expected_pool="other_pool")
+        self._test_create_volume_succeeds(storage_agent, expected_pool=pool)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_topologies_system_id_mismatch(self, storage_agent):
         storage_agent.return_value = self.storage_agent
-        self._prepare_create_volume_with_topologies("wrong_id")
+        self._prepare_create_volume_with_topologies("wrong_system_id")
 
         self.servicer.CreateVolume(self.request, self.context)
 
@@ -619,8 +619,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
                                                              space_efficiency=None):
         get_array_connection_info_from_secrets.side_effect = [utils.get_fake_array_connection_info()]
         self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
-            {"id123": {config.PARAMETERS_VOLUME_NAME_PREFIX: prefix, config.PARAMETERS_POOL: pool,
-                       config.PARAMETERS_SPACE_EFFICIENCY: space_efficiency}})}
+            {"system_id_stub": {config.PARAMETERS_VOLUME_NAME_PREFIX: prefix, config.PARAMETERS_POOL: pool,
+                                config.PARAMETERS_SPACE_EFFICIENCY: space_efficiency}})}
         self._test_create_volume_parameters(final_name, space_efficiency)
 
     @patch("controller.controller_server.utils.get_array_connection_info_from_secrets")

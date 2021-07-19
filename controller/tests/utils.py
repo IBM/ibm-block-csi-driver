@@ -33,7 +33,7 @@ def get_mock_mediator_response_snapshot(capacity, name, wwn, volume_name, array_
     return snapshot
 
 
-def get_fake_array_connection_info(user="user", password="pass", array_addresses=None, system_id="id123"):
+def get_fake_array_connection_info(user="user", password="pass", array_addresses=None, system_id="system_id_stub"):
     if array_addresses is None:
         array_addresses = ["arr1"]
     return ArrayConnectionInfo(array_addresses=array_addresses, user=user, password=password, system_id=system_id)

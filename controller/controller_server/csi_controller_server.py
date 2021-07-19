@@ -76,6 +76,11 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             system_id = array_connection_info.system_id
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
+
+                if system_id and system_id != array_mediator.identifier:
+                    raise ValidationException(
+                        controller_messages.system_id_mismatch_message.format(system_id, array_mediator.identifier))
+
                 volume_final_name = self._get_volume_final_name(volume_parameters, request.name, array_mediator)
 
                 required_bytes = request.capacity_range.required_bytes
@@ -91,10 +96,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     required_bytes = min_size
                     logger.debug("requested size is 0 so the default size will be used : {0} ".format(
                         required_bytes))
-
-                if system_id and system_id != array_mediator.identifier:
-                    raise ValidationException(
-                        controller_messages.system_id_mismatch_message.format(system_id, array_mediator.identifier))
 
                 try:
                     volume = array_mediator.get_volume(
