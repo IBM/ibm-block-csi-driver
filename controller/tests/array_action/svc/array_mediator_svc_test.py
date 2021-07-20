@@ -32,13 +32,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
              'target_vdisk_name': 'target_name',
              'id': 'test_fc_id',
              'status': FCMAP_STATUS_DONE,
-             'copy_rate': "non_zero_value"})]
+             'copy_rate': 'non_zero_value',
+             'function': ''})]
         self.fcmaps_as_source = [Munch(
             {'source_vdisk_name': 'test_snapshot',
              'target_vdisk_name': 'target_name',
              'id': 'test_fc_id',
              'status': FCMAP_STATUS_DONE,
-             'copy_rate': "non_zero_value"})]
+             'copy_rate': 'non_zero_value',
+             'function': ''})]
         self.svc.client.svcinfo.lsfcmap.return_value = Mock(as_list=self.fcmaps)
 
     def test_raise_ManagementIPsNotSupportError_in_init(self):
@@ -196,6 +198,16 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsfcmap.side_effect = [fcmaps_as_target, fcmaps_as_source]
         with self.assertRaises(array_errors.ObjectIsStillInUseError):
             self.svc.delete_volume("volume")
+
+    def test_delete_volume_found_hyper_swap(self):
+        fcmaps_as_target = Mock(as_list=[])
+        fcmaps = self.fcmaps
+        fcmaps[0].function = "hyper swap"
+        fcmaps_as_source = Mock(as_list=fcmaps)
+        self.svc.client.svcinfo.lsfcmap.side_effect = [fcmaps_as_target, fcmaps_as_source]
+        self.svc.delete_volume("volume")
+
+        self.svc.client.svctask.rmfcmap.assert_not_called()
 
     def test_delete_volume_has_clone_fcmaps_removed(self):
         fcmaps_as_target = Mock(as_list=[])
@@ -465,6 +477,16 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_mocks_for_delete_snapshot()
         fcmaps_as_target = self.fcmaps
         self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=fcmaps_as_target), Mock(as_list=[])]
+        self.svc.delete_snapshot("test_snapshot")
+
+        self.svc.client.svctask.rmfcmap.assert_called_once_with(object_id="test_fc_id", force=True)
+
+    def test_delete_snapshot_found_hyper_swap(self):
+        self._prepare_mocks_for_delete_snapshot()
+        fcmaps_as_target = self.fcmaps
+        fcmaps_as_source = self.fcmaps_as_source
+        fcmaps_as_source[0].function = "hyper swap"
+        self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=fcmaps_as_target), Mock(as_list=fcmaps_as_source)]
         self.svc.delete_snapshot("test_snapshot")
 
         self.svc.client.svctask.rmfcmap.assert_called_once_with(object_id="test_fc_id", force=True)
@@ -916,6 +938,16 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectIsStillInUseError):
             self.svc.expand_volume('vol_id', 2)
         self.svc.client.svctask.expandvdisksize.assert_not_called()
+
+    def test_expand_volume_found_hyper_swap(self):
+        self._prepare_mocks_for_expand_volume()
+        fcmaps = self.fcmaps_as_source
+        fcmaps[0].function = 'hyper swap'
+        self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=[]), Mock(as_list=fcmaps)]
+        self.svc.expand_volume('vol_id', 1024)
+
+        self.svc.client.svctask.expandvdisksize.assert_called_once_with(vdisk_id='test_volume', unit='b', size=512)
+        self.svc.client.svctask.rmfcmap.assert_not_called()
 
     def test_expand_volume_raise_object_not_found(self):
         self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=None)

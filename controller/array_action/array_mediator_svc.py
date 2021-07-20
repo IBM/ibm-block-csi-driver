@@ -517,13 +517,22 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._delete_fcmap(fcmap_id, force=True)
 
     def _safe_delete_fcmaps(self, object_name, fcmaps):
-        unfinished_fcmaps = [fcmap for fcmap in fcmaps
-                             if fcmap.status != FCMAP_STATUS_DONE or fcmap.copy_rate == "0"]
-        if unfinished_fcmaps:
-            raise array_errors.ObjectIsStillInUseError(id_or_name=object_name,
-                                                       used_by=unfinished_fcmaps)
+        fcmaps_to_delete = []
+        fcmaps_in_use = []
+
         for fcmap in fcmaps:
+            if not self._is_in_remote_copy_relationship(fcmap):
+                if fcmap.status != FCMAP_STATUS_DONE or fcmap.copy_rate == "0":
+                    fcmaps_in_use.append(fcmap)
+                else:
+                    fcmaps_to_delete.append(fcmap)
+        if fcmaps_in_use:
+            raise array_errors.ObjectIsStillInUseError(id_or_name=object_name, used_by=fcmaps_in_use)
+        for fcmap in fcmaps_to_delete:
             self._delete_fcmap(fcmap.id, force=False)
+
+    def _is_in_remote_copy_relationship(self, fcmap):
+        return fcmap.function != ""
 
     def _delete_object(self, cli_object, is_snapshot=False):
         object_name = cli_object.name
