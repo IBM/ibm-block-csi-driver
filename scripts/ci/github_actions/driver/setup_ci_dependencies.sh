@@ -18,7 +18,7 @@ image_version=`yq eval .identity.version config.yaml`
 cd -
 
 driver_images_tag=`scripts/ci/get_image_tag_from_branch.sh ${image_version} ${build_number} ${CI_ACTION_REF_NAME}`
-driver_images_tag=`echo $driver_images_tag | awk '{print$1}'`
 docker_image_branch_tag=`echo $driver_images_tag | awk '{print$2}'`
+driver_images_tag=`echo $driver_images_tag | awk '{print$1}'`
 echo "::set-output name=docker_image_branch_tag::${docker_image_branch_tag}"
 echo "::set-output name=driver_images_tag::${driver_images_tag}"
