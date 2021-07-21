@@ -19,6 +19,7 @@ jobs:
         uses: actions/setup-python@v2
         with:
           python-version: '3.x'
+      - uses: FranzDiebold/github-env-vars-action@v2
       - name: Setup dependencies
         id: setup_dependencies
         run: |
@@ -34,12 +35,13 @@ jobs:
           path: |
             /home/runner/.bash_profile
           retention-days: 1
-      - uses: FranzDiebold/github-env-vars-action@v2
    outputs:
-     image_version: "${{ steps.setup_dependencies.outputs.image_version }}"
+     docker_image_branch_tag: "${{ steps.setup_dependencies.outputs.docker_image_branch_tag }}"
+     driver_images_tag: "${{ steps.setup_dependencies.outputs.driver_images_tag }}"
 
   CSI-controller-static_code_analysis:
     runs-on: ubuntu-latest
+    name: "CSI controller static code analysis"
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -69,6 +71,7 @@ jobs:
 
   CSI-deployment-k8s_yamls_validation:
     runs-on: ubuntu-latest
+    name: "CSI deployment k8s yamls validation"
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -78,6 +81,7 @@ jobs:
 
   CSI-Build-and-push-images:
     runs-on: ubuntu-latest
+    name: "CSI Build and push images"
     needs:
       - CSI-controller-static_code_analysis
       - Unit_testing_coverage
@@ -107,11 +111,6 @@ jobs:
           key: ${{ runner.os }}-buildx-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
-      - name: Create github branch parameter
-        id: tested_github_branch
-        run: |
-          docker_image_branch_tag=`echo $CI_ACTION_REF_NAME| sed 's|/|.|g'`
-          echo "::set-output name=docker_image_branch_tag::${docker_image_branch_tag}"
       - name: Build and push ${{ matrix.image_type }}
         uses: docker/build-push-action@v2
         with:
@@ -119,8 +118,8 @@ jobs:
           platforms: linux/amd64,linux/ppc64le,linux/s390x
           push: true
           tags: |
-            csiblock1/ibm-block-csi-${{ matrix.image_type }}:${{ needs.Prepare_env.outputs.image_version }}_b${{ github.run_number }}_${{ steps.tested_github_branch.outputs.docker_image_branch_tag }}
-            csiblock1/ibm-block-csi-${{ matrix.image_type }}:${{ steps.tested_github_branch.outputs.docker_image_branch_tag }}
+            csiblock1/ibm-block-csi-${{ matrix.image_type }}:${{ needs.Prepare_env.outputs.driver_images_tag }}
+            csiblock1/ibm-block-csi-${{ matrix.image_type }}:${{ needs.Prepare_env.outputs.docker_image_branch_tag }}
             csiblock1/ibm-block-csi-${{ matrix.image_type }}:latest
           file: Dockerfile-csi-${{ matrix.image_type }}
           cache-from: type=local,src=/tmp/.buildx-${{ matrix.image_type }}
@@ -133,76 +132,3 @@ jobs:
         run: |
           [[ -G /tmp/.buildx-${{ matrix.image_type }} ]] && rm -rf /tmp/.buildx-${{ matrix.image_type }}
           mv /tmp/.buildx-new-${{ matrix.image_type }} /tmp/.buildx-${{ matrix.image_type }}
-    outputs:
-      driver_images_tag: "${{ needs.Prepare_env.outputs.image_version }}_b${{ github.run_number }}_${{ steps.tested_github_branch.outputs.docker_image_branch_tag }}"
-          
-  Create-cluster:
-    runs-on: ubuntu-latest
-    needs: CSI-Build-and-push-images
-    env:
-      csiblock_dockerhub_password: ${{ secrets.CSIBLOCK_DOCKERHUB_PASSWORD }}
-      controller_repository_for_test: csiblock1/ibm-block-csi-controller
-      node_repository_for_test: csiblock1/ibm-block-csi-node
-      operator_image_repository_for_test: csiblock1/ibm-block-csi-operator
-    timeout-minutes: 30
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          path: driver
-      - uses: FranzDiebold/github-env-vars-action@v2
-      - name: Retrieve ci dependencies
-        uses: actions/download-artifact@v2
-        with:
-          name: ci-dependencies
-          path: /home/runner
-      - name: Set up Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.x'
-      - uses: actions/cache@v2
-        with:
-          path: ${{ env.pythonLocation }}
-          key: ${{ env.pythonLocation }}-${{ hashFiles('dev-requirements.txt') }}
-      - name: Get the operator github branch
-        id: operator_github_branch
-        run: |
-          driver/scripts/ci/github_actions/driver/get_operator_github_branch.sh
-        env:
-          github_token: ${{ secrets.CSIBLOCK_GITHUB_TOKEN }}
-      - name: Create k8s Kind Cluster
-        uses: helm/kind-action@v1.1.0
-        with:
-          version: v0.11.1
-      - name: Wait for k8s cluster to be ready
-        run: |
-          driver/scripts/ci/github_actions/driver/wait_for_k8s_ready.sh
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          repository: IBM/ibm-block-csi-operator
-          ref: "${{ steps.operator_github_branch.outputs.operator_branch }}"
-          path: operator
-      - name: Deploy ibm block csi driver
-        run: |
-          driver/scripts/ci/github_actions/driver/deploy_driver.sh
-        env:
-          driver_images_tag: "${{ needs.CSI-Build-and-push-images.outputs.driver_images_tag }}"
-          operator_image_tag_for_test: "${{ steps.operator_github_branch.outputs.docker_image_branch_tag }}"
-          operator_file: "operator/deploy/installer/generated/ibm-block-csi-operator.yaml"
-          cr_file: "operator/deploy/crds/csi.ibm.com_v1_ibmblockcsi_cr.yaml"
-      - name: Wait for csi ibm block driver to be ready
-        run: |
-          driver/scripts/ci/github_actions/driver/wait_for_driver_to_be_ready.sh
-      - name: Save driver pods logs
-        if: always()
-        run: |
-          driver/scripts/ci/github_actions/driver/save_driver_pods_logs.sh
-      - name: Upload driver pods logs
-        if: always()
-        uses: actions/upload-artifact@v2
-        with:
-          name: Driver logs
-          path: |
-            /tmp/driver_*.txt
-          retention-days: 7
