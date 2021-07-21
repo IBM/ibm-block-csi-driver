@@ -24,6 +24,8 @@ jobs:
         id: setup_dependencies
         run: |
           scripts/ci/github_actions/driver/setup_ci_dependencies.sh
+        env:
+          build_number: "${{ github.run_number }}"
       - uses: actions/cache@v2
         with:
           path: ${{ env.pythonLocation }}
