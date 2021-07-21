@@ -15,6 +15,7 @@ EOL
 source /home/runner/.bash_profile
 cd common
 image_version=`yq eval .identity.version config.yaml`
+cd -
 
 driver_images_tag=`scripts/ci/get_image_tag_from_branch.sh ${image_version} ${build_number} ${CI_ACTION_REF_NAME}`
 driver_images_tag=`echo $driver_images_tag | awk '{print$1}'`
