@@ -77,9 +77,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
 
-                if system_id and system_id != array_mediator.identifier:
-                    raise ValidationException(
-                        controller_messages.system_id_mismatch_message.format(system_id, array_mediator.identifier))
+                self._validate_system_id_match_management_identifier(system_id, array_mediator)
 
                 volume_final_name = self._get_volume_final_name(volume_parameters, request.name, array_mediator)
 
@@ -160,6 +158,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             self._rollback_create_volume_from_source(array_mediator, volume.id)
             raise ex
 
+    def _validate_system_id_match_management_identifier(self, system_id, array_mediator):
+        logger.info("validating system id match management identifier")
+        if system_id and system_id != array_mediator.identifier:
+            raise ValidationException(
+                controller_messages.system_id_mismatch_message.format(system_id, array_mediator.identifier))
+
     @retry(Exception, tries=5, delay=1)
     def _rollback_create_volume_from_source(self, array_mediator, volume_id):
         logger.debug("Rollback copy volume from source. Deleting volume {0}".format(volume_id))
@@ -220,6 +224,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
             logger.debug(array_mediator)
 
+            self._validate_system_id_match_management_identifier(system_id, array_mediator)
+
             try:
                 logger.debug("Deleting volume {0}".format(volume_id))
                 array_mediator.delete_volume(volume_id)
@@ -253,6 +259,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             array_connection_info = utils.get_array_connection_info_from_secrets(request.secrets, system_id=system_id)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
+
+                self._validate_system_id_match_management_identifier(system_id, array_mediator)
+
                 lun, connectivity_type, array_initiators = array_mediator.map_volume_by_initiators(volume_id,
                                                                                                    initiators)
             logger.info("finished ControllerPublishVolume")
@@ -293,6 +302,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                                                  system_id=system_id)
 
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
+
+                self._validate_system_id_match_management_identifier(system_id, array_mediator)
+
                 array_mediator.unmap_volume_by_initiators(volume_id, initiators)
 
             logger.info("finished ControllerUnpublishVolume")
@@ -336,6 +348,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             pool = snapshot_parameters.pool
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
+
+                self._validate_system_id_match_management_identifier(system_id, array_mediator)
+
                 snapshot_final_name = self._get_snapshot_final_name(snapshot_parameters, request.name, array_mediator)
 
                 logger.info("Snapshot name : {}. Volume id : {}".format(snapshot_final_name, volume_id))
@@ -392,6 +407,9 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             array_connection_info = utils.get_array_connection_info_from_secrets(secrets, system_id=system_id)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
+
+                self._validate_system_id_match_management_identifier(system_id, array_mediator)
+
                 try:
                     array_mediator.delete_snapshot(snapshot_id)
                 except array_errors.ObjectNotFoundError as ex:
@@ -430,6 +448,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             array_connection_info = utils.get_array_connection_info_from_secrets(secrets, system_id=system_id)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
+
+                self._validate_system_id_match_management_identifier(system_id, array_mediator)
 
                 required_bytes = request.capacity_range.required_bytes
                 max_size = array_mediator.maximal_volume_size_in_bytes

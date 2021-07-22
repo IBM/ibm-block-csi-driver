@@ -26,6 +26,10 @@ class AbstractControllerTest(unittest.TestCase):
         self.addCleanup(detect_array_type_patcher.stop)
         self.request = ProtoBufMock()
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
+        self.fqdn = "fqdn"
+        self.mediator = XIVArrayMediator("user", "password", self.fqdn)
+        self.mediator.client = Mock()
+        self.mediator._identifier = "system_id_stub"
 
     @abc.abstractmethod
     def get_create_object_method(self):
@@ -85,6 +89,16 @@ class AbstractControllerTest(unittest.TestCase):
         msg = array_errors.FailedToFindStorageSystemType("endpoint").message
         self.assertIn(msg, context.details)
 
+    def _test_request_with_by_wrong_system_id_parameter(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+        objects_id = "{}:{}:{}".format("A9000", "wrong_system_id", "wwn")
+        self.request.source_volume_id = self.request.volume_id = self.request.snapshot_id = objects_id
+        context = utils.FakeContext()
+        self.get_create_object_method()(self.request, context)
+
+        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
+        self.assertIn("management identifier", context.details)
+
 
 class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
@@ -96,9 +110,6 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
 
     def setUp(self):
         super().setUp()
-        self.fqdn = "fqdn"
-        self.mediator = XIVArrayMediator("user", "password", self.fqdn)
-        self.mediator.client = Mock()
         self.mediator.get_snapshot = Mock()
         self.mediator.get_snapshot.return_value = None
 
@@ -147,17 +158,25 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.request.parameters = {config.PARAMETERS_POOL: pool}
         self._test_create_snapshot_succeeds(storage_agent, expected_pool=pool)
 
-    def _test_create_snapshot_with_by_system_id_parameter(self, storage_agent, system_id, expected_pool):
-        self.request.source_volume_id = "{}:{}:{}".format("A9000", system_id, snapshot_volume_wwn)
+    def _prepare_test_create_snapshot_with_by_system_id_parameter(self, system_id):
+        if system_id:
+            self.request.source_volume_id = "{}:{}:{}".format("A9000", system_id, snapshot_volume_wwn)
         self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
-            {"u1": {config.PARAMETERS_POOL: pool}, "u2": {config.PARAMETERS_POOL: "other_pool"}})}
-        self._test_create_snapshot_succeeds(storage_agent, expected_pool=expected_pool)
+            {"system_id_stub": {config.PARAMETERS_POOL: pool}, "u2": {config.PARAMETERS_POOL: "other_pool"}})}
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_by_system_id_parameter_succeeds(self, storage_agent):
-        self._test_create_snapshot_with_by_system_id_parameter(storage_agent, "u1", pool)
-        self._test_create_snapshot_with_by_system_id_parameter(storage_agent, "u2", "other_pool")
-        self._test_create_snapshot_with_by_system_id_parameter(storage_agent, None, None)
+        self._prepare_test_create_snapshot_with_by_system_id_parameter("system_id_stub")
+        self._test_create_snapshot_succeeds(storage_agent, expected_pool=pool)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_snapshot_with_by_system_id_parameter_None_succeeds(self, storage_agent):
+        self._prepare_test_create_snapshot_with_by_system_id_parameter(None)
+        self._test_create_snapshot_succeeds(storage_agent, expected_pool=None)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_snapshot_with_by_wrong_system_id_parameter(self, storage_agent):
+        self._test_request_with_by_wrong_system_id_parameter(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_belongs_to_wrong_volume(self, storage_agent):
@@ -293,9 +312,6 @@ class TestControllerServerDeleteSnapshot(AbstractControllerTest):
 
     def setUp(self):
         super().setUp()
-        self.fqdn = "fqdn"
-        self.mediator = XIVArrayMediator("user", "password", self.fqdn)
-        self.mediator.client = Mock()
         self.mediator.get_snapshot = Mock()
         self.mediator.get_snapshot.return_value = None
         self.storage_agent = MagicMock()
@@ -336,6 +352,10 @@ class TestControllerServerDeleteSnapshot(AbstractControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_delete_snapshot_with_by_wrong_system_id_parameter(self, storage_agent):
+        self._test_request_with_by_wrong_system_id_parameter(storage_agent)
+
 
 class ProtoBufMock(MagicMock):
     def HasField(self, field):
@@ -352,9 +372,6 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
 
     def setUp(self):
         super().setUp()
-        self.fqdn = "fqdn"
-        self.mediator = XIVArrayMediator("user", "password", self.fqdn)
-        self.mediator.client = Mock()
 
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.side_effect = [array_errors.ObjectNotFoundError("volume")]
@@ -459,8 +476,8 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_volume_with_wrong_secrets(self, a_enter):
-        self._test_create_object_with_wrong_secrets(a_enter)
+    def test_create_volume_with_wrong_secrets(self, storage_agent):
+        self._test_create_object_with_wrong_secrets(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_no_pool(self, storage_agent):
@@ -888,9 +905,6 @@ class TestControllerServerDeleteVolume(AbstractControllerTest):
 
     def setUp(self):
         super().setUp()
-        self.fqdn = "fqdn"
-        self.mediator = XIVArrayMediator("user", "password", self.fqdn)
-        self.storage_agent = MagicMock()
 
         self.mediator.get_volume = Mock()
         self.mediator.is_volume_has_snapshots = Mock()
@@ -910,6 +924,10 @@ class TestControllerServerDeleteVolume(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_delete_volume_with_wrong_secrets(self, storage_agent):
         self._test_create_object_with_wrong_secrets(storage_agent)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_delete_volume_with_by_wrong_system_id_parameter(self, storage_agent):
+        self._test_request_with_by_wrong_system_id_parameter(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_delete_volume_invalid_volume_id(self, storage_agent):
@@ -973,10 +991,7 @@ class TestControllerServerPublishVolume(AbstractControllerTest):
 
     def setUp(self):
         super().setUp()
-        self.fqdn = "fqdn"
         self.hostname = "hostname"
-        self.mediator = XIVArrayMediator("user", "password", self.fqdn)
-        self.mediator.client = Mock()
 
         self.mediator.get_host_by_host_identifiers = Mock()
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi"]
@@ -1035,6 +1050,10 @@ class TestControllerServerPublishVolume(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_publish_volume_with_wrong_secrets(self, storage_agent):
         self._test_create_object_with_wrong_secrets(storage_agent)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_publish_volume_with_by_wrong_system_id_parameter(self, storage_agent):
+        self._test_request_with_by_wrong_system_id_parameter(storage_agent)
 
     def test_publish_volume_wrong_volume_id(self):
         self.request.volume_id = "some-wrong-id-format"
@@ -1290,10 +1309,7 @@ class TestControllerServerUnPublishVolume(AbstractControllerTest):
 
     def setUp(self):
         super().setUp()
-        self.fqdn = "fqdn"
         self.hostname = "hostname"
-        self.mediator = XIVArrayMediator("user", "password", self.fqdn)
-        self.mediator.client = Mock()
 
         self.mediator.get_host_by_host_identifiers = Mock()
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi"]
@@ -1335,6 +1351,10 @@ class TestControllerServerUnPublishVolume(AbstractControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_unpublish_volume_with_wrong_secrets(self, storage_agent):
         self._test_create_object_with_wrong_secrets(storage_agent)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_unpublish_volume_with_by_wrong_system_id_parameter(self, storage_agent):
+        self._test_request_with_by_wrong_system_id_parameter(storage_agent)
 
     def test_unpublish_volume_wrong_volume_id(self):
         self.request.volume_id = "some-wrong-id-format"
@@ -1416,9 +1436,6 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
 
     def setUp(self):
         super().setUp()
-        self.fqdn = "fqdn"
-        self.mediator = XIVArrayMediator("user", "password", self.fqdn)
-        self.mediator.client = Mock()
 
         self.storage_agent = MagicMock()
         self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
@@ -1534,8 +1551,12 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_expand_volume_with_wrong_secrets(self, a_enter):
-        self._test_create_object_with_wrong_secrets(a_enter)
+    def test_expand_volume_with_wrong_secrets(self, storage_agent):
+        self._test_create_object_with_wrong_secrets(storage_agent)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_delete_volume_with_by_wrong_system_id_parameter(self, storage_agent):
+        self._test_request_with_by_wrong_system_id_parameter(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_expand_volume_with_array_connection_exception(self, storage_agent):
