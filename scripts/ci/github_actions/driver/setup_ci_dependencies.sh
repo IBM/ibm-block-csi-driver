@@ -11,7 +11,7 @@ image_version=`yq eval .identity.version config.yaml`
 cd -
 
 GITHUB_SHA=${GITHUB_SHA:0:7}_
-driver_image_tags=`scripts/ci/get_image_tags_from_branch.sh ${image_version} ${build_number} ${CI_ACTION_REF_NAME} ${GITHUB_SHA}`
+driver_image_tags=`scripts/ci/get_image_tags_from_branch.sh ${CI_ACTION_REF_NAME} ${image_version} ${build_number} ${GITHUB_SHA}`
 docker_image_branch_tag=`echo $driver_image_tags | awk '{print$2}'`
 driver_images_specific_tag=`echo $driver_image_tags | awk '{print$1}'`
 
