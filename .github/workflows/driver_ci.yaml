@@ -39,7 +39,7 @@ jobs:
           retention-days: 1
    outputs:
      docker_image_branch_tag: "${{ steps.setup_dependencies.outputs.docker_image_branch_tag }}"
-     driver_images_tag: "${{ steps.setup_dependencies.outputs.driver_images_tag }}"
+     driver_images_specific_tag: "${{ steps.setup_dependencies.outputs.driver_images_specific_tag }}"
 
   CSI-controller-static_code_analysis:
     runs-on: ubuntu-latest
@@ -120,9 +120,8 @@ jobs:
           platforms: linux/amd64,linux/ppc64le,linux/s390x
           push: true
           tags: |
-            csiblock1/ibm-block-csi-${{ matrix.image_type }}:${{ needs.Prepare_env.outputs.driver_images_tag }}
+            csiblock1/ibm-block-csi-${{ matrix.image_type }}:${{ needs.Prepare_env.outputs.driver_images_specific_tag }}
             csiblock1/ibm-block-csi-${{ matrix.image_type }}:${{ needs.Prepare_env.outputs.docker_image_branch_tag }}
-            csiblock1/ibm-block-csi-${{ matrix.image_type }}:latest
           file: Dockerfile-csi-${{ matrix.image_type }}
           cache-from: type=local,src=/tmp/.buildx-${{ matrix.image_type }}
           cache-to: type=local,dest=/tmp/.buildx-new-${{ matrix.image_type }}
