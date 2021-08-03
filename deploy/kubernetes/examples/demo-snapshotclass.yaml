@@ -9,3 +9,4 @@ parameters:
   csi.storage.k8s.io/snapshotter-secret-namespace: default
   snapshot_name_prefix: demoSnapshot   # Optional.
   pool: demo-pool                      # Optional. Use to create the snapshot on a different pool than the source.
+  SpaceEfficiency: deduplicated        # Optional. Use to create the snapshot with a different space efficiency than the source.
