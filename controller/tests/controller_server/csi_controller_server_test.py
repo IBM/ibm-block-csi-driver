@@ -1238,7 +1238,6 @@ class TestUnpublishVolume(BaseControllerSetUp, CommonControllerTest):
         arr_type = XIVArrayMediator.array_type
         self.request.volume_id = "{}:wwn1".format(arr_type)
         self.request.node_id = "hostname;iqn1;500143802426baf4"
-        self.request.volume_context = {}
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_unpublish_volume_success(self, storage_agent):

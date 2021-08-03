@@ -395,10 +395,9 @@ def _get_supported_capability(volume_capability):
             mount=csi_pb2.VolumeCapability.MountVolume(fs_type=volume_capability.mount.fs_type),
             access_mode=access_mode)
 
-    if volume_capability.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_BLOCK):
-        return csi_pb2.VolumeCapability(
-            mount=csi_pb2.VolumeCapability.BlockVolume(),
-            access_mode=access_mode)
+    return csi_pb2.VolumeCapability(
+        mount=csi_pb2.VolumeCapability.BlockVolume(),
+        access_mode=access_mode)
 
 
 def generate_csi_validate_volume_capabilities_response(volume_context, volume_capabilities, parameters):
