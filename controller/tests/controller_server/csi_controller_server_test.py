@@ -1260,8 +1260,8 @@ class TestUnpublishVolume(BaseControllerSetUp, CommonControllerTest):
     def test_unpublish_volume_with_wrong_secrets(self, storage_agent):
         self._test_request_with_wrong_secrets(storage_agent)
 
-    def test_unpublish_volume_wrong_volume_id(self):
-        self.request.volume_id = "some-wrong-id-format"
+    def test_unpublish_volume_with_too_much_delimiters_in_volume_id(self):
+        self.request.volume_id = "too:much:delimiters:in:id"
 
         self.servicer.ControllerUnpublishVolume(self.request, self.context)
 
