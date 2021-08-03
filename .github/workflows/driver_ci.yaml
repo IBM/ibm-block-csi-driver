@@ -41,7 +41,7 @@ jobs:
      docker_image_branch_tag: "${{ steps.setup_dependencies.outputs.docker_image_branch_tag }}"
      driver_images_specific_tag: "${{ steps.setup_dependencies.outputs.driver_images_specific_tag }}"
 
-  CSI-controller-static_code_analysis:
+  CSI_controller_static_code_analysis:
     runs-on: ubuntu-latest
     name: "CSI controller static code analysis"
     steps:
@@ -71,7 +71,7 @@ jobs:
         env:
           command_to_run: ${{ matrix.command-to-run }}
 
-  CSI-deployment-k8s_yamls_validation:
+  k8s_yamls_validation:
     runs-on: ubuntu-latest
     name: "CSI deployment k8s yamls validation"
     steps:
@@ -81,13 +81,13 @@ jobs:
         run: |
           ./scripts/run_yamlcheck.sh
 
-  CSI-Build-and-push-images:
+  CSI_Build_and_push_images:
     runs-on: ubuntu-latest
     name: "CSI Build and push images"
     needs:
-      - CSI-controller-static_code_analysis
+      - CSI_controller_static_code_analysis
       - Unit_testing_coverage
-      - CSI-deployment-k8s_yamls_validation
+      - k8s_yamls_validation
       - Prepare_env
     strategy:
       matrix:
