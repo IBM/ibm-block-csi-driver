@@ -44,6 +44,7 @@ def get_volume_topologies(request):
             topologies = accessibility_requirements.preferred[0].segments
             logger.info("Chosen volume topologies: {}".format(topologies))
             return topologies
+    return None
 
 
 def _get_system_info_for_topologies(secrets_config, node_topologies):
@@ -488,15 +489,16 @@ def get_node_id_info(node_id):
     return hostname, fc_wwns, iscsi_iqn
 
 
-def choose_connectivity_type(connecitvity_types):
+def choose_connectivity_type(connectivity_types):
     # If connectivity type support FC and iSCSI at the same time, chose FC
-    logger.debug("choosing connectivity type for connectivity types : {0}".format(connecitvity_types))
-    if FC_CONNECTIVITY_TYPE in connecitvity_types:
+    logger.debug("choosing connectivity type for connectivity types : {0}".format(connectivity_types))
+    if FC_CONNECTIVITY_TYPE in connectivity_types:
         logger.debug("connectivity type is : {0}".format(FC_CONNECTIVITY_TYPE))
         return FC_CONNECTIVITY_TYPE
-    if ISCSI_CONNECTIVITY_TYPE in connecitvity_types:
+    if ISCSI_CONNECTIVITY_TYPE in connectivity_types:
         logger.debug("connectivity type is : {0}".format(ISCSI_CONNECTIVITY_TYPE))
         return ISCSI_CONNECTIVITY_TYPE
+    return None
 
 
 def generate_csi_publish_volume_response(lun, connectivity_type, config, array_initiators):

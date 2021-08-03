@@ -172,6 +172,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         for cluster in self.client.svcinfo.lssystem():
             if cluster['location'] == 'local':
                 return cluster
+        return None
 
     @property
     def identifier(self):
@@ -235,6 +236,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         except Exception as ex:
             logger.exception(ex)
             raise ex
+        return None
 
     def _get_cli_volume_if_exists(self, volume_name):
         cli_volume = self._get_cli_volume(volume_name, not_exist_err=False)
@@ -395,6 +397,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         except Exception as ex:
             logger.exception(ex)
             raise ex
+        return None
 
     @retry(svc_errors.StorageArrayClientException, tries=5, delay=1)
     def _rollback_copy_to_target_volume(self, target_volume_name):
@@ -411,9 +414,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self._rollback_copy_to_target_volume(target_volume_name)
             raise ex
 
-    def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
-                                            minimum_volume_size_in_bytes, pool=None):
-        self._copy_to_target_volume(name, source_name)
+    def copy_to_existing_volume_from_source(self, volume_id, source_id, source_capacity_in_bytes,
+                                            minimum_volume_size_in_bytes):
+        source_name = self._get_volume_name_by_wwn(source_id)
+        target_volume_name = self._get_volume_name_by_wwn(volume_id)
+        self._copy_to_target_volume(target_volume_name, source_name)
 
     def create_volume(self, name, size_in_bytes, space_efficiency, pool):
         cli_volume = self._create_cli_volume(name, size_in_bytes, space_efficiency, pool)
@@ -827,7 +832,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             fc_wwns = self.client.svcinfo.lsfabric(host=host_name)
             for wwn in fc_wwns:
                 state = wwn.get('state', '')
-                if state == 'active' or state == 'inactive':
+                if state in ('active', 'inactive'):
                     fc_port_wwns.append(wwn.get('local_wwpn', ''))
             logger.debug("Getting fc wwns : {}".format(fc_port_wwns))
             return fc_port_wwns

@@ -187,7 +187,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             self.array.create_volume("fake_name", 1, 'thin', "fake_pool")
 
     def test_create_volume_fail_with_no_space_in_pool(self):
-        self.client_mock.get_volumes_by_pool.side_effect = ClientException("500", message="BE534459")
+        self.client_mock.get_volumes_by_pool.side_effect = InternalServerError("500", message="BE534459")
         with self.assertRaises(array_errors.NotEnoughSpaceInPool):
             self.array.create_volume("fake_name", 1, 'thin', "fake_pool")
 
@@ -310,6 +310,11 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_map_volume_volume_not_found(self):
         self.client_mock.map_volume_to_host.side_effect = ClientException("500", "[BE586015]")
         with self.assertRaises(array_errors.ObjectNotFoundError):
+            self.array.map_volume("fake_name", "fake_host")
+
+    def test_map_volume_no_available_lun(self):
+        self.client_mock.map_volume_to_host.side_effect = InternalServerError("500", "[BE74121B]")
+        with self.assertRaises(array_errors.NoAvailableLunError):
             self.array.map_volume("fake_name", "fake_host")
 
     def test_map_volume_fail_with_ClientException(self):
@@ -605,15 +610,6 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def _prepare_mocks_for_copy_to_existing_volume(self):
         volume = self.volume_response
-        self.client_mock.get_volumes_by_pool.side_effect = [[volume], [Munch(
-            {"cap": "1073741824",
-             "id": "0002",
-             "name": "source_name",
-             "pool": "fake_pool",
-             "tp": "ese",
-             "flashcopy": []
-             }
-        )]]
         self.client_mock.get_volume.return_value = volume
         self.client_mock.get_flashcopies_by_volume.side_effect = \
             [[], [self.flashcopy_response], [self.flashcopy_response]]
@@ -623,7 +619,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_copy_to_existing_volume_success(self):
         volume = self._prepare_mocks_for_copy_to_existing_volume()
-        self.array.copy_to_existing_volume_from_source("test_name", "source_name", 3, 2, "fake_pool")
+        self.array.copy_to_existing_volume_from_source(volume.id, "0002", 3, 2)
         self.client_mock.extend_volume.assert_called_once_with(volume_id=volume.id,
                                                                new_size_in_bytes=3)
         self.client_mock.create_flashcopy.assert_called_once_with(
@@ -633,11 +629,21 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                      FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET_OPTION
                      ])
 
-    def test_copy_to_existing_volume_raise_not_found(self):
+    def _test_copy_to_existing_volume_raise_errors(self, client_method, client_error, expected_error):
         self._prepare_mocks_for_copy_to_existing_volume()
-        self.client_mock.extend_volume.side_effect = NotFound("404")
-        with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.array.copy_to_existing_volume_from_source("test_name", "source_name", 3, 2, "fake_pool")
+        client_method.side_effect = client_error
+        with self.assertRaises(expected_error):
+            self.array.copy_to_existing_volume_from_source("test_name", "source_name", 3, 2)
+
+    def test_copy_to_existing_volume_raise_not_found(self):
+        self._test_copy_to_existing_volume_raise_errors(client_method=self.client_mock.extend_volume,
+                                                        client_error=NotFound("404"),
+                                                        expected_error=array_errors.ObjectNotFoundError)
+
+    def test_copy_to_existing_volume_raise_illegal_object_id(self):
+        self._test_copy_to_existing_volume_raise_errors(client_method=self.client_mock.get_volume,
+                                                        client_error=InternalServerError("500", "BE7A0005"),
+                                                        expected_error=array_errors.IllegalObjectID)
 
     def test_get_object_by_id_snapshot(self):
         snapshot = self._prepare_mocks_for_snapshot()

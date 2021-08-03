@@ -213,6 +213,23 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkfcmap.assert_called_once()
         self.svc.client.svctask.startfcmap.assert_called_once()
 
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def _test_copy_to_existing_volume_raise_errors(self, mock_warning, client_return_value, expected_error):
+        mock_warning.return_value = False
+        self.svc.client.svcinfo.lsvdisk.side_effect = [client_return_value]
+        with self.assertRaises(expected_error):
+            self.svc.copy_to_existing_volume_from_source("a", "b", 1, 1)
+
+    def test_copy_to_existing_volume_raise_not_found(self):
+        self._test_copy_to_existing_volume_raise_errors(client_return_value=Mock(as_single_element=None),
+                                                        expected_error=array_errors.ObjectNotFoundError)
+
+    def test_copy_to_existing_volume_raise_illegal_object_id(self):
+        self._test_copy_to_existing_volume_raise_errors(client_return_value=CLIFailureError('CMMVC6017E'),
+                                                        expected_error=array_errors.IllegalObjectID)
+        self._test_copy_to_existing_volume_raise_errors(client_return_value=CLIFailureError('CMMVC5741E'),
+                                                        expected_error=array_errors.IllegalObjectID)
+
     @staticmethod
     def _mock_cli_object(cli_object):
         return Mock(as_single_element=cli_object)

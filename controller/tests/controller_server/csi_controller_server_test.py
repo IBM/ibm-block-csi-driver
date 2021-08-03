@@ -629,7 +629,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.create_volume.assert_not_called()
 
     def test_create_volume_with_no_space_in_pool(self):
-        self.create_volume_returns_error(return_code=grpc.StatusCode.RESOURCE_EXHAUSTED,
+        self.create_volume_returns_error(return_code=grpc.StatusCode.INTERNAL,
                                          err=array_errors.NotEnoughSpaceInPool("pool"))
 
     def _prepare_idempotent_tests(self):
@@ -719,10 +719,9 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
                                                                                                 "a9k")
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.copy_to_existing_volume_from_source.assert_called_once_with(volume_name, snapshot_name,
+        self.mediator.copy_to_existing_volume_from_source.assert_called_once_with('wwn2', snapshot_id,
                                                                                   snapshot_capacity_bytes,
-                                                                                  self.capacity_bytes,
-                                                                                  pool)
+                                                                                  self.capacity_bytes)
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, snapshot_id)
 
@@ -743,8 +742,8 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertIn("invalid_snapshot_id", self.context.details)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_volume_from_source_illegal_object_name(self, storage_agent):
-        array_exception = array_errors.IllegalObjectName("")
+    def test_create_volume_from_source_illegal_object_id(self, storage_agent):
+        array_exception = array_errors.IllegalObjectID("")
         self._test_create_volume_from_snapshot_error(storage_agent, array_exception,
                                                      grpc.StatusCode.INVALID_ARGUMENT)
 
@@ -802,9 +801,10 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
             self.storage_agent.get_mediator.return_value.__exit__.side_effect = [copy_exception]
         self.mediator.delete_volume = Mock()
 
-        self.servicer.CreateVolume(self.request, self.context)
+        response = self.servicer.CreateVolume(self.request, self.context)
         self.mediator.delete_volume.assert_called_with(target_volume_id)
         self.assertEqual(self.context.code, return_code)
+        self.assertIsInstance(response, csi_pb2.CreateVolumeResponse)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_clone_volume_success(self, storage_agent):
@@ -819,10 +819,9 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
                                                                                               "a9k")
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.copy_to_existing_volume_from_source.assert_called_once_with(volume_name, clone_volume_name,
+        self.mediator.copy_to_existing_volume_from_source.assert_called_once_with('wwn2', volume_id,
                                                                                   volume_capacity_bytes,
-                                                                                  self.capacity_bytes,
-                                                                                  pool)
+                                                                                  self.capacity_bytes)
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, volume_id)
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
 
