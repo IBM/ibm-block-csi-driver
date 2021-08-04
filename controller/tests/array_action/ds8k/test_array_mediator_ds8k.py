@@ -187,7 +187,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             self.array.create_volume("fake_name", 1, 'thin', "fake_pool")
 
     def test_create_volume_failed_with_no_space_in_pool(self):
-        self.client_mock.get_volumes_by_pool.side_effect = ClientException("500", message="BE534459")
+        self.client_mock.get_volumes_by_pool.side_effect = InternalServerError("500", message="BE534459")
         with self.assertRaises(array_errors.NotEnoughSpaceInPool):
             self.array.create_volume("fake_name", 1, 'thin', "fake_pool")
 
@@ -310,6 +310,11 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_map_volume_volume_not_found(self):
         self.client_mock.map_volume_to_host.side_effect = ClientException("500", "[BE586015]")
         with self.assertRaises(array_errors.ObjectNotFoundError):
+            self.array.map_volume("fake_name", "fake_host")
+
+    def test_map_volume_no_available_lun(self):
+        self.client_mock.map_volume_to_host.side_effect = InternalServerError("500", "[BE74121B]")
+        with self.assertRaises(array_errors.NoAvailableLunError):
             self.array.map_volume("fake_name", "fake_host")
 
     def test_map_volume_failed_with_ClientException(self):
