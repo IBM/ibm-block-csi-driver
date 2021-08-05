@@ -4,7 +4,7 @@ metadata:
   name: demo-storageclass
 provisioner: block.csi.ibm.com
 parameters:
-  SpaceEfficiency: demo-space-efficiency  # Optional.
+  SpaceEfficiency: thin  # Optional.
   pool: demo-pool
 
   csi.storage.k8s.io/provisioner-secret-name: demo-secret
