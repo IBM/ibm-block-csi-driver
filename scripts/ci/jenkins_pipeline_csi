@@ -1,4 +1,13 @@
 pipeline {
+    parameters {
+        string(name: 'IMAGE_VERSION', defaultValue: "1.7.0")
+        string(name: 'CSI_CONTROLLER_IMAGE', defaultValue: "default")
+        string(name: 'CSI_NODE_IMAGE', defaultValue: "ibm-block-csi-driver-node-amd64")
+        string(name: 'DOCKER_REGISTRY', defaultValue: "stg-artifactory.haifa.ibm.com:5030")
+        string(name: 'EMAIL_TO', defaultValue: "")
+        string(name: 'BANDIT_SKIPS', defaultValue: "xavi-system-tests", description: "comma separated list of issues to skip from the bandit python security test.\nB506: https://jira.xiv.ibm.com/browse/CSI-500")
+        string(name: 'GOSEC_EXCLUDE', defaultValue: "production", description: "comma separated list of rules to exclude.\nRules are listed here: https://github.com/securego/gosec")
+    }
     environment {
         registryCredentialsID = 'csi_w3_user'
     }
