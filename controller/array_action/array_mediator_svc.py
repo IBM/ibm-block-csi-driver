@@ -532,7 +532,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self._delete_fcmap(fcmap.id, force=False)
 
     def _is_in_remote_copy_relationship(self, fcmap):
-        return fcmap.function != ""
+        return fcmap.rc_controlled == YES
 
     def _delete_object(self, cli_object, is_snapshot=False):
         object_name = cli_object.name

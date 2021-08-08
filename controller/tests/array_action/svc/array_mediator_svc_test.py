@@ -33,14 +33,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
              'id': 'test_fc_id',
              'status': FCMAP_STATUS_DONE,
              'copy_rate': 'non_zero_value',
-             'function': ''})]
+             'rc_controlled': 'no'})]
         self.fcmaps_as_source = [Munch(
             {'source_vdisk_name': 'test_snapshot',
              'target_vdisk_name': 'target_name',
              'id': 'test_fc_id',
              'status': FCMAP_STATUS_DONE,
              'copy_rate': 'non_zero_value',
-             'function': ''})]
+             'rc_controlled': 'no'})]
         self.svc.client.svcinfo.lsfcmap.return_value = Mock(as_list=self.fcmaps)
 
     def test_raise_ManagementIPsNotSupportError_in_init(self):
@@ -202,7 +202,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_delete_volume_found_hyper_swap(self):
         fcmaps_as_target = Mock(as_list=[])
         fcmaps = self.fcmaps
-        fcmaps[0].function = "hyper swap"
+        fcmaps[0].rc_controlled = "yes"
         fcmaps_as_source = Mock(as_list=fcmaps)
         self.svc.client.svcinfo.lsfcmap.side_effect = [fcmaps_as_target, fcmaps_as_source]
         self.svc.delete_volume("volume")
@@ -485,7 +485,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_mocks_for_delete_snapshot()
         fcmaps_as_target = self.fcmaps
         fcmaps_as_source = self.fcmaps_as_source
-        fcmaps_as_source[0].function = "hyper swap"
+        fcmaps_as_source[0].rc_controlled = "yes"
         self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=fcmaps_as_target), Mock(as_list=fcmaps_as_source)]
         self.svc.delete_snapshot("test_snapshot")
 
@@ -942,7 +942,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_expand_volume_found_hyper_swap(self):
         self._prepare_mocks_for_expand_volume()
         fcmaps = self.fcmaps_as_source
-        fcmaps[0].function = 'hyper swap'
+        fcmaps[0].rc_controlled = 'yes'
         self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=[]), Mock(as_list=fcmaps)]
         self.svc.expand_volume('vol_id', 1024)
 
