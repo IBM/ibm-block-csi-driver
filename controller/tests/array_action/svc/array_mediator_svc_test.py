@@ -199,7 +199,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectIsStillInUseError):
             self.svc.delete_volume("volume")
 
-    def test_delete_volume_found_hyperswap(self):
+    def test_delete_volume_in_hyperswap(self):
         fcmaps_as_target = Mock(as_list=[])
         fcmaps = self.fcmaps
         fcmaps[0].rc_controlled = "yes"
@@ -481,7 +481,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.client.svctask.rmfcmap.assert_called_once_with(object_id="test_fc_id", force=True)
 
-    def test_delete_snapshot_found_hyperswap(self):
+    def test_delete_snapshot_in_hyperswap(self):
         self._prepare_mocks_for_delete_snapshot()
         fcmaps_as_target = self.fcmaps
         fcmaps_as_source = self.fcmaps_as_source
@@ -939,7 +939,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.expand_volume('vol_id', 2)
         self.svc.client.svctask.expandvdisksize.assert_not_called()
 
-    def test_expand_volume_found_hyperswap(self):
+    def test_expand_volume_in_hyperswap(self):
         self._prepare_mocks_for_expand_volume()
         fcmaps = self.fcmaps_as_source
         fcmaps[0].rc_controlled = 'yes'
