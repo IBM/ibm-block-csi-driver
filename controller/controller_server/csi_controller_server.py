@@ -471,14 +471,14 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.info("finished ControllerGetCapabilities")
         return res
 
-    def _get_identity_config(self, attribute_name):
+    def get_identity_config(self, attribute_name):
         return self.cfg['identity'][attribute_name]
 
     @handle_common_exceptions(csi_pb2.GetPluginInfoResponse)
     def GetPluginInfo(self, _, context):
         logger.info("GetPluginInfo")
-        name = self._get_identity_config("name")
-        version = self._get_identity_config("version")
+        name = self.get_identity_config("name")
+        version = self.get_identity_config("version")
 
         if not name or not version:
             message = "plugin name or version cannot be empty"
@@ -525,7 +525,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.info("GetPluginCapabilities")
         service_type = csi_pb2.PluginCapability.Service.Type
         volume_expansion_type = csi_pb2.PluginCapability.VolumeExpansion.Type
-        capabilities = self._get_identity_config("capabilities")
+        capabilities = self.get_identity_config("capabilities")
         capability_list = []
         service_capabilities = capabilities.get('Service')
         volume_expansion_capability = capabilities.get('VolumeExpansion')

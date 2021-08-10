@@ -12,27 +12,27 @@ from controller.csi_general import csi_pb2_grpc
 logger = get_stdout_logger()
 
 
-class ControllerServicer(CSIControllerServicer):
+class ControllerServicer:
     """
     gRPC server for Digestor Service
     """
 
     def __init__(self, array_endpoint):
-        super().__init__()
         self.endpoint = array_endpoint
+        self.csi_servicer = CSIControllerServicer()
 
     def start_server(self):
         controller_server = grpc.server(futures.ThreadPoolExecutor(max_workers=settings.CSI_CONTROLLER_SERVER_WORKERS))
 
-        csi_pb2_grpc.add_ControllerServicer_to_server(self, controller_server)
-        csi_pb2_grpc.add_IdentityServicer_to_server(self, controller_server)
+        csi_pb2_grpc.add_ControllerServicer_to_server(self.csi_servicer, controller_server)
+        csi_pb2_grpc.add_IdentityServicer_to_server(self.csi_servicer, controller_server)
 
         # bind the server to the port defined above
         # controller_server.add_insecure_port('[::]:{}'.format(self.server_port))
         # controller_server.add_insecure_port('unix://{}'.format(self.server_port))
         controller_server.add_insecure_port(self.endpoint)
 
-        logger.info("Controller version: {}".format(self._get_identity_config("version")))
+        logger.info("Controller version: {}".format(self.csi_servicer.get_identity_config("version")))
 
         # start the server
         logger.debug("Listening for connections on endpoint address: {}".format(self.endpoint))
