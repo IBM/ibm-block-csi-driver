@@ -1,7 +1,7 @@
 apiVersion: snapshot.storage.k8s.io/v1beta1
 kind: VolumeSnapshotClass
 metadata:
-  name: demo-snapshotclass
+  name: demo-volumesnapshotclass
 driver: block.csi.ibm.com
 deletionPolicy: Delete
 parameters:
