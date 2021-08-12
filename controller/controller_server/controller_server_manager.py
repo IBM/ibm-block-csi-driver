@@ -12,11 +12,7 @@ from controller.csi_general import csi_pb2_grpc
 logger = get_stdout_logger()
 
 
-class ControllerServicer:
-    """
-    gRPC server for Digestor Service
-    """
-
+class ControllerServerManager:
     def __init__(self, array_endpoint):
         self.endpoint = array_endpoint
         self.csi_servicer = CSIControllerServicer()

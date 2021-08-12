@@ -1,7 +1,7 @@
 from argparse import ArgumentParser
 
 from controller.common.csi_logger import set_log_level
-from controller.controller_server.controller_servicer import ControllerServicer
+from controller.controller_server.controller_server_manager import ControllerServerManager
 
 
 def main():
@@ -12,8 +12,8 @@ def main():
 
     set_log_level(arguments.loglevel)
 
-    controller_servicer = ControllerServicer(arguments.endpoint)
-    controller_servicer.start_server()
+    server_manager = ControllerServerManager(arguments.endpoint)
+    server_manager.start_server()
 
 
 if __name__ == '__main__':
