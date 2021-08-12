@@ -512,9 +512,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             if not is_warning_message(ex.my_message):
                 logger.warning("Failed to stop fcmap '{0}': {1}".format(fcmap_id, ex))
 
-    def _stop_and_delete_fcmap(self, fcmap_id):
-        self._stop_fcmap(fcmap_id)
-        self._delete_fcmap(fcmap_id, force=True)
+    def _stop_and_delete_fcmap(self, fcmap):
+        self._stop_fcmap(fcmap.id)
+        if not self._is_in_remote_copy_relationship(fcmap):
+            self._delete_fcmap(fcmap.id, force=True)
 
     def _safe_delete_fcmaps(self, object_name, fcmaps):
         fcmaps_to_delete = []
@@ -543,7 +544,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if fcmaps_as_source:
             self._safe_delete_fcmaps(object_name, fcmaps_as_source)
         if fcmap_as_target:
-            self._stop_and_delete_fcmap(fcmap_as_target.id)
+            self._stop_and_delete_fcmap(fcmap_as_target)
         self._delete_volume_by_name(object_name)
 
     def _delete_unstarted_fcmap_if_exists(self, target_volume_name):
