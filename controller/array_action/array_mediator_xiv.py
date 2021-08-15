@@ -224,7 +224,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             if NO_ALLOCATION_SPACE_ERROR in ex.status:
                 raise array_errors.NotEnoughSpaceInPool(id_or_name=pool)
-        return None
+            raise ex
 
     def copy_to_existing_volume_from_source(self, volume_id, source_id, source_capacity_in_bytes,
                                             minimum_volume_size_in_bytes):
