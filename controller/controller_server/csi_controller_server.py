@@ -23,7 +23,7 @@ from controller.csi_general import csi_pb2_grpc
 logger = get_stdout_logger()
 
 
-class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
+class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     """
     gRPC server for Digestor Service
     """

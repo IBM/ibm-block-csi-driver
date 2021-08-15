@@ -10,7 +10,7 @@ import controller.array_action.errors as array_errors
 import controller.controller_server.config as config
 import controller.controller_server.errors as controller_errors
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
-from controller.controller_server.csi_controller_server import CSIControllerServicer
+from controller.controller_server.csi_controller_server import ControllerServicer
 from controller.controller_server.test_settings import volume_name, snapshot_name, snapshot_volume_name, \
     clone_volume_name, snapshot_volume_wwn, pool
 from controller.csi_general import csi_pb2
@@ -106,7 +106,7 @@ class TestControllerServerCreateSnapshot(AbstractControllerTest):
         self.storage_agent = MagicMock()
         self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
 
-        self.servicer = CSIControllerServicer()
+        self.servicer = ControllerServicer()
 
         self.request.parameters = {}
         self.capacity_bytes = 10
@@ -301,7 +301,7 @@ class TestControllerServerDeleteSnapshot(AbstractControllerTest):
         self.mediator.get_snapshot.return_value = None
         self.storage_agent = MagicMock()
         self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
-        self.servicer = CSIControllerServicer()
+        self.servicer = ControllerServicer()
         self.request.parameters = {}
         self.request.snapshot_id = "A9000:BADC0FFEE0DDF00D00000000DEADBABE"
         self.context = utils.FakeContext()
@@ -363,7 +363,7 @@ class TestControllerServerCreateVolume(AbstractControllerTest):
         self.storage_agent = MagicMock()
         self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
 
-        self.servicer = CSIControllerServicer()
+        self.servicer = ControllerServicer()
 
         caps = Mock()
         caps.mount = Mock()
@@ -888,7 +888,7 @@ class TestControllerServerDeleteVolume(AbstractControllerTest):
         self.storage_agent = MagicMock()
         self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
 
-        self.servicer = CSIControllerServicer()
+        self.servicer = ControllerServicer()
 
         self.request.volume_id = "xiv:volume-id"
 
@@ -982,7 +982,7 @@ class TestControllerServerPublishVolume(AbstractControllerTest):
         self.storage_agent = MagicMock()
         self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
 
-        self.servicer = CSIControllerServicer()
+        self.servicer = ControllerServicer()
 
         self.request = Mock()
         arr_type = XIVArrayMediator.array_type
@@ -1291,7 +1291,7 @@ class TestControllerServerUnPublishVolume(AbstractControllerTest):
         self.storage_agent = MagicMock()
         self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
 
-        self.servicer = CSIControllerServicer()
+        self.servicer = ControllerServicer()
 
         self.request = Mock()
         arr_type = XIVArrayMediator.array_type
@@ -1384,7 +1384,7 @@ class TestControllerServerUnPublishVolume(AbstractControllerTest):
 class TestControllerServerGetCapabilities(unittest.TestCase):
 
     def setUp(self):
-        self.servicer = CSIControllerServicer()
+        self.servicer = ControllerServicer()
 
     def test_controller_get_capabilities(self):
         request = Mock()
@@ -1409,7 +1409,7 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
         self.storage_agent = MagicMock()
         self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
 
-        self.servicer = CSIControllerServicer()
+        self.servicer = ControllerServicer()
 
         self.access_types = csi_pb2.VolumeCapability.AccessMode
         self.fs_type = "ext4"
@@ -1565,9 +1565,9 @@ class TestControllerServerExpandVolume(AbstractControllerTest):
 class TestIdentityServer(unittest.TestCase):
 
     def setUp(self):
-        self.servicer = CSIControllerServicer()
+        self.servicer = ControllerServicer()
 
-    @patch.object(CSIControllerServicer, "get_identity_config")
+    @patch.object(ControllerServicer, "get_identity_config")
     def test_identity_plugin_get_info_succeeds(self, identity_config):
         plugin_name = "plugin-name"
         version = "1.1.0"
@@ -1578,7 +1578,7 @@ class TestIdentityServer(unittest.TestCase):
         res = self.servicer.GetPluginInfo(request, context)
         self.assertEqual(res, csi_pb2.GetPluginInfoResponse(name=plugin_name, vendor_version=version))
 
-    @patch.object(CSIControllerServicer, "get_identity_config")
+    @patch.object(ControllerServicer, "get_identity_config")
     def test_identity_plugin_get_info_fails_when_attributes_from_config_are_missing(self, identity_config):
         request = Mock()
         context = Mock()
@@ -1593,7 +1593,7 @@ class TestIdentityServer(unittest.TestCase):
         self.assertEqual(res, csi_pb2.GetPluginInfoResponse())
         context.set_code.assert_called_with(grpc.StatusCode.INTERNAL)
 
-    @patch.object(CSIControllerServicer, "get_identity_config")
+    @patch.object(ControllerServicer, "get_identity_config")
     def test_identity_plugin_get_info_fails_when_name_or_value_are_empty(self, identity_config):
         request = Mock()
         context = Mock()

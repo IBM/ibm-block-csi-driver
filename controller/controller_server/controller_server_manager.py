@@ -5,7 +5,7 @@ import grpc
 
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
-from controller.controller_server.csi_controller_server import CSIControllerServicer
+from controller.controller_server.csi_controller_server import ControllerServicer
 from controller.csi_general import csi_pb2_grpc
 
 
@@ -15,7 +15,7 @@ logger = get_stdout_logger()
 class ControllerServerManager:
     def __init__(self, array_endpoint):
         self.endpoint = array_endpoint
-        self.csi_servicer = CSIControllerServicer()
+        self.csi_servicer = ControllerServicer()
 
     def start_server(self):
         controller_server = grpc.server(futures.ThreadPoolExecutor(max_workers=settings.CSI_CONTROLLER_SERVER_WORKERS))
