@@ -160,6 +160,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                                      user=self.user,
                                      password=self.password,
                                      )
+
             self.system_info = self.get_system_info()
 
             if parse(self.version) < parse(self.SUPPORTED_FROM_VERSION):
