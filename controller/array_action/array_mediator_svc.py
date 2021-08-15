@@ -377,7 +377,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                     raise array_errors.VolumeAlreadyExists(name, self.endpoint)
                 if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
                     raise array_errors.PoolDoesNotExist(pool, self.endpoint)
-                if (POOL_NOT_MATCH_VOL_CAPABILITIES in ex.my_message or NOT_REDUCTION_POOL in ex.my_message):
+                if POOL_NOT_MATCH_VOL_CAPABILITIES in ex.my_message or NOT_REDUCTION_POOL in ex.my_message:
                     raise array_errors.PoolDoesNotMatchCapabilities(pool, space_efficiency, ex)
                 if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in ex.my_message:
                     raise array_errors.NotEnoughSpaceInPool(id_or_name=pool)
