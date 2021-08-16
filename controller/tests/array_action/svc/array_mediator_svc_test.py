@@ -495,6 +495,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(self.svc.client.svctask.rmfcmap.call_count, 2)
         self.svc.client.svctask.rmvolume.assert_called_once_with(vdisk_id="test_snapshot")
 
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def test_delete_snapshot_with_fcmap_already_stopped_success(self,mock_warning):
+        self._prepare_mocks_for_delete_snapshot()
+        mock_warning.return_value = False
+        self.svc.client.svctask.stopfcmap.side_effect = [CLIFailureError('CMMVC5912E')]
+        self.svc.delete_snapshot("test_snapshot")
+        self.assertEqual(self.svc.client.svctask.rmfcmap.call_count, 2)
+        self.svc.client.svctask.rmvolume.assert_called_once_with(vdisk_id="test_snapshot")
+
     def test_validate_supported_space_efficiency_raise_error(self):
         space_efficiency = "Test"
         with self.assertRaises(

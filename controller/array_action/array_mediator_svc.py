@@ -32,6 +32,7 @@ VOL_ALREADY_UNMAPPED = 'CMMVC5842E'
 OBJ_ALREADY_EXIST = 'CMMVC6035E'
 FCMAP_ALREADY_EXIST = 'CMMVC6466E'
 FCMAP_ALREADY_COPYING = 'CMMVC5907E'
+FCMAP_ALREADY_IN_THE_STOPPED_STATE = 'CMMVC5912E'
 VOL_NOT_FOUND = 'CMMVC8957E'
 POOL_NOT_MATCH_VOL_CAPABILITIES = 'CMMVC9292E'
 NOT_REDUCTION_POOL = 'CMMVC9301E'
@@ -490,7 +491,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self.client.svctask.rmfcmap(object_id=fcmap_id, force=force)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
-                logger.warning("Failed to delete fcmap '{0}': {1}".format(fcmap_id, ex))
+                logger.exception("Failed to delete fcmap '{0}': {1}".format(fcmap_id, ex))
                 raise ex
 
     def _stop_fcmap(self, fcmap_id):
@@ -499,8 +500,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self.client.svctask.stopfcmap(object_id=fcmap_id)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
-                logger.warning("Failed to stop fcmap '{0}': {1}".format(fcmap_id, ex))
-                raise ex
+                if FCMAP_ALREADY_IN_THE_STOPPED_STATE in ex.my_message:
+                    logger.warning("fcmap '{0}' is already in the stopped state".format(fcmap_id))
+                else:
+                    logger.exception("Failed to stop fcmap '{0}': {1}".format(fcmap_id, ex))
+                    raise ex
 
     def _stop_and_delete_fcmap(self, fcmap_id):
         self._stop_fcmap(fcmap_id)
