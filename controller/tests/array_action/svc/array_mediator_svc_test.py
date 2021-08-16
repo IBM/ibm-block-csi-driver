@@ -496,7 +496,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.rmvolume.assert_called_once_with(vdisk_id="test_snapshot")
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
-    def test_delete_snapshot_with_fcmap_already_stopped_success(self,mock_warning):
+    def test_delete_snapshot_with_fcmap_already_stopped_success(self, mock_warning):
         self._prepare_mocks_for_delete_snapshot()
         mock_warning.return_value = False
         self.svc.client.svctask.stopfcmap.side_effect = [CLIFailureError('CMMVC5912E')]
