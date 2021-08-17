@@ -27,28 +27,19 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsnode.return_value = [node]
         port = Munch({'node_id': '1', 'IP_address': '1.1.1.1', 'IP_address_6': None})
         self.svc.client.svcinfo.lsportip.return_value = [port]
-        self.fcmaps = [Munch(
-            {'source_vdisk_name': 'source_name',
-             'target_vdisk_name': 'target_name',
-             'id': 'test_fc_id',
-             'status': FCMAP_STATUS_DONE,
-             'copy_rate': 'non_zero_value',
-             'rc_controlled': 'no'})]
-        self.fcmaps_as_target = [Munch(
-            {'source_vdisk_name': 'source_name',
-             'target_vdisk_name': 'target_name',
-             'id': 'test_fc_as_target_id',
-             'status': FCMAP_STATUS_DONE,
-             'copy_rate': 'non_zero_value',
-             'rc_controlled': 'no'})]
-        self.fcmaps_as_source = [Munch(
-            {'source_vdisk_name': 'test_snapshot',
-             'target_vdisk_name': 'target_name',
-             'id': 'test_fc_id',
-             'status': FCMAP_STATUS_DONE,
-             'copy_rate': 'non_zero_value',
-             'rc_controlled': 'no'})]
+        self.fcmaps = [self._create_dummy_fcmap('source_name', 'test_fc_id')]
+        self.fcmaps_as_target = [self._create_dummy_fcmap('source_name', 'test_fc_as_target_id')]
+        self.fcmaps_as_source = [self._create_dummy_fcmap('test_snapshot', 'test_fc_id')]
         self.svc.client.svcinfo.lsfcmap.return_value = Mock(as_list=self.fcmaps)
+
+    def _create_dummy_fcmap(self, source_name, id_value):
+        return Munch(
+            {'source_vdisk_name': source_name,
+             'target_vdisk_name': 'target_name',
+             'id': id_value,
+             'status': FCMAP_STATUS_DONE,
+             'copy_rate': 'non_zero_value',
+             'rc_controlled': 'no'})
 
     def test_raise_ManagementIPsNotSupportError_in_init(self):
         self.endpoint = ["IP_1", "IP_2"]
