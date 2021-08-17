@@ -513,8 +513,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 logger.warning("Failed to stop fcmap '{0}': {1}".format(fcmap_id, ex))
 
     def _stop_and_delete_fcmap(self, fcmap):
-        self._stop_fcmap(fcmap.id)
         if not self._is_in_remote_copy_relationship(fcmap):
+            self._stop_fcmap(fcmap.id)
             self._delete_fcmap(fcmap.id, force=True)
 
     def _safe_delete_fcmaps(self, object_name, fcmaps):
