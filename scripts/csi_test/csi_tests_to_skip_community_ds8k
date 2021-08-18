@@ -1,0 +1,7 @@
+GetCapacity
+ListVolumes
+ValidateVolumeCapabilities
+volume lifecycle
+ListSnapshots
+NodeGetVolumeStats
+should create volume from an existing source snapshot
