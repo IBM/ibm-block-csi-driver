@@ -939,7 +939,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.expand_volume('vol_id', 2)
         self.svc.client.svctask.expandvdisksize.assert_not_called()
 
-    def test_expand_volume_does_not_remove_hyperswap_fcmap(self):
+    def test_expand_volume_in_hyperswap(self):
         self._prepare_mocks_for_expand_volume()
         fcmaps_as_source, fcmaps_as_target = self._prepare_fcmaps_for_hyperswap()
         self.svc.client.svcinfo.lsfcmap.side_effect = [fcmaps_as_target, fcmaps_as_source]
