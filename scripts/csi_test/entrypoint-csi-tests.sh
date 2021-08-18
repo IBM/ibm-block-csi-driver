@@ -19,5 +19,5 @@ TESTS=`cat ${TESTS_TO_RUN_FILE}| sed -Ez '$ s/\n+$//' | tr '\n' "|"`
 --csi.junitfile ${JUNIT_OUTPUT} \
 --ginkgo.v \
 --ginkgo.debug \
---ginkgo.focus "${TESTS}"
+--ginkgo.skip "${TESTS}"
 
