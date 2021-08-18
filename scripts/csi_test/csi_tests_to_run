@@ -1,6 +1,0 @@
-GetCapacity
-ListVolumes
-ValidateVolumeCapabilities
-should not fail when requesting to create a volume with already existing name and same capacity
-ListSnapshots
-NodeGetVolumeStats
