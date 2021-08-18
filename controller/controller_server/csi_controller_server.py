@@ -1,7 +1,4 @@
 import os.path
-import time
-from concurrent import futures
-from argparse import ArgumentParser
 
 import grpc
 import yaml
@@ -13,13 +10,13 @@ import controller.controller_server.utils as utils
 from controller.array_action import messages
 from controller.array_action.storage_agent import get_agent, detect_array_type
 from controller.common import settings
-from controller.common.csi_logger import get_stdout_logger, set_log_level
+from controller.common.csi_logger import get_stdout_logger
 from controller.common.node_info import NodeIdInfo
 from controller.common.utils import set_current_thread_name
+from controller.controller_server import messages as controller_messages
 from controller.controller_server.errors import ObjectIdError, ValidationException
 from controller.controller_server.exception_handler import handle_common_exceptions, handle_exception, \
     build_error_response
-from controller.controller_server import messages as controller_messages
 from controller.csi_general import csi_pb2
 from controller.csi_general import csi_pb2_grpc
 
@@ -31,10 +28,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     gRPC server for Digestor Service
     """
 
-    def __init__(self, array_endpoint):
-
-        self.endpoint = array_endpoint
-
+    def __init__(self):
         my_path = os.path.abspath(os.path.dirname(__file__))
         path = os.path.join(my_path, "../../common/config.yaml")
 
@@ -477,14 +471,14 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.info("finished ControllerGetCapabilities")
         return res
 
-    def __get_identity_config(self, attribute_name):
+    def get_identity_config(self, attribute_name):
         return self.cfg['identity'][attribute_name]
 
     @handle_common_exceptions(csi_pb2.GetPluginInfoResponse)
     def GetPluginInfo(self, _, context):
         logger.info("GetPluginInfo")
-        name = self.__get_identity_config("name")
-        version = self.__get_identity_config("version")
+        name = self.get_identity_config("name")
+        version = self.get_identity_config("version")
 
         if not name or not version:
             message = "plugin name or version cannot be empty"
@@ -531,7 +525,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.info("GetPluginCapabilities")
         service_type = csi_pb2.PluginCapability.Service.Type
         volume_expansion_type = csi_pb2.PluginCapability.VolumeExpansion.Type
-        capabilities = self.__get_identity_config("capabilities")
+        capabilities = self.get_identity_config("capabilities")
         capability_list = []
         service_capabilities = capabilities.get('Service')
         volume_expansion_capability = capabilities.get('VolumeExpansion')
@@ -554,32 +548,6 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
         context.set_code(grpc.StatusCode.OK)
         return csi_pb2.ProbeResponse()
 
-    def start_server(self):
-        controller_server = grpc.server(futures.ThreadPoolExecutor(max_workers=settings.CSI_CONTROLLER_SERVER_WORKERS))
-
-        csi_pb2_grpc.add_ControllerServicer_to_server(self, controller_server)
-        csi_pb2_grpc.add_IdentityServicer_to_server(self, controller_server)
-
-        # bind the server to the port defined above
-        # controller_server.add_insecure_port('[::]:{}'.format(self.server_port))
-        # controller_server.add_insecure_port('unix://{}'.format(self.server_port))
-        controller_server.add_insecure_port(self.endpoint)
-
-        logger.info("Controller version: {}".format(self.__get_identity_config("version")))
-
-        # start the server
-        logger.debug("Listening for connections on endpoint address: {}".format(self.endpoint))
-
-        controller_server.start()
-        logger.debug('Controller Server running ...')
-
-        try:
-            while True:
-                time.sleep(60 * 60 * 60)
-        except KeyboardInterrupt:
-            controller_server.stop(0)
-            logger.debug('Controller Server Stopped ...')
-
     def _get_source_type_and_id(self, request):
         source = request.volume_content_source
         object_id = None
@@ -597,19 +565,3 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             object_id_info = utils.get_object_id_info(source_id, source_type)
             object_id = object_id_info.object_id
         return source_type, object_id
-
-
-def main():
-    parser = ArgumentParser()
-    parser.add_argument("-e", "--csi-endpoint", dest="endpoint", help="grpc endpoint")
-    parser.add_argument("-l", "--loglevel", dest="loglevel", help="log level")
-    arguments = parser.parse_args()
-
-    set_log_level(arguments.loglevel)
-
-    controller_servicer = ControllerServicer(arguments.endpoint)
-    controller_servicer.start_server()
-
-
-if __name__ == '__main__':
-    main()
