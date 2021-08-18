@@ -90,6 +90,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_get_volume_lsvdisk_cli_failure_error("volume_name", 'CMMVC5753E', array_errors.ObjectNotFoundError)
         self._test_get_volume_lsvdisk_cli_failure_error("\xff", 'CMMVC6017E', array_errors.IllegalObjectName)
         self._test_get_volume_lsvdisk_cli_failure_error("12345", 'CMMVC5703E', array_errors.IllegalObjectName)
+        self._test_get_volume_lsvdisk_cli_failure_error("", 'other error', CLIFailureError)
 
     def test_get_volume_return_correct_value(self):
         cli_volume_mock = Mock(as_single_element=self._get_cli_volume())
@@ -203,6 +204,16 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsfcmap.side_effect = [fcmaps_as_target, fcmaps_as_source]
         self.svc.delete_volume("volume")
         self.svc.client.svctask.rmfcmap.assert_called_once()
+
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def test_delete_volume_has_clone_rmfcmap_raise_error(self, mock_warning):
+        mock_warning.return_value = False
+        fcmaps_as_target = Mock(as_list=[])
+        fcmaps_as_source = Mock(as_list=self.fcmaps_as_source)
+        self.svc.client.svcinfo.lsfcmap.side_effect = [fcmaps_as_target, fcmaps_as_source]
+        self.svc.client.svctask.rmfcmap.side_effect = [CLIFailureError('error')]
+        with self.assertRaises(CLIFailureError):
+            self.svc.delete_volume("volume")
 
     def test_delete_volume_success(self):
         self.svc.client.svctask.rmvolume = Mock()
@@ -503,6 +514,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.delete_snapshot("test_snapshot")
         self.assertEqual(self.svc.client.svctask.rmfcmap.call_count, 2)
         self.svc.client.svctask.rmvolume.assert_called_once_with(vdisk_id="test_snapshot")
+
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def test_delete_snapshot_with_stopfcmap_raise_error(self, mock_warning):
+        self._prepare_mocks_for_delete_snapshot()
+        mock_warning.return_value = False
+        self.svc.client.svctask.stopfcmap.side_effect = [CLIFailureError('error')]
+        with self.assertRaises(CLIFailureError):
+            self.svc.delete_snapshot("test_snapshot")
 
     def test_validate_supported_space_efficiency_raise_error(self):
         space_efficiency = "Test"
