@@ -674,6 +674,11 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.array.get_object_by_id("", "snapshot")
 
+    def test_get_object_by_id_get_volume_raise_error(self):
+        self.client_mock.get_volume.side_effect = ClientException("500", "other error")
+        with self.assertRaises(ClientException):
+            self.array.get_object_by_id("", "volume")
+
     def test_expand_volume_success(self):
         volume = self._prepare_mocks_for_volume()
         self.array.expand_volume(volume_id=volume.id, required_bytes=10)
@@ -705,4 +710,9 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_expand_volume_extend_not_enough_space_error(self):
         self.client_mock.extend_volume.side_effect = [ClientException("500", message="BE531465")]
         with self.assertRaises(array_errors.NotEnoughSpaceInPool):
+            self.array.expand_volume(volume_id="test_id", required_bytes=10)
+
+    def test_expand_volume_extend_raise_other_error(self):
+        self.client_mock.extend_volume.side_effect = [ClientException("500", message="other error")]
+        with self.assertRaises(ClientException):
             self.array.expand_volume(volume_id="test_id", required_bytes=10)

@@ -167,7 +167,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 raise array_errors.UnsupportedStorageVersionError(
                     self.version, self.SUPPORTED_FROM_VERSION
                 )
-        except (exceptions.ClientError, exceptions.ClientException) as ex:
+        except exceptions.ClientException as ex:
             error_message = str(ex.message).upper()
             if ERROR_CODE_INVALID_CREDENTIALS in error_message or KNOWN_ERROR_CODE_INVALID_CREDENTIALS in error_message:
                 raise array_errors.CredentialsError(self.service_address)
@@ -252,7 +252,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
             logger.info("finished creating volume {}".format(name))
             return self.client.get_volume(api_volume.id)
-        except (exceptions.ClientError, exceptions.ClientException) as ex:
+        except exceptions.ClientException as ex:
             error_message = str(ex.message).upper()
             if ERROR_CODE_RESOURCE_NOT_EXISTS in error_message or INCORRECT_ID in error_message:
                 raise array_errors.PoolDoesNotExist(pool_id, self.identifier)
@@ -275,7 +275,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         try:
             self.client.extend_volume(volume_id=api_volume.id,
                                       new_size_in_bytes=new_size_in_bytes)
-        except (exceptions.ClientError, exceptions.ClientException) as ex:
+        except exceptions.ClientException as ex:
             if isinstance(ex, exceptions.NotFound):
                 raise array_errors.ObjectNotFoundError(api_volume.id)
             if ERROR_CODE_EXPAND_VOLUME_NOT_ENOUGH_EXTENTS in str(ex.message).upper():
@@ -304,7 +304,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 volume_id=volume_id
             )
             logger.info("Finished deleting volume {}".format(volume_id))
-        except (exceptions.ClientError, exceptions.ClientException) as ex:
+        except exceptions.ClientException as ex:
             if isinstance(ex, exceptions.NotFound):
                 if not_exist_err:
                     raise array_errors.ObjectNotFoundError(volume_id)
@@ -383,7 +383,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                         break
             logger.debug("Found volume mappings: {}".format(host_name_to_lun_id))
             return host_name_to_lun_id
-        except (exceptions.ClientError, exceptions.ClientException) as ex:
+        except exceptions.ClientException as ex:
             logger.error(
                 "Failed to get volume mappings. Reason is: {}".format(ex.details)
             )
@@ -397,7 +397,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             lun = scsilun_to_int(mapping.lunid)
             logger.debug("Successfully mapped volume to host with lun {}".format(lun))
             return lun
-        except (exceptions.ClientError, exceptions.ClientException) as ex:
+        except exceptions.ClientException as ex:
             if isinstance(ex, exceptions.NotFound):
                 raise array_errors.HostNotFoundError(host_name)
             if ERROR_CODE_MAP_VOLUME_NOT_ENOUGH_EXTENTS in str(ex.message).upper():
@@ -424,7 +424,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 logger.debug("Successfully unmapped volume from host with lun {}.".format(lunid))
             else:
                 raise array_errors.ObjectNotFoundError(volume_id)
-        except (exceptions.ClientError, exceptions.ClientException) as ex:
+        except exceptions.ClientException as ex:
             if HOST_DOES_NOT_EXIST in str(ex.message).upper():
                 raise array_errors.HostNotFoundError(host_name)
             if MAPPING_DOES_NOT_EXIST in str(ex.message).upper():
@@ -451,7 +451,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         try:
             volume_candidates = []
             volume_candidates.extend(self.client.get_volumes_by_pool(pool_id))
-        except (exceptions.ClientError, exceptions.ClientException) as ex:
+        except exceptions.ClientException as ex:
             error_message = str(ex.message).upper()
             if ERROR_CODE_RESOURCE_NOT_EXISTS in error_message or INCORRECT_ID in error_message:
                 raise array_errors.PoolDoesNotExist(pool_id, self.identifier)
@@ -464,7 +464,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             volume = self.client.get_volume(volume_id)
             volume.flashcopy = self.client.get_flashcopies_by_volume(volume.id)
             return volume
-        except (exceptions.ClientError, exceptions.ClientException) as ex:
+        except exceptions.ClientException as ex:
             if isinstance(ex, exceptions.NotFound):
                 if not_exist_err:
                     raise array_errors.ObjectNotFoundError(volume_id)
@@ -478,7 +478,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.info("Getting flashcopy {}".format(flashcopy_id))
         try:
             return self.client.get_flashcopies(flashcopy_id)
-        except (exceptions.ClientError, exceptions.ClientException) as ex:
+        except exceptions.ClientException as ex:
             if ERROR_CODE_RESOURCE_NOT_EXISTS in str(ex.message).upper():
                 logger.info("{} not found".format(flashcopy_id))
                 if not_exist_err:
@@ -529,7 +529,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             api_flashcopy = self.client.create_flashcopy(source_volume_id=source_volume_id,
                                                          target_volume_id=target_volume_id,
                                                          options=options)
-        except (exceptions.ClientError, exceptions.ClientException) as ex:
+        except exceptions.ClientException as ex:
             if ERROR_CODE_ALREADY_FLASHCOPY in str(ex.message).upper():
                 raise array_errors.SnapshotAlreadyExists(target_volume_id, self.service_address)
             if ERROR_CODE_VOLUME_NOT_FOUND_OR_ALREADY_PART_OF_CS_RELATIONSHIP in str(ex.message).upper():
@@ -584,7 +584,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def _delete_flashcopy(self, flashcopy_id):
         try:
             self.client.delete_flashcopy(flashcopy_id)
-        except (exceptions.ClientError, exceptions.ClientException) as ex:
+        except exceptions.ClientException as ex:
             logger.error(
                 "Failed to delete flashcopy {} on array {}, reason is: {}".format(
                     flashcopy_id,
@@ -612,7 +612,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                      port[LOGIN_PORT_STATE] == LOGIN_PORT_STATE_ONLINE]
             logger.debug("Found wwpns: {}".format(wwpns))
             return wwpns
-        except (exceptions.ClientError, exceptions.ClientException) as ex:
+        except exceptions.ClientException as ex:
             if isinstance(ex, exceptions.NotFound):
                 raise array_errors.HostNotFoundError(host_name)
             logger.error(

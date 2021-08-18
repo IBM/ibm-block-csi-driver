@@ -501,7 +501,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 if FCMAP_ALREADY_IN_THE_STOPPED_STATE in ex.my_message:
-                    logger.warning("fcmap '{0}' is already in the stopped state".format(fcmap_id))
+                    logger.info("fcmap '{0}' is already in the stopped state".format(fcmap_id))
                 else:
                     logger.exception("Failed to stop fcmap '{0}': {1}".format(fcmap_id, ex))
                     raise ex
