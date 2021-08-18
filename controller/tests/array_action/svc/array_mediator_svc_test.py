@@ -204,7 +204,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         fcmaps_as_source = Mock(as_list=self.fcmaps)
         return fcmaps_as_source, fcmaps_as_target
 
-    def test_delete_volume_in_hyperswap(self):
+    def test_delete_volume_does_not_remove_hyperswap_fcmap(self):
         fcmaps_as_source, fcmaps_as_target = self._prepare_fcmaps_for_hyperswap()
         self.svc.client.svcinfo.lsfcmap.side_effect = [fcmaps_as_target, fcmaps_as_source]
         self.svc.delete_volume("volume")
@@ -483,7 +483,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.client.svctask.rmfcmap.assert_called_once_with(object_id="test_fc_id", force=True)
 
-    def test_delete_snapshot_in_hyperswap(self):
+    def test_delete_snapshot_does_not_remove_hyperswap_fcmap(self):
         self._prepare_mocks_for_delete_snapshot()
         fcmaps_as_source, fcmaps_as_target = self._prepare_fcmaps_for_hyperswap()
         self.svc.client.svcinfo.lsfcmap.side_effect = [fcmaps_as_target, fcmaps_as_source]
@@ -939,7 +939,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.expand_volume('vol_id', 2)
         self.svc.client.svctask.expandvdisksize.assert_not_called()
 
-    def test_expand_volume_in_hyperswap(self):
+    def test_expand_volume_does_not_remove_hyperswap_fcmap(self):
         self._prepare_mocks_for_expand_volume()
         fcmaps_as_source, fcmaps_as_target = self._prepare_fcmaps_for_hyperswap()
         self.svc.client.svcinfo.lsfcmap.side_effect = [fcmaps_as_target, fcmaps_as_source]
