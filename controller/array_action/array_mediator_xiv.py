@@ -119,7 +119,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def _is_gen3(cli_object):
         return not hasattr(cli_object, "copy_master_wwn")
 
-    def _get_source_object_wwn(self, cli_object):
+    def _get_snapshot_source_wwn(self, cli_object):
         if self._is_gen3(cli_object):
             source_name = cli_object.master_name
             cli_source = self._get_cli_object_by_name(source_name)
@@ -146,7 +146,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                         cli_snapshot.wwn,
                         cli_snapshot.name,
                         self.endpoint,
-                        volume_id=self._get_source_object_wwn(cli_snapshot),
+                        volume_id=self._get_snapshot_source_wwn(cli_snapshot),
                         is_ready=True,
                         array_type=self.array_type)
 
