@@ -19,6 +19,7 @@ logger = get_stdout_logger()
 LUN_IS_ALREADY_IN_USE_ERROR = "LUN is already in use"
 UNDEFINED_MAPPING_ERROR = "The requested mapping is not defined"
 NO_ALLOCATION_SPACE_ERROR = "No space to allocate to the volume"
+NOT_AVAILABLE = "Not Available"
 
 
 class XIVArrayMediator(ArrayMediatorAbstract):
@@ -125,8 +126,13 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             return cli_source.wwn
         return cli_object.copy_master_wwn
 
+    def _get_volume_source_wwn(self, cli_volume):
+        if self._is_gen3(cli_volume) or cli_volume.copy_master_wwn == NOT_AVAILABLE:
+            return None
+        return cli_volume.copy_master_wwn
+
     def _generate_volume_response(self, cli_volume):
-        source_object_wwn = cli_volume.copy_master_wwn if not self._is_gen3(cli_volume) else None
+        source_object_wwn = self._get_volume_source_wwn(cli_volume)
         return Volume(self._convert_size_blocks_to_bytes(cli_volume.capacity),
                       cli_volume.wwn,
                       cli_volume.name,
