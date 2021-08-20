@@ -15,7 +15,6 @@
 FROM golang:1.11
 
 ARG CSI_PARAMS=csi_params
-ARG TESTS_TO_SKIP_FILE_PATH
 
 RUN git clone https://github.com/kubernetes-csi/csi-test /usr/local/go/src/github.com/kubernetes-csi/csi-test
 RUN make -C /usr/local/go/src/github.com/kubernetes-csi/csi-test
@@ -34,6 +33,6 @@ ENV SECRET_FILE="/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver
 ENV PARAM_FILE="/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/${CSI_PARAMS}"
 ENV ENDPOINT="/tmp/k8s_dir/nodecsi"
 ENV ENDPOINT_CONTROLLER="/tmp/k8s_dir/f"
-ENV TESTS_TO_SKIP_FILE=${TESTS_TO_SKIP_FILE_PATH}
+ENV TESTS_TO_SKIP_FILE="/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_tests_to_skip"
 
 ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/entrypoint-csi-tests.sh"]
