@@ -4,10 +4,10 @@ The following table details orchestration platforms suitable for deployment of t
 
 |Orchestration platform|Version|Architecture|
 |----------------------|-------|------------|
-|Kubernetes|1.20|x86|
 |Kubernetes|1.21|x86|
-|Red Hat® OpenShift®|4.7|x86, IBM Z®, IBM Power Systems™<sup>1</sup>|
+|Kubernetes|1.22|x86|
 |Red Hat OpenShift|4.8|x86, IBM Z, IBM Power Systems<sup>1</sup>|
+|Red Hat OpenShift|4.9|x86, IBM Z, IBM Power Systems<sup>1</sup>|
 
 <sup>1</sup>IBM Power Systems architecture is only supported on Spectrum Virtualize Family storage systems.
 
