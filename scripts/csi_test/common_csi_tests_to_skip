@@ -1,0 +1,6 @@
+GetCapacity
+ListVolumes
+ValidateVolumeCapabilities
+volume lifecycle
+ListSnapshots
+NodeGetVolumeStats
