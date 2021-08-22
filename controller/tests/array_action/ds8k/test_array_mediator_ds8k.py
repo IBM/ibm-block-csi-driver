@@ -712,7 +712,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.NotEnoughSpaceInPool):
             self.array.expand_volume(volume_id="test_id", required_bytes=10)
 
-    def test_expand_volume_extend_raise_other_error(self):
+    def test_expand_volume_extend_raise_error(self):
         self.client_mock.extend_volume.side_effect = [ClientException("500", message="other error")]
         with self.assertRaises(ClientException):
             self.array.expand_volume(volume_id="test_id", required_bytes=10)

@@ -491,7 +491,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self.client.svctask.rmfcmap(object_id=fcmap_id, force=force)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
-                logger.exception("Failed to delete fcmap '{0}': {1}".format(fcmap_id, ex))
+                logger.error("Failed to delete fcmap '{0}': {1}".format(fcmap_id, ex))
                 raise ex
 
     def _stop_fcmap(self, fcmap_id):
@@ -503,7 +503,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 if FCMAP_ALREADY_IN_THE_STOPPED_STATE in ex.my_message:
                     logger.info("fcmap '{0}' is already in the stopped state".format(fcmap_id))
                 else:
-                    logger.exception("Failed to stop fcmap '{0}': {1}".format(fcmap_id, ex))
+                    logger.error("Failed to stop fcmap '{0}': {1}".format(fcmap_id, ex))
                     raise ex
 
     def _stop_and_delete_fcmap(self, fcmap_id):
@@ -762,7 +762,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                                 if node.status.lower() == "online"}
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
-                logger.exception(ex)
+                logger.error(ex)
                 raise ex
         logger.debug("Found iqns by node id: {}".format(array_iqns_by_id))
         return array_iqns_by_id
