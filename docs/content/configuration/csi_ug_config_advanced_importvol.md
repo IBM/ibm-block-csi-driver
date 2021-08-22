@@ -16,6 +16,7 @@ Before starting to import an existing volume, find the following information in 
 
 To find the `volumeHandle`, use one of the following procedures:
 
+
 - Through command line (for Spectrum Virtualize Family):
 
   `lsvdisk <volume name> | grep vdisk_UID`
@@ -73,6 +74,8 @@ Use this procedure to help build a PV yaml file for your volumes.
     **Important:** Be sure to include the `storageClassName` and `controllerPublishSecretRef` parameters or errors will occur.
 
 2.  Take the `volume_name` and other optional information (collected before the procedure) and insert it into the yaml file.
+
+**Important:** If using the topology feature, the volumeHandle is contains the system ID. In the example below, the `volumeHandle` would read similar to the following: `SVC:demo-system-id-1:600507640082000B08000000000004FF`
 
     <pre>
     apiVersion: v1

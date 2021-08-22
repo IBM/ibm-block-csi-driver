@@ -2,6 +2,8 @@
 
 Create a storage class yaml file in order to define the storage system pool name, secret reference, `SpaceEfficiency`, and `fstype`.
 
+**Note:** If you are using the Topology Aware feature, in addition to the information and parameter definitions provided here, be sure to follow the steps in [Creating a StorageClass with topology feature](csi_ug_config_create_storageclasses_topology.md).
+
 Use the following procedure to create and apply the storage classes.
 
 **Note:** This procedure is applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.

@@ -4,6 +4,8 @@ Create an array secret YAML file in order to define the storage credentials (use
 
 **Important:** When your storage system password is changed, be sure to also change the passwords in the corresponding secrets, particularly when LDAP is used on the storage systems. <br /><br />Failing to do so causes mismatched passwords across the storage systems and the secrets, causing the user to be locked out of the storage systems.
 
+**Note:** If using the Topology Aware feature, follow the steps in [Creating a Secret that is Topology Aware](csi_ug_config_create_secret_topology.md).
+
 Use one of the following procedures to create and apply the secret:
 
 ## Creating an array secret file
