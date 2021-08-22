@@ -173,7 +173,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 raise array_errors.CredentialsError(self.service_address)
             logger.error(
                 'Failed to connect to DS8K array {}, reason is {}'.format(self.service_address, ex.details))
-            raise ConnectionError()
+            raise ex
 
     def disconnect(self):
         pass
