@@ -30,3 +30,14 @@ The following limitations apply when expanding volumes with the IBM block storag
 -   When using the CSI driver with IBM Spectrum Virtualize Family and IBM DS8000 Family products, during size expansion of a PersistentVolumeClaim (PVC), the size remains until all snapshots of the specific PVC are deleted.
 -   When expanding a PVC while not in use by a pod, the volume size immediately increases on the storage side. PVC size only increases, however, after a pod begins to use the PVC.
 -   When expanding a filesystem PVC for a volume that was previously formatted but is now no longer being used by a pod, any copy or replication operations performed on the PVC (such as snapshots or cloning, and so on) results in a copy with the newer, larger, size on the storage. However, its filesystem has the original, smaller, size.
+
+## HyperSwap usage limitations
+
+**Important:** The HyperSwap feature is only supported for use with IBM Spectrum Virtualize Family storage systems.
+
+
+The following limitations apply when using HyperSwap with the IBM block storage CSI driver:
+
+- If HyperSwap is being used, volume expansion cannot be used.
+- If HyperSwap is being used, volume cloning cannot be used.
+- HyperSwap cannot be created from a volume snapshot.
