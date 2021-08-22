@@ -92,6 +92,13 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.UnsupportedStorageVersionError):
             DS8KArrayMediator("user", "password", self.endpoint)
 
+    def test_connect_with_error(self):
+        self.client_mock.get_system.side_effect = \
+            ClientError("400", "other_error")
+        with self.assertRaises(ClientError) as ex:
+            DS8KArrayMediator("user", "password", self.endpoint)
+        self.assertEqual(ex.exception.message, "other_error")
+
     def test_validate_space_efficiency_thin_success(self):
         self.array.validate_supported_space_efficiency(
             config.SPACE_EFFICIENCY_THIN
