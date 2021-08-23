@@ -75,7 +75,7 @@ Use this procedure to help build a PV yaml file for your volumes.
 
 2.  Take the `volume_name` and other optional information (collected before the procedure) and insert it into the yaml file.
 
-**Important:** If using the topology feature, the volumeHandle is contains the system ID. In the example below, the `volumeHandle` would read similar to the following: `SVC:demo-system-id-1:600507640082000B08000000000004FF`
+**Important:** If using the topology feature, the volumeHandle contains the system ID. In the example below, the `volumeHandle` would read similar to the following: `SVC:demo-system-id-1:600507640082000B08000000000004FF`
 
     <pre>
     apiVersion: v1
