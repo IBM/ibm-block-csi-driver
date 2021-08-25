@@ -275,9 +275,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         try:
             self.client.extend_volume(volume_id=api_volume.id,
                                       new_size_in_bytes=new_size_in_bytes)
+        except exceptions.NotFound:
+            raise array_errors.ObjectNotFoundError(api_volume.id)
         except exceptions.ClientException as ex:
-            if isinstance(ex, exceptions.NotFound):
-                raise array_errors.ObjectNotFoundError(api_volume.id)
             if ERROR_CODE_EXPAND_VOLUME_NOT_ENOUGH_EXTENTS in str(ex.message).upper():
                 raise array_errors.NotEnoughSpaceInPool(api_volume.pool)
             raise ex
@@ -304,19 +304,18 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 volume_id=volume_id
             )
             logger.info("Finished deleting volume {}".format(volume_id))
+        except exceptions.NotFound:
+            if not_exist_err:
+                raise array_errors.ObjectNotFoundError(volume_id)
         except exceptions.ClientException as ex:
-            if isinstance(ex, exceptions.NotFound):
-                if not_exist_err:
-                    raise array_errors.ObjectNotFoundError(volume_id)
-            else:
-                logger.error(
-                    "Failed to delete volume {} on array {}, reason is: {}".format(
-                        volume_id,
-                        self.identifier,
-                        ex.details
-                    )
+            logger.error(
+                "Failed to delete volume {} on array {}, reason is: {}".format(
+                    volume_id,
+                    self.identifier,
+                    ex.details
                 )
-                raise array_errors.VolumeDeletionError(volume_id)
+            )
+            raise array_errors.VolumeDeletionError(volume_id)
 
     def _safe_delete_flashcopies(self, flashcopies, volume_name):
         for flashcopy in flashcopies:
@@ -397,9 +396,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             lun = scsilun_to_int(mapping.lunid)
             logger.debug("Successfully mapped volume to host with lun {}".format(lun))
             return lun
+        except exceptions.NotFound:
+            raise array_errors.HostNotFoundError(host_name)
         except exceptions.ClientException as ex:
-            if isinstance(ex, exceptions.NotFound):
-                raise array_errors.HostNotFoundError(host_name)
             if ERROR_CODE_MAP_VOLUME_NOT_ENOUGH_EXTENTS in str(ex.message).upper():
                 raise array_errors.NoAvailableLunError(volume_id)
             if ERROR_CODE_VOLUME_NOT_FOUND_FOR_MAPPING in str(ex.message).upper():
@@ -464,14 +463,12 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             volume = self.client.get_volume(volume_id)
             volume.flashcopy = self.client.get_flashcopies_by_volume(volume.id)
             return volume
-        except exceptions.ClientException as ex:
-            if isinstance(ex, exceptions.NotFound):
-                if not_exist_err:
-                    raise array_errors.ObjectNotFoundError(volume_id)
-            elif INCORRECT_ID in str(ex.message).upper():
+        except exceptions.NotFound:
+            if not_exist_err:
+                raise array_errors.ObjectNotFoundError(volume_id)
+        except (exceptions.ClientError, exceptions.InternalServerError) as ex:
+            if INCORRECT_ID in str(ex.message).upper():
                 raise array_errors.IllegalObjectID(volume_id)
-            else:
-                raise ex
         return None
 
     def _get_flashcopy_process(self, flashcopy_id, not_exist_err=True):
@@ -612,9 +609,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                      port[LOGIN_PORT_STATE] == LOGIN_PORT_STATE_ONLINE]
             logger.debug("Found wwpns: {}".format(wwpns))
             return wwpns
+        except exceptions.NotFound:
+            raise array_errors.HostNotFoundError(host_name)
         except exceptions.ClientException as ex:
-            if isinstance(ex, exceptions.NotFound):
-                raise array_errors.HostNotFoundError(host_name)
             logger.error(
                 "Failed to get array fc wwpn. Reason is: {}".format(ex.details)
             )
