@@ -319,8 +319,8 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             if request.volume_context:
                 utils.validate_volume_context_match_volume(request.volume_context, volume)
-
-            utils.validate_parameters_match_volume(request.parameters, volume)
+            if request.parameters:
+                utils.validate_parameters_match_volume(request.parameters, volume)
 
             logger.info("finished ValidateVolumeCapabilities")
             return utils.generate_csi_validate_volume_capabilities_response(request.volume_context,

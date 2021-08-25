@@ -302,8 +302,6 @@ def validate_validate_volume_capabilities_request(request):
 
     if request.parameters:
         _validate_pool_parameter(request.parameters)
-    else:
-        raise ValidationException(messages.pool_is_missing_message)
 
     validate_csi_volume_capabilities(request.volume_capabilities)
 
