@@ -19,8 +19,7 @@ from controller.tests.utils import get_fake_secret_config
 class TestUtils(unittest.TestCase):
 
     def setUp(self):
-        self.fqdn = "fqdn"
-        self.servicer = ControllerServicer(self.fqdn)
+        self.servicer = ControllerServicer()
         self.config = {"controller": {"publish_context_lun_parameter": "lun",
                                       "publish_context_connectivity_parameter": "connectivity_type",
                                       "publish_context_separator": ",",

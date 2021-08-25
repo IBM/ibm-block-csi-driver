@@ -27,19 +27,19 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsnode.return_value = [node]
         port = Munch({'node_id': '1', 'IP_address': '1.1.1.1', 'IP_address_6': None})
         self.svc.client.svcinfo.lsportip.return_value = [port]
-        self.fcmaps = [Munch(
-            {'source_vdisk_name': 'source_name',
-             'target_vdisk_name': 'target_name',
-             'id': 'test_fc_id',
-             'status': FCMAP_STATUS_DONE,
-             'copy_rate': "non_zero_value"})]
-        self.fcmaps_as_source = [Munch(
-            {'source_vdisk_name': 'test_snapshot',
-             'target_vdisk_name': 'target_name',
-             'id': 'test_fc_id',
-             'status': FCMAP_STATUS_DONE,
-             'copy_rate': "non_zero_value"})]
+        self.fcmaps = [self._create_dummy_fcmap('source_name', 'test_fc_id')]
+        self.fcmaps_as_target = [self._create_dummy_fcmap('source_name', 'test_fc_as_target_id')]
+        self.fcmaps_as_source = [self._create_dummy_fcmap('test_snapshot', 'test_fc_id')]
         self.svc.client.svcinfo.lsfcmap.return_value = Mock(as_list=self.fcmaps)
+
+    def _create_dummy_fcmap(self, source_name, id_value):
+        return Munch(
+            {'source_vdisk_name': source_name,
+             'target_vdisk_name': 'target_name',
+             'id': id_value,
+             'status': FCMAP_STATUS_DONE,
+             'copy_rate': 'non_zero_value',
+             'rc_controlled': 'no'})
 
     def test_raise_ManagementIPsNotSupportError_in_init(self):
         self.endpoint = ["IP_1", "IP_2"]
@@ -196,6 +196,20 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsfcmap.side_effect = [fcmaps_as_target, fcmaps_as_source]
         with self.assertRaises(array_errors.ObjectIsStillInUseError):
             self.svc.delete_volume("volume")
+
+    def _prepare_fcmaps_for_hyperswap(self):
+        self.fcmaps_as_target[0].rc_controlled = "yes"
+        fcmaps_as_target = Mock(as_list=self.fcmaps_as_target)
+        self.fcmaps[0].rc_controlled = "yes"
+        fcmaps_as_source = Mock(as_list=self.fcmaps)
+        return fcmaps_as_source, fcmaps_as_target
+
+    def test_delete_volume_does_not_remove_hyperswap_fcmap(self):
+        fcmaps_as_source, fcmaps_as_target = self._prepare_fcmaps_for_hyperswap()
+        self.svc.client.svcinfo.lsfcmap.side_effect = [fcmaps_as_target, fcmaps_as_source]
+        self.svc.delete_volume("volume")
+
+        self.svc.client.svctask.rmfcmap.assert_not_called()
 
     def test_delete_volume_has_clone_fcmaps_removed(self):
         fcmaps_as_target = Mock(as_list=[])
@@ -468,6 +482,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.delete_snapshot("test_snapshot")
 
         self.svc.client.svctask.rmfcmap.assert_called_once_with(object_id="test_fc_id", force=True)
+
+    def test_delete_snapshot_does_not_remove_hyperswap_fcmap(self):
+        self._prepare_mocks_for_delete_snapshot()
+        fcmaps_as_source, fcmaps_as_target = self._prepare_fcmaps_for_hyperswap()
+        self.svc.client.svcinfo.lsfcmap.side_effect = [fcmaps_as_target, fcmaps_as_source]
+        self.svc.delete_snapshot("test_snapshot")
+
+        self.svc.client.svctask.rmfcmap.assert_not_called()
 
     def _test_delete_snapshot_rmvolume_cli_failure_error(self, error_message_id, expected_error, snapshot_id="snap_id"):
         self._test_mediator_method_client_cli_failure_error(self.svc.delete_snapshot, (snapshot_id,),
@@ -916,6 +938,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectIsStillInUseError):
             self.svc.expand_volume('vol_id', 2)
         self.svc.client.svctask.expandvdisksize.assert_not_called()
+
+    def test_expand_volume_in_hyperswap(self):
+        self._prepare_mocks_for_expand_volume()
+        fcmaps_as_source, fcmaps_as_target = self._prepare_fcmaps_for_hyperswap()
+        self.svc.client.svcinfo.lsfcmap.side_effect = [fcmaps_as_target, fcmaps_as_source]
+        self.svc.expand_volume('vol_id', 1024)
+
+        self.svc.client.svctask.expandvdisksize.assert_called_once_with(vdisk_id='test_volume', unit='b', size=512)
+        self.svc.client.svctask.rmfcmap.assert_not_called()
 
     def test_expand_volume_raise_object_not_found(self):
         self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=None)

@@ -68,12 +68,13 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.close.assert_called_once_with()
 
     @staticmethod
-    def _get_cli_volume(name='mock_volume'):
+    def _get_cli_volume(name='mock_volume', wwn='123'):
         return Munch({
-            'wwn': '123',
+            'wwn': wwn,
             'name': name,
             'pool_name': 'fake_pool',
-            'capacity': '512'})
+            'capacity': '512',
+            'copy_master_wwn': wwn})
 
     def _test_create_volume_with_space_efficiency_success(self, space_efficiency):
         self.mediator.client.cmd.vol_create = Mock()
@@ -88,6 +89,14 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
     def test_create_volume_with_empty_space_efficiency_success(self):
         self._test_create_volume_with_space_efficiency_success("")
+
+    def test_create_volume_with_not_available_wwn(self):
+        self.mediator.client.cmd.vol_create = Mock()
+        self.mediator.client.cmd.vol_create.return_value = Mock(
+            as_single_element=self._get_cli_volume(wwn="Not Available"))
+        volume = self.mediator.create_volume("mock_volume", 512, None, "fake_pool")
+
+        self.assertIsNone(volume.copy_source_id)
 
     def test_create_volume_raise_illegal_name_for_object(self):
         self.mediator.client.cmd.vol_create.side_effect = [xcli_errors.IllegalNameForObjectError("", "volume", "")]

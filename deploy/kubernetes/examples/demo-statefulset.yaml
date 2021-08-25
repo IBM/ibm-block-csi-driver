@@ -1,7 +1,7 @@
 kind: StatefulSet
 apiVersion: apps/v1
 metadata:
-  name: demo-statefulset-raw-block
+  name: demo-statefulset
 spec:
   selector:
     matchLabels:
@@ -18,10 +18,16 @@ spec:
         image: registry.access.redhat.com/ubi8/ubi:latest
         command: [ "/bin/sh", "-c", "--" ]
         args: [ "while true; do sleep 30; done;" ]
+        volumeMounts:
+          - name: demo-volume-file-system
+            mountPath: "/data"
         volumeDevices:
           - name: demo-volume-raw-block
-            devicePath: "/dev/block"
+            devicePath: "/dev/block"            
       volumes:
+      - name: demo-volume-file-system
+        persistentVolumeClaim:
+          claimName: demo-pvc-file-system
       - name: demo-volume-raw-block
         persistentVolumeClaim:
           claimName: demo-pvc-raw-block

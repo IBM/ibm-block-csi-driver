@@ -1476,7 +1476,7 @@ class TestExpandVolume(BaseControllerSetUp, CommonControllerTest):
 
 class TestIdentityServer(BaseControllerSetUp):
 
-    @patch.object(ControllerServicer, "_ControllerServicer__get_identity_config")
+    @patch.object(ControllerServicer, "get_identity_config")
     def test_identity_plugin_get_info_succeeds(self, identity_config):
         plugin_name = "plugin-name"
         version = "1.1.0"
@@ -1487,7 +1487,7 @@ class TestIdentityServer(BaseControllerSetUp):
         res = self.servicer.GetPluginInfo(request, context)
         self.assertEqual(res, csi_pb2.GetPluginInfoResponse(name=plugin_name, vendor_version=version))
 
-    @patch.object(ControllerServicer, "_ControllerServicer__get_identity_config")
+    @patch.object(ControllerServicer, "get_identity_config")
     def test_identity_plugin_get_info_fails_when_attributes_from_config_are_missing(self, identity_config):
         request = Mock()
         context = Mock()
@@ -1502,7 +1502,7 @@ class TestIdentityServer(BaseControllerSetUp):
         self.assertEqual(res, csi_pb2.GetPluginInfoResponse())
         context.set_code.assert_called_with(grpc.StatusCode.INTERNAL)
 
-    @patch.object(ControllerServicer, "_ControllerServicer__get_identity_config")
+    @patch.object(ControllerServicer, "get_identity_config")
     def test_identity_plugin_get_info_fails_when_name_or_value_are_empty(self, identity_config):
         request = Mock()
         context = Mock()
