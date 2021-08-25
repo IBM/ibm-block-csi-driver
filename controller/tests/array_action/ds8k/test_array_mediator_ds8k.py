@@ -92,6 +92,13 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.UnsupportedStorageVersionError):
             DS8KArrayMediator("user", "password", self.endpoint)
 
+    def test_connect_with_error(self):
+        self.client_mock.get_system.side_effect = \
+            ClientError("400", "other_error")
+        with self.assertRaises(ClientError) as ex:
+            DS8KArrayMediator("user", "password", self.endpoint)
+        self.assertEqual(ex.exception.message, "other_error")
+
     def test_validate_space_efficiency_thin_success(self):
         self.array.validate_supported_space_efficiency(
             config.SPACE_EFFICIENCY_THIN
@@ -674,6 +681,11 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.array.get_object_by_id("", "snapshot")
 
+    def test_get_object_by_id_get_volume_raise_error(self):
+        self.client_mock.get_volume.side_effect = ClientException("500", "other error")
+        with self.assertRaises(ClientException):
+            self.array.get_object_by_id("", "volume")
+
     def test_expand_volume_success(self):
         volume = self._prepare_mocks_for_volume()
         self.array.expand_volume(volume_id=volume.id, required_bytes=10)
@@ -705,4 +717,9 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_expand_volume_extend_not_enough_space_error(self):
         self.client_mock.extend_volume.side_effect = [ClientException("500", message="BE531465")]
         with self.assertRaises(array_errors.NotEnoughSpaceInPool):
+            self.array.expand_volume(volume_id="test_id", required_bytes=10)
+
+    def test_expand_volume_extend_raise_error(self):
+        self.client_mock.extend_volume.side_effect = [ClientException("500", message="other error")]
+        with self.assertRaises(ClientException):
             self.array.expand_volume(volume_id="test_id", required_bytes=10)
