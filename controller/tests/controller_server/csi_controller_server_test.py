@@ -1574,10 +1574,6 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
         self._test_request_with_wrong_secrets(storage_agent)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_validate_volume_capabilities_with_wrong_parameters(self, storage_agent):
-        self._test_request_with_wrong_parameters(storage_agent)
-
-    @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_capabilities_with_unsupported_access_mode(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         self.request.volume_capabilities[0].access_mode.mode = 999
