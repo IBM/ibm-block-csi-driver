@@ -326,21 +326,12 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             return utils.generate_csi_validate_volume_capabilities_response(request.volume_context,
                                                                             request.volume_capabilities,
                                                                             request.parameters)
-        except (array_errors.ObjectNotFoundError, ObjectIdError) as ex:
-            logger.exception(ex)
-            context.set_details(ex.message)
-            context.set_code(grpc.StatusCode.NOT_FOUND)
-            return csi_pb2.ValidateVolumeCapabilitiesResponse(message=ex.message)
-        except (ValidationException, array_errors.SpaceEfficiencyNotSupported) as ex:
-            logger.exception(ex)
-            context.set_details(ex.message)
-            context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
-            return csi_pb2.ValidateVolumeCapabilitiesResponse(message=ex.message)
-        except Exception as ex:
-            logger.exception(ex)
-            context.set_details(ex)
-            context.set_code(grpc.StatusCode.INTERNAL)
-            return csi_pb2.ValidateVolumeCapabilitiesResponse(message=ex)
+        except ObjectIdError as ex:
+            return handle_exception(ex, context, grpc.StatusCode.NOT_FOUND,
+                                    csi_pb2.CreateSnapshotResponse)
+        except array_errors.SpaceEfficiencyNotSupported as ex:
+            return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
+                                    csi_pb2.CreateSnapshotResponse)
 
     @handle_common_exceptions(csi_pb2.ListVolumesResponse)
     def ListVolumes(self, request, context):

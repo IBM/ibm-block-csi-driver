@@ -33,7 +33,7 @@ class BaseControllerSetUp(unittest.TestCase):
         self.storage_agent = MagicMock()
         self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
 
-        self.servicer = ControllerServicer(self.fqdn)
+        self.servicer = ControllerServicer()
 
         self.request = ProtoBufMock()
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
@@ -1548,10 +1548,9 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
         self.request.volume_capabilities = [self.volume_capability]
 
-    def _assertResponse(self, response, expected_status_code, expected_details_substring):
+    def _assertResponse(self, expected_status_code, expected_details_substring):
         self.assertEqual(self.context.code, expected_status_code)
         self.assertTrue(expected_details_substring in self.context.details)
-        self.assertEqual(response, csi_pb2.ValidateVolumeCapabilitiesResponse(message=self.context.details))
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_capabilities_success(self, storage_agent):
@@ -1566,9 +1565,9 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
         storage_agent.return_value = self.storage_agent
         self.request.volume_id = ""
 
-        response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
+        self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
-        self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "volume id")
+        self._assertResponse(grpc.StatusCode.INVALID_ARGUMENT, "volume id")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_capabilities_with_wrong_secrets(self, storage_agent):
@@ -1583,9 +1582,9 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
         storage_agent.return_value = self.storage_agent
         self.request.volume_capabilities[0].access_mode.mode = 999
 
-        response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
+        self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
-        self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "unsupported access mode")
+        self._assertResponse(grpc.StatusCode.INVALID_ARGUMENT, "unsupported access mode")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_capabilities_with_unsupported_fs_type(self, storage_agent):
@@ -1594,45 +1593,45 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
         volume_capability = utils.get_mock_volume_capability(fs_type="ext3")
         self.request.volume_capabilities = [volume_capability]
 
-        response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
+        self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
-        self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "fs_type")
+        self._assertResponse(grpc.StatusCode.INVALID_ARGUMENT, "fs_type")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_capabilities_with_no_capabilities(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         self.request.volume_capabilities = {}
 
-        response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
+        self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
-        self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "not set")
+        self._assertResponse(grpc.StatusCode.INVALID_ARGUMENT, "not set")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_capabilities_with_bad_id(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         self.request.volume_id = "wwn1"
 
-        response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
+        self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
-        self._assertResponse(response, grpc.StatusCode.NOT_FOUND, "id format")
+        self._assertResponse(grpc.StatusCode.NOT_FOUND, "id format")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_capabilities_with_volume_not_found(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         self.mediator.get_object_by_id.return_value = None
 
-        response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
+        self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
-        self._assertResponse(response, grpc.StatusCode.NOT_FOUND, "wwn")
+        self._assertResponse(grpc.StatusCode.NOT_FOUND, "wwn")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_capabilities_with_volume_context_not_match(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         self.request.volume_context = {config.VOLUME_CONTEXT_VOLUME_NAME: "fake"}
 
-        response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
+        self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
-        self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "volume context")
+        self._assertResponse(grpc.StatusCode.INVALID_ARGUMENT, "volume context")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_capabilities_with_space_efficiency_not_match(self, storage_agent):
@@ -1640,27 +1639,27 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
         self.request.parameters.update({config.PARAMETERS_SPACE_EFFICIENCY: "not_none"})
         self.mediator.validate_supported_space_efficiency = Mock()
 
-        response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
+        self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
-        self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "space efficiency")
+        self._assertResponse(grpc.StatusCode.INVALID_ARGUMENT, "space efficiency")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_capabilities_with_pool_not_match(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         self.request.parameters.update({config.PARAMETERS_POOL: "other pool"})
 
-        response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
+        self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
-        self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "pool")
+        self._assertResponse(grpc.StatusCode.INVALID_ARGUMENT, "pool")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_capabilities_with_prefix_not_match(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         self.request.parameters.update({config.PARAMETERS_VOLUME_NAME_PREFIX: "prefix"})
 
-        response = self.servicer.ValidateVolumeCapabilities(self.request, self.context)
+        self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
-        self._assertResponse(response, grpc.StatusCode.INVALID_ARGUMENT, "prefix")
+        self._assertResponse(grpc.StatusCode.INVALID_ARGUMENT, "prefix")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_capabilities_parameters_success(self, storage_agent):
