@@ -1,4 +1,4 @@
-# Compatibility and requirements for topology
+# Compatibility and requirements
 
 For the complete and up-to-date information about the compatibility and requirements for using the IBM® block storage CSI driver, refer to its latest release notes. The release notes detail supported operating system and container platform versions, as well as microcode versions of the supported storage systems.
 
@@ -59,7 +59,20 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
 
    The instructions and relevant yaml files to enable volume snapshots can be found at: [https://github.com/kubernetes-csi/external-snapshotter#usage](https://github.com/kubernetes-csi/external-snapshotter#usage)
 
-4. Configure storage system connectivity.
+4. To use CSI Topology, any nodes in the cluster must have the following labels that introduce topology awareness:
+      - `topology.kubernetes.io/region`
+      - `topology.kubernetes.io/zone`
+
+      **Important:** These labels must be found on the nodes in the cluster **before** installing the IBM® block storage CSI driver. If these are not labelled before installation, the CSI driver will not be topology aware.
+
+      ```
+      $ kubectl get nodes -o=jsonpath='{range .items[*]}[{.metadata.name}, {.metadata.labels}]{"\n"}{end}' | grep --color "topology.block.csi.ibm.com"
+
+      [node1, {"beta.kubernetes.io/arch":"amd64","beta.kubernetes.io/os":"linux","kubernetes.io/arch":"amd64","kubernetes.io/hostname":"k8s-rhel-7-8-k8s-1-20-arbel-w1","kubernetes.io/os":"linux","topology.block.csi.ibm.com/demo-region":"demo-region-1","topology.block.csi.ibm.com/demo-zone":"demo-zone-1"}]
+      [node2, {"beta.kubernetes.io/arch":"amd64","beta.kubernetes.io/os":"linux","kubernetes.io/arch":"amd64","kubernetes.io/hostname":"k8s-rhel-7-8-k8s-1-20-arbel-w2","kubernetes.io/os":"linux","topology.block.csi.ibm.com/demo-region":"demo-region-2","topology.block.csi.ibm.com/demo-zone":"demo-zone-2"}]
+    ```
+
+5. Configure storage system connectivity.
 
     1.  Define the host of each Kubernetes node on the relevant storage systems with the valid WWPN (for Fibre Channel) or IQN (for iSCSI) of the node.
 
