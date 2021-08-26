@@ -6,9 +6,6 @@ Create an array secret YAML file in order to define the storage credentials (use
 
 Use the Secret file to connect a worker node to a storage system.
 
-Use one of the following procedures to create and apply the secret:
-
-## Creating an array secret file that is Topology Aware
 1. Create the secret file, similar to the following demo-secret-config.json:
 
     The `management_address` field can contain more than one address, with each value separated by a comma.
@@ -42,18 +39,8 @@ Use one of the following procedures to create and apply the secret:
        
 2. Apply the secret using the following command:
 
-    `kubectl apply -f demo-secret-config.json`
+    `kubectl create secret generic <secret name> -n <secret namespace> --from-file=config=demo-secret-config.json`
     
 
      The `secret/<NAME> created` message is emitted.
-
-
-## Creating an array secret via command line
-**Note:** This procedure is applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.
-
-Create the secret using the following command:
-
- ```
- kubectl create secret generic <NAME> --from-literal=username=<USER> --from-literal=password=<PASSWORD>--from-literal=management_address=<ARRAY_MGMT> -n <namespace>
- ```
  
