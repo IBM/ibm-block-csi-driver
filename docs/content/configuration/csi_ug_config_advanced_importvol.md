@@ -73,11 +73,10 @@ Use this procedure to help build a PV yaml file for your volumes.
 
     **Important:** Be sure to include the `storageClassName` and `controllerPublishSecretRef` parameters or errors will occur.
 
-2.  Take the `volume_name` and other optional information (collected before the procedure) and insert it into the yaml file.
+2.  Take the `volume_name` and other optional information (collected before the procedure) and insert it into the yaml file (under `spec.csi.volumeAttributes`).
 
-**Important:** If using the Topology Aware feature, the volumeHandle contains the system ID. In the example below, the `volumeHandle` would read similar to the following: `SVC:demo-system-id-1:600507640082000B08000000000004FF`
+**Important:** If using the Topology Aware feature, the `spec.csi.volumeHandle` contains the system ID. In the example below, the `spec.csi.volumeHandle` would read similar to the following: `SVC:demo-system-id-1:600507640082000B08000000000004FF`.
 
-    <pre>
     apiVersion: v1
     kind: PersistentVolume
     metadata:
@@ -94,16 +93,16 @@ Use this procedure to help build a PV yaml file for your volumes.
           name: demo-secret
           namespace: default
         driver: block.csi.ibm.com
-        <b># volumeAttributes:
+        # volumeAttributes:
           # pool_name: ibmc-block-gold
           # storage_type: SVC
           # volume_name: vol1
           # array_address: baremetal10-cluster.xiv.ibm.com
-        volumeHandle: SVC:600507640082000B08000000000004FF</b>
+        volumeHandle: SVC:600507640082000B08000000000004FF
       # persistentVolumeReclaimPolicy: Retain
       storageClassName: ibmc-block-gold
       # volumeMode: Filesystem
-    </pre>
+    
 
 3.  Create a PersistentVolumeClaim (PVC) yaml file.
 
@@ -112,56 +111,49 @@ Use this procedure to help build a PV yaml file for your volumes.
     -   To include a specific 5 Gi PV, be sure to include the `storageClassName`.
     -   For more information about creating a PVC yaml file, see [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
     
-    ```screen
-    apiVersion: v1
-    kind: PersistentVolumeClaim
-    metadata:
-      # annotations:
-        # pv.kubernetes.io/provisioned-by: block.csi.ibm.com
-      name: vol1-pvc
-    spec:
-      accessModes:
-      - ReadWriteOnce
-      resources:
-        requests:
-          storage: 1Gi
-      storageClassName: ibmc-block-gold
-      volumeName: vol1-pv
-    ```
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        # annotations:
+          # pv.kubernetes.io/provisioned-by: block.csi.ibm.com
+        name: vol1-pvc
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+        storageClassName: ibmc-block-gold
+        volumeName: vol1-pv
 
 4.  Create a StatefulSet.
 
     For more information about creating a StatefulSet, see [Creating a StatefulSet](csi_ug_config_create_statefulset.md).
 
-    ```screen
-    kind: StatefulSet
-    apiVersion: apps/v1
-    metadata:
-      name: sanity-statefulset
-    spec:
-      selector:
-        matchLabels:
-          app: sanity-statefulset
-      serviceName: sanity-statefulset
-      replicas: 1
-      template:
+        kind: StatefulSet
+        apiVersion: apps/v1
         metadata:
-          labels:
-            app: sanity-statefulset
+          name: sanity-statefulset
         spec:
-          containers:
-          - name: container1
-            image: registry.access.redhat.com/ubi8/ubi:latest
-            command: [ "/bin/sh", "-c", "--" ]
-            args: [ "while true; do sleep 30; done;" ]
-            volumeMounts:
+          selector:
+            matchLabels:
+              app: sanity-statefulset
+          serviceName: sanity-statefulset
+          replicas: 1
+          template:
+            metadata:
+              labels:
+                app: sanity-statefulset
+            spec:
+              containers:
+              - name: container1
+                image: registry.access.redhat.com/ubi8/ubi:latest
+                command: [ "/bin/sh", "-c", "--" ]
+                args: [ "while true; do sleep 30; done;" ]
+                volumeMounts:
+                  - name: vol1
+                    mountPath: "/data"
+              volumes:
               - name: vol1
-                mountPath: "/data"
-          volumes:
-          - name: vol1
-            persistentVolumeClaim:
-              claimName: vol1-pvc
-    
-    ```
-
-
+                persistentVolumeClaim:
+                  claimName: vol1-pvc

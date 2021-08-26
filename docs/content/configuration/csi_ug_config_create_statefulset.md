@@ -20,108 +20,108 @@ The `statefulset.apps/<filename> created` message is emitted.
 
 Create a StatefulSet yaml file, similar to the following demo-statefulset-file-system.yaml file.
 
-<pre>
-kind: StatefulSet
-apiVersion: apps/v1
-metadata:
-  name: demo-statefulset-file-system
-spec:
-  selector:
-    matchLabels:
-      app: demo-statefulset
-  serviceName: demo-statefulset
-  replicas: 1
-  template:
+Here, the `volumeMounts` indicates both the name of the volume, with the necessary `mountPath` of `"/data"`.
+
+    kind: StatefulSet
+    apiVersion: apps/v1
     metadata:
-      labels:
-        app: demo-statefulset
+      name: demo-statefulset-file-system
     spec:
-      containers:
-      - name: demo-container
-        image: registry.access.redhat.com/ubi8/ubi:latest
-        command: [ "/bin/sh", "-c", "--" ]
-        args: [ "while true; do sleep 30; done;" ]
-        <b>volumeMounts:
+      selector:
+        matchLabels:
+          app: demo-statefulset
+      serviceName: demo-statefulset
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            app: demo-statefulset
+        spec:
+          containers:
+          - name: demo-container
+            image: registry.access.redhat.com/ubi8/ubi:latest
+            command: [ "/bin/sh", "-c", "--" ]
+            args: [ "while true; do sleep 30; done;" ]
+            <b>volumeMounts:
+              - name: demo-volume-file-system
+                mountPath: "/data"</b>
+          volumes:
           - name: demo-volume-file-system
-            mountPath: "/data"</b>
-      volumes:
-      - name: demo-volume-file-system
-        persistentVolumeClaim:
-          claimName: demo-pvc-file-system
-</pre>
+            persistentVolumeClaim:
+              claimName: demo-pvc-file-system
 
 ## Creating a StatefulSet with raw block volume
 
 Create a StatefulSet yaml file, similar to the following demo-statefulset-raw-block.yaml file.
 
-<pre>
-kind: StatefulSet
-apiVersion: apps/v1
-metadata:
-  name: demo-statefulset-raw-block
-spec:
-  selector:
-    matchLabels:
-      app: demo-statefulset
-  serviceName: demo-statefulset
-  replicas: 1
-  template:
+Here, the `volumeDevices` indicates both the name of the volume, with the necessary `devicePath` of `"/dev/block"`.
+
+    kind: StatefulSet
+    apiVersion: apps/v1
     metadata:
-      labels:
-        app: demo-statefulset
+      name: demo-statefulset-raw-block
     spec:
-      containers:
-      - name: demo-container
-        image: registry.access.redhat.com/ubi8/ubi:latest
-        command: [ "/bin/sh", "-c", "--" ]
-        args: [ "while true; do sleep 30; done;" ]
-        <b>volumeDevices:
+      selector:
+        matchLabels:
+          app: demo-statefulset
+      serviceName: demo-statefulset
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            app: demo-statefulset
+        spec:
+          containers:
+          - name: demo-container
+            image: registry.access.redhat.com/ubi8/ubi:latest
+            command: [ "/bin/sh", "-c", "--" ]
+            args: [ "while true; do sleep 30; done;" ]
+            volumeDevices:
+              - name: demo-volume-raw-block
+                devicePath: "/dev/block"
+          volumes:
           - name: demo-volume-raw-block
-            devicePath: "/dev/block"</b>
-      volumes:
-      - name: demo-volume-raw-block
-        persistentVolumeClaim:
-          claimName: demo-pvc-raw-block
-</pre>
+            persistentVolumeClaim:
+              claimName: demo-pvc-raw-block
 
 ## Creating a StatefulSet with both raw block and file system volumes
 
 Create a StatefulSet yaml file, similar to the following demo-statefulset-combined.yaml file.
 
-<pre>
-kind: StatefulSet
-apiVersion: apps/v1
-metadata:
-  name: demo-statefulset-combined
-spec:
-  selector:
-    matchLabels:
-      app: demo-statefulset
-  serviceName: demo-statefulset
-  replicas: 1
-  template:
+In a mixed file, it is important to indicate both the `volumeMounts` and  `volumeDevices` parameters, where `mountPath` is `"/data"` and `devicePath` is `"/dev/block"`.
+
+    kind: StatefulSet
+    apiVersion: apps/v1
     metadata:
-      labels:
-        app: demo-statefulset
+      name: demo-statefulset-combined
     spec:
-      containers:
-      - name: demo-container
-        image: registry.access.redhat.com/ubi8/ubi:latest
-        command: [ "/bin/sh", "-c", "--" ]
-        args: [ "while true; do sleep 30; done;" ]
-        <b>volumeMounts:
+      selector:
+        matchLabels:
+          app: demo-statefulset
+      serviceName: demo-statefulset
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            app: demo-statefulset
+        spec:
+          containers:
+          - name: demo-container
+            image: registry.access.redhat.com/ubi8/ubi:latest
+            command: [ "/bin/sh", "-c", "--" ]
+            args: [ "while true; do sleep 30; done;" ]
+            volumeMounts:
+              - name: demo-volume-file-system
+                mountPath: "/data"
+            volumeDevices:
+              - name: demo-volume-raw-block
+                devicePath: "/dev/block"            
+          volumes:
           - name: demo-volume-file-system
-            mountPath: "/data"
-        volumeDevices:
+            persistentVolumeClaim:
+              claimName: demo-pvc-file-system
           - name: demo-volume-raw-block
-            devicePath: "/dev/block"</b>            
-      volumes:
-      - name: demo-volume-file-system
-        persistentVolumeClaim:
-          claimName: demo-pvc-file-system
-      - name: demo-volume-raw-block
-        persistentVolumeClaim:
-          claimName: demo-pvc-raw-block
-</pre>
+            persistentVolumeClaim:
+              claimName: demo-pvc-raw-block
 
 

@@ -25,66 +25,62 @@ Use the following sections, according to your PVC needs:
 
 ## <a name=PVC-fs></a>Creating PVC for volume with Filesystem
 
-Create a PVC yaml file, similar to the following demo-pvc-file-system.yaml file, with the size of 1 Gb.
+Create a PVC yaml file, similar to the following demo-pvc-file-system.yaml file, with the size of 1 Gb, where `volumeMode` is `Filesystem`.
 
 **Note:** `volumeMode` is an optional field. `Filesystem` is the default if the value is not added.
 
-<pre>
-kind: PersistentVolumeClaim
-apiVersion: v1
-metadata:
-  name: demo-pvc-file-system
-spec:
-  volumeMode: <b>Filesystem</b>  # Optional. The default is Filesystem.
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
-  storageClassName: demo-storageclass
-</pre>
+    kind: PersistentVolumeClaim
+    apiVersion: v1
+    metadata:
+      name: demo-pvc-file-system
+    spec:
+      volumeMode: Filesystem  # Optional. The default is Filesystem.
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+      storageClassName: demo-storageclass
 
 ## <a name=PVC-block></a>Creating PVC for raw block volume
 
-Create a PVC yaml file, similar to the following demo-pvc-raw-block.yaml file, with the size of 1 Gb.
+Create a PVC yaml file, similar to the following demo-pvc-raw-block.yaml file, with the size of 1 Gb, where `volumeMode` is `Block`.
 
-<pre>
-kind: PersistentVolumeClaim
-apiVersion: v1
-metadata:
-  name: demo-pvc-raw-block
-spec:
-  volumeMode: <b>Block</b>
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
-  storageClassName: demo-storageclass
-</pre>
+    kind: PersistentVolumeClaim
+    apiVersion: v1
+    metadata:
+      name: demo-pvc-raw-block
+    spec:
+      volumeMode: Block
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+      storageClassName: demo-storageclass
 
 ## <a name=PVC-vol-snapshot></a>Creating PVC from volume snapshot
 
 To create a PVC from an existing volume snapshot, create a PVC yaml file, similar to the following demo-pvc-from-snapshot.yaml file, with the size of 1 Gb.
 
-<pre>
-kind: PersistentVolumeClaim
-apiVersion: v1
-metadata:
-  name: demo-pvc-from-snapshot
-spec:
-  volumeMode: Filesystem
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
-  storageClassName: demo-storageclass
-  <b>dataSource:
-    name: demo-snapshot
-    kind: VolumeSnapshot
-    apiGroup: snapshot.storage.k8s.io</b>
-</pre>
+Update the `dataSource` parameters to reflect the existing volume snapshot information, where `kind` is `VolumeSnapshot`.
+
+    kind: PersistentVolumeClaim
+    apiVersion: v1
+    metadata:
+      name: demo-pvc-from-snapshot
+    spec:
+      volumeMode: Filesystem
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+      storageClassName: demo-storageclass
+      dataSource:
+        name: demo-snapshot
+        kind: VolumeSnapshot
+        apiGroup: snapshot.storage.k8s.io
 
 ## <a name=vol-clone-PVC></a>Creating a volume clone from an existing PVC
 
@@ -92,20 +88,20 @@ spec:
 
 To create a volume clone from an existing PVC object, create a PVC yaml file, similar to the following demo-pvc-cloned-pvc.yaml file, with the size of 1 Gb.
 
-<pre>
-kind: PersistentVolumeClaim
-apiVersion: v1
-metadata:
-  name: demo-pvc-cloned-pvc
-spec:
-  volumeMode: Filesystem
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
-  storageClassName: demo-storageclass
-  <b>dataSource:
-    name: demo-pvc-file-system
-    kind: PersistentVolumeClaim</b>
-</pre>
+Update the `dataSource` parameters to reflect the existing PVC object information, where `kind` is `PersistentVolumeClaim`.
+
+    kind: PersistentVolumeClaim
+    apiVersion: v1
+    metadata:
+      name: demo-pvc-cloned-pvc
+    spec:
+      volumeMode: Filesystem
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+      storageClassName: demo-storageclass
+      dataSource:
+        name: demo-pvc-file-system
+        kind: PersistentVolumeClaim
