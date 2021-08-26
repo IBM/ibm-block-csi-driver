@@ -27,7 +27,7 @@ COPY . .
 RUN make ibm-block-csi-driver
 
 # Final stage
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.4-200
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.4-208
 MAINTAINER IBM Storage
 
 ARG VERSION=1.7.0
