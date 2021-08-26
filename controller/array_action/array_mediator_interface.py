@@ -228,13 +228,14 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_snapshot(self, volume_id, snapshot_name, pool=None):
+    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool):
         """
         This function should create a snapshot from volume in the storage system.
         Args:
-            volume_id : id of the volume to be created from
-            snapshot_name : name of the snapshot to be created in the storage system
-            pool : pool to create the snapshot in (if not given, pool taken from source volume)
+            volume_id           : id of the volume to be created from
+            snapshot_name       : name of the snapshot to be created in the storage system
+            space_efficiency    : space efficiency (if empty/None, space efficiency taken from source volume)
+            pool                : pool to create the snapshot in (if empty/None, pool taken from source volume)
         Returns:
             Snapshot
         Raises:

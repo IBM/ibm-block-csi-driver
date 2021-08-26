@@ -12,7 +12,7 @@ import controller.controller_server.errors as controller_errors
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.controller_server.csi_controller_server import ControllerServicer
 from controller.controller_server.test_settings import volume_name, snapshot_name, snapshot_volume_name, \
-    clone_volume_name, snapshot_volume_wwn, pool
+    clone_volume_name, snapshot_volume_wwn, pool, space_efficiency
 from controller.csi_general import csi_pb2
 from controller.tests import utils
 from controller.tests.utils import ProtoBufMock
@@ -154,14 +154,15 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
                                                                                                snapshot_volume_name,
                                                                                                "xiv")
 
-    def _test_create_snapshot_succeeds(self, storage_agent, expected_pool=None):
+    def _test_create_snapshot_succeeds(self, storage_agent, expected_space_efficiency=None, expected_pool=None):
         self._prepare_create_snapshot_mocks(storage_agent)
 
         self.servicer.CreateSnapshot(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
         self.mediator.get_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name, pool=expected_pool)
-        self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name, expected_pool)
+        self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name,
+                                                              expected_space_efficiency, expected_pool)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_succeeds(self, storage_agent):
@@ -171,6 +172,12 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
     def test_create_snapshot_with_pool_parameter_succeeds(self, storage_agent):
         self.request.parameters = {config.PARAMETERS_POOL: pool}
         self._test_create_snapshot_succeeds(storage_agent, expected_pool=pool)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_snapshot_with_space_efficiency_parameter_succeeds(self, storage_agent):
+        self.mediator.validate_supported_space_efficiency = Mock()
+        self.request.parameters = {config.PARAMETERS_SPACE_EFFICIENCY: space_efficiency}
+        self._test_create_snapshot_succeeds(storage_agent, expected_space_efficiency=space_efficiency)
 
     def _test_create_snapshot_with_by_system_id_parameter(self, storage_agent, system_id, expected_pool):
         self.request.source_volume_id = "{}:{}:{}".format("A9000", system_id, snapshot_volume_wwn)
@@ -263,7 +270,7 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(self.context.code, return_code)
         self.assertIn(msg, self.context.details)
         self.mediator.get_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name, pool=None)
-        self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name, None)
+        self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name, None, None)
 
     def test_create_snapshot_with_not_found_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.NOT_FOUND,
@@ -290,6 +297,10 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                            err=array_errors.IllegalObjectID("volume-id"))
 
+    def test_create_snapshot_with_space_efficiency_not_supported_exception(self):
+        self.create_snapshot_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
+                                           err=array_errors.SpaceEfficiencyNotSupported(["fake"]))
+
     def test_create_snapshot_with_other_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INTERNAL, err=Exception("error"))
 
@@ -306,7 +317,7 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.servicer.CreateSnapshot(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_wwn, "prefix_some_name", None)
+        self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_wwn, "prefix_some_name", None, None)
 
 
 class TestDeleteSnapshot(BaseControllerSetUp, CommonControllerTest):

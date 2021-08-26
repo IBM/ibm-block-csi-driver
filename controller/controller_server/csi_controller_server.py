@@ -355,6 +355,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
             snapshot_parameters = utils.get_snapshot_parameters(parameters=request.parameters,
                                                                 system_id=array_connection_info.system_id)
             pool = snapshot_parameters.pool
+            space_efficiency = snapshot_parameters.space_efficiency
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
                 snapshot_final_name = self._get_snapshot_final_name(snapshot_parameters, request.name, array_mediator)
@@ -378,13 +379,14 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                         "Snapshot doesn't exist. Creating a new snapshot {0} from volume {1}".format(
                             snapshot_final_name,
                             volume_id))
-                    snapshot = array_mediator.create_snapshot(volume_id, snapshot_final_name, pool)
+                    array_mediator.validate_supported_space_efficiency(space_efficiency)
+                    snapshot = array_mediator.create_snapshot(volume_id, snapshot_final_name, space_efficiency, pool)
 
                 logger.debug("generating create snapshot response")
                 res = utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
                 logger.info("finished create snapshot")
                 return res
-        except (ObjectIdError, array_errors.SnapshotSourcePoolMismatch) as ex:
+        except (ObjectIdError, array_errors.SnapshotSourcePoolMismatch, array_errors.SpaceEfficiencyNotSupported) as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
                                     csi_pb2.CreateSnapshotResponse)
         except array_errors.SnapshotAlreadyExists as ex:

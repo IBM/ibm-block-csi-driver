@@ -450,10 +450,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         cli_volume = self._get_cli_volume(cli_object.name)
         return self._generate_volume_response(cli_volume)
 
-    def _create_similar_volume(self, source_cli_volume, target_volume_name, pool):
+    def _create_similar_volume(self, source_cli_volume, target_volume_name, space_efficiency, pool):
         logger.info("creating target cli volume '{0}' from source volume '{1}'".format(target_volume_name,
                                                                                        source_cli_volume.name))
-        space_efficiency = _get_cli_volume_space_efficiency(source_cli_volume)
+        if not space_efficiency:
+            space_efficiency = _get_cli_volume_space_efficiency(source_cli_volume)
         size_in_bytes = int(source_cli_volume.capacity)
         if not pool:
             pool = source_cli_volume.mdisk_grp_name
@@ -561,9 +562,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         target_cli_volume = self._delete_unstarted_fcmap_if_exists(target_volume_name)
         self._delete_target_volume_if_exists(target_cli_volume)
 
-    def _create_snapshot(self, target_volume_name, source_cli_volume, pool):
+    def _create_snapshot(self, target_volume_name, source_cli_volume, space_efficiency, pool):
         try:
-            self._create_similar_volume(source_cli_volume, target_volume_name, pool)
+            self._create_similar_volume(source_cli_volume, target_volume_name, space_efficiency, pool)
             return self._create_and_start_fcmap(source_cli_volume.name, target_volume_name, is_copy=False)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.error("Failed to create snapshot '{0}': {1}".format(target_volume_name, ex))
@@ -571,11 +572,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self._rollback_create_snapshot(target_volume_name)
             raise ex
 
-    def create_snapshot(self, volume_id, snapshot_name, pool=None):
+    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         source_volume_name = self._get_volume_name_by_wwn(volume_id)
         source_cli_volume = self._get_cli_volume(source_volume_name)
-        target_cli_volume = self._create_snapshot(snapshot_name, source_cli_volume, pool)
+        target_cli_volume = self._create_snapshot(snapshot_name, source_cli_volume, space_efficiency, pool)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         return self._generate_snapshot_response(target_cli_volume, source_cli_volume.vdisk_UID)
 
