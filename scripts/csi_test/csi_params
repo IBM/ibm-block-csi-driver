@@ -1,3 +1,3 @@
 #SpaceEfficiency: Compression
 pool: POOL_NAME
-#volume_name_prefix: v_olga
+#volume_name_prefix: vol_

@@ -297,7 +297,41 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
     @handle_common_exceptions(csi_pb2.ValidateVolumeCapabilitiesResponse)
     def ValidateVolumeCapabilities(self, request, context):
         logger.info("ValidateVolumeCapabilities")
-        raise NotImplementedError()
+        try:
+            utils.validate_validate_volume_capabilities_request(request)
+
+            volume_id_info = utils.get_volume_id_info(request.volume_id)
+            system_id = volume_id_info.system_id
+            array_type = volume_id_info.array_type
+            volume_id = volume_id_info.object_id
+
+            array_connection_info = utils.get_array_connection_info_from_secrets(request.secrets,
+                                                                                 system_id=system_id)
+
+            with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
+
+                volume = array_mediator.get_object_by_id(object_id=volume_id, object_type=config.VOLUME_TYPE_NAME)
+
+            if not volume:
+                raise array_errors.ObjectNotFoundError(volume_id)
+
+            logger.debug("volume found : {}".format(volume))
+
+            if request.volume_context:
+                utils.validate_volume_context_match_volume(request.volume_context, volume)
+            if request.parameters:
+                utils.validate_parameters_match_volume(request.parameters, volume)
+
+            logger.info("finished ValidateVolumeCapabilities")
+            return utils.generate_csi_validate_volume_capabilities_response(request.volume_context,
+                                                                            request.volume_capabilities,
+                                                                            request.parameters)
+        except ObjectIdError as ex:
+            return handle_exception(ex, context, grpc.StatusCode.NOT_FOUND,
+                                    csi_pb2.CreateSnapshotResponse)
+        except array_errors.SpaceEfficiencyNotSupported as ex:
+            return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
+                                    csi_pb2.CreateSnapshotResponse)
 
     @handle_common_exceptions(csi_pb2.ListVolumesResponse)
     def ListVolumes(self, request, context):

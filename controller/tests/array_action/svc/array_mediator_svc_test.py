@@ -125,8 +125,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC5738E", array_errors.IllegalObjectName, "a" * 64)
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC6035E", array_errors.VolumeAlreadyExists)
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC5754E", array_errors.PoolDoesNotExist)
-        self._test_create_volume_mkvolume_cli_failure_error("CMMVC9292E", array_errors.PoolDoesNotMatchCapabilities)
-        self._test_create_volume_mkvolume_cli_failure_error("CMMVC9301E", array_errors.PoolDoesNotMatchCapabilities)
+        self._test_create_volume_mkvolume_cli_failure_error("CMMVC9292E", array_errors.PoolDoesNotMatchSpaceEfficiency)
+        self._test_create_volume_mkvolume_cli_failure_error("CMMVC9301E", array_errors.PoolDoesNotMatchSpaceEfficiency)
 
     def _test_create_volume_success(self, space_efficiency):
         self.svc.client.svctask.mkvolume.return_value = Mock()

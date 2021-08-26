@@ -34,7 +34,7 @@ FCMAP_ALREADY_EXIST = 'CMMVC6466E'
 FCMAP_ALREADY_COPYING = 'CMMVC5907E'
 FCMAP_ALREADY_IN_THE_STOPPED_STATE = 'CMMVC5912E'
 VOL_NOT_FOUND = 'CMMVC8957E'
-POOL_NOT_MATCH_VOL_CAPABILITIES = 'CMMVC9292E'
+POOL_NOT_MATCH_VOL_SPACE_EFFICIENCY = 'CMMVC9292E'
 NOT_REDUCTION_POOL = 'CMMVC9301E'
 NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND = 'CMMVC5860E'
 NOT_ENOUGH_EXTENTS_IN_POOL_CREATE = 'CMMVC8710E'
@@ -187,14 +187,18 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _generate_volume_response(self, cli_volume):
         source_volume_wwn = self._get_source_volume_wwn_if_exists(cli_volume)
+        space_efficiency = _get_cli_volume_space_efficiency(cli_volume)
         return Volume(
-            int(cli_volume.capacity),
-            cli_volume.vdisk_UID,
-            cli_volume.name,
-            self.endpoint,
-            cli_volume.mdisk_grp_name,
-            source_volume_wwn,
-            self.array_type)
+            vol_size_bytes=int(cli_volume.capacity),
+            vol_id=cli_volume.vdisk_UID,
+            vol_name=cli_volume.name,
+            array_address=self.endpoint,
+            pool=cli_volume.mdisk_grp_name,
+            copy_source_id=source_volume_wwn,
+            array_type=self.array_type,
+            space_efficiency=space_efficiency,
+            default_space_efficiency=config.SPACE_EFFICIENCY_THICK
+        )
 
     def _generate_snapshot_response(self, cli_snapshot, source_volume_id):
         return Snapshot(int(cli_snapshot.capacity),
@@ -378,8 +382,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                     raise array_errors.VolumeAlreadyExists(name, self.endpoint)
                 if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
                     raise array_errors.PoolDoesNotExist(pool, self.endpoint)
-                if POOL_NOT_MATCH_VOL_CAPABILITIES in ex.my_message or NOT_REDUCTION_POOL in ex.my_message:
-                    raise array_errors.PoolDoesNotMatchCapabilities(pool, space_efficiency, ex)
+                if POOL_NOT_MATCH_VOL_SPACE_EFFICIENCY in ex.my_message or NOT_REDUCTION_POOL in ex.my_message:
+                    raise array_errors.PoolDoesNotMatchSpaceEfficiency(pool, space_efficiency, ex)
                 if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in ex.my_message:
                     raise array_errors.NotEnoughSpaceInPool(id_or_name=pool)
                 if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, INVALID_NAME, TOO_MANY_CHARS)):
@@ -443,7 +447,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return None
         if object_type is controller_config.SNAPSHOT_TYPE_NAME:
             return self._generate_snapshot_response_with_verification(cli_object)
-        return self._generate_volume_response(cli_object)
+        cli_volume = self._get_cli_volume(cli_object.name)
+        return self._generate_volume_response(cli_volume)
 
     def _create_similar_volume(self, source_cli_volume, target_volume_name, pool):
         logger.info("creating target cli volume '{0}' from source volume '{1}'".format(target_volume_name,
