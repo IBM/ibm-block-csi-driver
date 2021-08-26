@@ -5,7 +5,6 @@ Create a VolumeSnapshotClass YAML file to enable creation and deletion of volume
 **Note:**
 
 -   IBM® FlashCopy® function is referred to as the more generic volume snapshots and cloning within this documentation set. Not all supported products use the FlashCopy function terminology.
--   For volume snapshot support, the minimum orchestration platform version requirements are Red Hat® OpenShift® 4.4 and Kubernetes 1.17.
 
 In order to enable creation and deletion of volume snapshots for your storage system, create a VolumeSnapshotClass YAML file, similar to the following demo-snapshotclass.yaml.
 

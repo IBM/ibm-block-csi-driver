@@ -7,7 +7,6 @@ VolumeSnapshotClass needs to be present before a VolumeSnapshot can be created. 
 **Note:**
 
 -   IBM® FlashCopy® function is referred to as the more generic volume snapshots and cloning within this documentation set. Not all supported products use the FlashCopy function terminology.
--   For volume snapshot support, the minimum orchestration platform version requirements are Red Hat® OpenShift® 4.4 and Kubernetes 1.17.
 
 When creating volume snapshots, be sure to follow all of the snapshot configurations, found in [Compatibility and requirements](../installation/csi_ug_requirements.md) before snapshot creation.
 
