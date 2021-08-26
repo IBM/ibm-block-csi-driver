@@ -8,7 +8,7 @@ To view a PDF file, you need Adobe™ Reader. You can download it at no charge f
 
 |IBM block storage CSI driver publication|Description|PDF download link|
 |----------------------------------------|-----------|-----------------|
-|*Release notes*|This publication describes requirements, compatibility, change log, and known issues information for version 1.6.0.<br />First Edition (June 2021) for version 1.6.0.|![PDF icon](PDF_icon.jpg) [Download](../pdf/IBM_block_storage_CSI_driver_1.6.0_RN.pdf)|
+|*Release notes*|This publication describes requirements, compatibility, change log, and known issues information for version 1.6.0.<br />Second Edition (July 2021) for version 1.6.0.|![PDF icon](PDF_icon.jpg) [Download](../pdf/IBM_block_storage_CSI_driver_1.6.0_RN.pdf)|
 |*User guide*|This publication describes how to prepare for, install, configure, and use IBM block storage CSI driver.<br />Publication number: SC27-9590-10.|![PDF icon](PDF_icon.jpg) [Download](../pdf/IBM_block_storage_CSI_driver_1.6.0_UG.pdf)|
 
 ## Related information and publications
@@ -19,7 +19,7 @@ IBM resources
 
 -   [IBM SAN Volume Controller documentation](https://www.ibm.com/docs/en/sanvolumecontroller)
 -   [IBM Spectrum Scale documentation](https://www.ibm.com/docs/en/spectrum-scale)
--   [IBM FlashSystem® 5200, 5000, 5100, Storwize® V5100 and V5000E documentation](http://www.ibm.com/docs/en/f555sv-and-v)
+-   [IBM FlashSystem® 5200, 5000, 5100, Storwize® V5100 and V5000E documentation](http://www.ibm.com/docs/en/flashsystem-5x00)
 -   [IBM FlashSystem™ 7200 and Storwize V7000 documentation](https://www.ibm.com/docs/en/flashsystem-7x00)
 -   [IBM Spectrum Virtualize as Software Only documentation](https://www.ibm.com/docs/en/spectrumvirtualsoftw)
 -   [IBM FlashSystem 9200 and 9100 documentation](https://www.ibm.com/docs/en/flashsystem-9x00)
