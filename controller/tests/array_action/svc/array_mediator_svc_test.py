@@ -420,7 +420,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def _test_create_snapshot_lsvdisk_cli_failure_error(self, volume_id, snapshot_name, error_message_id,
                                                         expected_error, space_efficiency=None, pool=None):
-        self._test_mediator_method_client_cli_failure_error(self.svc.create_snapshot, (volume_id, snapshot_name, space_efficiency, pool),
+        self._test_mediator_method_client_cli_failure_error(self.svc.create_snapshot,
+                                                            (volume_id, snapshot_name, space_efficiency, pool),
                                                             self.svc.client.svcinfo.lsvdisk, error_message_id,
                                                             expected_error)
 
