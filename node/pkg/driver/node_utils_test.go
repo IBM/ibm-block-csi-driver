@@ -19,16 +19,17 @@ package driver_test
 import (
 	"errors"
 	"fmt"
-	gomock "github.com/golang/mock/gomock"
-	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
-	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
-	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
-	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"io/ioutil"
 	"os"
 	"reflect"
 	"syscall"
 	"testing"
+
+	gomock "github.com/golang/mock/gomock"
+	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
+	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
+	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
 var (

@@ -46,7 +46,7 @@ class ArrayMediator(ABC):
         Raises:
             VolumeAlreadyExists
             PoolDoesNotExist
-            PoolDoesNotMatchCapabilities
+            PoolDoesNotMatchSpaceEfficiency
             IllegalObjectName
             VolumeNameIsNotSupported
             PermissionDenied

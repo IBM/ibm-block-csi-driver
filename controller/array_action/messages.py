@@ -9,7 +9,7 @@ ObjectNotFoundError_message = "Object was not found : {0} "
 VolumeNameBelongsToSnapshotError_message = "Volume not found. Snapshot with the same id exists. \
                                                          Name : {0} , array : {1}"
 
-PoolDoesNotMatchCapabilities_message = "Pool : {0} does not match the following capabilities : {1} . error : {2}"
+PoolDoesNotMatchSpaceEfficiency_message = "Pool : {0} does not match the following space efficiency : {1} . error : {2}"
 
 SpaceEfficiencyNotSupported_message = "space efficiency is not supported : {0} "
 

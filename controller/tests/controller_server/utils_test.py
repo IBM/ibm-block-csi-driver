@@ -5,11 +5,13 @@ from mock import patch, Mock
 
 import controller.array_action.errors as array_errors
 import controller.controller_server.utils as utils
-from controller.controller_server import config
+from controller.array_action import config as array_config
+from controller.controller_server import config as controller_config
 from controller.controller_server.csi_controller_server import ControllerServicer
 from controller.controller_server.errors import ObjectIdError, ValidationException
 from controller.controller_server.test_settings import pool, user, password, array
 from controller.csi_general import csi_pb2
+from controller.tests import utils as test_utils
 from controller.tests.controller_server.csi_controller_server_test import ProtoBufMock
 from controller.tests.utils import get_fake_secret_config
 
@@ -17,8 +19,7 @@ from controller.tests.utils import get_fake_secret_config
 class TestUtils(unittest.TestCase):
 
     def setUp(self):
-        self.fqdn = "fqdn"
-        self.servicer = ControllerServicer(self.fqdn)
+        self.servicer = ControllerServicer()
         self.config = {"controller": {"publish_context_lun_parameter": "lun",
                                       "publish_context_connectivity_parameter": "connectivity_type",
                                       "publish_context_separator": ",",
@@ -75,7 +76,7 @@ class TestUtils(unittest.TestCase):
 
     def test_validate_secrets_with_config_valid_system_id(self):
         self._test_validate_secrets_with_config_valid_system_id("ui_.d")
-        self._test_validate_secrets_with_config_valid_system_id("a" * config.SECRET_SYSTEM_ID_MAX_LENGTH)
+        self._test_validate_secrets_with_config_valid_system_id("a" * controller_config.SECRET_SYSTEM_ID_MAX_LENGTH)
 
     def _test_validate_secrets_with_config_invalid_system_id(self, system_id):
         secrets = get_fake_secret_config(system_id=system_id)
@@ -83,7 +84,7 @@ class TestUtils(unittest.TestCase):
 
     def test_validate_secrets_with_config_invalid_parameters(self):
         system_ids = ["-u1", "u:1", "u1+", "u1*", "u-1(", "u/1", "u=1", " ", "",
-                      "a" * (config.SECRET_SYSTEM_ID_MAX_LENGTH + 1)]
+                      "a" * (controller_config.SECRET_SYSTEM_ID_MAX_LENGTH + 1)]
         for system_id in system_ids:
             self._test_validate_secrets_with_config_invalid_system_id(system_id=system_id)
 
@@ -115,36 +116,32 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(volume_parameters.pool, expected_pool)
 
     def test_get_pool_from_parameters(self):
-        parameters = {config.PARAMETERS_POOL: pool}
+        parameters = {controller_config.PARAMETERS_POOL: pool}
         self._test_get_pool_from_parameters(parameters)
         self._test_get_pool_from_parameters(parameters, system_id="u1")
-        parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
-            {"u1": {config.PARAMETERS_POOL: pool}, "u2": {config.PARAMETERS_POOL: "other_pool"}})}
+        parameters = {controller_config.PARAMETERS_BY_SYSTEM: json.dumps(
+            {"u1": {controller_config.PARAMETERS_POOL: pool}, "u2": {controller_config.PARAMETERS_POOL: "other_pool"}})}
         self._test_get_pool_from_parameters(parameters, system_id="u1")
         self._test_get_pool_from_parameters(parameters, expected_pool="other_pool", system_id="u2")
         self._test_get_pool_from_parameters(parameters, expected_pool=None)
 
     def test_validate_file_system_volume_capabilities(self):
-        cap = Mock()
-        cap.mount = Mock()
-        cap.mount.fs_type = "ext4"
         access_mode = csi_pb2.VolumeCapability.AccessMode
-        cap.access_mode.mode = access_mode.SINGLE_NODE_WRITER
-        cap.HasField.return_value = True
 
-        utils.validate_csi_volume_capabilties([cap])
+        cap = test_utils.get_mock_volume_capability()
+        utils.validate_csi_volume_capabilities([cap])
 
         with self.assertRaises(ValidationException):
-            utils.validate_csi_volume_capabilties([])
+            utils.validate_csi_volume_capabilities([])
 
         cap.mount.fs_type = "ext4dummy"
         with self.assertRaises(ValidationException):
-            utils.validate_csi_volume_capabilties([cap])
+            utils.validate_csi_volume_capabilities([cap])
 
         cap.mount.fs_type = "ext4"
         cap.access_mode.mode = access_mode.SINGLE_NODE_READER_ONLY
         with self.assertRaises(ValidationException):
-            utils.validate_csi_volume_capabilties([cap])
+            utils.validate_csi_volume_capabilities([cap])
 
     def test_validate_create_volume_source_empty(self):
         request = Mock()
@@ -175,11 +172,11 @@ class TestUtils(unittest.TestCase):
         is_block = True
         caps.HasField.side_effect = [is_mount, is_block]
 
-        utils.validate_csi_volume_capabilties([caps])
+        utils.validate_csi_volume_capabilities([caps])
 
     @patch('controller.controller_server.utils.validate_secrets')
-    @patch('controller.controller_server.utils.validate_csi_volume_capabilties')
-    def test_validate_create_volume_request(self, valiate_capabilities, validate_secrets):
+    @patch('controller.controller_server.utils.validate_csi_volume_capabilities')
+    def test_validate_create_volume_request(self, validate_capabilities, validate_secrets):
         request = Mock()
         request.name = ""
 
@@ -196,13 +193,13 @@ class TestUtils(unittest.TestCase):
             self.assertTrue("size" in str(ex))
 
         request.capacity_range.required_bytes = 10
-        valiate_capabilities.side_effect = ValidationException("msg")
+        validate_capabilities.side_effect = ValidationException("msg")
 
         with self.assertRaises(ValidationException) as ex:
             utils.validate_create_volume_request(request)
             self.assertTrue("msg" in str(ex))
 
-        valiate_capabilities.side_effect = None
+        validate_capabilities.side_effect = None
 
         validate_secrets.side_effect = ValidationException(" other msg")
 
@@ -230,12 +227,13 @@ class TestUtils(unittest.TestCase):
             utils.validate_create_volume_request(request)
             self.assertTrue("parameters" in str(ex))
 
-        request.parameters = {config.PARAMETERS_POOL: pool, config.PARAMETERS_SPACE_EFFICIENCY: "thin "}
+        request.parameters = {controller_config.PARAMETERS_POOL: pool,
+                              controller_config.PARAMETERS_SPACE_EFFICIENCY: "thin "}
         request.volume_content_source = None
 
         utils.validate_create_volume_request(request)
 
-        request.parameters = {config.PARAMETERS_POOL: pool}
+        request.parameters = {controller_config.PARAMETERS_POOL: pool}
         utils.validate_create_volume_request(request)
 
         request.capacity_range.required_bytes = 0
@@ -322,12 +320,11 @@ class TestUtils(unittest.TestCase):
             self.assertTrue("msg1" in str(ex))
 
         validate_capabilities.side_effect = None
-        request.secrets = ["secrets"]
-        validate_secrets.side_effect = [ValidationException("msg2")]
+        validate_secrets.side_effect = [ValidationException("secrets")]
 
         with self.assertRaises(ValidationException) as ex:
             utils.validate_publish_volume_request(request)
-            self.assertTrue("msg2" in str(ex))
+            self.assertTrue("secrets" in ex.message)
 
         validate_secrets.side_effect = None
 
@@ -338,23 +335,19 @@ class TestUtils(unittest.TestCase):
         request = Mock()
         request.volume_id = "somebadvolumename"
 
-        with self.assertRaises(ValidationException) as ex:
+        with self.assertRaises(ObjectIdError) as ex:
             utils.validate_unpublish_volume_request(request)
             self.assertTrue("volume" in str(ex))
 
         request.volume_id = "xiv:volume"
 
-        request.secrets = ["secrets"]
-        validate_secrets.side_effect = [ValidationException("msg2")]
+        validate_secrets.side_effect = [ValidationException("secret")]
+
         with self.assertRaises(ValidationException) as ex:
             utils.validate_unpublish_volume_request(request)
             self.assertTrue("msg2" in str(ex))
 
         validate_secrets.side_effect = None
-
-        utils.validate_unpublish_volume_request(request)
-
-        request.volume_id = "xiv:u2:volume"
 
         utils.validate_unpublish_volume_request(request)
 
@@ -412,3 +405,61 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(res.publish_context["lun"], '1')
         self.assertEqual(res.publish_context["connectivity_type"], "fc")
         self.assertEqual(res.publish_context["fc_wwns"], "wwn1,wwn2")
+
+    def _test_validate_parameters_match_volume(self, volume_field, volume_value, parameter_field, parameter_value,
+                                               default_space_efficiency=None):
+        volume = test_utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
+        setattr(volume, volume_field, volume_value)
+        volume.default_space_efficiency = default_space_efficiency
+        if parameter_field:
+            parameters = {parameter_field: parameter_value}
+        else:
+            parameters = {}
+
+        utils.validate_parameters_match_volume(parameters, volume)
+
+    def test_validate_parameters_match_volume_se_fail(self):
+        with self.assertRaises(ValidationException):
+            self._test_validate_parameters_match_volume(volume_field="space_efficiency",
+                                                        volume_value=array_config.SPACE_EFFICIENCY_NONE,
+                                                        parameter_field=controller_config.PARAMETERS_SPACE_EFFICIENCY,
+                                                        parameter_value="thin")
+
+    def test_validate_parameters_match_volume_thin_se_success(self):
+        self._test_validate_parameters_match_volume(volume_field="space_efficiency",
+                                                    volume_value=array_config.SPACE_EFFICIENCY_THIN,
+                                                    parameter_field=controller_config.PARAMETERS_SPACE_EFFICIENCY,
+                                                    parameter_value="thin")
+
+    def test_validate_parameters_match_volume_default_se_success(self):
+        self._test_validate_parameters_match_volume(volume_field="space_efficiency",
+                                                    volume_value=array_config.SPACE_EFFICIENCY_NONE,
+                                                    parameter_field=None,
+                                                    parameter_value=None,
+                                                    default_space_efficiency='none')
+
+    def test_validate_parameters_match_volume_pool_fail(self):
+        with self.assertRaises(ValidationException):
+            self._test_validate_parameters_match_volume(volume_field="pool",
+                                                        volume_value="test_pool",
+                                                        parameter_field=controller_config.PARAMETERS_POOL,
+                                                        parameter_value="fake_pool")
+
+    def test_validate_parameters_match_volume_pool_success(self):
+        self._test_validate_parameters_match_volume(volume_field="pool",
+                                                    volume_value="test_pool",
+                                                    parameter_field=controller_config.PARAMETERS_POOL,
+                                                    parameter_value="test_pool")
+
+    def test_validate_parameters_match_volume_prefix_fail(self):
+        with self.assertRaises(ValidationException):
+            self._test_validate_parameters_match_volume(volume_field="name",
+                                                        volume_value="vol-with-no-prefix",
+                                                        parameter_field=controller_config.PARAMETERS_VOLUME_NAME_PREFIX,
+                                                        parameter_value="prefix")
+
+    def test_validate_parameters_match_volume_prefix_success(self):
+        self._test_validate_parameters_match_volume(volume_field="name",
+                                                    volume_value="prefix_vol",
+                                                    parameter_field=controller_config.PARAMETERS_VOLUME_NAME_PREFIX,
+                                                    parameter_value="prefix")
