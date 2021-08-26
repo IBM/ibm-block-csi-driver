@@ -41,10 +41,9 @@ The following limitations apply when expanding volumes with the IBM block storag
 
 **Important:** The HyperSwap feature is only supported for use with IBM Spectrum Virtualize Family storage systems.
 
-The following limitations apply when using HyperSwap with the IBM block storage CSI driver:
+The following IBM block storage CSI driver features are not supported on the volumes where HyperSwap is being used:
 
-- HyperSwap cannot be created from a volume snapshot.
-- Snapshots from a HyperSwap PersistentVolumeClaim (PVC) are not supported.
-- If HyperSwap is being used, volume cloning cannot be used.
-- If HyperSwap is being used, volume expansion cannot be used.
+- Volume snapshots
+- Volume cloning
+- Volume expansion
 
