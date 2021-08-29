@@ -1,21 +1,24 @@
+from dataclasses import dataclass
+
+
 class MembersPrintable:
     def __str__(self):
         return "<{}: {}>".format(self.__class__.__name__,
                                  " ".join("{}={!r}".format(k, v) for k, v in self.__dict__.items()), )
 
 
-class Volume(MembersPrintable):
-    def __init__(self, vol_size_bytes, vol_id, vol_name, array_address, pool, copy_source_id, array_type,
-                 space_efficiency=None, default_space_efficiency=None):
-        self.capacity_bytes = vol_size_bytes
-        self.id = vol_id
-        self.name = vol_name
-        self.array_address = array_address
-        self.pool = pool
-        self.copy_source_id = copy_source_id
-        self.array_type = array_type
-        self.space_efficiency = space_efficiency
-        self.default_space_efficiency = default_space_efficiency
+@dataclass()
+class Volume:
+    capacity_bytes: int
+    id: str
+    storage_id: str
+    name: str
+    array_address: str
+    pool: str
+    copy_source_id: str
+    array_type: str
+    space_efficiency: str = None
+    default_space_efficiency: str = None
 
 
 class Snapshot(MembersPrintable):

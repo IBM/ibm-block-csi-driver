@@ -13,6 +13,7 @@ class ArrayConnectionInfo:
 class ObjectIdInfo:
     array_type: str
     system_id: str
+    storage_id: str
     object_id: str
 
 

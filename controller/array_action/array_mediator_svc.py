@@ -189,9 +189,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         source_volume_wwn = self._get_source_volume_wwn_if_exists(cli_volume)
         space_efficiency = _get_cli_volume_space_efficiency(cli_volume)
         return Volume(
-            vol_size_bytes=int(cli_volume.capacity),
-            vol_id=cli_volume.vdisk_UID,
-            vol_name=cli_volume.name,
+            capacity_bytes=int(cli_volume.capacity),
+            id=cli_volume.vdisk_UID,
+            storage_id= cli_volume.id,
+            name=cli_volume.name,
             array_address=self.endpoint,
             pool=cli_volume.mdisk_grp_name,
             copy_source_id=source_volume_wwn,

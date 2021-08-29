@@ -135,6 +135,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         source_object_wwn = self._get_volume_source_wwn(cli_volume)
         return Volume(self._convert_size_blocks_to_bytes(cli_volume.capacity),
                       cli_volume.wwn,
+                      cli_volume.id,
                       cli_volume.name,
                       self.endpoint,
                       cli_volume.pool_name,

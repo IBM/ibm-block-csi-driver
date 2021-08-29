@@ -269,6 +269,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             deduplicated_copy = YES
             compressed_copy = YES
         return Munch({'vdisk_UID': 'vol_id',
+                      'id':'6',
                       'name': 'source_volume',
                       'capacity': '1024',
                       'mdisk_grp_name': 'pool_name',
