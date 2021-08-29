@@ -73,6 +73,7 @@ const (
 	multipathdCmd               = "multipathd"
 	multipathCmd                = "multipath"
 	VolumeIdDelimiter           = ":"
+	VolumeStorageIdDelimiter    = ";"
 )
 
 func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperScsiGenericInterface {
@@ -132,12 +133,21 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 	logger.Debugf("Rescan : finish rescan lun on lun id : {%v}, with array identifiers : {%v}", lunId, arrayIdentifiers)
 	return nil
 }
+func getVolumeUuid(volumeId string) string {
+	volumeIdParts := strings.Split(volumeId, VolumeIdDelimiter)
+	idPart := volumeIdParts[len(volumeIdParts)-1]
+	splittedIdPart := strings.Split(idPart, VolumeStorageIdDelimiter)
+	if len(splittedIdPart) == 2 {
+		return splittedIdPart[1]
+	} else {
+		return splittedIdPart[0]
+	}
+}
 
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (string, error) {
 	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] ", volumeId)
 
-	volumeIdParts := strings.Split(volumeId, VolumeIdDelimiter)
-	volumeUuid := volumeIdParts[len(volumeIdParts)-1]
+	volumeUuid := getVolumeUuid(volumeId)
 
 	volumeUuidLower := strings.ToLower(volumeUuid)
 
