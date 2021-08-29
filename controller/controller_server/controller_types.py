@@ -13,7 +13,7 @@ class ArrayConnectionInfo:
 class ObjectIdInfo:
     array_type: str
     system_id: str
-    internal_object_id: str
+    internal_id: str
     object_id: str
 
 

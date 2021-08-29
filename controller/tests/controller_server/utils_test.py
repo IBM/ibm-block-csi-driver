@@ -351,31 +351,36 @@ class TestUtils(unittest.TestCase):
 
         utils.validate_unpublish_volume_request(request)
 
-    def test_get_volume_id_info(self):
-        with self.assertRaises(ObjectIdError) as ex:
-            utils.get_volume_id_info("badvolumeformat")
-        self.assertIn("volume", str(ex.exception))
-
-        volume_id_info = utils.get_volume_id_info("xiv:volume-id")
+    def _test_get_volume_id_info(self, object_id, system_id=None, internal_id=None):
+        system_id_field = ':' + system_id if system_id else ''
+        id_field = internal_id + ';' + object_id if internal_id else object_id
+        volume_id = '{}{}:{}'.format('xiv', system_id_field, id_field)
+        volume_id_info = utils.get_volume_id_info(volume_id)
         self.assertEqual(volume_id_info.array_type, "xiv")
-        self.assertEqual(volume_id_info.system_id, None)
-        self.assertEqual(volume_id_info.internal_object_id, None)
-        self.assertEqual(volume_id_info.object_id, "volume-id")
+        self.assertEqual(volume_id_info.system_id, system_id)
+        self.assertEqual(volume_id_info.internal_id, internal_id)
+        self.assertEqual(volume_id_info.object_id, object_id)
+
+    def test_get_volume_id_info(self):
+        self._test_get_volume_id_info(object_id="volume-id")
 
     def test_get_volume_id_info_with_system_id(self):
-        volume_id_info = utils.get_volume_id_info("xiv:system_id:volume-id")
-        self.assertEqual(volume_id_info.array_type, "xiv")
-        self.assertEqual(volume_id_info.system_id, "system_id")
-        self.assertEqual(volume_id_info.object_id, "volume-id")
+        self._test_get_volume_id_info(object_id="volume-id", system_id="system_id")
 
-    def test_get_volume_id_info_with_internal_object_id(self):
-        volume_id_info = utils.get_volume_id_info("xiv:0;volume-id")
-        self.assertEqual(volume_id_info.internal_object_id, "0")
-        self.assertEqual(volume_id_info.object_id, "volume-id")
+    def test_get_volume_id_info_with_internal_id(self):
+        self._test_get_volume_id_info(object_id="volume-id", internal_id="0")
 
-    def test_get_volume_id_info_with_internal_object_id_fail(self):
+    def test_get_volume_id_info_with_internal_id_system_id(self):
+        self._test_get_volume_id_info(object_id="volume-id", system_id="system_id", internal_id="0")
+
+    def test_get_volume_id_info_too_many_semicolons_fail(self):
         with self.assertRaises(ObjectIdError) as ex:
             utils.get_volume_id_info("xiv:0;volume;id")
+        self.assertIn("Wrong volume id format", str(ex.exception))
+
+    def test_get_volume_id_info_no_id_fail(self):
+        with self.assertRaises(ObjectIdError) as ex:
+            utils.get_volume_id_info("badvolumeformat")
         self.assertIn("Wrong volume id format", str(ex.exception))
 
     def test_get_node_id_info(self):
