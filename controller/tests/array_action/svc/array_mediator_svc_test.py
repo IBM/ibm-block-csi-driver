@@ -53,12 +53,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
                 array_errors.StorageManagementIPsNotSupportError):
             SVCArrayMediator("user", "password", self.endpoint)
 
-    # @patch("pysvc.unified.client.connect")
-    # def test_connect_errors(self, mock_connect):
-    #     mock_connect.side_effect = [
-    #         svc_errors.IncorrectCredentials('Failed_a')]
-    #     with self.assertRaises(array_errors.CredentialsError):
-    #         self.svc._connect()
+    @patch("pysvc.unified.client.connect")
+    def test_connect_errors(self, mock_connect):
+        mock_connect.side_effect = [
+            svc_errors.IncorrectCredentials('Failed_a')]
+        with self.assertRaises(array_errors.CredentialsError):
+            self.svc._connect()
 
     def test_close(self):
         self.svc.disconnect()
