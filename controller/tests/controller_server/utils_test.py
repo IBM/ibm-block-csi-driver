@@ -354,11 +354,29 @@ class TestUtils(unittest.TestCase):
     def test_get_volume_id_info(self):
         with self.assertRaises(ObjectIdError) as ex:
             utils.get_volume_id_info("badvolumeformat")
-            self.assertTrue("volume" in str(ex))
+        self.assertIn("volume", str(ex.exception))
 
         volume_id_info = utils.get_volume_id_info("xiv:volume-id")
         self.assertEqual(volume_id_info.array_type, "xiv")
+        self.assertEqual(volume_id_info.system_id, None)
+        self.assertEqual(volume_id_info.internal_object_id, None)
         self.assertEqual(volume_id_info.object_id, "volume-id")
+
+    def test_get_volume_id_info_with_system_id(self):
+        volume_id_info = utils.get_volume_id_info("xiv:system_id:volume-id")
+        self.assertEqual(volume_id_info.array_type, "xiv")
+        self.assertEqual(volume_id_info.system_id, "system_id")
+        self.assertEqual(volume_id_info.object_id, "volume-id")
+
+    def test_get_volume_id_info_with_internal_object_id(self):
+        volume_id_info = utils.get_volume_id_info("xiv:0;volume-id")
+        self.assertEqual(volume_id_info.internal_object_id, "0")
+        self.assertEqual(volume_id_info.object_id, "volume-id")
+
+    def test_get_volume_id_info_with_internal_object_id_fail(self):
+        with self.assertRaises(ObjectIdError) as ex:
+            utils.get_volume_id_info("xiv:0;volume;id")
+        self.assertIn("Wrong volume id format", str(ex.exception))
 
     def test_get_node_id_info(self):
         with self.assertRaises(array_errors.HostNotFoundError) as ex:

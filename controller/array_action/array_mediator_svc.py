@@ -191,7 +191,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return Volume(
             capacity_bytes=int(cli_volume.capacity),
             id=cli_volume.vdisk_UID,
-            storage_id= cli_volume.id,
+            internal_id=cli_volume.id,
             name=cli_volume.name,
             array_address=self.endpoint,
             pool=cli_volume.mdisk_grp_name,
@@ -204,9 +204,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def _generate_snapshot_response(self, cli_snapshot, source_volume_id):
         return Snapshot(int(cli_snapshot.capacity),
                         cli_snapshot.vdisk_UID,
+                        cli_snapshot.id,
                         cli_snapshot.name,
                         self.endpoint,
-                        volume_id=source_volume_id,
+                        source_volume_id=source_volume_id,
                         is_ready=True,
                         array_type=self.array_type)
 

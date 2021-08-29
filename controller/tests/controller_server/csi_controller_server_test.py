@@ -12,7 +12,7 @@ import controller.controller_server.errors as controller_errors
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.controller_server.csi_controller_server import ControllerServicer
 from controller.controller_server.test_settings import volume_name, snapshot_name, snapshot_volume_name, \
-    clone_volume_name, snapshot_volume_wwn, pool, space_efficiency
+    clone_volume_name, snapshot_volume_wwn, pool, space_efficiency, object_id
 from controller.csi_general import csi_pb2
 from controller.tests import utils
 from controller.tests.utils import ProtoBufMock
@@ -135,7 +135,7 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_snapshot.return_value = None
 
         self.request.name = snapshot_name
-        self.request.source_volume_id = "{}:{}".format("A9000", snapshot_volume_wwn)
+        self.request.source_volume_id = "{}:{};{}".format("A9000", object_id, snapshot_volume_wwn)
         self.mediator.get_object_by_id = Mock()
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(10, snapshot_volume_name,
                                                                                               "wwn", "xiv")
@@ -157,12 +157,13 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
     def _test_create_snapshot_succeeds(self, storage_agent, expected_space_efficiency=None, expected_pool=None):
         self._prepare_create_snapshot_mocks(storage_agent)
 
-        self.servicer.CreateSnapshot(self.request, self.context)
+        response_snapshot = self.servicer.CreateSnapshot(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
         self.mediator.get_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name, pool=expected_pool)
         self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name,
                                                               expected_space_efficiency, expected_pool)
+        self.assertEqual(response_snapshot.snapshot.snapshot_id, 'xiv:0;wwn')
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_succeeds(self, storage_agent):
@@ -331,17 +332,37 @@ class TestDeleteSnapshot(BaseControllerSetUp, CommonControllerTest):
         super().setUp()
         self.mediator.get_snapshot = Mock()
         self.mediator.get_snapshot.return_value = None
-
-        self.request.snapshot_id = "A9000:BADC0FFEE0DDF00D00000000DEADBABE"
+        self.mediator.delete_snapshot = Mock()
+        self.request.snapshot_id = "A9000:0;BADC0FFEE0DDF00D00000000DEADBABE"
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.delete_snapshot", Mock())
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_delete_snapshot_succeeds(self, storage_agent):
+    def _test_delete_snapshot_succeeds(self, snapshot_id, storage_agent):
         storage_agent.return_value = self.storage_agent
+        self.request.snapshot_id = snapshot_id
 
         self.servicer.DeleteSnapshot(self.request, self.context)
-
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
+
+    def test_delete_snapshot_with_internal_id_succeeds(self):
+        self._test_delete_snapshot_succeeds("xiv:0;volume-id")
+        self.mediator.delete_snapshot.assert_called_once()
+
+    def test_delete_snapshot_with_system_id_succeeds(self):
+        self._test_delete_snapshot_succeeds("xiv:system_id:volume-id")
+        self.mediator.delete_snapshot.assert_called_once()
+
+    def test_delete_snapshot_with_system_id_internal_id_succeeds(self):
+        self._test_delete_snapshot_succeeds("xiv:system_id:0;volume-id")
+        self.mediator.delete_snapshot.assert_called_once()
+
+    def test_delete_snapshot_no_internal_id_succeeds(self):
+        self._test_delete_snapshot_succeeds("xiv:volume-id")
+        self.mediator.delete_snapshot.assert_called_once()
+
+    def test_delete_snapshot_bad_id_succeeds(self):
+        self._test_delete_snapshot_succeeds("xiv:a:a:volume-id")
+        self.mediator.delete_snapshot.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_delete_snapshot_with_wrong_secrets(self, storage_agent):
@@ -399,10 +420,12 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.create_volume.assert_called_once_with(volume_name, 10, None, expected_pool)
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
+        return response_volume
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_succeeds(self, storage_agent):
-        self._test_create_volume_succeeds(storage_agent)
+        response_volume = self._test_create_volume_succeeds(storage_agent)
+        self.assertEqual(response_volume.volume.volume_id, 'xiv:0;wwn')
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_topologies_succeeds(self, storage_agent):
@@ -413,7 +436,8 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
                                    "topology.kubernetes.io/test2": "topology_value2"})]
         self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
             {"u1": {config.PARAMETERS_POOL: pool}, "u2": {config.PARAMETERS_POOL: "other_pool"}})}
-        self._test_create_volume_succeeds(storage_agent, expected_pool="other_pool")
+        response_volume = self._test_create_volume_succeeds(storage_agent, expected_pool="other_pool")
+        self.assertEqual(response_volume.volume.volume_id, 'xiv:u2:0;wwn')
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_space_efficiency_succeeds(self, storage_agent):
@@ -873,7 +897,7 @@ class TestDeleteVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.is_volume_has_snapshots = Mock()
         self.mediator.is_volume_has_snapshots.return_value = False
 
-        self.request.volume_id = "xiv:volume-id"
+        self.request.volume_id = "xiv:0;volume-id"
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_delete_volume_with_wrong_secrets(self, storage_agent):
@@ -923,12 +947,25 @@ class TestDeleteVolume(BaseControllerSetUp, CommonControllerTest):
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.delete_volume")
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_delete_volume_succeeds(self, storage_agent, delete_volume):
+    def _test_delete_volume_succeeds(self, volume_id, storage_agent, delete_volume):
         storage_agent.return_value = self.storage_agent
         delete_volume.return_value = Mock()
+        self.request.snapshot_id = volume_id
         self.servicer.DeleteVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
+
+    def test_delete_volume_with_internal_id_succeeds(self):
+        self._test_delete_volume_succeeds("xiv:0;volume-id")
+
+    def test_delete_volume_with_system_id_succeeds(self):
+        self._test_delete_volume_succeeds("xiv:system_id:volume-id")
+
+    def test_delete_volume_with_system_id_internal_id_succeeds(self):
+        self._test_delete_volume_succeeds("xiv:system_id:0;volume-id")
+
+    def test_delete_volume_no_internal_id_succeeds(self):
+        self._test_delete_volume_succeeds("xiv:volume-id")
 
 
 class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):

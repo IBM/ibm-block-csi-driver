@@ -72,6 +72,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         return Munch({
             'wwn': wwn,
             'name': name,
+            'id': '0',
             'pool_name': 'fake_pool',
             'capacity': '512',
             'copy_master_wwn': wwn})
