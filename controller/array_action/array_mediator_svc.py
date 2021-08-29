@@ -44,6 +44,7 @@ HOST_ID_PARAM = 'id'
 HOST_NAME_PARAM = 'name'
 HOST_ISCSI_NAMES_PARAM = 'iscsi_name'
 HOST_WWPNS_PARAM = 'WWPN'
+HOST_PORT_SET_ID = 'portset_id'
 HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
 
 FCMAP_STATUS_DONE = 'idle_or_copied'
@@ -783,8 +784,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.debug("Found iqns by node id: {}".format(array_iqns_by_id))
         return array_iqns_by_id
 
-    def _list_ip_ports(self):
+    def _list_ip_ports(self, port_set_id):
         try:
+            if port_set_id:
+                filter_value = 'portset_id={}'.format(port_set_id)
+                return self.client.svcinfo.lsip(filtervalue=filter_value)
             return self.client.svcinfo.lsportip(filtervalue='state=configured:failover=no')
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.error("Get iscsi targets failed. Reason is: {}".format(ex))
@@ -809,14 +813,15 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             ips_by_iqn[iqn].extend(ips)
         return dict(ips_by_iqn)
 
-    def _get_iscsi_targets_by_node_id(self):
-        ports = self._list_ip_ports()
+    def _get_iscsi_targets_by_node_id(self, host_name):
+        port_set_id = self._get_host_port_set_id(host_name)
+        ports = self._list_ip_ports(port_set_id)
         return self._create_ips_by_node_id_map(ports)
 
-    def get_iscsi_targets_by_iqn(self):
+    def get_iscsi_targets_by_iqn(self, host_name=None):
         logger.debug("Getting iscsi targets by iqn")
         iqns_by_node_id = self._get_array_iqns_by_node_id()
-        ips_by_node_id = self._get_iscsi_targets_by_node_id()
+        ips_by_node_id = self._get_iscsi_targets_by_node_id(host_name)
         ips_by_iqn = self._unify_ips_by_iqn(iqns_by_node_id, ips_by_node_id)
 
         if ips_by_iqn and any(ips_by_iqn.values()):
@@ -840,3 +845,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             logger.error(msg="Failed to get array fc wwn. Reason "
                              "is: {0}".format(ex))
             raise ex
+
+    def _get_host_by_name(self, host_name):
+        filter_value = 'name={}'.format(host_name)
+        hosts_list = self.client.svcinfo.lshost(filtervalue=filter_value).as_list
+        if not hosts_list:
+            raise array_errors.HostNotFoundError(host_name)
+        return hosts_list[0]
+
+    def _get_host_port_set_id(self, host_name):
+        host = self._get_host_by_name(host_name)
+        return host.get(HOST_PORT_SET_ID)

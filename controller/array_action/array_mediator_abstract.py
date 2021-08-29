@@ -26,7 +26,7 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
         if FC_CONNECTIVITY_TYPE == connectivity_type:
             array_initiators = self.get_array_fc_wwns(host_name)
         elif ISCSI_CONNECTIVITY_TYPE == connectivity_type:
-            array_initiators = self.get_iscsi_targets_by_iqn()
+            array_initiators = self.get_iscsi_targets_by_iqn(host_name)
         else:
             raise UnsupportedConnectivityTypeError(connectivity_type)
 
