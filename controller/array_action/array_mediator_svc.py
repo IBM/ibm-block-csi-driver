@@ -798,9 +798,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def _create_ips_by_node_id_map(ports):
         ips_by_node_id = defaultdict(list)
         for port in ports:
-            if port.IP_address:
+            if port.get('IP_address'):
                 ips_by_node_id[port.node_id].append(port.IP_address)
-            if port.IP_address_6:
+            if port.get('IP_address_6'):
                 ipv6 = port.IP_address_6.join('[]')
                 ips_by_node_id[port.node_id].append(ipv6)
         return dict(ips_by_node_id)
