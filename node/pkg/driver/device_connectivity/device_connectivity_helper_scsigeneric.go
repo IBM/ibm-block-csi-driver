@@ -73,7 +73,7 @@ const (
 	multipathdCmd               = "multipathd"
 	multipathCmd                = "multipath"
 	VolumeIdDelimiter           = ":"
-	VolumeStorageIdDelimiter    = ";"
+	VolumeStorageIdsDelimiter   = ";"
 )
 
 func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperScsiGenericInterface {
@@ -135,12 +135,12 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 }
 func getVolumeUuid(volumeId string) string {
 	volumeIdParts := strings.Split(volumeId, VolumeIdDelimiter)
-	idPart := volumeIdParts[len(volumeIdParts)-1]
-	splittedIdPart := strings.Split(idPart, VolumeStorageIdDelimiter)
-	if len(splittedIdPart) == 2 {
-		return splittedIdPart[1]
+	idsPart := volumeIdParts[len(volumeIdParts)-1]
+	splittedIdsPart := strings.Split(idsPart, VolumeStorageIdsDelimiter)
+	if len(splittedIdsPart) == 2 {
+		return splittedIdsPart[1]
 	} else {
-		return splittedIdPart[0]
+		return splittedIdsPart[0]
 	}
 }
 
