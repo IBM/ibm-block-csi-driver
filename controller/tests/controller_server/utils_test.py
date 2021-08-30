@@ -352,9 +352,9 @@ class TestUtils(unittest.TestCase):
         utils.validate_unpublish_volume_request(request)
 
     def _test_get_volume_id_info(self, object_id, system_id=None, internal_id=None):
-        system_id_field = ':' + system_id if system_id else ''
-        id_field = internal_id + ';' + object_id if internal_id else object_id
-        volume_id = '{}{}:{}'.format('xiv', system_id_field, id_field)
+        system_id_field = ':{}'.format(system_id) if system_id else ''
+        ids_field = '{};{}'.format(internal_id, object_id) if internal_id else object_id
+        volume_id = '{}{}:{}'.format('xiv', system_id_field, ids_field)
         volume_id_info = utils.get_volume_id_info(volume_id)
         self.assertEqual(volume_id_info.array_type, "xiv")
         self.assertEqual(volume_id_info.system_id, system_id)

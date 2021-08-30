@@ -12,7 +12,7 @@ import controller.controller_server.errors as controller_errors
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.controller_server.csi_controller_server import ControllerServicer
 from controller.controller_server.test_settings import volume_name, snapshot_name, snapshot_volume_name, \
-    clone_volume_name, snapshot_volume_wwn, pool, space_efficiency, object_id
+    clone_volume_name, snapshot_volume_wwn, pool, space_efficiency, internal_id
 from controller.csi_general import csi_pb2
 from controller.tests import utils
 from controller.tests.utils import ProtoBufMock
@@ -135,7 +135,7 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_snapshot.return_value = None
 
         self.request.name = snapshot_name
-        self.request.source_volume_id = "{}:{};{}".format("A9000", object_id, snapshot_volume_wwn)
+        self.request.source_volume_id = "{}:{};{}".format("A9000", internal_id, snapshot_volume_wwn)
         self.mediator.get_object_by_id = Mock()
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(10, snapshot_volume_name,
                                                                                               "wwn", "xiv")
@@ -411,7 +411,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.create_volume = Mock()
         self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "volume", "wwn", "xiv")
 
-    def _test_create_volume_succeeds(self, storage_agent, expected_pool=pool):
+    def _test_create_volume_succeeds(self, storage_agent, expected_volume_id, expected_pool=pool):
         self._prepare_create_volume_mocks(storage_agent)
 
         response_volume = self.servicer.CreateVolume(self.request, self.context)
@@ -420,12 +420,11 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.create_volume.assert_called_once_with(volume_name, 10, None, expected_pool)
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
-        return response_volume
+        self.assertEqual(response_volume.volume.volume_id, expected_volume_id)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_succeeds(self, storage_agent):
-        response_volume = self._test_create_volume_succeeds(storage_agent)
-        self.assertEqual(response_volume.volume.volume_id, 'xiv:0;wwn')
+        self._test_create_volume_succeeds(storage_agent, 'xiv:0;wwn')
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_topologies_succeeds(self, storage_agent):
@@ -436,8 +435,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
                                    "topology.kubernetes.io/test2": "topology_value2"})]
         self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
             {"u1": {config.PARAMETERS_POOL: pool}, "u2": {config.PARAMETERS_POOL: "other_pool"}})}
-        response_volume = self._test_create_volume_succeeds(storage_agent, expected_pool="other_pool")
-        self.assertEqual(response_volume.volume.volume_id, 'xiv:u2:0;wwn')
+        self._test_create_volume_succeeds(storage_agent, 'xiv:u2:0;wwn', expected_pool="other_pool")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_space_efficiency_succeeds(self, storage_agent):
@@ -950,7 +948,7 @@ class TestDeleteVolume(BaseControllerSetUp, CommonControllerTest):
     def _test_delete_volume_succeeds(self, volume_id, storage_agent, delete_volume):
         storage_agent.return_value = self.storage_agent
         delete_volume.return_value = Mock()
-        self.request.snapshot_id = volume_id
+        self.request.volume_id = volume_id
         self.servicer.DeleteVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
