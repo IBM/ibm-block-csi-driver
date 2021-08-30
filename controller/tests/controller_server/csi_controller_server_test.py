@@ -12,7 +12,7 @@ import controller.controller_server.errors as controller_errors
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.controller_server.csi_controller_server import ControllerServicer
 from controller.controller_server.test_settings import volume_name, snapshot_name, snapshot_volume_name, \
-    clone_volume_name, snapshot_volume_wwn, pool, space_efficiency, internal_id
+    clone_volume_name, snapshot_volume_wwn, pool, space_efficiency, object_id
 from controller.csi_general import csi_pb2
 from controller.tests import utils
 from controller.tests.utils import ProtoBufMock
@@ -135,7 +135,7 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_snapshot.return_value = None
 
         self.request.name = snapshot_name
-        self.request.source_volume_id = "{}:{};{}".format("A9000", internal_id, snapshot_volume_wwn)
+        self.request.source_volume_id = "{}:{};{}".format("A9000", object_id, snapshot_volume_wwn)
         self.mediator.get_object_by_id = Mock()
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(10, snapshot_volume_name,
                                                                                               "wwn", "xiv")
