@@ -114,9 +114,10 @@ def get_snapshot_id(new_snapshot):
 
 
 def _get_object_id(obj, system_id=None):
+    object_ids_value = config.PARAMETERS_OBJECT_IDS_DELIMITER.join((obj.internal_id, obj.id))
     if system_id:
-        return config.PARAMETERS_OBJECT_ID_DELIMITER.join((obj.array_type, system_id, obj.id))
-    return config.PARAMETERS_OBJECT_ID_DELIMITER.join((obj.array_type, obj.id))
+        return config.PARAMETERS_OBJECT_ID_INFO_DELIMITER.join((obj.array_type, system_id, object_ids_value))
+    return config.PARAMETERS_OBJECT_ID_INFO_DELIMITER.join((obj.array_type, object_ids_value))
 
 
 def _is_system_id_valid(system_id):
@@ -234,10 +235,10 @@ def _validate_object_id(object_id, object_type=config.VOLUME_TYPE_NAME,
     logger.debug("validating volume id")
     if not object_id:
         raise ValidationException(message)
-    if config.PARAMETERS_OBJECT_ID_DELIMITER not in object_id:
+    if config.PARAMETERS_OBJECT_ID_INFO_DELIMITER not in object_id:
         raise ObjectIdError(object_type, object_id)
-    if len(object_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)) not in {config.MINIMUM_VOLUME_ID_PARTS,
-                                                                           config.MAXIMUM_VOLUME_ID_PARTS}:
+    if len(object_id.split(config.PARAMETERS_OBJECT_ID_INFO_DELIMITER)) not in {config.MINIMUM_VOLUME_ID_PARTS,
+                                                                                config.MAXIMUM_VOLUME_ID_PARTS}:
         raise ValidationException(messages.volume_id_wrong_format_message)
 
 
@@ -459,16 +460,23 @@ def _get_context_from_volume(volume):
 
 def get_object_id_info(full_object_id, object_type):
     logger.debug("getting {0} info for id : {1}".format(object_type, full_object_id))
-    splitted_object_id = full_object_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)
-    system_id = None
+    splitted_object_id = full_object_id.split(config.PARAMETERS_OBJECT_ID_INFO_DELIMITER)
+    system_id, wwn, internal_id = None, None, None
     if len(splitted_object_id) == 2:
         array_type, object_id = splitted_object_id
     elif len(splitted_object_id) == 3:
         array_type, system_id, object_id = splitted_object_id
     else:
         raise ObjectIdError(object_type, full_object_id)
+    splitted_id = object_id.split(config.PARAMETERS_OBJECT_IDS_DELIMITER)
+    if len(splitted_id) == 1:
+        wwn = splitted_id[0]
+    elif len(splitted_id) == 2:
+        internal_id, wwn = splitted_id
+    else:
+        raise ObjectIdError(object_type, full_object_id)
     logger.debug("volume id : {0}, array type :{1}".format(object_id, array_type))
-    return ObjectIdInfo(array_type=array_type, system_id=system_id, object_id=object_id)
+    return ObjectIdInfo(array_type=array_type, system_id=system_id, internal_id=internal_id, object_id=wwn)
 
 
 def get_node_id_info(node_id):

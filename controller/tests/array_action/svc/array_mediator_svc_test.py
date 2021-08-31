@@ -137,6 +137,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(volume.capacity_bytes, 1024)
         self.assertEqual(volume.array_type, 'SVC')
         self.assertEqual(volume.id, 'vol_id')
+        self.assertEqual(volume.internal_id, 'test_id')
 
     def test_create_volume_with_thin_space_efficiency_success(self):
         self._test_create_volume_success(config.SPACE_EFFICIENCY_THIN)
@@ -269,6 +270,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             deduplicated_copy = YES
             compressed_copy = YES
         return Munch({'vdisk_UID': 'vol_id',
+                      'id': 'test_id',
                       'name': 'source_volume',
                       'capacity': '1024',
                       'mdisk_grp_name': 'pool_name',
