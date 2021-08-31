@@ -72,7 +72,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         return Munch({
             'wwn': wwn,
             'name': name,
-            'id': '0',
+            'id': 'test_id',
             'pool_name': 'fake_pool',
             'capacity': '512',
             'copy_master_wwn': wwn})
@@ -84,6 +84,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_create.assert_called_once_with(vol='mock_volume', size_blocks=1,
                                                                     pool='fake_pool')
         self.assertEqual(volume.name, "mock_volume")
+        self.assertEqual(volume.internal_id, 'test_id')
 
     def test_create_volume_success(self):
         self._test_create_volume_with_space_efficiency_success(None)
