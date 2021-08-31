@@ -1,6 +1,6 @@
 # Table of Contents
 
-* [CSI repository welcome](book_files/csi_block_storage_kc_welcome.md)
+* [Welcome](book_files/csi_block_storage_kc_welcome.md)
 * [What's new](book_files/csi_block_storage_kc_whatsnew.md)
 * [Release notes](book_files/csi_block_storage_kc_rn.md)
 	* [What's new in 1.6.0](content/release_notes/csi_rn_whatsnew.md)
@@ -10,6 +10,7 @@
 		* [Supported orchestration platforms](content/release_notes/csi_rn_supported_orchestration.md)
 	* [Change log](content/release_notes/csi_rn_changelog.md)
 		* [1.6.0 (June 2021)](content/release_notes/csi_rn_changelog_1.6.0.md)
+		* [1.5.1 (July 2021)](content/release_notes/csi_rn_changelog_1.5.1.md)
 		* [1.5.0 (March 2021)](content/release_notes/csi_rn_changelog_1.5.0.md)
 		* [1.4.0 (December 2020)](content/release_notes/csi_rn_changelog_1.4.0.md)
 		* [1.3.0 (September 2020)](content/release_notes/csi_rn_changelog_1.3.0.md)
