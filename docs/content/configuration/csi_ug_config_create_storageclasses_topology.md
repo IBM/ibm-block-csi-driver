@@ -1,6 +1,6 @@
 # Creating a StorageClass with topology feature
 
-When using the Topology Aware feature, different parameters must be taken into account, when creating a storage class yaml file. Use this information to create a StorageClass that is Topology Aware.
+When using the CSI Topology feature, different parameters must be taken into account when creating a storage class yaml file with specific `by_system_id` requirements. Use this information to help define a StorageClass that is topology aware.
 
 **Note:** For information and parameter definitions that are not related to topology awareness, be sure to see the information provided in [Creating a StorageClass](csi_ug_config_create_storageclasses.md), in addition to the current section.
 
