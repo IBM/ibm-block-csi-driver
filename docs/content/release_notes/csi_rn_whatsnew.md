@@ -10,6 +10,11 @@ IBM® block storage CSI driver 1.7.0 is now topology aware. Using this feature, 
 
 For more information, see [CSI Topology Feature](https://kubernetes-csi.github.io/docs/topology.html).
 
+## New volume replication support for IBM Spectrum Virtualize Family storage systems
+
+When using IBM Spectrum Virtualize Family storage systems, the CSI driver now supports volume replication (mirroring).
+
+
 ## New HyperSwap support for IBM Spectrum Virtualize Family storage systems
 
 When using IBM Spectrum Virtualize Family storage systems, the CSI driver now supports HyperSwap implementation.

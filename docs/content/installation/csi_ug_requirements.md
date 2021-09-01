@@ -50,8 +50,14 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
    Apply the yaml file.
 
    `oc apply -f 99-ibm-attach.yaml`
+
+3. Configure storage system connectivity.
+
+    1.  Define the host of each Kubernetes node on the relevant storage systems with the valid WWPN (for Fibre Channel) or IQN (for iSCSI) of the node.
+
+    2.  For Fibre Channel, configure the relevant zoning from the storage to the host.
     
-3. If needed, enable support for volume snapshots (FlashCopy® function) on your Kubernetes cluster.
+4. (Optional) If planning on using volume snapshots (FlashCopy® function), enable support on your Kubernetes cluster.
 
    For more information and instructions, see the Kubernetes blog post, [Kubernetes 1.20: Kubernetes Volume Snapshot Moves to GA](https://kubernetes.io/blog/2020/12/10/kubernetes-1.20-volume-snapshot-moves-to-ga/).
 
@@ -59,7 +65,16 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
 
    The instructions and relevant yaml files to enable volume snapshots can be found at: [https://github.com/kubernetes-csi/external-snapshotter#usage](https://github.com/kubernetes-csi/external-snapshotter#usage)
 
-4. To use CSI Topology, any nodes in the cluster must have the following labels that introduce topology awareness:
+5. (Optional) If planning on using volume replication (mirroring), enable support on your Kubernetes cluster.
+
+    Install the following replication CRDs, once per cluster.
+
+    ```
+    curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.1.0/config/crd/bases/replication.storage.openshift.io_volumereplicationclasses.yamlkubectl apply -f ./replication.storage.openshift.io_volumereplicationclasses.yaml
+    curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.1.0/config/crd/bases/replication.storage.openshift.io_volumereplications.yamlkubectl apply -f ./replication.storage.openshift.io_volumereplications.yaml
+    ```
+
+6. (Optional) To use CSI Topology, any nodes in the cluster must have the following labels that introduce topology awareness:
       - `topology.kubernetes.io/region`
       - `topology.kubernetes.io/zone`
 
@@ -72,11 +87,7 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
       [node2, {"beta.kubernetes.io/arch":"amd64","beta.kubernetes.io/os":"linux","kubernetes.io/arch":"amd64","kubernetes.io/hostname":"k8s-rhel-7-8-k8s-1-20-arbel-w2","kubernetes.io/os":"linux","topology.block.csi.ibm.com/demo-region":"demo-region-2","topology.block.csi.ibm.com/demo-zone":"demo-zone-2"}]
     ```
 
-5. Configure storage system connectivity.
 
-    1.  Define the host of each Kubernetes node on the relevant storage systems with the valid WWPN (for Fibre Channel) or IQN (for iSCSI) of the node.
-
-    2.  For Fibre Channel, configure the relevant zoning from the storage to the host.
 
 
 

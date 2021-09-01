@@ -33,7 +33,7 @@ When creating volume snapshots, be sure to follow all of the snapshot configurat
 
 3.  Verify that the VolumeSnapshot was created.
 
-    Run the kubectl describe volumesnapshot command.
+    Run the `kubectl describe volumesnapshot` command.
 
     See the **Status** section of the output for the following:
 
