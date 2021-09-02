@@ -24,13 +24,6 @@ _<a name=spaceefficiency>**Table:**</a> `SpaceEfficiency` parameter definitions 
 
 - The IBM DS8000 Family `pool` value is the pool ID and not the pool name as is used in other storage systems.
 - Be sure that the `pool` value is the name of an existing pool on the storage system.
-- To create a volume with HyperSwap on IBM Spectrum Virtualize storage systems, put a colon (:) between the two pools within the `pool` value. For example:
-  
-  ```
-  pool: demo-pool1:demo-pool2 
-  ```
-  For more information about the HyperSwap limitations, see [Limitations](content\release_notes\csi_rn_limitations.md) within the release notes.
-  
 - The `allowVolumeExpansion` parameter is optional but is necessary for using volume expansion. The default value is _false_.
 
 **Note:** Be sure to set the value to true to allow volume expansion.

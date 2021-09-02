@@ -14,11 +14,6 @@ For more information, see [CSI Topology Feature](https://kubernetes-csi.github.i
 
 When using IBM Spectrum Virtualize Family storage systems, the CSI driver now supports volume replication (mirroring).
 
-
-## New HyperSwap support for IBM Spectrum Virtualize Family storage systems
-
-When using IBM Spectrum Virtualize Family storage systems, the CSI driver now supports HyperSwap implementation.
-
 ## Additional supported orchestration platforms for deployment
 
 This version adds support for orchestration platforms Kubernetes 1.22 and Red Hat OpenShift 4.9, suitable for deployment of the CSI (Container Storage Interface) driver.
