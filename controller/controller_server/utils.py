@@ -109,11 +109,11 @@ def get_volume_id(new_volume, system_id):
     return _get_object_id(new_volume, system_id)
 
 
-def get_snapshot_id(new_snapshot):
-    return _get_object_id(new_snapshot)
+def get_snapshot_id(new_snapshot, system_id):
+    return _get_object_id(new_snapshot, system_id)
 
 
-def _get_object_id(obj, system_id=None):
+def _get_object_id(obj, system_id):
     object_ids_value = config.PARAMETERS_OBJECT_IDS_DELIMITER.join((obj.internal_id, obj.id))
     if system_id:
         return config.PARAMETERS_OBJECT_ID_INFO_DELIMITER.join((obj.array_type, system_id, object_ids_value))
@@ -361,12 +361,12 @@ def generate_csi_create_volume_response(new_volume, system_id=None, source_type=
     return res
 
 
-def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
+def generate_csi_create_snapshot_response(new_snapshot, system_id, source_volume_id):
     logger.debug("creating create snapshot response for snapshot : {0}".format(new_snapshot))
 
     res = csi_pb2.CreateSnapshotResponse(snapshot=csi_pb2.Snapshot(
         size_bytes=new_snapshot.capacity_bytes,
-        snapshot_id=get_snapshot_id(new_snapshot),
+        snapshot_id=get_snapshot_id(new_snapshot, system_id),
         source_volume_id=source_volume_id,
         creation_time=get_current_timestamp(),
         ready_to_use=new_snapshot.is_ready))

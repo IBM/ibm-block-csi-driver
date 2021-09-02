@@ -383,7 +383,7 @@ class ControllerServicer(csi_pb2_grpc.ControllerServicer):
                     snapshot = array_mediator.create_snapshot(volume_id, snapshot_final_name, space_efficiency, pool)
 
                 logger.debug("generating create snapshot response")
-                res = utils.generate_csi_create_snapshot_response(snapshot, source_volume_id)
+                res = utils.generate_csi_create_snapshot_response(snapshot, system_id, source_volume_id)
                 logger.info("finished create snapshot")
                 return res
         except (ObjectIdError, array_errors.SnapshotSourcePoolMismatch, array_errors.SpaceEfficiencyNotSupported) as ex:
