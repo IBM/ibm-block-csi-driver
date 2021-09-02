@@ -889,7 +889,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     @staticmethod
     def _is_replication_disconnected(rcrelationship):
-        return rcrelationship.state.contains('disconnected')
+        return 'disconnected' in rcrelationship.state
 
     @staticmethod
     def _is_replication_ready(rcrelationship):
