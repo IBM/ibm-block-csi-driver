@@ -25,9 +25,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
         node = Munch({'id': '1', 'name': 'node1', 'iscsi_name': 'iqn.1986-03.com.ibm:2145.v7k1.node1',
                       'status': 'online'})
         self.svc.client.svcinfo.lsnode.return_value = [node]
-        port = Munch({'node_id': '1', 'IP_address': '1.1.1.1', 'IP_address_6': None})
-        self.svc.client.svcinfo.lsportip.return_value = [port]
-        self.svc.client.svcinfo.lsip.return_value = [port]
+        lsportip_port = Munch({'node_id': '1', 'IP_address': '1.1.1.1', 'IP_address_6': None})
+        lsip_port = Munch({'node_id': '1', 'IP_address': '1.1.1.1', 'portset_id': 'demo_id'})
+        self.svc.client.svcinfo.lsportip.return_value = [lsportip_port]
+        self.svc.client.svcinfo.lsip.return_value = [lsip_port]
         self.fcmaps = [self._create_dummy_fcmap('source_name', 'test_fc_id')]
         self.fcmaps_as_target = [self._create_dummy_fcmap('source_name', 'test_fc_as_target_id')]
         self.fcmaps_as_source = [self._create_dummy_fcmap('test_snapshot', 'test_fc_id')]
@@ -862,21 +863,21 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_iscsi_targets_cmd_error_raise_host_not_found(self):
         self.svc.client.svcinfo.lshost.return_value = Mock(as_list=[])
         with self.assertRaises(array_errors.HostNotFoundError):
-            self.svc.get_iscsi_targets_by_iqn()
+            self.svc.get_iscsi_targets_by_iqn('test_host')
 
     def test_get_iscsi_targets_cmd_error_raise_no_targets_error(self):
         self._prepare_mocks_for_get_iscsi_targets()
         self.svc.client.svcinfo.lsportip.side_effect = [
             svc_errors.CommandExecutionError('Failed')]
         with self.assertRaises(array_errors.NoIscsiTargetsFoundError):
-            self.svc.get_iscsi_targets_by_iqn()
+            self.svc.get_iscsi_targets_by_iqn('test_host')
 
     def test_get_iscsi_targets_cli_error_raise_no_targets_error(self):
         self._prepare_mocks_for_get_iscsi_targets()
         self.svc.client.svcinfo.lsportip.side_effect = [
             CLIFailureError("Failed")]
         with self.assertRaises(array_errors.NoIscsiTargetsFoundError):
-            self.svc.get_iscsi_targets_by_iqn()
+            self.svc.get_iscsi_targets_by_iqn('test_host')
 
     def test_get_iscsi_targets_no_online_node_raise_no_targets_error(self):
         self._prepare_mocks_for_get_iscsi_targets()
@@ -886,14 +887,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
                       'status': 'offline'})
         self.svc.client.svcinfo.lsnode.return_value = [node]
         with self.assertRaises(array_errors.NoIscsiTargetsFoundError):
-            self.svc.get_iscsi_targets_by_iqn()
+            self.svc.get_iscsi_targets_by_iqn('test_host')
 
     def test_get_iscsi_targets_no_nodes_nor_ips_raise_no_targets_error(self):
         self._prepare_mocks_for_get_iscsi_targets()
         self.svc.client.svcinfo.lsnode.return_value = []
         self.svc.client.svcinfo.lsportip.return_value = []
         with self.assertRaises(array_errors.NoIscsiTargetsFoundError):
-            self.svc.get_iscsi_targets_by_iqn()
+            self.svc.get_iscsi_targets_by_iqn('test_host')
 
     def test_get_iscsi_targets_no_port_with_ip_raise_no_targets_error(self):
         self._prepare_mocks_for_get_iscsi_targets()
@@ -901,31 +902,31 @@ class TestArrayMediatorSVC(unittest.TestCase):
         port_2 = Munch({'node_id': '2', 'IP_address': '', 'IP_address_6': None})
         self.svc.client.svcinfo.lsportip.return_value = [port_1, port_2]
         with self.assertRaises(array_errors.NoIscsiTargetsFoundError):
-            self.svc.get_iscsi_targets_by_iqn()
+            self.svc.get_iscsi_targets_by_iqn('test_host')
 
     def test_get_iscsi_targets_no_ip_raise_no_targets_error(self):
         self._prepare_mocks_for_get_iscsi_targets()
         self.svc.client.svcinfo.lsportip.return_value = []
         with self.assertRaises(array_errors.NoIscsiTargetsFoundError):
-            self.svc.get_iscsi_targets_by_iqn()
+            self.svc.get_iscsi_targets_by_iqn('test_host')
 
     def test_get_iscsi_targets_with_lsportip_success(self):
         self._prepare_mocks_for_get_iscsi_targets()
-        ips_by_iqn = self.svc.get_iscsi_targets_by_iqn()
+        ips_by_iqn = self.svc.get_iscsi_targets_by_iqn('test_host')
         self.svc.client.svcinfo.lsportip.assert_called_once()
         self.assertEqual(ips_by_iqn, {'iqn.1986-03.com.ibm:2145.v7k1.node1': ['1.1.1.1']})
 
     def test_get_iscsi_targets_with_lsip_success(self):
-        self._prepare_mocks_for_get_iscsi_targets(portset_id='0')
-        ips_by_iqn = self.svc.get_iscsi_targets_by_iqn(host_name='host1')
-        self.svc.client.svcinfo.lsip.assert_called_once_with(filtervalue='portset_id=0')
+        self._prepare_mocks_for_get_iscsi_targets(portset_id='demo_id')
+        ips_by_iqn = self.svc.get_iscsi_targets_by_iqn('test_host')
+        self.svc.client.svcinfo.lsip.assert_called_once_with(filtervalue='portset_id=demo_id')
         self.svc.client.svcinfo.lsportip.not_called()
         self.assertEqual(ips_by_iqn, {'iqn.1986-03.com.ibm:2145.v7k1.node1': ['1.1.1.1']})
 
     def test_get_iscsi_targets_with_exception(self):
         self.svc.client.svcinfo.lsnode.side_effect = [Exception]
         with self.assertRaises(Exception):
-            self.svc.get_iscsi_targets_by_iqn()
+            self.svc.get_iscsi_targets_by_iqn('test_host')
 
     def test_get_iscsi_targets_with_multi_nodes(self):
         self._prepare_mocks_for_get_iscsi_targets()
@@ -943,7 +944,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         port_3 = Munch({'node_id': '2', 'IP_address': '', 'IP_address_6': '1::1'})
         self.svc.client.svcinfo.lsportip.return_value = [port_1, port_2, port_3]
 
-        ips_by_iqn = self.svc.get_iscsi_targets_by_iqn()
+        ips_by_iqn = self.svc.get_iscsi_targets_by_iqn('test_host')
 
         self.assertEqual(ips_by_iqn, {'iqn.1986-03.com.ibm:2145.v7k1.node1': ['1.1.1.1', '2.2.2.2'],
                                       'iqn.1986-03.com.ibm:2145.v7k1.node2': ['[1::1]']})

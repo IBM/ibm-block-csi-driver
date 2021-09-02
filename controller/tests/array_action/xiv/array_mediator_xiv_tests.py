@@ -607,7 +607,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.ipinterface_list.return_value = []
 
         with self.assertRaises(Exception):
-            self.mediator.get_iscsi_targets_by_iqn()
+            self.mediator.get_iscsi_targets_by_iqn('test_host')
 
     def test_get_iscsi_targets_by_iqn_success(self):
         config_param = utils.get_mock_xiv_config_param(name="iscsi_name", value="iqn1")
@@ -616,7 +616,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         ip_interface6 = utils.get_mock_xiv_ip_interface("iSCSI", address6="::1")
         self.mediator.client.cmd.ipinterface_list.return_value = [ip_interface, ip_interface6]
 
-        targets_by_iqn = self.mediator.get_iscsi_targets_by_iqn()
+        targets_by_iqn = self.mediator.get_iscsi_targets_by_iqn('test_host')
 
         self.assertEqual(targets_by_iqn, {"iqn1": ["1.2.3.4", "[::1]"]})
 

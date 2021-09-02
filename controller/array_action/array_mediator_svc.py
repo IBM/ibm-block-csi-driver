@@ -820,7 +820,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         ports = self._list_ip_ports(port_set_id)
         return self._create_ips_by_node_id_map(ports)
 
-    def get_iscsi_targets_by_iqn(self, host_name=None):
+    def get_iscsi_targets_by_iqn(self, host_name):
         logger.debug("Getting iscsi targets by iqn")
         iqns_by_node_id = self._get_array_iqns_by_node_id()
         ips_by_node_id = self._get_iscsi_targets_by_node_id(host_name)

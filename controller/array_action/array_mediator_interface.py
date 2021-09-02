@@ -266,7 +266,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_iscsi_targets_by_iqn(self, host_name=None):
+    def get_iscsi_targets_by_iqn(self, host_name):
         """
         This function will return a mapping of the storage array iscsi names to their iscsi target IPs
 
