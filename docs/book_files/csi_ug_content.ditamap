@@ -30,13 +30,22 @@ navtitle="Installing the driver with the OpenShift web console" format="markdown
 </topicref>
 </chapter>
 <chapter href="../content/configuration/csi_ug_config.md" format="markdown">
-<topicref href="../content/configuration/csi_ug_config_create_secret.md" format="markdown"/>
-<topicref href="../content/configuration/csi_ug_config_create_storageclasses.md" format="markdown"/>
-<topicref href="../content/configuration/csi_ug_config_create_pvc.md" navtitle="Creating PersistentVolumeClaim (PVC)" format="markdown"/>
-<topicref href="../content/configuration/csi_ug_config_create_statefulset.md"
-navtitle="Creating PersistentVolumeClaim (PVC)" format="markdown"/>
-<topicref href="../content/configuration/csi_ug_config_create_vol_snapshotclass.md" navtitle="Creating a VolumeSnapshotClass" format="markdown"/>
-<topicref href="../content/configuration/csi_ug_config_create_snapshots.md" navtitle="Creating Volume Snapshots" format="markdown"/>
+<topicref href="../content/configuration/csi_ug_config_create_secret.md" format="markdown">
+<topicref href="../content/configuration/csi_ug_config_create_secret_topology.md" format="markdown"
+/>
+</topicref>
+<topicref href="../content/configuration/csi_ug_config_create_storageclasses.md" format="markdown">
+<topicref href="../content/configuration/csi_ug_config_create_storageclasses_topology.md"
+format="markdown"/>
+</topicref>
+<topicref href="../content/configuration/csi_ug_config_create_pvc.md" format="markdown"/>
+<topicref href="../content/configuration/csi_ug_config_create_statefulset.md" format="markdown"/>
+<topicref href="../content/configuration/csi_ug_config_create_vol_snapshotclass.md"
+format="markdown"/>
+<topicref href="../content/configuration/csi_ug_config_create_snapshots.md" format="markdown"/>
+<topicref href="../content/configuration/csi_ug_config_create_vol_replicationclass.md"
+format="markdown"/>
+<topicref href="../content/configuration/csi_ug_config_create_replication.md" format="markdown"/>
 <topicref href="../content/configuration/csi_ug_config_expand_pvc.md" navtitle="Expanding a volume" product="volexpand" format="markdown"/>
 <topicref href="../content/configuration/csi_ug_config_advanced.md" navtitle="Advanced configuration" format="markdown">
 <topicref href="../content/configuration/csi_ug_config_advanced_importvol.md" navtitle="Advanced configuration" format="markdown"/>
