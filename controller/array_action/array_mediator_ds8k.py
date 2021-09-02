@@ -222,9 +222,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def _generate_volume_response(self, api_volume):
         space_efficiency = _get_parameter_space_efficiency(api_volume.tp)
         return Volume(
-            vol_size_bytes=int(api_volume.cap),
-            vol_id=self._generate_volume_scsi_identifier(volume_id=api_volume.id),
-            vol_name=api_volume.name,
+            capacity_bytes=int(api_volume.cap),
+            id=self._generate_volume_scsi_identifier(volume_id=api_volume.id),
+            internal_id=api_volume.id,
+            name=api_volume.name,
             array_address=self.service_address,
             copy_source_id=self._get_copy_source_id(api_volume=api_volume),
             pool=api_volume.pool,
@@ -659,10 +660,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def _generate_snapshot_response(self, api_snapshot, source_volume_id):
         return Snapshot(capacity_bytes=int(api_snapshot.cap),
-                        snapshot_id=self._generate_volume_scsi_identifier(api_snapshot.id),
-                        snapshot_name=api_snapshot.name,
+                        id=self._generate_volume_scsi_identifier(api_snapshot.id),
+                        internal_id=api_snapshot.id,
+                        name=api_snapshot.name,
                         array_address=self.service_address,
-                        volume_id=self._generate_volume_scsi_identifier(source_volume_id),
+                        source_volume_id=self._generate_volume_scsi_identifier(source_volume_id),
                         is_ready=True,
                         array_type=self.array_type)
 

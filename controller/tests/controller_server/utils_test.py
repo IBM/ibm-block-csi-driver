@@ -351,14 +351,37 @@ class TestUtils(unittest.TestCase):
 
         utils.validate_unpublish_volume_request(request)
 
+    def _test_get_volume_id_info(self, object_id, system_id=None, internal_id=None):
+        system_id_field = ':{}'.format(system_id) if system_id else ''
+        ids_field = '{};{}'.format(internal_id, object_id) if internal_id else object_id
+        volume_id = '{}{}:{}'.format('xiv', system_id_field, ids_field)
+        volume_id_info = utils.get_volume_id_info(volume_id)
+        self.assertEqual(volume_id_info.array_type, "xiv")
+        self.assertEqual(volume_id_info.system_id, system_id)
+        self.assertEqual(volume_id_info.internal_id, internal_id)
+        self.assertEqual(volume_id_info.object_id, object_id)
+
     def test_get_volume_id_info(self):
+        self._test_get_volume_id_info(object_id="volume-id")
+
+    def test_get_volume_id_info_with_system_id(self):
+        self._test_get_volume_id_info(object_id="volume-id", system_id="system_id")
+
+    def test_get_volume_id_info_with_internal_id(self):
+        self._test_get_volume_id_info(object_id="volume-id", internal_id="0")
+
+    def test_get_volume_id_info_with_internal_id_system_id(self):
+        self._test_get_volume_id_info(object_id="volume-id", system_id="system_id", internal_id="0")
+
+    def test_get_volume_id_info_too_many_semicolons_fail(self):
+        with self.assertRaises(ObjectIdError) as ex:
+            utils.get_volume_id_info("xiv:0;volume;id")
+        self.assertIn("Wrong volume id format", str(ex.exception))
+
+    def test_get_volume_id_info_no_id_fail(self):
         with self.assertRaises(ObjectIdError) as ex:
             utils.get_volume_id_info("badvolumeformat")
-            self.assertTrue("volume" in str(ex))
-
-        volume_id_info = utils.get_volume_id_info("xiv:volume-id")
-        self.assertEqual(volume_id_info.array_type, "xiv")
-        self.assertEqual(volume_id_info.object_id, "volume-id")
+        self.assertIn("Wrong volume id format", str(ex.exception))
 
     def test_get_node_id_info(self):
         with self.assertRaises(array_errors.HostNotFoundError) as ex:

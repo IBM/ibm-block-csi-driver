@@ -135,6 +135,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         source_object_wwn = self._get_volume_source_wwn(cli_volume)
         return Volume(self._convert_size_blocks_to_bytes(cli_volume.capacity),
                       cli_volume.wwn,
+                      cli_volume.id,
                       cli_volume.name,
                       self.endpoint,
                       cli_volume.pool_name,
@@ -144,9 +145,10 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def _generate_snapshot_response(self, cli_snapshot):
         return Snapshot(self._convert_size_blocks_to_bytes(cli_snapshot.capacity),
                         cli_snapshot.wwn,
+                        cli_snapshot.id,
                         cli_snapshot.name,
                         self.endpoint,
-                        volume_id=self._get_snapshot_source_wwn(cli_snapshot),
+                        source_volume_id=self._get_snapshot_source_wwn(cli_snapshot),
                         is_ready=True,
                         array_type=self.array_type)
 
