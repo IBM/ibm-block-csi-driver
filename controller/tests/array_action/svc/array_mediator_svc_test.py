@@ -8,7 +8,7 @@ from pysvc.unified.response import CLIFailureError
 import controller.array_action.config as config
 import controller.array_action.errors as array_errors
 from controller.array_action.array_mediator_svc import SVCArrayMediator, build_kwargs_from_parameters, \
-    HOST_ID_PARAM, HOST_NAME_PARAM, HOST_ISCSI_NAMES_PARAM, HOST_WWPNS_PARAM, FCMAP_STATUS_DONE, YES, HOST_PORT_SET_ID
+    HOST_ID_PARAM, HOST_NAME_PARAM, HOST_ISCSI_NAMES_PARAM, HOST_WWPNS_PARAM, FCMAP_STATUS_DONE, YES, HOST_PORTSET_ID
 from controller.array_action.svc_cli_result_reader import SVCListResultsElement
 from controller.common.node_info import Initiators
 
@@ -713,14 +713,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE,
                           config.FC_CONNECTIVITY_TYPE], connectivity_type)
 
-    def _get_host_as_dictionary(self, id, name, iscsi_names_list, wwpns_list, port_set_id=None):
+    def _get_host_as_dictionary(self, id, name, iscsi_names_list, wwpns_list, portset_id=None):
         res = {HOST_ID_PARAM: id, HOST_NAME_PARAM: name}
         if iscsi_names_list:
             res[HOST_ISCSI_NAMES_PARAM] = iscsi_names_list
         if wwpns_list:
             res[HOST_WWPNS_PARAM] = wwpns_list
-        if port_set_id:
-            res[HOST_PORT_SET_ID] = port_set_id
+        if portset_id:
+            res[HOST_PORTSET_ID] = portset_id
         return res
 
     def _get_hosts_list_result(self, hosts_dict):
@@ -740,7 +740,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             if wwpns_list:
                 for wwpn in wwpns_list:
                     current_element.add(HOST_WWPNS_PARAM, wwpn)
-            current_element.add(HOST_PORT_SET_ID, host_dict.get(HOST_PORT_SET_ID))
+            current_element.add(HOST_PORTSET_ID, host_dict.get(HOST_PORTSET_ID))
             detailed_hosts_list.append(current_element)
         return iter(detailed_hosts_list)
 
