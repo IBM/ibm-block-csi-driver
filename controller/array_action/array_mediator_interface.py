@@ -342,6 +342,101 @@ class ArrayMediator(ABC):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
+        """
+        This function will return the volume replication relationship info
+
+        Args:
+            volume_internal_id : internal id of the volume in the replication relationship
+            other_volume_internal_id : internal id of the other volume in the replication relationship
+            other_system_id : id of the other system of the replication relationship
+
+        Returns:
+            Replication
+
+        Raises:
+            ObjectNotFound
+            IllegalObjectName
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
+        """
+        This function will create and activate a volume replication relationship
+
+        Args:
+            volume_internal_id : internal id of the volume in the replication relationship
+            other_volume_internal_id : internal id of the other volume in the replication relationship
+            other_system_id : id of the other system of the replication relationship
+            copy_type : sync/async
+
+        Returns:
+            None
+
+        Raises:
+            ObjectNotFound
+            IllegalObjectName
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def delete_replication(self, replication_name):
+        """
+        This function will disable and delete a volume replication relationship
+
+        Args:
+            replication_name : name of the replication relationship
+
+        Returns:
+            None
+
+        Raises:
+            ObjectNotFound
+            IllegalObjectName
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def promote_replication_volume(self, replication_name):
+        """
+        This function will promote the role of the volume in the connected system to be primary
+
+        Args:
+            replication_name : name of the replication relationship
+
+        Returns:
+            None
+
+        Raises:
+            ObjectNotFound
+            IllegalObjectName
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def demote_replication_volume(self, replication_name):
+        """
+        This function will demote the role of the volume in the connected system to be secondary
+
+        Args:
+            replication_name : name of the replication relationship
+
+        Returns:
+            None
+
+        Raises:
+            ObjectNotFound
+            IllegalObjectName
+            PermissionDenied
+        """
+        raise NotImplementedError
+
     @property
     @abstractmethod
     def identifier(self):

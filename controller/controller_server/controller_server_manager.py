@@ -5,8 +5,10 @@ import grpc
 
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
-from controller.controller_server.csi_controller_server import ControllerServicer
+from controller.controller_server.csi_controller_server import CSIControllerServicer
+from controller.controller_server.addons_server import ReplicationControllerServicer
 from controller.csi_general import csi_pb2_grpc
+from controller.csi_general import replication_pb2_grpc
 
 
 logger = get_stdout_logger()
@@ -15,13 +17,15 @@ logger = get_stdout_logger()
 class ControllerServerManager:
     def __init__(self, array_endpoint):
         self.endpoint = array_endpoint
-        self.csi_servicer = ControllerServicer()
+        self.csi_servicer = CSIControllerServicer()
+        self.replication_servicer = ReplicationControllerServicer()
 
     def start_server(self):
         controller_server = grpc.server(futures.ThreadPoolExecutor(max_workers=settings.CSI_CONTROLLER_SERVER_WORKERS))
 
         csi_pb2_grpc.add_ControllerServicer_to_server(self.csi_servicer, controller_server)
         csi_pb2_grpc.add_IdentityServicer_to_server(self.csi_servicer, controller_server)
+        replication_pb2_grpc.add_ControllerServicer_to_server(self.replication_servicer, controller_server)
 
         # bind the server to the port defined above
         # controller_server.add_insecure_port('[::]:{}'.format(self.server_port))

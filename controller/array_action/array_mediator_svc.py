@@ -9,7 +9,7 @@ from retry import retry
 import controller.array_action.config as config
 import controller.array_action.errors as array_errors
 import controller.controller_server.config as controller_config
-from controller.array_action.array_action_types import Volume, Snapshot, Host
+from controller.array_action.array_action_types import Volume, Snapshot, Host, Replication
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.svc_cli_result_reader import SVCListResultsReader
 from controller.array_action.utils import classproperty, bytes_to_string
@@ -47,11 +47,15 @@ HOST_WWPNS_PARAM = 'WWPN'
 HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
 
 FCMAP_STATUS_DONE = 'idle_or_copied'
+RCRELATIONSHIP_STATE_IDLE = 'idling'
 
 YES = 'yes'
 
 ENDPOINT_TYPE_SOURCE = 'source'
 ENDPOINT_TYPE_TARGET = 'target'
+
+ENDPOINT_TYPE_MASTER = 'master'
+ENDPOINT_TYPE_AUX = 'aux'
 
 
 def is_warning_message(ex):
@@ -84,6 +88,31 @@ def build_kwargs_from_parameters(space_efficiency, pool_name, volume_name,
         elif space_efficiency == config.SPACE_EFFICIENCY_DEDUPLICATED:
             cli_kwargs.update({'compressed': True, 'deduplicated': True})
 
+    return cli_kwargs
+
+
+def build_create_replication_kwargs(master_cli_volume_id, aux_cli_volume_id, other_system_id, copy_type):
+    cli_kwargs = {
+        'master': master_cli_volume_id,
+        'aux': aux_cli_volume_id,
+        'cluster': other_system_id,
+    }
+    if copy_type == config.REPLICATION_COPY_TYPE_ASYNC:
+        cli_kwargs.update({'global': True})
+    return cli_kwargs
+
+
+def build_start_replication_kwargs(rcrelationship_id, primary_endpoint_type):
+    cli_kwargs = {'object_id': rcrelationship_id}
+    if primary_endpoint_type:
+        cli_kwargs.update({'primary': primary_endpoint_type})
+    return cli_kwargs
+
+
+def build_stop_replication_kwargs(rcrelationship_id, add_access):
+    cli_kwargs = {'object_id': rcrelationship_id}
+    if add_access:
+        cli_kwargs.update({'access': True})
     return cli_kwargs
 
 
@@ -842,3 +871,192 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             logger.error(msg="Failed to get array fc wwn. Reason "
                              "is: {0}".format(ex))
             raise ex
+
+    def _get_replication_endpoint_type(self, rcrelationship):
+        if self._identifier == rcrelationship.master_cluster_id:
+            return ENDPOINT_TYPE_MASTER
+        return ENDPOINT_TYPE_AUX
+
+    def _get_replication_other_endpoint_type(self, rcrelationship):
+        endpoint_type = self._get_replication_endpoint_type(rcrelationship)
+        if endpoint_type == ENDPOINT_TYPE_MASTER:
+            return ENDPOINT_TYPE_AUX
+        return ENDPOINT_TYPE_MASTER
+
+    @staticmethod
+    def _is_replication_idle(rcrelationship):
+        return rcrelationship.state == RCRELATIONSHIP_STATE_IDLE
+
+    @staticmethod
+    def _is_replication_disconnected(rcrelationship):
+        return rcrelationship.state.contains('disconnected')
+
+    @staticmethod
+    def _is_replication_ready(rcrelationship):
+        return rcrelationship.state.startswith('consistent')
+
+    def _is_replication_endpoint_primary(self, rcrelationship, endpoint_type=None):
+        if not endpoint_type:
+            endpoint_type = self._get_replication_endpoint_type(rcrelationship)
+        return rcrelationship.primary == endpoint_type
+
+    @staticmethod
+    def _get_replication_copy_type(rcrelationship):
+        if rcrelationship.copy_type == 'global':
+            return config.REPLICATION_COPY_TYPE_ASYNC
+        return config.REPLICATION_COPY_TYPE_SYNC
+
+    def _generate_replication_response(self, rcrelationship, volume_internal_id, other_volume_internal_id):
+        copy_type = self._get_replication_copy_type(rcrelationship)
+        is_primary = self._is_replication_endpoint_primary(rcrelationship)
+        is_ready = self._is_replication_ready(rcrelationship)
+        return Replication(name=rcrelationship.name,
+                           volume_internal_id=volume_internal_id,
+                           other_volume_internal_id=other_volume_internal_id,
+                           copy_type=copy_type,
+                           is_primary=is_primary,
+                           is_ready=is_ready)
+
+    def _get_lsrcrelationship(self, filter_value):
+        return self.client.svcinfo.lsrcrelationship(filtervalue=filter_value)
+
+    def _get_rcrelationship_by_name(self, replication_name, not_exist_error=True):
+        filter_value = 'RC_rel_name={0}'.format(replication_name)
+        rcrelationship = self._get_lsrcrelationship(filter_value).as_single_element
+        if not rcrelationship and not_exist_error:
+            raise array_errors.ObjectNotFoundError(replication_name)
+        return rcrelationship
+
+    def _get_rcrelationships(self, cli_volume_id, other_cli_volume_id, other_system_id, as_master):
+        endpoint_type = ENDPOINT_TYPE_AUX
+        other_endpoint_type = ENDPOINT_TYPE_MASTER
+        if as_master:
+            endpoint_type = ENDPOINT_TYPE_MASTER
+            other_endpoint_type = ENDPOINT_TYPE_AUX
+        filter_value = '{END}_vdisk_id={VDISK_ID}:' \
+                       '{OTHER_END}_vdisk_id={OTHER_VDISK_ID}:' \
+                       '{OTHER_END}_cluster_id={OTHER_CLUSTER_ID}'.format(END=endpoint_type, VDISK_ID=cli_volume_id,
+                                                                          OTHER_END=other_endpoint_type,
+                                                                          OTHER_VDISK_ID=other_cli_volume_id,
+                                                                          OTHER_CLUSTER_ID=other_system_id)
+        return self._get_lsrcrelationship(filter_value).as_list
+
+    def _get_rcrelationship(self, cli_volume_id, other_cli_volume_id, other_system_id):
+        rcrelationships = self._get_rcrelationships(cli_volume_id, other_cli_volume_id,
+                                                    other_system_id, as_master=True)
+        rcrelationships.extend(self._get_rcrelationships(cli_volume_id, other_cli_volume_id,
+                                                         other_system_id, as_master=False))
+        if len(rcrelationships) != 1:
+            logger.warning('found {0} rcrelationships for volume id {1} '
+                           'with volume id {2} of system {3}'.format(len(rcrelationships),
+                                                                     cli_volume_id,
+                                                                     other_cli_volume_id,
+                                                                     other_system_id))
+            return None
+        return rcrelationships[0]
+
+    def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
+        rcrelationship = self._get_rcrelationship(volume_internal_id, other_volume_internal_id, other_system_id)
+        if not rcrelationship:
+            return None
+        logger.info("found rcrelationship: {}".format(rcrelationship))
+        return self._generate_replication_response(rcrelationship, volume_internal_id, other_volume_internal_id)
+
+    def _create_rcrelationship(self, master_cli_volume_id, aux_cli_volume_id, other_system_id, copy_type):
+        logger.info("creating remote copy relationship for master volume id: {0} "
+                    "and auxiliary volume id: {1} with system {2} using {3} copy type".format(master_cli_volume_id,
+                                                                                              aux_cli_volume_id,
+                                                                                              other_system_id,
+                                                                                              copy_type))
+        kwargs = build_create_replication_kwargs(master_cli_volume_id, aux_cli_volume_id, other_system_id, copy_type)
+        try:
+            svc_response = self.client.svctask.mkrcrelationship(**kwargs)
+            message = str(svc_response.response[0])
+            id_start, id_end = message.find('[') + 1, message.find(']')
+            raw_id = message[id_start:id_end]
+            return int(raw_id)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if not is_warning_message(ex.my_message):
+                logger.error("failed to create rcrelationship for volume id {0} "
+                             "with volume id {1} of system {2}: {3}".format(master_cli_volume_id,
+                                                                            aux_cli_volume_id,
+                                                                            other_system_id,
+                                                                            ex))
+                raise ex
+        return None
+
+    def _start_rcrelationship(self, rcrelationship_id, primary_endpoint_type=None):
+        logger.info("starting remote copy relationship with id: {0}".format(rcrelationship_id))
+        try:
+            kwargs = build_start_replication_kwargs(rcrelationship_id, primary_endpoint_type)
+            self.client.svctask.startrcrelationship(**kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if not is_warning_message(ex.my_message):
+                logger.warning("failed to start rcrelationship '{0}': {1}".format(rcrelationship_id, ex))
+
+    def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
+        rc_id = self._create_rcrelationship(volume_internal_id, other_volume_internal_id, other_system_id, copy_type)
+        self._start_rcrelationship(rc_id)
+
+    def _stop_rcrelationship(self, rcrelationship_id, add_access_to_secondary=False):
+        logger.info("stopping remote copy relationship with id: {}. access: {}".format(rcrelationship_id,
+                                                                                       add_access_to_secondary))
+        kwargs = build_stop_replication_kwargs(rcrelationship_id, add_access_to_secondary)
+        try:
+            self.client.svctask.stoprcrelationship(**kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if not is_warning_message(ex.my_message):
+                logger.warning("failed to stop rcrelationship '{0}': {1}".format(rcrelationship_id, ex))
+
+    def _delete_rcrelationship(self, rcrelationship_id):
+        logger.info("deleting remote copy relationship with id: {0}".format(rcrelationship_id))
+        try:
+            self.client.svctask.rmrcrelationship(object_id=rcrelationship_id)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if not is_warning_message(ex.my_message):
+                logger.warning("failed to delete rcrelationship '{0}': {1}".format(rcrelationship_id, ex))
+
+    def delete_replication(self, replication_name):
+        rcrelationship = self._get_rcrelationship_by_name(replication_name, not_exist_error=False)
+        if not rcrelationship:
+            logger.info("could not find replication with name {}".format(replication_name))
+            return
+        self._stop_rcrelationship(rcrelationship.id)
+        self._delete_rcrelationship(rcrelationship.id)
+
+    def _promote_replication_endpoint(self, endpoint_type, replication_name):
+        logger.info("making '{}' primary for remote copy relationship {}".format(endpoint_type, replication_name))
+        try:
+            self.client.svctask.switchrcrelationship(primary=endpoint_type, object_id=replication_name)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if not is_warning_message(ex.my_message):
+                logger.error("failed to make '{}' primary for rcrelationship {}: {}".format(endpoint_type,
+                                                                                            replication_name,
+                                                                                            ex.my_message))
+                raise
+        logger.info("succeeded making '{}' primary for remote copy relationship {}".format(endpoint_type,
+                                                                                           replication_name))
+
+    def _ensure_endpoint_is_primary(self, rcrelationship, endpoint_type):
+        if self._is_replication_endpoint_primary(rcrelationship, endpoint_type):
+            logger.info("'{}' is already primary for rcrelationship {}. "
+                        "skipping the switch".format(endpoint_type,
+                                                     rcrelationship.name))
+            return
+        if self._is_replication_idle(rcrelationship):
+            self._start_rcrelationship(rcrelationship.id, primary_endpoint_type=endpoint_type)
+            return
+        self._promote_replication_endpoint(endpoint_type, rcrelationship.name)
+
+    def promote_replication_volume(self, replication_name):
+        rcrelationship = self._get_rcrelationship_by_name(replication_name)
+        if self._is_replication_disconnected(rcrelationship):
+            self._stop_rcrelationship(rcrelationship.id, add_access_to_secondary=True)
+            return
+        endpoint_type = self._get_replication_endpoint_type(rcrelationship)
+        self._ensure_endpoint_is_primary(rcrelationship, endpoint_type)
+
+    def demote_replication_volume(self, replication_name):
+        rcrelationship = self._get_rcrelationship_by_name(replication_name)
+        endpoint_type_to_promote = self._get_replication_other_endpoint_type(rcrelationship)
+        self._ensure_endpoint_is_primary(rcrelationship, endpoint_type_to_promote)

@@ -10,6 +10,7 @@ secret_missing_connection_info_message = "secret is missing connection info"
 secret_missing_topologies_message = "secret is missing topologies"
 invalid_system_id_message = "got an invalid system id: {}, validation regex: {}"
 invalid_json_parameter_message = "got an invalid json parameter: {}, error: {}."
+invalid_replication_copy_type_message = "got an invalid copy type: {}"
 secret_missing_message = 'secret is missing'
 capabilities_not_set_message = "capabilities were not set"
 unsupported_fs_type_message = "unsupported fs_type : {}"

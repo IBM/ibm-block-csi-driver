@@ -10,9 +10,9 @@ import controller.array_action.errors as array_errors
 import controller.controller_server.config as config
 import controller.controller_server.errors as controller_errors
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
-from controller.controller_server.csi_controller_server import ControllerServicer
+from controller.controller_server.csi_controller_server import CSIControllerServicer
 from controller.controller_server.test_settings import volume_name, snapshot_name, snapshot_volume_name, \
-    clone_volume_name, snapshot_volume_wwn, pool, space_efficiency, object_id
+    clone_volume_name, snapshot_volume_wwn, pool, space_efficiency, object_internal_id
 from controller.csi_general import csi_pb2
 from controller.tests import utils
 from controller.tests.utils import ProtoBufMock
@@ -33,7 +33,7 @@ class BaseControllerSetUp(unittest.TestCase):
         self.storage_agent = MagicMock()
         self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
 
-        self.servicer = ControllerServicer()
+        self.servicer = CSIControllerServicer()
 
         self.request = ProtoBufMock()
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
@@ -135,7 +135,7 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_snapshot.return_value = None
 
         self.request.name = snapshot_name
-        self.request.source_volume_id = "{}:{};{}".format("A9000", object_id, snapshot_volume_wwn)
+        self.request.source_volume_id = "{}:{};{}".format("A9000", object_internal_id, snapshot_volume_wwn)
         self.mediator.get_object_by_id = Mock()
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(10, snapshot_volume_name,
                                                                                               "wwn", "xiv")
@@ -1522,7 +1522,7 @@ class TestExpandVolume(BaseControllerSetUp, CommonControllerTest):
 
 class TestIdentityServer(BaseControllerSetUp):
 
-    @patch.object(ControllerServicer, "get_identity_config")
+    @patch.object(CSIControllerServicer, "get_identity_config")
     def test_identity_plugin_get_info_succeeds(self, identity_config):
         plugin_name = "plugin-name"
         version = "1.1.0"
@@ -1533,7 +1533,7 @@ class TestIdentityServer(BaseControllerSetUp):
         res = self.servicer.GetPluginInfo(request, context)
         self.assertEqual(res, csi_pb2.GetPluginInfoResponse(name=plugin_name, vendor_version=version))
 
-    @patch.object(ControllerServicer, "get_identity_config")
+    @patch.object(CSIControllerServicer, "get_identity_config")
     def test_identity_plugin_get_info_fails_when_attributes_from_config_are_missing(self, identity_config):
         request = Mock()
         context = Mock()
@@ -1548,7 +1548,7 @@ class TestIdentityServer(BaseControllerSetUp):
         self.assertEqual(res, csi_pb2.GetPluginInfoResponse())
         context.set_code.assert_called_with(grpc.StatusCode.INTERNAL)
 
-    @patch.object(ControllerServicer, "get_identity_config")
+    @patch.object(CSIControllerServicer, "get_identity_config")
     def test_identity_plugin_get_info_fails_when_name_or_value_are_empty(self, identity_config):
         request = Mock()
         context = Mock()
