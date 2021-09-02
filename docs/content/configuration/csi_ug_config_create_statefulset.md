@@ -42,7 +42,7 @@ Here, the `volumeMounts` indicates both the name of the volume, with the necessa
             image: registry.access.redhat.com/ubi8/ubi:latest
             command: [ "/bin/sh", "-c", "--" ]
             args: [ "while true; do sleep 30; done;" ]
-            <b>volumeMounts:
+            volumeMounts:
               - name: demo-volume-file-system
                 mountPath: "/data"</b>
           volumes:

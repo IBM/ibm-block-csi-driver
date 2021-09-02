@@ -1,6 +1,6 @@
 # Compatibility and requirements
 
-For the complete and up-to-date information about the compatibility and requirements for using the IBM® block storage CSI driver, refer to its latest release notes. The release notes detail supported operating system and container platform versions, as well as microcode versions of the supported storage systems.
+For the complete and up-to-date information about the compatibility and requirements for using the IBM® block storage CSI driver, refer to its latest release notes. The release notes detail supported operating system and container platform versions, and microcode versions of the supported storage systems.
 
 Before beginning the installation of the CSI (Container Storage Interface) driver, be sure to verify that you comply with the following prerequisites.
 
@@ -67,7 +67,7 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
 
 5. (Optional) If planning on using volume replication (mirroring), enable support on your Kubernetes cluster.
 
-    Install the following replication CRDs, once per cluster.
+    Install the following replication CRDs once per cluster.
 
     ```
     curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.1.0/config/crd/bases/replication.storage.openshift.io_volumereplicationclasses.yamlkubectl apply -f ./replication.storage.openshift.io_volumereplicationclasses.yaml
@@ -78,7 +78,7 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
       - `topology.kubernetes.io/region`
       - `topology.kubernetes.io/zone`
 
-      **Important:** These labels must be found on the nodes in the cluster **before** installing the IBM® block storage CSI driver. If these are not labelled before installation, the CSI driver will not be topology aware.
+      **Important:** These labels must be found on the nodes in the cluster **before** installing the IBM® block storage CSI driver. If these are not labeled before installation, the CSI driver will not be topology aware.
 
       ```
       $ kubectl get nodes -o=jsonpath='{range .items[*]}[{.metadata.name}, {.metadata.labels}]{"\n"}{end}' | grep --color "topology.block.csi.ibm.com"

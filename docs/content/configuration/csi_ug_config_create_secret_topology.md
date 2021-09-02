@@ -1,8 +1,8 @@
-# Creating a Secret that is Topology Aware
+# Creating a Secret with topology awareness
 
-Create an array secret YAML file in order to define the storage credentials (username and password) and address. Use this information for creating a Secret that is Topology Aware.
+Create an array secret YAML file in order to define the storage credentials (username and password) and address. Use this information for creating a Secret that is topology aware.
 
-**Note:** If you are not using the Topology Aware feature, follow the steps in [Creating a Secret](csi_ug_config_create_secret.md).
+**Note:** If you are not using the CSI Topology feature, follow the steps in [Creating a Secret](csi_ug_config_create_secret.md).
 
 Use the Secret file to connect a worker node to a storage system.
 
