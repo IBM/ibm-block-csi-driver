@@ -14,7 +14,7 @@ When creating volume snapshots, be sure to follow all of the snapshot configurat
 
     For more information about PVC configuration, see [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
 
-    ```screen
+    ```
     apiVersion: snapshot.storage.k8s.io/v1beta1
     kind: VolumeSnapshot
     metadata:

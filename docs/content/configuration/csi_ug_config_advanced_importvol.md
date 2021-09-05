@@ -75,33 +75,33 @@ Use this procedure to help build a PV yaml file for your volumes.
 
 2.  Take the `volume_name` and other optional information (collected before the procedure) and insert it into the yaml file (under `spec.csi.volumeAttributes`).
 
-**Important:** If using the CSI Topology feature, the `spec.csi.volumeHandle` contains the system ID. In the example below, the `spec.csi.volumeHandle` would read similar to the following: `SVC:demo-system-id-1:600507640082000B08000000000004FF`.
-
-    apiVersion: v1
-    kind: PersistentVolume
-    metadata:
-      # annotations:
-        # pv.kubernetes.io/provisioned-by: block.csi.ibm.com
-      name: vol1-pv
-    spec:
-      accessModes:
-      - ReadWriteOnce
-      capacity:
-        storage: 1Gi
-      csi:
-        controllerPublishSecretRef:
-          name: demo-secret
-          namespace: default
-        driver: block.csi.ibm.com
-        # volumeAttributes:
-          # pool_name: ibmc-block-gold
-          # storage_type: SVC
-          # volume_name: vol1
-          # array_address: baremetal10-cluster.xiv.ibm.com
-        volumeHandle: SVC:600507640082000B08000000000004FF
-      # persistentVolumeReclaimPolicy: Retain
-      storageClassName: ibmc-block-gold
-      # volumeMode: Filesystem
+    **Important:** If using the CSI Topology feature, the `spec.csi.volumeHandle` contains the system ID. In the example below, the `spec.csi.volumeHandle` would read similar to the following: `SVC:demo-system-id-1:600507640082000B08000000000004FF`.
+    
+        apiVersion: v1
+        kind: PersistentVolume
+        metadata:
+          # annotations:
+            # pv.kubernetes.io/provisioned-by: block.csi.ibm.com
+          name: vol1-pv
+        spec:
+          accessModes:
+          - ReadWriteOnce
+          capacity:
+            storage: 1Gi
+          csi:
+            controllerPublishSecretRef:
+              name: demo-secret
+              namespace: default
+            driver: block.csi.ibm.com
+            # volumeAttributes:
+              # pool_name: ibmc-block-gold
+              # storage_type: SVC
+              # volume_name: vol1
+              # array_address: baremetal10-cluster.xiv.ibm.com
+            volumeHandle: SVC:600507640082000B08000000000004FF
+          # persistentVolumeReclaimPolicy: Retain
+          storageClassName: ibmc-block-gold
+          # volumeMode: Filesystem
     
 
 3.  Create a PersistentVolumeClaim (PVC) yaml file.
@@ -111,24 +111,24 @@ Use this procedure to help build a PV yaml file for your volumes.
     -   To include a specific 5 Gi PV, be sure to include the `storageClassName`.
     -   For more information about creating a PVC yaml file, see [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
     
-      apiVersion: v1
-      kind: PersistentVolumeClaim
-      metadata:
-        # annotations:
-          # pv.kubernetes.io/provisioned-by: block.csi.ibm.com
-        name: vol1-pvc
-      spec:
-        accessModes:
-        - ReadWriteOnce
-        resources:
-          requests:
-            storage: 1Gi
-        storageClassName: ibmc-block-gold
-        volumeName: vol1-pv
+            apiVersion: v1
+            kind: PersistentVolumeClaim
+            metadata:
+              # annotations:
+                # pv.kubernetes.io/provisioned-by: block.csi.ibm.com
+              name: vol1-pvc
+            spec:
+              accessModes:
+              - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 1Gi
+              storageClassName: ibmc-block-gold
+              volumeName: vol1-pv
 
 4.  Create a StatefulSet.
 
-    For more information about creating a StatefulSet, see [Creating a StatefulSet](csi_ug_config_create_statefulset.md).
+      For more information about creating a StatefulSet, see [Creating a StatefulSet](csi_ug_config_create_statefulset.md).
 
         kind: StatefulSet
         apiVersion: apps/v1
