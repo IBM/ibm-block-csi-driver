@@ -70,8 +70,11 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
     Install the following replication CRDs once per cluster.
 
     ```
-    curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.1.0/config/crd/bases/replication.storage.openshift.io_volumereplicationclasses.yamlkubectl apply -f ./replication.storage.openshift.io_volumereplicationclasses.yaml
-    curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.1.0/config/crd/bases/replication.storage.openshift.io_volumereplications.yamlkubectl apply -f ./replication.storage.openshift.io_volumereplications.yaml
+    curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.1.0/config/crd/bases/replication.storage.openshift.io_volumereplicationclasses.yaml
+    kubectl apply -f ./replication.storage.openshift.io_volumereplicationclasses.yaml
+    
+    curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.1.0/config/crd/bases/replication.storage.openshift.io_volumereplications.yaml
+    kubectl apply -f ./replication.storage.openshift.io_volumereplications.yaml
     ```
 
 6. (Optional) To use CSI Topology, any nodes in the cluster must have the following labels that introduce topology awareness:
@@ -81,7 +84,7 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
       **Important:** These labels must be found on the nodes in the cluster **before** installing the IBM® block storage CSI driver. If these are not labeled before installation, the CSI driver will not be topology aware.
 
       ```
-      $ kubectl get nodes -o=jsonpath='{range .items[*]}[{.metadata.name}, {.metadata.labels}]{"\n"}{end}' | grep --color "topology.block.csi.ibm.com"
+      $> kubectl get nodes -o=jsonpath='{range .items[*]}[{.metadata.name}, {.metadata.labels}]{"\n"}{end}' | grep --color "topology.block.csi.ibm.com"
 
       [node1, {"beta.kubernetes.io/arch":"amd64","beta.kubernetes.io/os":"linux","kubernetes.io/arch":"amd64","kubernetes.io/hostname":"k8s-rhel-7-8-k8s-1-20-arbel-w1","kubernetes.io/os":"linux","topology.block.csi.ibm.com/demo-region":"demo-region-1","topology.block.csi.ibm.com/demo-zone":"demo-zone-1"}]
       [node2, {"beta.kubernetes.io/arch":"amd64","beta.kubernetes.io/os":"linux","kubernetes.io/arch":"amd64","kubernetes.io/hostname":"k8s-rhel-7-8-k8s-1-20-arbel-w2","kubernetes.io/os":"linux","topology.block.csi.ibm.com/demo-region":"demo-region-2","topology.block.csi.ibm.com/demo-zone":"demo-zone-2"}]

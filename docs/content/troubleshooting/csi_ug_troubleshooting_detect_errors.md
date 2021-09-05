@@ -9,7 +9,7 @@ This is an overview of actions that you can take to pinpoint a potential cause f
 1.  Verify that the CSI driver is running. (Make sure the `csi-controller` pod status is _Running_).
 
     ```
-    $> kubectl get all -n <namespace> -l csi
+    kubectl get all -n <namespace> -l csi
     ```
 
 2.  If `pod/ibm-block-csi-controller-0` is not in a _Running_ state, run the following command:

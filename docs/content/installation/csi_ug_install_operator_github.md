@@ -24,8 +24,8 @@ Use the following steps to install the operator and driver, with [GitHub](https:
 
     4. Verify that the operator is running. (Make sure that the Status is _Running_.)
 
-        ```screen
-        $ kubectl get pod -l app.kubernetes.io/name=ibm-block-csi-operator -n <namespace>
+        ```
+        $> kubectl get pod -l app.kubernetes.io/name=ibm-block-csi-operator -n <namespace>
         NAME                                    READY   STATUS    RESTARTS   AGE
         ibm-block-csi-operator-5bb7996b86-xntss 1/1     Running   0          10m
         ```
@@ -48,7 +48,7 @@ Use the following steps to install the operator and driver, with [GitHub](https:
     
     4.  Verify that the driver is running:
         ```bash
-        $ kubectl get pods -n <namespace> -l csi
+        $> kubectl get pods -n <namespace> -l csi
         NAME                                    READY   STATUS  RESTARTS AGE
         ibm-block-csi-controller-0              6/6     Running 0        9m36s
         ibm-block-csi-node-jvmvh                3/3     Running 0        9m36s
