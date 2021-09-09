@@ -8,18 +8,18 @@ In order to enable volume replication for your storage system, create a VolumeRe
 
 When configuring the file, be sure to use the same array secret and array secret namespace as defined in [Creating a Secret](csi_ug_config_create_secret.md).
 
--   The `snapshot_name_prefix` parameter is optional.
-
 ```
 apiVersion: replication.storage.openshift.io/v1alpha1
 kind: VolumeReplicationClass
 metadata:
-  name: volumereplicationclass-sample
+  name: demo-volumereplicationclass
 spec:
-  provisioner: example.provisioner.io
+  provisioner: block.csi.ibm.com
   parameters:
-    replication.storage.openshift.io/replication-secret-name: secret-name
-    replication.storage.openshift.io/replication-secret-namespace: secret-namespace
+    system_id: "0000000000DEM01D"
+    copy_type: "async"  # Optional. Values sync\async. The default is sync.
+    replication.storage.openshift.io/replication-secret-name: demo-secret
+    replication.storage.openshift.io/replication-secret-namespace: default
 ```
 
 After the YAML file is created, apply it by using the `kubectl apply -f` command.

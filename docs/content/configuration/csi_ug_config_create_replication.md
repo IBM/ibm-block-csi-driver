@@ -8,7 +8,7 @@ VolumeReplicationClass needs to be present before a VolumeSnapshot can be create
 
 When replicating a volume, be sure to follow all of the replication configurations, found in [Compatibility and requirements](../installation/csi_ug_requirements.md) before snapshot creation.
 
-1.  Replicate a specific  PersistentVolumeClaim (PVC) using the demo-replication.yaml.
+1.  Replicate a specific  PersistentVolumeClaim (PVC) using the demo-volumereplication.yaml.
 
     For more information about PVC configuration, see [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
 
@@ -16,14 +16,14 @@ When replicating a volume, be sure to follow all of the replication configuratio
     apiVersion: replication.storage.openshift.io/v1alpha1
     kind: VolumeReplication
     metadata:
-      name: volumereplication-sample
+      name: demo-volumereplication
       namespace: default
     spec:
-      volumeReplicationClass: volumereplicationclass-sample
+      volumeReplicationClass: demo-volumereplicationclass
       replicationState: primary
       dataSource:
         kind: PersistentVolumeClaim
-        name: myPersistentVolumeClaim # should be in same namespace as VolumeReplication
+        name: demo-pvc-file-system # should be in same namespace as VolumeReplication
     ```
 
 2.  After the YAML file is created, apply it by using the `kubectl apply -f` command.
