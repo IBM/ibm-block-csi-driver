@@ -31,7 +31,7 @@ When creating volume snapshots, be sure to follow all of the snapshot configurat
     kubectl apply -f <filename>.yaml
     ```
 
-3.  Verify that the VolumeSnapshot was created.
+3.  Verify that the volume snapshot was created.
 
     Run the `kubectl describe volumesnapshot` command.
 

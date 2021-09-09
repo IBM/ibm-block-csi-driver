@@ -6,9 +6,9 @@ VolumeReplicationClass needs to be present before a VolumeSnapshot can be create
 
 **Note:** Replication is also known as mirroring in many storage systems.
 
-When replicating a volume, be sure to follow all of the replication configurations, found in [Compatibility and requirements](../installation/csi_ug_requirements.md) before snapshot creation.
+When replicating a volume, be sure to follow all of the replication configurations, found in [Compatibility and requirements](../installation/csi_ug_requirements.md) before volume replication.
 
-1.  Replicate a specific  PersistentVolumeClaim (PVC) using the `demo-volumereplication.yaml`.
+1.  Replicate a specific PersistentVolumeClaim (PVC) using the `demo-volumereplication.yaml`.
 
     For more information about PVC configuration, see [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
 
@@ -32,13 +32,13 @@ When replicating a volume, be sure to follow all of the replication configuratio
     kubectl apply -f <filename>.yaml
     ```
 
-3.  Verify that the VolumeReplication file was created.
+3.  Verify that the volume was replicated.
 
     Run the `kubectl describe volumereplication` command.
 
     See the **Status** section of the output for the following:
 
-    -   **Bound Volume Snapshot Content Name:** Indicates the volume is bound to the specified VolumeSnapshotContent.
+    -   **Bound Volume Snapshot Content Name:** Indicates that the volume is bound to the specified VolumeSnapshotContent.
     -   **Creation Time:** Indicates when the snapshot was created.
     -   **Ready to Use:** Indicates the volume snapshot is ready to use.
     -   **Restore Size:** Indicates the minimum volume size required when restoring (provisioning) a volume from this snapshot.
