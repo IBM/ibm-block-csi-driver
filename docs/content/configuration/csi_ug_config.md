@@ -2,9 +2,9 @@
 
 Use this information to configure the IBM® block storage CSI driver after installation.
 
-Once the driver is installed and running (see [Installing the operator and driver](../installation/csi_ug_install_operator.md)), in order to use the driver and run stateful applications using IBM block storage systems, the relevant yaml files must be created.
+Once the driver is installed and running (see [Installing the operator and driver](../installation/csi_ug_install_operator.md)), in order to use the driver and run stateful applications using IBM block storage systems, the relevant YAML files must be created.
 
-Multiple yaml files per type can be created (with different configurations), according to your storage needs.
+Multiple YAML files per type can be created (with different configurations), according to your storage needs.
 
 -   [Creating a Secret](csi_ug_config_create_secret.md)
     -   [Creating a Secret with topology awareness](csi_ug_config_create_secret_topology.md)

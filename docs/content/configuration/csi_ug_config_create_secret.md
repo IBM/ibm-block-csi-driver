@@ -9,7 +9,7 @@ Create an array secret YAML file in order to define the storage credentials (use
 Use one of the following procedures to create and apply the secret:
 
 ## Creating an array secret file
-1. Create the secret file, similar to the following demo-secret.yaml:
+1. Create the secret file, similar to the following `demo-secret.yaml`:
 
     The `management_address` field can contain more than one address, with each value separated by a comma.
 

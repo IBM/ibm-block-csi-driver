@@ -1,6 +1,6 @@
 # Creating a StorageClass
 
-Create a storage class yaml file in order to define the storage system pool name, secret reference, `SpaceEfficiency`, and `fstype`.
+Create a storage class YAML file in order to define the storage system pool name, secret reference, `SpaceEfficiency`, and `fstype`.
 
 **Note:** If you are using the CSI Topology feature, in addition to the information and parameter definitions provided here, be sure to follow the steps in [Creating a StorageClass with topology awareness](csi_ug_config_create_storageclasses_topology.md).
 
@@ -8,7 +8,7 @@ Use the following procedure to create and apply the storage classes.
 
 **Note:** This procedure is applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.
 
-Create a storage class yaml file, similar to the following demo-storageclass.yaml.
+Create a storage class YAML file, similar to the following `demo-storageclass.yaml`.
 
 Update the capabilities, pools, and array secrets, as needed.
 

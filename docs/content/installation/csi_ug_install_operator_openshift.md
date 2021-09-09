@@ -38,9 +38,9 @@ The Red Hat OpenShift Container Platform uses the following `SecurityContextCons
 
 10. Click **Create Instance** to create the IBM block storage CSI driver (`IBMBlockCSI`).
 
-    A yaml file opens in the web console. This file can be left as-is, or edited as needed.
+    A YAML file opens in the web console. This file can be left as-is, or edited as needed.
 
-11. Update the yaml file to include your user-defined namespace.
+11. Update the YAML file to include your user-defined namespace.
 
 12. Click **Create**.
 

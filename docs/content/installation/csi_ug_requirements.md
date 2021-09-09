@@ -37,7 +37,7 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
 
    **Additional configuration steps for OpenShift® Container Platform users (RHEL and RHCOS).** Other users can continue to step 3.
 
-   Download and save the following yaml file:
+   Download and save the following YAML file:
 
    ```
    curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/master/deploy/99-ibm-attach.yaml > 99-ibm-attach.yaml
@@ -45,9 +45,9 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
 
    This file can be used for both Fibre Channel and iSCSI configurations. To support iSCSI, uncomment the last two lines in the file.
 
-   **Important:** The 99-ibm-attach.yaml configuration file overrides any files that already exist on your system. Only use this file if the files mentioned are not already created. <br />If one or more have been created, edit this yaml file, as necessary.
+   **Important:** The `99-ibm-attach.yaml` configuration file overrides any files that already exist on your system. Only use this file if the files mentioned are not already created. <br />If one or more have been created, edit this YAML file, as necessary.
 
-   Apply the yaml file.
+   Apply the YAML file.
 
    `oc apply -f 99-ibm-attach.yaml`
 
@@ -63,7 +63,7 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
 
    Install both the Snapshot CRDs and the Common Snapshot Controller once per cluster.
 
-   The instructions and relevant yaml files to enable volume snapshots can be found at: [https://github.com/kubernetes-csi/external-snapshotter#usage](https://github.com/kubernetes-csi/external-snapshotter#usage)
+   The instructions and relevant YAML files to enable volume snapshots can be found at: [https://github.com/kubernetes-csi/external-snapshotter#usage](https://github.com/kubernetes-csi/external-snapshotter#usage)
 
 5. (Optional) If planning on using volume replication (mirroring), enable support on your Kubernetes cluster.
 

@@ -1,6 +1,6 @@
 # Creating a VolumeReplication
 
-Create a VolumeReplication yaml file to replicate a specific PersistentVolumeClaim (PVC).
+Create a VolumeReplication YAML file to replicate a specific PersistentVolumeClaim (PVC).
 
 VolumeReplicationClass needs to be present before a VolumeSnapshot can be created. For more information, see [Creating a VolumeReplicationClass](csi_ug_config_create_vol_replicationclass.md).
 
@@ -8,7 +8,7 @@ VolumeReplicationClass needs to be present before a VolumeSnapshot can be create
 
 When replicating a volume, be sure to follow all of the replication configurations, found in [Compatibility and requirements](../installation/csi_ug_requirements.md) before snapshot creation.
 
-1.  Replicate a specific  PersistentVolumeClaim (PVC) using the demo-volumereplication.yaml.
+1.  Replicate a specific  PersistentVolumeClaim (PVC) using the `demo-volumereplication.yaml`.
 
     For more information about PVC configuration, see [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
 

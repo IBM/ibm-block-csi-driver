@@ -1,6 +1,6 @@
 # Creating a PersistentVolumeClaim (PVC)
 
-Create a PersistentVolumeClaim (PVC) yaml file for a persistent volume (PV).
+Create a PersistentVolumeClaim (PVC) YAML file for a persistent volume (PV).
 
 The IBM® block storage CSI driver supports using both file system and raw block volume types.
 
@@ -8,7 +8,7 @@ The IBM® block storage CSI driver supports using both file system and raw block
 
 **Note:** The examples below create the PVC with a storage size 1 Gb. This can be changed, per customer needs.
 
-Use the sections below for creating yaml files for PVCs with file system and raw block volume types. After each yaml file creation, use the `kubectl apply` command.
+Use the sections below for creating YAML files for PVCs with file system and raw block volume types. After each YAML file creation, use the `kubectl apply` command.
 
 ```
 kubectl apply -f <filename>.yaml
@@ -25,7 +25,7 @@ Use the following sections, according to your PVC needs:
 
 ## <a name=PVC-fs></a>Creating PVC for volume with Filesystem
 
-Create a PVC yaml file, similar to the following demo-pvc-file-system.yaml file, with the size of 1 Gb, where `volumeMode` is `Filesystem`.
+Create a PVC YAML file, similar to the following `demo-pvc-file-system.yaml` file, with the size of 1 Gb, where `volumeMode` is `Filesystem`.
 
 **Note:** `volumeMode` is an optional field. `Filesystem` is the default if the value is not added.
 
@@ -44,7 +44,7 @@ Create a PVC yaml file, similar to the following demo-pvc-file-system.yaml file,
 
 ## <a name=PVC-block></a>Creating PVC for raw block volume
 
-Create a PVC yaml file, similar to the following demo-pvc-raw-block.yaml file, with the size of 1 Gb, where `volumeMode` is `Block`.
+Create a PVC YAML file, similar to the following `demo-pvc-raw-block.yaml` file, with the size of 1 Gb, where `volumeMode` is `Block`.
 
     kind: PersistentVolumeClaim
     apiVersion: v1
@@ -61,7 +61,7 @@ Create a PVC yaml file, similar to the following demo-pvc-raw-block.yaml file, w
 
 ## <a name=PVC-vol-snapshot></a>Creating PVC from volume snapshot
 
-To create a PVC from an existing volume snapshot, create a PVC yaml file, similar to the following demo-pvc-from-snapshot.yaml file, with the size of 1 Gb.
+To create a PVC from an existing volume snapshot, create a PVC YAML file, similar to the following `demo-pvc-from-snapshot.yaml` file, with the size of 1 Gb.
 
 Update the `dataSource` parameters to reflect the existing volume snapshot information, where `kind` is `VolumeSnapshot`.
 
@@ -86,7 +86,7 @@ Update the `dataSource` parameters to reflect the existing volume snapshot infor
 
 **Note:** IBM FlashCopy® function is referred to as the more generic volume snapshots and cloning within this documentation set. Not all supported products use the FlashCopy function terminology.
 
-To create a volume clone from an existing PVC object, create a PVC yaml file, similar to the following demo-pvc-cloned-pvc.yaml file, with the size of 1 Gb.
+To create a volume clone from an existing PVC object, create a PVC YAML file, similar to the following `demo-pvc-cloned-pvc.yaml` file, with the size of 1 Gb.
 
 Update the `dataSource` parameters to reflect the existing PVC object information, where `kind` is `PersistentVolumeClaim`.
 

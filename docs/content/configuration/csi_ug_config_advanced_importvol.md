@@ -1,8 +1,8 @@
 # Importing an existing volume
 
-Use this information to import volumes created externally from the IBM® block storage CSI driver by using a persistent volume (PV) yaml file.
+Use this information to import volumes created externally from the IBM® block storage CSI driver by using a persistent volume (PV) YAML file.
 
-Before starting to import an existing volume, find the following information in the existing volume in order to include the information in the persistent volume (PV) yaml file:
+Before starting to import an existing volume, find the following information in the existing volume in order to include the information in the persistent volume (PV) YAML file:
 
 -   `volumeHandle`
 -   `volumeAttributes` (optional)
@@ -65,15 +65,15 @@ To find the `volumeHandle`, use one of the following procedures:
       For more information, see [IBM Hyper-Scale Manager documentation](https://www.ibm.com/docs/en/hyper-scale-manager/).
 
 
-Use this procedure to help build a PV yaml file for your volumes.
+Use this procedure to help build a PV YAML file for your volumes.
 
 **Note:** These steps are setup for importing volumes from a Spectrum Virtualize Family system. Change parameters, as needed.
 
-1.  Create a persistent volume (PV) yaml file.
+1.  Create a persistent volume (PV) YAML file.
 
     **Important:** Be sure to include the `storageClassName` and `controllerPublishSecretRef` parameters or errors will occur.
 
-2.  Take the `volume_name` and other optional information (collected before the procedure) and insert it into the yaml file (under `spec.csi.volumeAttributes`).
+2.  Take the `volume_name` and other optional information (collected before the procedure) and insert it into the YAML file (under `spec.csi.volumeAttributes`).
 
     **Important:** If using the CSI Topology feature, the `spec.csi.volumeHandle` contains the system ID. In the example below, the `spec.csi.volumeHandle` would read similar to the following: `SVC:demo-system-id-1:600507640082000B08000000000004FF`.
     
@@ -104,12 +104,12 @@ Use this procedure to help build a PV yaml file for your volumes.
           # volumeMode: Filesystem
     
 
-3.  Create a PersistentVolumeClaim (PVC) yaml file.
+3.  Create a PersistentVolumeClaim (PVC) YAML file.
 
     **Note:**
 
     -   To include a specific 5 Gi PV, be sure to include the `storageClassName`.
-    -   For more information about creating a PVC yaml file, see [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
+    -   For more information about creating a PVC YAML file, see [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
     
             apiVersion: v1
             kind: PersistentVolumeClaim
