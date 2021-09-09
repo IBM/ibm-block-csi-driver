@@ -20,7 +20,7 @@ To find the `volumeHandle`, use one of the following procedures:
 - Through command line (for Spectrum Virtualize Family):
 
   `lsvdisk <volume name> | grep vdisk_UID`
-    
+
   ```
   lsvdisk vol0 | grep vdisk_UID
   vdisk_UID 600507640082000B08000000000004FF
