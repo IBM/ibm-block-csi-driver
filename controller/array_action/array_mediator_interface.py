@@ -266,12 +266,12 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_iscsi_targets_by_iqn(self):
+    def get_iscsi_targets_by_iqn(self, host_name):
         """
         This function will return a mapping of the storage array iscsi names to their iscsi target IPs
 
         Args:
-            None
+            host_name : used to filter relevant hosts
 
         Returns:
             ips_by_iqn : A dict mapping array-iqns to their list of IPs ({iqn1:[ip1, ip2], iqn2:[ip3, ip4, ...], ...})
@@ -279,6 +279,7 @@ class ArrayMediator(ABC):
         Raises:
             PermissionDeniedError
             NoIscsiTargetsFoundError
+            HostNotFoundError
         """
         raise NotImplementedError
 

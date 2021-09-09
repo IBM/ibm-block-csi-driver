@@ -8,7 +8,7 @@ from pysvc.unified.response import CLIFailureError
 import controller.array_action.config as config
 import controller.array_action.errors as array_errors
 from controller.array_action.array_mediator_svc import SVCArrayMediator, build_kwargs_from_parameters, \
-    HOST_ID_PARAM, HOST_NAME_PARAM, HOST_ISCSI_NAMES_PARAM, HOST_WWPNS_PARAM, FCMAP_STATUS_DONE, YES
+    HOST_ID_PARAM, HOST_NAME_PARAM, HOST_ISCSI_NAMES_PARAM, HOST_WWPNS_PARAM, FCMAP_STATUS_DONE, YES, HOST_PORTSET_ID
 from controller.array_action.svc_cli_result_reader import SVCListResultsElement
 from controller.common.node_info import Initiators
 
@@ -25,8 +25,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
         node = Munch({'id': '1', 'name': 'node1', 'iscsi_name': 'iqn.1986-03.com.ibm:2145.v7k1.node1',
                       'status': 'online'})
         self.svc.client.svcinfo.lsnode.return_value = [node]
-        port = Munch({'node_id': '1', 'IP_address': '1.1.1.1', 'IP_address_6': None})
-        self.svc.client.svcinfo.lsportip.return_value = [port]
+        lsportip_port = Munch({'node_id': '1', 'IP_address': '1.1.1.1', 'IP_address_6': None})
+        lsip_port = Munch({'node_id': '1', 'IP_address': '1.1.1.1', 'portset_id': 'demo_id'})
+        self.svc.client.svcinfo.lsportip.return_value = [lsportip_port]
+        self.svc.client.svcinfo.lsip.return_value = [lsip_port]
         self.fcmaps = [self._create_dummy_fcmap('source_name', 'test_fc_id')]
         self.fcmaps_as_target = [self._create_dummy_fcmap('source_name', 'test_fc_as_target_id')]
         self.fcmaps_as_source = [self._create_dummy_fcmap('test_snapshot', 'test_fc_id')]
@@ -610,17 +612,20 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(SVCArrayMediator.max_connections, 2)
         self.assertEqual(SVCArrayMediator.max_lun_retries, 10)
 
+    def _prepare_mocks_for_get_host_by_identifiers_(self, result_reader_iter, hosts):
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
+        self.svc.client.send_raw_command = Mock()
+        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
+        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
+
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
     def test_get_host_by_identifiers_returns_host_not_found(self, result_reader_iter):
         host_1 = self._get_host_as_dictionary('host_id_1', 'test_host_1', ['iqn.test.1'], [])
         host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', ['iqn.test.2'], [])
         host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', ['iqn.test.3'], [])
         hosts = [host_1, host_2, host_3]
-        self.svc.client.svcinfo.lshost = Mock()
-        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
-        self.svc.client.send_raw_command = Mock()
-        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
-        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
+        self._prepare_mocks_for_get_host_by_identifiers_(result_reader_iter, hosts)
         with self.assertRaises(array_errors.HostNotFoundError):
             self.svc.get_host_by_host_identifiers(Initiators('Test_iqn', ['Test_wwn']))
 
@@ -637,11 +642,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', ['iqn.test.3'], [])
         host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', [], ['Test_wwn'])
         hosts = [host_1, host_2, host_3]
-        self.svc.client.svcinfo.lshost = Mock()
-        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
-        self.svc.client.send_raw_command = Mock()
-        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
-        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
+        self._prepare_mocks_for_get_host_by_identifiers_(result_reader_iter, hosts)
         with self.assertRaises(array_errors.MultipleHostsFoundError):
             self.svc.get_host_by_host_identifiers(Initiators('iqn.test.3', ['Test_wwn']))
 
@@ -651,11 +652,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', ['iqn.test.2'], ['abc3'])
         host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', ['iqn.test.3'], ['abc3'])
         hosts = [host_1, host_2, host_3]
-        self.svc.client.svcinfo.lshost = Mock()
-        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
-        self.svc.client.send_raw_command = Mock()
-        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
-        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
+        self._prepare_mocks_for_get_host_by_identifiers_(result_reader_iter, hosts)
         host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
             'iqn.test.2', ['abcd3']))
         self.assertEqual('test_host_2', host)
@@ -667,11 +664,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', ['iqn.test.2', 'iqn.test.22'], ['abc3'])
         host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', ['iqn.test.3'], ['abc3'])
         hosts = [host_1, host_2, host_3]
-        self.svc.client.svcinfo.lshost = Mock()
-        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
-        self.svc.client.send_raw_command = Mock()
-        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
-        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
+        self._prepare_mocks_for_get_host_by_identifiers_(result_reader_iter, hosts)
         host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
             'iqn.test.2', ['abcd3']))
         self.assertEqual('test_host_2', host)
@@ -683,11 +676,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', [''], ['abc2'])
         host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', ['iqn.test.3'], ['abc1', 'abc3'])
         hosts = [host_1, host_2, host_3]
-        self.svc.client.svcinfo.lshost = Mock()
-        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
-        self.svc.client.send_raw_command = Mock()
-        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
-        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
+        self._prepare_mocks_for_get_host_by_identifiers_(result_reader_iter, hosts)
         host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
             'iqn.test.6', ['abc3', 'ABC1']))
         self.assertEqual('test_host_3', host)
@@ -705,11 +694,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', ['iqn.test.2'], ['abc3'])
         host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', ['iqn.test.3'], ['abc3'])
         hosts = [host_1, host_2, host_3]
-        self.svc.client.svcinfo.lshost = Mock()
-        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
-        self.svc.client.send_raw_command = Mock()
-        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
-        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
+        self._prepare_mocks_for_get_host_by_identifiers_(result_reader_iter, hosts)
         with self.assertRaises(array_errors.HostNotFoundError):
             self.svc.get_host_by_host_identifiers(Initiators('', []))
         result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
@@ -722,22 +707,20 @@ class TestArrayMediatorSVC(unittest.TestCase):
         host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', ['iqn.test.6'], ['abcd3'])
         host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', ['iqn.test.2'], ['abc3'])
         hosts = [host_1, host_2, host_3]
-        self.svc.client.svcinfo.lshost = Mock()
-        self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
-        self.svc.client.send_raw_command = Mock()
-        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
-        result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
+        self._prepare_mocks_for_get_host_by_identifiers_(result_reader_iter, hosts)
         host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators('iqn.test.2', ['ABC3']))
         self.assertEqual('test_host_3', host)
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE,
                           config.FC_CONNECTIVITY_TYPE], connectivity_type)
 
-    def _get_host_as_dictionary(self, id, name, iscsi_names_list, wwpns_list):
+    def _get_host_as_dictionary(self, id, name, iscsi_names_list, wwpns_list, portset_id=None):
         res = {HOST_ID_PARAM: id, HOST_NAME_PARAM: name}
         if iscsi_names_list:
             res[HOST_ISCSI_NAMES_PARAM] = iscsi_names_list
         if wwpns_list:
             res[HOST_WWPNS_PARAM] = wwpns_list
+        if portset_id:
+            res[HOST_PORTSET_ID] = portset_id
         return res
 
     def _get_hosts_list_result(self, hosts_dict):
@@ -757,6 +740,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             if wwpns_list:
                 for wwpn in wwpns_list:
                     current_element.add(HOST_WWPNS_PARAM, wwpn)
+            current_element.add(HOST_PORTSET_ID, host_dict.get(HOST_PORTSET_ID))
             detailed_hosts_list.append(current_element)
         return iter(detailed_hosts_list)
 
@@ -871,55 +855,81 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.rmvdiskhostmap.return_value = None
         self.svc.unmap_volume("volume", "host")
 
+    def _prepare_mocks_for_get_iscsi_targets(self, portset_id=None):
+        host = self._get_host_as_dictionary('host_id', 'test_host', ['iqn.test.0', 'iqn.test.00'], ['abc0'], portset_id)
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = Mock(as_list=self._get_hosts_list_result([host]))
+
+    def test_get_iscsi_targets_cmd_error_raise_host_not_found(self):
+        self.svc.client.svcinfo.lshost.return_value = Mock(as_list=[])
+        with self.assertRaises(array_errors.HostNotFoundError):
+            self.svc.get_iscsi_targets_by_iqn('test_host')
+
     def test_get_iscsi_targets_cmd_error_raise_no_targets_error(self):
+        self._prepare_mocks_for_get_iscsi_targets()
         self.svc.client.svcinfo.lsportip.side_effect = [
             svc_errors.CommandExecutionError('Failed')]
         with self.assertRaises(array_errors.NoIscsiTargetsFoundError):
-            self.svc.get_iscsi_targets_by_iqn()
+            self.svc.get_iscsi_targets_by_iqn('test_host')
 
     def test_get_iscsi_targets_cli_error_raise_no_targets_error(self):
+        self._prepare_mocks_for_get_iscsi_targets()
         self.svc.client.svcinfo.lsportip.side_effect = [
             CLIFailureError("Failed")]
         with self.assertRaises(array_errors.NoIscsiTargetsFoundError):
-            self.svc.get_iscsi_targets_by_iqn()
+            self.svc.get_iscsi_targets_by_iqn('test_host')
 
     def test_get_iscsi_targets_no_online_node_raise_no_targets_error(self):
+        self._prepare_mocks_for_get_iscsi_targets()
         node = Munch({'id': '1',
                       'name': 'node1',
                       'iscsi_name': 'iqn.1986-03.com.ibm:2145.v7k1.node1',
                       'status': 'offline'})
         self.svc.client.svcinfo.lsnode.return_value = [node]
         with self.assertRaises(array_errors.NoIscsiTargetsFoundError):
-            self.svc.get_iscsi_targets_by_iqn()
+            self.svc.get_iscsi_targets_by_iqn('test_host')
 
     def test_get_iscsi_targets_no_nodes_nor_ips_raise_no_targets_error(self):
+        self._prepare_mocks_for_get_iscsi_targets()
         self.svc.client.svcinfo.lsnode.return_value = []
         self.svc.client.svcinfo.lsportip.return_value = []
         with self.assertRaises(array_errors.NoIscsiTargetsFoundError):
-            self.svc.get_iscsi_targets_by_iqn()
+            self.svc.get_iscsi_targets_by_iqn('test_host')
 
     def test_get_iscsi_targets_no_port_with_ip_raise_no_targets_error(self):
+        self._prepare_mocks_for_get_iscsi_targets()
         port_1 = Munch({'node_id': '1', 'IP_address': None, 'IP_address_6': ''})
         port_2 = Munch({'node_id': '2', 'IP_address': '', 'IP_address_6': None})
         self.svc.client.svcinfo.lsportip.return_value = [port_1, port_2]
         with self.assertRaises(array_errors.NoIscsiTargetsFoundError):
-            self.svc.get_iscsi_targets_by_iqn()
+            self.svc.get_iscsi_targets_by_iqn('test_host')
 
     def test_get_iscsi_targets_no_ip_raise_no_targets_error(self):
+        self._prepare_mocks_for_get_iscsi_targets()
         self.svc.client.svcinfo.lsportip.return_value = []
         with self.assertRaises(array_errors.NoIscsiTargetsFoundError):
-            self.svc.get_iscsi_targets_by_iqn()
+            self.svc.get_iscsi_targets_by_iqn('test_host')
 
-    def test_get_iscsi_targets_success(self):
-        ips_by_iqn = self.svc.get_iscsi_targets_by_iqn()
+    def test_get_iscsi_targets_with_lsportip_success(self):
+        self._prepare_mocks_for_get_iscsi_targets()
+        ips_by_iqn = self.svc.get_iscsi_targets_by_iqn('test_host')
+        self.svc.client.svcinfo.lsportip.assert_called_once()
+        self.assertEqual(ips_by_iqn, {'iqn.1986-03.com.ibm:2145.v7k1.node1': ['1.1.1.1']})
+
+    def test_get_iscsi_targets_with_lsip_success(self):
+        self._prepare_mocks_for_get_iscsi_targets(portset_id='demo_id')
+        ips_by_iqn = self.svc.get_iscsi_targets_by_iqn('test_host')
+        self.svc.client.svcinfo.lsip.assert_called_once_with(filtervalue='portset_id=demo_id')
+        self.svc.client.svcinfo.lsportip.not_called()
         self.assertEqual(ips_by_iqn, {'iqn.1986-03.com.ibm:2145.v7k1.node1': ['1.1.1.1']})
 
     def test_get_iscsi_targets_with_exception(self):
         self.svc.client.svcinfo.lsnode.side_effect = [Exception]
         with self.assertRaises(Exception):
-            self.svc.get_iscsi_targets_by_iqn()
+            self.svc.get_iscsi_targets_by_iqn('test_host')
 
     def test_get_iscsi_targets_with_multi_nodes(self):
+        self._prepare_mocks_for_get_iscsi_targets()
         node1 = Munch({'id': '1',
                        'name': 'node1',
                        'iscsi_name': 'iqn.1986-03.com.ibm:2145.v7k1.node1',
@@ -934,7 +944,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         port_3 = Munch({'node_id': '2', 'IP_address': '', 'IP_address_6': '1::1'})
         self.svc.client.svcinfo.lsportip.return_value = [port_1, port_2, port_3]
 
-        ips_by_iqn = self.svc.get_iscsi_targets_by_iqn()
+        ips_by_iqn = self.svc.get_iscsi_targets_by_iqn('test_host')
 
         self.assertEqual(ips_by_iqn, {'iqn.1986-03.com.ibm:2145.v7k1.node1': ['1.1.1.1', '2.2.2.2'],
                                       'iqn.1986-03.com.ibm:2145.v7k1.node2': ['[1::1]']})

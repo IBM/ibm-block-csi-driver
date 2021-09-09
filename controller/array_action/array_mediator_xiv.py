@@ -486,7 +486,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         config_get_list = self.client.cmd.config_get().as_list
         return next(c.value for c in config_get_list if c.name == "iscsi_name")
 
-    def get_iscsi_targets_by_iqn(self):
+    def get_iscsi_targets_by_iqn(self, host_name):
         array_iqn = self._get_array_iqn()
         iscsi_targets = self._get_iscsi_targets()
         return {array_iqn: iscsi_targets}
