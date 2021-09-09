@@ -42,5 +42,5 @@ Use the Secret file to connect a worker node to a storage system.
     `kubectl create secret generic <secret name> -n <secret namespace> --from-file=config=demo-secret-config.json`
     
 
-     The `secret/<NAME> created` message is emitted.
+     The `secret/<secret name> created` message is emitted.
  

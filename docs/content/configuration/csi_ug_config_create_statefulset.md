@@ -14,7 +14,7 @@ Use the sections below for yaml creation of StatefulSets with file system, raw b
 kubectl apply -f <filename>.yaml
 ```
 
-The `statefulset.apps/<filename> created` message is emitted.
+The `statefulset.apps/<statefulset-name> created` message is emitted.
 
 ## Creating a StatefulSet with file system volumes
 

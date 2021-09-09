@@ -4,7 +4,7 @@ Create a VolumeReplicationClass YAML file to enable volume replication.
 
 **Note:** Replication is also known as mirroring in many storage systems.
 
-In order to enable volume replication for your storage system, create a VolumeReplicationClass YAML file, similar to the following demo-replicationclass.yaml.
+In order to enable volume replication for your storage system, create a VolumeReplicationClass YAML file, similar to the following demo-volumereplicationclass.yaml.
 
 When configuring the file, be sure to use the same array secret and array secret namespace as defined in [Creating a Secret](csi_ug_config_create_secret.md).
 

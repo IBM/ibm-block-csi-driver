@@ -32,7 +32,7 @@ Use one of the following procedures to create and apply the secret:
     `kubectl apply -f demo-secret.yaml`
     
 
-     The `secret/<NAME> created` message is emitted.
+     The `secret/<demo-secret> created` message is emitted.
 
 
 ## Creating an array secret via command line

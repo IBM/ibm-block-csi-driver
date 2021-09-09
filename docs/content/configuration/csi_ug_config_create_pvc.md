@@ -14,7 +14,7 @@ Use the sections below for creating yaml files for PVCs with file system and raw
 kubectl apply -f <filename>.yaml
 ```
 
-The `persistentvolumeclaim/<filename> created` message is emitted.
+The `persistentvolumeclaim/<pvc-name> created` message is emitted.
 
 Use the following sections, according to your PVC needs:
 
