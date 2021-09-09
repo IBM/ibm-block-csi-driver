@@ -848,13 +848,13 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                              "is: {0}".format(ex))
             raise ex
 
-    def _get_host_by_name(self, host_name):
+    def _get_cli_host_by_name(self, host_name):
         filter_value = 'name={}'.format(host_name)
-        hosts_list = self.client.svcinfo.lshost(filtervalue=filter_value).as_single_element
-        if not hosts_list:
+        cli_host = self.client.svcinfo.lshost(filtervalue=filter_value).as_single_element
+        if not cli_host:
             raise array_errors.HostNotFoundError(host_name)
-        return hosts_list
+        return cli_host
 
     def _get_host_portset_id(self, host_name):
-        host = self._get_host_by_name(host_name)
-        return host.get(HOST_PORTSET_ID)
+        cli_host = self._get_cli_host_by_name(host_name)
+        return cli_host.get(HOST_PORTSET_ID)
