@@ -33,7 +33,7 @@ The following limitations apply when expanding volumes with the IBM block storag
 
 ## Volume replication limitations
 
-The following limitations apply when using volume replication (mirroring) with the IBM block storage CSI driver:
+The following limitations apply when using volume replication (remote copy) with the IBM block storage CSI driver:
 
 - The volume replication function is only supported for use with IBM Spectrum Virtualize Family storage systems.
 - When there is a role switch conducted, this is not reflected within the other Kubernetes replication objects.

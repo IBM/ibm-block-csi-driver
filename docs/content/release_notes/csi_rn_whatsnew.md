@@ -12,7 +12,7 @@ For more information, see [CSI Topology Feature](https://kubernetes-csi.github.i
 
 ## New volume replication support for IBM Spectrum Virtualize Family storage systems
 
-When using IBM Spectrum Virtualize Family storage systems, the CSI driver now supports volume replication (mirroring).
+When using IBM Spectrum Virtualize Family storage systems, the CSI driver now supports volume replication (remote copy).
 
 ## Additional supported orchestration platforms for deployment
 

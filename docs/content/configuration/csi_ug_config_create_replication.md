@@ -4,7 +4,7 @@ Create a VolumeReplication YAML file to replicate a specific PersistentVolumeCla
 
 VolumeReplicationClass needs to be present before a VolumeSnapshot can be created. For more information, see [Creating a VolumeReplicationClass](csi_ug_config_create_vol_replicationclass.md).
 
-**Note:** Replication is also known as mirroring in many storage systems.
+**Note:** Replication is referred to as the more generic volume replication within this documentation set. Spectrum Virtualize products refer to this feature as the remote copy function.
 
 When replicating a volume, be sure to follow all of the replication configurations, found in [Compatibility and requirements](../installation/csi_ug_requirements.md) before volume replication.
 
@@ -36,11 +36,10 @@ When replicating a volume, be sure to follow all of the replication configuratio
 
     Run the `kubectl describe volumereplication` command.
 
-    See the **Status** section of the output for the following:
+    See the **Status** section to see which of the following states the replicated volume is part of:
 
-    -   **Bound Volume Snapshot Content Name:** Indicates that the volume is bound to the specified VolumeSnapshotContent.
-    -   **Creation Time:** Indicates when the snapshot was created.
-    -   **Ready to Use:** Indicates the volume snapshot is ready to use.
-    -   **Restore Size:** Indicates the minimum volume size required when restoring (provisioning) a volume from this snapshot.
+    -   **Primary** Indicates that the replicated volume is the primary volume.
+    -   **Secondary** Indicates that the replicated volume is the secondary volume.
+    -   **Unknown** Indicates that the driver does not recognize the replicated volume status.
 
-
+    **Note:** For information about changing the replication status, see the [Usage](https://github.com/csi-addons/volume-replication-operator/tree/v0.1.0#usage) section of the Volume Replicator Operator for csi-addons.

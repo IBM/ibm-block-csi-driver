@@ -2,7 +2,7 @@
 
 Create a VolumeReplicationClass YAML file to enable volume replication.
 
-**Note:** Replication is also known as mirroring in many storage systems.
+**Note:** Replication is referred to as the more generic volume replication within this documentation set. Spectrum Virtualize products refer to this feature as the remote copy function.
 
 In order to enable volume replication for your storage system, create a VolumeReplicationClass YAML file, similar to the following `demo-volumereplicationclass.yaml`.
 
