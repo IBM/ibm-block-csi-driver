@@ -44,7 +44,7 @@ Here, the `volumeMounts` indicates both the name of the volume, with the necessa
             args: [ "while true; do sleep 30; done;" ]
             volumeMounts:
               - name: demo-volume-file-system
-                mountPath: "/data"</b>
+                mountPath: "/data"
           volumes:
           - name: demo-volume-file-system
             persistentVolumeClaim:
