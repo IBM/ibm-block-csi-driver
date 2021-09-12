@@ -44,7 +44,10 @@ format="markdown"/>
 format="markdown"/>
 <topicref href="../content/configuration/csi_ug_config_create_snapshots.md" format="markdown"/>
 <topicref href="../content/configuration/csi_ug_config_create_vol_replicationclass.md"
-format="markdown"/>
+format="markdown">
+<topicref format="markdown"
+href="../content/configuration/csi_ug_config_replication_find_systemid.md"/>
+</topicref>
 <topicref href="../content/configuration/csi_ug_config_create_replication.md" format="markdown"/>
 <topicref href="../content/configuration/csi_ug_config_expand_pvc.md" navtitle="Expanding a volume" product="volexpand" format="markdown"/>
 <topicref href="../content/configuration/csi_ug_config_advanced.md" navtitle="Advanced configuration" format="markdown">

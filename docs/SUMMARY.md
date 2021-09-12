@@ -43,6 +43,7 @@
 	* [Creating a VolumeSnapshotClass](content/configuration/csi_ug_config_create_vol_snapshotclass.md)
 	* [Creating a VolumeSnapshot](content/configuration/csi_ug_config_create_snapshots.md)
 	* [Creating a VolumeReplicationClass](content/configuration/csi_ug_config_create_vol_replicationclass.md)
+		* [Finding a `system_id`](content/configuration/csi_ug_config_replication_find_systemid.md)
 	* [Creating a VolumeReplication](content/configuration/csi_ug_config_create_replication.md)
 	* [Expanding a PersistentVolumeClaim (PVC)](content/configuration/csi_ug_config_expand_pvc.md)
 	* [Advanced configuration](content/configuration/csi_ug_config_advanced.md)
