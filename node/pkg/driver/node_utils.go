@@ -39,8 +39,8 @@ import (
 )
 
 var (
-	getOpts        = metav1.GetOptions{}
-	topologyPrefix = "topology.block.csi.ibm.com"
+	getOpts          = metav1.GetOptions{}
+	topologyPrefixes = [...]string{"topology.block.csi.ibm.com"}
 )
 
 const (
@@ -466,8 +466,10 @@ func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[
 
 	topologyLabels := make(map[string]string)
 	for key, value := range node.Labels {
-		if strings.HasPrefix(key, topologyPrefix) {
-			topologyLabels[key] = value
+		for _, prefix := range topologyPrefixes {
+			if strings.HasPrefix(key, prefix) {
+				topologyLabels[key] = value
+			}
 		}
 	}
 	return topologyLabels, nil
