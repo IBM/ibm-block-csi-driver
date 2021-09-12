@@ -88,7 +88,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
                 logger.info("promoting volume for replication {}".format(replication.name))
                 mediator.promote_replication_volume(replication.name)
         else:
-            if replication.is_primary:
+            if replication.is_primary or replication.is_primary is None:
                 logger.info("demoting volume for replication {}".format(replication.name))
                 mediator.demote_replication_volume(replication.name)
             else:
@@ -121,6 +121,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
             self._ensure_volume_role_for_replication(mediator, replication, is_to_promote)
 
+        logger.info("finished {}".format(method_name))
         return response_type()
 
     @handle_common_exceptions(pb2.PromoteVolumeResponse)

@@ -48,6 +48,7 @@ HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
 
 FCMAP_STATUS_DONE = 'idle_or_copied'
 RCRELATIONSHIP_STATE_IDLE = 'idling'
+RCRELATIONSHIP_STATE_READY = 'consistent_synchronized'
 
 YES = 'yes'
 
@@ -102,10 +103,12 @@ def build_create_replication_kwargs(master_cli_volume_id, aux_cli_volume_id, oth
     return cli_kwargs
 
 
-def build_start_replication_kwargs(rcrelationship_id, primary_endpoint_type):
+def build_start_replication_kwargs(rcrelationship_id, primary_endpoint_type, force):
     cli_kwargs = {'object_id': rcrelationship_id}
     if primary_endpoint_type:
         cli_kwargs.update({'primary': primary_endpoint_type})
+    if force:
+        cli_kwargs.update({'force': True})
     return cli_kwargs
 
 
@@ -877,11 +880,15 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return ENDPOINT_TYPE_MASTER
         return ENDPOINT_TYPE_AUX
 
-    def _get_replication_other_endpoint_type(self, rcrelationship):
-        endpoint_type = self._get_replication_endpoint_type(rcrelationship)
+    @staticmethod
+    def _get_other_endpoint_type(endpoint_type):
         if endpoint_type == ENDPOINT_TYPE_MASTER:
             return ENDPOINT_TYPE_AUX
         return ENDPOINT_TYPE_MASTER
+
+    def _get_replication_other_endpoint_type(self, rcrelationship):
+        endpoint_type = self._get_replication_endpoint_type(rcrelationship)
+        return self._get_other_endpoint_type(endpoint_type)
 
     @staticmethod
     def _is_replication_idle(rcrelationship):
@@ -893,12 +900,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     @staticmethod
     def _is_replication_ready(rcrelationship):
-        return rcrelationship.state.startswith('consistent')
+        return rcrelationship.state == RCRELATIONSHIP_STATE_READY
 
     def _is_replication_endpoint_primary(self, rcrelationship, endpoint_type=None):
         if not endpoint_type:
             endpoint_type = self._get_replication_endpoint_type(rcrelationship)
-        return rcrelationship.primary == endpoint_type
+        if rcrelationship.primary:
+            return rcrelationship.primary == endpoint_type
+        return None
 
     @staticmethod
     def _get_replication_copy_type(rcrelationship):
@@ -908,14 +917,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _generate_replication_response(self, rcrelationship, volume_internal_id, other_volume_internal_id):
         copy_type = self._get_replication_copy_type(rcrelationship)
-        is_primary = self._is_replication_endpoint_primary(rcrelationship)
         is_ready = self._is_replication_ready(rcrelationship)
+        is_primary = self._is_replication_endpoint_primary(rcrelationship)
         return Replication(name=rcrelationship.name,
                            volume_internal_id=volume_internal_id,
                            other_volume_internal_id=other_volume_internal_id,
                            copy_type=copy_type,
-                           is_primary=is_primary,
-                           is_ready=is_ready)
+                           is_ready=is_ready,
+                           is_primary=is_primary)
 
     def _get_lsrcrelationship(self, filter_value):
         return self.client.svcinfo.lsrcrelationship(filtervalue=filter_value)
@@ -985,14 +994,16 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 raise ex
         return None
 
-    def _start_rcrelationship(self, rcrelationship_id, primary_endpoint_type=None):
-        logger.info("starting remote copy relationship with id: {0}".format(rcrelationship_id))
+    def _start_rcrelationship(self, rcrelationship_id, primary_endpoint_type=None, force=False):
+        logger.info("starting remote copy relationship with id: {} primary: {} force: {}".format(rcrelationship_id,
+                                                                                                 primary_endpoint_type,
+                                                                                                 force))
         try:
-            kwargs = build_start_replication_kwargs(rcrelationship_id, primary_endpoint_type)
+            kwargs = build_start_replication_kwargs(rcrelationship_id, primary_endpoint_type, force)
             self.client.svctask.startrcrelationship(**kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
-                logger.warning("failed to start rcrelationship '{0}': {1}".format(rcrelationship_id, ex))
+                logger.warning("failed to start rcrelationship '{}': {}".format(rcrelationship_id, ex))
 
     def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
         rc_id = self._create_rcrelationship(volume_internal_id, other_volume_internal_id, other_system_id, copy_type)
@@ -1044,8 +1055,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                                                      rcrelationship.name))
             return
         if self._is_replication_idle(rcrelationship):
-            self._start_rcrelationship(rcrelationship.id, primary_endpoint_type=endpoint_type)
-            return
+            other_endpoint_type = self._get_other_endpoint_type(endpoint_type)
+            self._start_rcrelationship(rcrelationship.id, primary_endpoint_type=other_endpoint_type, force=True)
         self._promote_replication_endpoint(endpoint_type, rcrelationship.name)
 
     def promote_replication_volume(self, replication_name):
