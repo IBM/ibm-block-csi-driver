@@ -38,8 +38,8 @@ When replicating a volume, be sure to follow all of the replication configuratio
 
     See the `status.state` section to see which of the following states the replication is in:
 
-    -   **Primary** Indicates that the replicated volume is the primary volume.
-    -   **Secondary** Indicates that the replicated volume is the secondary volume.
+    -   **Primary** Indicates that the source volume is the primary volume.
+    -   **Secondary** Indicates that the source volume is the secondary volume.
     -   **Unknown** Indicates that the driver does not recognize the replication state.
 
     **Note:** For information about changing the replication state, see the [Usage](https://github.com/csi-addons/volume-replication-operator/tree/v0.1.0#usage) section of the Volume Replication Operator for csi-addons.
