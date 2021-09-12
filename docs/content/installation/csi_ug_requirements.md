@@ -6,7 +6,7 @@ Before beginning the installation of the CSI (Container Storage Interface) drive
 
 For IBM Cloud® Satellite users, see [cloud.ibm.com/docs/satellite](https://cloud.ibm.com/docs/satellite) for full system requirements.
 
-**Important:** When using Satellite, complete the following checks, configurations, and the installation process before assigning the hosts to your locations. </br>In addition, **do not** create a Kubernetes cluster. This is done through Satellite.
+**Important:** When using Satellite, complete the following checks, configurations, and the installation process before assigning the hosts to your locations. </br>In addition, **do not** create a Kubernetes cluster. Creating the Kubernetes cluster is done through Satellite.
 
 -   The CSI driver requires the following ports to be opened on the worker nodes OS firewall:
     -   **For all iSCSI users**
@@ -27,7 +27,7 @@ For IBM Cloud® Satellite users, see [cloud.ibm.com/docs/satellite](https://clou
 
 -   Be sure that multipathing is installed and running.
 
-Perform these steps for each worker node in Kubernetes cluster to prepare your environment for installing the CSI (Container Storage Interface) driver.
+Complete these steps for each worker node in Kubernetes cluster to prepare your environment for installing the CSI (Container Storage Interface) driver.
 
 1. **For RHEL OS users:** Ensure iSCSI connectivity. If using RHCOS or if the packages are already installed, skip this step and continue to step 2.
 
@@ -45,7 +45,7 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
 
    This file can be used for both Fibre Channel and iSCSI configurations. To support iSCSI, uncomment the last two lines in the file.
 
-   **Important:** The `99-ibm-attach.yaml` configuration file overrides any files that already exist on your system. Only use this file if the files mentioned are not already created. <br />If one or more have been created, edit this YAML file, as necessary.
+   **Important:** The `99-ibm-attach.yaml` configuration file overrides any files that exist on your system. Only use this file if the files mentioned are not already created. <br />If one or more were created, edit this YAML file, as necessary.
 
    Apply the YAML file.
 
@@ -77,11 +77,9 @@ Perform these steps for each worker node in Kubernetes cluster to prepare your e
     kubectl apply -f ./replication.storage.openshift.io_volumereplications.yaml
     ```
 
-6. (Optional) To use CSI Topology, any nodes in the cluster must have the following labels that introduce topology awareness:
-      - `topology.kubernetes.io/region`
-      - `topology.kubernetes.io/zone`
-
-      **Important:** These labels must be found on the nodes in the cluster **before** installing the IBM® block storage CSI driver. If these are not labeled before installation, the CSI driver will not be topology aware.
+6. (Optional) To use CSI Topology, all nodes in the cluster must contain the `topology.kubernetes.io` label to introduce topology awareness:
+      
+      **Important:** These labels must be found on the nodes in the cluster **before** installing the IBM® block storage CSI driver. If the nodes are not labeled before installation, CSI Topology cannot be used with the CSI driver.
 
       ```
       $> kubectl get nodes -o=jsonpath='{range .items[*]}[{.metadata.name}, {.metadata.labels}]{"\n"}{end}' | grep --color "topology.block.csi.ibm.com"
