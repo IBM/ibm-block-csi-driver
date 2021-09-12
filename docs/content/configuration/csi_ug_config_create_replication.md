@@ -36,10 +36,10 @@ When replicating a volume, be sure to follow all of the replication configuratio
 
     Run the `kubectl describe volumereplication` command.
 
-    See the **Status** section to see which of the following states the replicated volume is part of:
+    See the `status.state` section to see which of the following states the replicated volume is part of:
 
     -   **Primary** Indicates that the replicated volume is the primary volume.
     -   **Secondary** Indicates that the replicated volume is the secondary volume.
-    -   **Unknown** Indicates that the driver does not recognize the replicated volume status.
+    -   **Unknown** Indicates that the driver does not recognize the replicated state.
 
     **Note:** For information about changing the replication status, see the [Usage](https://github.com/csi-addons/volume-replication-operator/tree/v0.1.0#usage) section of the Volume Replicator Operator for csi-addons.
