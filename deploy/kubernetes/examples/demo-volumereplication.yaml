@@ -8,4 +8,4 @@ spec:
   replicationState: primary
   dataSource:
     kind: PersistentVolumeClaim
-    name: demo-pvc-file-system  # Should be in same namespace as VolumeReplication
+    name: demo-pvc-file-system  # Ensure that this is in the same namespace as VolumeReplication.
