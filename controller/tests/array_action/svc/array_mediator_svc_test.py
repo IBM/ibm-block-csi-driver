@@ -858,10 +858,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def _prepare_mocks_for_get_iscsi_targets(self, portset_id=None):
         host = self._get_host_as_dictionary('host_id', 'test_host', ['iqn.test.0', 'iqn.test.00'], ['abc0'], portset_id)
         self.svc.client.svcinfo.lshost = Mock()
-        self.svc.client.svcinfo.lshost.return_value = Mock(as_list=self._get_hosts_list_result([host]))
+        self.svc.client.svcinfo.lshost.return_value = Mock(as_single_element=host)
 
     def test_get_iscsi_targets_cmd_error_raise_host_not_found(self):
-        self.svc.client.svcinfo.lshost.return_value = Mock(as_list=[])
+        self.svc.client.svcinfo.lshost.return_value = Mock(as_single_element=[])
         with self.assertRaises(array_errors.HostNotFoundError):
             self.svc.get_iscsi_targets_by_iqn('test_host')
 
