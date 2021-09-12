@@ -1,6 +1,6 @@
 # Finding a `system_id`
 
-Find the storage system `system_id` parameter on your storage system in order to create a VolumeReplicationClass YAML file, enabling replication.
+Find the remote storage system `system_id` parameter on your storage system in order to create a VolumeReplicationClass YAML file, enabling replication.
 
 For finding the `system_id` parameter on your Spectrum Virtualize storage system, use the `lspartnership` command.
 
