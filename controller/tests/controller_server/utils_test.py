@@ -106,10 +106,10 @@ class TestUtils(unittest.TestCase):
         self._test_get_array_connection_info_from_secrets(secrets, system_id="u1")
         secrets = {"username": user, "password": password, "management_address": array}
         self._test_get_array_connection_info_from_secrets(secrets)
-        secrets = get_fake_secret_config(supported_topologies=[{"topology.kubernetes.io/test": "zone1"}])
+        secrets = get_fake_secret_config(supported_topologies=[{"topology.block.csi.ibm.com/test1": "zone1"}])
         self._test_get_array_connection_info_from_secrets(secrets,
-                                                          topologies={"topology.kubernetes.io/test": "zone1",
-                                                                      "topology.block.csi.ibm.com/test": "dev1"})
+                                                          topologies={"topology.block.csi.ibm.com/test1": "zone1",
+                                                                      "topology.block.csi.ibm.com/test2": "dev1"})
 
     def _test_get_pool_from_parameters(self, parameters, expected_pool=pool, system_id=None):
         volume_parameters = utils.get_volume_parameters(parameters, system_id)

@@ -433,10 +433,10 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_topologies_succeeds(self, storage_agent):
         self.request.secrets = utils.get_fake_secret_config(system_id="u2", supported_topologies=[
-            {"topology.kubernetes.io/test": "topology_value"}])
+            {"topology.block.csi.ibm.com/test": "topology_value"}])
         self.request.accessibility_requirements.preferred = [
-            ProtoBufMock(segments={"topology.kubernetes.io/test": "topology_value",
-                                   "topology.kubernetes.io/test2": "topology_value2"})]
+            ProtoBufMock(segments={"topology.block.csi.ibm.com/test": "topology_value",
+                                   "topology.block.csi.ibm.com/test2": "topology_value2"})]
         self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
             {"u1": {config.PARAMETERS_POOL: pool}, "u2": {config.PARAMETERS_POOL: "other_pool"}})}
         self._test_create_volume_succeeds(storage_agent, 'xiv:u2:0;wwn', expected_pool="other_pool")
