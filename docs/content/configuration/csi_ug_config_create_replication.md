@@ -2,7 +2,7 @@
 
 Create a VolumeReplication YAML file to replicate a specific PersistentVolumeClaim (PVC).
 
-VolumeReplicationClass needs to be present before a VolumeSnapshot can be created. For more information, see [Creating a VolumeReplicationClass](csi_ug_config_create_vol_replicationclass.md).
+VolumeReplicationClass needs to be present before a VolumeReplication can be created. For more information, see [Creating a VolumeReplicationClass](csi_ug_config_create_vol_replicationclass.md).
 
 **Note:** Replication is referred to as the more generic volume replication within this documentation set. Spectrum Virtualize products refer to this feature as the remote copy function.
 
