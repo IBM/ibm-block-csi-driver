@@ -2,13 +2,13 @@
 
 Create a StatefulSet YAML file to manage stateful applications.
 
-The IBM® block storage CSI driver supports using both file system and raw block volume types.
+The IBM® block storage CSI driver supports both file system and raw block volume types.
 
 StatefulSets can include volumes with file systems, raw block volume systems, or both.
 
 **Important:** When defining the StatefulSet configuration, be sure to define volumes according to the PVC type.
 
-Use the sections below for YAML creation of StatefulSets with file system, raw block volume, and mixed types. After each YAML file creation, use the `kubectl apply` command.
+Use the following sections for YAML creation of StatefulSets with file system, raw block volume, and mixed types. After each YAML file creation, use the `kubectl apply` command.
 
 ```
 kubectl apply -f <filename>.yaml
@@ -20,7 +20,7 @@ The `statefulset.apps/<statefulset-name> created` message is emitted.
 
 Create a StatefulSet YAML file, similar to the following `demo-statefulset-file-system.yaml` file.
 
-Here, the `volumeMounts` indicates both the name of the volume, with the necessary `mountPath` of `"/data"`.
+Be sure to indicate the `volumeMounts`, listing each volumes name and path. In this example, the `mountPath` is listed as `"/data"`.
 
     kind: StatefulSet
     apiVersion: apps/v1
@@ -54,7 +54,7 @@ Here, the `volumeMounts` indicates both the name of the volume, with the necessa
 
 Create a StatefulSet YAML file, similar to the following `demo-statefulset-raw-block.yaml` file.
 
-Here, the `volumeDevices` indicates both the name of the volume, with the necessary `devicePath` of `"/dev/block"`.
+Be sure to indicate the `volumeDevices`, listing each volumes name and path. In this example, the `devicePath` is listed as `"/dev/block"`.
 
     kind: StatefulSet
     apiVersion: apps/v1
@@ -88,7 +88,7 @@ Here, the `volumeDevices` indicates both the name of the volume, with the necess
 
 Create a StatefulSet YAML file, similar to the following `demo-statefulset-combined.yaml` file.
 
-In a mixed file, it is important to indicate both the `volumeMounts` and  `volumeDevices` parameters, where `mountPath` is `"/data"` and `devicePath` is `"/dev/block"`.
+In a StatefulSet file with two volumes with different volume modes, it is important to indicate both the `volumeMounts` and  `volumeDevices` parameters.
 
     kind: StatefulSet
     apiVersion: apps/v1
