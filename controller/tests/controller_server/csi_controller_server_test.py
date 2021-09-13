@@ -154,7 +154,8 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
                                                                                                snapshot_volume_name,
                                                                                                "xiv")
 
-    def _test_create_snapshot_succeeds(self, storage_agent, expected_space_efficiency=None, expected_pool=None):
+    def _test_create_snapshot_succeeds(self, storage_agent, expected_space_efficiency=None, expected_pool=None,
+                                       system_id=None):
         self._prepare_create_snapshot_mocks(storage_agent)
 
         response_snapshot = self.servicer.CreateSnapshot(self.request, self.context)
@@ -163,7 +164,9 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name, pool=expected_pool)
         self.mediator.create_snapshot.assert_called_once_with(snapshot_volume_wwn, snapshot_name,
                                                               expected_space_efficiency, expected_pool)
-        self.assertEqual(response_snapshot.snapshot.snapshot_id, 'xiv:0;wwn')
+        system_id_part = ':{}'.format(system_id) if system_id else ''
+        snapshot_id = 'xiv{}:0;wwn'.format(system_id_part)
+        self.assertEqual(response_snapshot.snapshot.snapshot_id, snapshot_id)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_succeeds(self, storage_agent):
@@ -181,10 +184,11 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self._test_create_snapshot_succeeds(storage_agent, expected_space_efficiency=space_efficiency)
 
     def _test_create_snapshot_with_by_system_id_parameter(self, storage_agent, system_id, expected_pool):
-        self.request.source_volume_id = "{}:{}:{}".format("A9000", system_id, snapshot_volume_wwn)
+        system_id_part = ':{}'.format(system_id) if system_id else ''
+        self.request.source_volume_id = "{}{}:{}".format("A9000", system_id_part, snapshot_volume_wwn)
         self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
             {"u1": {config.PARAMETERS_POOL: pool}, "u2": {config.PARAMETERS_POOL: "other_pool"}})}
-        self._test_create_snapshot_succeeds(storage_agent, expected_pool=expected_pool)
+        self._test_create_snapshot_succeeds(storage_agent, expected_pool=expected_pool, system_id=system_id)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_by_system_id_parameter_succeeds(self, storage_agent):
@@ -429,10 +433,10 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_topologies_succeeds(self, storage_agent):
         self.request.secrets = utils.get_fake_secret_config(system_id="u2", supported_topologies=[
-            {"topology.kubernetes.io/test": "topology_value"}])
+            {"topology.block.csi.ibm.com/test": "topology_value"}])
         self.request.accessibility_requirements.preferred = [
-            ProtoBufMock(segments={"topology.kubernetes.io/test": "topology_value",
-                                   "topology.kubernetes.io/test2": "topology_value2"})]
+            ProtoBufMock(segments={"topology.block.csi.ibm.com/test": "topology_value",
+                                   "topology.block.csi.ibm.com/test2": "topology_value2"})]
         self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
             {"u1": {config.PARAMETERS_POOL: pool}, "u2": {config.PARAMETERS_POOL: "other_pool"}})}
         self._test_create_volume_succeeds(storage_agent, 'xiv:u2:0;wwn', expected_pool="other_pool")

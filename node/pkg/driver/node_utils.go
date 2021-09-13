@@ -40,7 +40,7 @@ import (
 
 var (
 	getOpts          = metav1.GetOptions{}
-	topologyPrefixes = [...]string{"topology.kubernetes.io", "topology.block.csi.ibm.com"}
+	topologyPrefixes = [...]string{"topology.block.csi.ibm.com"}
 )
 
 const (

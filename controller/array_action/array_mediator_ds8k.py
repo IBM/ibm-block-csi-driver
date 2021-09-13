@@ -612,7 +612,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         self._delete_object(snapshot_id, object_is_snapshot=True)
         logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
 
-    def get_iscsi_targets_by_iqn(self):
+    def get_iscsi_targets_by_iqn(self, host_name):
         return {}
 
     def get_array_fc_wwns(self, host_name=None):

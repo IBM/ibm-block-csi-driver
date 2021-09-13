@@ -1135,7 +1135,7 @@ func TestNodeGetCapabilities(t *testing.T) {
 }
 
 func TestNodeGetInfo(t *testing.T) {
-	topologySegments := map[string]string{"topology.kubernetes.io/zone": "testZone"}
+	topologySegments := map[string]string{"topology.block.csi.ibm.com/zone": "testZone"}
 
 	testCases := []struct {
 		name              string
