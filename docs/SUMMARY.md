@@ -36,7 +36,6 @@
 * [CSI driver configuration](content/configuration/csi_ug_config.md)
 	* [Creating a Secret](content/configuration/csi_ug_config_create_secret.md)
 	* [Creating a StorageClass](content/configuration/csi_ug_config_create_storageclasses.md)
-		* [Creating a StorageClass with topology awareness](content/configuration/csi_ug_config_create_storageclasses_topology.md)
 	* [Creating a PersistentVolumeClaim (PVC)](content/configuration/csi_ug_config_create_pvc.md)
 	* [Creating a StatefulSet](content/configuration/csi_ug_config_create_statefulset.md)
 	* [Creating a VolumeSnapshotClass](content/configuration/csi_ug_config_create_vol_snapshotclass.md)
