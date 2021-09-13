@@ -91,7 +91,7 @@ def get_snapshot_parameters(parameters, system_id):
 
 
 def get_object_parameters(parameters, prefix_param_name, system_id):
-    raw_parameters_by_system = parameters.get(config.PARAMETERS_BY_MANAGEMENT)
+    raw_parameters_by_system = parameters.get(config.PARAMETERS_BY_SYSTEM)
     system_parameters = {}
     if raw_parameters_by_system and system_id:
         parameters_by_system = _parse_raw_json(raw_json=raw_parameters_by_system)
@@ -226,7 +226,7 @@ def _validate_pool_parameter(parameters):
     if config.PARAMETERS_POOL in parameters:
         if not parameters[config.PARAMETERS_POOL]:
             raise ValidationException(messages.pool_should_not_be_empty_message)
-    elif not parameters.get(config.PARAMETERS_BY_MANAGEMENT):
+    elif not parameters.get(config.PARAMETERS_BY_SYSTEM):
         raise ValidationException(messages.pool_is_missing_message)
 
 

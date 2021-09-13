@@ -119,7 +119,7 @@ class TestUtils(unittest.TestCase):
         parameters = {controller_config.PARAMETERS_POOL: pool}
         self._test_get_pool_from_parameters(parameters)
         self._test_get_pool_from_parameters(parameters, system_id="u1")
-        parameters = {controller_config.PARAMETERS_BY_MANAGEMENT: json.dumps(
+        parameters = {controller_config.PARAMETERS_BY_SYSTEM: json.dumps(
             {"u1": {controller_config.PARAMETERS_POOL: pool}, "u2": {controller_config.PARAMETERS_POOL: "other_pool"}})}
         self._test_get_pool_from_parameters(parameters, system_id="u1")
         self._test_get_pool_from_parameters(parameters, expected_pool="other_pool", system_id="u2")

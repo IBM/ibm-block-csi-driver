@@ -186,7 +186,7 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
     def _test_create_snapshot_with_by_system_id_parameter(self, storage_agent, system_id, expected_pool):
         system_id_part = ':{}'.format(system_id) if system_id else ''
         self.request.source_volume_id = "{}{}:{}".format("A9000", system_id_part, snapshot_volume_wwn)
-        self.request.parameters = {config.PARAMETERS_BY_MANAGEMENT: json.dumps(
+        self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
             {"u1": {config.PARAMETERS_POOL: pool}, "u2": {config.PARAMETERS_POOL: "other_pool"}})}
         self._test_create_snapshot_succeeds(storage_agent, expected_pool=expected_pool, system_id=system_id)
 
@@ -437,7 +437,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.request.accessibility_requirements.preferred = [
             ProtoBufMock(segments={"topology.block.csi.ibm.com/test": "topology_value",
                                    "topology.block.csi.ibm.com/test2": "topology_value2"})]
-        self.request.parameters = {config.PARAMETERS_BY_MANAGEMENT: json.dumps(
+        self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
             {"u1": {config.PARAMETERS_POOL: pool}, "u2": {config.PARAMETERS_POOL: "other_pool"}})}
         self._test_create_volume_succeeds(storage_agent, 'xiv:u2:0;wwn', expected_pool="other_pool")
 
@@ -618,7 +618,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
                                                              final_name="default_some_name",
                                                              space_efficiency=None):
         get_array_connection_info_from_secrets.side_effect = [utils.get_fake_array_connection_info()]
-        self.request.parameters = {config.PARAMETERS_BY_MANAGEMENT: json.dumps(
+        self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
             {"u1": {config.PARAMETERS_VOLUME_NAME_PREFIX: prefix, config.PARAMETERS_POOL: pool,
                     config.PARAMETERS_SPACE_EFFICIENCY: space_efficiency}})}
         self._test_create_volume_parameters(final_name, space_efficiency)
