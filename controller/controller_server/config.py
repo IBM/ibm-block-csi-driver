@@ -30,7 +30,7 @@ VOLUME_CONTEXT_POOL = "pool_name"
 VOLUME_CONTEXT_STORAGE_TYPE = "storage_type"
 
 PARAMETERS_POOL = "pool"
-PARAMETERS_BY_SYSTEM = "by_system_id"
+PARAMETERS_BY_MANAGEMENT = "by_management_id"
 PARAMETERS_SPACE_EFFICIENCY = "SpaceEfficiency"
 PARAMETERS_VOLUME_NAME_PREFIX = "volume_name_prefix"
 PARAMETERS_SNAPSHOT_NAME_PREFIX = "snapshot_name_prefix"
