@@ -20,7 +20,7 @@ When creating volume snapshots, be sure to follow all of the snapshot configurat
     metadata:
       name: demo-snapshot
     spec:
-      volumeSnapshotClassName: demo-snapshotclass
+      volumeSnapshotClassName: demo-volumesnapshotclass-config-secret
       source:
         persistentVolumeClaimName: demo-pvc-file-system
     ```
