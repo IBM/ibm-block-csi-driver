@@ -30,14 +30,8 @@ navtitle="Installing the driver with the OpenShift web console" format="markdown
 </topicref>
 </chapter>
 <chapter href="../content/configuration/csi_ug_config.md" format="markdown">
-<topicref href="../content/configuration/csi_ug_config_create_secret.md" format="markdown">
-<topicref href="../content/configuration/csi_ug_config_create_secret_topology.md" format="markdown"
-/>
-</topicref>
-<topicref href="../content/configuration/csi_ug_config_create_storageclasses.md" format="markdown">
-<topicref href="../content/configuration/csi_ug_config_create_storageclasses_topology.md"
-format="markdown"/>
-</topicref>
+<topicref href="../content/configuration/csi_ug_config_create_secret.md" format="markdown"/>
+<topicref href="../content/configuration/csi_ug_config_create_storageclasses.md" format="markdown"/>
 <topicref href="../content/configuration/csi_ug_config_create_pvc.md" format="markdown"/>
 <topicref href="../content/configuration/csi_ug_config_create_statefulset.md" format="markdown"/>
 <topicref href="../content/configuration/csi_ug_config_create_vol_snapshotclass.md"
@@ -50,8 +44,17 @@ href="../content/configuration/csi_ug_config_replication_find_systemid.md"/>
 </topicref>
 <topicref href="../content/configuration/csi_ug_config_create_replication.md" format="markdown"/>
 <topicref href="../content/configuration/csi_ug_config_expand_pvc.md" navtitle="Expanding a volume" product="volexpand" format="markdown"/>
-<topicref href="../content/configuration/csi_ug_config_advanced.md" navtitle="Advanced configuration" format="markdown">
-<topicref href="../content/configuration/csi_ug_config_advanced_importvol.md" navtitle="Advanced configuration" format="markdown"/>
+<topicref href="../content/configuration/csi_ug_config_topology.md" format="markdown">
+<topicref href="../content/configuration/csi_ug_config_create_secret_topology.md" format="markdown"/>
+<topicref href="../content/configuration/csi_ug_config_create_storageclasses_topology.md"
+format="markdown"/>
+<topicref href="../content/configuration/csi_ug_config_create_vol_snapshotclass_topology.md"
+format="markdown"/>
+</topicref>
+<topicref href="../content/configuration/csi_ug_config_advanced.md"
+navtitle="Advanced configuration" format="markdown">
+<topicref href="../content/configuration/csi_ug_config_advanced_importvol.md"
+navtitle="Advanced configuration" format="markdown"/>
 </topicref>
 </chapter>
 <chapter href="../content/using/csi_ug_using.md" format="markdown" navtitle="Using IBM block storage CSI driver">

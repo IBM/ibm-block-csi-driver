@@ -20,19 +20,15 @@ When configuring the file, be sure to use the same array secret and array secret
 apiVersion: snapshot.storage.k8s.io/v1beta1
 kind: VolumeSnapshotClass
 metadata:
-  name: demo-volumesnapshotclass-config-secret
+  name: demo-volumesnapshotclass
 driver: block.csi.ibm.com
 deletionPolicy: Delete
 parameters:
-  # non-csi.storage.k8s.io parameters may be specified in by_system_id per system and/or outside by_system_id as the cross-system default.
-
-  by_system_id: '{"demo-system-id-1":{"pool":"demo-pool-1","SpaceEfficiency":"deduplicated","snapshot_name_prefix":"demo-prefix-1"},
-                  "demo-system-id-2":{"pool":"demo-pool-2","snapshot_name_prefix":"demo-prefix-2"}}'  # Optional.
   pool: demo-pool                    # Optional. Use to create the snapshot on a different pool than the source.
   SpaceEfficiency: thin              # Optional. Use to create the snapshot with a different space efficiency than the source.
   snapshot_name_prefix: demo-prefix  # Optional.
 
-  csi.storage.k8s.io/snapshotter-secret-name: demo-config-secret
+  csi.storage.k8s.io/snapshotter-secret-name: demo-secret
   csi.storage.k8s.io/snapshotter-secret-namespace: default
 ```
 
