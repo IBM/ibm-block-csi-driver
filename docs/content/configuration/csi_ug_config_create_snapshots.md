@@ -10,7 +10,7 @@ VolumeSnapshotClass needs to be present before a VolumeSnapshot can be created. 
 
 When creating volume snapshots, be sure to follow all of the snapshot configurations, found in [Compatibility and requirements](../installation/csi_ug_requirements.md) before snapshot creation.
 
-1.  Create a snapshot for a specific PersistentVolumeClaim (PVC) using the `demo-snapshot.yaml`.
+1.  Create a snapshot for a specific PersistentVolumeClaim (PVC) using the `demo-volumesnapshot.yaml`.
 
     For more information about PVC configuration, see [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
 
@@ -18,9 +18,9 @@ When creating volume snapshots, be sure to follow all of the snapshot configurat
     apiVersion: snapshot.storage.k8s.io/v1beta1
     kind: VolumeSnapshot
     metadata:
-      name: demo-snapshot
+      name: demo-volumesnapshot
     spec:
-      volumeSnapshotClassName: demo-volumesnapshotclass-config-secret
+      volumeSnapshotClassName: demo-volumesnapshotclass
       source:
         persistentVolumeClaimName: demo-pvc-file-system
     ```
