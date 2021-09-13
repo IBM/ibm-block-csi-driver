@@ -77,14 +77,7 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
         kubectl apply -f ./replication.storage.openshift.io_volumereplications.yaml
         ````
     
-    2. To enable support on your storage system, use the `mkfcpartnership` command.
-
-        For more information, see the following sections within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/):
-
-        - **Command-line interface** > **Copy Service commands** > **mkfcpartnership**
-        - **Product overview** > **Technical overview** > **Copy Services functions** > **Metro Mirror and Global Mirror partnerships**
-
-
+    2. To enable support on your storage system, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Administering** > **Managing Copy Services** > **Managing remote-copy partnerships**.
 
 6. (Optional) To use CSI Topology, at least one node in the cluster must contain the label prefix of `topology.block.csi.ibm.com` to introduce topology awareness:
       
