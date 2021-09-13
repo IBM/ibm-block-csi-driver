@@ -115,7 +115,7 @@ This document provides advanced technical information. Use it to help with advan
           volumes:
           - name: demo-volume-file-system
             persistentVolumeClaim:
-              claimName: demo-pvc-file-system​
+              claimName: demo-pvc-file-system
     #      nodeSelector:
     #        kubernetes.io/hostname: HOSTNAME
     </pre>
