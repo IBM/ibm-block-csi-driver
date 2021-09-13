@@ -25,7 +25,7 @@ Use the following sections, according to your PVC needs:
 
 ## <a name=PVC-fs></a>Creating PVC for volume with Filesystem
 
-Create a PVC YAML file, similar to the following `demo-pvc-file-system.yaml` file, with the size of 1 Gb, where `volumeMode` is `Filesystem`.
+Create a PVC YAML file, similar to the following `demo-pvc-file-system.yaml` file, with the size of 1 Gb, with `volumeMode` defined as `Filesystem`.
 
 **Note:** `volumeMode` is an optional field. `Filesystem` is the default if the value is not added.
 
@@ -44,7 +44,7 @@ Create a PVC YAML file, similar to the following `demo-pvc-file-system.yaml` fil
 
 ## <a name=PVC-block></a>Creating PVC for raw block volume
 
-Create a PVC YAML file, similar to the following `demo-pvc-raw-block.yaml` file, with the size of 1 Gb, where `volumeMode` is `Block`.
+Create a PVC YAML file, similar to the following `demo-pvc-raw-block.yaml` file, with the size of 1 Gb, with `volumeMode` defined as `Block`.
 
     kind: PersistentVolumeClaim
     apiVersion: v1
