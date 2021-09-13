@@ -23,7 +23,7 @@ When replicating a volume, be sure to follow all of the replication configuratio
       replicationState: primary
       dataSource:
         kind: PersistentVolumeClaim
-        name: demo-pvc-file-system # should be in same namespace as VolumeReplication
+        name: demo-pvc-file-system  # Ensure that this is in the same namespace as VolumeReplication.
     ```
 
 2.  After the YAML file is created, apply it by using the `kubectl apply -f` command.

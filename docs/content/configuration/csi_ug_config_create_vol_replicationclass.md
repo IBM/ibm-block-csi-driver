@@ -18,8 +18,9 @@ metadata:
 spec:
   provisioner: block.csi.ibm.com
   parameters:
-    system_id: "0000000000DEM01D"
-    copy_type: "async"  # Optional. Values sync\async. The default is sync.
+    system_id: demo-system-id
+    copy_type: async  # Optional. Values sync/async. The default is sync.
+
     replication.storage.openshift.io/replication-secret-name: demo-secret
     replication.storage.openshift.io/replication-secret-namespace: default
 ```

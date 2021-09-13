@@ -11,30 +11,30 @@ Use the Secret file to connect a worker node to a storage system.
     The `management_address` field can contain more than one address, with each value separated by a comma.
 
     ```
+      {
+    "demo-management-id-1": {
+      "username": "demo-username-1",
+      "password": "demo-password-1",
+      "management_address": "demo-management-address-1",
+      "supported_topologies": [
         {
-     "demo-system-id-1": {
-       "username": "demo-username-1",
-       "password": "demo-password-1",
-        "management_address": "demo-management-address-1",
-        "supported_topologies": [
-         {
-           "topology.block.csi.ibm.com/demo-region": "demo-region-1",
-           "topology.block.csi.ibm.com/demo-zone": "demo-zone-1"
-         }
-       ]
-     },
-     "demo-system-id-2": {
-       "username": "demo-username-2",
-       "password": "demo-password-2",
-       "management_address": "demo-management-address-2",
-       "supported_topologies": [
-         {
-           "topology.block.csi.ibm.com/demo-region": "demo-region-2",
-           "topology.block.csi.ibm.com/demo-zone": "demo-zone-2"
-         }
-       ]
-     }
-   }
+          "topology.block.csi.ibm.com/demo-region": "demo-region-1",
+          "topology.block.csi.ibm.com/demo-zone": "demo-zone-1"
+        }
+      ]
+    },
+    "demo-management-id-2": {
+      "username": "demo-username-2",
+      "password": "demo-password-2",
+      "management_address": "demo-management-address-2",
+      "supported_topologies": [
+        {
+          "topology.block.csi.ibm.com/demo-region": "demo-region-2",
+          "topology.block.csi.ibm.com/demo-zone": "demo-zone-2"
+        }
+      ]
+    }
+  }
      ```
        
 2. Apply the secret using the following command:

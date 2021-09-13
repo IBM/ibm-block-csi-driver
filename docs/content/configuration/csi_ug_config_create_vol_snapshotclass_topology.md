@@ -1,6 +1,6 @@
 # Creating a VolumeSnapshotClass with topology awareness
 
-When using the CSI Topology feature, different parameters must be taken into account when creating a VolumeSnapshotClass YAML file with specific `by_system_id` requirements. Use this information to help define a VolumeSnapshotClass that is topology aware and enables the creation and deletion of volume snapshots.
+When using the CSI Topology feature, different parameters must be taken into account when creating a VolumeSnapshotClass YAML file with specific `by_management_id` requirements. Use this information to help define a VolumeSnapshotClass that is topology aware and enables the creation and deletion of volume snapshots.
 
 **Note:** 
   - For information and parameter definitions that are not related to topology awareness, be sure to see the information provided in [Creating a VolumeSnapshotClass](csi_ug_config_create_vol_snapshotclass.md), in addition to the current section.
@@ -15,13 +15,13 @@ When configuring the file, be sure to use the same array secret and array secret
   - The `snapshot_name_prefix` parameter is optional.
   - The `CSI` prefix is added as default if not specified by the user.
 
-  The `by_system_id` parameter is optional and values, such as the `pool`, `SpaceEfficiency`, and `volume_name_prefix` may all be specified.
+  The `by_management_id` parameter is optional and values, such as the `pool`, `SpaceEfficiency`, and `volume_name_prefix` may all be specified.
 
-The various `by_system_id` parameters are chosen within the following hierarchical order:
-1. From within the `by_system_id` parameter, per system (if specified).
-2. Outside of the parameter, as a cross-system default (if not specified within the `by_system_id` parameter).
+The various `by_management_id` parameters are chosen within the following hierarchical order:
+1. From within the `by_management_id` parameter, per system (if specified).
+2. Outside of the parameter, as a cross-system default (if not specified within the `by_management_id` parameter).
 
-**Note:** If the parameter is defined both inside as well as outside the `by_system_id` parameter, the parameters go by whatever is within the parameter.
+**Note:** If the parameter is defined both inside as well as outside the `by_management_id` parameter, the parameters go by whatever is within the parameter.
     
 ```
 apiVersion: snapshot.storage.k8s.io/v1beta1
@@ -31,10 +31,10 @@ metadata:
 driver: block.csi.ibm.com
 deletionPolicy: Delete
 parameters:
-  # non-csi.storage.k8s.io parameters may be specified in by_system_id per system and/or outside by_system_id as the cross-system default.
+  # non-csi.storage.k8s.io parameters may be specified in by_management_id per system and/or outside by_management_id as the cross-system default.
 
-  by_system_id: '{"demo-system-id-1":{"pool":"demo-pool-1","SpaceEfficiency":"deduplicated","snapshot_name_prefix":"demo-prefix-1"},
-                  "demo-system-id-2":{"pool":"demo-pool-2","snapshot_name_prefix":"demo-prefix-2"}}'  # Optional.
+  by_management_id: '{"demo-management-id-1":{"pool":"demo-pool-1","SpaceEfficiency":"deduplicated","snapshot_name_prefix":"demo-prefix-1"},
+                      "demo-management-id-2":{"pool":"demo-pool-2","snapshot_name_prefix":"demo-prefix-2"}}'  # Optional.
   pool: demo-pool                    # Optional. Use to create the snapshot on a different pool than the source.
   SpaceEfficiency: thin              # Optional. Use to create the snapshot with a different space efficiency than the source.
   snapshot_name_prefix: demo-prefix  # Optional.

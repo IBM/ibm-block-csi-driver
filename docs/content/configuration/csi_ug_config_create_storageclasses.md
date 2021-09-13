@@ -34,25 +34,20 @@ _<a name=spaceefficiency>**Table:**</a> `SpaceEfficiency` parameter definitions 
 **Note:** For IBM DS8000 Family, the maximum prefix length is five characters. The maximum prefix length for other systems is 20 characters. <br /><br />For storage systems that use Spectrum Virtualize, the `CSI` prefix is added as default if not specified by the user.
 
     
-      kind: StorageClass
-      apiVersion: storage.k8s.io/v1
-      metadata:
-        name: demo-storageclass
-      provisioner: block.csi.ibm.com
-      parameters:
-        SpaceEfficiency: deduplicated   # Optional.
-        pool: demo-pool
-      
-        csi.storage.k8s.io/provisioner-secret-name: demo-secret
-        csi.storage.k8s.io/provisioner-secret-namespace: default
-        csi.storage.k8s.io/controller-publish-secret-name: demo-secret
-        csi.storage.k8s.io/controller-publish-secret-namespace: default
-        csi.storage.k8s.io/controller-expand-secret-name: demo-secret
-        csi.storage.k8s.io/controller-expand-secret-namespace: default
-      
-        csi.storage.k8s.io/fstype: xfs   # Optional. Values ext4\xfs. The default is ext4.
-        volume_name_prefix: demoPVC      # Optional.
-      allowVolumeExpansion: true
+    kind: StorageClass
+    apiVersion: storage.k8s.io/v1
+    metadata:
+      name: demo-storageclass
+    provisioner: block.csi.ibm.com
+    parameters:
+      pool: demo-pool
+      SpaceEfficiency: thin            # Optional.
+      volume_name_prefix: demo-prefix  # Optional.
+
+      csi.storage.k8s.io/fstype: xfs   # Optional. Values ext4/xfs. The default is ext4.
+      csi.storage.k8s.io/secret-name: demo-secret
+      csi.storage.k8s.io/secret-namespace: default
+    allowVolumeExpansion: true
     
 
 Apply the storage class.

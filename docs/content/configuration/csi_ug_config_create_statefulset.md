@@ -86,14 +86,14 @@ Be sure to indicate the `volumeDevices`, listing each volumes name and path. In 
 
 ## Creating a StatefulSet with both raw block and file system volumes
 
-Create a StatefulSet YAML file, similar to the following `demo-statefulset-combined.yaml` file.
+Create a StatefulSet YAML file, similar to the following `demo-statefulset.yaml` file.
 
 In a StatefulSet file with two volumes with different volume modes, it is important to indicate both the `volumeMounts` and `volumeDevices` parameters.
 
     kind: StatefulSet
     apiVersion: apps/v1
     metadata:
-      name: demo-statefulset-combined
+      name: demo-statefulset
     spec:
       selector:
         matchLabels:
@@ -123,5 +123,4 @@ In a StatefulSet file with two volumes with different volume modes, it is import
           - name: demo-volume-raw-block
             persistentVolumeClaim:
               claimName: demo-pvc-raw-block
-
 
