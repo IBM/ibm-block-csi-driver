@@ -17,12 +17,12 @@ This document provides advanced technical information. Use it to help with advan
 
   For example, to configure a Linux multipath device, verify that the `find_multipaths` parameter in the multipath.conf file is disabled by removing the `find_multipaths yes` string from the file.
 
-  Be sure that there is at least one multipath defined. If not, define a virtual multipath \(if single\) - for example, for RHEL.
+  Be sure that there is at least one multipath defined. If not, define a virtual multipath (if single) - for example, for RHEL.
 
 - Ensure iSCSI connectivity for RHEL users:
 
-    -   `iscsi-initiator-utils` \(if iSCSI connection is required\)
-    -   `xfsprogs` \(if XFS file system is required\)
+    -   `iscsi-initiator-utils` (if iSCSI connection is required)
+    -   `xfsprogs` (if XFS file system is required)
     ```screen
     yum -y install iscsi-initiator-utils
     yum -y install xfsprogs
@@ -31,13 +31,13 @@ This document provides advanced technical information. Use it to help with advan
 
 ## Running a stateful container with file system configurations
 
-1.  Create an array secret, as described in [Creating a Secret](docs/csi_ug_config_create_secret.md).
+1.  Create an array secret, as described in [Creating a Secret](docs/content/configuration/csi_ug_config_create_secret.md).
 
-2.  Create a storage class, as described in [Creating a StorageClass](docs/csi_ug_config_create_storageclasses.md).
+2.  Create a storage class, as described in [Creating a StorageClass](docs/content/configuration/csi_ug_config_create_storageclasses.md).
 
-3.  Create a PVC demo-pvc-file-system.yaml with the size of 1 Gb, as described in [Creating a PersistentVolumeClaim \(PVC\)](docs/csi_ug_config_create_pvc.md).
+3.  Create a PVC demo-pvc-file-system.yaml with the size of 1 Gb, as described in [Creating a PersistentVolumeClaim (PVC)](docs/content/configuration/csi_ug_config_create_pvc.md).
 
-4.  Display the existing PVC and the created persistent volume \(PV\).
+4.  Display the existing PVC and the created persistent volume (PV).
 
     ```screen
     $> kubectl get pv,pvc
@@ -53,11 +53,11 @@ This document provides advanced technical information. Use it to help with advan
     ACCESS MODES   STORAGECLASS   AGE
     RWO            demo-storageclass           78s
     
-    $\> kubectl describe persistentvolume/pvc-828ce909-6eb2-11ea-abc8-005056a49b44
+    $> kubectl describe persistentvolume/pvc-828ce909-6eb2-11ea-abc8-005056a49b44
     Name:            pvc-828ce909-6eb2-11ea-abc8-005056a49b44
-    Labels:          <none\>
+    Labels:          <none>
     Annotations:     pv.kubernetes.io/provisioned-by: block.csi.ibm.com
-    Finalizers:      \[kubernetes.io/pv-protection external-attacher/block-csi-ibm-com\]
+    Finalizers:      [kubernetes.io/pv-protection external-attacher/block-csi-ibm-com]
     StorageClass:    demo-storageclass
     Status:          Bound
     Claim:           default/demo-pvc-file-system
@@ -65,19 +65,19 @@ This document provides advanced technical information. Use it to help with advan
     Access Modes:    RWO
     VolumeMode:      Filesystem
     Capacity:        1Gi
-    Node Affinity:   <none\>
+    Node Affinity:   <none>
     Message:
     Source:
-        Type:              CSI \(a Container Storage Interface \(CSI\) volume source\)
+        Type:              CSI (a Container Storage Interface (CSI) volume source)
         Driver:            block.csi.ibm.com
         VolumeHandle:      SVC:60050760718106998000000000000543
         ReadOnly:          false
-        VolumeAttributes:      array\_address=baremetal10-cluster.xiv.ibm.com
-                               pool\_name=demo-pool
+        VolumeAttributes:      array\address=baremetal10-cluster.xiv.ibm.com
+                               pool\name=demo-pool
                                storage.kubernetes.io/csiProvisionerIdentity=1585146948772-8081-block.csi.ibm.com
-                               storage\_type=SVC
-                               volume\_name=demoPVC-828ce909-6eb2-11ea-abc8-005056a49b44
-    Events:                <none\>
+                               storage\type=SVC
+                               volume\name=demoPVC-828ce909-6eb2-11ea-abc8-005056a49b44
+    Events:                <none>
     ```
 
 5.  Create a StatefulSet.
@@ -107,8 +107,8 @@ This document provides advanced technical information. Use it to help with advan
           containers:
           - name: demo-container
             image: registry.access.redhat.com/ubi8/ubi:latest
-            command: \[ "/bin/sh", "-c", "--" \]
-            args: \[ "while true; do sleep 30; done;" \]
+            command: [ "/bin/sh", "-c", "--" ]
+            args: [ "while true; do sleep 30; done;" ]
             <b>volumeMounts:
               - name: demo-volume-file-system
                 mountPath: "data"</b>
@@ -122,7 +122,7 @@ This document provides advanced technical information. Use it to help with advan
 
 6.  Check the newly created pod.
 
-    Display the newly created pod \(make sure the pod status is _Running_\).
+    Display the newly created pod (make sure the pod status is _Running_).
 
     ```
     $> kubectl get pod demo-statefulset-file-system-0
@@ -159,7 +159,7 @@ This document provides advanced technical information. Use it to help with advan
 
         ```screen
         $>[k8s-node1]  multipath -ll
-        mpathz (828ce9096eb211eaabc8005056a49b44) dm-3 IBM     ,2145 \(for SVC\)         
+        mpathz (828ce9096eb211eaabc8005056a49b44) dm-3 IBM     ,2145 (for SVC)         
         size=1.0G features='1 queue_if_no_path' hwhandler='0' wp=rw
         `-+- policy='service-time 0' prio=1 status=active
           |- 37:0:0:12 sdc 8:32 active ready running
@@ -169,7 +169,7 @@ This document provides advanced technical information. Use it to help with advan
         lrwxrwxrwx. 1 root root 7 Aug 12 19:29 /dev/mapper/mpathz -> ../dm-3
         ```
 
-    4.  List the physical devices of the multipath mpathz and its mountpoint on the host. \(This is the `/data` inside the stateful pod\).
+    4.  List the physical devices of the multipath mpathz and its mountpoint on the host. (This is the `/data` inside the stateful pod).
 
         ```screen
         $>[k8s-node1]  lsblk /dev/sdb /dev/sdc
@@ -196,7 +196,7 @@ This document provides advanced technical information. Use it to help with advan
         {"connectivity":"iscsi","mpathDevice":"dm-3","sysDevices":",sdb,sdc"}
         ```
 
-9.  Delete StatefulSet and then recreate, in order to validate data \(/data/FILE\) remains in the persistent volume.
+9.  Delete StatefulSet and then recreate, in order to validate data (/data/FILE) remains in the persistent volume.
 
     1.  Delete the StatefulSet.
 
@@ -257,9 +257,9 @@ This document provides advanced technical information. Use it to help with advan
 
 2.  Create a storage class, as described in [Creating a StorageClass](csi_ug_config_create_storageclasses.md).
 
-3.  Create a PVC with the size of 1 Gb, as described in [Creating a PersistentVolumeClaim \(PVC\)](csi_ug_config_create_pvc.md).
+3.  Create a PVC with the size of 1 Gb, as described in [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
 
-4.  Display the existing PVC and the created persistent volume \(PV\).
+4.  Display the existing PVC and the created persistent volume (PV).
 
     ```screen
     $> kubectl get pv,pvc
@@ -277,9 +277,9 @@ This document provides advanced technical information. Use it to help with advan
     
     kubectl describe persistentvolume/pvc-828ce909-6eb2-11ea-abc8-005056a49b44
     Name:            pvc-828ce909-6eb2-11ea-abc8-005056a49b44
-    Labels:          <none\>
+    Labels:          <none>
     Annotations:     pv.kubernetes.io/provisioned-by: block.csi.ibm.com
-    Finalizers:      \[kubernetes.io/pv-protection external-attacher/block-csi-ibm-com\]
+    Finalizers:      [kubernetes.io/pv-protection external-attacher/block-csi-ibm-com]
     StorageClass:    demo-storageclass
     Status:          Bound
     Claim:           default/demo-pvc-raw-block
@@ -287,19 +287,19 @@ This document provides advanced technical information. Use it to help with advan
     Access Modes:    RWO
     VolumeMode:      Block
     Capacity:        1Gi
-    Node Affinity:   <none\>
+    Node Affinity:   <none>
     Message:
     Source:
-        Type:              CSI \(a Container Storage Interface \(CSI\) volume source\)
+        Type:              CSI (a Container Storage Interface (CSI) volume source)
         Driver:            block.csi.ibm.com
         VolumeHandle:      SVC:60050760718106998000000000000543
         ReadOnly:          false
-        VolumeAttributes:      array\_address=baremetal10-cluster.xiv.ibm.com
-                               pool\_name=demo-pool
+        VolumeAttributes:      array\address=baremetal10-cluster.xiv.ibm.com
+                               pool\name=demo-pool
                                storage.kubernetes.io/csiProvisionerIdentity=1585146948772-8081-block.csi.ibm.com
-                               storage\_type=SVC
-                               volume\_name=demoPVC-828ce909-6eb2-11ea-abc8-005056a49b44
-    Events:                <none\>
+                               storage\type=SVC
+                               volume\name=demoPVC-828ce909-6eb2-11ea-abc8-005056a49b44
+    Events:                <none>
     
     ```
 
@@ -331,8 +331,8 @@ This document provides advanced technical information. Use it to help with advan
           containers:
           - name: demo-container
             image: registry.access.redhat.com/ubi8/ubi:latest
-            command: \[ "/bin/sh", "-c", "--" \]
-            args: \[ "while true; do sleep 30; done;" \]
+            command: [ "/bin/sh", "-c", "--" ]
+            args: [ "while true; do sleep 30; done;" ]
             <b>volumeDevices:
               - name: demo-volume-raw-block
                 devicePath: "/dev/block"</b>
@@ -347,7 +347,7 @@ This document provides advanced technical information. Use it to help with advan
 
 6.  Check the newly created pod.
 
-    Display the newly created pod \(make sure the pod status is _Running_).
+    Display the newly created pod (make sure the pod status is _Running_).
 
     ```
     kubectl get pod demo-statefulset-raw-block-0
@@ -369,7 +369,7 @@ This document provides advanced technical information. Use it to help with advan
     t e s t _ b l o c k  
     ```
 
-8.  Delete StatefulSet and then recreate, in order to validate data \(test\_block in /dev/block\) remains in the persistent volume.
+8.  Delete StatefulSet and then recreate, in order to validate data (test\block in /dev/block) remains in the persistent volume.
 
     1.  Delete the StatefulSet.
 
@@ -382,7 +382,7 @@ This document provides advanced technical information. Use it to help with advan
 
         ```screen
         $> kubectl get statefulset/demo-statefulset-raw-block
-        Error from server (NotFound): statefulsets.apps <StatefulSet name\> not found
+        Error from server (NotFound): statefulsets.apps <StatefulSet name> not found
         ```
 
     3.  Recreate the StatefulSet and verify that the content written to /dev/block exists.
@@ -391,8 +391,8 @@ This document provides advanced technical information. Use it to help with advan
         $> kubectl create -f demo-statefulset-raw-block.yaml
         statefulset/demo-statefulset-raw-block created
         
-        $\> kubectl exec demo-statefulset-raw-block-0 -- bash -c "od -An -c -N 10 /dev/block"
-        t e s t \_ b l o c k 
+        $> kubectl exec demo-statefulset-raw-block-0 -- bash -c "od -An -c -N 10 /dev/block"
+        t e s t \ b l o c k 
         ```
 
 9.  Delete StatefulSet and the PVC.
@@ -445,7 +445,7 @@ statefulset.apps/ibm-block-csi-controller 1 1 2h
 
 ### Verifying the CSI driver is running
 
-Verify that the CSI driver is running. \(Make sure the csi-controller pod status is Running\).
+Verify that the CSI driver is running. (Make sure the csi-controller pod status is Running).
 
 ```screen
 $> kubectl get all -n <namespace> -l csi
@@ -472,7 +472,7 @@ statefulset.apps/ibm-block-csi-controller 1       1       2h
 
 Use this information to help pinpoint potential causes for multipath failures.
 
--   **Display multipath information \(FC and iSCSI\)**
+-   **Display multipath information (FC and iSCSI)**
 
     Display multipath information, using the sudo multipath -ll command.
 
@@ -509,7 +509,7 @@ Use this information to help pinpoint potential causes for multipath failures.
     sdb  2:0:0:0    disk IBM      2145             0000 iscsi
     ```
 
--   **Check for multipath daemon availability \(FC and iSCSI\)**
+-   **Check for multipath daemon availability (FC and iSCSI)**
 
     Check for multipath daemon availability, using the `systemctl status multipathd` command.
 
@@ -592,10 +592,10 @@ If an error during automatic iSCSI login occurs, perform the following steps for
 
 **Note:** This procedure is applicable for both RHEL and RHCOS users. When using RHCOS, use the following:
 
--   Log into the RHCOS node with the core user \(for example, `ssh core@worker1.apps.openshift.mycluster.net`\)
+-   Log into the RHCOS node with the core user (for example, `ssh core@worker1.apps.openshift.mycluster.net`)
 -   iscsiadm commands must start with sudo
 
-1.  Verify that the node.startup in the /etc/iscsi/iscsid.conf file is set to automatic. If not, set it as required and then restart the iscsid service \(service iscsid restart\).
+1.  Verify that the node.startup in the /etc/iscsi/iscsid.conf file is set to automatic. If not, set it as required and then restart the iscsid service (service iscsid restart).
 2.  Discover and log into at least two iSCSI targets on the relevant storage systems.
 
     **Note:** A multipath device can't be created without at least two ports.
