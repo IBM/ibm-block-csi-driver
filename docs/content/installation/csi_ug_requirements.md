@@ -77,7 +77,7 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
     kubectl apply -f ./replication.storage.openshift.io_volumereplications.yaml
     ```
 
-6. (Optional) To use CSI Topology, all nodes in the cluster must contain the `topology.kubernetes.io` label to introduce topology awareness:
+6. (Optional) To use CSI Topology, all nodes in the cluster must contain the `topology.block.csi.ibm.com` label to introduce topology awareness:
       
       **Important:** These labels must be found on the nodes in the cluster **before** installing the IBM® block storage CSI driver. If the nodes are not labeled before installation, CSI Topology cannot be used with the CSI driver.
 
