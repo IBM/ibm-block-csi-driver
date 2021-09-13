@@ -65,30 +65,32 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
 
    The instructions and relevant YAML files to enable volume snapshots can be found at: [https://github.com/kubernetes-csi/external-snapshotter#usage](https://github.com/kubernetes-csi/external-snapshotter#usage)
 
-5. (Optional) If planning on using volume replication (remote copy function), enable support on your Kubernetes cluster.
-
-    Install the following replication CRDs once per cluster.
-
-    ```
-    curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.1.0/config/crd/bases/replication.storage.openshift.io_volumereplicationclasses.yaml
-    kubectl apply -f ./replication.storage.openshift.io_volumereplicationclasses.yaml
+5. (Optional) If planning on using volume replication (remote copy function), enable support on your Kubernetes cluster and storage system.
     
-    curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.1.0/config/crd/bases/replication.storage.openshift.io_volumereplications.yaml
-    kubectl apply -f ./replication.storage.openshift.io_volumereplications.yaml
-    ```
+    1. To enable support on your Kubernetes cluster, install the following replication CRDs once per cluster.
+
+        ```
+        curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.1.0/config/crd/bases/replication.storage.openshift.io_volumereplicationclasses.yaml
+        kubectl apply -f ./replication.storage.openshift.io_volumereplicationclasses.yaml
+        
+        curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.1.0/config/crd/bases/replication.storage.openshift.io_volumereplications.yaml
+        kubectl apply -f ./replication.storage.openshift.io_volumereplications.yaml
+        ````
+    
+    2. To enable support on your storage system, use the `mkfcpartnership` command.
+
+        For more information, see the following sections within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/):
+
+        - **Command-line interface** > **Copy Service commands** > **mkfcpartnership**
+        - **Product overview** > **Technical overview** > **Copy Services functions** > **Metro Mirror and Global Mirror partnerships**
+
+
 
 6. (Optional) To use CSI Topology, all nodes in the cluster must contain the `topology.block.csi.ibm.com` label to introduce topology awareness:
       
       **Important:** These labels must be found on the nodes in the cluster **before** installing the IBM® block storage CSI driver. If the nodes are not labeled before installation, CSI Topology cannot be used with the CSI driver.
 
-      ```
-      $> kubectl get nodes -o=jsonpath='{range .items[*]}[{.metadata.name}, {.metadata.labels}]{"\n"}{end}' | grep --color "topology.block.csi.ibm.com"
-
-      [node1, {"beta.kubernetes.io/arch":"amd64","beta.kubernetes.io/os":"linux","kubernetes.io/arch":"amd64","kubernetes.io/hostname":"demo-node1","kubernetes.io/os":"linux","topology.block.csi.ibm.com/demo-region":"demo-region-1","topology.block.csi.ibm.com/demo-zone":"demo-zone-1"}]
-      [node2, {"beta.kubernetes.io/arch":"amd64","beta.kubernetes.io/os":"linux","kubernetes.io/arch":"amd64","kubernetes.io/hostname":"demo-node2","kubernetes.io/os":"linux","topology.block.csi.ibm.com/demo-region":"demo-region-2","topology.block.csi.ibm.com/demo-zone":"demo-zone-2"}]
-    ```
-
-    For more information, see [Configuring for CSI Topology](content/configuration/csi_ug_config_topology.md). 
+      For more information, see [Configuring for CSI Topology](content/configuration/csi_ug_config_topology.md). 
 
 
 
