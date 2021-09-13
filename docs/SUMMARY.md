@@ -35,7 +35,6 @@
 		* [Manual upgrade with OpenShift](content/installation/csi_ug_upgrade_ocp_manual.md)
 * [CSI driver configuration](content/configuration/csi_ug_config.md)
 	* [Creating a Secret](content/configuration/csi_ug_config_create_secret.md)
-		* [Creating a Secret with topology awareness](content/configuration/csi_ug_config_create_secret_topology.md)
 	* [Creating a StorageClass](content/configuration/csi_ug_config_create_storageclasses.md)
 		* [Creating a StorageClass with topology awareness](content/configuration/csi_ug_config_create_storageclasses_topology.md)
 	* [Creating a PersistentVolumeClaim (PVC)](content/configuration/csi_ug_config_create_pvc.md)
