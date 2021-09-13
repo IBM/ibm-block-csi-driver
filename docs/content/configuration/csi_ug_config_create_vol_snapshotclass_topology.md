@@ -15,13 +15,11 @@ When configuring the file, be sure to use the same array secret and array secret
   - The `snapshot_name_prefix` parameter is optional.
   - The `CSI` prefix is added as default if not specified by the user.
 
-  The `by_management_id` parameter is optional and values, such as the `pool`, `SpaceEfficiency`, and `volume_name_prefix` may all be specified.
+  The `by_management_id` parameter is optional and values such as the `pool`, `SpaceEfficiency`, and `volume_name_prefix` may all be specified.
 
 The various `by_management_id` parameters are chosen within the following hierarchical order:
 1. From within the `by_management_id` parameter, per system (if specified).
-2. Outside of the parameter, as a cross-system default (if not specified within the `by_management_id` parameter).
-
-**Note:** If the parameter is defined both inside as well as outside the `by_management_id` parameter, the parameters go by whatever is within the parameter.
+2. Outside of the parameter, as a cross-system default (if not specified within the `by_management_id` parameter for the relevant `management-id`).
     
 ```
 apiVersion: snapshot.storage.k8s.io/v1beta1

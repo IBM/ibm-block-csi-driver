@@ -9,16 +9,15 @@ The StorageClass file must be defined to contain topology information, based off
 
 With topology awareness, the StorageClass must have the `volumeBindingMode` set to `WaitForFirstConsumer` (as defined in the `.yaml` example below.) This defines that any PVCs that are requested with this specific StorageClass, will wait to be configured until the CSI driver can see the worker node topology.
 
-The `by_management_id` parameter is optional and values, such as the `pool`, `SpaceEfficiency`, and `volume_name_prefix` may all be specified.
+The `by_management_id` parameter is optional and values such as the `pool`, `SpaceEfficiency`, and `volume_name_prefix` may all be specified.
 
 The various `by_management_id` parameters are chosen within the following hierarchical order:
 1. From within the `by_management_id` parameter, per system (if specified).
-2. Outside of the parameter, as a cross-system default (if not specified within the `by_management_id` parameter).
+2. Outside of the parameter, as a cross-system default (if not specified within the `by_management_id` parameter for the relevant `management-id`).
 
-**Note:** If the parameter is defined both inside as well as outside the `by_management_id` parameter, the parameters go by whatever is within the parameter.
   
   ```
-   kind: StorageClass
+kind: StorageClass
 apiVersion: storage.k8s.io/v1
 metadata:
   name: demo-storageclass-config-secret
