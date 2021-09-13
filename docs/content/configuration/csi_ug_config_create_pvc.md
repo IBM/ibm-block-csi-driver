@@ -78,7 +78,7 @@ Update the `dataSource` parameters to reflect the existing volume snapshot infor
           storage: 1Gi
       storageClassName: demo-storageclass
       dataSource:
-        name: demo-snapshot
+        name: demo-volumesnapshot
         kind: VolumeSnapshot
         apiGroup: snapshot.storage.k8s.io
 
