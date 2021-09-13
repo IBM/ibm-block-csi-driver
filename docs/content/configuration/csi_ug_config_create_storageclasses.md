@@ -57,5 +57,3 @@ Apply the storage class.
   ```
 
 The `storageclass.storage.k8s.io/demo-storageclass created` message is emitted.
-
-
