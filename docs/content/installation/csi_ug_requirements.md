@@ -84,9 +84,11 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
       ```
       $> kubectl get nodes -o=jsonpath='{range .items[*]}[{.metadata.name}, {.metadata.labels}]{"\n"}{end}' | grep --color "topology.block.csi.ibm.com"
 
-      [node1, {"beta.kubernetes.io/arch":"amd64","beta.kubernetes.io/os":"linux","kubernetes.io/arch":"amd64","kubernetes.io/hostname":"k8s-rhel-7-8-k8s-1-20-arbel-w1","kubernetes.io/os":"linux","topology.block.csi.ibm.com/demo-region":"demo-region-1","topology.block.csi.ibm.com/demo-zone":"demo-zone-1"}]
-      [node2, {"beta.kubernetes.io/arch":"amd64","beta.kubernetes.io/os":"linux","kubernetes.io/arch":"amd64","kubernetes.io/hostname":"k8s-rhel-7-8-k8s-1-20-arbel-w2","kubernetes.io/os":"linux","topology.block.csi.ibm.com/demo-region":"demo-region-2","topology.block.csi.ibm.com/demo-zone":"demo-zone-2"}]
+      [node1, {"beta.kubernetes.io/arch":"amd64","beta.kubernetes.io/os":"linux","kubernetes.io/arch":"amd64","kubernetes.io/hostname":"demo-node1","kubernetes.io/os":"linux","topology.block.csi.ibm.com/demo-region":"demo-region-1","topology.block.csi.ibm.com/demo-zone":"demo-zone-1"}]
+      [node2, {"beta.kubernetes.io/arch":"amd64","beta.kubernetes.io/os":"linux","kubernetes.io/arch":"amd64","kubernetes.io/hostname":"demo-node2","kubernetes.io/os":"linux","topology.block.csi.ibm.com/demo-region":"demo-region-2","topology.block.csi.ibm.com/demo-zone":"demo-zone-2"}]
     ```
+
+    For more information, see [Configuring for CSI Topology](content/configuration/csi_ug_config_topology.md). 
 
 
 
