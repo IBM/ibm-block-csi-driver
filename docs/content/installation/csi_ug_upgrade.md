@@ -2,7 +2,7 @@
 
 Use this information to upgrade the IBM® block storage CSI driver.
 
-- The OpenShift web console and OperatorHub.io both automatically upgrade the the CSI (Container Storage Interface) driver when a new version is released.
+- The OpenShift web console and OperatorHub.io both automatically upgrade the CSI (Container Storage Interface) driver when a new version is released.
     - With OpenShift web console, the **Approval Strategy** must be set to **Automatic**.
 
         To check if your operator is running at the latest release level, from the OpenShift web console, browse to **Operators** > **Installed Operators**. Check the status of the Operator for IBM block storage CSI driver. Ensure that the **Upgrade Status** is _Up to date_.
