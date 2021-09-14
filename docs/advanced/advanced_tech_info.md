@@ -39,50 +39,53 @@ This document provides advanced technical information. Use it to help with advan
 
 4.  Display the existing PVC and the created persistent volume (PV).
 
-        $> kubectl get pv,pvc
-        NAME                                                        CAPACITY   ACCESS MODES
-        persistentvolume/pvc-828ce909-6eb2-11ea-abc8-005056a49b44   1Gi        RWO
+     <pre>
+      $> kubectl get pv,pvc
+      NAME                                                        CAPACITY   ACCESS MODES
+      persistentvolume/pvc-828ce909-6eb2-11ea-abc8-005056a49b44   1Gi        RWO
         
-        RECLAIM POLICY   STATUS   CLAIM                          STORAGECLASS     REASON  AGE
-        Delete           Bound    default/demo-pvc-file-system   demo-storageclass        109m
+      RECLAIM POLICY   STATUS   CLAIM                          STORAGECLASS     REASON  AGE
+      Delete           Bound    default/demo-pvc-file-system   demo-storageclass        109m
         
-        NAME                                         STATUS   VOLUME                                     CAPACITY   
-        persistentvolumeclaim/demo-pvc-file-system   Bound    pvc-828ce909-6eb2-11ea-abc8-005056a49b44   1Gi
+      NAME                                         STATUS   VOLUME                                     CAPACITY   
+      persistentvolumeclaim/demo-pvc-file-system   Bound    pvc-828ce909-6eb2-11ea-abc8-005056a49b44   1Gi
         
-        ACCESS MODES   STORAGECLASS       AGE
-        RWO            demo-storageclass  78s
+      ACCESS MODES   STORAGECLASS       AGE
+      RWO            demo-storageclass  78s
         
-        $> kubectl describe persistentvolume/pvc-b5336053-46a0-4eb0-a4d8-1d8ef309e108
-        Name:            pvc-b5336053-46a0-4eb0-a4d8-1d8ef309e108
-        Labels:          <none>
-        Annotations:     pv.kubernetes.io/provisioned-by: block.csi.ibm.com
-        Finalizers:      [kubernetes.io/pv-protection]
-        StorageClass:    demo-storageclass
-        Status:          Bound
-        Claim:           default/demo-pvc-file-system
-        Reclaim Policy:  Delete
-        Access Modes:    RWO
-        VolumeMode:      Filesystem
-        Capacity:        1Gi
-        Node Affinity:   <none>
-        Message:
-        Source:
-            Type:              CSI (a Container Storage Interface (CSI) volume source)
-            Driver:            block.csi.ibm.com
-            FSType:            xfs
-            VolumeHandle:      SVC:26;60050760718186998000000000005E93
-            ReadOnly:          false
-            VolumeAttributes:     array_address=baremetal10-cluster.xiv.ibm.com
-                                  pool_name=anna_pool
-                                  storage.kubernetes.io/csiProvisionerIdentity=1631546133261-8081-block.csi.ibm.com
-                                  storage_type=SVC
-                                  volume_name=demo-prefix_pvc-b5336053-46a0-4eb0-a4d8-1d8ef309e108
-        Events:                <none>
-
+      $> kubectl describe persistentvolume/pvc-b5336053-46a0-4eb0-a4d8-1d8ef309e108
+      Name:            pvc-b5336053-46a0-4eb0-a4d8-1d8ef309e108
+      Labels:          <none>
+      Annotations:     pv.kubernetes.io/provisioned-by: block.csi.ibm.com
+      Finalizers:      [kubernetes.io/pv-protection]
+      StorageClass:    demo-storageclass
+      Status:          Bound
+      Claim:           default/demo-pvc-file-system
+      Reclaim Policy:  Delete
+      Access Modes:    RWO
+      VolumeMode:      Filesystem
+      Capacity:        1Gi
+      Node Affinity:   <none>
+      Message:
+      Source:
+          Type:              CSI (a Container Storage Interface (CSI) volume source)
+          Driver:            block.csi.ibm.com
+          FSType:            xfs
+          VolumeHandle:      SVC:26;60050760718186998000000000005E93
+          ReadOnly:          false
+          VolumeAttributes:     array_address=demo-management-address
+                                pool_name=demo-pool
+                                storage.kubernetes.io/csiProvisionerIdentity=1631546133261-8081-block.csi.ibm.com
+                                storage_type=SVC
+                                volume_name=demo-prefix_pvc-b5336053-46a0-4eb0-a4d8-1d8ef309e108
+      Events:                <none>
+      </pre>
 5.  Create a StatefulSet.
 
-        $> kubectl create -f demo-statefulset-file-system.yaml
-        statefulset.apps/demo-statefulset-file-system created
+    <pre>
+    $> kubectl create -f demo-statefulset-file-system.yaml
+    statefulset.apps/demo-statefulset-file-system created
+    </pre>
 
     <pre>
     $> cat demo-statefulset-file-system.yaml
