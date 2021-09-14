@@ -7,7 +7,7 @@ import controller.array_action.errors as array_errors
 import controller.controller_server.utils as utils
 from controller.array_action import config as array_config
 from controller.controller_server import config as controller_config
-from controller.controller_server.csi_controller_server import ControllerServicer
+from controller.controller_server.csi_controller_server import CSIControllerServicer
 from controller.controller_server.errors import ObjectIdError, ValidationException
 from controller.controller_server.test_settings import pool, user, password, array
 from controller.csi_general import csi_pb2
@@ -19,7 +19,7 @@ from controller.tests.utils import get_fake_secret_config
 class TestUtils(unittest.TestCase):
 
     def setUp(self):
-        self.servicer = ControllerServicer()
+        self.servicer = CSIControllerServicer()
         self.config = {"controller": {"publish_context_lun_parameter": "lun",
                                       "publish_context_connectivity_parameter": "connectivity_type",
                                       "publish_context_separator": ",",

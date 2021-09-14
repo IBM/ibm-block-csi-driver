@@ -42,6 +42,19 @@ def get_mock_mediator_response_snapshot(capacity, name, wwn, volume_name, array_
     return snapshot
 
 
+def get_mock_mediator_response_replication(name, volume_internal_id, other_volume_internal_id,
+                                           copy_type="sync", is_primary=True, is_ready=True):
+    replication = Mock()
+    replication.name = name
+    replication.volume_internal_id = volume_internal_id
+    replication.other_volume_internal_id = other_volume_internal_id
+    replication.copy_type = copy_type
+    replication.is_primary = is_primary
+    replication.is_ready = is_ready
+
+    return replication
+
+
 def get_mock_volume_capability(mode=1, fs_type="ext4", mount_flags=None):
     capability = ProtoBufMock(spec=["mount", "access_mode"])
     mount = ProtoBufMock(spec=["fs_type", "mount_flags"])

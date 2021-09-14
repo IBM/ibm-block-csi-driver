@@ -9,7 +9,8 @@ from google.protobuf.timestamp_pb2 import Timestamp
 import controller.array_action.errors as array_errors
 import controller.controller_server.config as config
 import controller.controller_server.messages as messages
-from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
+from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE, \
+                                           REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.settings import NAME_PREFIX_SEPARATOR
 from controller.controller_server.controller_types import ArrayConnectionInfo, ObjectIdInfo, ObjectParameters
@@ -82,7 +83,7 @@ def get_array_connection_info_from_secrets(secrets, topologies=None, system_id=N
     return _get_array_connection_info_from_system_info(system_info, system_id)
 
 
-def get_volume_parameters(parameters, system_id):
+def get_volume_parameters(parameters, system_id=None):
     return get_object_parameters(parameters, config.PARAMETERS_VOLUME_NAME_PREFIX, system_id)
 
 
@@ -542,6 +543,24 @@ def validate_unpublish_volume_request(request):
     validate_secrets(request.secrets)
 
     logger.debug("unpublish volume request validation finished.")
+
+
+def validate_addons_request(request):
+    logger.debug("validating addons request")
+
+    logger.debug("validating volume id")
+    if request.volume_id == "" or request.target_volume_id == "":
+        raise ValidationException(messages.volume_id_should_not_be_empty_message)
+
+    logger.debug("validating copy type")
+    if config.PARAMETERS_COPY_TYPE in request.parameters:
+        copy_type = request.parameters.get(config.PARAMETERS_COPY_TYPE)
+        if copy_type not in (REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC):
+            raise ValidationException(messages.invalid_replication_copy_type_message.format(copy_type))
+
+    validate_secrets(request.secrets)
+
+    logger.debug("addons request validation finished")
 
 
 def get_current_timestamp():
