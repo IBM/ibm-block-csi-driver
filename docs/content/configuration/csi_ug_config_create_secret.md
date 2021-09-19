@@ -40,7 +40,6 @@ Use one of the following procedures to create and apply the secret:
 
 Create the secret using the following command:
 
- ```
- kubectl create secret generic <NAME> --from-literal=username=<USER> --from-literal=password=<PASSWORD>--from-literal=management_address=<ARRAY_MGMT> -n <namespace>
- ```
- 
+```
+kubectl create secret generic demo-secret --from-literal=username=demo-username --from-literal=password=demo-password --from-literal=management_address=demo-management-address -n default
+```

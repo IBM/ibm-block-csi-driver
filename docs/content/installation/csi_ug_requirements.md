@@ -73,7 +73,7 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
 
    The instructions and relevant YAML files to enable volume snapshots can be found at: [https://github.com/kubernetes-csi/external-snapshotter#usage](https://github.com/kubernetes-csi/external-snapshotter#usage)
 
-5. (Optional) If planning on using volume replication (remote copy function), enable support on your Kubernetes cluster and storage system.
+5. (Optional) If planning on using volume replication (remote copy function), enable support on your orchestration platform cluster and storage system.
     
     1. To enable support on your Kubernetes cluster, install the following replication CRDs once per cluster.
 
