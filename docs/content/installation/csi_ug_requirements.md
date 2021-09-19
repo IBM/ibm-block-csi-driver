@@ -29,7 +29,7 @@ For IBM Cloud® Satellite users, see [cloud.ibm.com/docs/satellite](https://clou
 
 Complete these steps for each worker node in Kubernetes cluster to prepare your environment for installing the CSI (Container Storage Interface) driver.
 
-1. **For RHEL OS users:** Ensure host connectivity and that the following packages are installed:
+1. **For RHEL OS users:** Ensure proper connectivity and that the following packages are installed:
 
     If using RHCOS or if the packages are already installed, skip this step and continue to step 2.
 
