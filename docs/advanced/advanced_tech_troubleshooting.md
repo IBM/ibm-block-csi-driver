@@ -73,7 +73,6 @@ Use this information to help pinpoint potential causes for multipath failures.
     | `- 3:0:0:0 sda 8:0  active ready running
     `-+- policy='service-time 0' prio=10 status=enabled
     `- 2:0:0:0 sdb 8:16 active ready running
-    </pre>
 
 -   **Display device attachment**
 
@@ -199,5 +198,3 @@ If an error during automatic iSCSI login occurs, perform the following steps for
 
     <pre>
     $> iscsiadm -m session -rescanRescanning session [sid: 1, target: {storage system IQN},portal: {storage system iSCSI port IP},{port number}
-
-

@@ -95,7 +95,6 @@
     kubectl get pod demo-statefulset-raw-block-0
     NAME                 READY   STATUS    RESTARTS   AGE
     demo-statefulset-raw-block-0   1/1     Running   0          43s
-    </pre>
 
 7. Write data to the persistent volume of the pod.
 
@@ -109,7 +108,6 @@
         
     kubectl exec demo-statefulset-raw-block-0 -- bash -c "od -An -c -N 10 /dev/block"
     t e s t _ b l o c k
-    </pre>
 
 8. Delete StatefulSet and then recreate, in order to validate data (test\block in /dev/block) remains in the persistent volume.
 
@@ -118,7 +116,6 @@
         <pre>
         $> kubectl delete statefulset/demo-statefulset-raw-block
         statefulset/demo-statefulset-raw-block deleted
-        </pre>
 
     2. Wait until the pod is deleted. Once deleted, the `"demo-statefulset-file-system" not found` is returned.
 
@@ -134,7 +131,6 @@
             
         $> kubectl exec demo-statefulset-raw-block-0 -- bash -c "od -An -c -N 10 /dev/block"
         t e s t \ b l o c k
-        </pre>
 
 9. Delete StatefulSet and the PVC.
   
@@ -150,4 +146,3 @@
         
     $> kubectl get pv,pvc
     No resources found.
-    </pre>
