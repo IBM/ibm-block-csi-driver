@@ -124,9 +124,11 @@ This document provides advanced technical information. Use it to help with advan
 
     Display the newly created pod (make sure the pod status is _Running_).
 
-        $> kubectl get pod demo-statefulset-file-system-0
-        NAME                 READY   STATUS    RESTARTS   AGE
-        demo-statefulset-file-system-0   1/1     Running   0          43s
+    <pre>
+    $> kubectl get pod demo-statefulset-file-system-0
+    NAME                 READY   STATUS    RESTARTS   AGE
+    demo-statefulset-file-system-0   1/1     Running   0          43s
+    </pre>
 
 7.  Write data to the persistent volume of the pod.
 
