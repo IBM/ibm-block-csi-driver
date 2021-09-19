@@ -17,7 +17,7 @@ For IBM Cloud® Satellite users, see [cloud.ibm.com/docs/satellite](https://clou
 
         Port 7778
 
-    -   **IBM Spectrum® Virtualize Family includes IBM® SAN Volume Controller and IBM FlashSystem® family members built with IBM Spectrum® Virtualize (including FlashSystem 5xxx, 7200, 9100, 9200, 9200R)**
+    -   **IBM Spectrum® Virtualize Family includes IBM® SAN Volume Controller and IBM FlashSystem® family members that are built with IBM Spectrum® Virtualize (including FlashSystem 5xxx, 7200, 9100, 9200, 9200R)**
 
         Port 22
 
@@ -29,7 +29,15 @@ For IBM Cloud® Satellite users, see [cloud.ibm.com/docs/satellite](https://clou
 
 Complete these steps for each worker node in Kubernetes cluster to prepare your environment for installing the CSI (Container Storage Interface) driver.
 
-1. **For RHEL OS users:** Ensure iSCSI connectivity. If using RHCOS or if the packages are already installed, skip this step and continue to step 2.
+1. **For RHEL OS users:** Ensure host connectivity and that the following packages are installed:
+
+    If using RHCOS or if the packages are already installed, skip this step and continue to step 2.
+
+    - `sg3_utils`
+    - `iscsi-initiator-utils`
+    - `device-mapper-multipath`
+    - `xfsprogs` (if XFS file system is required)
+
 
 2. Configure Linux® multipath devices on the host.
 
