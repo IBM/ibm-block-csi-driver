@@ -2,14 +2,15 @@
 set -x
 
 CSI_VERSION="v1.2.0"
-ADDONS_VERSION="v0.2.0"
+#ADDONS_VERSION="v0.2.0"
 PB2_DIR="controller/csi_general"
 
 mkdir -p ./proto/${PB2_DIR}
 cd ./proto/${PB2_DIR}
 
 curl -O https://raw.githubusercontent.com/container-storage-interface/spec/${CSI_VERSION}/csi.proto
-curl -O https://raw.githubusercontent.com/csi-addons/spec/${ADDONS_VERSION}/replication.proto
+#curl -O https://raw.githubusercontent.com/csi-addons/spec/${ADDONS_VERSION}/replication.proto
+curl -O https://raw.githubusercontent.com/oriyarde/spec/add_replication_id/replication.proto
 
 cd -
 

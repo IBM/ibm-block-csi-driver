@@ -21,7 +21,7 @@ class TestControllerServicerEnableVolumeReplication(BaseControllerSetUp, CommonC
         super().setUp()
         self.servicer = ReplicationControllerServicer()
         self.request.volume_id = "{}:{};{}".format("A9000", object_internal_id, volume_wwn)
-        self.request.target_volume_id = "{}:{};{}".format("A9000", other_object_internal_id, volume_wwn)
+        self.request.replication_id = "{}:{};{}".format("A9000", other_object_internal_id, volume_wwn)
         self.request.parameters.update({PARAMETERS_SYSTEM_ID: system_id,
                                         PARAMETERS_COPY_TYPE: copy_type})
         self.mediator.get_object_by_id = Mock()
