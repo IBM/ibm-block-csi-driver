@@ -29,17 +29,7 @@ For IBM Cloud® Satellite users, see [cloud.ibm.com/docs/satellite](https://clou
 
 Complete these steps for each worker node in Kubernetes cluster to prepare your environment for installing the CSI (Container Storage Interface) driver.
 
-1. **For RHEL OS users:** Ensure proper connectivity and that the following packages are installed:
-
-    If using RHCOS or if the packages are already installed, skip this step and continue to step 2.
-
-    - `sg3_utils`
-    - `iscsi-initiator-utils`
-    - `device-mapper-multipath`
-    - `xfsprogs` (if XFS file system is required)
-
-
-2. Configure Linux® multipath devices on the host.
+1. Configure Linux® multipath devices on the host.
 
    **Important:** Be sure to configure each worker with storage connectivity according to your storage system instructions. For more information, find your storage system documentation in [IBM Documentation](http://www.ibm.com/docs/).
 
@@ -59,12 +49,21 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
 
    `oc apply -f 99-ibm-attach.yaml`
 
-3. Configure storage system connectivity.
+2. Configure storage system connectivity.
 
     1.  Define the host of each Kubernetes node on the relevant storage systems with the valid WWPN (for Fibre Channel) or IQN (for iSCSI) of the node.
 
     2.  For Fibre Channel, configure the relevant zoning from the storage to the host.
-    
+
+3. **For RHEL OS users:** Ensure proper connectivity and that the following packages are installed:
+
+    If using RHCOS or if the packages are already installed, this step may be skipped.
+
+    - `sg3_utils`
+    - `iscsi-initiator-utils`
+    - `device-mapper-multipath`
+    - `xfsprogs` (if XFS file system is required)
+
 4. (Optional) If planning on using volume snapshots (FlashCopy® function), enable support on your Kubernetes cluster.
 
    For more information and instructions, see the Kubernetes blog post, [Kubernetes 1.20: Kubernetes Volume Snapshot Moves to GA](https://kubernetes.io/blog/2020/12/10/kubernetes-1.20-volume-snapshot-moves-to-ga/).
