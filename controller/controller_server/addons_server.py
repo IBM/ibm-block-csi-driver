@@ -128,7 +128,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
     def PromoteVolume(self, request, context):
         return self._ensure_volume_role(request, context, is_to_promote=True, response_type=pb2.PromoteVolumeResponse)
 
-    @handle_common_exceptions(pb2.PromoteVolumeResponse)
+    @handle_common_exceptions(pb2.DemoteVolumeResponse)
     def DemoteVolume(self, request, context):
         return self._ensure_volume_role(request, context, is_to_promote=False, response_type=pb2.DemoteVolumeResponse)
 
