@@ -21,7 +21,7 @@ DESCRIPTOR = _descriptor.FileDescriptor(
   package='replication',
   syntax='proto3',
   serialized_options=_b('Z\r.;replication'),
-  serialized_pb=_b('\n(controller/csi_general/replication.proto\x12\x0breplication\x1a google/protobuf/descriptor.proto\"\xd1\x02\n\x1e\x45nableVolumeReplicationRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x18\n\x10target_volume_id\x18\x04 \x01(\t\x12O\n\nparameters\x18\x02 \x03(\x0b\x32;.replication.EnableVolumeReplicationRequest.ParametersEntry\x12N\n\x07secrets\x18\x03 \x03(\x0b\x32\x38.replication.EnableVolumeReplicationRequest.SecretsEntryB\x03\xd8\x44\x01\x1a\x31\n\x0fParametersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"!\n\x1f\x45nableVolumeReplicationResponse\"\xd4\x02\n\x1f\x44isableVolumeReplicationRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x18\n\x10target_volume_id\x18\x04 \x01(\t\x12P\n\nparameters\x18\x02 \x03(\x0b\x32<.replication.DisableVolumeReplicationRequest.ParametersEntry\x12O\n\x07secrets\x18\x03 \x03(\x0b\x32\x39.replication.DisableVolumeReplicationRequest.SecretsEntryB\x03\xd8\x44\x01\x1a\x31\n\x0fParametersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\"\n DisableVolumeReplicationResponse\"\xc2\x02\n\x14PromoteVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x18\n\x10target_volume_id\x18\x05 \x01(\t\x12\r\n\x05\x66orce\x18\x02 \x01(\x08\x12\x45\n\nparameters\x18\x03 \x03(\x0b\x32\x31.replication.PromoteVolumeRequest.ParametersEntry\x12\x44\n\x07secrets\x18\x04 \x03(\x0b\x32..replication.PromoteVolumeRequest.SecretsEntryB\x03\xd8\x44\x01\x1a\x31\n\x0fParametersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x17\n\x15PromoteVolumeResponse\"\xbf\x02\n\x13\x44\x65moteVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x18\n\x10target_volume_id\x18\x05 \x01(\t\x12\r\n\x05\x66orce\x18\x02 \x01(\x08\x12\x44\n\nparameters\x18\x03 \x03(\x0b\x32\x30.replication.DemoteVolumeRequest.ParametersEntry\x12\x43\n\x07secrets\x18\x04 \x03(\x0b\x32-.replication.DemoteVolumeRequest.SecretsEntryB\x03\xd8\x44\x01\x1a\x31\n\x0fParametersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x16\n\x14\x44\x65moteVolumeResponse\"\xbf\x02\n\x13ResyncVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x18\n\x10target_volume_id\x18\x05 \x01(\t\x12\r\n\x05\x66orce\x18\x02 \x01(\x08\x12\x44\n\nparameters\x18\x03 \x03(\x0b\x32\x30.replication.ResyncVolumeRequest.ParametersEntry\x12\x43\n\x07secrets\x18\x04 \x03(\x0b\x32-.replication.ResyncVolumeRequest.SecretsEntryB\x03\xd8\x44\x01\x1a\x31\n\x0fParametersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"%\n\x14ResyncVolumeResponse\x12\r\n\x05ready\x18\x01 \x01(\x08\x32\x87\x04\n\nController\x12v\n\x17\x45nableVolumeReplication\x12+.replication.EnableVolumeReplicationRequest\x1a,.replication.EnableVolumeReplicationResponse\"\x00\x12y\n\x18\x44isableVolumeReplication\x12,.replication.DisableVolumeReplicationRequest\x1a-.replication.DisableVolumeReplicationResponse\"\x00\x12X\n\rPromoteVolume\x12!.replication.PromoteVolumeRequest\x1a\".replication.PromoteVolumeResponse\"\x00\x12U\n\x0c\x44\x65moteVolume\x12 .replication.DemoteVolumeRequest\x1a!.replication.DemoteVolumeResponse\"\x00\x12U\n\x0cResyncVolume\x12 .replication.ResyncVolumeRequest\x1a!.replication.ResyncVolumeResponse\"\x00::\n\x12replication_secret\x12\x1d.google.protobuf.FieldOptions\x18\xcb\x08 \x01(\x08\x42\x0fZ\r.;replicationb\x06proto3')
+  serialized_pb=_b('\n(controller/csi_general/replication.proto\x12\x0breplication\x1a google/protobuf/descriptor.proto\"\xd4\x02\n\x1e\x45nableVolumeReplicationRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x1b\n\x0ereplication_id\x18\x04 \x01(\tB\x03\xe0\x44\x01\x12O\n\nparameters\x18\x02 \x03(\x0b\x32;.replication.EnableVolumeReplicationRequest.ParametersEntry\x12N\n\x07secrets\x18\x03 \x03(\x0b\x32\x38.replication.EnableVolumeReplicationRequest.SecretsEntryB\x03\xd8\x44\x01\x1a\x31\n\x0fParametersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"!\n\x1f\x45nableVolumeReplicationResponse\"\xd7\x02\n\x1f\x44isableVolumeReplicationRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x1b\n\x0ereplication_id\x18\x04 \x01(\tB\x03\xe0\x44\x01\x12P\n\nparameters\x18\x02 \x03(\x0b\x32<.replication.DisableVolumeReplicationRequest.ParametersEntry\x12O\n\x07secrets\x18\x03 \x03(\x0b\x32\x39.replication.DisableVolumeReplicationRequest.SecretsEntryB\x03\xd8\x44\x01\x1a\x31\n\x0fParametersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\"\n DisableVolumeReplicationResponse\"\xc5\x02\n\x14PromoteVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x1b\n\x0ereplication_id\x18\x05 \x01(\tB\x03\xe0\x44\x01\x12\r\n\x05\x66orce\x18\x02 \x01(\x08\x12\x45\n\nparameters\x18\x03 \x03(\x0b\x32\x31.replication.PromoteVolumeRequest.ParametersEntry\x12\x44\n\x07secrets\x18\x04 \x03(\x0b\x32..replication.PromoteVolumeRequest.SecretsEntryB\x03\xd8\x44\x01\x1a\x31\n\x0fParametersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x17\n\x15PromoteVolumeResponse\"\xc2\x02\n\x13\x44\x65moteVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x1b\n\x0ereplication_id\x18\x05 \x01(\tB\x03\xe0\x44\x01\x12\r\n\x05\x66orce\x18\x02 \x01(\x08\x12\x44\n\nparameters\x18\x03 \x03(\x0b\x32\x30.replication.DemoteVolumeRequest.ParametersEntry\x12\x43\n\x07secrets\x18\x04 \x03(\x0b\x32-.replication.DemoteVolumeRequest.SecretsEntryB\x03\xd8\x44\x01\x1a\x31\n\x0fParametersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"\x16\n\x14\x44\x65moteVolumeResponse\"\xc2\x02\n\x13ResyncVolumeRequest\x12\x11\n\tvolume_id\x18\x01 \x01(\t\x12\x1b\n\x0ereplication_id\x18\x05 \x01(\tB\x03\xe0\x44\x01\x12\r\n\x05\x66orce\x18\x02 \x01(\x08\x12\x44\n\nparameters\x18\x03 \x03(\x0b\x32\x30.replication.ResyncVolumeRequest.ParametersEntry\x12\x43\n\x07secrets\x18\x04 \x03(\x0b\x32-.replication.ResyncVolumeRequest.SecretsEntryB\x03\xd8\x44\x01\x1a\x31\n\x0fParametersEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\x1a.\n\x0cSecretsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\t:\x02\x38\x01\"%\n\x14ResyncVolumeResponse\x12\r\n\x05ready\x18\x01 \x01(\x08\x32\x87\x04\n\nController\x12v\n\x17\x45nableVolumeReplication\x12+.replication.EnableVolumeReplicationRequest\x1a,.replication.EnableVolumeReplicationResponse\"\x00\x12y\n\x18\x44isableVolumeReplication\x12,.replication.DisableVolumeReplicationRequest\x1a-.replication.DisableVolumeReplicationResponse\"\x00\x12X\n\rPromoteVolume\x12!.replication.PromoteVolumeRequest\x1a\".replication.PromoteVolumeResponse\"\x00\x12U\n\x0c\x44\x65moteVolume\x12 .replication.DemoteVolumeRequest\x1a!.replication.DemoteVolumeResponse\"\x00\x12U\n\x0cResyncVolume\x12 .replication.ResyncVolumeRequest\x1a!.replication.ResyncVolumeResponse\"\x00::\n\x12replication_secret\x12\x1d.google.protobuf.FieldOptions\x18\xcb\x08 \x01(\x08:3\n\x0b\x61lpha_field\x12\x1d.google.protobuf.FieldOptions\x18\xcc\x08 \x01(\x08\x42\x0fZ\r.;replicationb\x06proto3')
   ,
   dependencies=[google_dot_protobuf_dot_descriptor__pb2.DESCRIPTOR,])
 
@@ -30,6 +30,14 @@ REPLICATION_SECRET_FIELD_NUMBER = 1099
 replication_secret = _descriptor.FieldDescriptor(
   name='replication_secret', full_name='replication.replication_secret', index=0,
   number=1099, type=8, cpp_type=7, label=1,
+  has_default_value=False, default_value=False,
+  message_type=None, enum_type=None, containing_type=None,
+  is_extension=True, extension_scope=None,
+  serialized_options=None, file=DESCRIPTOR)
+ALPHA_FIELD_FIELD_NUMBER = 1100
+alpha_field = _descriptor.FieldDescriptor(
+  name='alpha_field', full_name='replication.alpha_field', index=1,
+  number=1100, type=8, cpp_type=7, label=1,
   has_default_value=False, default_value=False,
   message_type=None, enum_type=None, containing_type=None,
   is_extension=True, extension_scope=None,
@@ -69,8 +77,8 @@ _ENABLEVOLUMEREPLICATIONREQUEST_PARAMETERSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=332,
-  serialized_end=381,
+  serialized_start=335,
+  serialized_end=384,
 )
 
 _ENABLEVOLUMEREPLICATIONREQUEST_SECRETSENTRY = _descriptor.Descriptor(
@@ -106,8 +114,8 @@ _ENABLEVOLUMEREPLICATIONREQUEST_SECRETSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=383,
-  serialized_end=429,
+  serialized_start=386,
+  serialized_end=432,
 )
 
 _ENABLEVOLUMEREPLICATIONREQUEST = _descriptor.Descriptor(
@@ -125,12 +133,12 @@ _ENABLEVOLUMEREPLICATIONREQUEST = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='target_volume_id', full_name='replication.EnableVolumeReplicationRequest.target_volume_id', index=1,
+      name='replication_id', full_name='replication.EnableVolumeReplicationRequest.replication_id', index=1,
       number=4, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=_b('\340D\001'), file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='parameters', full_name='replication.EnableVolumeReplicationRequest.parameters', index=2,
       number=2, type=11, cpp_type=10, label=3,
@@ -158,7 +166,7 @@ _ENABLEVOLUMEREPLICATIONREQUEST = _descriptor.Descriptor(
   oneofs=[
   ],
   serialized_start=92,
-  serialized_end=429,
+  serialized_end=432,
 )
 
 
@@ -181,8 +189,8 @@ _ENABLEVOLUMEREPLICATIONRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=431,
-  serialized_end=464,
+  serialized_start=434,
+  serialized_end=467,
 )
 
 
@@ -219,8 +227,8 @@ _DISABLEVOLUMEREPLICATIONREQUEST_PARAMETERSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=332,
-  serialized_end=381,
+  serialized_start=335,
+  serialized_end=384,
 )
 
 _DISABLEVOLUMEREPLICATIONREQUEST_SECRETSENTRY = _descriptor.Descriptor(
@@ -256,8 +264,8 @@ _DISABLEVOLUMEREPLICATIONREQUEST_SECRETSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=383,
-  serialized_end=429,
+  serialized_start=386,
+  serialized_end=432,
 )
 
 _DISABLEVOLUMEREPLICATIONREQUEST = _descriptor.Descriptor(
@@ -275,12 +283,12 @@ _DISABLEVOLUMEREPLICATIONREQUEST = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='target_volume_id', full_name='replication.DisableVolumeReplicationRequest.target_volume_id', index=1,
+      name='replication_id', full_name='replication.DisableVolumeReplicationRequest.replication_id', index=1,
       number=4, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=_b('\340D\001'), file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='parameters', full_name='replication.DisableVolumeReplicationRequest.parameters', index=2,
       number=2, type=11, cpp_type=10, label=3,
@@ -307,8 +315,8 @@ _DISABLEVOLUMEREPLICATIONREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=467,
-  serialized_end=807,
+  serialized_start=470,
+  serialized_end=813,
 )
 
 
@@ -331,8 +339,8 @@ _DISABLEVOLUMEREPLICATIONRESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=809,
-  serialized_end=843,
+  serialized_start=815,
+  serialized_end=849,
 )
 
 
@@ -369,8 +377,8 @@ _PROMOTEVOLUMEREQUEST_PARAMETERSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=332,
-  serialized_end=381,
+  serialized_start=335,
+  serialized_end=384,
 )
 
 _PROMOTEVOLUMEREQUEST_SECRETSENTRY = _descriptor.Descriptor(
@@ -406,8 +414,8 @@ _PROMOTEVOLUMEREQUEST_SECRETSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=383,
-  serialized_end=429,
+  serialized_start=386,
+  serialized_end=432,
 )
 
 _PROMOTEVOLUMEREQUEST = _descriptor.Descriptor(
@@ -425,12 +433,12 @@ _PROMOTEVOLUMEREQUEST = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='target_volume_id', full_name='replication.PromoteVolumeRequest.target_volume_id', index=1,
+      name='replication_id', full_name='replication.PromoteVolumeRequest.replication_id', index=1,
       number=5, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=_b('\340D\001'), file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='force', full_name='replication.PromoteVolumeRequest.force', index=2,
       number=2, type=8, cpp_type=7, label=1,
@@ -464,8 +472,8 @@ _PROMOTEVOLUMEREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=846,
-  serialized_end=1168,
+  serialized_start=852,
+  serialized_end=1177,
 )
 
 
@@ -488,8 +496,8 @@ _PROMOTEVOLUMERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1170,
-  serialized_end=1193,
+  serialized_start=1179,
+  serialized_end=1202,
 )
 
 
@@ -526,8 +534,8 @@ _DEMOTEVOLUMEREQUEST_PARAMETERSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=332,
-  serialized_end=381,
+  serialized_start=335,
+  serialized_end=384,
 )
 
 _DEMOTEVOLUMEREQUEST_SECRETSENTRY = _descriptor.Descriptor(
@@ -563,8 +571,8 @@ _DEMOTEVOLUMEREQUEST_SECRETSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=383,
-  serialized_end=429,
+  serialized_start=386,
+  serialized_end=432,
 )
 
 _DEMOTEVOLUMEREQUEST = _descriptor.Descriptor(
@@ -582,12 +590,12 @@ _DEMOTEVOLUMEREQUEST = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='target_volume_id', full_name='replication.DemoteVolumeRequest.target_volume_id', index=1,
+      name='replication_id', full_name='replication.DemoteVolumeRequest.replication_id', index=1,
       number=5, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=_b('\340D\001'), file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='force', full_name='replication.DemoteVolumeRequest.force', index=2,
       number=2, type=8, cpp_type=7, label=1,
@@ -621,8 +629,8 @@ _DEMOTEVOLUMEREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1196,
-  serialized_end=1515,
+  serialized_start=1205,
+  serialized_end=1527,
 )
 
 
@@ -645,8 +653,8 @@ _DEMOTEVOLUMERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1517,
-  serialized_end=1539,
+  serialized_start=1529,
+  serialized_end=1551,
 )
 
 
@@ -683,8 +691,8 @@ _RESYNCVOLUMEREQUEST_PARAMETERSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=332,
-  serialized_end=381,
+  serialized_start=335,
+  serialized_end=384,
 )
 
 _RESYNCVOLUMEREQUEST_SECRETSENTRY = _descriptor.Descriptor(
@@ -720,8 +728,8 @@ _RESYNCVOLUMEREQUEST_SECRETSENTRY = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=383,
-  serialized_end=429,
+  serialized_start=386,
+  serialized_end=432,
 )
 
 _RESYNCVOLUMEREQUEST = _descriptor.Descriptor(
@@ -739,12 +747,12 @@ _RESYNCVOLUMEREQUEST = _descriptor.Descriptor(
       is_extension=False, extension_scope=None,
       serialized_options=None, file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
-      name='target_volume_id', full_name='replication.ResyncVolumeRequest.target_volume_id', index=1,
+      name='replication_id', full_name='replication.ResyncVolumeRequest.replication_id', index=1,
       number=5, type=9, cpp_type=9, label=1,
       has_default_value=False, default_value=_b("").decode('utf-8'),
       message_type=None, enum_type=None, containing_type=None,
       is_extension=False, extension_scope=None,
-      serialized_options=None, file=DESCRIPTOR),
+      serialized_options=_b('\340D\001'), file=DESCRIPTOR),
     _descriptor.FieldDescriptor(
       name='force', full_name='replication.ResyncVolumeRequest.force', index=2,
       number=2, type=8, cpp_type=7, label=1,
@@ -778,8 +786,8 @@ _RESYNCVOLUMEREQUEST = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1542,
-  serialized_end=1861,
+  serialized_start=1554,
+  serialized_end=1876,
 )
 
 
@@ -809,8 +817,8 @@ _RESYNCVOLUMERESPONSE = _descriptor.Descriptor(
   extension_ranges=[],
   oneofs=[
   ],
-  serialized_start=1863,
-  serialized_end=1900,
+  serialized_start=1878,
+  serialized_end=1915,
 )
 
 _ENABLEVOLUMEREPLICATIONREQUEST_PARAMETERSENTRY.containing_type = _ENABLEVOLUMEREPLICATIONREQUEST
@@ -844,6 +852,7 @@ DESCRIPTOR.message_types_by_name['DemoteVolumeResponse'] = _DEMOTEVOLUMERESPONSE
 DESCRIPTOR.message_types_by_name['ResyncVolumeRequest'] = _RESYNCVOLUMEREQUEST
 DESCRIPTOR.message_types_by_name['ResyncVolumeResponse'] = _RESYNCVOLUMERESPONSE
 DESCRIPTOR.extensions_by_name['replication_secret'] = replication_secret
+DESCRIPTOR.extensions_by_name['alpha_field'] = alpha_field
 _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 EnableVolumeReplicationRequest = _reflection.GeneratedProtocolMessageType('EnableVolumeReplicationRequest', (_message.Message,), dict(
@@ -997,22 +1006,28 @@ ResyncVolumeResponse = _reflection.GeneratedProtocolMessageType('ResyncVolumeRes
 _sym_db.RegisterMessage(ResyncVolumeResponse)
 
 google_dot_protobuf_dot_descriptor__pb2.FieldOptions.RegisterExtension(replication_secret)
+google_dot_protobuf_dot_descriptor__pb2.FieldOptions.RegisterExtension(alpha_field)
 
 DESCRIPTOR._options = None
 _ENABLEVOLUMEREPLICATIONREQUEST_PARAMETERSENTRY._options = None
 _ENABLEVOLUMEREPLICATIONREQUEST_SECRETSENTRY._options = None
+_ENABLEVOLUMEREPLICATIONREQUEST.fields_by_name['replication_id']._options = None
 _ENABLEVOLUMEREPLICATIONREQUEST.fields_by_name['secrets']._options = None
 _DISABLEVOLUMEREPLICATIONREQUEST_PARAMETERSENTRY._options = None
 _DISABLEVOLUMEREPLICATIONREQUEST_SECRETSENTRY._options = None
+_DISABLEVOLUMEREPLICATIONREQUEST.fields_by_name['replication_id']._options = None
 _DISABLEVOLUMEREPLICATIONREQUEST.fields_by_name['secrets']._options = None
 _PROMOTEVOLUMEREQUEST_PARAMETERSENTRY._options = None
 _PROMOTEVOLUMEREQUEST_SECRETSENTRY._options = None
+_PROMOTEVOLUMEREQUEST.fields_by_name['replication_id']._options = None
 _PROMOTEVOLUMEREQUEST.fields_by_name['secrets']._options = None
 _DEMOTEVOLUMEREQUEST_PARAMETERSENTRY._options = None
 _DEMOTEVOLUMEREQUEST_SECRETSENTRY._options = None
+_DEMOTEVOLUMEREQUEST.fields_by_name['replication_id']._options = None
 _DEMOTEVOLUMEREQUEST.fields_by_name['secrets']._options = None
 _RESYNCVOLUMEREQUEST_PARAMETERSENTRY._options = None
 _RESYNCVOLUMEREQUEST_SECRETSENTRY._options = None
+_RESYNCVOLUMEREQUEST.fields_by_name['replication_id']._options = None
 _RESYNCVOLUMEREQUEST.fields_by_name['secrets']._options = None
 
 _CONTROLLER = _descriptor.ServiceDescriptor(
@@ -1021,8 +1036,8 @@ _CONTROLLER = _descriptor.ServiceDescriptor(
   file=DESCRIPTOR,
   index=0,
   serialized_options=None,
-  serialized_start=1903,
-  serialized_end=2422,
+  serialized_start=1918,
+  serialized_end=2437,
   methods=[
   _descriptor.MethodDescriptor(
     name='EnableVolumeReplication',

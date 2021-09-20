@@ -549,7 +549,7 @@ def validate_addons_request(request):
     logger.debug("validating addons request")
 
     logger.debug("validating volume id")
-    if request.volume_id == "" or request.target_volume_id == "":
+    if request.volume_id == "" or request.replication_id == "":
         raise ValidationException(messages.volume_id_should_not_be_empty_message)
 
     logger.debug("validating copy type")

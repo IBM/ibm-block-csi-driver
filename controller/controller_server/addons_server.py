@@ -24,7 +24,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         volume_id = volume_id_info.object_id
         volume_internal_id = volume_id_info.internal_id
 
-        other_volume_id_info = utils.get_volume_id_info(request.target_volume_id)
+        other_volume_id_info = utils.get_volume_id_info(request.replication_id)
         other_volume_internal_id = other_volume_id_info.internal_id
 
         other_system_id = request.parameters.get(config.PARAMETERS_SYSTEM_ID)
@@ -62,7 +62,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         volume_id_info = utils.get_volume_id_info(request.volume_id)
         volume_internal_id = volume_id_info.internal_id
 
-        other_volume_id_info = utils.get_volume_id_info(request.target_volume_id)
+        other_volume_id_info = utils.get_volume_id_info(request.replication_id)
         other_volume_internal_id = other_volume_id_info.internal_id
 
         other_system_id = request.parameters.get(config.PARAMETERS_SYSTEM_ID)
@@ -103,7 +103,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         volume_id_info = utils.get_volume_id_info(request.volume_id)
         volume_internal_id = volume_id_info.internal_id
 
-        other_volume_id_info = utils.get_volume_id_info(request.target_volume_id)
+        other_volume_id_info = utils.get_volume_id_info(request.replication_id)
         other_volume_internal_id = other_volume_id_info.internal_id
 
         other_system_id = request.parameters.get(config.PARAMETERS_SYSTEM_ID)
@@ -128,7 +128,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
     def PromoteVolume(self, request, context):
         return self._ensure_volume_role(request, context, is_to_promote=True, response_type=pb2.PromoteVolumeResponse)
 
-    @handle_common_exceptions(pb2.PromoteVolumeResponse)
+    @handle_common_exceptions(pb2.DemoteVolumeResponse)
     def DemoteVolume(self, request, context):
         return self._ensure_volume_role(request, context, is_to_promote=False, response_type=pb2.DemoteVolumeResponse)
 
@@ -141,7 +141,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         volume_id_info = utils.get_volume_id_info(request.volume_id)
         volume_internal_id = volume_id_info.internal_id
 
-        other_volume_id_info = utils.get_volume_id_info(request.target_volume_id)
+        other_volume_id_info = utils.get_volume_id_info(request.replication_id)
         other_volume_internal_id = other_volume_id_info.internal_id
 
         other_system_id = request.parameters.get(config.PARAMETERS_SYSTEM_ID)
