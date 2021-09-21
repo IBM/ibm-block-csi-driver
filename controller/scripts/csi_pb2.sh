@@ -2,7 +2,7 @@
 set -x
 
 CSI_VERSION="v1.2.0"
-ADDONS_VERSION="v0.2.0"
+ADDONS_VERSION="v0.1.1"
 PB2_DIR="controller/csi_general"
 
 mkdir -p ./proto/${PB2_DIR}
@@ -18,4 +18,4 @@ python -m grpc_tools.protoc --proto_path=proto \
                             --grpc_python_out=. \
                             proto/${PB2_DIR}/*.proto
 
-rm -rf ./proto/${PB2_DIR}
+rm -rf ./proto/
