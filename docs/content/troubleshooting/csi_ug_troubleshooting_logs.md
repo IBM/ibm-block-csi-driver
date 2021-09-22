@@ -1,12 +1,12 @@
-# Log collection
+# Log and status collection
 
-Use the CSI (Container Storage Interface) driver logs for problem identification.
+Use the CSI (Container Storage Interface) driver debug information for problem identification.
 
 **Note:** These procedures are applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.
 
-To collect and display logs, related to the different components of IBM® block storage CSI driver, use the following Kubernetes commands:
+To collect and display status and logs related to the different components of IBM® block storage CSI driver, use the following Kubernetes commands:
 
-## Log collection for CSI pods, daemonset, and StatefulSet
+## Status collection for CSI pods, daemonset, and statefulset
 
 `kubectl get all -n <namespace>  -l csi`
 
@@ -21,3 +21,21 @@ To collect and display logs, related to the different components of IBM® block 
 ## Log collection for Operator for IBM block storage CSI driver
 
 `kubectl log -f -n <namespace> ibm-block-csi-operator-<PODID> -c ibm-block-csi-operator`
+
+## Detecting errors
+
+To help pinpoint potential causes for stateful pod failure:
+
+1.  Verify that the CSI driver is running. (Make sure the `csi-controller` pod status is _Running_).
+
+    ```
+    kubectl get all -n <namespace> -l csi
+    ```
+
+2.  If `pod/ibm-block-csi-controller-0` is not in a _Running_ state, run the following command:
+
+    ```
+    kubectl describe -n <namespace> pod/ibm-block-csi-controller-0
+    ```
+
+    View the logs.

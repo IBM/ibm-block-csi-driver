@@ -63,7 +63,6 @@ navtitle="Sample configurations for running a stateful container" format="markdo
 </chapter>
 <chapter href="../content/troubleshooting/csi_ug_troubleshooting.md" format="markdown">
 <topicref href="../content/troubleshooting/csi_ug_troubleshooting_logs.md" navtitle="Detecting errors" format="markdown"/>
-<topicref href="../content/troubleshooting/csi_ug_troubleshooting_detect_errors.md" navtitle="Detecting errors" format="markdown"/>
 <topicref href="../content/troubleshooting/csi_ug_troubleshooting_node_crash.md"
 navtitle="Recovering a pod volume attachment from a crashed Kubernetes node" format="markdown"/>
 <topicref href="../content/troubleshooting/csi_ug_troubleshooting_misc.md" navtitle="Detecting errors" format="markdown"/>
