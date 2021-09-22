@@ -6,7 +6,7 @@ Create an array secret YAML file in order to define the storage credentials (use
 
 Use the Secret file to connect a worker node to a storage system.
 
-Within the Secret, each `management-id` (here, represented by `demo-management-id-x`), is used to identify the storage system within other configuration files.
+Within the Secret, each management ID (here, represented by `demo-management-id-x`), is used to identify the storage system within other configuration files.
 
 1. Create the secret file, similar to the following `demo-secret-config.json`:
 
