@@ -88,7 +88,7 @@ Be sure to indicate the `volumeDevices`, listing each volume's name and path. In
 
 Create a StatefulSet YAML file, similar to the following `demo-statefulset.yaml` file.
 
-In a StatefulSet file with two volumes with different volume modes, it is important to indicate both the `volumeMounts` and `volumeDevices` parameters.
+In a StatefulSet file using both volume modes it is important to indicate both the `volumeMounts` and `volumeDevices` parameters.
 
     kind: StatefulSet
     apiVersion: apps/v1
