@@ -20,7 +20,7 @@ The `statefulset.apps/<statefulset-name> created` message is emitted.
 
 Create a StatefulSet YAML file, similar to the following `demo-statefulset-file-system.yaml` file.
 
-Be sure to indicate the `volumeMounts`, listing each volumes name and path. In this example, the `mountPath` is listed as `"/data"`.
+Be sure to indicate the `volumeMounts`, listing each volume's name and path. In this example, the `mountPath` is listed as `"/data"`.
 
     kind: StatefulSet
     apiVersion: apps/v1
@@ -54,7 +54,7 @@ Be sure to indicate the `volumeMounts`, listing each volumes name and path. In t
 
 Create a StatefulSet YAML file, similar to the following `demo-statefulset-raw-block.yaml` file.
 
-Be sure to indicate the `volumeDevices`, listing each volumes name and path. In this example, the `devicePath` is listed as `"/dev/block"`.
+Be sure to indicate the `volumeDevices`, listing each volume's name and path. In this example, the `devicePath` is listed as `"/dev/block"`.
 
     kind: StatefulSet
     apiVersion: apps/v1
