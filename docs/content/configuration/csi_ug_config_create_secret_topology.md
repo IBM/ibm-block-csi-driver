@@ -8,7 +8,7 @@ Use the Secret file to connect a worker node to a storage system.
 
 Within the Secret, each `management-id` (here, represented by `demo-management-id-x`), is used to identify the storage system within other configuration files.
 
-1. Create the secret file, similar to the following demo-secret-config.json:
+1. Create the secret file, similar to the following `demo-secret-config.json`:
 
     The `management_address` field can contain more than one address, with each value separated by a comma.
 
