@@ -3,7 +3,7 @@
 When using the CSI Topology feature, different parameters must be taken into account when creating a VolumeSnapshotClass YAML file with specific `by_management_id` requirements. Use this information to help define a VolumeSnapshotClass that is topology aware and enables the creation and deletion of volume snapshots.
 
 **Note:** 
-  - For information and parameter definitions that are not related to topology awareness, be sure to see the information provided in [Creating a VolumeSnapshotClass](csi_ug_config_create_vol_snapshotclass.md), in addition to the current section.
+  - For information and parameter definitions that are not related to topology awareness, be sure to see the information that is provided in [Creating a VolumeSnapshotClass](csi_ug_config_create_vol_snapshotclass.md), in addition to the current section.
   
   - IBM® FlashCopy® function is referred to as the more generic volume snapshots and cloning within this documentation set. Not all supported products use the FlashCopy function terminology.
 
@@ -12,10 +12,11 @@ In order to enable creation and deletion of volume snapshots for your storage sy
 When configuring the file, be sure to use the same array secret and array secret namespace as defined in [Creating a Secret with topology awareness](csi_ug_config_create_secret_topology.md).
 
 **Note:**
+  - The maximum prefix length is 20 characters.
   - The `snapshot_name_prefix` parameter is optional.
   - The `CSI` prefix is added as default if not specified by the user.
 
-  The `by_management_id` parameter is optional and values such as the `pool`, `SpaceEfficiency`, and `volume_name_prefix` may all be specified.
+  The `by_management_id` parameter is optional and values such as the `pool`, `SpaceEfficiency`, and `volume_name_prefix` can all be specified.
 
 The various `by_management_id` parameters are chosen within the following hierarchical order:
 1. From within the `by_management_id` parameter, per system (if specified).
