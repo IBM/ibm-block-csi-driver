@@ -2,7 +2,7 @@
 
 Create a VolumeReplicationClass YAML file to enable volume replication.
 
-**Note:** Replication is referred to as the more generic volume replication within this documentation set. Spectrum Virtualize products refer to this feature as the remote copy function.
+**Note:** Remote copy function is referred to as the more generic volume replication within this documentation set. Not all supported products use the remote-copy function terminology.
 
 In order to enable volume replication for your storage system, create a VolumeReplicationClass YAML file, similar to the following `demo-volumereplicationclass.yaml`.
 
