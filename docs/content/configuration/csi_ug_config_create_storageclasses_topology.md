@@ -7,7 +7,7 @@ When using the CSI Topology feature, different parameters must be taken into acc
 
 The StorageClass file must be defined to contain topology information, based off of the labels that were already defined on the nodes in the cluster (see [Compatibility and requirements](../installation/csi_ug_requirements.md)). This determines the storage pools that are then served as candidates for PersistentVolumeClaim (PVC) requests made, as well as the subset of nodes that can make use of the volumes provisioned by the CSI driver.
 
-With topology awareness, the StorageClass must have the `volumeBindingMode` set to `WaitForFirstConsumer` (as defined in the `.yaml` example below.) This defines that any PVCs that are requested with this specific StorageClass, will wait to be configured until the CSI driver can see the worker node topology.
+With topology awareness, the StorageClass must have the `volumeBindingMode` set to `WaitForFirstConsumer` (as defined in the `.yaml` example below). This defines that any PVCs that are requested with this specific StorageClass, will wait to be configured until the CSI driver can see the worker node topology.
 
 The `by_management_id` parameter is optional and values such as the `pool`, `SpaceEfficiency`, and `volume_name_prefix` may all be specified.
 
