@@ -2,13 +2,13 @@
 
 Create a StatefulSet YAML file to manage stateful applications.
 
-The IBM® block storage CSI driver supports both file system and raw block volume types.
+The IBM® block storage CSI driver supports both file system and raw block volume modes.
 
 StatefulSets can include volumes with file systems, raw block volume systems, or both.
 
-**Important:** When defining the StatefulSet configuration, be sure to define volumes according to the PVC type.
+**Important:** When defining the StatefulSet configuration, be sure to define volumes according to the PVC volume mode.
 
-Use the following sections for YAML creation of StatefulSets with file system, raw block volume, and mixed types. After each YAML file creation, use the `kubectl apply` command.
+Use the following sections for YAML creation of StatefulSets with file system, raw block volume, and mixed volume modes. After each YAML file creation, use the `kubectl apply` command.
 
 ```
 kubectl apply -f <filename>.yaml

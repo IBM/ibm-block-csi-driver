@@ -2,13 +2,13 @@
 
 Create a PersistentVolumeClaim (PVC) YAML file for a persistent volume (PV).
 
-The IBM® block storage CSI driver supports using both file system and raw block volume types.
+The IBM® block storage CSI driver supports using both file system and raw block volume modes.
 
-**Important:** If not defined, the default type is `Filesystem`. Be sure to define the type as `Block` if this configuration is preferred.
+**Important:** If not defined, the default mode is `Filesystem`. Be sure to define the mode as `Block` if this configuration is preferred.
 
 **Note:** The examples below create the PVC with a storage size 1 Gb. This can be changed, per customer needs.
 
-Use the sections below for creating YAML files for PVCs with file system and raw block volume types. After each YAML file creation, use the `kubectl apply` command.
+Use the sections below for creating YAML files for PVCs with file system and raw block volume modes. After each YAML file creation, use the `kubectl apply` command.
 
 ```
 kubectl apply -f <filename>.yaml
