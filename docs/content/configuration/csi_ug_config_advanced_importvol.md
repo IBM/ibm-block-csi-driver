@@ -18,24 +18,15 @@ To find the `volumeHandle`, use one of the following procedures:
 
 - **Through command line (for Spectrum Virtualize Family):**
 
-  `lsvdisk <volume name> | grep vdisk_UID`
+  Find the `vdisk_UID` parameter, by using the `lsvdisk` command.
 
-  ```
-  lsvdisk vol0 | grep vdisk_UID
-  vdisk_UID 600507640082000B08000000000004FF
-  ```
+  For more information, see **Command-line interface** > **Volume commands** > **lsvdisk** within your specific product documentation on [IBM Docs](https://www.ibm.com/docs/en).
 
 - **Through command line (for FlashSystem A9000 and A9000R):**
 
-  `vol_list_extended vol=<volume_name>`
-
-  For example, for `vol1`:
-
-  ```
-  A9000>> vol_list_extended vol=vol1
-  Name   WWN                                Product Serial Number     
-  vol1   6001738CFC9035E8000000000091F0C0   60035E8000000000091F0C0 
-  ```
+  Find the WWN for the volume, by using the `vol_list_extended` command.
+  
+  For more information, see **Reference** > **Command-line reference (12.3.2.x)** > **Volume management commands** > **Listing a volume's extended attributes** within your specific product documentation on [IBM Docs](https://www.ibm.com/docs/en).
 
 - **Through the Spectrum Virtualize management GUI:**
 
@@ -109,20 +100,22 @@ Use this procedure to help build a PV YAML file for your volumes.
     - To include a specific 5 Gi PV, be sure to include the `storageClassName`.
     - For more information about creating a PVC YAML file, see [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
     
-            apiVersion: v1
-            kind: PersistentVolumeClaim
-            metadata:
-              # annotations:
-                # pv.kubernetes.io/provisioned-by: block.csi.ibm.com
-              name: vol1-pvc
-            spec:
-              accessModes:
-              - ReadWriteOnce
-              resources:
-                requests:
-                  storage: 1Gi
-              storageClassName: ibmc-block-gold
-              volumeName: vol1-pv
+    ```
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      # annotations:
+        # pv.kubernetes.io/provisioned-by: block.csi.ibm.com
+      name: vol1-pvc
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+      storageClassName: ibmc-block-gold
+      volumeName: vol1-pv
+    ```
 
 4. Create a StatefulSet.
 
