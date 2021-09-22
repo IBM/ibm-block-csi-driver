@@ -97,7 +97,7 @@ Use this procedure to help build a PV YAML file for your volumes.
 
     **Note:**
 
-    - To include a specific 5 Gi PV, be sure to include the `storageClassName`.
+    - Be sure to include the `storageClassName`.
     - For more information about creating a PVC YAML file, see [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
     
     ```
