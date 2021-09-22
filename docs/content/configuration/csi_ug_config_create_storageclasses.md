@@ -51,7 +51,7 @@ _<a name=spaceefficiency>**Table:**</a> `SpaceEfficiency` parameter definitions 
 Apply the storage class.
 
   ```
-  kubectl apply -f demo-storageclass.yaml
+  kubectl apply -f <filename>.yaml
   ```
 
-The `storageclass.storage.k8s.io/demo-storageclass created` message is emitted.
+The `storageclass.storage.k8s.io/<storageclass-name> created` message is emitted.

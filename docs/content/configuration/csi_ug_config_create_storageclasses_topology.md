@@ -40,8 +40,8 @@ allowVolumeExpansion: true
 Apply the storage class.
 
   ```
-  kubectl apply -f demo-storageclass-config-secret.yaml
+  kubectl apply -f <filename>.yaml
   ```
-The `storageclass.storage.k8s.io/demo-storageclass-config-secret created` message is emitted.
+The `storageclass.storage.k8s.io/<storageclass-name> created` message is emitted.
 
 
