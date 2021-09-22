@@ -12,7 +12,7 @@ IBM® block storage CSI driver 1.7.0 supports different IBM storage systems as l
 
 **Note:**
 
--   Newer microcode versions may also be compatible. When a newer microcode version becomes available, contact IBM Support to inquire whether the new microcode version is compatible with the current version of the CSI driver.
--   The IBM Spectrum Virtualize Family and IBM SAN Volume Controller storage systems run the IBM Spectrum Virtualize software. In addition, IBM Spectrum Virtualize package is available as a deployable solution that can be run on any compatible hardware.
+- For the latest microcode storage support information, see the [Lifecycle and support matrix](https://www.ibm.com/docs/en/stg-block-csi-driver?topic=SSRQ8T/landing/csi_lifecycle_support_matrix.html).
+- The IBM Spectrum Virtualize Family and IBM SAN Volume Controller storage systems run the IBM Spectrum Virtualize software. In addition, IBM Spectrum Virtualize package is available as a deployable solution that can be run on any compatible hardware.
 
 

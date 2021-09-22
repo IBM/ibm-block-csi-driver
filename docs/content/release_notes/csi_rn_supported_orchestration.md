@@ -10,5 +10,7 @@ The following table details orchestration platforms suitable for deployment of t
 
 <sup>1</sup>IBM Power Systems architecture is only supported on Spectrum Virtualize and DS8000 Family storage systems.
 
-**Note:** As of this document's publication date, IBM Cloud® Satellite only supports RHEL 7 on x86 architecture for Red Hat OpenShift. For the latest support information, see [cloud.ibm.com/docs/satellite](https://cloud.ibm.com/docs/satellite).
+**Note:** 
+- As of this document's publication date, IBM Cloud® Satellite only supports RHEL 7 on x86 architecture for Red Hat OpenShift. For the latest support information, see [cloud.ibm.com/docs/satellite](https://cloud.ibm.com/docs/satellite).
+- For the latest orchestration platform support information, see the [Lifecycle and support matrix](https://www.ibm.com/docs/en/stg-block-csi-driver?topic=SSRQ8T/landing/csi_lifecycle_support_matrix.html).
 
