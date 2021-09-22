@@ -33,4 +33,4 @@ The following limitations apply when expanding volumes with the IBM block storag
 
 ## Volume replication limitations
 
-When a role switch is conducted, this is not reflected within the other Kubernetes replication objects.
+When a role switch is conducted, this is not reflected within the other orchestration platform replication objects.
