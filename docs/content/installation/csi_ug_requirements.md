@@ -55,16 +55,16 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
 
     2.  For Fibre Channel, configure the relevant zoning from the storage to the host.
 
-3. **For RHEL OS users:** Ensure proper connectivity and that the following packages are installed:
+    3. **For RHEL OS users:** Ensure proper connectivity and that the following packages are installed:
 
-    If using RHCOS or if the packages are already installed, this step may be skipped.
+        If using RHCOS or if the packages are already installed, this step may be skipped.
 
-    - `sg3_utils`
-    - `iscsi-initiator-utils`
-    - `device-mapper-multipath`
-    - `xfsprogs` (if XFS file system is required)
+        - `sg3_utils`
+        - `iscsi-initiator-utils`
+        - `device-mapper-multipath`
+        - `xfsprogs` (if XFS file system is required)
 
-4. (Optional) If planning on using volume snapshots (FlashCopy® function), enable support on your Kubernetes cluster.
+3. (Optional) If planning on using volume snapshots (FlashCopy® function), enable support on your Kubernetes cluster.
 
    For more information and instructions, see the Kubernetes blog post, [Kubernetes 1.20: Kubernetes Volume Snapshot Moves to GA](https://kubernetes.io/blog/2020/12/10/kubernetes-1.20-volume-snapshot-moves-to-ga/).
 
@@ -72,7 +72,7 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
 
    The instructions and relevant YAML files to enable volume snapshots can be found at: [https://github.com/kubernetes-csi/external-snapshotter#usage](https://github.com/kubernetes-csi/external-snapshotter#usage)
 
-5. (Optional) If planning on using volume replication (remote copy function), enable support on your orchestration platform cluster and storage system.
+4. (Optional) If planning on using volume replication (remote copy function), enable support on your orchestration platform cluster and storage system.
     
     1. To enable support on your Kubernetes cluster, install the following replication CRDs once per cluster.
 
@@ -86,7 +86,7 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
     
     2. To enable support on your storage system, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Administering** > **Managing Copy Services** > **Managing remote-copy partnerships**.
 
-6. (Optional) To use CSI Topology, at least one node in the cluster must have the label-prefix of `topology.block.csi.ibm.com` to introduce topology awareness:
+5. (Optional) To use CSI Topology, at least one node in the cluster must have the label-prefix of `topology.block.csi.ibm.com` to introduce topology awareness:
       
       **Important:** This label-prefix must be found on the nodes in the cluster **before** installing the IBM® block storage CSI driver. If the nodes do not have the proper label-prefix before installation, CSI Topology cannot be used with the CSI driver.
 
