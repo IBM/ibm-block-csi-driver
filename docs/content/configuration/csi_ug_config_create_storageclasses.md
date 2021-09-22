@@ -8,9 +8,7 @@ Use the following procedure to create and apply the storage classes.
 
 **Note:** This procedure is applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.
 
-Create a storage class YAML file, similar to the following `demo-storageclass.yaml`.
-
-Update the capabilities, pools, and array secrets, as needed.
+Create a storage class YAML file, similar to the following `demo-storageclass.yaml` and update the storage parameters as needed.
 
 Use the `SpaceEfficiency` parameters for each storage system, as defined in [the following table](#spaceefficiency). These values are not case-sensitive.
 
@@ -31,7 +29,7 @@ _<a name=spaceefficiency>**Table:**</a> `SpaceEfficiency` parameter definitions 
 - The `csi.storage.k8s.io/fstype` parameter is optional. The values that are allowed are _ext4_ or _xfs_. The default value is _ext4_.
 - The `volume_name_prefix` parameter is optional.
 
-**Note:** For IBM DS8000 Family, the maximum prefix length is five characters. The maximum prefix length for other systems is 20 characters. <br /><br />For storage systems that use Spectrum Virtualize, the `CSI` prefix is added as default if not specified by the user.
+**Note:** For IBM DS8000 Family, the maximum prefix length is 5 characters. The maximum prefix length for other systems is 20 characters. <br /><br />For storage systems that use Spectrum Virtualize, the `CSI` prefix is added as default if not specified by the user.
 
     
     kind: StorageClass
