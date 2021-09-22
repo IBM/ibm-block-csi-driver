@@ -45,16 +45,16 @@ Follow the following procedure to recover from a crashed node (see a [full examp
     kubectl delete pod <pod name> --grace-period=0 --force
     ```
 
-5.  Verify that the pod is now in a _Running_ state and that the pod has moved to worker-node1.
+5.  Verify that the pod is now in a _Running_ state and that the pod has moved to a running node.
 
     <a name="full_example">For example:</a>
 
     ```
     $> kubectl get nodes
-    NAME STATUS ROLES AGE VERSION
-    k8s-master Ready master 6d <your k8s version>
-    k8s-node1 Ready <none> 6d <your k8s version>
-    k8s-node3 NotReady <none> 6d <your k8s version>
+    NAME        STATUS   ROLES  AGE VERSION
+    k8s-master  Ready    master 6d  <your k8s version>
+    k8s-node1   Ready    <none> 6d  <your k8s version>
+    k8s-node3   NotReady <none> 6d  <your k8s version>
 
     $> kubectl get pods --all-namespaces -o wide | grep default
     default sanity-statefulset-0 1/1 Terminating 0 19m 10.244.2.37 k8s-node3
