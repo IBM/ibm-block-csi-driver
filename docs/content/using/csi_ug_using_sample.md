@@ -6,14 +6,6 @@ These instructions illustrate the general flow for a basic configuration require
 
 **Note:** The secret names given can be user specified. When giving secret names when managing different system storage types, be sure to give system type indicators to each name.
 
-The following are examples of different types of secret names that can be given per storage type.
-
-|Storage system name|Secret name|
-|-------------------|-----------|
-|IBM FlashSystem® A9000 <br />IBM FlashSystem A9000R|a9000-array1|
-|IBM Spectrum Virtualize Family including IBM SAN Volume Controller and <br />IBM FlashSystem family members built with IBM Spectrum Virtualize <br />(including FlashSystem 5xxx, 7200, 9100, 9200, 9200R)|storwize-array1|
-|IBM DS8000® Family products|DS8000-array1|
-
 Use this information to run a stateful container on StatefulSet volumes using either file systems or raw block volumes.
 
 1. Create an array secret, as described in [Creating a Secret](../configuration/csi_ug_config_create_secret.md).
