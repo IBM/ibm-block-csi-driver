@@ -17,7 +17,7 @@ k8s-node1   Ready    <none> 6d  <your k8s version>
 k8s-node2   NotReady <none> 6d  <your k8s version>
 
 $>kubectl get pods --all-namespaces -o wide | grep default
-default sanity-statefulset-0 1/1 Terminating 0 19m 10.244.2.37 k8s-node3
+default sanity-statefulset-0 1/1 Terminating 0 19m 10.244.2.37 k8s-node2
 ```
 
 ## Recovering a crashed node
@@ -57,7 +57,7 @@ Follow the following procedure to recover from a crashed node (see a [full examp
     k8s-node2   NotReady <none> 6d  <your k8s version>
 
     $> kubectl get pods --all-namespaces -o wide | grep default
-    default sanity-statefulset-0 1/1 Terminating 0 19m 10.244.2.37 k8s-node3
+    default sanity-statefulset-0 1/1 Terminating 0 19m 10.244.2.37 k8s-node2
 
     $> kubectl get volumeattachment
     NAME AGE

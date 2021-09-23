@@ -26,16 +26,16 @@ To collect and display status and logs related to the different components of IB
 
 To help pinpoint potential causes for stateful pod failure:
 
-1.  Verify that the CSI driver is running. (Make sure the `csi-controller` pod status is _Running_).
+1.  Verify that all CSI pods are running.
 
     ```
-    kubectl get all -n <namespace> -l csi
+    kubectl get pods -n <namespace> -l csi
     ```
 
-2.  If `pod/ibm-block-csi-controller-0` is not in a _Running_ state, run the following command:
+2.  If a pod is not in a _Running_ state, run the following command:
 
     ```
-    kubectl describe -n <namespace> pod/ibm-block-csi-controller-0
+    kubectl describe -n <namespace> pod/<pod-name>
     ```
 
     View the logs.
