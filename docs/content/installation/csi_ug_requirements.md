@@ -61,10 +61,10 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
 
     If using RHCOS or if the packages are already installed, this step may be skipped.
 
-       - `sg3_utils`
-       - `iscsi-initiator-utils`
-       - `device-mapper-multipath`
-       - `xfsprogs` (if XFS file system is required)
+       - sg3_utils
+       - iscsi-initiator-utils
+       - device-mapper-multipath
+       - xfsprogs (if XFS file system is required)
 
 4. (Optional) If planning on using volume snapshots (FlashCopy® function), enable support on your Kubernetes cluster.
 
