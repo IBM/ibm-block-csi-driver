@@ -20,8 +20,6 @@ Use this information to run a stateful container on StatefulSet volumes using ei
 
 3. Create a PVC with the size of 1 Gb, as described in [Creating a PersistentVolumeClaim (PVC)](../configuration/csi_ug_config_create_pvc.md).
 
-4. Display the existing PVC and the created persistent volume (PV).
+4. (Optional) Display the existing PVC and the created persistent volume (PV).
 
 5. Create a StatefulSet, as described in [Creating a StatefulSet](../configuration/csi_ug_config_create_statefulset.md).
-
-
