@@ -35,6 +35,8 @@ When creating volume snapshots, be sure to follow all of the snapshot configurat
 
     Run the `kubectl describe volumesnapshot <volumesnapshot-name>` command.
 
+    The `volumesnapshot.snapshot.storage.k8s.io/<volumesnapshot-name> created` message is emitted.
+
     See the **Status** section of the output for the following:
 
     -   **Bound Volume Snapshot Content Name:** Indicates the volume is bound to the specified VolumeSnapshotContent.

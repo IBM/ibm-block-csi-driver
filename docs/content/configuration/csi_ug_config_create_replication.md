@@ -36,6 +36,8 @@ When replicating a volume, be sure to follow all of the replication configuratio
 
     Run the `kubectl describe volumereplication` command.
 
+    The `volumereplication.replication.storage.openshift.io/<volumereplication-name> created` message is emitted.
+
     See the `status.state` section to see which of the following states the replication is in:
 
     -   **Primary** Indicates that the source volume is the primary volume.

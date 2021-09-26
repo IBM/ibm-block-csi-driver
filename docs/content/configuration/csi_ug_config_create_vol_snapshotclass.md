@@ -35,3 +35,4 @@ After the YAML file is created, apply it by using the `kubectl apply -f` command
 ```
 kubectl apply -f <filename>.yaml
 ```
+ The `volumesnapshotclass.snapshot.storage.k8s.io/<volumesnapshotclass-name> created` message is emitted.
