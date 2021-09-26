@@ -120,31 +120,3 @@ Use this procedure to help build a PV YAML file for your volumes.
 4. Create a StatefulSet.
 
       For more information about creating a StatefulSet, see [Creating a StatefulSet](csi_ug_config_create_statefulset.md).
-
-        kind: StatefulSet
-        apiVersion: apps/v1
-        metadata:
-          name: sanity-statefulset
-        spec:
-          selector:
-            matchLabels:
-              app: sanity-statefulset
-          serviceName: sanity-statefulset
-          replicas: 1
-          template:
-            metadata:
-              labels:
-                app: sanity-statefulset
-            spec:
-              containers:
-              - name: container1
-                image: registry.access.redhat.com/ubi8/ubi:latest
-                command: [ "/bin/sh", "-c", "--" ]
-                args: [ "while true; do sleep 30; done;" ]
-                volumeMounts:
-                  - name: vol1
-                    mountPath: "/data"
-              volumes:
-              - name: vol1
-                persistentVolumeClaim:
-                  claimName: vol1-pvc
