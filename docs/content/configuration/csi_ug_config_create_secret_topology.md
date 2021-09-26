@@ -4,7 +4,9 @@ Create an array secret YAML file to define the storage credentials (username and
 
 **Note:** If you are not using the CSI Topology feature, follow the steps in [Creating a Secret](csi_ug_config_create_secret.md).
 
-Within the Secret, each management ID (here, represented by `demo-management-id-x`), is used to identify the storage system within other configuration files.
+Within the Secret, each user-defined management ID (here, represented by `demo-management-id-x`), is used to identify the storage system within other configuration files.
+
+**Note:** The management ID must start and end with a character or number. In addition, the following symbols may be used within the management ID: -, _, and ..
 
 1. Create the secret file, similar to the following `demo-secret-config.json`:
 
