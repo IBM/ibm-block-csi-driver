@@ -9,7 +9,7 @@ Before starting to import an existing volume, find the following information in 
   Including:
 
     - `pool_name`: _Name of Pool where volume is located_ (Listed as `pool_id` for DS8000® Family systems.)
-    - `storage_type`: <`SVC` | `A9K` | `DS8K`>
+    - `storage_type`: <`SVC` | `A9000` | `DS8K`>
     - `volume_name`: _Volume name_
     - `array_address`: _Array address_
 
@@ -18,8 +18,9 @@ To find the `volumeHandle`, use one of the following procedures:
 
 - **Through command line (for Spectrum Virtualize Family):**
 
-  Find the `vdisk_UID` parameter, by using the `lsvdisk` command.
-
+  - Find the `vdisk_UID` attribute, by using the `lsvdisk` command.
+  - When using the remote copy function find the `ID` attribute. This is also found by using the `lsvdisk` command.
+  
   For more information, see **Command-line interface** > **Volume commands** > **lsvdisk** within your specific product documentation on [IBM Docs](https://www.ibm.com/docs/en).
 
 - **Through command line (for FlashSystem A9000 and A9000R):**
@@ -104,8 +105,6 @@ Use this procedure to help build a PV YAML file for your volumes.
     apiVersion: v1
     kind: PersistentVolumeClaim
     metadata:
-      # annotations:
-        # pv.kubernetes.io/provisioned-by: block.csi.ibm.com
       name: vol1-pvc
     spec:
       accessModes:
