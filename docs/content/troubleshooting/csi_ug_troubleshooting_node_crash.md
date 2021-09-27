@@ -47,9 +47,8 @@ Follow the following procedure to recover from a crashed node (see a [full examp
 
 5.  Verify that the pod is now in a _Running_ state and that the pod has moved to a _Ready_ node.
 
-    <a name="full_example">For example:</a>
+<a name="full_example">For example:</a>
 
-    ```
     $> kubectl get nodes
     NAME        STATUS   ROLES  AGE VERSION
     k8s-master  Ready    master 6d  <your k8s version>
@@ -72,5 +71,4 @@ Follow the following procedure to recover from a crashed node (see a [full examp
 
     $> kubectl get pods --all-namespaces -o wide | grep default
     default sanity-statefulset-0 1/1 Running 0 26s 10.244.1.210 k8s-node1
-    ```
 
