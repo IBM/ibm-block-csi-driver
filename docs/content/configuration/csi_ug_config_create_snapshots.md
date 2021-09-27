@@ -31,11 +31,11 @@ When creating volume snapshots, be sure to follow all of the snapshot configurat
     kubectl apply -f <filename>.yaml
     ```
 
+    The `volumesnapshot.snapshot.storage.k8s.io/<volumesnapshot-name> created` message is emitted.
+
 3.  Verify that the volume snapshot was created.
 
     Run the `kubectl describe volumesnapshot <volumesnapshot-name>` command.
-
-    The `volumesnapshot.snapshot.storage.k8s.io/<volumesnapshot-name> created` message is emitted.
 
     See the **Status** section of the output for the following:
 

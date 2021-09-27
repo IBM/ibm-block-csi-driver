@@ -32,11 +32,11 @@ When replicating a volume, be sure to follow all of the replication configuratio
     kubectl apply -f <filename>.yaml
     ```
 
+    The `volumereplication.replication.storage.openshift.io/<volumereplication-name> created` message is emitted.
+
 3.  Verify that the volume was replicated.
 
     Run the `kubectl describe volumereplication` command.
-
-    The `volumereplication.replication.storage.openshift.io/<volumereplication-name> created` message is emitted.
 
     See the `status.state` section to see which of the following states the replication is in:
 
