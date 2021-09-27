@@ -10,6 +10,8 @@ Use the following procedure to create and apply the storage classes.
 
 Create a storage class YAML file, similar to the following `demo-storageclass.yaml` and update the storage parameters as needed.
 
+When configuring the file, be sure to use the same array secret and array secret namespace as defined in [Creating a Secret](csi_ug_config_create_secret.md).
+
 Use the `SpaceEfficiency` parameters for each storage system, as defined in [the following table](#spaceefficiency). These values are not case-sensitive.
 
 _<a name=spaceefficiency>**Table:**</a> `SpaceEfficiency` parameter definitions per storage system type_
