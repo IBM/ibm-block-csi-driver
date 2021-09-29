@@ -12,7 +12,7 @@ Perform the following steps in order to uninstall the CSI driver and operator.
 2. Delete the operator.
 
     ```
-    kubectl -n <namespace> delete -f ibm-block-csi-operator.yaml
+    kubectl <namespace> delete -f ibm-block-csi-operator.yaml
     ```
 
 
