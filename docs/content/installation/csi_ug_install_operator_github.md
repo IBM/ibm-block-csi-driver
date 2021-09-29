@@ -4,7 +4,7 @@ The operator for IBM® block storage CSI driver can be installed directly with G
 
 Use the following steps to install the operator and driver, with [GitHub](https://github.com/IBM/ibm-block-csi-operator) (github.com/IBM/ibm-block-csi-operator).
 
-**Note:** Before you begin, you may need to create a user-defined namespace. Create the project namespace, using the `kubectl create ns <namespace>` command.
+**Note:** Before you begin, it is best practice to create a user-defined namespace. Create the project namespace, using the `kubectl create ns <new-namespace>` command.
 
 1.  Install the operator.
 
@@ -14,12 +14,14 @@ Use the following steps to install the operator and driver, with [GitHub](https:
         curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.7.0/deploy/installer/generated/ibm-block-csi-operator.yaml > ibm-block-csi-operator.yaml
         ```
 
-    2.  **Optional:** Update the image fields in the `ibm-block-csi-operator.yaml`.
+    2.  (Optional) Update the image fields in the `ibm-block-csi-operator.yaml`.
+
+        **Note:** If a user-defined namespace was created, edit the namespace from `default` to `<new-namespace>`.
 
     3. Install the operator, using a user-defined namespace.
 
         ```
-        kubectl -n <namespace> apply -f ibm-block-csi-operator.yaml
+        kubectl apply -f ibm-block-csi-operator.yaml
         ```
 
     4. Verify that the operator is running. (Make sure that the Status is _Running_.)
@@ -38,7 +40,7 @@ Use the following steps to install the operator and driver, with [GitHub](https:
         curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.7.0/config/samples/csi.ibm.com_v1_ibmblockcsi_cr.yaml > csi.ibm.com_v1_ibmblockcsi_cr.yaml
         ```
 
-    2.  **Optional:** Update the image repository field, tag field, or both in the `csi.ibm.com_v1_ibmblockcsi_cr.yaml`.
+    2.  (Optional) Update the image repository field, tag field, or both in the `csi.ibm.com_v1_ibmblockcsi_cr.yaml`.
 
     3.  Install the `csi.ibm.com_v1_ibmblockcsi_cr.yaml`.
 
@@ -47,7 +49,7 @@ Use the following steps to install the operator and driver, with [GitHub](https:
         ```
     
     4.  Verify that the driver is running:
-        ```bash
+        ```
         $> kubectl get pods -n <namespace> -l csi
         NAME                                    READY   STATUS  RESTARTS AGE
         ibm-block-csi-controller-0              6/6     Running 0        9m36s
