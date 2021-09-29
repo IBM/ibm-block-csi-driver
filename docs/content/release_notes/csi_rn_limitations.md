@@ -35,5 +35,5 @@ The following limitations apply when expanding volumes with the IBM block storag
 
 When a role switch is conducted, this is not reflected within the other orchestration platform replication objects.
 
-**Important:** When implementing volume replication, be sure to use the Retain reclaim policy for the PersistentVolume and using the latest import procedure (version 1.7.0 or later) (see [Importing an existing volume](../configuration/csi_ug_config_advanced_importvol.md) in the User Guide).
+**Important:** When using volume replication, be sure to delete the PersistentVolume applying the `Retain` reclaim policy and using the latest import procedure (version 1.7.0 or later) (see [Importing an existing volume](../configuration/csi_ug_config_advanced_importvol.md) in the User Guide).
 For more information, see the [Change the Reclaim Policy of a PersistentVolume](https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy/) information in the Kubernetes documentation.
