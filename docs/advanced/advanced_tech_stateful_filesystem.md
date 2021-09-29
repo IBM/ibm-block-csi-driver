@@ -22,8 +22,8 @@
       ACCESS MODES   STORAGECLASS       AGE
       RWO            demo-storageclass  78s
         
-      $> kubectl describe persistentvolume/pvc-b5336053-46a0-4eb0-a4d8-1d8ef309e108
-      Name:            pvc-b5336053-46a0-4eb0-a4d8-1d8ef309e108
+      $> kubectl describe persistentvolume/pvc-828ce909-6eb2-11ea-abc8-005056a49b44
+      Name:            pvc-828ce909-6eb2-11ea-abc8-005056a49b44
       Labels:          <none>
       Annotations:     pv.kubernetes.io/provisioned-by: block.csi.ibm.com
       Finalizers:      [kubernetes.io/pv-protection]
@@ -46,7 +46,7 @@
                                 pool_name=demo-pool
                                 storage.kubernetes.io/csiProvisionerIdentity=1631546133261-8081-block.csi.ibm.com
                                 storage_type=SVC
-                                volume_name=demo-prefix_pvc-b5336053-46a0-4eb0-a4d8-1d8ef309e108
+                                volume_name=demo-prefix_pvc-828ce909-6eb2-11ea-abc8-005056a49b44
       Events:                <none>
       </pre>
 5. Create a StatefulSet.

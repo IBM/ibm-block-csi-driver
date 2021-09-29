@@ -4,7 +4,7 @@
 
 2. Create a storage class, as described in [Creating a StorageClass](../content/configuration/csi_ug_config_create_storageclasses.md).
 
-3. Create a PVC with the size of 1 Gb, as described in [Creating a PersistentVolumeClaim (PVC)](../content/configuration/csi_ug_config_create_pvc.md).
+3. Create a PVC demo-pvc-raw-block.yaml with the size of 1 Gb, as described in [Creating a PersistentVolumeClaim (PVC)](../content/configuration/csi_ug_config_create_pvc.md).
 
 4. Display the existing PVC and the created persistent volume (PV).
 
@@ -68,7 +68,7 @@
       replicas: 1
       template:
         metadata:
-        labels:
+          labels:
             app: demo-statefulset
         spec:
           containers:
@@ -78,14 +78,11 @@
             args: [ "while true; do sleep 30; done;" ]
             volumeDevices:
               - name: demo-volume-raw-block
-                devicePath: "/dev/block"
+                devicePath: "/dev/block"            
           volumes:
           - name: demo-volume-raw-block
             persistentVolumeClaim:
-              claimName: demo-pvc-raw-block
-        
-        # nodeSelector:
-        # kubernetes.io/hostname: HOSTNAME
+              claimName: demo-pvc-raw-block</pre>      
 
 6. Check the newly created pod.
 
@@ -101,7 +98,7 @@
     The PV should be mounted inside the pod at /dev.
 
     <pre>
-    kubectl exec demo-statefulset-raw-block-0 -- bash -c " echo "test_block" | dd conv=unblock of=/dev/block"
+    kubectl exec demo-statefulset-raw-block-0 -- bash -c "echo "test_block" | dd conv=unblock of=/dev/block"
     0+1 records in
     0+1 records out
     11 bytes copied, 9.3576e-05 s, 118 kB/s
@@ -129,8 +126,7 @@
         $> kubectl create -f demo-statefulset-raw-block.yaml
         statefulset/demo-statefulset-raw-block created
             
-        $> kubectl exec demo-statefulset-raw-block-0 -- bash -c "od -An -c -N 10 /dev/block"
-        t e s t \ b l o c k
+        t e s t _ b l o c k
 
 9. Delete StatefulSet and the PVC.
   
@@ -139,7 +135,7 @@
     statefulset/demo-statefulset-raw-block deleted
         
     $> kubectl get statefulset/demo-statefulset-raw-block
-    No resources found.
+    Error from server (NotFound): statefulsets.apps "demo-statefulset-raw-block" not found
         
     $> kubectl delete pvc/demo-pvc-raw-block
     persistentvolumeclaim/demo-pvc-raw-block deleted

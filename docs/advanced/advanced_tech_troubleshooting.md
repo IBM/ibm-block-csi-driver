@@ -62,6 +62,8 @@ Use this section for advanced troubleshooting information for your CSI driver.
 
 Use this information to help pinpoint potential causes for multipath failures.
 
+**Note:** Run these commands should be run on one of the worker nodes.
+
 -   **Display multipath information (FC and iSCSI)**
 
     Display multipath information, using the sudo multipath -ll command.
