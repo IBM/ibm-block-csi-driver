@@ -1,6 +1,6 @@
 # Importing an existing volume
 
-Use this information to import volumes created externally from the IBM® block storage CSI driver by using a persistent volume (PV) YAML file.
+Use this information to import volumes that were created externally from the IBM® block storage CSI driver by using a persistent volume (PV) YAML file.
 
 Before starting to import an existing volume, find the following information in the existing volume in order to include the information in the persistent volume (PV) YAML file:
 - `volumeHandle`
@@ -15,58 +15,84 @@ Before starting to import an existing volume, find the following information in 
 
 To find the `volumeHandle`, use one of the following procedures:
 
+- **For Spectrum Virtualize Family**
 
-- **Through command line (for Spectrum Virtualize Family):**
+  The `volumeHandle` is formatted as `SVC:id;vdisk_UID`.
 
-  - Find the `vdisk_UID` attribute, by using the `lsvdisk` command.
-  - In order to enable the remote copy function find the `ID` attribute. This is also found by using the `lsvdisk` command.
+  - Through command line:
+    Find both the `id` and `vdisk_UID` attributes, by using the `lsvdisk` command.
+
+    For more information, see **Command-line interface** > **Volume commands** > **lsvdisk** within your specific product documentation on [IBM Docs](https://www.ibm.com/docs/en).
+
+  - Through the management GUI:
+
+    1. Select **Volumes** > **Volumes** from the side bar.
+
+        The **Volumes** page is displayed.
+
+    2. Browse to the volume that the port is on and right-click > **Properties**.
+
+      The Properties window is displayed. Use the **Volume ID** and **Volume UID** values.
+
+    For more information about Spectrum Virtualize products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).
   
-  For more information, see **Command-line interface** > **Volume commands** > **lsvdisk** within your specific product documentation on [IBM Docs](https://www.ibm.com/docs/en).
+- **For FlashSystem A9000 and A9000R:**
 
-- **Through command line (for FlashSystem A9000 and A9000R):**
-
-  Find the WWN for the volume, by using the `vol_list_extended` command.
+  The `volumeHandle` is formatted as `A9000:id;WWN`.
   
-  For more information, see **Reference** > **Command-line reference (12.3.2.x)** > **Volume management commands** > **Listing a volume's extended attributes** within your specific product documentation on [IBM Docs](https://www.ibm.com/docs/en).
+  - Through command line:
 
-- **Through the Spectrum Virtualize management GUI:**
+    Find the `id` and `WWN` for the volume, by using the `vol_list -f` command.
 
-  1. Select **Volumes** > **Volumes** from the side bar.
+    For more information, see **Reference** > **Command-line reference (12.3.2.x)** > **Volume management commands** > **Listing volumes** within your specific product documentation on [IBM Docs](https://www.ibm.com/docs/en).
 
-     The **Volumes** page appears.
+  - Through the Hyper-Scale Management user interface:
 
-  2. Browse to the volume that the port is on and right-click > **Properties**.
+    1. Select **Pools and Volumes Views** > **Volumes** from the side bar.
 
-     The Properties window appears. Use the UID number.
+        The **Volumes** table is displayed.
 
-     For more information about Spectrum Virtualize products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).
+    2. Select the `Volume`.
 
-- **Through the IBM Hyper-Scale Manager user interface for FlashSystem A9000 and A9000R storage systems:**
+        The **Volume Properties** form is displayed.
 
-  1. Select **Pools and Volumes Views** > **Volumes** from the side bar.
-
-      The **Volumes** table is displayed.
-
-  2. Select the `Volume`.
-
-      The **Volume Properties** form appears.
-
-  3. Use the **ID** number.
+    3. Use the **ID** and **WWN** values.
     
-      For more information, see [IBM Hyper-Scale Manager documentation](https://www.ibm.com/docs/en/hyper-scale-manager/).
+    For more information, see [IBM Hyper-Scale Manager documentation](https://www.ibm.com/docs/en/hyper-scale-manager/).
 
+- **For DS8000 Family:**
+
+  The `volumeHandle` is formatted as `DS8K:id;GUID`.
+  The `id` is the last four digits of the `GUID`.
+
+  - Through the command line:
+
+    Find the `GUID` for the volume, by using the `lsfbvol` command.
+
+  - Through the DS8000 Storage Management GUI:
+
+    1. Select **Volumes** from the side bar.
+
+        The **Volumes** page is displayed.
+
+    2. Browse to the volume that the port is on and right-click > **Properties**.
+
+        The Properties window is displayed. Use the **GUID** value.
+
+    For more information about DS8000 Family products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).
+  
 
 Use this procedure to help build a PV YAML file for your volumes.
 
-**Note:** These steps are setup for importing volumes from a Spectrum Virtualize Family system. Change parameters, as needed.
+**Note:** These steps are set up for importing volumes from a Spectrum Virtualize Family system. Change parameters, as needed.
 
 1. Create a persistent volume (PV) YAML file.
 
-    **Important:** Be sure to include the `storageClassName` and `controllerPublishSecretRef` parameters or errors will occur.
+    **Important:** Be sure to include the `storageClassName` and `controllerPublishSecretRef` parameters or errors may occur.
 
 2. Take the `volume_name` and other optional information (collected before the procedure) and insert it into the YAML file (under `spec.csi.volumeAttributes`).
 
-    **Important:** If using the CSI Topology feature, the `spec.csi.volumeHandle` contains the system ID. In the example below, the `spec.csi.volumeHandle` would read similar to the following: `SVC:demo-system-id-1:600507640082000B08000000000004FF`.
+    **Important:** If using the CSI Topology feature, the `spec.csi.volumeHandle` contains the management ID (see [Creating a StorageClass with topology awareness](csi_ug_config_create_storageclasses_topology.md)). In the example below, the `spec.csi.volumeHandle` would read similar to the following: `SVC:demo-system-id-1:600507640082000B08000000000004FF`.
     
         apiVersion: v1
         kind: PersistentVolume
@@ -89,7 +115,7 @@ Use this procedure to help build a PV YAML file for your volumes.
               # storage_type: SVC
               # volume_name: vol1
               # array_address: baremetal10-cluster.xiv.ibm.com
-            volumeHandle: SVC:600507640082000B08000000000004FF
+            volumeHandle: SVC:0;600507640082000B08000000000004FF
           # persistentVolumeReclaimPolicy: Retain
           storageClassName: ibmc-block-gold
           # volumeMode: Filesystem
