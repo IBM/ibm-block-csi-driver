@@ -10,8 +10,6 @@ With topology awareness, the StorageClass must have the `volumeBindingMode` set 
 
 The `by_management_id` parameter is optional and values such as the `pool`, `SpaceEfficiency`, and `volume_name_prefix` may all be specified.
 
-When configuring the file, be sure to use the same array secret and array secret namespace as defined in [Creating a Secret with topology awareness](csi_ug_config_create_secret_topology.md).
-
 The various `by_management_id` parameters are chosen within the following hierarchical order:
 1. From within the `by_management_id` parameter, per system (if specified).
 2. Outside of the parameter, as a cross-system default (if not specified within the `by_management_id` parameter for the relevant `management-id`).
