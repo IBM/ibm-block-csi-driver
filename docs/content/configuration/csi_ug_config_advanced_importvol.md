@@ -141,7 +141,3 @@ Use this procedure to help build a PV YAML file for your volumes.
       storageClassName: ibmc-block-gold
       volumeName: vol1-pv
     ```
-
-4. Create a StatefulSet.
-
-      For more information about creating a StatefulSet, see [Creating a StatefulSet](csi_ug_config_create_statefulset.md).
