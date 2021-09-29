@@ -69,6 +69,8 @@ To find the `volumeHandle`, use one of the following procedures:
 
     Find the `GUID` for the volume, by using the `lsfbvol` command.
 
+     For more information, see **Reference** > **Command-line interface** > **CLI commands** > **Storage configuration commands** > **Fixed block logical volume specific commands** > **lsfbvol** within your specific product documentation on [IBM Docs](https://www.ibm.com/docs/en).
+
   - Through the DS8000 Storage Management GUI:
 
     1. Select **Volumes** from the side bar.
