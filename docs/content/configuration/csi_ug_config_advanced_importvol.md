@@ -19,7 +19,7 @@ To find the `volumeHandle`, use one of the following procedures:
 - **Through command line (for Spectrum Virtualize Family):**
 
   - Find the `vdisk_UID` attribute, by using the `lsvdisk` command.
-  - When using the remote copy function find the `ID` attribute. This is also found by using the `lsvdisk` command.
+  - In order to enable the remote copy function find the `ID` attribute. This is also found by using the `lsvdisk` command.
   
   For more information, see **Command-line interface** > **Volume commands** > **lsvdisk** within your specific product documentation on [IBM Docs](https://www.ibm.com/docs/en).
 
