@@ -4,7 +4,7 @@ As opposed to known issues, limitations are functionality restrictions that are 
 
 ## IBM® DS8000® usage limitations
 
-Connectivity limits on the storage side might be reached with DS8000 Family products due to due many open connections. This occurs due to connection closing lag times from the storage side.
+Connectivity limits on the storage side might be reached with DS8000 Family products due to too many open connections. This occurs due to connection closing lag times from the storage side.
 
 ## Volume snapshot limitations
 
