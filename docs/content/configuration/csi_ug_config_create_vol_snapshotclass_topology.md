@@ -9,11 +9,6 @@ When using the CSI Topology feature, different parameters must be taken into acc
 
 In order to enable creation and deletion of volume snapshots for your storage system, create a VolumeSnapshotClass YAML file, similar to the following `demo-volumesnapshotclass-config-secret.yaml`.
 
-**Note:**
-  - The maximum prefix length is 20 characters.
-  - The `snapshot_name_prefix` parameter is optional.
-  - The `CSI` prefix is added as default if not specified by the user.
-
   The `by_management_id` parameter is optional and values such as the `pool`, `SpaceEfficiency`, and `volume_name_prefix` can all be specified.
 
 The various `by_management_id` parameters are chosen within the following hierarchical order:
