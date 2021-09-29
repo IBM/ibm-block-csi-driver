@@ -28,12 +28,17 @@ The following limitations apply when using volume clones with the IBM block stor
 The following limitations apply when expanding volumes with the IBM block storage CSI driver:
 
 -   When using the CSI driver with IBM Spectrum Virtualize Family and IBM DS8000 Family products, during size expansion of a PersistentVolumeClaim (PVC), the size remains until all snapshots of the specific PVC are deleted.
--   When expanding a PVC while not in use by a pod, the volume size immediately increases on the storage side. PVC size only increases, however, after a pod begins to use the PVC.
+-   When expanding a PVC while not in use by a pod, the volume size immediately increases on the storage side. However, PVC size only increases after a pod uses the PVC.
 -   When expanding a filesystem PVC for a volume that was previously formatted but is now no longer being used by a pod, any copy or replication operations performed on the PVC (such as snapshots or cloning) results in a copy with the newer, larger, size on the storage. However, its filesystem has the original, smaller, size.
 
 ## Volume replication limitations
 
 When a role switch is conducted, this is not reflected within the other orchestration platform replication objects.
 
-**Important:** When using volume replication, be sure to delete the PersistentVolume applying the `Retain` reclaim policy and using the latest import procedure (version 1.7.0 or later) (see [Importing an existing volume](../configuration/csi_ug_config_advanced_importvol.md) in the User Guide).
-For more information, see the [Change the Reclaim Policy of a PersistentVolume](https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy/) information in the Kubernetes documentation.
+**Important:** When using volume replication on volumes that were created with a driver version lower than 1.7.0:
+
+ 1. Change the reclaim policy of the relevant PersistentVolumes to `Retain`.
+ 2. Delete the relevant PersistentVolumes.
+ 3. Import the volumes, by using the latest import procedure (version 1.7.0 or later) (see [Importing an existing volume](../configuration/csi_ug_config_advanced_importvol.md) in the User Guide).
+      
+    For more information, see the [Change the Reclaim Policy of a PersistentVolume](https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy/) information in the Kubernetes documentation.
