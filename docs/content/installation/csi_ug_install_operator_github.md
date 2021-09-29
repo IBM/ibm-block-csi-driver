@@ -18,7 +18,7 @@ Use the following steps to install the operator and driver, with [GitHub](https:
 
         **Note:** If a user-defined namespace was created, edit the namespace from `default` to `<new-namespace>`.
 
-    3. Install the operator, using a user-defined namespace.
+    3. Install the operator.
 
         ```
         kubectl apply -f ibm-block-csi-operator.yaml
@@ -27,7 +27,7 @@ Use the following steps to install the operator and driver, with [GitHub](https:
     4. Verify that the operator is running. (Make sure that the Status is _Running_.)
 
         ```
-        $> kubectl get pod -l app.kubernetes.io/name=ibm-block-csi-operator -n <namespace>
+        $> kubectl get pod -l app.kubernetes.io/name=ibm-block-csi-operator -n <new-namespace>
         NAME                                    READY   STATUS    RESTARTS   AGE
         ibm-block-csi-operator-5bb7996b86-xntss 1/1     Running   0          10m
         ```
