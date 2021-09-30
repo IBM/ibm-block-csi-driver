@@ -4,7 +4,7 @@ You can use the CSI (Container Storage Interface) driver for running stateful co
 
 These instructions illustrate the general flow for a basic configuration required for running a stateful container with volumes provisioned on storage system.
 
-**Note:** The secret names given can be user specified. To implement order and help any debugging that may be required, provide system type indicators to each secret name when managing different system storage types.
+**Note:** The secret names given are user specified. To implement order and help any debugging that may be required, provide system type indicators to each secret name when managing different system storage types.
 
 Use this information to run a stateful container on StatefulSet volumes using either file systems or raw block volumes.
 
