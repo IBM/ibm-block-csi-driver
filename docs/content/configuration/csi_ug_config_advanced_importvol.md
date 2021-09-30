@@ -101,7 +101,7 @@ Use this procedure to help build a PV YAML file for your volumes.
         metadata:
           # annotations:
             # pv.kubernetes.io/provisioned-by: block.csi.ibm.com
-          name: vol1-pv
+          name: demo-pv
         spec:
           accessModes:
           - ReadWriteOnce
@@ -113,13 +113,13 @@ Use this procedure to help build a PV YAML file for your volumes.
               namespace: default
             driver: block.csi.ibm.com
             # volumeAttributes:
-              # pool_name: ibmc-block-gold
+              # pool_name: demo-pool
               # storage_type: SVC
-              # volume_name: vol1
-              # array_address: baremetal10-cluster.xiv.ibm.com
+              # volume_name: demo-prefix_demo-pvc-file-system
+              # array_address: demo-management-address
             volumeHandle: SVC:0;600507640082000B08000000000004FF
           # persistentVolumeReclaimPolicy: Retain
-          storageClassName: ibmc-block-gold
+          storageClassName: demo-storageclass
           # volumeMode: Filesystem
 
 3. Create a PersistentVolumeClaim (PVC) YAML file.
@@ -133,7 +133,7 @@ Use this procedure to help build a PV YAML file for your volumes.
     apiVersion: v1
     kind: PersistentVolumeClaim
     metadata:
-      name: vol1-pvc
+      name: demo-pvc
     spec:
       accessModes:
       - ReadWriteOnce
@@ -141,5 +141,5 @@ Use this procedure to help build a PV YAML file for your volumes.
         requests:
           storage: 1Gi
       storageClassName: ibmc-block-gold
-      volumeName: vol1-pv
+      volumeName: demo-pv
     ```
