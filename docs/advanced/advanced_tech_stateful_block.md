@@ -29,7 +29,7 @@
       Finalizers:      [kubernetes.io/pv-protection]
       StorageClass:    demo-storageclass
       Status:          Bound
-      Claim:           default/demo-pvc-file-system
+      Claim:           default/demo-pvc-raw-block
       Reclaim Policy:  Delete
       Access Modes:    RWO
       VolumeMode:      Block
