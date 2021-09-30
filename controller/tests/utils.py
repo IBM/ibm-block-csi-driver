@@ -1,22 +1,30 @@
 import json
 
-from mock import Mock
 import grpc
+from mock import Mock, MagicMock
 
 from controller.controller_server.controller_types import ArrayConnectionInfo
 from controller.controller_server.test_settings import user as test_user, password as test_password, array as test_array
 
 
-def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_source_id=None):
+class ProtoBufMock(MagicMock):
+    def HasField(self, field):
+        return hasattr(self, field)
+
+
+def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_source_id=None, space_efficiency=None,
+                                      default_space_efficiency=None):
     volume = Mock()
     volume.capacity_bytes = size
     volume.id = wwn
+    volume.internal_id = "0"
     volume.name = name
     volume.array_address = "arr1"
     volume.pool = "pool1"
     volume.array_type = array_type
     volume.copy_source_id = copy_source_id
-
+    volume.space_efficiency = space_efficiency
+    volume.default_space_efficiency = default_space_efficiency
     return volume
 
 
@@ -24,6 +32,7 @@ def get_mock_mediator_response_snapshot(capacity, name, wwn, volume_name, array_
     snapshot = Mock()
     snapshot.capacity_bytes = capacity
     snapshot.id = wwn
+    snapshot.internal_id = "0"
     snapshot.name = name
     snapshot.volume_name = volume_name
     snapshot.array_address = "arr1"
@@ -31,6 +40,31 @@ def get_mock_mediator_response_snapshot(capacity, name, wwn, volume_name, array_
     snapshot.is_ready = True
 
     return snapshot
+
+
+def get_mock_mediator_response_replication(name, volume_internal_id, other_volume_internal_id,
+                                           copy_type="sync", is_primary=True, is_ready=True):
+    replication = Mock()
+    replication.name = name
+    replication.volume_internal_id = volume_internal_id
+    replication.other_volume_internal_id = other_volume_internal_id
+    replication.copy_type = copy_type
+    replication.is_primary = is_primary
+    replication.is_ready = is_ready
+
+    return replication
+
+
+def get_mock_volume_capability(mode=1, fs_type="ext4", mount_flags=None):
+    capability = ProtoBufMock(spec=["mount", "access_mode"])
+    mount = ProtoBufMock(spec=["fs_type", "mount_flags"])
+    access_mode = ProtoBufMock(spec=["mode"])
+    setattr(mount, "mount_flags", mount_flags)
+    setattr(mount, "fs_type", fs_type)
+    setattr(access_mode, "mode", mode)
+    setattr(capability, "mount", mount)
+    setattr(capability, "access_mode", access_mode)
+    return capability
 
 
 def get_fake_array_connection_info(user="user", password="pass", array_addresses=None, system_id="u1"):

@@ -1,27 +1,26 @@
 # Creating a VolumeSnapshot
 
-Create a VolumeSnapshot yaml file for a specific PersistentVolumeClaim (PVC).
+Create a VolumeSnapshot YAML file for a specific PersistentVolumeClaim (PVC).
 
 VolumeSnapshotClass needs to be present before a VolumeSnapshot can be created. For more information, see [Creating a VolumeSnapshotClass](csi_ug_config_create_vol_snapshotclass.md).
 
 **Note:**
 
 -   IBM® FlashCopy® function is referred to as the more generic volume snapshots and cloning within this documentation set. Not all supported products use the FlashCopy function terminology.
--   For volume snapshot support, the minimum orchestration platform version requirements are Red Hat® OpenShift® 4.4 and Kubernetes 1.17.
 
 When creating volume snapshots, be sure to follow all of the snapshot configurations, found in [Compatibility and requirements](../installation/csi_ug_requirements.md) before snapshot creation.
 
-1.  Create a snapshot for a specific PersistentVolumeClaim (PVC) using the demo-snapshot.yaml.
+1.  Create a snapshot for a specific PersistentVolumeClaim (PVC) using the `demo-volumesnapshot.yaml`.
 
     For more information about PVC configuration, see [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
 
-    ```screen
+    ```
     apiVersion: snapshot.storage.k8s.io/v1beta1
     kind: VolumeSnapshot
     metadata:
-      name: demo-snapshot
+      name: demo-volumesnapshot
     spec:
-      volumeSnapshotClassName: demo-snapshotclass
+      volumeSnapshotClassName: demo-volumesnapshotclass
       source:
         persistentVolumeClaimName: demo-pvc-file-system
     ```
@@ -32,9 +31,11 @@ When creating volume snapshots, be sure to follow all of the snapshot configurat
     kubectl apply -f <filename>.yaml
     ```
 
-3.  Verify that the VolumeSnapshot was created.
+    The `volumesnapshot.snapshot.storage.k8s.io/<volumesnapshot-name> created` message is emitted.
 
-    Run the kubectl describe volumesnapshot command.
+3.  Verify that the volume snapshot was created.
+
+    Run the `kubectl describe volumesnapshot <volumesnapshot-name>` command.
 
     See the **Status** section of the output for the following:
 

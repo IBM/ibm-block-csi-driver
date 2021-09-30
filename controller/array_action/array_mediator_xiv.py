@@ -19,6 +19,7 @@ logger = get_stdout_logger()
 LUN_IS_ALREADY_IN_USE_ERROR = "LUN is already in use"
 UNDEFINED_MAPPING_ERROR = "The requested mapping is not defined"
 NO_ALLOCATION_SPACE_ERROR = "No space to allocate to the volume"
+NOT_AVAILABLE = "Not Available"
 
 
 class XIVArrayMediator(ArrayMediatorAbstract):
@@ -114,34 +115,53 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def _convert_size_blocks_to_bytes(self, size_in_blocks):
         return int(size_in_blocks) * self.BLOCK_SIZE_IN_BYTES
 
+    @staticmethod
+    def _is_gen3(cli_object):
+        return not hasattr(cli_object, "copy_master_wwn")
+
+    def _get_snapshot_source_wwn(self, cli_snapshot):
+        if self._is_gen3(cli_snapshot):
+            source_name = cli_snapshot.master_name
+            cli_source = self._get_cli_object_by_name(source_name)
+            return cli_source.wwn
+        return cli_snapshot.copy_master_wwn
+
+    def _get_volume_source_wwn(self, cli_volume):
+        if self._is_gen3(cli_volume) or cli_volume.copy_master_wwn == NOT_AVAILABLE:
+            return None
+        return cli_volume.copy_master_wwn
+
     def _generate_volume_response(self, cli_volume):
-        # vol_copy_type and copy_master_wwn were added in a9k. In xiv they didn't exist
-        is_copy = hasattr(cli_volume, "vol_copy_type") and cli_volume.vol_copy_type == "Copy"
-        copy_src_object_wwn = cli_volume.copy_master_wwn if is_copy else None
+        source_object_wwn = self._get_volume_source_wwn(cli_volume)
         return Volume(self._convert_size_blocks_to_bytes(cli_volume.capacity),
                       cli_volume.wwn,
+                      cli_volume.id,
                       cli_volume.name,
                       self.endpoint,
                       cli_volume.pool_name,
-                      copy_src_object_wwn,
+                      source_object_wwn,
                       self.array_type)
 
     def _generate_snapshot_response(self, cli_snapshot):
         return Snapshot(self._convert_size_blocks_to_bytes(cli_snapshot.capacity),
                         cli_snapshot.wwn,
+                        cli_snapshot.id,
                         cli_snapshot.name,
                         self.endpoint,
-                        volume_id=cli_snapshot.copy_master_wwn,
+                        source_volume_id=self._get_snapshot_source_wwn(cli_snapshot),
                         is_ready=True,
                         array_type=self.array_type)
 
-    def get_volume(self, volume_name, pool=None):
-        logger.debug("Get volume : {}".format(volume_name))
+    def _get_cli_object_by_name(self, volume_name):
         try:
-            cli_volume = self.client.cmd.vol_list(vol=volume_name).as_single_element
+            return self.client.cmd.vol_list(vol=volume_name).as_single_element
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise array_errors.IllegalObjectName(ex.status)
+
+    def get_volume(self, volume_name, pool=None):
+        logger.debug("Get volume : {}".format(volume_name))
+        cli_volume = self._get_cli_object_by_name(volume_name)
 
         logger.debug("cli volume returned : {}".format(cli_volume))
         if not cli_volume:
@@ -212,13 +232,17 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             if NO_ALLOCATION_SPACE_ERROR in ex.status:
                 raise array_errors.NotEnoughSpaceInPool(id_or_name=pool)
+            raise ex
 
-    def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
-                                            minimum_volume_size_in_bytes, pool=None):
+    def copy_to_existing_volume_from_source(self, volume_id, source_id, source_capacity_in_bytes,
+                                            minimum_volume_size_in_bytes):
         logger.debug(
             "Copy source {0} data to volume {1}. source capacity {2}. Minimal requested volume capacity {3}".format(
-                name, source_name, source_capacity_in_bytes, minimum_volume_size_in_bytes))
+                source_id, volume_id, source_capacity_in_bytes, minimum_volume_size_in_bytes))
         try:
+            name = self._get_object_name_by_wwn(volume_id=volume_id)
+            source_name = self._get_object_name_by_wwn(volume_id=source_id)
+
             logger.debug("Formatting volume {0}".format(name))
             self.client.cmd.vol_format(vol=name)
             logger.debug("Copying source {0} data to volume {1}.".format(source_name, name))
@@ -233,13 +257,13 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise array_errors.IllegalObjectName(ex.status)
         except xcli_errors.SourceVolumeBadNameError as ex:
             logger.exception(ex)
-            raise array_errors.ObjectNotFoundError(source_name)
+            raise array_errors.ObjectNotFoundError(source_id)
         except (xcli_errors.VolumeBadNameError, xcli_errors.TargetVolumeBadNameError) as ex:
             logger.exception(ex)
-            raise array_errors.ObjectNotFoundError(name)
+            raise array_errors.ObjectNotFoundError(volume_id)
         except xcli_errors.OperationForbiddenForUserCategoryError as ex:
             logger.exception(ex)
-            raise array_errors.PermissionDeniedError("create volume : {0}".format(name))
+            raise array_errors.PermissionDeniedError("copy to {0} from source: {1}".format(volume_id, source_id))
 
     def _get_cli_object_by_wwn(self, volume_id, not_exist_err=False):
         try:
@@ -302,7 +326,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             return self._generate_snapshot_response(cli_object)
         return self._generate_volume_response(cli_object)
 
-    def create_snapshot(self, volume_id, snapshot_name, pool=None):
+    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool):
         logger.info("creating snapshot {0} from volume {1}".format(snapshot_name, volume_id))
         source_cli_volume = self._get_cli_object_by_wwn(volume_id)
         if pool and pool != source_cli_volume.pool_name:
@@ -385,7 +409,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise array_errors.HostNotFoundError(host_name)
 
-        luns_in_use = set([int(host_mapping.lun) for host_mapping in host_mapping_list])
+        luns_in_use = set(int(host_mapping.lun) for host_mapping in host_mapping_list)
         logger.debug("luns in use : {0}".format(luns_in_use))
 
         # try to use random lun number just in case there are many calls at the same time to reduce re-tries
@@ -462,7 +486,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         config_get_list = self.client.cmd.config_get().as_list
         return next(c.value for c in config_get_list if c.name == "iscsi_name")
 
-    def get_iscsi_targets_by_iqn(self):
+    def get_iscsi_targets_by_iqn(self, host_name):
         array_iqn = self._get_array_iqn()
         iscsi_targets = self._get_iscsi_targets()
         return {array_iqn: iscsi_targets}
@@ -470,3 +494,18 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def get_array_fc_wwns(self, host_name):
         fc_wwns_objects = self.client.cmd.fc_port_list()
         return [port.wwpn for port in fc_wwns_objects if port.port_state == 'Online' and port.role == 'Target']
+
+    def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
+        raise NotImplementedError
+
+    def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
+        raise NotImplementedError
+
+    def delete_replication(self, replication_name):
+        raise NotImplementedError
+
+    def promote_replication_volume(self, replication_name):
+        raise NotImplementedError
+
+    def demote_replication_volume(self, replication_name):
+        raise NotImplementedError

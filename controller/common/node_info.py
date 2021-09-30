@@ -27,7 +27,7 @@ class Initiators:
         """
         self.iscsi_iqn = iscsi_iqn
         self.fc_wwns = fc_wwns
-        self._fc_wwns_lowercase_set = set([wwn.lower() for wwn in fc_wwns])
+        self._fc_wwns_lowercase_set = set(wwn.lower() for wwn in fc_wwns)
         self._iscsi_iqn_lowercase = iscsi_iqn.lower()
 
     def is_array_wwns_match(self, host_wwns):

@@ -46,7 +46,7 @@ class ArrayMediator(ABC):
         Raises:
             VolumeAlreadyExists
             PoolDoesNotExist
-            PoolDoesNotMatchCapabilities
+            PoolDoesNotMatchSpaceEfficiency
             IllegalObjectName
             VolumeNameIsNotSupported
             PermissionDenied
@@ -54,27 +54,25 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def copy_to_existing_volume_from_source(self, name, source_name, source_capacity_in_bytes,
-                                            minimum_volume_size_in_bytes, pool=None):
+    def copy_to_existing_volume_from_source(self, volume_id, source_id, source_capacity_in_bytes,
+                                            minimum_volume_size_in_bytes):
         """
         This function should create a volume from source volume or snapshot in the storage system.
 
         Args:
-            name                            : name of the volume to be created in the storage system
-            source_name                     : name of source to create from
+            volume_id                       : id of the volume to be created in the storage system
+            source_id                       : id of source to create from
             source_capacity_in_bytes        : capacity of source to create from
             minimum_volume_size_in_bytes    : if source capacity is lower than this value volume will
                                             be increased to this value
-            pool                            : pool of the volume and source object to find them more efficiently.
 
         Returns:
             Volume
 
         Raises:
             ObjectNotFoundError
-            IllegalObjectName
+            IllegalObjectID
             PermissionDenied
-            PoolParameterIsMissing
         """
         raise NotImplementedError
 
@@ -230,13 +228,14 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_snapshot(self, volume_id, snapshot_name, pool=None):
+    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool):
         """
         This function should create a snapshot from volume in the storage system.
         Args:
-            volume_id : id of the volume to be created from
-            snapshot_name : name of the snapshot to be created in the storage system
-            pool : pool to create the snapshot in (if not given, pool taken from source volume)
+            volume_id           : id of the volume to be created from
+            snapshot_name       : name of the snapshot to be created in the storage system
+            space_efficiency    : space efficiency (if empty/None, space efficiency taken from source volume)
+            pool                : pool to create the snapshot in (if empty/None, pool taken from source volume)
         Returns:
             Snapshot
         Raises:
@@ -267,12 +266,12 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_iscsi_targets_by_iqn(self):
+    def get_iscsi_targets_by_iqn(self, host_name):
         """
         This function will return a mapping of the storage array iscsi names to their iscsi target IPs
 
         Args:
-            None
+            host_name : used to filter relevant hosts
 
         Returns:
             ips_by_iqn : A dict mapping array-iqns to their list of IPs ({iqn1:[ip1, ip2], iqn2:[ip3, ip4, ...], ...})
@@ -280,6 +279,7 @@ class ArrayMediator(ABC):
         Raises:
             PermissionDeniedError
             NoIscsiTargetsFoundError
+            HostNotFoundError
         """
         raise NotImplementedError
 
@@ -340,6 +340,101 @@ class ArrayMediator(ABC):
 
         Raises:
             SpaceEfficiencyNotSupported
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
+        """
+        This function will return the volume replication relationship info
+
+        Args:
+            volume_internal_id : internal id of the volume in the replication relationship
+            other_volume_internal_id : internal id of the other volume in the replication relationship
+            other_system_id : id of the other system of the replication relationship
+
+        Returns:
+            Replication
+
+        Raises:
+            ObjectNotFound
+            IllegalObjectName
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
+        """
+        This function will create and activate a volume replication relationship
+
+        Args:
+            volume_internal_id : internal id of the volume in the replication relationship
+            other_volume_internal_id : internal id of the other volume in the replication relationship
+            other_system_id : id of the other system of the replication relationship
+            copy_type : sync/async
+
+        Returns:
+            None
+
+        Raises:
+            ObjectNotFound
+            IllegalObjectName
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def delete_replication(self, replication_name):
+        """
+        This function will disable and delete a volume replication relationship
+
+        Args:
+            replication_name : name of the replication relationship
+
+        Returns:
+            None
+
+        Raises:
+            ObjectNotFound
+            IllegalObjectName
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def promote_replication_volume(self, replication_name):
+        """
+        This function will promote the role of the volume in the connected system to be primary
+
+        Args:
+            replication_name : name of the replication relationship
+
+        Returns:
+            None
+
+        Raises:
+            ObjectNotFound
+            IllegalObjectName
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def demote_replication_volume(self, replication_name):
+        """
+        This function will demote the role of the volume in the connected system to be secondary
+
+        Args:
+            replication_name : name of the replication relationship
+
+        Returns:
+            None
+
+        Raises:
+            ObjectNotFound
+            IllegalObjectName
+            PermissionDenied
         """
         raise NotImplementedError
 

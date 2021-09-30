@@ -1,6 +1,7 @@
 import json
 import re
 from hashlib import sha256
+from operator import eq
 
 import base58
 from google.protobuf.timestamp_pb2 import Timestamp
@@ -8,8 +9,10 @@ from google.protobuf.timestamp_pb2 import Timestamp
 import controller.array_action.errors as array_errors
 import controller.controller_server.config as config
 import controller.controller_server.messages as messages
-from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
+from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE, \
+                                           REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC
 from controller.common.csi_logger import get_stdout_logger
+from controller.common.settings import NAME_PREFIX_SEPARATOR
 from controller.controller_server.controller_types import ArrayConnectionInfo, ObjectIdInfo, ObjectParameters
 from controller.controller_server.errors import ObjectIdError, ValidationException
 from controller.csi_general import csi_pb2
@@ -42,6 +45,7 @@ def get_volume_topologies(request):
             topologies = accessibility_requirements.preferred[0].segments
             logger.info("Chosen volume topologies: {}".format(topologies))
             return topologies
+    return None
 
 
 def _get_system_info_for_topologies(secrets_config, node_topologies):
@@ -79,7 +83,7 @@ def get_array_connection_info_from_secrets(secrets, topologies=None, system_id=N
     return _get_array_connection_info_from_system_info(system_info, system_id)
 
 
-def get_volume_parameters(parameters, system_id):
+def get_volume_parameters(parameters, system_id=None):
     return get_object_parameters(parameters, config.PARAMETERS_VOLUME_NAME_PREFIX, system_id)
 
 
@@ -106,14 +110,15 @@ def get_volume_id(new_volume, system_id):
     return _get_object_id(new_volume, system_id)
 
 
-def get_snapshot_id(new_snapshot):
-    return _get_object_id(new_snapshot)
+def get_snapshot_id(new_snapshot, system_id):
+    return _get_object_id(new_snapshot, system_id)
 
 
-def _get_object_id(obj, system_id=None):
+def _get_object_id(obj, system_id):
+    object_ids_value = config.PARAMETERS_OBJECT_IDS_DELIMITER.join((obj.internal_id, obj.id))
     if system_id:
-        return config.PARAMETERS_OBJECT_ID_DELIMITER.join((obj.array_type, system_id, obj.id))
-    return config.PARAMETERS_OBJECT_ID_DELIMITER.join((obj.array_type, obj.id))
+        return config.PARAMETERS_OBJECT_ID_INFO_DELIMITER.join((obj.array_type, system_id, object_ids_value))
+    return config.PARAMETERS_OBJECT_ID_INFO_DELIMITER.join((obj.array_type, object_ids_value))
 
 
 def _is_system_id_valid(system_id):
@@ -169,10 +174,12 @@ def validate_secrets(secrets):
 
 
 def validate_csi_volume_capability(cap):
-    logger.debug("validating csi volume capability : {0}".format(cap))
+    logger.debug("validating csi volume capability")
     if cap.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_MOUNT):
         if cap.mount.fs_type and (cap.mount.fs_type not in config.SUPPORTED_FS_TYPES):
             raise ValidationException(messages.unsupported_fs_type_message.format(cap.mount.fs_type))
+        if cap.mount.mount_flags:
+            raise ValidationException(messages.unsupported_mount_flags_message)
 
     elif not cap.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_BLOCK):
         # should never get here since the value can be only mount (for fs volume) or block (for raw block)
@@ -186,9 +193,9 @@ def validate_csi_volume_capability(cap):
     logger.debug("csi volume capabilities validation finished.")
 
 
-def validate_csi_volume_capabilties(capabilities):
-    logger.debug("validating csi volume capabilities: {}".format(capabilities))
-    if len(capabilities) == 0:
+def validate_csi_volume_capabilities(capabilities):
+    logger.debug("validating csi volume capabilities")
+    if not capabilities:
         raise ValidationException(messages.capabilities_not_set_message)
 
     for cap in capabilities:
@@ -211,10 +218,29 @@ def _validate_source_info(source, source_type):
     source_object = getattr(source, source_type)
     logger.info("Source {0} specified: {1}".format(source_type, source_object))
     source_object_id = getattr(source_object, config.VOLUME_SOURCE_ID_FIELDS[source_type])
-    if not source_object_id:
-        raise ValidationException(messages.volume_source_id_is_missing.format(source_type))
-    if config.PARAMETERS_OBJECT_ID_DELIMITER not in source_object_id:
-        raise ObjectIdError(source_type, source_object_id)
+    message = messages.volume_source_id_is_missing.format(source_type)
+    _validate_object_id(source_object_id, object_type=source_type, message=message)
+
+
+def _validate_pool_parameter(parameters):
+    logger.debug("validating pool parameter")
+    if config.PARAMETERS_POOL in parameters:
+        if not parameters[config.PARAMETERS_POOL]:
+            raise ValidationException(messages.pool_should_not_be_empty_message)
+    elif not parameters.get(config.PARAMETERS_BY_SYSTEM):
+        raise ValidationException(messages.pool_is_missing_message)
+
+
+def _validate_object_id(object_id, object_type=config.VOLUME_TYPE_NAME,
+                        message=messages.volume_id_should_not_be_empty_message):
+    logger.debug("validating volume id")
+    if not object_id:
+        raise ValidationException(message)
+    if config.PARAMETERS_OBJECT_ID_INFO_DELIMITER not in object_id:
+        raise ObjectIdError(object_type, object_id)
+    if len(object_id.split(config.PARAMETERS_OBJECT_ID_INFO_DELIMITER)) not in {config.MINIMUM_VOLUME_ID_PARTS,
+                                                                                config.MAXIMUM_VOLUME_ID_PARTS}:
+        raise ValidationException(messages.volume_id_wrong_format_message)
 
 
 def validate_create_volume_request(request):
@@ -232,19 +258,14 @@ def validate_create_volume_request(request):
     else:
         raise ValidationException(messages.no_capacity_range_message)
 
-    validate_csi_volume_capabilties(request.volume_capabilities)
+    validate_csi_volume_capabilities(request.volume_capabilities)
 
     validate_secrets(request.secrets)
 
-    logger.debug("validating storage class parameters")
     if request.parameters:
-        if config.PARAMETERS_POOL in request.parameters:
-            if not request.parameters[config.PARAMETERS_POOL]:
-                raise ValidationException(messages.pool_should_not_be_empty_message)
-        elif not request.parameters.get(config.PARAMETERS_BY_SYSTEM):
-            raise ValidationException(messages.pool_is_missing_message)
+        _validate_pool_parameter(request.parameters)
     else:
-        raise ValidationException(messages.params_are_missing_message)
+        raise ValidationException(messages.pool_is_missing_message)
 
     logger.debug("validating volume copy source")
     validate_create_volume_source(request)
@@ -257,7 +278,9 @@ def validate_create_snapshot_request(request):
     logger.debug("validating snapshot name")
     if not request.name:
         raise ValidationException(messages.name_should_not_be_empty_message)
+
     validate_secrets(request.secrets)
+
     logger.debug("validating source volume id")
     if not request.source_volume_id:
         raise ValidationException(messages.snapshot_src_volume_id_is_missing)
@@ -267,16 +290,41 @@ def validate_create_snapshot_request(request):
 def validate_delete_snapshot_request(request):
     logger.debug("validating delete snapshot request")
     if not request.snapshot_id:
-        raise ValidationException(messages.name_should_not_be_empty_message)
+        raise ValidationException(messages.snapshot_id_should_not_be_empty_message)
+
     validate_secrets(request.secrets)
+
     logger.debug("request validation finished.")
+
+
+def validate_validate_volume_capabilities_request(request):
+    logger.debug("validating validate_volume_capabilities request")
+
+    _validate_object_id(request.volume_id)
+
+    if request.parameters:
+        _validate_pool_parameter(request.parameters)
+
+    validate_csi_volume_capabilities(request.volume_capabilities)
+
+    validate_secrets(request.secrets)
+
+
+def validate_volume_context_match_volume(volume_context, volume):
+    logger.debug("validate volume_context is matching volume")
+    context_from_existing_volume = _get_context_from_volume(volume)
+
+    if volume_context != context_from_existing_volume:
+        raise ValidationException(
+            messages.volume_context_not_match_volume_message.format(volume_context, context_from_existing_volume))
+    logger.debug("volume_context validation finished.")
 
 
 def validate_expand_volume_request(request):
     logger.debug("validating expand volume request")
 
     if not request.volume_id:
-        raise ValidationException(messages.id_should_not_be_empty_message)
+        raise ValidationException(messages.volume_id_should_not_be_empty_message)
 
     logger.debug("validating volume capacity")
     if request.capacity_range:
@@ -291,15 +339,10 @@ def validate_expand_volume_request(request):
 
 
 def generate_csi_create_volume_response(new_volume, system_id=None, source_type=None):
-    logger.debug("creating volume response for volume : {0}".format(new_volume))
+    logger.debug("creating create volume response for volume : {0}".format(new_volume))
 
-    volume_context = {"volume_name": new_volume.name,
-                      "array_address": ",".join(
-                          new_volume.array_address if isinstance(new_volume.array_address, list) else [
-                              new_volume.array_address]),
-                      "pool_name": new_volume.pool,
-                      "storage_type": new_volume.array_type
-                      }
+    volume_context = _get_context_from_volume(new_volume)
+
     content_source = None
     if new_volume.copy_source_id:
         if source_type == config.SNAPSHOT_TYPE_NAME:
@@ -319,12 +362,12 @@ def generate_csi_create_volume_response(new_volume, system_id=None, source_type=
     return res
 
 
-def generate_csi_create_snapshot_response(new_snapshot, source_volume_id):
-    logger.debug("creating snapshot response for snapshot : {0}".format(new_snapshot))
+def generate_csi_create_snapshot_response(new_snapshot, system_id, source_volume_id):
+    logger.debug("creating create snapshot response for snapshot : {0}".format(new_snapshot))
 
     res = csi_pb2.CreateSnapshotResponse(snapshot=csi_pb2.Snapshot(
         size_bytes=new_snapshot.capacity_bytes,
-        snapshot_id=get_snapshot_id(new_snapshot),
+        snapshot_id=get_snapshot_id(new_snapshot, system_id),
         source_volume_id=source_volume_id,
         creation_time=get_current_timestamp(),
         ready_to_use=new_snapshot.is_ready))
@@ -341,6 +384,36 @@ def generate_csi_expand_volume_response(capacity_bytes, node_expansion_required=
     )
 
     logger.debug("finished creating expand volume response")
+    return res
+
+
+def _get_supported_capability(volume_capability):
+    access_mode = csi_pb2.VolumeCapability.AccessMode(mode=volume_capability.access_mode.mode)
+
+    if volume_capability.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_MOUNT):
+        return csi_pb2.VolumeCapability(
+            mount=csi_pb2.VolumeCapability.MountVolume(fs_type=volume_capability.mount.fs_type),
+            access_mode=access_mode)
+
+    return csi_pb2.VolumeCapability(
+        mount=csi_pb2.VolumeCapability.BlockVolume(),
+        access_mode=access_mode)
+
+
+def generate_csi_validate_volume_capabilities_response(volume_context, volume_capabilities, parameters):
+    logger.debug("creating validate volume capabilities response")
+
+    capabilities = []
+    for capability in volume_capabilities:
+        supported_capability = _get_supported_capability(volume_capability=capability)
+        capabilities.append(supported_capability)
+
+    res = csi_pb2.ValidateVolumeCapabilitiesResponse(confirmed=csi_pb2.ValidateVolumeCapabilitiesResponse.Confirmed(
+        volume_context=volume_context,
+        volume_capabilities=capabilities,
+        parameters=parameters))
+
+    logger.debug("finished creating validate volume capabilities response")
     return res
 
 
@@ -377,18 +450,34 @@ def get_snapshot_id_info(snapshot_id):
     return get_object_id_info(snapshot_id, config.SNAPSHOT_TYPE_NAME)
 
 
+def _get_context_from_volume(volume):
+    return {config.VOLUME_CONTEXT_VOLUME_NAME: volume.name,
+            config.VOLUME_CONTEXT_ARRAY_ADDRESS: ",".join(
+                volume.array_address if isinstance(volume.array_address, list) else [volume.array_address]),
+            config.VOLUME_CONTEXT_POOL: volume.pool,
+            config.VOLUME_CONTEXT_STORAGE_TYPE: volume.array_type
+            }
+
+
 def get_object_id_info(full_object_id, object_type):
     logger.debug("getting {0} info for id : {1}".format(object_type, full_object_id))
-    splitted_object_id = full_object_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)
-    system_id = None
+    splitted_object_id = full_object_id.split(config.PARAMETERS_OBJECT_ID_INFO_DELIMITER)
+    system_id, wwn, internal_id = None, None, None
     if len(splitted_object_id) == 2:
         array_type, object_id = splitted_object_id
     elif len(splitted_object_id) == 3:
         array_type, system_id, object_id = splitted_object_id
     else:
         raise ObjectIdError(object_type, full_object_id)
+    splitted_id = object_id.split(config.PARAMETERS_OBJECT_IDS_DELIMITER)
+    if len(splitted_id) == 1:
+        wwn = splitted_id[0]
+    elif len(splitted_id) == 2:
+        internal_id, wwn = splitted_id
+    else:
+        raise ObjectIdError(object_type, full_object_id)
     logger.debug("volume id : {0}, array type :{1}".format(object_id, array_type))
-    return ObjectIdInfo(array_type=array_type, system_id=system_id, object_id=object_id)
+    return ObjectIdInfo(array_type=array_type, system_id=system_id, internal_id=internal_id, object_id=wwn)
 
 
 def get_node_id_info(node_id):
@@ -406,15 +495,16 @@ def get_node_id_info(node_id):
     return hostname, fc_wwns, iscsi_iqn
 
 
-def choose_connectivity_type(connecitvity_types):
+def choose_connectivity_type(connectivity_types):
     # If connectivity type support FC and iSCSI at the same time, chose FC
-    logger.debug("choosing connectivity type for connectivity types : {0}".format(connecitvity_types))
-    if FC_CONNECTIVITY_TYPE in connecitvity_types:
+    logger.debug("choosing connectivity type for connectivity types : {0}".format(connectivity_types))
+    if FC_CONNECTIVITY_TYPE in connectivity_types:
         logger.debug("connectivity type is : {0}".format(FC_CONNECTIVITY_TYPE))
         return FC_CONNECTIVITY_TYPE
-    if ISCSI_CONNECTIVITY_TYPE in connecitvity_types:
+    if ISCSI_CONNECTIVITY_TYPE in connectivity_types:
         logger.debug("connectivity type is : {0}".format(ISCSI_CONNECTIVITY_TYPE))
         return ISCSI_CONNECTIVITY_TYPE
+    return None
 
 
 def generate_csi_publish_volume_response(lun, connectivity_type, config, array_initiators):
@@ -448,14 +538,29 @@ def generate_csi_publish_volume_response(lun, connectivity_type, config, array_i
 def validate_unpublish_volume_request(request):
     logger.debug("validating unpublish volume request")
 
-    logger.debug("validating volume id")
-    if len(request.volume_id.split(config.PARAMETERS_OBJECT_ID_DELIMITER)) not in {config.MINIMUM_VOLUME_ID_PARTS,
-                                                                                   config.MAXIMUM_VOLUME_ID_PARTS}:
-        raise ValidationException(messages.volume_id_wrong_format_message)
+    _validate_object_id(request.volume_id)
 
     validate_secrets(request.secrets)
 
     logger.debug("unpublish volume request validation finished.")
+
+
+def validate_addons_request(request):
+    logger.debug("validating addons request")
+
+    logger.debug("validating volume id")
+    if request.volume_id == "" or request.replication_id == "":
+        raise ValidationException(messages.volume_id_should_not_be_empty_message)
+
+    logger.debug("validating copy type")
+    if config.PARAMETERS_COPY_TYPE in request.parameters:
+        copy_type = request.parameters.get(config.PARAMETERS_COPY_TYPE)
+        if copy_type not in (REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC):
+            raise ValidationException(messages.invalid_replication_copy_type_message.format(copy_type))
+
+    validate_secrets(request.secrets)
+
+    logger.debug("addons request validation finished")
 
 
 def get_current_timestamp():
@@ -466,3 +571,28 @@ def get_current_timestamp():
 
 def hash_string(string):
     return base58.b58encode(sha256(string.encode()).digest()).decode()
+
+
+def _validate_parameter_match_volume(parameter_value, value_from_volume, error_message_format, cmp=eq):
+    if parameter_value and not cmp(parameter_value, value_from_volume):
+        raise ValidationException(error_message_format.format(parameter_value, value_from_volume))
+
+
+def validate_parameters_match_volume(parameters, volume):
+    logger.debug("validating space efficiency parameter matches volume's")
+    space_efficiency = parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
+    if space_efficiency:
+        space_efficiency = space_efficiency.lower()
+    else:
+        space_efficiency = volume.default_space_efficiency
+    _validate_parameter_match_volume(space_efficiency, volume.space_efficiency,
+                                     messages.space_efficiency_not_match_volume_message)
+
+    logger.debug("validating pool parameter matches volume's")
+    pool = parameters.get(config.PARAMETERS_POOL)
+    _validate_parameter_match_volume(pool, volume.pool, messages.pool_not_match_volume_message)
+
+    logger.debug("validating prefix parameter matches volume's")
+    prefix = parameters.get(config.PARAMETERS_VOLUME_NAME_PREFIX)
+    _validate_parameter_match_volume(prefix, volume.name, messages.prefix_not_match_volume_message,
+                                     lambda pref, name: name.startswith(pref + NAME_PREFIX_SEPARATOR))

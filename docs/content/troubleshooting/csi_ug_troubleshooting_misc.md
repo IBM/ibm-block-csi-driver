@@ -12,7 +12,7 @@ kubectl get -n <namespace>  csidriver,sa,clusterrole,clusterrolebinding,stateful
 ```
 
 ## Error during pod creation
-**Note:** This troubleshooting procedure is relevant for volumes using file system types only (not for volumes using raw block volume types).
+**Note:** This troubleshooting procedure is relevant for volumes using file system volume mode only (not for volumes using raw block volume mode).
 
 If the following error occurs during stateful application pod creation (the pod status is _ContainerCreating_):
 

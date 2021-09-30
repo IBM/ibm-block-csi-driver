@@ -19,6 +19,9 @@ package driver
 import (
 	"context"
 	"fmt"
+	"path"
+	"strings"
+
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/ibm/ibm-block-csi-driver/node/goid_info"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
@@ -27,8 +30,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/utils/mount"
-	"path"
-	"strings"
 )
 
 var (
@@ -711,7 +712,7 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	}
 	logger.Debugf("discovered topology labels : %v", topologyLabels)
 
-	fcExists := d.NodeUtils.IsPathExists(FCPath)
+	fcExists := d.NodeUtils.IsFCExists()
 	if fcExists {
 		fcWWNs, err = d.NodeUtils.ParseFCPorts()
 		if err != nil {

@@ -4,33 +4,35 @@ Create an array secret YAML file in order to define the storage credentials (use
 
 **Important:** When your storage system password is changed, be sure to also change the passwords in the corresponding secrets, particularly when LDAP is used on the storage systems. <br /><br />Failing to do so causes mismatched passwords across the storage systems and the secrets, causing the user to be locked out of the storage systems.
 
+**Note:** If using the CSI Topology feature, follow the steps in [Creating a Secret with topology awareness](csi_ug_config_create_secret_topology.md).
+
 Use one of the following procedures to create and apply the secret:
 
 ## Creating an array secret file
-1. Create the secret file, similar to the following demo-secret.yaml:
+1. Create the secret file, similar to the following `demo-secret.yaml`:
 
     The `management_address` field can contain more than one address, with each value separated by a comma.
 
     ```
-     kind: Secret
-     apiVersion: v1
-     metadata:
-       name:  demo-secret
-       namespace: default
-     type: Opaque
-     stringData:
-       management_address: demo-management-address  # Array management addresses
-       username: demo-username                      # Array username
-     data:
-       password: ZGVtby1wYXNzd29yZA==               # base64 array password
+    kind: Secret
+    apiVersion: v1
+    metadata:
+      name:  demo-secret
+      namespace: default
+    type: Opaque
+    stringData:
+      management_address: demo-management-address  # Array management addresses
+      username: demo-username                      # Array username
+    data:
+      password: ZGVtby1wYXNzd29yZA==               # base64 array password
      ```
        
 2. Apply the secret using the following command:
 
-    `kubectl apply -f demo-secret.yaml`
+    `kubectl apply -f <filename>.yaml`
     
 
-     The `secret/<NAME> created` message is emitted.
+     The `secret/<secret-name> created` message is emitted.
 
 
 ## Creating an array secret via command line
@@ -38,7 +40,6 @@ Use one of the following procedures to create and apply the secret:
 
 Create the secret using the following command:
 
- ```
- kubectl create secret generic <NAME> --from-literal=username=<USER> --from-literal=password=<PASSWORD>--from-literal=management_address=<ARRAY_MGMT> -n <namespace>
- ```
- 
+```
+kubectl create secret generic demo-secret --from-literal=username=demo-username --from-literal=password=demo-password --from-literal=management_address=demo-management-address -n default
+```

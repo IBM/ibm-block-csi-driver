@@ -12,10 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM registry.access.redhat.com/ubi8/python-38:1-60
+FROM registry.access.redhat.com/ubi8/python-38:1-68
 MAINTAINER IBM Storage
 
-ARG VERSION=1.6.0
+ARG VERSION=1.7.0
 ARG BUILD_NUMBER=0
 
 ###Required Labels
@@ -33,8 +33,6 @@ COPY controller/requirements.txt /driver/controller/
 RUN pip3 install --default-timeout=100 --upgrade pip==19.3.1
 # avoid default boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
-# TODO: remove CRYPTOGRAPHY_ALLOW_OPENSSL_102 when upgrading to ubi8
-ENV CRYPTOGRAPHY_ALLOW_OPENSSL_102=true
 ENV CRYPTOGRAPHY_DONT_BUILD_RUST=1
 RUN pip3 install -r /driver/controller/requirements.txt
 
