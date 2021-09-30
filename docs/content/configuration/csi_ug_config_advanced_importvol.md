@@ -22,7 +22,7 @@ To find the `volumeHandle`, use one of the following procedures:
   - Through command line:
     Find both the `id` and `vdisk_UID` attributes, by using the `lsvdisk` command.
 
-    For more information, see **Command-line interface** > **Volume commands** > **lsvdisk** within your specific product documentation on [IBM Docs](https://www.ibm.com/docs/en).
+    For more information, see **Command-line interface** > **Volume commands** > **lsvdisk** within your specific product documentation on [IBM Documentation](https://www.ibm.com/docs/en).
 
   - Through the management GUI:
 
@@ -44,7 +44,7 @@ To find the `volumeHandle`, use one of the following procedures:
 
     Find the `id` and `WWN` for the volume, by using the `vol_list -f` command.
 
-    For more information, see **Reference** > **Command-line reference (12.3.2.x)** > **Volume management commands** > **Listing volumes** within your specific product documentation on [IBM Docs](https://www.ibm.com/docs/en).
+    For more information, see **Reference** > **Command-line reference (12.3.2.x)** > **Volume management commands** > **Listing volumes** within your specific product documentation on [IBM Documentation](https://www.ibm.com/docs/en).
 
   - Through the Hyper-Scale Management user interface:
 
@@ -69,7 +69,7 @@ To find the `volumeHandle`, use one of the following procedures:
 
     Find the `GUID` for the volume, by using the `lsfbvol` command.
 
-     For more information, see **Reference** > **Command-line interface** > **CLI commands** > **Storage configuration commands** > **Fixed block logical volume specific commands** > **lsfbvol** within your specific product documentation on [IBM Docs](https://www.ibm.com/docs/en).
+     For more information, see **Reference** > **Command-line interface** > **CLI commands** > **Storage configuration commands** > **Fixed block logical volume specific commands** > **lsfbvol** within your specific product documentation on [IBM Documentation](https://www.ibm.com/docs/en).
 
   - Through the DS8000 Storage Management GUI:
 
