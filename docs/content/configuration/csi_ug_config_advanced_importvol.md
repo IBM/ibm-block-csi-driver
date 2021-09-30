@@ -1,121 +1,139 @@
 # Importing an existing volume
 
-Use this information to import volumes created externally from the IBM® block storage CSI driver by using a persistent volume (PV) yaml file.
+Use this information to import volumes that were created externally from the IBM® block storage CSI driver by using a persistent volume (PV) YAML file.
 
-Before starting to import an existing volume, find the following information in the existing volume in order to include the information in the persistent volume (PV) yaml file:
+Before starting to import an existing volume, find the following information in the existing volume in order to include the information in the persistent volume (PV) YAML file:
+- `volumeHandle`
+- `volumeAttributes` (optional)
+  
+  Including:
 
--   `volumeHandle`
--   `volumeAttributes` (optional)
-
-    Including:
-
-    -   `pool_name`: _Name of Pool where volume is located_ (Listed as `pool_id` for DS8000® Family systems.)
-    -   `storage_type`: <SVC | A9K | DS8K>
-    -   `volume_name`: _Volume name_
-    -   `array_address`: _Array address_
+    - `pool_name`: _Name of Pool where volume is located_ (Listed as `pool_id` for DS8000® Family systems.)
+    - `storage_type`: <`SVC` | `A9000` | `DS8K`>
+    - `volume_name`: _Volume name_
+    - `array_address`: _Array address_
 
 To find the `volumeHandle`, use one of the following procedures:
 
-- Through command line (for Spectrum Virtualize Family):
+- **For Spectrum Virtualize Family**
 
-  `lsvdisk <volume name> | grep vdisk_UID`
+  The `volumeHandle` is formatted as `SVC:id;vdisk_UID`.
+
+  - Through command line:
+    Find both the `id` and `vdisk_UID` attributes, by using the `lsvdisk` command.
+
+    For more information, see **Command-line interface** > **Volume commands** > **lsvdisk** within your specific product documentation on [IBM Documentation](https://www.ibm.com/docs/en).
+
+  - Through the management GUI:
+
+    1. Select **Volumes** > **Volumes** from the side bar.
+
+        The **Volumes** page is displayed.
+
+    2. Browse to the volume that the port is on and right-click > **Properties**.
+
+      The Properties window is displayed. Use the **Volume ID** and **Volume UID** values.
+
+    For more information about Spectrum Virtualize products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).
+  
+- **For FlashSystem A9000 and A9000R:**
+
+  The `volumeHandle` is formatted as `A9000:id;WWN`.
+  
+  - Through command line:
+
+    Find the `id` and `WWN` for the volume, by using the `vol_list -f` command.
+
+    For more information, see **Reference** > **Command-line reference (12.3.2.x)** > **Volume management commands** > **Listing volumes** within your specific product documentation on [IBM Documentation](https://www.ibm.com/docs/en).
+
+  - Through the Hyper-Scale Management user interface:
+
+    1. Select **Pools and Volumes Views** > **Volumes** from the side bar.
+
+        The **Volumes** table is displayed.
+
+    2. Select the `Volume`.
+
+        The **Volume Properties** form is displayed.
+
+    3. Use the **ID** and **WWN** values.
     
-  ```
-  lsvdisk vol0 | grep vdisk_UID
-  vdisk_UID 600507640082000B08000000000004FF
-  ```
+    For more information, see [IBM Hyper-Scale Manager documentation](https://www.ibm.com/docs/en/hyper-scale-manager/).
 
-- Through command line (for FlashSystem A9000 and A9000R):
+- **For DS8000 Family:**
 
-  `vol_list_extended vol=<volume_name>`
+  The `volumeHandle` is formatted as `DS8K:id;GUID`.
+  The `id` is the last four digits of the `GUID`.
 
-  For example, for `vol1`:
+  - Through the command line:
 
-  ```
-  A9000>> vol_list_extended vol=vol1
-  Name   WWN                                Product Serial Number     
-  vol1   6001738CFC9035E8000000000091F0C0   60035E8000000000091F0C0 
-  ```
+    Find the `GUID` for the volume, by using the `lsfbvol` command.
 
-- Through the Spectrum Virtualize management GUI:
+     For more information, see **Reference** > **Command-line interface** > **CLI commands** > **Storage configuration commands** > **Fixed block logical volume specific commands** > **lsfbvol** within your specific product documentation on [IBM Documentation](https://www.ibm.com/docs/en).
 
-  1.  Select **Volumes** > **Volumes** from the side bar.
+  - Through the DS8000 Storage Management GUI:
 
-      The **Volumes** page appears.
+    1. Select **Volumes** from the side bar.
 
-  2.  Browse to the volume that the port is on and right-click > **Properties**.
+        The **Volumes** page is displayed.
 
-      The Properties window appears. Use the UID number.
+    2. Browse to the volume that the port is on and right-click > **Properties**.
 
-      For more information about Spectrum Virtualize products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).
+        The Properties window is displayed. Use the **GUID** value.
 
-- Through the IBM Hyper-Scale Manager user interface for FlashSystem A9000 and A90000R storage systems:
+    For more information about DS8000 Family products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).
+  
 
-  1.  Select **Pools and Volumes Views** > **Volumes** from the side bar.
+Use this procedure to help build a PV YAML file for your volumes.
 
-      The **Volumes** table is displayed.
+**Note:** These steps are set up for importing volumes from a Spectrum Virtualize Family system. Change parameters, as needed.
 
-  2.  Select the `Volume`.
+1. Create a persistent volume (PV) YAML file.
 
-      The **Volume Properties** form appears.
+    **Important:** Be sure to include the `storageClassName` and `controllerPublishSecretRef` parameters or errors may occur.
 
-  3.  Use the **ID** number.
+2. Take the `volume_name` and other optional information (collected before the procedure) and insert it into the YAML file (under `spec.csi.volumeAttributes`).
+
+    **Important:** If using the CSI Topology feature, the `spec.csi.volumeHandle` contains the management ID (see [Creating a StorageClass with topology awareness](csi_ug_config_create_storageclasses_topology.md)). In the example below, the `spec.csi.volumeHandle` would read similar to the following: `SVC:demo-system-id-1:0;600507640082000B08000000000004FF`.
     
-      For more information, see [IBM Hyper-Scale Manager documentation](https://www.ibm.com/docs/en/hyper-scale-manager/).
+        apiVersion: v1
+        kind: PersistentVolume
+        metadata:
+          # annotations:
+            # pv.kubernetes.io/provisioned-by: block.csi.ibm.com
+          name: demo-pv
+        spec:
+          accessModes:
+          - ReadWriteOnce
+          capacity:
+            storage: 1Gi
+          csi:
+            controllerPublishSecretRef:
+              name: demo-secret
+              namespace: default
+            driver: block.csi.ibm.com
+            # volumeAttributes:
+              # pool_name: demo-pool
+              # storage_type: SVC
+              # volume_name: demo-prefix_demo-pvc-file-system
+              # array_address: demo-management-address
+            volumeHandle: SVC:0;600507640082000B08000000000004FF
+          # persistentVolumeReclaimPolicy: Retain
+          storageClassName: demo-storageclass
+          # volumeMode: Filesystem
 
-
-Use this procedure to help build a PV yaml file for your volumes.
-
-**Note:** These steps are setup for importing volumes from a Spectrum Virtualize Family system. Change parameters, as needed.
-
-1.  Create a persistent volume (PV) yaml file.
-
-    **Important:** Be sure to include the `storageClassName` and `controllerPublishSecretRef` parameters or errors will occur.
-
-2.  Take the `volume_name` and other optional information (collected before the procedure) and insert it into the yaml file.
-
-    <pre>
-    apiVersion: v1
-    kind: PersistentVolume
-    metadata:
-      # annotations:
-        # pv.kubernetes.io/provisioned-by: block.csi.ibm.com
-      name: vol1-pv
-    spec:
-      accessModes:
-      - ReadWriteOnce
-      capacity:
-        storage: 1Gi
-      csi:
-        controllerPublishSecretRef:
-          name: demo-secret
-          namespace: default
-        driver: block.csi.ibm.com
-        <b># volumeAttributes:
-          # pool_name: ibmc-block-gold
-          # storage_type: SVC
-          # volume_name: vol1
-          # array_address: baremetal10-cluster.xiv.ibm.com
-        volumeHandle: SVC:600507640082000B08000000000004FF</b>
-      # persistentVolumeReclaimPolicy: Retain
-      storageClassName: ibmc-block-gold
-      # volumeMode: Filesystem
-    </pre>
-
-3.  Create a PersistentVolumeClaim (PVC) yaml file.
+3. Create a PersistentVolumeClaim (PVC) YAML file.
 
     **Note:**
 
-    -   To include a specific 5 Gi PV, be sure to include the `storageClassName`.
-    -   For more information about creating a PVC yaml file, see [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
+    - Be sure to include the `storageClassName`.
+    - For more information about creating a PVC YAML file, see [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
     
-    ```screen
+    ```
     apiVersion: v1
     kind: PersistentVolumeClaim
     metadata:
-      # annotations:
-        # pv.kubernetes.io/provisioned-by: block.csi.ibm.com
-      name: vol1-pvc
+      name: demo-pvc
     spec:
       accessModes:
       - ReadWriteOnce
@@ -123,42 +141,5 @@ Use this procedure to help build a PV yaml file for your volumes.
         requests:
           storage: 1Gi
       storageClassName: ibmc-block-gold
-      volumeName: vol1-pv
+      volumeName: demo-pv
     ```
-
-4.  Create a StatefulSet.
-
-    For more information about creating a StatefulSet, see [Creating a StatefulSet](csi_ug_config_create_statefulset.md).
-
-    ```screen
-    kind: StatefulSet
-    apiVersion: apps/v1
-    metadata:
-      name: sanity-statefulset
-    spec:
-      selector:
-        matchLabels:
-          app: sanity-statefulset
-      serviceName: sanity-statefulset
-      replicas: 1
-      template:
-        metadata:
-          labels:
-            app: sanity-statefulset
-        spec:
-          containers:
-          - name: container1
-            image: registry.access.redhat.com/ubi8/ubi:latest
-            command: [ "/bin/sh", "-c", "--" ]
-            args: [ "while true; do sleep 30; done;" ]
-            volumeMounts:
-              - name: vol1
-                mountPath: "/data"
-          volumes:
-          - name: vol1
-            persistentVolumeClaim:
-              claimName: vol1-pvc
-    
-    ```
-
-
