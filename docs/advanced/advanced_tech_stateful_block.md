@@ -8,45 +8,47 @@
 
 4. Display the existing PVC and the created persistent volume (PV).
 
-    <pre>
-    $> kubectl get pv,pvc
-    NAME                                                        CAPACITY   ACCESS MODES
-    persistentvolume/pvc-828ce909-6eb2-11ea-abc8-005056a49b44   1Gi        RWO
+      <pre>
+      $> kubectl get pv,pvc
+      NAME                                                        CAPACITY   ACCESS MODES
+      persistentvolume/pvc-828ce909-6eb2-11ea-abc8-005056a49b44   1Gi        RWO
         
-    RECLAIM POLICY   STATUS   CLAIM              STORAGECLASS   REASON   AGE
-    Delete           Bound    default/demo-pvc-raw-block   demo-storageclass   109m
+      RECLAIM POLICY   STATUS   CLAIM                          STORAGECLASS     REASON  AGE
+      Delete           Bound    default/demo-pvc-raw-block   demo-storageclass        109m
         
-    NAME                             STATUS   VOLUME                                     CAPACITY   
-    persistentvolumeclaim/demo-pvc-raw-block   Bound    pvc-828ce909-6eb2-11ea-abc8-005056a49b44   1Gi
+      NAME                                         STATUS   VOLUME                                     CAPACITY   
+      persistentvolumeclaim/demo-pvc-raw-block   Bound    pvc-828ce909-6eb2-11ea-abc8-005056a49b44   1Gi
         
-    ACCESS MODES   STORAGECLASS       AGE
-    RWO            demo-storageclass  78s
+      ACCESS MODES   STORAGECLASS       AGE
+      RWO            demo-storageclass  78s
         
-    kubectl describe persistentvolume/pvc-828ce909-6eb2-11ea-abc8-005056a49b44
-    Name:            pvc-828ce909-6eb2-11ea-abc8-005056a49b44
-    Labels:          <none>
-    Annotations:     pv.kubernetes.io/provisioned-by: block.csi.ibm.com
-    Finalizers:      [kubernetes.io/pv-protection external-attacher/block-csi-ibm-com]
-    StorageClass:    demo-storageclass
-    Status:          Bound
-    Claim:           default/demo-pvc-raw-block
-    Reclaim Policy:  Delete
-    Access Modes:    RWO
-    VolumeMode:      Block
-    Capacity:        1Gi
-    Node Affinity:   <none>
-    Message:
-    Source:
-        Type:              CSI (a Container Storage Interface (CSI) volume source)
-        Driver:            block.csi.ibm.com
-        VolumeHandle:      SVC:60050760718106998000000000000543
-        ReadOnly:          false
-        VolumeAttributes:      array\address=baremetal10-cluster.xiv.ibm.com
-                              pool\name=demo-pool
-                              storage.kubernetes.io/csiProvisionerIdentity=1585146948772-8081-block.csi.ibm.com
-                              storage\type=SVC
-                              volume\name=demoPVC-828ce909-6eb2-11ea-abc8-005056a49b44
-    Events:                <none>
+      $> kubectl describe persistentvolume/pvc-828ce909-6eb2-11ea-abc8-005056a49b44
+      Name:            pvc-828ce909-6eb2-11ea-abc8-005056a49b44
+      Labels:          <none>
+      Annotations:     pv.kubernetes.io/provisioned-by: block.csi.ibm.com
+      Finalizers:      [kubernetes.io/pv-protection]
+      StorageClass:    demo-storageclass
+      Status:          Bound
+      Claim:           default/demo-pvc-file-system
+      Reclaim Policy:  Delete
+      Access Modes:    RWO
+      VolumeMode:      Block
+      Capacity:        1Gi
+      Node Affinity:   <none>
+      Message:
+      Source:
+          Type:              CSI (a Container Storage Interface (CSI) volume source)
+          Driver:            block.csi.ibm.com
+          FSType:            xfs
+          VolumeHandle:      SVC:26;60050760718186998000000000005E93
+          ReadOnly:          false
+          VolumeAttributes:     array_address=demo-management-address
+                                pool_name=demo-pool
+                                storage.kubernetes.io/csiProvisionerIdentity=1631546133261-8081-block.csi.ibm.com
+                                storage_type=SVC
+                                volume_name=demo-prefix_pvc-828ce909-6eb2-11ea-abc8-005056a49b44
+      Events:                <none>
+      </pre>
 
 5. Create a StatefulSet.
 
@@ -106,7 +108,7 @@
     kubectl exec demo-statefulset-raw-block-0 -- bash -c "od -An -c -N 10 /dev/block"
     t e s t _ b l o c k
 
-8. Delete StatefulSet and then recreate, in order to validate data (test\block in /dev/block) remains in the persistent volume.
+8. Delete StatefulSet and then recreate, in order to validate data (test_block in /dev/block) remains in the persistent volume.
 
     1. Delete the StatefulSet.
 
@@ -126,6 +128,8 @@
         $> kubectl create -f demo-statefulset-raw-block.yaml
         statefulset/demo-statefulset-raw-block created
             
+        kubectl exec demo-statefulset-raw-block-0 – bash -c "od -An -c -N 10 /dev/block"
+        
         t e s t _ b l o c k
 
 9. Delete StatefulSet and the PVC.
