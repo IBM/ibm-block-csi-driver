@@ -12,6 +12,8 @@ When replicating a volume, be sure to follow all of the replication configuratio
 
     For more information about PVC configuration, see [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
 
+    **Note:** Use the `spec.csi.volumeHandle` of the relevant target PersistentVolume (PV) for the `replicationHandle` value.
+
     ```
     apiVersion: replication.storage.openshift.io/v1alpha1
     kind: VolumeReplication
@@ -21,7 +23,7 @@ When replicating a volume, be sure to follow all of the replication configuratio
     spec:
       volumeReplicationClass: demo-volumereplicationclass
       replicationState: primary
-      replicationHandle: "SVC:demo-id;demo-uid"
+      replicationHandle: demo-replicationhandle
       dataSource:
         kind: PersistentVolumeClaim
         name: demo-pvc-file-system  # Ensure that this is in the same namespace as VolumeReplication.
