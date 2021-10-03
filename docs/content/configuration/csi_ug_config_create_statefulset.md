@@ -1,127 +1,126 @@
 # Creating a StatefulSet
 
-Create a StatefulSet yaml file to manage stateful applications.
+Create a StatefulSet YAML file to manage stateful applications.
 
-The IBM® block storage CSI driver supports using both file system and raw block volume types.
+The IBM® block storage CSI driver supports both file system and raw block volume modes.
 
-StatefulSets can include volumes with file systems, raw block volume systems, or both.
+StatefulSets can include file system volumes, raw block volumes, or both.
 
-**Important:** When defining the StatefulSet configuration, be sure to define volumes according to the PVC type.
+**Important:** When defining the StatefulSet configuration, be sure to define volumes according to the PVC volume mode.
 
-Use the sections below for yaml creation of StatefulSets with file system, raw block volume, and mixed types. After each yaml file creation, use the `kubectl apply` command.
+Use the following sections for YAML creation of StatefulSets with file system, raw block volume, and mixed volume modes. After each YAML file creation, use the `kubectl apply` command.
 
 ```
 kubectl apply -f <filename>.yaml
 ```
 
-The `statefulset.apps/<filename> created` message is emitted.
+The `statefulset.apps/<statefulset-name> created` message is emitted.
 
 ## Creating a StatefulSet with file system volumes
 
-Create a StatefulSet yaml file, similar to the following demo-statefulset-file-system.yaml file.
+Create a StatefulSet YAML file, similar to the following `demo-statefulset-file-system.yaml` file.
 
-<pre>
-kind: StatefulSet
-apiVersion: apps/v1
-metadata:
-  name: demo-statefulset-file-system
-spec:
-  selector:
-    matchLabels:
-      app: demo-statefulset
-  serviceName: demo-statefulset
-  replicas: 1
-  template:
+Be sure to indicate the `volumeMounts`, listing each volume's name and path. In this example, the `mountPath` is listed as `"/data"`.
+
+    kind: StatefulSet
+    apiVersion: apps/v1
     metadata:
-      labels:
-        app: demo-statefulset
+      name: demo-statefulset-file-system
     spec:
-      containers:
-      - name: demo-container
-        image: registry.access.redhat.com/ubi8/ubi:latest
-        command: [ "/bin/sh", "-c", "--" ]
-        args: [ "while true; do sleep 30; done;" ]
-        <b>volumeMounts:
+      selector:
+        matchLabels:
+          app: demo-statefulset
+      serviceName: demo-statefulset
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            app: demo-statefulset
+        spec:
+          containers:
+          - name: demo-container
+            image: registry.access.redhat.com/ubi8/ubi:latest
+            command: [ "/bin/sh", "-c", "--" ]
+            args: [ "while true; do sleep 30; done;" ]
+            volumeMounts:
+              - name: demo-volume-file-system
+                mountPath: "/data"
+          volumes:
           - name: demo-volume-file-system
-            mountPath: "/data"</b>
-      volumes:
-      - name: demo-volume-file-system
-        persistentVolumeClaim:
-          claimName: demo-pvc-file-system
-</pre>
+            persistentVolumeClaim:
+              claimName: demo-pvc-file-system
 
 ## Creating a StatefulSet with raw block volume
 
-Create a StatefulSet yaml file, similar to the following demo-statefulset-raw-block.yaml file.
+Create a StatefulSet YAML file, similar to the following `demo-statefulset-raw-block.yaml` file.
 
-<pre>
-kind: StatefulSet
-apiVersion: apps/v1
-metadata:
-  name: demo-statefulset-raw-block
-spec:
-  selector:
-    matchLabels:
-      app: demo-statefulset
-  serviceName: demo-statefulset
-  replicas: 1
-  template:
+Be sure to indicate the `volumeDevices`, listing each volume's name and path. In this example, the `devicePath` is listed as `"/dev/block"`.
+
+    kind: StatefulSet
+    apiVersion: apps/v1
     metadata:
-      labels:
-        app: demo-statefulset
+      name: demo-statefulset-raw-block
     spec:
-      containers:
-      - name: demo-container
-        image: registry.access.redhat.com/ubi8/ubi:latest
-        command: [ "/bin/sh", "-c", "--" ]
-        args: [ "while true; do sleep 30; done;" ]
-        <b>volumeDevices:
+      selector:
+        matchLabels:
+          app: demo-statefulset
+      serviceName: demo-statefulset
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            app: demo-statefulset
+        spec:
+          containers:
+          - name: demo-container
+            image: registry.access.redhat.com/ubi8/ubi:latest
+            command: [ "/bin/sh", "-c", "--" ]
+            args: [ "while true; do sleep 30; done;" ]
+            volumeDevices:
+              - name: demo-volume-raw-block
+                devicePath: "/dev/block"
+          volumes:
           - name: demo-volume-raw-block
-            devicePath: "/dev/block"</b>
-      volumes:
-      - name: demo-volume-raw-block
-        persistentVolumeClaim:
-          claimName: demo-pvc-raw-block
-</pre>
+            persistentVolumeClaim:
+              claimName: demo-pvc-raw-block
 
 ## Creating a StatefulSet with both raw block and file system volumes
 
-Create a StatefulSet yaml file, similar to the following demo-statefulset-combined.yaml file.
+Create a StatefulSet YAML file, similar to the following `demo-statefulset.yaml` file.
 
-<pre>
-kind: StatefulSet
-apiVersion: apps/v1
-metadata:
-  name: demo-statefulset-combined
-spec:
-  selector:
-    matchLabels:
-      app: demo-statefulset
-  serviceName: demo-statefulset
-  replicas: 1
-  template:
+In a StatefulSet file that uses both volume modes, it is important to indicate both the `volumeMounts` and `volumeDevices` parameters.
+
+    kind: StatefulSet
+    apiVersion: apps/v1
     metadata:
-      labels:
-        app: demo-statefulset
+      name: demo-statefulset
     spec:
-      containers:
-      - name: demo-container
-        image: registry.access.redhat.com/ubi8/ubi:latest
-        command: [ "/bin/sh", "-c", "--" ]
-        args: [ "while true; do sleep 30; done;" ]
-        <b>volumeMounts:
+      selector:
+        matchLabels:
+          app: demo-statefulset
+      serviceName: demo-statefulset
+      replicas: 1
+      template:
+        metadata:
+          labels:
+            app: demo-statefulset
+        spec:
+          containers:
+          - name: demo-container
+            image: registry.access.redhat.com/ubi8/ubi:latest
+            command: [ "/bin/sh", "-c", "--" ]
+            args: [ "while true; do sleep 30; done;" ]
+            volumeMounts:
+              - name: demo-volume-file-system
+                mountPath: "/data"
+            volumeDevices:
+              - name: demo-volume-raw-block
+                devicePath: "/dev/block"            
+          volumes:
           - name: demo-volume-file-system
-            mountPath: "/data"
-        volumeDevices:
+            persistentVolumeClaim:
+              claimName: demo-pvc-file-system
           - name: demo-volume-raw-block
-            devicePath: "/dev/block"</b>            
-      volumes:
-      - name: demo-volume-file-system
-        persistentVolumeClaim:
-          claimName: demo-pvc-file-system
-      - name: demo-volume-raw-block
-        persistentVolumeClaim:
-          claimName: demo-pvc-raw-block
-</pre>
-
+            persistentVolumeClaim:
+              claimName: demo-pvc-raw-block
 

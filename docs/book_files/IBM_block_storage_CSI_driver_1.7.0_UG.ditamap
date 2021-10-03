@@ -6,7 +6,7 @@
 <ibmbook xml:lang="en-us">
 <ibmbooktitle>
 <ibmbooklibrary><titleline>IBM block storage CSI
-driver</titleline><titleline>1.6.0</titleline></ibmbooklibrary>
+driver</titleline><titleline>1.7.0</titleline></ibmbooklibrary>
 <ibmmainbooktitle><titleline>User Guide</titleline></ibmmainbooktitle>
 </ibmbooktitle>
 <bookmeta>
@@ -17,9 +17,6 @@ driver</titleline><titleline>1.6.0</titleline></ibmbooklibrary>
 <audience/>
 <prodinfo><prodname/>
 </prodinfo>
-<bookid>
-<booknumber>SC27-9590-10</booknumber>
-</bookid>
 <bookrights>
 <copyrfirst>
 <year>2021</year>

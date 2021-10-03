@@ -9,15 +9,15 @@ When a worker node shuts down or crashes, all pods in a StatefulSet that reside 
 
 For example:
 
-```screen
-$> kubectl get nodes
-NAME STATUS ROLES AGE VERSION
-k8s-master Ready master 6d <your k8s version>
-k8s-node1 Ready <none> 6d <your k8s version>
-k8s-node3 NotReady <none> 6d <your k8s version>
+```
+$>kubectl get nodes
+NAME        STATUS   ROLES  AGE VERSION
+k8s-master  Ready    master 6d  <your k8s version>
+k8s-node1   Ready    <none> 6d  <your k8s version>
+k8s-node2   NotReady <none> 6d  <your k8s version>
 
-$> kubectl get pods --all-namespaces -o wide | grep default
-default sanity-statefulset-0 1/1 Terminating 0 19m 10.244.2.37 k8s-node3
+$>kubectl get pods --all-namespaces -o wide | grep default
+default sanity-statefulset-0 1/1 Terminating 0 19m 10.244.2.37 k8s-node2
 ```
 
 ## Recovering a crashed node
@@ -45,32 +45,30 @@ Follow the following procedure to recover from a crashed node (see a [full examp
     kubectl delete pod <pod name> --grace-period=0 --force
     ```
 
-5.  Verify that the pod is now in a _Running_ state and that the pod has moved to worker-node1.
+5.  Verify that the pod is now in a _Running_ state and that the pod has moved to a _Ready_ node.
 
 <a name="full_example">For example:</a>
 
-```screen
-$> kubectl get nodes
-NAME STATUS ROLES AGE VERSION
-k8s-master Ready master 6d <your k8s version>
-k8s-node1 Ready <none> 6d <your k8s version>
-k8s-node3 NotReady <none> 6d <your k8s version>
+    $> kubectl get nodes
+    NAME        STATUS   ROLES  AGE VERSION
+    k8s-master  Ready    master 6d  <your k8s version>
+    k8s-node1   Ready    <none> 6d  <your k8s version>
+    k8s-node2   NotReady <none> 6d  <your k8s version>
 
-$> kubectl get pods --all-namespaces -o wide | grep default
-default sanity-statefulset-0 1/1 Terminating 0 19m 10.244.2.37 k8s-node3
+    $> kubectl get pods --all-namespaces -o wide | grep default
+    default sanity-statefulset-0 1/1 Terminating 0 19m 10.244.2.37 k8s-node2
 
-$> kubectl get volumeattachment
-NAME AGE
-csi-5944e1c742d25e7858a8e48311cdc6cc85218f1156dd6598d4cf824fb1412143 10m
+    $> kubectl get volumeattachment
+    NAME AGE
+    csi-5944e1c742d25e7858a8e48311cdc6cc85218f1156dd6598d4cf824fb1412143 10m
 
-$> kubectl delete volumeattachment csi-5944e1c742d25e7858a8e48311cdc6cc85218f1156dd6598d4cf824fb1412143
-volumeattachment.storage.k8s.io "csi-5944e1c742d25e7858a8e48311cdc6cc85218f1156dd6598d4cf824fb1412143" deleted
+    $> kubectl delete volumeattachment csi-5944e1c742d25e7858a8e48311cdc6cc85218f1156dd6598d4cf824fb1412143
+    volumeattachment.storage.k8s.io "csi-5944e1c742d25e7858a8e48311cdc6cc85218f1156dd6598d4cf824fb1412143" deleted
 
-$> kubectl delete pod sanity-statefulset-0 --grace-period=0 --force
-warning: Immediate deletion does not wait for confirmation that the running resource has been terminated. The resource may continue to run on the cluster indefinitely.
-pod "sanity-statefulset-0" deleted
+    $> kubectl delete pod sanity-statefulset-0 --grace-period=0 --force
+    warning: Immediate deletion does not wait for confirmation that the running resource has been terminated. The resource may continue to run on the cluster indefinitely.
+    pod "sanity-statefulset-0" deleted
 
-$> kubectl get pods --all-namespaces -o wide | grep default
-default sanity-statefulset-0 1/1 Running 0 26s 10.244.1.210 k8s-node1
-```
+    $> kubectl get pods --all-namespaces -o wide | grep default
+    default sanity-statefulset-0 1/1 Running 0 26s 10.244.1.210 k8s-node1
 

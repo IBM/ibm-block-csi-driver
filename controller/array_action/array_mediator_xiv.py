@@ -19,6 +19,7 @@ logger = get_stdout_logger()
 LUN_IS_ALREADY_IN_USE_ERROR = "LUN is already in use"
 UNDEFINED_MAPPING_ERROR = "The requested mapping is not defined"
 NO_ALLOCATION_SPACE_ERROR = "No space to allocate to the volume"
+NOT_AVAILABLE = "Not Available"
 
 
 class XIVArrayMediator(ArrayMediatorAbstract):
@@ -118,17 +119,23 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def _is_gen3(cli_object):
         return not hasattr(cli_object, "copy_master_wwn")
 
-    def _get_source_object_wwn(self, cli_object):
-        if self._is_gen3(cli_object):
-            source_name = cli_object.master_name
+    def _get_snapshot_source_wwn(self, cli_snapshot):
+        if self._is_gen3(cli_snapshot):
+            source_name = cli_snapshot.master_name
             cli_source = self._get_cli_object_by_name(source_name)
             return cli_source.wwn
-        return cli_object.copy_master_wwn
+        return cli_snapshot.copy_master_wwn
+
+    def _get_volume_source_wwn(self, cli_volume):
+        if self._is_gen3(cli_volume) or cli_volume.copy_master_wwn == NOT_AVAILABLE:
+            return None
+        return cli_volume.copy_master_wwn
 
     def _generate_volume_response(self, cli_volume):
-        source_object_wwn = cli_volume.copy_master_wwn if not self._is_gen3(cli_volume) else None
+        source_object_wwn = self._get_volume_source_wwn(cli_volume)
         return Volume(self._convert_size_blocks_to_bytes(cli_volume.capacity),
                       cli_volume.wwn,
+                      cli_volume.id,
                       cli_volume.name,
                       self.endpoint,
                       cli_volume.pool_name,
@@ -138,9 +145,10 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def _generate_snapshot_response(self, cli_snapshot):
         return Snapshot(self._convert_size_blocks_to_bytes(cli_snapshot.capacity),
                         cli_snapshot.wwn,
+                        cli_snapshot.id,
                         cli_snapshot.name,
                         self.endpoint,
-                        volume_id=self._get_source_object_wwn(cli_snapshot),
+                        source_volume_id=self._get_snapshot_source_wwn(cli_snapshot),
                         is_ready=True,
                         array_type=self.array_type)
 
@@ -224,7 +232,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             if NO_ALLOCATION_SPACE_ERROR in ex.status:
                 raise array_errors.NotEnoughSpaceInPool(id_or_name=pool)
-        return None
+            raise ex
 
     def copy_to_existing_volume_from_source(self, volume_id, source_id, source_capacity_in_bytes,
                                             minimum_volume_size_in_bytes):
@@ -318,7 +326,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             return self._generate_snapshot_response(cli_object)
         return self._generate_volume_response(cli_object)
 
-    def create_snapshot(self, volume_id, snapshot_name, pool=None):
+    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool):
         logger.info("creating snapshot {0} from volume {1}".format(snapshot_name, volume_id))
         source_cli_volume = self._get_cli_object_by_wwn(volume_id)
         if pool and pool != source_cli_volume.pool_name:
@@ -478,7 +486,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         config_get_list = self.client.cmd.config_get().as_list
         return next(c.value for c in config_get_list if c.name == "iscsi_name")
 
-    def get_iscsi_targets_by_iqn(self):
+    def get_iscsi_targets_by_iqn(self, host_name):
         array_iqn = self._get_array_iqn()
         iscsi_targets = self._get_iscsi_targets()
         return {array_iqn: iscsi_targets}
@@ -486,3 +494,18 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def get_array_fc_wwns(self, host_name):
         fc_wwns_objects = self.client.cmd.fc_port_list()
         return [port.wwpn for port in fc_wwns_objects if port.port_state == 'Online' and port.role == 'Target']
+
+    def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
+        raise NotImplementedError
+
+    def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
+        raise NotImplementedError
+
+    def delete_replication(self, replication_name):
+        raise NotImplementedError
+
+    def promote_replication_volume(self, replication_name):
+        raise NotImplementedError
+
+    def demote_replication_volume(self, replication_name):
+        raise NotImplementedError

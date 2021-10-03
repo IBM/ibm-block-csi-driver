@@ -2,7 +2,7 @@
 <!DOCTYPE map PUBLIC "-//IBM//DTD DITA IBM Map//EN" "ibm-map.dtd">
 <?Pub Sty _display FontColor="red"?><?Pub Inc?>
 <map xml:lang="en-us">
-<title><tm trademark="IBM" tmtype="reg">IBM</tm> block storage CSI driver 1.6.0 Release <tm
+<title><tm trademark="IBM" tmtype="reg">IBM</tm> block storage CSI driver 1.7.0 Release <tm
 trademark="Notes" tmtype="reg">Notes</tm> content map</title>
 <?Pub Caret 39?>
 <topicref href="../content/release_notes/csi_rn_whatsnew.md" format="markdown"/>
@@ -12,7 +12,10 @@ trademark="Notes" tmtype="reg">Notes</tm> content map</title>
 <topicref href="../content/release_notes/csi_rn_supported_orchestration.md" format="markdown"/>
 </topicref>
 <topicref href="../content/release_notes/csi_rn_changelog.md" navtitle="Change log" format="markdown">
+<topicref href="../content/release_notes/csi_rn_changelog_1.7.0.md" navtitle="1.7.0 (Seotember 2021)" format="markdown"/>
 <topicref href="../content/release_notes/csi_rn_changelog_1.6.0.md" navtitle="1.6.0 (June 2021)" format="markdown"/>
+<topicref href="../content/release_notes/csi_rn_changelog_1.5.1.md" navtitle="1.5.1 (July 2021)"
+format="markdown"/>
 <topicref href="../content/release_notes/csi_rn_changelog_1.5.0.md" navtitle="1.5.0 (March 2021)"
 format="markdown"/>
 <topicref href="../content/release_notes/csi_rn_changelog_1.4.0.md" navtitle="1.4.0 (December 2020)"
