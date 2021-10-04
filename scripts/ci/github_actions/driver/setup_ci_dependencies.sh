@@ -2,18 +2,14 @@
 set +o pipefail
 
 install_ci_dependencies (){
-  python -m pip install --upgrade pip
+  scripts/ci/github_actions/setup_yq.sh
+  python -m pip install --upgrade pip==21.2.4
   echo docker-hub==2.2.0 > dev-requirements.txt
   pip install -r dev-requirements.txt
-cat >>/home/runner/.bash_profile <<'EOL'
-yq() {
-  docker run --rm -i -v "${PWD}":/workdir mikefarah/yq "$@"
-}
-EOL
+  source /home/runner/.bash_profile
 }
 
 get_driver_version (){
-  source /home/runner/.bash_profile
   yq eval .identity.version common/config.yaml
 }
 

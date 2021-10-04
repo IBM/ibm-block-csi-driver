@@ -10,7 +10,7 @@ on:
       - master
 jobs:
   Prepare_env:
-   name: "prepare env"
+   name: "Prepare env"
    runs-on: ubuntu-latest
    steps:
       - name: Checkout code
@@ -18,7 +18,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
-          python-version: '3.x'
+          python-version: '3.9.7'
       - uses: FranzDiebold/github-env-vars-action@v2
       - name: Setup dependencies
         id: setup_dependencies
