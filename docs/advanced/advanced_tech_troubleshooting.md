@@ -1,7 +1,6 @@
 # Troubleshooting
 Use this section for advanced troubleshooting information for your CSI driver.
 
-- [Log collection for CSI pods, daemonset, and StatefulSet](#Log-collection-for-CSI-pods-daemonset-and-StatefulSet)
 - [Verifying the CSI driver is running](#Verifying-the-CSI-driver-is-running)
 - [Multipath troubleshooting](#Multipath-troubleshooting)
 - [General troubleshooting](#General-troubleshooting)
