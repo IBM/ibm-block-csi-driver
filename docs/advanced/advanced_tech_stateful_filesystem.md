@@ -106,56 +106,7 @@
     $> kubectl exec demo-statefulset-file-system-0 -- ls /data/FILE
     /data/FILE
 
-8. Log into the worker node that has the running pod and display the newly attached volume on the node.
-
-    1. Verify which worker node is running the `pod demo-statefulset-file-system-0​​`.
-
-        <pre>
-        $> kubectl describe pod demo-statefulset-file-system-0 | grep "^Node:"
-        Node: k8s-node1/hostname
-
-    2. Establish an SSH connection and log into the worker node.
-
-        `$> ssh root@k8s-node1`
-
-    3. List the multipath devices on the worker node.
-
-        <pre>
-        $>[k8s-node1]  multipath -ll
-        mpathz (828ce9096eb211eaabc8005056a49b44) dm-3 IBM     ,2145 (for SVC)         
-        size=1.0G features='1 queue_if_no_path' hwhandler='0' wp=rw
-        `-+- policy='service-time 0' prio=1 status=active
-        |- 37:0:0:12 sdc 8:32 active ready running
-        `- 36:0:0:12 sdb 8:16 active ready running
-            
-        $>[k8s-node1] ls -l /dev/mapper/mpathz
-        lrwxrwxrwx. 1 root root 7 Aug 12 19:29 /dev/mapper/mpathz -> ../dm-3
-
-    4. List the physical devices of the multipath mpathz and its mountpoint on the host. (This is the `/data` inside the stateful pod).
-
-       <pre>
-       $>[k8s-node1]  lsblk /dev/sdb /dev/sdc
-       NAME      MAJ:MIN RM  SIZE  RO  TYPE    MOUNTPOINT
-       sdb       8:16    0   1G    0   disk  
-       └─mpathz 253:3    0   1G    0   mpath   /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-828ce909-6eb2-11ea-abc8-005056a49b44
-       sdc       8:32    0   1G    0   disk  
-       └─mpathz 253:3    0   1G    0   mpath   /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-828ce909-6eb2-11ea-abc8-005056a49b44
-
-    5. View the PV mounted on this host.
-
-        **Note:** All PV mountpoints look like: `/var/lib/kubelet/pods/\*/volumes/kubernetes.io~csi/pvc-\*/mount`
-
-        <pre>
-        $>[k8s-node1]  df | egrep pvc
-        /dev/mapper/mpathz      1038336    32944   1005392   4% /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-828ce909-6eb2-11ea-abc8-005056a49b44/mount
-
-    6. Details about the driver internal metadata file .stageInfo.json is stored in the k8s PV node stage path `/var/lib/kubelet/plugins/kubernetes.io/csi/pv/<PVC-ID>/globalmount/.stageInfo.json`. The CSI driver creates the metadata file during the NodeStage API and is used at later stages by the NodePublishVolume, NodeUnPublishVolume and NodeUnStage CSI APIs later on.
-
-      <pre>        
-      $> cat /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-828ce909-6eb2-11ea-abc8-005056a49b44/globalmount/.stageInfo.json
-      {"connectivity":"iscsi","mpathDevice":"dm-3","sysDevices":",sdb,sdc"}
-
-9. Delete StatefulSet and then recreate, in order to validate data (/data/FILE) remains in the persistent volume.
+8. Delete StatefulSet and then recreate, in order to validate data (/data/FILE) remains in the persistent volume.
 
     1. Delete the StatefulSet.
 
@@ -189,7 +140,7 @@
         $> kubectl exec demo-statefulset-file-system-0 -- ls /data/FILE
         File
 
-10. Delete StatefulSet and the PVC.
+9. Delete StatefulSet and the PVC.
 
     <pre>
     $> kubectl delete statefulset/demo-statefulset-file-system

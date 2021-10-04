@@ -6,33 +6,6 @@ Use this section for advanced troubleshooting information for your CSI driver.
 - [Multipath troubleshooting](#Multipath-troubleshooting)
 - [General troubleshooting](#General-troubleshooting)
 
-## Log collection for CSI pods, daemonset, and StatefulSet
-
- `kubectl get all -n <namespace>  -l csi`
-
- For example:
-
- <pre>
- $> kubectl get all -n <namespace> -l csi
- NAME READY STATUS RESTARTS AGE
- pod/ibm-block-csi-controller-0 6/6 Running 0 2h
- pod/ibm-block-csi-node-nbtsg 3/3 Running 0 2h
- pod/ibm-block-csi-node-wd5tm 3/3 Running 0 2h
- pod/ibm-block-csi-operator-7684549698-hzmfh 1/1 Running 0 2h
-
- NAME DESIRED CURRENT READY UP-TO-DATE AVAILABLE NODE SELECTOR AGE
- daemonset.apps/ibm-block-csi-node 2 2 2 2 2 <none> 2h
-
- NAME DESIRED CURRENT UP-TO-DATE AVAILABLE AGE
- deployment.apps/ibm-block-csi-operator 1 1 1 1 2h
-
- NAME DESIRED CURRENT READY AGE
- replicaset.apps/ibm-block-csi-operator-7684549698 1 1 1 2h
-
- NAME DESIRED CURRENT AGE
- statefulset.apps/ibm-block-csi-controller 1 1 2h
- </pre>
- 
 ## Verifying the CSI driver is running
 
   Verify that the CSI driver is running. (Make sure the csi-controller pod status is _Running_).
@@ -184,7 +157,7 @@ If an error during automatic iSCSI login occurs, perform the following steps for
 -   Log into the RHCOS node with the core user (for example, `ssh core@worker1.apps.openshift.mycluster.net`)
 -   iscsiadm commands must start with sudo
 
-1. Verify that the node.startup in the /etc/iscsi/iscsid.conf file is set to automatic. If not, set it as required and then restart the iscsid service (service iscsid restart).
+1. Verify that the node.startup in the /etc/iscsi/iscsid.conf file is set to automatic. If not, set it as required and then restart iscsid (`systemctl restart iscsid`).
 2. Discover and log into at least two iSCSI targets on the relevant storage systems.
 
     **Note:** A multipath device can't be created without at least two ports.
@@ -199,4 +172,6 @@ If an error during automatic iSCSI login occurs, perform the following steps for
 3. Verify that the login was successful and display all targets that you logged into. The portal value must be the iSCSI target IP address.
 
     <pre>
-    $> iscsiadm -m session -rescanRescanning session [sid: 1, target: {storage system IQN},portal: {storage system iSCSI port IP},{port number}
+    # iscsiadm -m session -R
+    Rescanning session [sid: 1, target: {storage system IQN},portal: {storage system iSCSI port IP},{port number}]
+    Rescanning session [sid: 2, target: {storage system IQN},portal: {storage system iSCSI port IP},{port number}]
