@@ -128,9 +128,8 @@
         $> kubectl create -f demo-statefulset-raw-block.yaml
         statefulset/demo-statefulset-raw-block created
             
-        kubectl exec demo-statefulset-raw-block-0 – bash -c "od -An -c -N 10 /dev/block"
-        
-        t e s t _ b l o c k
+        $> kubectl exec demo-statefulset-raw-block-0 -- bash -c "od -An -c -N 10 /dev/block"
+        t   e   s   t   _   b   l   o   c   k
 
 9. Delete StatefulSet and the PVC.
   

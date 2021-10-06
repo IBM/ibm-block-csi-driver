@@ -119,8 +119,7 @@ Use the following command for general troubleshooting:
 For example:
 
   <pre>
-  $> kubectl get -n csi-ns csidriver,sa,clusterrole,clusterrolebinding,statefulset,pod,daemonset |
-  grep ibm-block-csi
+  $> kubectl get -n <namespace>  csidriver,sa,clusterrole,clusterrolebinding,statefulset,pod,daemonset | grep ibm-block-csi
   csidriver.storage.k8s.io/ibm-block-csi-driver 7d
 
   serviceaccount/ibm-block-csi-controller-sa 1 2h
@@ -171,6 +170,6 @@ If an error during automatic iSCSI login occurs, perform the following steps for
 3. Verify that the login was successful and display all targets that you logged into. The portal value must be the iSCSI target IP address.
 
     <pre>
-    # iscsiadm -m session -R
+    $> iscsiadm -m session -R
     Rescanning session [sid: 1, target: {storage system IQN},portal: {storage system iSCSI port IP},{port number}]
     Rescanning session [sid: 2, target: {storage system IQN},portal: {storage system iSCSI port IP},{port number}]

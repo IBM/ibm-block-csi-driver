@@ -76,7 +76,7 @@
           - name: demo-container
             image: registry.access.redhat.com/ubi8/ubi:latest
             command: [ "/bin/sh", "-c", "--" ]
-              args: [ "while true; do sleep 30; done;" ]
+            args: [ "while true; do sleep 30; done;" ]
             <b>volumeMounts:
               - name: demo-volume-file-system
                 mountPath: "data"</b>
@@ -138,7 +138,7 @@
         statefulset/demo-statefulset-file-system created
             
         $> kubectl exec demo-statefulset-file-system-0 -- ls /data/FILE
-        File
+        /data/FILE
 
 9. Delete StatefulSet and the PVC.
 
