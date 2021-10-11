@@ -9,7 +9,6 @@ Use this section for advanced troubleshooting information for your CSI driver.
 
   Verify that the CSI driver is running. (Make sure the csi-controller pod status is _Running_).
 
-  <pre>
   $> kubectl get all -n <namespace> -l csi
   NAME                                        READY STATUS  RESTARTS  AGE
   pod/ibm-block-csi-controller-0              6/6   Running 0         2h
