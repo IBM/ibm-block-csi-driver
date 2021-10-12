@@ -36,7 +36,7 @@ Use this information to help pinpoint potential causes for multipath failures.
 
 -   **Display multipath information (FC and iSCSI)**
 
-    Display multipath information, using the sudo multipath -ll command.
+    Display multipath information, using the `sudo multipath -ll` command.
 
     <pre>
     mpathb (3600507680283851530000000000000a6) dm-0 IBM,2145
