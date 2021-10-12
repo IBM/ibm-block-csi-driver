@@ -380,7 +380,7 @@ func TestHelperWaitForDmToExist(t *testing.T) {
 		},
 		{
 			name:         "Should succeed",
-			devices:      "dm-1,volumeUuid\ndm-2,otherUuid",
+			devices:      "dm-1,600fakevolumeuuid000000000111\ndm-2,otherUuid",
 			cmdReturnErr: nil,
 			expErr:       nil,
 		},
@@ -393,7 +393,7 @@ func TestHelperWaitForDmToExist(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
-			volumeUuid := "volumeUuid"
+			volumeUuid := "600fakevolumeuuid000000000111"
 			args := []string{"show", "maps", "raw", "format", "\"", "%d,%w", "\""}
 			fake_executer.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathdCmd, "multipathd", args).Return([]byte(tc.devices), tc.cmdReturnErr)
 			helperGeneric := device_connectivity.NewGetDmsPathHelperGeneric(fake_executer)

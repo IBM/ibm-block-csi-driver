@@ -510,8 +510,25 @@ func NewGetDmsPathHelperGeneric(executer executer.ExecuterInterface) GetDmsPathH
 	return &GetDmsPathHelperGeneric{executer: executer}
 }
 
-func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeUuid string, maxRetries int, intervalSeconds int) (string, error) {
+func ConvertScsiUuidToNguid(scsiUuid string) string {
+	fmt.Println(scsiUuid)
+	indices := []int{1, 7, 16}
+	var splitedText []string
+	for index, _ := range indices {
+		last := len(scsiUuid)
+		if index+1 < len(indices) {
+			last = indices[index+1]
+		}
 
+		splitedText = append(splitedText, scsiUuid[indices[index]:last])
+	}
+	print(splitedText)
+	finalNguid := splitedText[2] + splitedText[0] + "0" + splitedText[1]
+	return finalNguid
+}
+
+func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeUuid string, maxRetries int, intervalSeconds int) (string, error) {
+	volumeNGUID := ConvertScsiUuidToNguid(volumeUuid)
 	formatTemplate := strings.Join([]string{"%d", "%w"}, MpathdSeparator)
 	args := []string{"show", "maps", "raw", "format", "\"", formatTemplate, "\""}
 	var err error
@@ -522,7 +539,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeUuid string, maxRetries 
 			return "", err
 		}
 		dms := string(out)
-		if !strings.Contains(dms, volumeUuid) {
+		if !strings.Contains(dms, volumeUuid) && !strings.Contains(dms, volumeNGUID) {
 			err = os.ErrNotExist
 		} else {
 			return dms, nil
