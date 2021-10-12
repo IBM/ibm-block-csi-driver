@@ -53,7 +53,7 @@
 5. Create a StatefulSet.
 
     <pre>
-    kubectl create -f demo-statefulset-raw-block.yaml
+    $> kubectl create -f demo-statefulset-raw-block.yaml
     statefulset.apps/demo-statefulset-raw-block created
 
     $> cat demo-statefulset-raw-block.yaml
@@ -91,7 +91,7 @@
     Display the newly created pod (make sure the pod status is _Running_).
 
     <pre>
-    $>kubectl get pod demo-statefulset-raw-block-0
+    $> kubectl get pod demo-statefulset-raw-block-0
     NAME                 READY   STATUS    RESTARTS   AGE
     demo-statefulset-raw-block-0   1/1     Running   0          43s
 
@@ -100,12 +100,12 @@
     The PV should be mounted inside the pod at /dev.
 
     <pre>
-    $>kubectl exec demo-statefulset-raw-block-0 -- bash -c "echo "test_block" | dd conv=unblock of=/dev/block"
+    $> kubectl exec demo-statefulset-raw-block-0 -- bash -c "echo "test_block" | dd conv=unblock of=/dev/block"
     0+1 records in
     0+1 records out
     11 bytes copied, 9.3576e-05 s, 118 kB/s
         
-    $>kubectl exec demo-statefulset-raw-block-0 -- bash -c "od -An -c -N 10 /dev/block"
+    $> kubectl exec demo-statefulset-raw-block-0 -- bash -c "od -An -c -N 10 /dev/block"
     t e s t _ b l o c k
 
 8. Delete StatefulSet and then recreate, in order to validate data (test_block in /dev/block) remains in the persistent volume.
