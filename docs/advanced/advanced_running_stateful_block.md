@@ -108,7 +108,7 @@
     $> kubectl exec demo-statefulset-raw-block-0 -- bash -c "od -An -c -N 10 /dev/block"
     t e s t _ b l o c k
 
-8. Delete StatefulSet and then recreate, in order to validate data (test_block in /dev/block) remains in the persistent volume.
+8. Delete StatefulSet and then recreate, in order to validate that the data (test_block in /dev/block) remains in the persistent volume.
 
     1. Delete the StatefulSet.
 
