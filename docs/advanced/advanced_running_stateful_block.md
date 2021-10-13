@@ -1,11 +1,8 @@
 # Running a stateful container with raw block volume configurations
 
 1. Create an array secret, as described in [Creating a Secret](../content/configuration/csi_ug_config_create_secret.md).
-
 2. Create a storage class, as described in [Creating a StorageClass](../content/configuration/csi_ug_config_create_storageclasses.md).
-
 3. Create a PVC demo-pvc-raw-block.yaml with the size of 1 Gb, as described in [Creating a PersistentVolumeClaim (PVC)](../content/configuration/csi_ug_config_create_pvc.md).
-
 4. Display the existing PVC and the created persistent volume (PV).
 
       <pre>
@@ -49,7 +46,6 @@
                                 volume_name=demo-prefix_pvc-828ce909-6eb2-11ea-abc8-005056a49b44
       Events:                <none>
       </pre>
-
 5. Create a StatefulSet.
 
     <pre>
@@ -84,8 +80,7 @@
           volumes:
           - name: demo-volume-raw-block
             persistentVolumeClaim:
-              claimName: demo-pvc-raw-block</pre>      
-
+              claimName: demo-pvc-raw-block</pre>
 6. Check the newly created pod.
 
     Display the newly created pod (make sure the pod status is _Running_).
@@ -93,8 +88,7 @@
     <pre>
     $> kubectl get pod demo-statefulset-raw-block-0
     NAME                 READY   STATUS    RESTARTS   AGE
-    demo-statefulset-raw-block-0   1/1     Running   0          43s
-
+    demo-statefulset-raw-block-0   1/1     Running   0          43s  
 7. Write data to the persistent volume of the pod.
 
     The PV should be mounted inside the pod at /dev.
@@ -107,21 +101,23 @@
         
     $> kubectl exec demo-statefulset-raw-block-0 -- bash -c "od -An -c -N 10 /dev/block"
     t e s t _ b l o c k
+<<<<<<< Updated upstream
 
 8. Delete StatefulSet and then recreate, in order to validate that the data (test_block in /dev/block) remains in the persistent volume.
 
+=======
+8. Delete StatefulSet and then recreate, in order to validate data (test_block in /dev/block) remains in the persistent volume.
+>>>>>>> Stashed changes
     1. Delete the StatefulSet.
 
         <pre>
         $> kubectl delete statefulset/demo-statefulset-raw-block
         statefulset/demo-statefulset-raw-block deleted
-
     2. Wait until the pod is deleted. Once deleted, the `"demo-statefulset-file-system" not found` is returned.
 
         <pre>
         $> kubectl get statefulset/demo-statefulset-raw-block
         Error from server (NotFound): statefulsets.apps <StatefulSet name> not found
-
     3. Recreate the StatefulSet and verify that the content written to /dev/block exists.
 
         <pre>
@@ -130,7 +126,6 @@
             
         $> kubectl exec demo-statefulset-raw-block-0 -- bash -c "od -An -c -N 10 /dev/block"
         t   e   s   t   _   b   l   o   c   k
-
 9. Delete StatefulSet and the PVC.
   
     <pre>
