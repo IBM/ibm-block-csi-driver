@@ -529,7 +529,6 @@ func ConvertScsiUuidToNguid(scsiUuid string) string {
 
 func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeUuid string, maxRetries int, intervalSeconds int) (string, error) {
 	volumeNGUID := ConvertScsiUuidToNguid(volumeUuid)
-	logger.Debugf("volumeNGUID: %s, volumeUuid: %s", volumeNGUID, volumeUuid)
 	formatTemplate := strings.Join([]string{"%d", "%w"}, MpathdSeparator)
 	args := []string{"show", "maps", "raw", "format", "\"", formatTemplate, "\""}
 	var err error
