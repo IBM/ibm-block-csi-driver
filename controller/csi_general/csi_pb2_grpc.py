@@ -2,7 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-import controller.csi_general.csi_pb2 as csi__pb2
+from controller.csi_general import csi_pb2 as controller_dot_csi__general_dot_csi__pb2
 
 
 class IdentityStub(object):
@@ -16,18 +16,18 @@ class IdentityStub(object):
         """
         self.GetPluginInfo = channel.unary_unary(
                 '/csi.v1.Identity/GetPluginInfo',
-                request_serializer=csi__pb2.GetPluginInfoRequest.SerializeToString,
-                response_deserializer=csi__pb2.GetPluginInfoResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.GetPluginInfoRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.GetPluginInfoResponse.FromString,
                 )
         self.GetPluginCapabilities = channel.unary_unary(
                 '/csi.v1.Identity/GetPluginCapabilities',
-                request_serializer=csi__pb2.GetPluginCapabilitiesRequest.SerializeToString,
-                response_deserializer=csi__pb2.GetPluginCapabilitiesResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.GetPluginCapabilitiesRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.GetPluginCapabilitiesResponse.FromString,
                 )
         self.Probe = channel.unary_unary(
                 '/csi.v1.Identity/Probe',
-                request_serializer=csi__pb2.ProbeRequest.SerializeToString,
-                response_deserializer=csi__pb2.ProbeResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.ProbeRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.ProbeResponse.FromString,
                 )
 
 
@@ -57,18 +57,18 @@ def add_IdentityServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'GetPluginInfo': grpc.unary_unary_rpc_method_handler(
                     servicer.GetPluginInfo,
-                    request_deserializer=csi__pb2.GetPluginInfoRequest.FromString,
-                    response_serializer=csi__pb2.GetPluginInfoResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.GetPluginInfoRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.GetPluginInfoResponse.SerializeToString,
             ),
             'GetPluginCapabilities': grpc.unary_unary_rpc_method_handler(
                     servicer.GetPluginCapabilities,
-                    request_deserializer=csi__pb2.GetPluginCapabilitiesRequest.FromString,
-                    response_serializer=csi__pb2.GetPluginCapabilitiesResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.GetPluginCapabilitiesRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.GetPluginCapabilitiesResponse.SerializeToString,
             ),
             'Probe': grpc.unary_unary_rpc_method_handler(
                     servicer.Probe,
-                    request_deserializer=csi__pb2.ProbeRequest.FromString,
-                    response_serializer=csi__pb2.ProbeResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.ProbeRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.ProbeResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -86,15 +86,16 @@ class Identity(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Identity/GetPluginInfo',
-            csi__pb2.GetPluginInfoRequest.SerializeToString,
-            csi__pb2.GetPluginInfoResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.GetPluginInfoRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.GetPluginInfoResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def GetPluginCapabilities(request,
@@ -102,15 +103,16 @@ class Identity(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Identity/GetPluginCapabilities',
-            csi__pb2.GetPluginCapabilitiesRequest.SerializeToString,
-            csi__pb2.GetPluginCapabilitiesResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.GetPluginCapabilitiesRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.GetPluginCapabilitiesResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def Probe(request,
@@ -118,15 +120,16 @@ class Identity(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Identity/Probe',
-            csi__pb2.ProbeRequest.SerializeToString,
-            csi__pb2.ProbeResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.ProbeRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.ProbeResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
 
 class ControllerStub(object):
@@ -140,63 +143,68 @@ class ControllerStub(object):
         """
         self.CreateVolume = channel.unary_unary(
                 '/csi.v1.Controller/CreateVolume',
-                request_serializer=csi__pb2.CreateVolumeRequest.SerializeToString,
-                response_deserializer=csi__pb2.CreateVolumeResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.CreateVolumeRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.CreateVolumeResponse.FromString,
                 )
         self.DeleteVolume = channel.unary_unary(
                 '/csi.v1.Controller/DeleteVolume',
-                request_serializer=csi__pb2.DeleteVolumeRequest.SerializeToString,
-                response_deserializer=csi__pb2.DeleteVolumeResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.DeleteVolumeRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.DeleteVolumeResponse.FromString,
                 )
         self.ControllerPublishVolume = channel.unary_unary(
                 '/csi.v1.Controller/ControllerPublishVolume',
-                request_serializer=csi__pb2.ControllerPublishVolumeRequest.SerializeToString,
-                response_deserializer=csi__pb2.ControllerPublishVolumeResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.ControllerPublishVolumeRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.ControllerPublishVolumeResponse.FromString,
                 )
         self.ControllerUnpublishVolume = channel.unary_unary(
                 '/csi.v1.Controller/ControllerUnpublishVolume',
-                request_serializer=csi__pb2.ControllerUnpublishVolumeRequest.SerializeToString,
-                response_deserializer=csi__pb2.ControllerUnpublishVolumeResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.ControllerUnpublishVolumeRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.ControllerUnpublishVolumeResponse.FromString,
                 )
         self.ValidateVolumeCapabilities = channel.unary_unary(
                 '/csi.v1.Controller/ValidateVolumeCapabilities',
-                request_serializer=csi__pb2.ValidateVolumeCapabilitiesRequest.SerializeToString,
-                response_deserializer=csi__pb2.ValidateVolumeCapabilitiesResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.ValidateVolumeCapabilitiesRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.ValidateVolumeCapabilitiesResponse.FromString,
                 )
         self.ListVolumes = channel.unary_unary(
                 '/csi.v1.Controller/ListVolumes',
-                request_serializer=csi__pb2.ListVolumesRequest.SerializeToString,
-                response_deserializer=csi__pb2.ListVolumesResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.ListVolumesRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.ListVolumesResponse.FromString,
                 )
         self.GetCapacity = channel.unary_unary(
                 '/csi.v1.Controller/GetCapacity',
-                request_serializer=csi__pb2.GetCapacityRequest.SerializeToString,
-                response_deserializer=csi__pb2.GetCapacityResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.GetCapacityRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.GetCapacityResponse.FromString,
                 )
         self.ControllerGetCapabilities = channel.unary_unary(
                 '/csi.v1.Controller/ControllerGetCapabilities',
-                request_serializer=csi__pb2.ControllerGetCapabilitiesRequest.SerializeToString,
-                response_deserializer=csi__pb2.ControllerGetCapabilitiesResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.ControllerGetCapabilitiesRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.ControllerGetCapabilitiesResponse.FromString,
                 )
         self.CreateSnapshot = channel.unary_unary(
                 '/csi.v1.Controller/CreateSnapshot',
-                request_serializer=csi__pb2.CreateSnapshotRequest.SerializeToString,
-                response_deserializer=csi__pb2.CreateSnapshotResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.CreateSnapshotRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.CreateSnapshotResponse.FromString,
                 )
         self.DeleteSnapshot = channel.unary_unary(
                 '/csi.v1.Controller/DeleteSnapshot',
-                request_serializer=csi__pb2.DeleteSnapshotRequest.SerializeToString,
-                response_deserializer=csi__pb2.DeleteSnapshotResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.DeleteSnapshotRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.DeleteSnapshotResponse.FromString,
                 )
         self.ListSnapshots = channel.unary_unary(
                 '/csi.v1.Controller/ListSnapshots',
-                request_serializer=csi__pb2.ListSnapshotsRequest.SerializeToString,
-                response_deserializer=csi__pb2.ListSnapshotsResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.ListSnapshotsRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.ListSnapshotsResponse.FromString,
                 )
         self.ControllerExpandVolume = channel.unary_unary(
                 '/csi.v1.Controller/ControllerExpandVolume',
-                request_serializer=csi__pb2.ControllerExpandVolumeRequest.SerializeToString,
-                response_deserializer=csi__pb2.ControllerExpandVolumeResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.ControllerExpandVolumeRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.ControllerExpandVolumeResponse.FromString,
+                )
+        self.ControllerGetVolume = channel.unary_unary(
+                '/csi.v1.Controller/ControllerGetVolume',
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.ControllerGetVolumeRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.ControllerGetVolumeResponse.FromString,
                 )
 
 
@@ -275,68 +283,79 @@ class ControllerServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def ControllerGetVolume(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_ControllerServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'CreateVolume': grpc.unary_unary_rpc_method_handler(
                     servicer.CreateVolume,
-                    request_deserializer=csi__pb2.CreateVolumeRequest.FromString,
-                    response_serializer=csi__pb2.CreateVolumeResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.CreateVolumeRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.CreateVolumeResponse.SerializeToString,
             ),
             'DeleteVolume': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteVolume,
-                    request_deserializer=csi__pb2.DeleteVolumeRequest.FromString,
-                    response_serializer=csi__pb2.DeleteVolumeResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.DeleteVolumeRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.DeleteVolumeResponse.SerializeToString,
             ),
             'ControllerPublishVolume': grpc.unary_unary_rpc_method_handler(
                     servicer.ControllerPublishVolume,
-                    request_deserializer=csi__pb2.ControllerPublishVolumeRequest.FromString,
-                    response_serializer=csi__pb2.ControllerPublishVolumeResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.ControllerPublishVolumeRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.ControllerPublishVolumeResponse.SerializeToString,
             ),
             'ControllerUnpublishVolume': grpc.unary_unary_rpc_method_handler(
                     servicer.ControllerUnpublishVolume,
-                    request_deserializer=csi__pb2.ControllerUnpublishVolumeRequest.FromString,
-                    response_serializer=csi__pb2.ControllerUnpublishVolumeResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.ControllerUnpublishVolumeRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.ControllerUnpublishVolumeResponse.SerializeToString,
             ),
             'ValidateVolumeCapabilities': grpc.unary_unary_rpc_method_handler(
                     servicer.ValidateVolumeCapabilities,
-                    request_deserializer=csi__pb2.ValidateVolumeCapabilitiesRequest.FromString,
-                    response_serializer=csi__pb2.ValidateVolumeCapabilitiesResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.ValidateVolumeCapabilitiesRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.ValidateVolumeCapabilitiesResponse.SerializeToString,
             ),
             'ListVolumes': grpc.unary_unary_rpc_method_handler(
                     servicer.ListVolumes,
-                    request_deserializer=csi__pb2.ListVolumesRequest.FromString,
-                    response_serializer=csi__pb2.ListVolumesResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.ListVolumesRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.ListVolumesResponse.SerializeToString,
             ),
             'GetCapacity': grpc.unary_unary_rpc_method_handler(
                     servicer.GetCapacity,
-                    request_deserializer=csi__pb2.GetCapacityRequest.FromString,
-                    response_serializer=csi__pb2.GetCapacityResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.GetCapacityRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.GetCapacityResponse.SerializeToString,
             ),
             'ControllerGetCapabilities': grpc.unary_unary_rpc_method_handler(
                     servicer.ControllerGetCapabilities,
-                    request_deserializer=csi__pb2.ControllerGetCapabilitiesRequest.FromString,
-                    response_serializer=csi__pb2.ControllerGetCapabilitiesResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.ControllerGetCapabilitiesRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.ControllerGetCapabilitiesResponse.SerializeToString,
             ),
             'CreateSnapshot': grpc.unary_unary_rpc_method_handler(
                     servicer.CreateSnapshot,
-                    request_deserializer=csi__pb2.CreateSnapshotRequest.FromString,
-                    response_serializer=csi__pb2.CreateSnapshotResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.CreateSnapshotRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.CreateSnapshotResponse.SerializeToString,
             ),
             'DeleteSnapshot': grpc.unary_unary_rpc_method_handler(
                     servicer.DeleteSnapshot,
-                    request_deserializer=csi__pb2.DeleteSnapshotRequest.FromString,
-                    response_serializer=csi__pb2.DeleteSnapshotResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.DeleteSnapshotRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.DeleteSnapshotResponse.SerializeToString,
             ),
             'ListSnapshots': grpc.unary_unary_rpc_method_handler(
                     servicer.ListSnapshots,
-                    request_deserializer=csi__pb2.ListSnapshotsRequest.FromString,
-                    response_serializer=csi__pb2.ListSnapshotsResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.ListSnapshotsRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.ListSnapshotsResponse.SerializeToString,
             ),
             'ControllerExpandVolume': grpc.unary_unary_rpc_method_handler(
                     servicer.ControllerExpandVolume,
-                    request_deserializer=csi__pb2.ControllerExpandVolumeRequest.FromString,
-                    response_serializer=csi__pb2.ControllerExpandVolumeResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.ControllerExpandVolumeRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.ControllerExpandVolumeResponse.SerializeToString,
+            ),
+            'ControllerGetVolume': grpc.unary_unary_rpc_method_handler(
+                    servicer.ControllerGetVolume,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.ControllerGetVolumeRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.ControllerGetVolumeResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -354,15 +373,16 @@ class Controller(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Controller/CreateVolume',
-            csi__pb2.CreateVolumeRequest.SerializeToString,
-            csi__pb2.CreateVolumeResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.CreateVolumeRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.CreateVolumeResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def DeleteVolume(request,
@@ -370,15 +390,16 @@ class Controller(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Controller/DeleteVolume',
-            csi__pb2.DeleteVolumeRequest.SerializeToString,
-            csi__pb2.DeleteVolumeResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.DeleteVolumeRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.DeleteVolumeResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def ControllerPublishVolume(request,
@@ -386,15 +407,16 @@ class Controller(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Controller/ControllerPublishVolume',
-            csi__pb2.ControllerPublishVolumeRequest.SerializeToString,
-            csi__pb2.ControllerPublishVolumeResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.ControllerPublishVolumeRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.ControllerPublishVolumeResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def ControllerUnpublishVolume(request,
@@ -402,15 +424,16 @@ class Controller(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Controller/ControllerUnpublishVolume',
-            csi__pb2.ControllerUnpublishVolumeRequest.SerializeToString,
-            csi__pb2.ControllerUnpublishVolumeResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.ControllerUnpublishVolumeRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.ControllerUnpublishVolumeResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def ValidateVolumeCapabilities(request,
@@ -418,15 +441,16 @@ class Controller(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Controller/ValidateVolumeCapabilities',
-            csi__pb2.ValidateVolumeCapabilitiesRequest.SerializeToString,
-            csi__pb2.ValidateVolumeCapabilitiesResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.ValidateVolumeCapabilitiesRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.ValidateVolumeCapabilitiesResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def ListVolumes(request,
@@ -434,15 +458,16 @@ class Controller(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Controller/ListVolumes',
-            csi__pb2.ListVolumesRequest.SerializeToString,
-            csi__pb2.ListVolumesResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.ListVolumesRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.ListVolumesResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def GetCapacity(request,
@@ -450,15 +475,16 @@ class Controller(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Controller/GetCapacity',
-            csi__pb2.GetCapacityRequest.SerializeToString,
-            csi__pb2.GetCapacityResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.GetCapacityRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.GetCapacityResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def ControllerGetCapabilities(request,
@@ -466,15 +492,16 @@ class Controller(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Controller/ControllerGetCapabilities',
-            csi__pb2.ControllerGetCapabilitiesRequest.SerializeToString,
-            csi__pb2.ControllerGetCapabilitiesResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.ControllerGetCapabilitiesRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.ControllerGetCapabilitiesResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def CreateSnapshot(request,
@@ -482,15 +509,16 @@ class Controller(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Controller/CreateSnapshot',
-            csi__pb2.CreateSnapshotRequest.SerializeToString,
-            csi__pb2.CreateSnapshotResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.CreateSnapshotRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.CreateSnapshotResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def DeleteSnapshot(request,
@@ -498,15 +526,16 @@ class Controller(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Controller/DeleteSnapshot',
-            csi__pb2.DeleteSnapshotRequest.SerializeToString,
-            csi__pb2.DeleteSnapshotResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.DeleteSnapshotRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.DeleteSnapshotResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def ListSnapshots(request,
@@ -514,15 +543,16 @@ class Controller(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Controller/ListSnapshots',
-            csi__pb2.ListSnapshotsRequest.SerializeToString,
-            csi__pb2.ListSnapshotsResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.ListSnapshotsRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.ListSnapshotsResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def ControllerExpandVolume(request,
@@ -530,15 +560,33 @@ class Controller(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Controller/ControllerExpandVolume',
-            csi__pb2.ControllerExpandVolumeRequest.SerializeToString,
-            csi__pb2.ControllerExpandVolumeResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.ControllerExpandVolumeRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.ControllerExpandVolumeResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
+
+    @staticmethod
+    def ControllerGetVolume(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(request, target, '/csi.v1.Controller/ControllerGetVolume',
+            controller_dot_csi__general_dot_csi__pb2.ControllerGetVolumeRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.ControllerGetVolumeResponse.FromString,
+            options, channel_credentials,
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
 
 class NodeStub(object):
@@ -552,43 +600,43 @@ class NodeStub(object):
         """
         self.NodeStageVolume = channel.unary_unary(
                 '/csi.v1.Node/NodeStageVolume',
-                request_serializer=csi__pb2.NodeStageVolumeRequest.SerializeToString,
-                response_deserializer=csi__pb2.NodeStageVolumeResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.NodeStageVolumeRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.NodeStageVolumeResponse.FromString,
                 )
         self.NodeUnstageVolume = channel.unary_unary(
                 '/csi.v1.Node/NodeUnstageVolume',
-                request_serializer=csi__pb2.NodeUnstageVolumeRequest.SerializeToString,
-                response_deserializer=csi__pb2.NodeUnstageVolumeResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.NodeUnstageVolumeRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.NodeUnstageVolumeResponse.FromString,
                 )
         self.NodePublishVolume = channel.unary_unary(
                 '/csi.v1.Node/NodePublishVolume',
-                request_serializer=csi__pb2.NodePublishVolumeRequest.SerializeToString,
-                response_deserializer=csi__pb2.NodePublishVolumeResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.NodePublishVolumeRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.NodePublishVolumeResponse.FromString,
                 )
         self.NodeUnpublishVolume = channel.unary_unary(
                 '/csi.v1.Node/NodeUnpublishVolume',
-                request_serializer=csi__pb2.NodeUnpublishVolumeRequest.SerializeToString,
-                response_deserializer=csi__pb2.NodeUnpublishVolumeResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.NodeUnpublishVolumeRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.NodeUnpublishVolumeResponse.FromString,
                 )
         self.NodeGetVolumeStats = channel.unary_unary(
                 '/csi.v1.Node/NodeGetVolumeStats',
-                request_serializer=csi__pb2.NodeGetVolumeStatsRequest.SerializeToString,
-                response_deserializer=csi__pb2.NodeGetVolumeStatsResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.NodeGetVolumeStatsRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.NodeGetVolumeStatsResponse.FromString,
                 )
         self.NodeExpandVolume = channel.unary_unary(
                 '/csi.v1.Node/NodeExpandVolume',
-                request_serializer=csi__pb2.NodeExpandVolumeRequest.SerializeToString,
-                response_deserializer=csi__pb2.NodeExpandVolumeResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.NodeExpandVolumeRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.NodeExpandVolumeResponse.FromString,
                 )
         self.NodeGetCapabilities = channel.unary_unary(
                 '/csi.v1.Node/NodeGetCapabilities',
-                request_serializer=csi__pb2.NodeGetCapabilitiesRequest.SerializeToString,
-                response_deserializer=csi__pb2.NodeGetCapabilitiesResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.NodeGetCapabilitiesRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.NodeGetCapabilitiesResponse.FromString,
                 )
         self.NodeGetInfo = channel.unary_unary(
                 '/csi.v1.Node/NodeGetInfo',
-                request_serializer=csi__pb2.NodeGetInfoRequest.SerializeToString,
-                response_deserializer=csi__pb2.NodeGetInfoResponse.FromString,
+                request_serializer=controller_dot_csi__general_dot_csi__pb2.NodeGetInfoRequest.SerializeToString,
+                response_deserializer=controller_dot_csi__general_dot_csi__pb2.NodeGetInfoResponse.FromString,
                 )
 
 
@@ -648,43 +696,43 @@ def add_NodeServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'NodeStageVolume': grpc.unary_unary_rpc_method_handler(
                     servicer.NodeStageVolume,
-                    request_deserializer=csi__pb2.NodeStageVolumeRequest.FromString,
-                    response_serializer=csi__pb2.NodeStageVolumeResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.NodeStageVolumeRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.NodeStageVolumeResponse.SerializeToString,
             ),
             'NodeUnstageVolume': grpc.unary_unary_rpc_method_handler(
                     servicer.NodeUnstageVolume,
-                    request_deserializer=csi__pb2.NodeUnstageVolumeRequest.FromString,
-                    response_serializer=csi__pb2.NodeUnstageVolumeResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.NodeUnstageVolumeRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.NodeUnstageVolumeResponse.SerializeToString,
             ),
             'NodePublishVolume': grpc.unary_unary_rpc_method_handler(
                     servicer.NodePublishVolume,
-                    request_deserializer=csi__pb2.NodePublishVolumeRequest.FromString,
-                    response_serializer=csi__pb2.NodePublishVolumeResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.NodePublishVolumeRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.NodePublishVolumeResponse.SerializeToString,
             ),
             'NodeUnpublishVolume': grpc.unary_unary_rpc_method_handler(
                     servicer.NodeUnpublishVolume,
-                    request_deserializer=csi__pb2.NodeUnpublishVolumeRequest.FromString,
-                    response_serializer=csi__pb2.NodeUnpublishVolumeResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.NodeUnpublishVolumeRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.NodeUnpublishVolumeResponse.SerializeToString,
             ),
             'NodeGetVolumeStats': grpc.unary_unary_rpc_method_handler(
                     servicer.NodeGetVolumeStats,
-                    request_deserializer=csi__pb2.NodeGetVolumeStatsRequest.FromString,
-                    response_serializer=csi__pb2.NodeGetVolumeStatsResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.NodeGetVolumeStatsRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.NodeGetVolumeStatsResponse.SerializeToString,
             ),
             'NodeExpandVolume': grpc.unary_unary_rpc_method_handler(
                     servicer.NodeExpandVolume,
-                    request_deserializer=csi__pb2.NodeExpandVolumeRequest.FromString,
-                    response_serializer=csi__pb2.NodeExpandVolumeResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.NodeExpandVolumeRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.NodeExpandVolumeResponse.SerializeToString,
             ),
             'NodeGetCapabilities': grpc.unary_unary_rpc_method_handler(
                     servicer.NodeGetCapabilities,
-                    request_deserializer=csi__pb2.NodeGetCapabilitiesRequest.FromString,
-                    response_serializer=csi__pb2.NodeGetCapabilitiesResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.NodeGetCapabilitiesRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.NodeGetCapabilitiesResponse.SerializeToString,
             ),
             'NodeGetInfo': grpc.unary_unary_rpc_method_handler(
                     servicer.NodeGetInfo,
-                    request_deserializer=csi__pb2.NodeGetInfoRequest.FromString,
-                    response_serializer=csi__pb2.NodeGetInfoResponse.SerializeToString,
+                    request_deserializer=controller_dot_csi__general_dot_csi__pb2.NodeGetInfoRequest.FromString,
+                    response_serializer=controller_dot_csi__general_dot_csi__pb2.NodeGetInfoResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -702,15 +750,16 @@ class Node(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Node/NodeStageVolume',
-            csi__pb2.NodeStageVolumeRequest.SerializeToString,
-            csi__pb2.NodeStageVolumeResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.NodeStageVolumeRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.NodeStageVolumeResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def NodeUnstageVolume(request,
@@ -718,15 +767,16 @@ class Node(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Node/NodeUnstageVolume',
-            csi__pb2.NodeUnstageVolumeRequest.SerializeToString,
-            csi__pb2.NodeUnstageVolumeResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.NodeUnstageVolumeRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.NodeUnstageVolumeResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def NodePublishVolume(request,
@@ -734,15 +784,16 @@ class Node(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Node/NodePublishVolume',
-            csi__pb2.NodePublishVolumeRequest.SerializeToString,
-            csi__pb2.NodePublishVolumeResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.NodePublishVolumeRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.NodePublishVolumeResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def NodeUnpublishVolume(request,
@@ -750,15 +801,16 @@ class Node(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Node/NodeUnpublishVolume',
-            csi__pb2.NodeUnpublishVolumeRequest.SerializeToString,
-            csi__pb2.NodeUnpublishVolumeResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.NodeUnpublishVolumeRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.NodeUnpublishVolumeResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def NodeGetVolumeStats(request,
@@ -766,15 +818,16 @@ class Node(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Node/NodeGetVolumeStats',
-            csi__pb2.NodeGetVolumeStatsRequest.SerializeToString,
-            csi__pb2.NodeGetVolumeStatsResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.NodeGetVolumeStatsRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.NodeGetVolumeStatsResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def NodeExpandVolume(request,
@@ -782,15 +835,16 @@ class Node(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Node/NodeExpandVolume',
-            csi__pb2.NodeExpandVolumeRequest.SerializeToString,
-            csi__pb2.NodeExpandVolumeResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.NodeExpandVolumeRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.NodeExpandVolumeResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def NodeGetCapabilities(request,
@@ -798,15 +852,16 @@ class Node(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Node/NodeGetCapabilities',
-            csi__pb2.NodeGetCapabilitiesRequest.SerializeToString,
-            csi__pb2.NodeGetCapabilitiesResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.NodeGetCapabilitiesRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.NodeGetCapabilitiesResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
 
     @staticmethod
     def NodeGetInfo(request,
@@ -814,12 +869,13 @@ class Node(object):
             options=(),
             channel_credentials=None,
             call_credentials=None,
+            insecure=False,
             compression=None,
             wait_for_ready=None,
             timeout=None,
             metadata=None):
         return grpc.experimental.unary_unary(request, target, '/csi.v1.Node/NodeGetInfo',
-            csi__pb2.NodeGetInfoRequest.SerializeToString,
-            csi__pb2.NodeGetInfoResponse.FromString,
+            controller_dot_csi__general_dot_csi__pb2.NodeGetInfoRequest.SerializeToString,
+            controller_dot_csi__general_dot_csi__pb2.NodeGetInfoResponse.FromString,
             options, channel_credentials,
-            call_credentials, compression, wait_for_ready, timeout, metadata)
+            insecure, call_credentials, compression, wait_for_ready, timeout, metadata)
