@@ -1106,6 +1106,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def get_host_name_if_equal(self, iscsi_host, nvme_host, fc_host):
         s = {iscsi_host, nvme_host, fc_host}
         s.discard(None)
-        if len(s) > 1:
-            return None
-        return s.pop()
+        if len(s) == 1:
+            return s.pop()
+        return None
