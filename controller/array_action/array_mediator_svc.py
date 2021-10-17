@@ -12,7 +12,7 @@ import controller.controller_server.config as controller_config
 from controller.array_action.array_action_types import Volume, Snapshot, Host, Replication
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.svc_cli_result_reader import SVCListResultsReader
-from controller.array_action.utils import classproperty, bytes_to_string
+from controller.array_action.utils import classproperty, bytes_to_string, convert_scsi_uuid_to_nguid
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 
@@ -43,6 +43,7 @@ LIST_HOSTS_CMD_FORMAT = 'lshost {HOST_ID};'
 HOST_ID_PARAM = 'id'
 HOST_NAME_PARAM = 'name'
 HOST_ISCSI_NAMES_PARAM = 'iscsi_name'
+HOST_NQN_PARAM = 'nqn'
 HOST_WWPNS_PARAM = 'WWPN'
 HOST_PORTSET_ID = 'portset_id'
 HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
@@ -372,15 +373,22 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.debug("found wwn : {0}".format(wwn))
         return wwn
 
-    def _get_cli_volume_by_wwn(self, volume_id, not_exist_err=False):
-        filter_value = 'vdisk_UID=' + volume_id
+    def _lsvdisk_by_uid(self, vdisk_uid):
+        filter_value = 'vdisk_UID=' + vdisk_uid
         try:
-            cli_volume = self.client.svcinfo.lsvdisk(bytes=True, filtervalue=filter_value).as_single_element
+            return self.client.svcinfo.lsvdisk(bytes=True, filtervalue=filter_value).as_single_element
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, INVALID_FILTER_VALUE)):
                     raise array_errors.IllegalObjectID(ex.my_message)
                 raise ex
+        return None
+
+    def _get_cli_volume_by_wwn(self, volume_id, not_exist_err=False):
+        cli_volume = self._lsvdisk_by_uid(volume_id)
+        if not cli_volume:
+            volume_nguid = convert_scsi_uuid_to_nguid(volume_id)
+            cli_volume = self._lsvdisk_by_uid(volume_nguid)
         if not cli_volume and not_exist_err:
             raise array_errors.ObjectNotFoundError(volume_id)
         return cli_volume
@@ -626,7 +634,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host name for initiators : {0}".format(initiators))
         detailed_hosts_list = self._get_detailed_hosts_list()
-        iscsi_host, fc_host = None, None
+        iscsi_host, nvme_host, fc_host = None, None, None
         for host in detailed_hosts_list:
             if initiators.is_array_iscsi_iqns_match(host.iscsi_names):
                 iscsi_host = host.name
@@ -636,17 +644,31 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 fc_host = host.name
                 logger.debug("found fc wwns in list : {0} for host : "
                              "{1}".format(initiators.fc_wwns, fc_host))
+            logger.debug("check initiator nqn : {0} vs host nqn : {1}".format(initiators.nvme_nqn, host.nqn))
+            if initiators.is_array_nvme_nqn_match(host.nqn):
+                nvme_host = host.name
+                logger.debug("found nvme nqn in list : {0} for host : "
+                             "{1}".format(initiators.nvme_nqn, nvme_host))
+        if iscsi_host and fc_host and nvme_host:
+            if iscsi_host == fc_host == nvme_host:
+                return fc_host, [config.ISCSI_CONNECTIVITY_TYPE,
+                                 config.FC_CONNECTIVITY_TYPE,
+                                 config.NVME_OVER_FC_CONNECTIVITY_TYPE]
+            raise array_errors.MultipleHostsFoundError(initiators, fc_host)
         if iscsi_host and fc_host:
             if iscsi_host == fc_host:
                 return fc_host, [config.ISCSI_CONNECTIVITY_TYPE,
                                  config.FC_CONNECTIVITY_TYPE]
             raise array_errors.MultipleHostsFoundError(initiators, fc_host)
-        if iscsi_host:
-            logger.debug("found host : {0} with iqn : {1}".format(iscsi_host, initiators.iscsi_iqn))
-            return iscsi_host, [config.ISCSI_CONNECTIVITY_TYPE]
+        if nvme_host:
+            logger.debug("found host : {0} with nqn : {1}".format(nvme_host, initiators.nvme_nqn))
+            return nvme_host, [config.NVME_OVER_FC_CONNECTIVITY_TYPE]
         if fc_host:
             logger.debug("found host : {0} with fc wwn : {1}".format(fc_host, initiators.fc_wwns))
             return fc_host, [config.FC_CONNECTIVITY_TYPE]
+        if iscsi_host:
+            logger.debug("found host : {0} with iqn : {1}".format(iscsi_host, initiators.iscsi_iqn))
+            return iscsi_host, [config.ISCSI_CONNECTIVITY_TYPE]
         logger.debug("can not found host by using initiators: {0} ".format(initiators))
         raise array_errors.HostNotFoundError(initiators)
 
@@ -674,7 +696,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             host_name = host_details.get(HOST_NAME_PARAM)
             iscsi_names = host_details.get_as_list(HOST_ISCSI_NAMES_PARAM)
             wwns = host_details.get_as_list(HOST_WWPNS_PARAM)
-            host = Host(host_id, host_name, iscsi_names, wwns)
+            nqn = host_details.get_as_list(HOST_NQN_PARAM)
+            host = Host(host_id, host_name, iscsi_names, wwns, nqn)
             res.append(host)
         return res
 
@@ -750,7 +773,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.debug("The first available lun is : {0}".format(lun))
         return lun
 
-    def map_volume(self, volume_id, host_name):
+    def map_volume(self, volume_id, host_name, connectivity_type):
         logger.debug("mapping volume : {0} to host : "
                      "{1}".format(volume_id, host_name))
         vol_name = self._get_volume_name_by_wwn(volume_id)
@@ -761,8 +784,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         }
 
         try:
-            lun = self.get_first_free_lun(host_name)
-            cli_kwargs.update({'scsi': lun})
+            if connectivity_type != config.NVME_OVER_FC_CONNECTIVITY_TYPE:
+                lun = self.get_first_free_lun(host_name)
+                cli_kwargs.update({'scsi': lun})
+            else:
+                lun = config.NVME_OVER_FC_CONNECTIVITY_TYPE
             self.client.svctask.mkvdiskhostmap(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):

@@ -10,7 +10,7 @@ import controller.array_action.errors as array_errors
 import controller.controller_server.config as config
 import controller.controller_server.messages as messages
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE, \
-                                           REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC
+    REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC, NVME_OVER_FC_CONNECTIVITY_TYPE
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.settings import NAME_PREFIX_SEPARATOR
 from controller.controller_server.controller_types import ArrayConnectionInfo, ObjectIdInfo, ObjectParameters
@@ -483,21 +483,25 @@ def get_object_id_info(full_object_id, object_type):
 def get_node_id_info(node_id):
     logger.debug("getting node info for node id : {0}".format(node_id))
     split_node = node_id.split(config.PARAMETERS_NODE_ID_DELIMITER)
-    hostname, fc_wwns, iscsi_iqn = "", "", ""
+    hostname, nvme_nqn, fc_wwns, iscsi_iqn = "", "", "", ""
     if len(split_node) == config.SUPPORTED_CONNECTIVITY_TYPES + 1:
-        hostname, fc_wwns, iscsi_iqn = split_node
-    elif len(split_node) == 2:
-        hostname, fc_wwns = split_node
+        hostname, nvme_nqn, fc_wwns, iscsi_iqn = split_node
+    elif len(split_node) == 3:
+        hostname, nvme_nqn, fc_wwns = split_node
     else:
         raise array_errors.HostNotFoundError(node_id)
-    logger.debug("node name : {0}, iscsi_iqn : {1}, fc_wwns : {2} ".format(
-        hostname, iscsi_iqn, fc_wwns))
-    return hostname, fc_wwns, iscsi_iqn
+    logger.debug("node name : {0}, iscsi_iqn : {1}, fc_wwns : {2}, nvme_nqn: {3} ".format(
+        hostname, iscsi_iqn, fc_wwns, nvme_nqn))
+    return hostname, nvme_nqn, fc_wwns, iscsi_iqn
 
 
 def choose_connectivity_type(connectivity_types):
-    # If connectivity type support FC and iSCSI at the same time, chose FC
+    # If connectivity type support FC and iSCSI at the same time, chose FC.
+    # If NVME is supported, chose NVME.
     logger.debug("choosing connectivity type for connectivity types : {0}".format(connectivity_types))
+    if NVME_OVER_FC_CONNECTIVITY_TYPE in connectivity_types:
+        logger.debug("connectivity type is : {0}".format(NVME_OVER_FC_CONNECTIVITY_TYPE))
+        return NVME_OVER_FC_CONNECTIVITY_TYPE
     if FC_CONNECTIVITY_TYPE in connectivity_types:
         logger.debug("connectivity type is : {0}".format(FC_CONNECTIVITY_TYPE))
         return FC_CONNECTIVITY_TYPE

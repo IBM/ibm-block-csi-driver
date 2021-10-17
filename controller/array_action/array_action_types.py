@@ -28,11 +28,12 @@ class Snapshot:
 
 
 class Host:
-    def __init__(self, host_id, host_name, iscsi_names, wwns):
+    def __init__(self, host_id, host_name, iscsi_names, wwns, nqn):
         self.id = host_id
         self.name = host_name
         self.iscsi_names = iscsi_names
         self.wwns = wwns
+        self.nqn = nqn
 
 
 class Replication:
