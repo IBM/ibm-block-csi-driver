@@ -635,42 +635,31 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.debug("Getting host name for initiators : {0}".format(initiators))
         detailed_hosts_list = self._get_detailed_hosts_list()
         iscsi_host, nvme_host, fc_host = None, None, None
+        connectivity_types = set()
         for host in detailed_hosts_list:
             if initiators.is_array_iscsi_iqns_match(host.iscsi_names):
                 iscsi_host = host.name
+                connectivity_types.add(config.ISCSI_CONNECTIVITY_TYPE)
                 logger.debug("found iscsi iqn in list : {0} for host : "
                              "{1}".format(initiators.iscsi_iqn, iscsi_host))
             if initiators.is_array_wwns_match(host.wwns):
                 fc_host = host.name
+                connectivity_types.add(config.FC_CONNECTIVITY_TYPE)
                 logger.debug("found fc wwns in list : {0} for host : "
                              "{1}".format(initiators.fc_wwns, fc_host))
             logger.debug("check initiator nqn : {0} vs host nqn : {1}".format(initiators.nvme_nqn, host.nqn))
             if initiators.is_array_nvme_nqn_match(host.nqn):
                 nvme_host = host.name
+                connectivity_types.add(config.NVME_OVER_FC_CONNECTIVITY_TYPE)
                 logger.debug("found nvme nqn in list : {0} for host : "
                              "{1}".format(initiators.nvme_nqn, nvme_host))
-        if iscsi_host and fc_host and nvme_host:
-            if iscsi_host == fc_host == nvme_host:
-                return fc_host, [config.ISCSI_CONNECTIVITY_TYPE,
-                                 config.FC_CONNECTIVITY_TYPE,
-                                 config.NVME_OVER_FC_CONNECTIVITY_TYPE]
+        if not connectivity_types:
+            logger.debug("can not found host by using initiators: {0} ".format(initiators))
+            raise array_errors.HostNotFoundError(initiators)
+        host_name = self.get_host_name_if_equal(iscsi_host, nvme_host, fc_host)
+        if not host_name:
             raise array_errors.MultipleHostsFoundError(initiators, fc_host)
-        if iscsi_host and fc_host:
-            if iscsi_host == fc_host:
-                return fc_host, [config.ISCSI_CONNECTIVITY_TYPE,
-                                 config.FC_CONNECTIVITY_TYPE]
-            raise array_errors.MultipleHostsFoundError(initiators, fc_host)
-        if nvme_host:
-            logger.debug("found host : {0} with nqn : {1}".format(nvme_host, initiators.nvme_nqn))
-            return nvme_host, [config.NVME_OVER_FC_CONNECTIVITY_TYPE]
-        if fc_host:
-            logger.debug("found host : {0} with fc wwn : {1}".format(fc_host, initiators.fc_wwns))
-            return fc_host, [config.FC_CONNECTIVITY_TYPE]
-        if iscsi_host:
-            logger.debug("found host : {0} with iqn : {1}".format(iscsi_host, initiators.iscsi_iqn))
-            return iscsi_host, [config.ISCSI_CONNECTIVITY_TYPE]
-        logger.debug("can not found host by using initiators: {0} ".format(initiators))
-        raise array_errors.HostNotFoundError(initiators)
+        return host_name, list(connectivity_types)
 
     def _get_detailed_hosts_list(self):
         logger.debug("Getting detailed hosts list on array {0}".format(self.endpoint))
@@ -1113,3 +1102,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         rcrelationship = self._get_rcrelationship_by_name(replication_name)
         endpoint_type_to_promote = self._get_replication_other_endpoint_type(rcrelationship)
         self._ensure_endpoint_is_primary(rcrelationship, endpoint_type_to_promote)
+
+    def get_host_name_if_equal(self, iscsi_host, nvme_host, fc_host):
+        s = {iscsi_host, nvme_host, fc_host}
+        s.discard(None)
+        if len(s) > 1:
+            return None
+        return s.pop()
