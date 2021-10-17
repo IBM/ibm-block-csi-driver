@@ -388,19 +388,34 @@ class TestUtils(unittest.TestCase):
             utils.get_node_id_info("badnodeformat")
             self.assertTrue("node" in str(ex))
 
-        hostname, _, fc_wwns, iscsi_iqn = utils.get_node_id_info("hostabc;;;iqn.ibm")
+        hostname, nvme_nqn, fc_wwns, iscsi_iqn = utils.get_node_id_info("hostabc;;;iqn.ibm")
         self.assertEqual(hostname, "hostabc")
         self.assertEqual(iscsi_iqn, "iqn.ibm")
+        self.assertEqual(nvme_nqn, "")
         self.assertEqual(fc_wwns, "")
 
-        hostname, _, fc_wwns, iscsi_iqn = utils.get_node_id_info("hostabc;;wwn1:wwn2;iqn.ibm")
+        hostname, nvme_nqn, fc_wwns, iscsi_iqn = utils.get_node_id_info("hostabc;;wwn1:wwn2;iqn.ibm")
         self.assertEqual(hostname, "hostabc")
         self.assertEqual(iscsi_iqn, "iqn.ibm")
+        self.assertEqual(nvme_nqn, "")
         self.assertEqual(fc_wwns, "wwn1:wwn2")
 
-        hostname, _, fc_wwns, iscsi_iqn = utils.get_node_id_info("hostabc;;wwn1:wwn2")
+        hostname, nvme_nqn, fc_wwns, iscsi_iqn = utils.get_node_id_info("hostabc;nqn.ibm;wwn1:wwn2")
         self.assertEqual(hostname, "hostabc")
         self.assertEqual(iscsi_iqn, "")
+        self.assertEqual(nvme_nqn, "nqn.ibm")
+        self.assertEqual(fc_wwns, "wwn1:wwn2")
+
+        hostname, nvme_nqn, fc_wwns, iscsi_iqn = utils.get_node_id_info("hostabc;nqn.ibm;")
+        self.assertEqual(hostname, "hostabc")
+        self.assertEqual(iscsi_iqn, "")
+        self.assertEqual(nvme_nqn, "nqn.ibm")
+        self.assertEqual(fc_wwns, "")
+
+        hostname, nvme_nqn, fc_wwns, iscsi_iqn = utils.get_node_id_info("hostabc;;wwn1:wwn2")
+        self.assertEqual(hostname, "hostabc")
+        self.assertEqual(iscsi_iqn, "")
+        self.assertEqual(nvme_nqn, "")
         self.assertEqual(fc_wwns, "wwn1:wwn2")
 
     def test_choose_connectivity_types(self):
