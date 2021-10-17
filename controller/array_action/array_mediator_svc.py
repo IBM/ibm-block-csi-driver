@@ -654,7 +654,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 logger.debug("found nvme nqn in list : {0} for host : "
                              "{1}".format(initiators.nvme_nqn, nvme_host))
         if not connectivity_types:
-            logger.debug("can not found host by using initiators: {0} ".format(initiators))
+            logger.debug("could not find host by using initiators: {0} ".format(initiators))
             raise array_errors.HostNotFoundError(initiators)
         host_name = self.get_host_name_if_equal(iscsi_host, nvme_host, fc_host)
         if not host_name:
