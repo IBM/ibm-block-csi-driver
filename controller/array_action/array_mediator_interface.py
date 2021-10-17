@@ -158,7 +158,7 @@ class ArrayMediator(ABC):
         Args:
            volume_id : the volume WWN.
            host_name : the name of the host to map the volume to.
-           connectivity_type : connectivity type (iscsi, fc or nvme)
+           connectivity_type : connectivity type (e.g. iscsi, fc, etc...)
 
         Returns:
            lun : the lun_id the volume was mapped to.
