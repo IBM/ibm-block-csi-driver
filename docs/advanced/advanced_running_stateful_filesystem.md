@@ -1,61 +1,13 @@
 ## Running a stateful container with file system configurations
 
-1. Create an array secret, as described in [Creating a Secret](../content/configuration/csi_ug_config_create_secret.md). 
+1. Follow the instructions for running a stateful container, as detailed in steps 1 through 4 of [Sample configurations for running a stateful container](../content/using/csi_ug_using_sample.md).
 
-2. Create a storage class, as described in [Creating a StorageClass](../content/configuration/csi_ug_config_create_storageclasses.md).
-
-3. Create a PVC demo-pvc-file-system.yaml with the size of 1 Gb, as described in [Creating a PersistentVolumeClaim (PVC)](../content/configuration/csi_ug_config_create_pvc.md).
-
-4. Display the existing PVC and the created persistent volume (PV).
-
-     <pre>
-      $> kubectl get pv,pvc
-      NAME                                                        CAPACITY   ACCESS MODES
-      persistentvolume/pvc-828ce909-6eb2-11ea-abc8-005056a49b44   1Gi        RWO
-        
-      RECLAIM POLICY   STATUS   CLAIM                          STORAGECLASS     REASON  AGE
-      Delete           Bound    default/demo-pvc-file-system   demo-storageclass        109m
-        
-      NAME                                         STATUS   VOLUME                                     CAPACITY   
-      persistentvolumeclaim/demo-pvc-file-system   Bound    pvc-828ce909-6eb2-11ea-abc8-005056a49b44   1Gi
-        
-      ACCESS MODES   STORAGECLASS       AGE
-      RWO            demo-storageclass  78s
-        
-      $> kubectl describe persistentvolume/pvc-828ce909-6eb2-11ea-abc8-005056a49b44
-      Name:            pvc-828ce909-6eb2-11ea-abc8-005056a49b44
-      Labels:          <none>
-      Annotations:     pv.kubernetes.io/provisioned-by: block.csi.ibm.com
-      Finalizers:      [kubernetes.io/pv-protection]
-      StorageClass:    demo-storageclass
-      Status:          Bound
-      Claim:           default/demo-pvc-file-system
-      Reclaim Policy:  Delete
-      Access Modes:    RWO
-      VolumeMode:      Filesystem
-      Capacity:        1Gi
-      Node Affinity:   <none>
-      Message:
-      Source:
-          Type:              CSI (a Container Storage Interface (CSI) volume source)
-          Driver:            block.csi.ibm.com
-          FSType:            xfs
-          VolumeHandle:      SVC:26;60050760718186998000000000005E93
-          ReadOnly:          false
-          VolumeAttributes:     array_address=demo-management-address
-                                pool_name=demo-pool
-                                storage.kubernetes.io/csiProvisionerIdentity=1631546133261-8081-block.csi.ibm.com
-                                storage_type=SVC
-                                volume_name=demo-prefix_pvc-828ce909-6eb2-11ea-abc8-005056a49b44
-      Events:                <none>
-      </pre>
-5. Create a StatefulSet.
+2. Create a StatefulSet.
 
     <pre>
     $> kubectl create -f demo-statefulset-file-system.yaml
     statefulset.apps/demo-statefulset-file-system created
-    
-    <pre>
+        
     $> cat demo-statefulset-file-system.yaml
     kind: StatefulSet
     apiVersion: apps/v1
@@ -86,9 +38,7 @@
               claimName: demo-pvc-file-system
       #      nodeSelector:
       #        kubernetes.io/hostname: HOSTNAME
-    
-
-6. Check the newly created pod.
+3. Check the newly created pod.
 
     Display the newly created pod (make sure the pod status is _Running_).
 
@@ -97,7 +47,7 @@
     NAME                 READY   STATUS    RESTARTS   AGE
     demo-statefulset-file-system-0   1/1     Running   0          43s
 
-7. Write data to the persistent volume of the pod.
+4. Write data to the persistent volume of the pod.
 
     The PV should be mounted inside the pod at `/data`.
 
@@ -106,7 +56,7 @@
     $> kubectl exec demo-statefulset-file-system-0 -- ls /data/FILE
     /data/FILE
 
-8. Delete StatefulSet and then recreate, in order to validate data (/data/FILE) remains in the persistent volume.
+5. Delete StatefulSet and then recreate, in order to validate data (/data/FILE) remains in the persistent volume.
 
     1. Delete the StatefulSet.
 
@@ -140,7 +90,7 @@
         $> kubectl exec demo-statefulset-file-system-0 -- ls /data/FILE
         /data/FILE
 
-9. Delete StatefulSet and the PVC.
+6. Delete StatefulSet and the PVC.
 
     <pre>
     $> kubectl delete statefulset/demo-statefulset-file-system
