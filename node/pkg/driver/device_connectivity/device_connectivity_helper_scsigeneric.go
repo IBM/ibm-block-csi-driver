@@ -191,9 +191,9 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 
 func (r OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(deviceName string) error {
 	devicePath := filepath.Join(DevPath, deviceName)
-	_, err := r.Executer.ExecuteWithTimeout(TimeOutBlockdevCmd, blockdevCmd, []string{"–flushbufs", devicePath})
+	_, err := r.Executer.ExecuteWithTimeout(TimeOutBlockdevCmd, blockdevCmd, []string{"--flushbufs", devicePath})
 	if err != nil {
-		logger.Errorf("blockdev –flushbufs {%v} did not succeed to flush the device buffers. err={%v}", devicePath,
+		logger.Errorf("blockdev --flushbufs {%v} did not succeed to flush the device buffers. err={%v}", devicePath,
 			err.Error())
 		return err
 	}
@@ -211,7 +211,10 @@ func (r OsDeviceConnectivityHelperScsiGeneric) flushDevicesBuffers(deviceNames [
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice string) error {
-	r.flushDeviceBuffers(mpathDevice)
+	err := r.flushDeviceBuffers(mpathDevice)
+	if err != nil {
+		return err
+	}
 
 	// mpathdevice is dm-4 for example
 	logger.Debugf("Flushing mpath device : {%v}", mpathDevice)
@@ -238,7 +241,10 @@ func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice 
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices []string) error {
-	r.flushDevicesBuffers(sysDevices)
+	flushErr := r.flushDevicesBuffers(sysDevices)
+	if flushErr != nil {
+		return flushErr
+	}
 
 	// sysDevices  = sdb, sda,...
 	logger.Debugf("Removing scsi device : {%v}", sysDevices)
