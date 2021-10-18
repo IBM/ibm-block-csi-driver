@@ -7,26 +7,7 @@ Use this section for advanced troubleshooting information for your CSI driver.
 
 ## Verifying the CSI driver is running
 
-  Verify that the CSI driver is running. (Make sure the csi-controller pod status is _Running_).
-
-    $> kubectl get all -n <namespace> -l csi
-    NAME                                        READY STATUS  RESTARTS  AGE
-    pod/ibm-block-csi-controller-0              6/6   Running 0         2h
-    pod/ibm-block-csi-node-nbtsg                3/3   Running 0         2h
-    pod/ibm-block-csi-node-wd5tm                3/3   Running 0         2h
-    pod/ibm-block-csi-operator-7684549698-hzmfh 1/1   Running 0         2h
-
-    NAME                              DESIRED CURRENT READY UP-TO-DATE  AVAILABLE NODE SELECTOR AGE
-    daemonset.apps/ibm-block-csi-node 2        2      2     2           2         <none>        2h
-
-    NAME                                    DESIRED CURRENT UP-TO-DATE  AVAILABLE AGE
-    deployment.apps/ibm-block-csi-operator  1       1       1           1         2h
-
-    NAME                                              DESIRED CURRENT READY AGE
-    replicaset.apps/ibm-block-csi-operator-7684549698 1       1       1     2h
-
-    NAME                                      DESIRED CURRENT AGE
-    statefulset.apps/ibm-block-csi-controller 1       1       2h
+  Verify that the CSI driver is running. (Make sure the csi-controller pod status is _Running_), using the `$> kubectl get all -n <namespace> -l csi` command.
 
 ## Multipath troubleshooting
 
