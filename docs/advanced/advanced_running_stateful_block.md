@@ -88,7 +88,7 @@
     demo-statefulset-raw-block-0   1/1     Running   0          43s  
 7. Write data to the persistent volume of the pod.
 
-    The PV should be mounted inside the pod at /dev.
+    The PV should be mounted inside the pod at /dev/block.
     <pre>
     $> kubectl exec demo-statefulset-raw-block-0 -- bash -c "echo "test_block" | dd conv=unblock of=/dev/block"
     0+1 records in
