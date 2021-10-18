@@ -702,7 +702,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.get_host_by_host_identifiers(Initiators('123', ['a', 'b'], ''))
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
-    def test_get_host_by_identifiers_return_iscsi_nvme_fc_all_support(self, result_reader_iter):
+    def test_get_host_by_identifiers_return_iscsi_nvme_and_fc(self, result_reader_iter):
         self._prepare_mocks_for_get_host_by_identifiers_(result_reader_iter)
         host, connectivity_type = self.svc.get_host_by_host_identifiers(
             Initiators('iqn.test.2', ['ABC2'], 'nqn.test.2'))
