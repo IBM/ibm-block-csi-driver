@@ -342,17 +342,16 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 	logger.Debugf("targetname files matches were found : {%v}", matches)
 
 	re := regexp.MustCompile(regexpValue)
+	logger.Debugf("Check if any match is relevant for storage target (%s).", arrayIdentifier)
 	for _, targetPath := range matches {
-		logger.Debugf("Check if targetname path (%s) is relevant for storage target (%s).", targetPath, arrayIdentifier)
 		targetName, err := o.Executer.IoutilReadFile(targetPath)
 		if err != nil {
 			logger.Warningf("Could not read target name from file : {%v}, error : {%v}", targetPath, err)
 			continue
 		}
 		identifierFromHost := strings.TrimSpace(string(targetName))
-		//For FC WWNs from the host, the value will like this: 0x500507680b26c0aa, but the arrayIdentifier doesn't has this prefix
+		//For FC WWNs from the host, the value will like this: 0x500507680b26c0aa, but the arrayIdentifier doesn't have this prefix
 		if strings.HasPrefix(identifierFromHost, "0x") {
-			logger.Tracef("Remove the 0x prefix for: {%v}", identifierFromHost)
 			identifierFromHost = strings.TrimLeft(identifierFromHost, "0x")
 		}
 		if strings.EqualFold(identifierFromHost, arrayIdentifier) {
