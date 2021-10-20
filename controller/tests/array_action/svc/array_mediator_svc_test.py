@@ -614,11 +614,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(SVCArrayMediator.max_lun_retries, 10)
 
     def _prepare_mocks_for_get_host_by_identifiers_(self, result_reader_iter):
-        host_1 = self._get_host_as_dictionary('host_id_1', 'test_host_1', ['iqn.test.1'], ['abc1'],
+        host_1 = self._get_host_as_dictionary('host_id_1', 'test_host_1', ['iqn.test.1'], ['wwn1'],
                                               nqn_list=['nqn.test.1'])
-        host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', ['iqn.test.2'], ['abc2'],
+        host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', ['iqn.test.2'], ['wwn2'],
                                               nqn_list=['nqn.test.2'])
-        host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', ['iqn.test.3'], ['abc1', 'abc3'],
+        host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', ['iqn.test.3'], ['wwn3'],
                                               nqn_list=['nqn.test.3'])
         hosts = [host_1, host_2, host_3]
         self.svc.client.svcinfo.lshost = Mock()
@@ -631,7 +631,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_host_by_identifiers_returns_host_not_found(self, result_reader_iter):
         self._prepare_mocks_for_get_host_by_identifiers_(result_reader_iter)
         with self.assertRaises(array_errors.HostNotFoundError):
-            self.svc.get_host_by_host_identifiers(Initiators('Test_iqn', ['Test_WWN'], ''))
+            self.svc.get_host_by_host_identifiers(Initiators('Test_iqn', ['Test_wwn'], ''))
 
     def test_get_host_by_identifier_return_host_not_found_when_no_hosts_exist(self):
         hosts = []
@@ -644,13 +644,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_host_by_identifiers_raise_multiplehostsfounderror(self, result_reader_iter):
         self._prepare_mocks_for_get_host_by_identifiers_(result_reader_iter)
         with self.assertRaises(array_errors.MultipleHostsFoundError):
-            self.svc.get_host_by_host_identifiers(Initiators('iqn.test.3', ['abc2'], ''))
+            self.svc.get_host_by_host_identifiers(Initiators('iqn.test.3', ['wwn2'], ''))
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
     def test_get_host_by_identifiers_return_iscsi_host(self, result_reader_iter):
         self._prepare_mocks_for_get_host_by_identifiers_(result_reader_iter)
         host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
-            'iqn.test.2', ['abcd3'], ''))
+            'iqn.test.2', ['Test_wwn'], ''))
         self.assertEqual('test_host_2', host)
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_type)
 
@@ -658,7 +658,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_host_by_identifiers_return_iscsi_host_with_list_iqn(self, result_reader_iter):
         self._prepare_mocks_for_get_host_by_identifiers_(result_reader_iter)
         host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
-            'iqn.test.2', ['abcd3'], ''))
+            'iqn.test.2', ['Test_wwn'], ''))
         self.assertEqual('test_host_2', host)
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_type)
 
@@ -666,33 +666,33 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_host_by_identifiers_return_nvme_host(self, result_reader_iter):
         self._prepare_mocks_for_get_host_by_identifiers_(result_reader_iter)
         host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
-            'iqn.test.6', ['abcd3'], 'nqn.test.3'))
+            'iqn.test.6', ['Test_wwn'], 'nqn.test.3'))
         self.assertEqual('test_host_3', host)
         self.assertEqual([config.NVME_OVER_FC_CONNECTIVITY_TYPE], connectivity_type)
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
     def test_get_host_by_identifiers_return_fc_host(self, result_reader_iter):
-        host_1 = self._get_host_as_dictionary('host_id_1', 'test_host_1', [], ['abc1'])
-        host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', [''], ['abc2'])
-        host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', ['iqn.test.3'], ['abc1', 'abc3'])
+        host_1 = self._get_host_as_dictionary('host_id_1', 'test_host_1', [], ['wwn1'])
+        host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', [''], ['wwn2'])
+        host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', ['iqn.test.3'], ['wwn3', 'wwn4'])
         hosts = [host_1, host_2, host_3]
         self._prepare_mocks_for_get_host_by_identifiers_(result_reader_iter)
         host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
-            'iqn.test.6', ['abc3', 'ABC1'], ''))
+            'iqn.test.6', ['wwn4', 'WWN3'], ''))
         self.assertEqual('test_host_3', host)
         self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_type)
 
         result_reader_iter.return_value = self._get_detailed_hosts_list_result(hosts)
         host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
-            'iqn.test.6', ['abc3'], ''))
+            'iqn.test.6', ['wwn3'], ''))
         self.assertEqual('test_host_3', host)
         self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_type)
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
     def test_get_host_by_identifiers_with_wrong_fc_iscsi_raise_not_found(self, result_reader_iter):
-        host_1 = self._get_host_as_dictionary('host_id_1', 'test_host_1', [], ['abc1'])
-        host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', ['iqn.test.2'], ['abc3'])
-        host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', ['iqn.test.3'], ['abc3'])
+        host_1 = self._get_host_as_dictionary('host_id_1', 'test_host_1', [], ['wwn1'])
+        host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', ['iqn.test.2'], ['wwn3'])
+        host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', ['iqn.test.3'], ['wwn3'])
         hosts = [host_1, host_2, host_3]
         self._prepare_mocks_for_get_host_by_identifiers_(result_reader_iter)
         with self.assertRaises(array_errors.HostNotFoundError):
@@ -702,10 +702,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.get_host_by_host_identifiers(Initiators('123', ['a', 'b'], ''))
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
-    def test_get_host_by_identifiers_return_iscsi_nvme_fc_all_support(self, result_reader_iter):
+    def test_get_host_by_identifiers_return_iscsi_nvme_and_fc(self, result_reader_iter):
         self._prepare_mocks_for_get_host_by_identifiers_(result_reader_iter)
         host, connectivity_type = self.svc.get_host_by_host_identifiers(
-            Initiators('iqn.test.2', ['ABC2'], 'nqn.test.2'))
+            Initiators('iqn.test.2', ['WWN2'], 'nqn.test.2'))
         self.assertEqual('test_host_2', host)
         self.assertEqual(
             {config.ISCSI_CONNECTIVITY_TYPE, config.FC_CONNECTIVITY_TYPE, config.NVME_OVER_FC_CONNECTIVITY_TYPE},
@@ -842,7 +842,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_map_volume_nvme_success(self):
         self.svc.client.svctask.mkvdiskhostmap.return_value = None
         lun = self.svc.map_volume("volume", "host", config.NVME_OVER_FC_CONNECTIVITY_TYPE)
-        self.assertEqual(lun, 'nvme')
+        self.assertEqual(lun, "")
 
     def _test_unmap_volume_rmvdiskhostmap_error(self, client_error, expected_error):
         self._test_mediator_method_client_error(self.svc.unmap_volume, ("volume", "host"),
@@ -865,7 +865,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.unmap_volume("volume", "host")
 
     def _prepare_mocks_for_get_iscsi_targets(self, portset_id=None):
-        host = self._get_host_as_dictionary('host_id', 'test_host', ['iqn.test.0', 'iqn.test.00'], ['abc0'], portset_id)
+        host = self._get_host_as_dictionary('host_id', 'test_host', ['iqn.test.0', 'iqn.test.00'], ['wwn0'], portset_id)
         self.svc.client.svcinfo.lshost = Mock()
         self.svc.client.svcinfo.lshost.return_value = Mock(as_single_element=host)
 

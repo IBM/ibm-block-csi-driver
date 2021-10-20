@@ -490,14 +490,12 @@ def get_node_id_info(node_id):
         hostname, nvme_nqn, fc_wwns = split_node
     else:
         raise array_errors.HostNotFoundError(node_id)
-    logger.debug("node name : {0}, iscsi_iqn : {1}, fc_wwns : {2}, nvme_nqn: {3} ".format(
-        hostname, iscsi_iqn, fc_wwns, nvme_nqn))
+    logger.debug("node name : {0}, nvme_nqn: {1}, fc_wwns : {2}, iscsi_iqn : {3} ".format(
+        hostname, nvme_nqn, fc_wwns, iscsi_iqn))
     return hostname, nvme_nqn, fc_wwns, iscsi_iqn
 
 
 def choose_connectivity_type(connectivity_types):
-    # If connectivity type support FC and iSCSI at the same time, chose FC.
-    # If NVME is supported, chose NVME.
     logger.debug("choosing connectivity type for connectivity types : {0}".format(connectivity_types))
     if NVME_OVER_FC_CONNECTIVITY_TYPE in connectivity_types:
         logger.debug("connectivity type is : {0}".format(NVME_OVER_FC_CONNECTIVITY_TYPE))

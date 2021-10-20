@@ -773,11 +773,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         }
 
         try:
-            if connectivity_type != config.NVME_OVER_FC_CONNECTIVITY_TYPE:
+            if connectivity_type == config.NVME_OVER_FC_CONNECTIVITY_TYPE:
+                lun = ""
+            else:
                 lun = self.get_first_free_lun(host_name)
                 cli_kwargs.update({'scsi': lun})
-            else:
-                lun = config.NVME_OVER_FC_CONNECTIVITY_TYPE
             self.client.svctask.mkvdiskhostmap(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
