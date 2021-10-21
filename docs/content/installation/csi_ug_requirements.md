@@ -45,7 +45,7 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
 
    **Important:**
    - The `99-ibm-attach.yaml` configuration file overrides any files that exist on your system. Only use this file if the files mentioned are not already created. <br />If one or more were created, edit this YAML file, as necessary.
-   - The `99-ibm-attach.yaml` configuration file creates a `multipath.conf` file. It is best practice to update the file according to your storage system needs.
+   - The `99-ibm-attach.yaml` configuration file with the default configuration by the CSI driver. It is best practice to update the file according to your storage system and application networking needs.
 
    Apply the YAML file.
 
