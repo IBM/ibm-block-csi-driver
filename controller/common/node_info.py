@@ -11,7 +11,7 @@ class NodeIdInfo:
         node_name, nvme_nqn, fc_wwns_str, iscsi_iqn = utils.get_node_id_info(node_id)
         fc_wwns = fc_wwns_str.split(config.PARAMETERS_FC_WWN_DELIMITER)
         self.node_name = node_name
-        self.initiators = Initiators(iscsi_iqn.strip(), fc_wwns, nvme_nqn.strip())
+        self.initiators = Initiators(nvme_nqn.strip(), fc_wwns, iscsi_iqn.strip())
 
 
 class Initiators:
@@ -22,9 +22,9 @@ class Initiators:
     def __init__(self, nvme_nqn, fc_wwns, iscsi_iqn):
         """
         Args:
-            iscsi_iqn : iqn
-            fc_wwns : list of fc wwns
             nvme_nqn: nqn
+            fc_wwns : list of fc wwns
+            iscsi_iqn : iqn
         """
         self.iscsi_iqn = iscsi_iqn
         self.fc_wwns = fc_wwns
