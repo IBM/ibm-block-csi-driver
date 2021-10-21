@@ -699,13 +699,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.get_host_by_host_identifiers(Initiators('', ['a', 'b'], '123'))
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
-    def test_get_host_by_identifiers_return_iscsi_nvme_and_fc(self, result_reader_iter):
+    def test_get_host_by_identifiers_return_nvme_fc_and_iscsi(self, result_reader_iter):
         self._prepare_mocks_for_get_host_by_identifiers(result_reader_iter)
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
             Initiators('nqn.test.2', ['WWN2'], 'iqn.test.2'))
         self.assertEqual('test_host_2', hostname)
         self.assertEqual(
-            {config.ISCSI_CONNECTIVITY_TYPE, config.FC_CONNECTIVITY_TYPE, config.NVME_OVER_FC_CONNECTIVITY_TYPE},
+            {config.NVME_OVER_FC_CONNECTIVITY_TYPE, config.FC_CONNECTIVITY_TYPE, config.ISCSI_CONNECTIVITY_TYPE},
             set(connectivity_types))
 
     def _get_host_as_dictionary(self, id, name, iscsi_names_list, wwpns_list, portset_id=None, nqn_list=None):

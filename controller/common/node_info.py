@@ -26,12 +26,12 @@ class Initiators:
             fc_wwns : list of fc wwns
             iscsi_iqn : iqn
         """
-        self.iscsi_iqn = iscsi_iqn
-        self.fc_wwns = fc_wwns
         self.nvme_nqn = nvme_nqn
+        self.fc_wwns = fc_wwns
+        self.iscsi_iqn = iscsi_iqn
+        self._nvme_nqn_lowercase = nvme_nqn.lower()
         self._fc_wwns_lowercase_set = set(wwn.lower() for wwn in fc_wwns)
         self._iscsi_iqn_lowercase = iscsi_iqn.lower()
-        self._nvme_nqn_lowercase = nvme_nqn.lower()
 
     def is_array_wwns_match(self, host_wwns):
         """

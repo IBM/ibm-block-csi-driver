@@ -12,7 +12,7 @@ import controller.controller_server.config as controller_config
 from controller.array_action.array_action_types import Volume, Snapshot, Host, Replication
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.svc_cli_result_reader import SVCListResultsReader
-from controller.array_action.utils import classproperty, bytes_to_string, convert_scsi_uuid_to_nguid
+from controller.array_action.utils import classproperty, bytes_to_string, convert_scsi_id_to_nguid
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 
@@ -387,7 +387,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def _get_cli_volume_by_wwn(self, volume_id, not_exist_err=False):
         cli_volume = self._lsvdisk_by_uid(volume_id)
         if not cli_volume:
-            volume_nguid = convert_scsi_uuid_to_nguid(volume_id)
+            volume_nguid = convert_scsi_id_to_nguid(volume_id)
             cli_volume = self._lsvdisk_by_uid(volume_nguid)
         if not cli_volume and not_exist_err:
             raise array_errors.ObjectNotFoundError(volume_id)
@@ -647,7 +647,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 connectivity_types.add(config.FC_CONNECTIVITY_TYPE)
                 logger.debug("found fc wwns in list : {0} for host : "
                              "{1}".format(initiators.fc_wwns, fc_host))
-            logger.debug("check initiator nqn : {0} vs host nqn : {1}".format(initiators.nvme_nqn, host.nqn))
             if initiators.is_array_nvme_nqn_match(host.nqn):
                 nvme_host = host.name
                 connectivity_types.add(config.NVME_OVER_FC_CONNECTIVITY_TYPE)
@@ -1102,7 +1101,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._ensure_endpoint_is_primary(rcrelationship, endpoint_type_to_promote)
 
     def _get_host_name_if_equal(self, nvme_host, fc_host, iscsi_host):
-        s = {iscsi_host, nvme_host, fc_host}
+        s = {nvme_host, iscsi_host, fc_host}
         s.discard(None)
         if len(s) == 1:
             return s.pop()

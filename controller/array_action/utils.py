@@ -12,7 +12,7 @@ def bytes_to_string(input_as_bytes):
     return input_as_bytes.decode(UTF_8) if input_as_bytes else ""
 
 
-def convert_scsi_uuid_to_nguid(volume_id):
+def convert_scsi_id_to_nguid(volume_id):
     logger.debug("converting scsi uuid : {} to nguid".format(volume_id))
     oui = volume_id[1:WWN_OUI_END]
     vendor_identifier = volume_id[WWN_OUI_END:WWN_VENDOR_IDENTIFIER_END]

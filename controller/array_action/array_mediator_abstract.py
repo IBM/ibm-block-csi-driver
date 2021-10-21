@@ -5,7 +5,7 @@ import controller.array_action.errors as array_errors
 from controller.array_action.array_mediator_interface import ArrayMediator
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE, NVME_OVER_FC_CONNECTIVITY_TYPE
 from controller.array_action.errors import NoConnectionAvailableException, UnsupportedConnectivityTypeError
-from controller.array_action.utils import convert_scsi_uuid_to_nguid
+from controller.array_action.utils import convert_scsi_id_to_nguid
 from controller.common.csi_logger import get_stdout_logger
 from controller.controller_server import utils
 
@@ -65,5 +65,5 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
         host_name, connectivity_types = self.get_host_by_host_identifiers(initiators)
         connectivity_type = utils.choose_connectivity_type(connectivity_types)
         if connectivity_type == NVME_OVER_FC_CONNECTIVITY_TYPE:
-            vol_id = convert_scsi_uuid_to_nguid(vol_id)
+            vol_id = convert_scsi_id_to_nguid(vol_id)
         self.unmap_volume(vol_id, host_name)
