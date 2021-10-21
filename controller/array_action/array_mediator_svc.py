@@ -771,8 +771,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             'object_id': vol_name,
             'force': True
         }
-
-        try:
         lun = ""
         try:
             if connectivity_type != config.NVME_OVER_FC_CONNECTIVITY_TYPE:
