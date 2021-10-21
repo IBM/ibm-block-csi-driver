@@ -8,8 +8,8 @@ from pysvc.unified.response import CLIFailureError
 import controller.array_action.config as config
 import controller.array_action.errors as array_errors
 from controller.array_action.array_mediator_svc import SVCArrayMediator, build_kwargs_from_parameters, \
-    HOST_ID_PARAM, HOST_NAME_PARAM, HOST_ISCSI_NAMES_PARAM, HOST_WWPNS_PARAM, FCMAP_STATUS_DONE, YES, HOST_PORTSET_ID, \
-    HOST_NQN_PARAM
+    HOST_ID_PARAM, HOST_NAME_PARAM, HOST_NQN_PARAM, HOST_WWPNS_PARAM, HOST_ISCSI_NAMES_PARAM, FCMAP_STATUS_DONE, YES, \
+    HOST_PORTSET_ID
 from controller.array_action.svc_cli_result_reader import SVCListResultsElement
 from controller.common.node_info import Initiators
 

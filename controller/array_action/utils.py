@@ -17,7 +17,7 @@ def convert_scsi_id_to_nguid(volume_id):
     oui = volume_id[1:WWN_OUI_END]
     vendor_identifier = volume_id[WWN_OUI_END:WWN_VENDOR_IDENTIFIER_END]
     vendor_identifier_extension = volume_id[WWN_VENDOR_IDENTIFIER_END:]
-    final_nguid = vendor_identifier_extension + oui + '0' + vendor_identifier
+    final_nguid = ''.join((vendor_identifier_extension, oui, '0', vendor_identifier))
     logger.debug("nguid is : {}".format(final_nguid))
     return final_nguid
 

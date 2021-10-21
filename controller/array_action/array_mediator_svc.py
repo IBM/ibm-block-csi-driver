@@ -42,9 +42,9 @@ NOT_ENOUGH_EXTENTS_IN_POOL_CREATE = 'CMMVC8710E'
 LIST_HOSTS_CMD_FORMAT = 'lshost {HOST_ID};'
 HOST_ID_PARAM = 'id'
 HOST_NAME_PARAM = 'name'
-HOST_ISCSI_NAMES_PARAM = 'iscsi_name'
 HOST_NQN_PARAM = 'nqn'
 HOST_WWPNS_PARAM = 'WWPN'
+HOST_ISCSI_NAMES_PARAM = 'iscsi_name'
 HOST_PORTSET_ID = 'portset_id'
 HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
 
@@ -637,21 +637,21 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         nvme_host, fc_host, iscsi_host = None, None, None
         connectivity_types = set()
         for host in detailed_hosts_list:
-            if initiators.is_array_iscsi_iqns_match(host.iscsi_names):
-                iscsi_host = host.name
-                connectivity_types.add(config.ISCSI_CONNECTIVITY_TYPE)
-                logger.debug("found iscsi iqn in list : {0} for host : "
-                             "{1}".format(initiators.iscsi_iqn, iscsi_host))
-            if initiators.is_array_wwns_match(host.wwns):
-                fc_host = host.name
-                connectivity_types.add(config.FC_CONNECTIVITY_TYPE)
-                logger.debug("found fc wwns in list : {0} for host : "
-                             "{1}".format(initiators.fc_wwns, fc_host))
             if initiators.is_array_nvme_nqn_match(host.nqn):
                 nvme_host = host.name
                 connectivity_types.add(config.NVME_OVER_FC_CONNECTIVITY_TYPE)
                 logger.debug("found nvme nqn in list : {0} for host : "
                              "{1}".format(initiators.nvme_nqn, nvme_host))
+            if initiators.is_array_wwns_match(host.wwns):
+                fc_host = host.name
+                connectivity_types.add(config.FC_CONNECTIVITY_TYPE)
+                logger.debug("found fc wwns in list : {0} for host : "
+                             "{1}".format(initiators.fc_wwns, fc_host))
+            if initiators.is_array_iscsi_iqns_match(host.iscsi_names):
+                iscsi_host = host.name
+                connectivity_types.add(config.ISCSI_CONNECTIVITY_TYPE)
+                logger.debug("found iscsi iqn in list : {0} for host : "
+                             "{1}".format(initiators.iscsi_iqn, iscsi_host))
         if not connectivity_types:
             logger.debug("could not find host by using initiators: {0} ".format(initiators))
             raise array_errors.HostNotFoundError(initiators)
@@ -682,10 +682,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         for host_details in hosts_reader:
             host_id = host_details.get(HOST_ID_PARAM)
             host_name = host_details.get(HOST_NAME_PARAM)
-            iscsi_names = host_details.get_as_list(HOST_ISCSI_NAMES_PARAM)
-            wwns = host_details.get_as_list(HOST_WWPNS_PARAM)
             nqn = host_details.get_as_list(HOST_NQN_PARAM)
-            host = Host(host_id, host_name, iscsi_names, wwns, nqn)
+            wwns = host_details.get_as_list(HOST_WWPNS_PARAM)
+            iscsi_names = host_details.get_as_list(HOST_ISCSI_NAMES_PARAM)
+            host = Host(host_id, host_name, nqn, wwns, iscsi_names)
             res.append(host)
         return res
 
