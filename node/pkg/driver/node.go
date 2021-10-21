@@ -50,18 +50,19 @@ var (
 	defaultFSType              = "ext4"
 	StageInfoFilename          = ".stageInfo.json"
 	supportedConnectivityTypes = map[string]bool{
-		device_connectivity.ConnectionTypeISCSI: true,
-		device_connectivity.ConnectionTypeFC:    true,
-		// TODO add nvme later on
+		device_connectivity.ConnectionTypeISCSI:   true,
+		device_connectivity.ConnectionTypeFC:      true,
+		device_connectivity.ConnectionTypeNVMEoFC: true,
 	}
 
 	IscsiFullPath = "/host/etc/iscsi/initiatorname.iscsi"
+	NvmeFullPath  = "/host/etc/nvme/hostnqn"
 )
 
 const (
 	FCPath          = "/sys/class/fc_host"
 	FCPortPath      = "/sys/class/fc_host/host*/port_name"
-	MaxNodeIdLength = 128
+	MaxNodeIdLength = 192
 )
 
 //go:generate mockgen -destination=../../mocks/mock_NodeMounter.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeMounter
@@ -131,21 +132,23 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	arrayInitiators := d.NodeUtils.GetArrayInitiators(ipsByArrayInitiator)
+	if connectivityType != device_connectivity.ConnectionTypeNVMEoFC {
+		arrayInitiators := d.NodeUtils.GetArrayInitiators(ipsByArrayInitiator)
 
-	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
-	if !ok {
-		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
+		osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
+		if !ok {
+			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
+		}
+
+		osDeviceConnectivity.EnsureLogin(ipsByArrayInitiator)
+
+		err = osDeviceConnectivity.RescanDevices(lun, arrayInitiators)
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
 	}
 
-	osDeviceConnectivity.EnsureLogin(ipsByArrayInitiator)
-
-	err = osDeviceConnectivity.RescanDevices(lun, arrayInitiators)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(volId)
+	mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volId)
 	logger.Debugf("Discovered device : {%v}", mpathDevice)
 	if err != nil {
 		logger.Errorf("Error while discovering the device : {%v}", err.Error())
@@ -242,9 +245,11 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong lun id %d.", lun)}
 	}
 
-	if len(ipsByArrayInitiator) == 0 {
-		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong arrayInitiators %v.",
-			ipsByArrayInitiator)}
+	if connectivityType != device_connectivity.ConnectionTypeNVMEoFC {
+		if len(ipsByArrayInitiator) == 0 {
+			return &RequestValidationError{fmt.Sprintf("PublishContext with wrong arrayInitiators %v.",
+				ipsByArrayInitiator)}
+		}
 	}
 
 	if connectivityType == device_connectivity.ConnectionTypeISCSI {
@@ -703,6 +708,7 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	defer logger.Debugf("<<<< NodeGetInfo")
 
 	var iscsiIQN string
+	var nvmeNQN string
 	var fcWWNs []string
 	var err error
 
@@ -711,6 +717,11 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	logger.Debugf("discovered topology labels : %v", topologyLabels)
+
+	nvmeExists := d.NodeUtils.IsPathExists(NvmeFullPath)
+	if nvmeExists {
+		nvmeNQN, _ = d.NodeUtils.ParseNVMEnqn()
+	}
 
 	fcExists := d.NodeUtils.IsFCExists()
 	if fcExists {
@@ -725,12 +736,12 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 		iscsiIQN, _ = d.NodeUtils.ParseIscsiInitiators()
 	}
 
-	if fcWWNs == nil && iscsiIQN == "" {
-		err := fmt.Errorf("Cannot find valid fc wwns or iscsi iqn")
+	if fcWWNs == nil && iscsiIQN == "" && nvmeNQN == "" {
+		err := fmt.Errorf("Cannot find valid NVME nqn, fc wwns or iscsi iqn")
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	nodeId, err := d.NodeUtils.GenerateNodeID(d.Hostname, fcWWNs, iscsiIQN)
+	nodeId, err := d.NodeUtils.GenerateNodeID(d.Hostname, nvmeNQN, fcWWNs, iscsiIQN)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

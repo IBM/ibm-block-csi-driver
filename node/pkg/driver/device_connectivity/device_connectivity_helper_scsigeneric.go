@@ -65,6 +65,7 @@ const (
 	DevPath                     = "/dev"
 	ConnectionTypeISCSI         = "iscsi"
 	ConnectionTypeFC            = "fc"
+	ConnectionTypeNVMEoFC       = "nvmeof"
 	WaitForMpathRetries         = 5
 	WaitForMpathWaitIntervalSec = 1
 	FC_HOST_SYSFS_PATH          = "/sys/class/fc_remote_ports/rport-*/port_name"
@@ -150,13 +151,13 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	volumeUuid := getVolumeUuid(volumeId)
 
 	volumeUuidLower := strings.ToLower(volumeUuid)
-
-	dmPath, _ := r.Helper.GetDmsPath(volumeUuidLower)
+	volumeNGUID := ConvertScsiUuidToNguid(volumeUuidLower)
+	dmPath, _ := r.Helper.GetDmsPath(volumeUuidLower, volumeNGUID)
 
 	if dmPath != "" {
 		SgInqWwn, _ := r.Helper.GetWwnByScsiInq(dmPath)
 
-		if strings.ToLower(SgInqWwn) == volumeUuidLower {
+		if strings.ToLower(SgInqWwn) == volumeUuidLower || strings.ToLower(SgInqWwn) == volumeNGUID {
 			return dmPath, nil
 		}
 	}
@@ -165,7 +166,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 		return "", err
 	}
 
-	dmPath, err := r.Helper.GetDmsPath(volumeUuidLower)
+	dmPath, err := r.Helper.GetDmsPath(volumeUuidLower, volumeNGUID)
 
 	if err != nil {
 		return "", err
@@ -180,7 +181,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 		return "", err
 	}
 
-	if strings.ToLower(SgInqWwn) != volumeUuidLower {
+	if strings.ToLower(SgInqWwn) != volumeUuidLower && strings.ToLower(SgInqWwn) != volumeNGUID {
 		// To make sure we found the right WWN, if not raise error instead of using wrong mpath
 		return "", &ErrorWrongDeviceFound{dmPath, volumeUuidLower, SgInqWwn}
 	}
@@ -261,7 +262,7 @@ type OsDeviceConnectivityHelperInterface interface {
 		Mainly for writting clean unit testing, so we can Mock this interface in order to unit test OsDeviceConnectivityHelperGeneric logic.
 	*/
 	GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error)
-	GetDmsPath(volumeId string) (string, error)
+	GetDmsPath(volumeId string, volumeNguid string) (string, error)
 	GetWwnByScsiInq(dev string) (string, error)
 	ReloadMultipath() error
 }
@@ -458,10 +459,10 @@ func (o OsDeviceConnectivityHelperGeneric) ReloadMultipath() error {
 	logger.Infof("ReloadMultipath: reload finished successfully")
 	return nil
 }
-func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeId string) (string, error) {
+func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeId string, volumeNguid string) (string, error) {
 	volumeUuidLower := strings.ToLower(volumeId)
 
-	mpathdOutput, err := o.Helper.WaitForDmToExist(volumeUuidLower, WaitForMpathRetries, WaitForMpathWaitIntervalSec)
+	mpathdOutput, err := o.Helper.WaitForDmToExist(volumeUuidLower, volumeNguid, WaitForMpathRetries, WaitForMpathWaitIntervalSec)
 
 	if err != nil {
 		return "", err
@@ -477,7 +478,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeId string) (string, 
 		deviceLine := scanner.Text()
 		lineParts := strings.Split(deviceLine, MpathdSeparator)
 		dm, uuid := lineParts[0], lineParts[1]
-		if strings.Contains(uuid, volumeUuidLower) {
+		if strings.Contains(uuid, volumeUuidLower) || strings.Contains(uuid, volumeNguid) {
 			dmPath := filepath.Join(DevPath, filepath.Base(strings.TrimSpace(dm)))
 			dms[dmPath] = true
 			logger.Infof("GetMpathDevice: DM found: %s for volume %s", dmPath, uuid)
@@ -499,7 +500,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeId string) (string, 
 //go:generate mockgen -destination=../../../mocks/mock_GetDmsPathHelperInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity GetDmsPathHelperInterface
 
 type GetDmsPathHelperInterface interface {
-	WaitForDmToExist(volumeUuid string, maxRetries int, intervalSeconds int) (string, error)
+	WaitForDmToExist(volumeUuid string, volumeNGUID string, maxRetries int, intervalSeconds int) (string, error)
 }
 
 type GetDmsPathHelperGeneric struct {
@@ -510,8 +511,23 @@ func NewGetDmsPathHelperGeneric(executer executer.ExecuterInterface) GetDmsPathH
 	return &GetDmsPathHelperGeneric{executer: executer}
 }
 
-func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeUuid string, maxRetries int, intervalSeconds int) (string, error) {
+func ConvertScsiUuidToNguid(scsiUuid string) string {
+	indices := []int{1, 7, 16}
+	var splitedText []string
+	for index, _ := range indices {
+		last := len(scsiUuid)
+		if index+1 < len(indices) {
+			last = indices[index+1]
+		}
 
+		splitedText = append(splitedText, scsiUuid[indices[index]:last])
+	}
+	print(splitedText)
+	finalNguid := splitedText[2] + splitedText[0] + "0" + splitedText[1]
+	return finalNguid
+}
+
+func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeUuid string, volumeNGUID string, maxRetries int, intervalSeconds int) (string, error) {
 	formatTemplate := strings.Join([]string{"%d", "%w"}, MpathdSeparator)
 	args := []string{"show", "maps", "raw", "format", "\"", formatTemplate, "\""}
 	var err error
@@ -522,7 +538,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeUuid string, maxRetries 
 			return "", err
 		}
 		dms := string(out)
-		if !strings.Contains(dms, volumeUuid) {
+		if !strings.Contains(dms, volumeUuid) && !strings.Contains(dms, volumeNGUID) {
 			err = os.ErrNotExist
 		} else {
 			return dms, nil

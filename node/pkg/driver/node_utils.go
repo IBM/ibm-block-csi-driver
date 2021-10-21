@@ -61,6 +61,7 @@ const (
 
 type NodeUtilsInterface interface {
 	ParseIscsiInitiators() (string, error)
+	ParseNVMEnqn() (string, error)
 	ParseFCPorts() ([]string, error)
 	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, map[string][]string, error)
 	GetArrayInitiators(ipsByArrayInitiator map[string][]string) []string
@@ -81,7 +82,7 @@ type NodeUtilsInterface interface {
 	FormatDevice(devicePath string, fsType string)
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
-	GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN string) (string, error)
+	GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []string, iscsiIQN string) (string, error)
 	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
 }
 
@@ -125,12 +126,15 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, c
 	ipsByArrayInitiator := make(map[string][]string)
 	strLun := publishContext[configYaml.Controller.Publish_context_lun_parameter]
 
-	lun, err := strconv.Atoi(strLun)
-	if err != nil {
-		return "", -1, nil, err
-	}
-
+	var lun int
+	var err error
 	connectivityType := publishContext[configYaml.Controller.Publish_context_connectivity_parameter]
+	if connectivityType != device_connectivity.ConnectionTypeNVMEoFC {
+		lun, err = strconv.Atoi(strLun)
+		if err != nil {
+			return "", -1, nil, err
+		}
+	}
 	if connectivityType == device_connectivity.ConnectionTypeISCSI {
 		iqns := strings.Split(publishContext[configYaml.Controller.Publish_context_array_iqn], PublishContextSeparator)
 		for _, iqn := range iqns {
@@ -195,6 +199,24 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 		return false
 	}
 	return true
+}
+
+func (n NodeUtils) ParseNVMEnqn() (string, error) {
+	file, err := os.Open(NvmeFullPath)
+	if err != nil {
+		return "", err
+	}
+
+	defer file.Close()
+
+	fileOut, err := ioutil.ReadAll(file)
+	if err != nil {
+		return "", err
+	}
+
+	nvmeNqn := strings.TrimSpace(string(fileOut))
+
+	return nvmeNqn, nil
 }
 
 func (n NodeUtils) ParseFCPorts() ([]string, error) {
@@ -414,17 +436,23 @@ func (n NodeUtils) GetPodPath(origPath string) string {
 	return path.Join(PrefixChrootOfHostRoot, origPath)
 }
 
-func (n NodeUtils) GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN string) (string, error) {
+func (n NodeUtils) GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []string, iscsiIQN string) (string, error) {
 	var nodeId strings.Builder
 	nodeId.Grow(MaxNodeIdLength)
 	nodeId.WriteString(hostName)
 	nodeId.WriteString(NodeIdDelimiter)
 
+	if len(nvmeNQN) > 0 {
+		if nodeId.Len()+len(nvmeNQN)+len(NodeIdDelimiter) <= MaxNodeIdLength {
+			nodeId.WriteString(nvmeNQN)
+		} else {
+			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
+		}
+	}
+	nodeId.WriteString(NodeIdDelimiter)
 	if len(fcWWNs) > 0 {
 		if nodeId.Len()+len(fcWWNs[0]) <= MaxNodeIdLength {
 			nodeId.WriteString(fcWWNs[0])
-		} else {
-			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
 		}
 
 		for _, fcPort := range fcWWNs[1:] {
@@ -438,7 +466,7 @@ func (n NodeUtils) GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN str
 		if nodeId.Len()+len(NodeIdDelimiter)+len(iscsiIQN) <= MaxNodeIdLength {
 			nodeId.WriteString(NodeIdDelimiter)
 			nodeId.WriteString(iscsiIQN)
-		} else if len(fcWWNs) == 0 {
+		} else if len(fcWWNs) == 0 && nvmeNQN == "" {
 			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
 		}
 	}
