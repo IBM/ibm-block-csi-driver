@@ -665,7 +665,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
     def test_get_host_by_identifiers_return_nvme_host(self, result_reader_iter):
         self._prepare_mocks_for_get_host_by_identifiers_(result_reader_iter)
-        host, connectivity_type = self.svc.get_host_by_host_identifiers(Initiators(
+        hostname, connectivity_types = self.svc.get_host_by_host_identifiers(Initiators(
             'iqn.test.6', ['Test_wwn'], 'nqn.test.3'))
         self.assertEqual('test_host_3', host)
         self.assertEqual([config.NVME_OVER_FC_CONNECTIVITY_TYPE], connectivity_type)
