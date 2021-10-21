@@ -61,10 +61,10 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
 
     If using RHCOS or if the packages are already installed, this step may be skipped.
 
-       - sg3_utils
-       - iscsi-initiator-utils
-       - device-mapper-multipath
-       - xfsprogs (if XFS file system is required)
+    - sg3_utils
+    - iscsi-initiator-utils
+    - device-mapper-multipath
+    - xfsprogs (if XFS file system is required)
 
 4. (Optional) If planning on using volume snapshots (FlashCopy® function), enable support on your Kubernetes cluster.
 
@@ -79,10 +79,10 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
     1. To enable support on your Kubernetes cluster, install the following replication CRDs once per cluster.
 
         ```
-        curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.1.0/config/crd/bases/replication.storage.openshift.io_volumereplicationclasses.yaml
+        curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.2.0/config/crd/bases/replication.storage.openshift.io_volumereplicationclasses.yaml
         kubectl apply -f ./replication.storage.openshift.io_volumereplicationclasses.yaml
         
-        curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.1.0/config/crd/bases/replication.storage.openshift.io_volumereplications.yaml
+        curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.2.0/config/crd/bases/replication.storage.openshift.io_volumereplications.yaml
         kubectl apply -f ./replication.storage.openshift.io_volumereplications.yaml
         ````
     
