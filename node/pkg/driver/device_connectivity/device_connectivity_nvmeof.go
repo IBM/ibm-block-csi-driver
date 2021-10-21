@@ -33,7 +33,6 @@ func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface) OsDevic
 }
 
 func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(_ map[string][]string) {
-	// Nvme doesn't require login
 }
 
 func (r OsDeviceConnectivityNvmeOFc) RescanDevices(_ int, _ []string) error {
@@ -41,9 +40,6 @@ func (r OsDeviceConnectivityNvmeOFc) RescanDevices(_ int, _ []string) error {
 }
 
 func (r OsDeviceConnectivityNvmeOFc) GetMpathDevice(volumeId string) (string, error) {
-	/*
-	   Return Value: "dm-X" of the volumeID.
-	*/
 	return r.HelperScsiGeneric.GetMpathDevice(volumeId)
 }
 

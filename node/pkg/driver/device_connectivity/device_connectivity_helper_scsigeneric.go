@@ -75,6 +75,8 @@ const (
 	multipathCmd                = "multipath"
 	VolumeIdDelimiter           = ":"
 	VolumeStorageIdsDelimiter   = ";"
+	WwnOuiEnd                   = 7
+	WwnVendorIdentifierEnd      = 16
 )
 
 func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperScsiGenericInterface {
@@ -151,7 +153,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	volumeUuid := getVolumeUuid(volumeId)
 
 	volumeUuidLower := strings.ToLower(volumeUuid)
-	volumeNGUID := ConvertScsiUuidToNguid(volumeUuidLower)
+	volumeNGUID := ConvertScsiIdToNguid(volumeUuidLower)
 	dmPath, _ := r.Helper.GetDmsPath(volumeUuidLower, volumeNGUID)
 
 	if dmPath != "" {
@@ -511,19 +513,13 @@ func NewGetDmsPathHelperGeneric(executer executer.ExecuterInterface) GetDmsPathH
 	return &GetDmsPathHelperGeneric{executer: executer}
 }
 
-func ConvertScsiUuidToNguid(scsiUuid string) string {
-	indices := []int{1, 7, 16}
-	var splitedText []string
-	for index, _ := range indices {
-		last := len(scsiUuid)
-		if index+1 < len(indices) {
-			last = indices[index+1]
-		}
-
-		splitedText = append(splitedText, scsiUuid[indices[index]:last])
-	}
-	print(splitedText)
-	finalNguid := splitedText[2] + splitedText[0] + "0" + splitedText[1]
+func ConvertScsiIdToNguid(scsiId string) string {
+	logger.Infof("Converting scsi uuid : %s to nguid", scsiId)
+	oui := scsiId[1:WwnOuiEnd]
+	vendorIdentifier := scsiId[WwnOuiEnd:WwnVendorIdentifierEnd]
+	vendorIdentifierExtension := scsiId[WwnVendorIdentifierEnd:]
+	finalNguid := vendorIdentifierExtension + oui + "0" + vendorIdentifier
+	logger.Infof("Nguid is : %s", finalNguid)
 	return finalNguid
 }
 

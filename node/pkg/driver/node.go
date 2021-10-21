@@ -132,21 +132,21 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	if connectivityType != device_connectivity.ConnectionTypeNVMEoFC {
-		arrayInitiators := d.NodeUtils.GetArrayInitiators(ipsByArrayInitiator)
 
-		osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
-		if !ok {
-			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
-		}
+	arrayInitiators := d.NodeUtils.GetArrayInitiators(ipsByArrayInitiator)
 
-		osDeviceConnectivity.EnsureLogin(ipsByArrayInitiator)
+	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
+	if !ok {
+		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
+	}
 
-		err = osDeviceConnectivity.RescanDevices(lun, arrayInitiators)
-		if err != nil {
+	osDeviceConnectivity.EnsureLogin(ipsByArrayInitiator)
+
+	err = osDeviceConnectivity.RescanDevices(lun, arrayInitiators)
+	if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
-	}
+
 
 	mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volId)
 	logger.Debugf("Discovered device : {%v}", mpathDevice)
