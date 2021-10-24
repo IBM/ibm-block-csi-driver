@@ -60,7 +60,7 @@ var (
 	TimeOutMultipathCmd  = 60 * 1000
 	TimeOutMultipathdCmd = 10 * 1000
 	TimeOutBlockdevCmd   = 10 * 1000
-	TimeOutSgInqCmd      = 10 * 1000
+	TimeOutSgInqCmd      = 3 * 1000
 )
 
 const (
