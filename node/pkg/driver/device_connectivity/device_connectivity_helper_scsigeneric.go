@@ -68,7 +68,7 @@ const (
 	ConnectionTypeFC            = "fc"
 	WaitForMpathRetries         = 5
 	WaitForMpathWaitIntervalSec = 1
-	FC_HOST_SYSFS_PATH          = "/sys/class/fc_remote_ports/rport-*/port_name"
+	FcHostSysfsPath             = "/sys/class/fc_remote_ports/rport-*/port_name"
 	IscsiHostRexExPath          = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
 	blockdevCmd                 = "blockdev"
 	mpathdSeparator             = ","
@@ -328,7 +328,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 		targetFilePath = IscsiHostRexExPath
 		regexpValue = "host([0-9]+)"
 	} else {
-		targetFilePath = FC_HOST_SYSFS_PATH
+		targetFilePath = FcHostSysfsPath
 		regexpValue = "rport-([0-9]+)"
 	}
 
