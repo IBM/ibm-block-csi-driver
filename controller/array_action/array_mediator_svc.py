@@ -1101,8 +1101,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._ensure_endpoint_is_primary(rcrelationship, endpoint_type_to_promote)
 
     def _get_host_name_if_equal(self, nvme_host, fc_host, iscsi_host):
-        s = {nvme_host, iscsi_host, fc_host}
-        s.discard(None)
-        if len(s) == 1:
-            return s.pop()
+        unique_names = {nvme_host, iscsi_host, fc_host}
+        unique_names.discard(None)
+        if len(unique_names) == 1:
+            return unique_names.pop()
         return None
