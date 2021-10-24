@@ -60,6 +60,7 @@ var (
 	TimeOutMultipathCmd  = 60 * 1000
 	TimeOutMultipathdCmd = 10 * 1000
 	TimeOutBlockdevCmd   = 10 * 1000
+	TimeOutSgInqCmd      = 10 * 1000
 )
 
 const (
@@ -425,7 +426,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 	args := []string{"-p", "0x83", dev}
 	// add timeout in case the call never comes back.
 	logger.Debugf("Calling [%s] with timeout", sgInqCmd)
-	outputBytes, err := o.Executer.ExecuteWithTimeout(3000, sgInqCmd, args)
+	outputBytes, err := o.Executer.ExecuteWithTimeout(TimeOutSgInqCmd, sgInqCmd, args)
 	if err != nil {
 		return "", err
 	}

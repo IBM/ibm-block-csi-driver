@@ -475,7 +475,7 @@ func TestHelperGetWwnByScsiInq(t *testing.T) {
 			fake_executer.EXPECT().IsExecutable(sgInqCmd).Return(tc.sgInqExecutable)
 
 			if tc.sgInqExecutable == nil {
-				fake_executer.EXPECT().ExecuteWithTimeout(3000, sgInqCmd, args).Return(tc.cmdReturn, tc.cmdReturnErr)
+				fake_executer.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, sgInqCmd, args).Return(tc.cmdReturn, tc.cmdReturnErr)
 			}
 
 			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fake_executer)
