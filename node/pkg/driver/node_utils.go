@@ -453,6 +453,8 @@ func (n NodeUtils) GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []stri
 	if len(fcWWNs) > 0 {
 		if nodeId.Len()+len(fcWWNs[0]) <= MaxNodeIdLength {
 			nodeId.WriteString(fcWWNs[0])
+		} else if nvmeNQN == "" {
+			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
 		}
 
 		for _, fcPort := range fcWWNs[1:] {

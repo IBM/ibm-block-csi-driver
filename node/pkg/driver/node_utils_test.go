@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"strings"
 	"syscall"
 	"testing"
 
@@ -33,7 +34,12 @@ import (
 )
 
 var (
-	nodeUtils = driver.NewNodeUtils(&executer.Executer{}, nil)
+	nodeUtils    = driver.NewNodeUtils(&executer.Executer{}, nil)
+	hostName     = "test-hostname"
+	longHostName = strings.Repeat("test-hostname", 15)
+	nvmeNQN      = "nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1"
+	fcWWNs       = []string{"10000000c9934d9f", "10000000c9934d9h", "10000000c9934d9a", "10000000c9934d9b", "10000000c9934d9z"}
+	iscsiIQN     = "iqn.1994-07.com.redhat:e123456789"
 )
 
 func TestParseIscsiInitiators(t *testing.T) {
@@ -54,8 +60,8 @@ func TestParseIscsiInitiators(t *testing.T) {
 		},
 		{
 			name:         "right_iqn",
-			file_content: "InitiatorName=iqn.1996-05.com.redhat:123123122",
-			expIqn:       "iqn.1996-05.com.redhat:123123122",
+			file_content: fmt.Sprintf("InitiatorName=%s", iscsiIQN),
+			expIqn:       iscsiIQN,
 		},
 	}
 
@@ -216,46 +222,67 @@ func TestGenerateNodeID(t *testing.T) {
 	testCases := []struct {
 		name      string
 		hostName  string
+		nvmeNQN   string
 		fcWWNs    []string
 		iscsiIQN  string
 		expErr    error
 		expNodeId string
 	}{
 		{name: "success all in",
-			hostName:  "test-host",
-			fcWWNs:    []string{"10000000c9934d9f", "10000000c9934d9h"},
-			iscsiIQN:  "iqn.1994-07.com.redhat:e123456789",
-			expNodeId: "test-host;10000000c9934d9f:10000000c9934d9h;iqn.1994-07.com.redhat:e123456789",
+			hostName:  hostName,
+			nvmeNQN:   nvmeNQN,
+			fcWWNs:    fcWWNs[:2],
+			iscsiIQN:  iscsiIQN,
+			expNodeId: fmt.Sprintf("%s;%s;%s;%s", hostName, nvmeNQN, strings.Join(fcWWNs[:2], ":"), iscsiIQN),
 		},
-		{name: "success no fc ports",
-			hostName:  "test-hostname.ibm.com",
+		{name: "success only iscsi port",
+			hostName:  hostName,
+			nvmeNQN:   "",
 			fcWWNs:    []string{},
-			iscsiIQN:  "iqn.1994-07.com.redhat:e123456789",
-			expNodeId: "test-hostname.ibm.com;;iqn.1994-07.com.redhat:e123456789",
+			iscsiIQN:  iscsiIQN,
+			expNodeId: fmt.Sprintf("%s;;;%s", hostName, iscsiIQN),
 		},
-		{name: "success no iscsi port",
-			hostName:  "test-hostname.ibm.com",
-			fcWWNs:    []string{"10000000c9934d9f", "10000000c9934d9h"},
+		{name: "success only fc ports",
+			hostName:  hostName,
+			nvmeNQN:   "",
+			fcWWNs:    fcWWNs[:2],
 			iscsiIQN:  "",
-			expNodeId: "test-hostname.ibm.com;10000000c9934d9f:10000000c9934d9h",
+			expNodeId: fmt.Sprintf("%s;;%s", hostName, strings.Join(fcWWNs[:2], ":")),
 		},
-		{name: "success many fc ports",
-			hostName:  "test-hostname.ibm.com",
-			fcWWNs:    []string{"10000000c9934d9f", "10000000c9934d9h", "10000000c9934d9a", "10000000c9934d9b", "10000000c9934d9z"},
-			iscsiIQN:  "iqn.1994-07.com.redhat:e123456789",
-			expNodeId: "test-hostname.ibm.com;10000000c9934d9f:10000000c9934d9h:10000000c9934d9a:10000000c9934d9b:10000000c9934d9z",
+		{name: "success only nvme port",
+			hostName:  hostName,
+			nvmeNQN:   nvmeNQN,
+			fcWWNs:    []string{},
+			iscsiIQN:  "",
+			expNodeId: fmt.Sprintf("%s;%s;", hostName, nvmeNQN),
+		},
+		{name: "success many fc ports and iscsi port",
+			hostName:  hostName,
+			nvmeNQN:   "",
+			fcWWNs:    fcWWNs,
+			iscsiIQN:  iscsiIQN,
+			expNodeId: fmt.Sprintf("%s;;%s;%s", hostName, strings.Join(fcWWNs, ":"), iscsiIQN),
+		},
+		{name: "fail long hostName on nvme port",
+			hostName: longHostName,
+			nvmeNQN:  nvmeNQN,
+			fcWWNs:   []string{},
+			iscsiIQN: "",
+			expErr:   errors.New(fmt.Sprintf("could not fit any ports in node id: %s;, length limit: 192", longHostName)),
 		},
 		{name: "fail long hostName on fc ports",
-			hostName: "test-hostname-that-is-too-long-and-take-almost-128-characters-so-no-port-get-place-additional-characters.nodeutilstest.ibm.com",
-			fcWWNs:   []string{"10000000c9934d9f", "10000000c9934d9h"},
+			hostName: longHostName,
+			nvmeNQN:  "",
+			fcWWNs:   fcWWNs[:2],
 			iscsiIQN: "",
-			expErr:   errors.New("could not fit any ports in node id: test-hostname-that-is-too-long-and-take-almost-128-characters-so-no-port-get-place-additional-characters.nodeutilstest.ibm.com;, length limit: 128"),
+			expErr:   errors.New(fmt.Sprintf("could not fit any ports in node id: %s;;, length limit: 192", longHostName)),
 		},
 		{name: "fail long hostName on iscsi ports",
-			hostName: "test-hostname-that-is-too-long-and-take-almost-128-characters-so-no-port-get-place-additional-characters.nodeutilstest.ibm.com",
+			hostName: longHostName,
+			nvmeNQN:  "",
 			fcWWNs:   []string{},
-			iscsiIQN: "iqn.1994-07.com.redhat:e123456789",
-			expErr:   errors.New("could not fit any ports in node id: test-hostname-that-is-too-long-and-take-almost-128-characters-so-no-port-get-place-additional-characters.nodeutilstest.ibm.com;, length limit: 128"),
+			iscsiIQN: iscsiIQN,
+			expErr:   errors.New(fmt.Sprintf("could not fit any ports in node id: %s;;, length limit: 192", longHostName)),
 		},
 	}
 	for _, tc := range testCases {
@@ -267,10 +294,10 @@ func TestGenerateNodeID(t *testing.T) {
 			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
 			nodeUtils := driver.NewNodeUtils(fake_executer, nil)
 
-			nodeId, err := nodeUtils.GenerateNodeID(tc.hostName, tc.fcWWNs, tc.iscsiIQN)
+			nodeId, err := nodeUtils.GenerateNodeID(tc.hostName, tc.nvmeNQN, tc.fcWWNs, tc.iscsiIQN)
 
 			if tc.expErr != nil {
-				if err.Error() != tc.expErr.Error() {
+				if err == nil || err.Error() != tc.expErr.Error() {
 					t.Fatalf("Expecting err: expected %v, got %v", tc.expErr, err)
 				}
 

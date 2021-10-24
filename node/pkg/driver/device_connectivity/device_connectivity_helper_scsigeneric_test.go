@@ -28,6 +28,11 @@ import (
 	"testing"
 )
 
+var (
+	volumeUuid  = "6oui000vendorsi0vendorsie0000000"
+	volumeNguid = "vendorsie0000000oui0000vendorsi0"
+)
+
 func NewOsDeviceConnectivityHelperScsiGenericForTest(
 	executer executer.ExecuterInterface,
 	helper device_connectivity.OsDeviceConnectivityHelperInterface,
@@ -161,7 +166,7 @@ func TestGetMpathDevice(t *testing.T) {
 			},
 			getWwnByScsiInqReturn: []GetWwnByScsiInqReturn{
 				GetWwnByScsiInqReturn{
-					wwn: "600fakevolumeuuid000000000111",
+					wwn: "6oui000vendorsi0vendorsie0000000",
 					err: nil,
 				},
 			},
@@ -191,7 +196,7 @@ func TestGetMpathDevice(t *testing.T) {
 
 			getWwnByScsiInqReturn: []GetWwnByScsiInqReturn{
 				GetWwnByScsiInqReturn{
-					wwn: "600fakevolumeuuid000000000111",
+					wwn: "6oui000vendorsi0vendorsie0000000",
 					err: nil,
 				},
 			},
@@ -212,7 +217,7 @@ func TestGetMpathDevice(t *testing.T) {
 			fake_mutex := &sync.Mutex{}
 
 			for _, r := range tc.getDmsPathReturn {
-				fake_helper.EXPECT().GetDmsPath("600fakevolumeuuid000000000111").Return(
+				fake_helper.EXPECT().GetDmsPath(volumeUuid, volumeNguid).Return(
 					r.dmPath,
 					r.err)
 			}
@@ -229,7 +234,7 @@ func TestGetMpathDevice(t *testing.T) {
 			}
 
 			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fake_executer, fake_helper, fake_mutex)
-			DMPath, err := o.GetMpathDevice("Test:600FAKEVOLUMEUUID000000000111")
+			DMPath, err := o.GetMpathDevice("Test:6oui000vendorsi0vendorsie0000000")
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")
@@ -284,7 +289,7 @@ func TestGetDmsPath(t *testing.T) {
 			name: "Should fail when WaitForDmToExist found more than 1 dm for volume",
 			waitForDmToExistReturn: []WaitForDmToExistReturn{
 				WaitForDmToExistReturn{
-					out: "dm-1,600fakevolumeuuid000000000111\ndm-2,otheruuid\ndm-3,600fakevolumeuuid000000000111",
+					out: fmt.Sprintf("dm-1,%s\ndm-2,otheruuid\ndm-3,%s", volumeUuid, volumeUuid),
 					err: nil,
 				},
 			},
@@ -297,7 +302,7 @@ func TestGetDmsPath(t *testing.T) {
 			name: "Should succeed to GetDmPath with space in start of input",
 			waitForDmToExistReturn: []WaitForDmToExistReturn{
 				WaitForDmToExistReturn{
-					out: " dm-1,600fakevolumeuuid000000000111",
+					out: " dm-1,6oui000vendorsi0vendorsie0000000",
 					err: nil,
 				},
 			},
@@ -310,7 +315,7 @@ func TestGetDmsPath(t *testing.T) {
 			name: "Should succeed to GetDmPath",
 			waitForDmToExistReturn: []WaitForDmToExistReturn{
 				WaitForDmToExistReturn{
-					out: "dm-1,600fakevolumeuuid000000000111\ndm-2,otheruuid\ndm-3,otheruuid2",
+					out: "dm-1,6oui000vendorsi0vendorsie0000000\ndm-2,otheruuid\ndm-3,otheruuid2",
 					err: nil,
 				},
 			},
@@ -330,11 +335,11 @@ func TestGetDmsPath(t *testing.T) {
 			fake_helper := mocks.NewMockGetDmsPathHelperInterface(mockCtrl)
 
 			for _, r := range tc.waitForDmToExistReturn {
-				fake_helper.EXPECT().WaitForDmToExist("600fakevolumeuuid000000000111", 5, 1).Return(r.out, r.err)
+				fake_helper.EXPECT().WaitForDmToExist(volumeUuid, volumeNguid, 5, 1).Return(r.out, r.err)
 			}
 
 			helperGeneric := NewOsDeviceConnectivityHelperGenericForTest(fake_executer, fake_helper)
-			dmPath, err := helperGeneric.GetDmsPath("600FAKEVOLUMEUUID000000000111")
+			dmPath, err := helperGeneric.GetDmsPath(volumeUuid, volumeNguid)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")
@@ -380,7 +385,7 @@ func TestHelperWaitForDmToExist(t *testing.T) {
 		},
 		{
 			name:         "Should succeed",
-			devices:      "dm-1,volumeUuid\ndm-2,otherUuid",
+			devices:      "dm-1,600507607181869980000000000030E8\ndm-2,otherUuid",
 			cmdReturnErr: nil,
 			expErr:       nil,
 		},
@@ -393,11 +398,12 @@ func TestHelperWaitForDmToExist(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
-			volumeUuid := "volumeUuid"
+			volumeUuid := "600507607181869980000000000030E8"
+			volumeNguid := "80000000000030E80050760071818699"
 			args := []string{"show", "maps", "raw", "format", "\"", "%d,%w", "\""}
 			fake_executer.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathdCmd, "multipathd", args).Return([]byte(tc.devices), tc.cmdReturnErr)
 			helperGeneric := device_connectivity.NewGetDmsPathHelperGeneric(fake_executer)
-			devices, err := helperGeneric.WaitForDmToExist(volumeUuid, 1, 1)
+			devices, err := helperGeneric.WaitForDmToExist(volumeUuid, volumeNguid, 1, 1)
 			if err != nil {
 				if err.Error() != tc.expErr.Error() {
 					t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())
@@ -439,7 +445,7 @@ func TestHelperGetWwnByScsiInq(t *testing.T) {
 		},
 		{
 			name:            "Should return error when wwn line not matching the expected pattern",
-			cmdReturn:       []byte("Vendor Specific Identifier Extension: 0xcea5f6\n\t\t\t  [600fakevolumeuuid000000000111]"),
+			cmdReturn:       []byte("Vendor Specific Identifier Extension: 0xcea5f6\n\t\t\t  [6oui000vendorsi0vendorsie0000000]"),
 			wwn:             "",
 			cmdReturnErr:    nil,
 			expErrType:      reflect.TypeOf(&device_connectivity.ErrorNoRegexWwnMatchInScsiInq{}),
@@ -455,8 +461,8 @@ func TestHelperGetWwnByScsiInq(t *testing.T) {
 		},
 		{
 			name:            "Should succeed",
-			cmdReturn:       []byte("Vendor Specific Identifier Extension: 0xcea5f6\n\t\t\t  [0x600fakevolumeuuid000000000111]"),
-			wwn:             "600FAKEVOLUMEUUID000000000111",
+			cmdReturn:       []byte("Vendor Specific Identifier Extension: 0xcea5f6\n\t\t\t  [0x6oui000vendorsi0vendorsie0000000]"),
+			wwn:             "6oui000vendorsi0vendorsie0000000",
 			cmdReturnErr:    nil,
 			expErr:          nil,
 			sgInqExecutable: nil,

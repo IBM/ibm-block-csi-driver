@@ -144,9 +144,8 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	err = osDeviceConnectivity.RescanDevices(lun, arrayInitiators)
 	if err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-
+		return nil, status.Error(codes.Internal, err.Error())
+	}
 
 	mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volId)
 	logger.Debugf("Discovered device : {%v}", mpathDevice)
