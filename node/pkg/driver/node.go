@@ -132,7 +132,6 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-
 	arrayInitiators := d.NodeUtils.GetArrayInitiators(ipsByArrayInitiator)
 
 	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
@@ -147,7 +146,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volId)
+	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(volId)
 	logger.Debugf("Discovered device : {%v}", mpathDevice)
 	if err != nil {
 		logger.Errorf("Error while discovering the device : {%v}", err.Error())

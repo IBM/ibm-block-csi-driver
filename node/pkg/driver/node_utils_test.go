@@ -52,7 +52,7 @@ func TestParseIscsiInitiators(t *testing.T) {
 		{
 			name:         "wrong iqn file",
 			file_content: "wrong-content",
-			expErr:       fmt.Errorf(driver.ErrorWhileTryingToReadIQN, "wrong-content"),
+			expErr:       fmt.Errorf(driver.ErrorWhileTryingToReadPort, device_connectivity.ConnectionTypeISCSI, "wrong-content"),
 		},
 		{
 			name:   "non existing file",
@@ -120,6 +120,79 @@ func TestParseIscsiInitiators(t *testing.T) {
 
 }
 
+func TestParseNVMEnqn(t *testing.T) {
+	testCases := []struct {
+		name         string
+		file_content string
+		expErr       error
+		expNqn       string
+	}{
+		{
+			name:   "non existing file",
+			expErr: &os.PathError{Op: "open", Path: "/non/existent/path", Err: syscall.ENOENT},
+		},
+		{
+			name:         "right_nqn",
+			file_content: nvmeNQN,
+			expNqn:       nvmeNQN,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			filePath := ""
+
+			if tc.file_content != "" {
+				tmpFile, err := ioutil.TempFile(os.TempDir(), "nvme-")
+				fmt.Println(tmpFile)
+				if err != nil {
+					t.Fatalf("Cannot create temporary file : %v", err)
+				}
+
+				defer func() {
+					os.Remove(tmpFile.Name())
+					driver.IscsiFullPath = "/host/etc/nvme/hostnqn"
+				}()
+
+				fmt.Println("Created File: " + tmpFile.Name())
+
+				text := []byte(tc.file_content)
+				if _, err = tmpFile.Write(text); err != nil {
+					t.Fatalf("Failed to write to temporary file: %v", err)
+				}
+
+				if err := tmpFile.Close(); err != nil {
+					t.Fatalf(err.Error())
+				}
+				filePath = tmpFile.Name()
+			} else {
+				filePath = "/non/existent/path"
+			}
+
+			driver.NvmeFullPath = filePath
+			nqn, err := nodeUtils.ParseNVMEnqn()
+
+			if tc.expErr != nil {
+				if err.Error() != tc.expErr.Error() {
+					t.Fatalf("Expecting err: expected %v, got %v", tc.expErr, err)
+				}
+
+			} else {
+				if err != nil {
+					t.Fatalf("err is not nil. got: %v", err)
+				}
+				if nqn != tc.expNqn {
+					t.Fatalf("scheme mismatches: expected %v, got %v", tc.expNqn, nqn)
+				}
+
+			}
+
+		})
+	}
+
+}
+
 func TestParseFCPortsName(t *testing.T) {
 	testCases := []struct {
 		name          string
@@ -131,26 +204,26 @@ func TestParseFCPortsName(t *testing.T) {
 		{
 			name:          "fc port file with wrong content",
 			file_contents: []string{"wrong content"},
-			expErr:        fmt.Errorf(driver.ErrorWhileTryingToReadFC, "wrong content"),
+			expErr:        fmt.Errorf(driver.ErrorWhileTryingToReadPort, device_connectivity.ConnectionTypeFC, "wrong content"),
 		},
 		{
 			name:   "fc unsupported",
 			expErr: fmt.Errorf(driver.ErrorUnsupportedConnectivityType, device_connectivity.ConnectionTypeFC),
 		},
 		{
-			name:          "one FC port",
+			name:          "one fc port",
 			file_contents: []string{"0x10000000c9934d9f"},
 			expFCPorts:    []string{"10000000c9934d9f"},
 		},
 		{
-			name:          "one FC port file with wrong content, another is good",
+			name:          "one fc port file with wrong content, another is good",
 			file_contents: []string{"wrong content", "0x10000000c9934dab"},
 			expFCPorts:    []string{"10000000c9934dab"},
 		},
 		{
-			name:          "one fc port file with wrong content, aonther file path is inexistent",
+			name:          "one fc port file with wrong content, another file path is inexistent",
 			file_contents: []string{"wrong content", ""},
-			expErr:        errors.New("[Error while tring to get FC port from string: wrong content., open /non/existent/path: no such file or directory]"),
+			expErr:        errors.New("[Error while trying to get fc port from string: wrong content., open /non/existent/path: no such file or directory]"),
 		},
 		{
 			name:          "two FC ports",

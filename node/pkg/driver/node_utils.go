@@ -98,29 +98,6 @@ func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface) 
 	}
 }
 
-func (n NodeUtils) ParseIscsiInitiators() (string, error) {
-	file, err := os.Open(IscsiFullPath)
-	if err != nil {
-		return "", err
-	}
-
-	defer file.Close()
-
-	fileOut, err := ioutil.ReadAll(file)
-	if err != nil {
-		return "", err
-	}
-
-	fileSplit := strings.Split(string(fileOut), "InitiatorName=")
-	if len(fileSplit) != 2 {
-		return "", fmt.Errorf(ErrorWhileTryingToReadIQN, string(fileOut))
-	}
-
-	iscsiIqn := strings.TrimSpace(fileSplit[1])
-
-	return iscsiIqn, nil
-}
-
 func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, map[string][]string, error) {
 	// this will return :  connectivityType, lun, ipsByArrayInitiator, error
 	ipsByArrayInitiator := make(map[string][]string)
@@ -201,8 +178,8 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 	return true
 }
 
-func (n NodeUtils) ParseNVMEnqn() (string, error) {
-	file, err := os.Open(NvmeFullPath)
+func parseFromFile(path string, prefix string, portType string) (string, error) {
+	file, err := os.Open(path)
 	if err != nil {
 		return "", err
 	}
@@ -214,14 +191,33 @@ func (n NodeUtils) ParseNVMEnqn() (string, error) {
 		return "", err
 	}
 
-	nvmeNqn := strings.TrimSpace(string(fileOut))
+	fileOutString := string(fileOut)
 
-	return nvmeNqn, nil
+	if prefix != "" {
+		fileSplit := strings.Split(fileOutString, prefix)
+		if len(fileSplit) != 2 {
+			return "", fmt.Errorf(ErrorWhileTryingToReadPort, portType, string(fileOut))
+		}
+		fileOutString = fileSplit[1]
+	}
+
+	iscsiIqn := strings.TrimSpace(fileOutString)
+
+	return iscsiIqn, nil
+}
+
+func (n NodeUtils) ParseIscsiInitiators() (string, error) {
+	return parseFromFile(IscsiFullPath, "InitiatorName=", device_connectivity.ConnectionTypeISCSI)
+}
+
+func (n NodeUtils) ParseNVMEnqn() (string, error) {
+	return parseFromFile(NvmeFullPath, "", device_connectivity.ConnectionTypeNVMEoFC)
 }
 
 func (n NodeUtils) ParseFCPorts() ([]string, error) {
 	var errs []error
 	var fcPorts []string
+	var fcPort string
 
 	fpaths, err := n.Executer.FilepathGlob(FCPortPath)
 	if fpaths == nil {
@@ -232,31 +228,17 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 	}
 
 	for _, fpath := range fpaths {
-		file, err := os.Open(fpath)
+		fcPort, err = parseFromFile(fpath, "0x", device_connectivity.ConnectionTypeFC)
 		if err != nil {
-			errs = append(errs, err)
-			break
-		}
-		defer file.Close()
-
-		fileOut, err := ioutil.ReadAll(file)
-		if err != nil {
-			errs = append(errs, err)
-			break
-		}
-
-		fileSplit := strings.Split(string(fileOut), "0x")
-		if len(fileSplit) != 2 {
-			err := fmt.Errorf(ErrorWhileTryingToReadFC, string(fileOut))
 			errs = append(errs, err)
 		} else {
-			fcPorts = append(fcPorts, strings.TrimSpace(fileSplit[1]))
+			fcPorts = append(fcPorts, fcPort)
 		}
 	}
 
 	if errs != nil {
 		err := errors.NewAggregate(errs)
-		logger.Errorf("errors occured while looking for FC ports: {%v}", err)
+		logger.Errorf("errors occured while looking for fc ports: {%v}", err)
 		if fcPorts == nil {
 			return nil, err
 		}
