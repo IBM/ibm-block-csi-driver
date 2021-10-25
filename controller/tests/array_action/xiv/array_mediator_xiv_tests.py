@@ -391,33 +391,34 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_get_host_by_identifiers_returns_host_not_found(self):
         iqn = "iqn"
         wwns = ['wwn1', 'wwn2']
+        nqn = ""
         host1 = utils.get_mock_xiv_host("host1", "iqn1", "")
         host2 = utils.get_mock_xiv_host("host2", "iqn1", "")
         host3 = utils.get_mock_xiv_host("host3", "iqn2", "")
 
         self.mediator.client.cmd.host_list.return_value = Mock(as_list=[host1, host2, host3])
         with self.assertRaises(array_errors.HostNotFoundError):
-            self.mediator.get_host_by_host_identifiers(Initiators('', wwns, iqn))
+            self.mediator.get_host_by_host_identifiers(Initiators(nqn, wwns, iqn))
 
     def test_get_host_by_identifiers_returns_host_not_found_when_no_hosts_exist(self):
         iqn = "iqn"
-
+        nqn = ""
         self.mediator.client.cmd.host_list.return_value = Mock(as_list=[])
         with self.assertRaises(array_errors.HostNotFoundError):
-            self.mediator.get_host_by_host_identifiers(Initiators('', [], iqn))
+            self.mediator.get_host_by_host_identifiers(Initiators(nqn, [], iqn))
 
     def test_get_host_by_iscsi_identifiers_succeeds(self):
         iqn = "iqn1"
         wwns = []
         right_host = "host1"
-
+        nqn = ""
         host1 = utils.get_mock_xiv_host(right_host, "iqn1,iqn4", "")
         host2 = utils.get_mock_xiv_host("host2", "iqn2", "")
         host3 = utils.get_mock_xiv_host("host3", "iqn2", "")
         host4 = utils.get_mock_xiv_host("host4", "iqn3", "")
 
         self.mediator.client.cmd.host_list.return_value = Mock(as_list=[host1, host2, host3, host4])
-        host, connectivity_type = self.mediator.get_host_by_host_identifiers(Initiators('', wwns, iqn))
+        host, connectivity_type = self.mediator.get_host_by_host_identifiers(Initiators(nqn, wwns, iqn))
         self.assertEqual(host, right_host)
         self.assertEqual(connectivity_type, [ISCSI_CONNECTIVITY_TYPE])
 
@@ -425,14 +426,14 @@ class TestArrayMediatorXIV(unittest.TestCase):
         iqn = "iqn5"
         wwns = ["wwn2", "wwn5"]
         right_host = "host2"
-
+        nqn = ""
         host1 = utils.get_mock_xiv_host("host1", "iqn1", "wwn1")
         host2 = utils.get_mock_xiv_host(right_host, "iqn2", "wwn2")
         host3 = utils.get_mock_xiv_host("host3", "iqn2", "wwn3")
         host4 = utils.get_mock_xiv_host("host4", "iqn3", "wwn4")
 
         self.mediator.client.cmd.host_list.return_value = Mock(as_list=[host1, host2, host3, host4])
-        host, connectivity_type = self.mediator.get_host_by_host_identifiers(Initiators('', wwns, iqn))
+        host, connectivity_type = self.mediator.get_host_by_host_identifiers(Initiators(nqn, wwns, iqn))
         self.assertEqual(host, right_host)
         self.assertEqual(connectivity_type, [FC_CONNECTIVITY_TYPE])
 
@@ -440,14 +441,14 @@ class TestArrayMediatorXIV(unittest.TestCase):
         iqn = "iqn2"
         wwns = ["wwn2", "wwn5"]
         right_host = "host2"
-
+        nqn = ""
         host1 = utils.get_mock_xiv_host("host1", "iqn1", "wwn1")
         host2 = utils.get_mock_xiv_host(right_host, "iqn2", "wwn2")
         host3 = utils.get_mock_xiv_host("host3", "iqn3", "wwn3")
         host4 = utils.get_mock_xiv_host("host4", "iqn4", "wwn4")
 
         self.mediator.client.cmd.host_list.return_value = Mock(as_list=[host1, host2, host3, host4])
-        host, connectivity_type = self.mediator.get_host_by_host_identifiers(Initiators('', wwns, iqn))
+        host, connectivity_type = self.mediator.get_host_by_host_identifiers(Initiators(nqn, wwns, iqn))
         self.assertEqual(host, right_host)
         self.assertEqual(connectivity_type, [FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE])
 
@@ -515,12 +516,12 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_map_volume_volume_not_found(self):
         self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=None)
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.mediator.map_volume("volume-wwn", "host", "")
+            self.mediator.map_volume("volume-wwn", "host", "fake_connectivity_type")
 
     def test_map_volume_raise_illegal_object_id(self):
         self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalValueForArgumentError("", "volume-wwn", "")]
         with self.assertRaises(array_errors.IllegalObjectID):
-            self.mediator.map_volume("volume-wwn", "host", "")
+            self.mediator.map_volume("volume-wwn", "host", "fake_connectivity_type")
 
     @patch.object(XIVArrayMediator, "MAX_LUN_NUMBER", 3)
     @patch.object(XIVArrayMediator, "MIN_LUN_NUMBER", 1)
@@ -531,13 +532,13 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
         self.mediator.client.cmd.mapping_list.return_value = Mock(as_list=[mapping1, mapping2, mapping3])
         with self.assertRaises(array_errors.NoAvailableLunError):
-            self.mediator.map_volume("volume-wwn", "host", "")
+            self.mediator.map_volume("volume-wwn", "host", "fake_connectivity_type")
 
     def map_volume_with_error(self, xcli_err, status, returned_err):
         self.mediator.client.cmd.map_vol.side_effect = [xcli_err("", status, "")]
         with patch.object(XIVArrayMediator, "_get_next_available_lun"):
             with self.assertRaises(returned_err):
-                self.mediator.map_volume("volume-wwn", "host", "")
+                self.mediator.map_volume("volume-wwn", "host", "fake_connectivity_type")
 
     def test_map_volume_operation_forbidden(self):
         self.map_volume_with_error(xcli_errors.OperationForbiddenForUserCategoryError, "",
@@ -563,7 +564,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_map_volume_success(self, next_lun):
         next_lun.return_value = 5
         self.mediator.client.cmd.map_vol.return_value = None
-        lun = self.mediator.map_volume("volume-wwn", "host", "")
+        lun = self.mediator.map_volume("volume-wwn", "host", "fake_connectivity_type")
         self.assertEqual(lun, '5')
 
     def test_unmap_volume_no_volume_raise_object_not_found(self):
