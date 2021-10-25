@@ -61,7 +61,7 @@ const (
 
 type NodeUtilsInterface interface {
 	ParseIscsiInitiators() (string, error)
-	ParseNVMEnqn() (string, error)
+	ParseNvmeNqn() (string, error)
 	ParseFCPorts() ([]string, error)
 	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, map[string][]string, error)
 	GetArrayInitiators(ipsByArrayInitiator map[string][]string) []string
@@ -210,7 +210,7 @@ func (n NodeUtils) ParseIscsiInitiators() (string, error) {
 	return parseFromFile(IscsiFullPath, "InitiatorName=", device_connectivity.ConnectionTypeISCSI)
 }
 
-func (n NodeUtils) ParseNVMEnqn() (string, error) {
+func (n NodeUtils) ParseNvmeNqn() (string, error) {
 	return parseFromFile(NvmeFullPath, "", device_connectivity.ConnectionTypeNVMEoFC)
 }
 

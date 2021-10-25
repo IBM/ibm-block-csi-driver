@@ -93,7 +93,7 @@ func TestParseNVMEnqn(t *testing.T) {
 			}
 
 			driver.NvmeFullPath = filePath
-			nqn, err := nodeUtils.ParseNVMEnqn()
+			nqn, err := nodeUtils.ParseNvmeNqn()
 
 			if tc.expErr != nil {
 				if err.Error() != tc.expErr.Error() {

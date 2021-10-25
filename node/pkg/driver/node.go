@@ -718,7 +718,7 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 
 	nvmeExists := d.NodeUtils.IsPathExists(NvmeFullPath)
 	if nvmeExists {
-		nvmeNQN, _ = d.NodeUtils.ParseNVMEnqn()
+		nvmeNQN, _ = d.NodeUtils.ParseNvmeNqn()
 	}
 
 	fcExists := d.NodeUtils.IsFCExists()
