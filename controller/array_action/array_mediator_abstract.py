@@ -3,7 +3,7 @@ from retry import retry
 
 import controller.array_action.errors as array_errors
 from controller.array_action.array_mediator_interface import ArrayMediator
-from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE, NVME_OVER_FC_CONNECTIVITY_TYPE
+from controller.array_action.config import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.errors import NoConnectionAvailableException, UnsupportedConnectivityTypeError
 from controller.array_action.utils import convert_scsi_id_to_nguid
 from controller.common.csi_logger import get_stdout_logger

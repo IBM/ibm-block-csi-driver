@@ -9,8 +9,8 @@ from google.protobuf.timestamp_pb2 import Timestamp
 import controller.array_action.errors as array_errors
 import controller.controller_server.config as config
 import controller.controller_server.messages as messages
-from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE, \
-    REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC, NVME_OVER_FC_CONNECTIVITY_TYPE
+from controller.array_action.config import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
+    ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.settings import NAME_PREFIX_SEPARATOR
 from controller.controller_server.controller_types import ArrayConnectionInfo, ObjectIdInfo, ObjectParameters
@@ -521,15 +521,15 @@ def generate_csi_publish_volume_response(lun, connectivity_type, config, array_i
         connectivity_param: connectivity_type
     }
 
-    if connectivity_type == ISCSI_CONNECTIVITY_TYPE:
+    if connectivity_type == FC_CONNECTIVITY_TYPE:
+        array_initiators_param = config["controller"]["publish_context_fc_initiators"]
+        publish_context[array_initiators_param] = separator.join(array_initiators)
+    elif connectivity_type == ISCSI_CONNECTIVITY_TYPE:
         for iqn, ips in array_initiators.items():
             publish_context[iqn] = separator.join(ips)
 
         array_initiators_param = config["controller"]["publish_context_array_iqn"]
         publish_context[array_initiators_param] = separator.join(array_initiators.keys())
-    else:
-        array_initiators_param = config["controller"]["publish_context_fc_initiators"]
-        publish_context[array_initiators_param] = separator.join(array_initiators)
 
     res = csi_pb2.ControllerPublishVolumeResponse(publish_context=publish_context)
 

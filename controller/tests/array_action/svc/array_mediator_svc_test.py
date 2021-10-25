@@ -729,10 +729,6 @@ class TestArrayMediatorSVC(unittest.TestCase):
             current_element = SVCListResultsElement()
             current_element.add(HOST_ID_PARAM, host_dict.get(HOST_ID_PARAM))
             current_element.add(HOST_NAME_PARAM, host_dict.get(HOST_NAME_PARAM))
-            iscsi_names_list = host_dict.get(HOST_ISCSI_NAMES_PARAM)
-            if iscsi_names_list:
-                for iscsi_name in iscsi_names_list:
-                    current_element.add(HOST_ISCSI_NAMES_PARAM, iscsi_name)
             nvme_nqn_list = host_dict.get(HOST_NQN_PARAM)
             if nvme_nqn_list:
                 for nqn in nvme_nqn_list:
@@ -741,6 +737,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
             if wwpns_list:
                 for wwpn in wwpns_list:
                     current_element.add(HOST_WWPNS_PARAM, wwpn)
+            iscsi_names_list = host_dict.get(HOST_ISCSI_NAMES_PARAM)
+            if iscsi_names_list:
+                for iscsi_name in iscsi_names_list:
+                    current_element.add(HOST_ISCSI_NAMES_PARAM, iscsi_name)
             current_element.add(HOST_PORTSET_ID, host_dict.get(HOST_PORTSET_ID))
             detailed_hosts_list.append(current_element)
         return iter(detailed_hosts_list)
