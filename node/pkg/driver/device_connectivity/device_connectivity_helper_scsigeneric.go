@@ -158,8 +158,8 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 
 	if dmPath != "" {
 		SgInqWwn, _ := r.Helper.GetWwnByScsiInq(dmPath)
-
-		if strings.ToLower(SgInqWwn) == volumeUuidLower || strings.ToLower(SgInqWwn) == volumeNGUID {
+		SgInqWwnLower := strings.ToLower(SgInqWwn)
+		if SgInqWwnLower == volumeUuidLower || SgInqWwnLower == volumeNGUID {
 			return dmPath, nil
 		}
 	}
@@ -182,8 +182,8 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	if err != nil {
 		return "", err
 	}
-
-	if strings.ToLower(SgInqWwn) != volumeUuidLower && strings.ToLower(SgInqWwn) != volumeNGUID {
+	SgInqWwnLower := strings.ToLower(SgInqWwn)
+	if SgInqWwnLower != volumeUuidLower && SgInqWwnLower != volumeNGUID {
 		// To make sure we found the right WWN, if not raise error instead of using wrong mpath
 		return "", &ErrorWrongDeviceFound{dmPath, volumeUuidLower, SgInqWwn}
 	}
