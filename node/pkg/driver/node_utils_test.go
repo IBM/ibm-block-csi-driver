@@ -188,10 +188,10 @@ func TestParseFCPortsName(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 			devicePath := "/sys/class/fc_host/host*/port_name"
-			fake_executer.EXPECT().FilepathGlob(devicePath).Return(fpaths, tc.err)
-			nodeUtils := driver.NewNodeUtils(fake_executer, nil)
+			fakeExecuter.EXPECT().FilepathGlob(devicePath).Return(fpaths, tc.err)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil)
 
 			fcs, err := nodeUtils.ParseFCPorts()
 
@@ -364,8 +364,8 @@ func TestGenerateNodeID(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
-			nodeUtils := driver.NewNodeUtils(fake_executer, nil)
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil)
 
 			nodeId, err := nodeUtils.GenerateNodeID(tc.hostName, tc.nvmeNQN, tc.fcWWNs, tc.iscsiIQN)
 
