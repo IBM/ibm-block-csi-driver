@@ -613,13 +613,16 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(SVCArrayMediator.max_connections, 2)
         self.assertEqual(SVCArrayMediator.max_lun_retries, 10)
 
-    def _prepare_mocks_for_get_host_by_identifiers(self, result_reader_iter):
+    def _prepare_mocks_for_get_host_by_identifiers(self, result_reader_iter, special_host=None):
         host_1 = self._get_host_as_dictionary('host_id_1', 'test_host_1', ['iqn.test.1'], ['wwn1'],
                                               nqn_list=['nqn.test.1'])
         host_2 = self._get_host_as_dictionary('host_id_2', 'test_host_2', ['iqn.test.2'], ['wwn2'],
                                               nqn_list=['nqn.test.2'])
-        host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', ['iqn.test.3'], ['wwn3'],
-                                              nqn_list=['nqn.test.3'])
+        if special_host:
+            host_3 = special_host
+        else:
+            host_3 = self._get_host_as_dictionary('host_id_3', 'test_host_3', ['iqn.test.3'], ['wwn3'],
+                                                  nqn_list=['nqn.test.3'])
         hosts = [host_1, host_2, host_3]
         self.svc.client.svcinfo.lshost = Mock()
         self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
@@ -655,9 +658,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
     def test_get_host_by_identifiers_return_iscsi_host_with_list_iqn(self, result_reader_iter):
-        self._prepare_mocks_for_get_host_by_identifiers(result_reader_iter)
-        hostname, connectivity_types = self.svc.get_host_by_host_identifiers(Initiators('', ['Test_wwn'], 'iqn.test.2'))
-        self.assertEqual('test_host_2', hostname)
+        host_with_iqn_list = self._get_host_as_dictionary('host_id_s', 'test_host_s', ['iqn.test.s1', 'iqn.test.s2'],
+                                                          ['wwns'])
+        self._prepare_mocks_for_get_host_by_identifiers(result_reader_iter, special_host=host_with_iqn_list)
+        hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
+            Initiators('', ['Test_wwn'], 'iqn.test.s1'))
+        self.assertEqual('test_host_s', hostname)
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_types)
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
