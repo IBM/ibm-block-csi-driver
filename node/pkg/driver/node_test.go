@@ -55,9 +55,9 @@ func newTestNodeService(nodeUtils driver.NodeUtilsInterface, osDevCon device_con
 
 func newTestNodeServiceStaging(nodeUtils driver.NodeUtilsInterface, osDevCon device_connectivity.OsDeviceConnectivityInterface, nodeMounter driver.NodeMounter) driver.NodeService {
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
-		device_connectivity.ConnectionTypeISCSI:   osDevCon,
-		device_connectivity.ConnectionTypeFC:      osDevCon,
 		device_connectivity.ConnectionTypeNVMEoFC: osDevCon,
+		device_connectivity.ConnectionTypeFC:      osDevCon,
+		device_connectivity.ConnectionTypeISCSI:   osDevCon,
 	}
 
 	return driver.NodeService{
@@ -1184,7 +1184,7 @@ func TestNodeGetInfo(t *testing.T) {
 			name:        "iqn and fc path are inexistent",
 			iscsiExists: false,
 			fcExists:    false,
-			expErr:      status.Error(codes.Internal, fmt.Errorf("Cannot find valid NVME nqn, fc wwns or iscsi iqn").Error()),
+			expErr:      status.Error(codes.Internal, fmt.Errorf("Cannot find valid nvme nqn, fc wwns or iscsi iqn").Error()),
 		},
 		{
 			name:        "iqn path is inexistsent",

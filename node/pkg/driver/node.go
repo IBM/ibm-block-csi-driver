@@ -50,13 +50,13 @@ var (
 	defaultFSType              = "ext4"
 	StageInfoFilename          = ".stageInfo.json"
 	supportedConnectivityTypes = map[string]bool{
-		device_connectivity.ConnectionTypeISCSI:   true,
-		device_connectivity.ConnectionTypeFC:      true,
 		device_connectivity.ConnectionTypeNVMEoFC: true,
+		device_connectivity.ConnectionTypeFC:      true,
+		device_connectivity.ConnectionTypeISCSI:   true,
 	}
 
-	IscsiFullPath = "/host/etc/iscsi/initiatorname.iscsi"
 	NvmeFullPath  = "/host/etc/nvme/hostnqn"
+	IscsiFullPath = "/host/etc/iscsi/initiatorname.iscsi"
 )
 
 const (
@@ -705,9 +705,9 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	logger.Debugf(">>>> NodeGetInfo: called with args %+v", *req)
 	defer logger.Debugf("<<<< NodeGetInfo")
 
-	var iscsiIQN string
 	var nvmeNQN string
 	var fcWWNs []string
+	var iscsiIQN string
 	var err error
 
 	topologyLabels, err := d.NodeUtils.GetTopologyLabels(ctx, d.Hostname)
@@ -734,8 +734,8 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 		iscsiIQN, _ = d.NodeUtils.ParseIscsiInitiators()
 	}
 
-	if fcWWNs == nil && iscsiIQN == "" && nvmeNQN == "" {
-		err := fmt.Errorf("Cannot find valid NVME nqn, fc wwns or iscsi iqn")
+	if nvmeNQN == "" && fcWWNs == nil && iscsiIQN == "" {
+		err := fmt.Errorf("Cannot find valid nvme nqn, fc wwns or iscsi iqn")
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 

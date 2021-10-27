@@ -289,7 +289,7 @@ func TestGetDmsPath(t *testing.T) {
 			name: "Should fail when WaitForDmToExist found more than 1 dm for volume",
 			waitForDmToExistReturn: []WaitForDmToExistReturn{
 				WaitForDmToExistReturn{
-					out: fmt.Sprintf("dm-1,%s\ndm-2,otheruuid\ndm-3,%s", volumeUuid, volumeUuid),
+					out: fmt.Sprintf("dm-1,%s\ndm-2,%s\ndm-3,%s", volumeUuid, "otheruuid", volumeUuid),
 					err: nil,
 				},
 			},
@@ -315,7 +315,7 @@ func TestGetDmsPath(t *testing.T) {
 			name: "Should succeed to GetDmPath",
 			waitForDmToExistReturn: []WaitForDmToExistReturn{
 				WaitForDmToExistReturn{
-					out: fmt.Sprintf("dm-1,%s\ndm-2,otheruuid\ndm-3,otheruuid2", volumeUuid),
+					out: fmt.Sprintf("dm-1,%s\ndm-2,%s\ndm-3,%s", volumeUuid, "otheruuid", "otheruuid2"),
 					err: nil,
 				},
 			},
@@ -385,7 +385,7 @@ func TestHelperWaitForDmToExist(t *testing.T) {
 		},
 		{
 			name:         "Should succeed",
-			devices:      fmt.Sprintf("dm-1,%s\ndm-2,otherUuid", volumeUuid),
+			devices:      fmt.Sprintf("dm-1,%s\ndm-2,%s", volumeUuid, "otherUuid"),
 			cmdReturnErr: nil,
 			expErr:       nil,
 		},
