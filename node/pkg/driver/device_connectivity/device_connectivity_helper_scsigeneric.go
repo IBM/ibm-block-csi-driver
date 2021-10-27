@@ -153,13 +153,13 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	volumeUuid := getVolumeUuid(volumeId)
 
 	volumeUuidLower := strings.ToLower(volumeUuid)
-	volumeNGUID := ConvertScsiIdToNguid(volumeUuidLower)
-	dmPath, _ := r.Helper.GetDmsPath(volumeUuidLower, volumeNGUID)
+	volumeNguid := ConvertScsiIdToNguid(volumeUuidLower)
+	dmPath, _ := r.Helper.GetDmsPath(volumeUuidLower, volumeNguid)
 
 	if dmPath != "" {
 		SgInqWwn, _ := r.Helper.GetWwnByScsiInq(dmPath)
 		SgInqWwnLower := strings.ToLower(SgInqWwn)
-		if SgInqWwnLower == volumeUuidLower || SgInqWwnLower == volumeNGUID {
+		if SgInqWwnLower == volumeUuidLower || SgInqWwnLower == volumeNguid {
 			return dmPath, nil
 		}
 	}
@@ -168,7 +168,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 		return "", err
 	}
 
-	dmPath, err := r.Helper.GetDmsPath(volumeUuidLower, volumeNGUID)
+	dmPath, err := r.Helper.GetDmsPath(volumeUuidLower, volumeNguid)
 
 	if err != nil {
 		return "", err
@@ -183,7 +183,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 		return "", err
 	}
 	SgInqWwnLower := strings.ToLower(SgInqWwn)
-	if SgInqWwnLower != volumeUuidLower && SgInqWwnLower != volumeNGUID {
+	if SgInqWwnLower != volumeUuidLower && SgInqWwnLower != volumeNguid {
 		// To make sure we found the right WWN, if not raise error instead of using wrong mpath
 		return "", &ErrorWrongDeviceFound{dmPath, volumeUuidLower, SgInqWwn}
 	}
@@ -502,7 +502,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeId string, volumeNgu
 //go:generate mockgen -destination=../../../mocks/mock_GetDmsPathHelperInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity GetDmsPathHelperInterface
 
 type GetDmsPathHelperInterface interface {
-	WaitForDmToExist(volumeUuid string, volumeNGUID string, maxRetries int, intervalSeconds int) (string, error)
+	WaitForDmToExist(volumeUuid string, volumeNguid string, maxRetries int, intervalSeconds int) (string, error)
 }
 
 type GetDmsPathHelperGeneric struct {
@@ -523,7 +523,7 @@ func ConvertScsiIdToNguid(scsiId string) string {
 	return finalNguid
 }
 
-func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeUuid string, volumeNGUID string, maxRetries int, intervalSeconds int) (string, error) {
+func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeUuid string, volumeNguid string, maxRetries int, intervalSeconds int) (string, error) {
 	formatTemplate := strings.Join([]string{"%d", "%w"}, MpathdSeparator)
 	args := []string{"show", "maps", "raw", "format", "\"", formatTemplate, "\""}
 	var err error
@@ -534,7 +534,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeUuid string, volumeNGUID
 			return "", err
 		}
 		dms := string(out)
-		if !strings.Contains(dms, volumeUuid) && !strings.Contains(dms, volumeNGUID) {
+		if !strings.Contains(dms, volumeUuid) && !strings.Contains(dms, volumeNguid) {
 			err = os.ErrNotExist
 		} else {
 			return dms, nil
