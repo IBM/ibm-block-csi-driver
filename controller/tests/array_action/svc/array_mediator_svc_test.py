@@ -264,7 +264,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         return Mock(as_single_element=cli_object)
 
     @staticmethod
-    def _get_cli_volume(with_deduplicated_copy=True):
+    def _get_cli_volume(with_deduplicated_copy=True, name='source_volume'):
         se_copy = YES
         deduplicated_copy = 'no'
         compressed_copy = 'no'
@@ -274,7 +274,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             compressed_copy = YES
         return Munch({'vdisk_UID': 'vol_id',
                       'id': 'test_id',
-                      'name': 'source_volume',
+                      'name': name,
                       'capacity': '1024',
                       'mdisk_grp_name': 'pool_name',
                       'FC_id': '',
@@ -833,13 +833,18 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_map_volume_success(self, mock_get_first_free_lun):
         mock_get_first_free_lun.return_value = '5'
         self.svc.client.svctask.mkvdiskhostmap.return_value = None
-        lun = self.svc.map_volume("volume", "host", "")
+        self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=self._get_cli_volume(name='volume'))
+        lun = self.svc.map_volume("volume_id", "host", "")
         self.assertEqual(lun, '5')
+        self.svc.client.svctask.mkvdiskhostmap.assert_called_once_with(host='host', object_id='volume', force=True,
+                                                                       scsi='5')
 
     def test_map_volume_nvme_success(self):
         self.svc.client.svctask.mkvdiskhostmap.return_value = None
+        self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=self._get_cli_volume(name='volume'))
         lun = self.svc.map_volume("volume", "host", config.NVME_OVER_FC_CONNECTIVITY_TYPE)
         self.assertEqual(lun, "")
+        self.svc.client.svctask.mkvdiskhostmap.assert_called_once_with(host='host', object_id='volume', force=True)
 
     def _test_unmap_volume_rmvdiskhostmap_error(self, client_error, expected_error):
         self._test_mediator_method_client_error(self.svc.unmap_volume, ("volume", "host"),
