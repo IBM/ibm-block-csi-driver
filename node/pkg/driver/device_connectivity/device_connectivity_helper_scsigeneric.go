@@ -59,7 +59,7 @@ type WaitForMpathResult struct {
 var (
 	TimeOutMultipathCmd  = 60 * 1000
 	TimeOutMultipathdCmd = 10 * 1000
-	TimeOutBlockdevCmd   = 10 * 1000
+	TimeOutBlockDevCmd   = 10 * 1000
 	TimeOutSgInqCmd      = 3 * 1000
 )
 
@@ -71,7 +71,7 @@ const (
 	WaitForMpathWaitIntervalSec = 1
 	FcHostSysfsPath             = "/sys/class/fc_remote_ports/rport-*/port_name"
 	IscsiHostRexExPath          = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
-	blockdevCmd                 = "blockdev"
+	blockDevCmd                 = "blockdev"
 	mpathdSeparator             = ","
 	multipathdCmd               = "multipathd"
 	multipathCmd                = "multipath"
@@ -192,7 +192,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 
 func (r OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(deviceName string) error {
 	devicePath := filepath.Join(DevPath, deviceName)
-	_, err := r.Executer.ExecuteWithTimeout(TimeOutBlockdevCmd, blockdevCmd, []string{"--flushbufs", devicePath})
+	_, err := r.Executer.ExecuteWithTimeout(TimeOutBlockDevCmd, blockDevCmd, []string{"--flushbufs", devicePath})
 	if err != nil {
 		logger.Errorf("blockdev --flushbufs {%v} did not succeed to flush the device buffers. err={%v}", devicePath,
 			err.Error())
