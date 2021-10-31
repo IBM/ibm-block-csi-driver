@@ -658,7 +658,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_types)
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
-    def test_get_host_by_identifiers_return_iscsi_host_no_other_ports(self, result_reader_iter):
+    def test_get_host_by_identifiers_no_other_ports_return_iscsi_host(self, result_reader_iter):
         host_with_iqn_list = self._get_host_as_dictionary('host_id_s', 'test_host_s', iscsi_names_list=['iqn.test.s'])
         self._prepare_mocks_for_get_host_by_identifiers(result_reader_iter, special_host=host_with_iqn_list)
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
@@ -685,7 +685,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual([config.NVME_OVER_FC_CONNECTIVITY_TYPE], connectivity_types)
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
-    def test_get_host_by_identifiers_return_nvme_host_no_other_ports(self, result_reader_iter):
+    def test_get_host_by_identifiers_no_other_ports_return_nvme_host(self, result_reader_iter):
         host_with_iqn_list = self._get_host_as_dictionary('host_id_s', 'test_host_s', nqn_list=['nqn.test.s'])
         self._prepare_mocks_for_get_host_by_identifiers(result_reader_iter, special_host=host_with_iqn_list)
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
@@ -713,7 +713,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_types)
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
-    def test_get_host_by_identifiers_return_fc_host_no_other_ports(self, result_reader_iter):
+    def test_get_host_by_identifiers_no_other_ports_return_fc_host(self, result_reader_iter):
         host_with_iqn_list = self._get_host_as_dictionary('host_id_s', 'test_host_s', wwpns_list=['WWNs'])
         self._prepare_mocks_for_get_host_by_identifiers(result_reader_iter, special_host=host_with_iqn_list)
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
@@ -852,7 +852,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     @patch("controller.array_action.array_mediator_svc.SVCArrayMediator.get_first_free_lun")
     def _test_map_volume_mkvdiskhostmap_error(self, client_error, expected_error, mock_get_first_free_lun):
         mock_get_first_free_lun.return_value = '1'
-        self._test_mediator_method_client_error(self.svc.map_volume, ("volume", "host", ""),
+        self._test_mediator_method_client_error(self.svc.map_volume, ("volume", "host", "connectivity_type"),
                                                 self.svc.client.svctask.mkvdiskhostmap, client_error,
                                                 expected_error)
 
@@ -872,7 +872,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         mock_get_first_free_lun.return_value = '5'
         self.svc.client.svctask.mkvdiskhostmap.return_value = None
         self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=self._get_cli_volume(name='volume'))
-        lun = self.svc.map_volume("volume_id", "host", "")
+        lun = self.svc.map_volume("volume_id", "host", "connectivity_type")
         self.assertEqual(lun, '5')
         self.svc.client.svctask.mkvdiskhostmap.assert_called_once_with(host='host', object_id='volume', force=True,
                                                                        scsi='5')

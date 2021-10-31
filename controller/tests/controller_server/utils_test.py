@@ -416,21 +416,14 @@ class TestUtils(unittest.TestCase):
         self._check_node_id_parameters(node_id_info, "", fc_wwns, "")
 
     def test_choose_connectivity_types(self):
-        res = utils.choose_connectivity_type([NVME_OVER_FC_CONNECTIVITY_TYPE])
-        self.assertEqual(res, NVME_OVER_FC_CONNECTIVITY_TYPE)
-
-        res = utils.choose_connectivity_type([FC_CONNECTIVITY_TYPE])
-        self.assertEqual(res, FC_CONNECTIVITY_TYPE)
-
-        res = utils.choose_connectivity_type([ISCSI_CONNECTIVITY_TYPE])
-        self.assertEqual(res, ISCSI_CONNECTIVITY_TYPE)
-
-        res = utils.choose_connectivity_type(
-            [NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE])
-        self.assertEqual(res, NVME_OVER_FC_CONNECTIVITY_TYPE)
-
-        res = utils.choose_connectivity_type([FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE])
-        self.assertEqual(res, FC_CONNECTIVITY_TYPE)
+        iscsi = ISCSI_CONNECTIVITY_TYPE
+        fc = FC_CONNECTIVITY_TYPE
+        nvme = NVME_OVER_FC_CONNECTIVITY_TYPE
+        expected_chosen_by_connectivities_found = {(iscsi, fc, nvme): nvme, (fc, iscsi): fc, (iscsi,): iscsi, (fc,): fc,
+                                                   (nvme,): nvme}
+        for connectivities_found, expected_chosen_connectivity in expected_chosen_by_connectivities_found.items():
+            actual_chosen = utils.choose_connectivity_type(list(connectivities_found))
+            self.assertEqual(actual_chosen, expected_chosen_connectivity)
 
     def _check_publish_volume_response_parameters(self, lun, connectivity_type, array_initiators):
         publish_volume_response = utils.generate_csi_publish_volume_response(lun, connectivity_type, self.config,
