@@ -3,7 +3,7 @@ module github.com/ibm/ibm-block-csi-driver
 go 1.13
 
 require (
-	github.com/container-storage-interface/spec v1.2.0
+	github.com/container-storage-interface/spec v1.5.0
 	github.com/golang/mock v1.3.1
 	github.com/sirupsen/logrus v1.4.2
 	golang.org/x/sync v0.0.0-20190423024810-112230192c58

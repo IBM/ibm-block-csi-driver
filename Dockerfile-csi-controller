@@ -12,10 +12,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+FROM registry.access.redhat.com/ubi8/python-38:1-68 as builder
+COPY controller/requirements.txt /tmp/
+USER root
+RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
+USER default
+RUN pip3 install --ignore-installed --default-timeout=100 --upgrade pip==21.2.4
+# avoid default boringssl lib, since it does not support z systems
+ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
+RUN pip3 install -r /tmp/requirements.txt
+
+
 FROM registry.access.redhat.com/ubi8/python-38:1-68
 MAINTAINER IBM Storage
 
-ARG VERSION=1.7.0
+ARG VERSION=1.8.0
 ARG BUILD_NUMBER=0
 
 ###Required Labels
@@ -29,13 +40,7 @@ LABEL name="IBM block storage CSI driver controller" \
       io.k8s.description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage." \
       io.openshift.tags=ibm,csi,ibm-block-csi-driver,ibm-block-csi-node
 
-COPY controller/requirements.txt /driver/controller/
-RUN pip3 install --default-timeout=100 --upgrade pip==19.3.1
-# avoid default boringssl lib, since it does not support z systems
-ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
-ENV CRYPTOGRAPHY_DONT_BUILD_RUST=1
-RUN pip3 install -r /driver/controller/requirements.txt
-
+COPY --from=builder /opt/app-root /opt/app-root
 COPY ./common /driver/common
 COPY ./controller /driver/controller
 COPY ./LICENSE /licenses/
@@ -47,5 +52,3 @@ ENV PYTHONPATH=/driver
 # Note: UBI runs with app-user by default.
 
 ENTRYPOINT ["/driver/controller/scripts/entrypoint.sh"]
-
-
