@@ -323,8 +323,9 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_map_volume(self):
         scsi_id = "6005076306FFD3010000000000000001"
         host_name = "test_name"
+        connectivity_type = "fake_connectivity_type"
         self.client_mock.map_volume_to_host.return_value = Munch({"lunid": "01"})
-        lun = self.array.map_volume(scsi_id, host_name, "fake_connectivity_type")
+        lun = self.array.map_volume(scsi_id, host_name, connectivity_type)
         self.assertEqual(lun, 1)
         self.client_mock.map_volume_to_host.assert_called_once_with(host_name, scsi_id[-4:])
 
