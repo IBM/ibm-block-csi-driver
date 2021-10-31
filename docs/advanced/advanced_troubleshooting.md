@@ -112,7 +112,7 @@ For example:
 
 
     statefulset.apps/ibm-block-csi-controller 1 1 2h
-    pod/ibm-block-csi-controller-0 6/6 Running 0 2h
+    pod/ibm-block-csi-controller-0 7/7 Running 0 2h
     pod/ibm-block-csi-node-nbtsg 3/3 Running 0 2h
     pod/ibm-block-csi-node-wd5tm 3/3 Running 0 2h
     pod/ibm-block-csi-operator-7684549698-hzmfh 1/1 Running 0 2h

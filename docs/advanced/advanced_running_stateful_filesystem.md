@@ -27,9 +27,8 @@
 
     2. Wait until the pod is deleted. Once deleted, the `"demo-statefulset-file-system" not found` is returned.
 
-        <pre>
-        $> kubectl get statefulset/demo-statefulset-file-system
-        Error from server (NotFound): statefulsets.apps <StatefulSet name> not found
+            $> kubectl get statefulset/demo-statefulset-file-system
+            Error from server (NotFound): statefulsets.apps <statefulset-name> not found
 
     3. Verify that the multipath was deleted and that the PV mountpoint no longer exists by establishing an SSH connection and logging into the worker node.
           
