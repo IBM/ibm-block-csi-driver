@@ -7,7 +7,7 @@ for envi in $MANDATORY_ENVS; do
 done
 
 # Prepare specific tag for the image
-tags=`scripts/ci/get_image_tags_from_branch.sh ${GIT_BRANCH} ${IMAGE_VERSION} ${BUILD_NUMBER}`
+tags=`scripts/ci/get_image_tags_from_branch.sh ${GIT_BRANCH} ${IMAGE_VERSION} ${BUILD_NUMBER} ${GIT_COMMIT}`
 specific_tag=`echo $tags | awk '{print$1}'`
 
 # Set latest tag only if its from develop branch or master and prepare tags

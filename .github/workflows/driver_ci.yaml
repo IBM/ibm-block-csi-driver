@@ -9,7 +9,7 @@ on:
       - develop
       - master
 jobs:
-  Prepare_env:
+  prepare_env:
    name: "Prepare env"
    runs-on: ubuntu-latest
    steps:
@@ -41,7 +41,7 @@ jobs:
      docker_image_branch_tag: "${{ steps.setup_dependencies.outputs.docker_image_branch_tag }}"
      driver_images_specific_tag: "${{ steps.setup_dependencies.outputs.driver_images_specific_tag }}"
 
-  CSI_controller_static_code_analysis:
+  csi_controller_static_code_analysis:
     runs-on: ubuntu-latest
     name: "CSI controller static code analysis"
     steps:
@@ -51,7 +51,7 @@ jobs:
         run: |
           ./scripts/run_static_code_analysis.sh
 
-  Unit_testing_coverage:
+  unit_testing_coverage:
     runs-on: ubuntu-latest
     name: "Unit testing + coverage ${{ matrix.csiblock-component }}"
     strategy:
@@ -81,9 +81,9 @@ jobs:
         run: |
           ./scripts/run_yamlcheck.sh
 
-  CSI_Build_and_push_images:
+  csi_build_and_push_images:
     runs-on: ubuntu-latest
-    name: "CSI Build and push images"
+    name: "Build and push images"
     needs:
       - CSI_controller_static_code_analysis
       - Unit_testing_coverage
