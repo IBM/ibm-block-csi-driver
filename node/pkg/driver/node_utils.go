@@ -203,7 +203,7 @@ func readAfterPrefix(path string, prefix string, portType string) (string, error
 
 	if prefix != "" {
 		if !strings.Contains(fileOutString, prefix) {
-			return "", fmt.Errorf(ErrorWhileTryingToReadPort, portType, string(fileOut))
+			return "", fmt.Errorf(ErrorWhileTryingToReadPort, portType, fileOutString)
 		}
 		fileOutString = strings.TrimPrefix(fileOutString, prefix)
 	}
