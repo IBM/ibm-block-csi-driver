@@ -151,10 +151,22 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkvolume.assert_called_with(name="test_volume", unit="b", size=1024, pool="pool_name",
                                                             compressed=True)
 
-    def test_create_volume_with_deduplicated_space_efficiency_success(self):
+    def test_create_volume_with_deduplicated_backward_compatibility_space_efficiency_success(self):
         self._test_create_volume_success(config.SPACE_EFFICIENCY_DEDUPLICATED)
         self.svc.client.svctask.mkvolume.assert_called_with(name="test_volume", unit="b", size=1024, pool="pool_name",
                                                             compressed=True, deduplicated=True)
+
+    def test_create_volume_with_deduplicated_compressed_space_efficiency_success(self):
+        self._test_create_volume_success(config.SPACE_EFFICIENCY_DEDUPLICATED_DELIMITER.join(
+            [config.SPACE_EFFICIENCY_DEDUPLICATED, config.SPACE_EFFICIENCY_COMPRESSED]))
+        self.svc.client.svctask.mkvolume.assert_called_with(name="test_volume", unit="b", size=1024, pool="pool_name",
+                                                            compressed=True, deduplicated=True)
+
+    def test_create_volume_with_deduplicated_thin_space_efficiency_success(self):
+        self._test_create_volume_success(config.SPACE_EFFICIENCY_DEDUPLICATED_DELIMITER.join(
+            [config.SPACE_EFFICIENCY_DEDUPLICATED, config.SPACE_EFFICIENCY_THIN]))
+        self.svc.client.svctask.mkvolume.assert_called_with(name="test_volume", unit="b", size=1024, pool="pool_name",
+                                                            thin=True, deduplicated=True)
 
     def _test_create_volume_with_default_space_efficiency_success(self, space_efficiency):
         self._test_create_volume_success(space_efficiency)
@@ -587,6 +599,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.validate_supported_space_efficiency(compressed_space_efficiency)
         deduplicated_space_efficiency = config.SPACE_EFFICIENCY_DEDUPLICATED
         self.svc.validate_supported_space_efficiency(deduplicated_space_efficiency)
+        deduplicated_thin_space_efficiency = config.SPACE_EFFICIENCY_DEDUPLICATED_DELIMITER.join(
+            [config.SPACE_EFFICIENCY_DEDUPLICATED, config.SPACE_EFFICIENCY_THIN])
+        self.svc.validate_supported_space_efficiency(deduplicated_thin_space_efficiency)
+        deduplicated_compressed_space_efficiency = config.SPACE_EFFICIENCY_DEDUPLICATED_DELIMITER.join(
+            [config.SPACE_EFFICIENCY_DEDUPLICATED, config.SPACE_EFFICIENCY_COMPRESSED])
+        self.svc.validate_supported_space_efficiency(deduplicated_compressed_space_efficiency)
 
     def test_build_kwargs_from_parameters(self):
         size = self.svc._convert_size_bytes(1000)
