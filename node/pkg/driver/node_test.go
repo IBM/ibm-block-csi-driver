@@ -55,9 +55,9 @@ func newTestNodeService(nodeUtils driver.NodeUtilsInterface, osDevCon device_con
 
 func newTestNodeServiceStaging(nodeUtils driver.NodeUtilsInterface, osDevCon device_connectivity.OsDeviceConnectivityInterface, nodeMounter driver.NodeMounter) driver.NodeService {
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
-		device_connectivity.ConnectionTypeISCSI:   osDevCon,
-		device_connectivity.ConnectionTypeFC:      osDevCon,
 		device_connectivity.ConnectionTypeNVMEoFC: osDevCon,
+		device_connectivity.ConnectionTypeFC:      osDevCon,
+		device_connectivity.ConnectionTypeISCSI:   osDevCon,
 	}
 
 	return driver.NodeService{
@@ -1139,74 +1139,105 @@ func TestNodeGetInfo(t *testing.T) {
 	topologySegments := map[string]string{"topology.block.csi.ibm.com/zone": "testZone"}
 
 	testCases := []struct {
-		name              string
-		return_iqn        string
-		return_iqn_err    error
-		return_fcs        []string
-		return_fc_err     error
-		return_nodeId_err error
-		expErr            error
-		expNodeId         string
-		iscsiExists       bool
-		fcExists          bool
+		name            string
+		returnNqn       string
+		returnNqnErr    error
+		returnFcs       []string
+		returnFcErr     error
+		returnIqn       string
+		returnIqnErr    error
+		returnNodeidErr error
+		expErr          error
+		expNodeId       string
+		nvmeExists      bool
+		fcExists        bool
+		iscsiExists     bool
 	}{
 		{
-			name:          "good iqn, empty fc with error from node_utils",
-			return_fc_err: fmt.Errorf("some error"),
-			expErr:        status.Error(codes.Internal, fmt.Errorf("some error").Error()),
-			iscsiExists:   true,
-			fcExists:      true,
+			name:        "good iqn, empty fc with error from node_utils",
+			returnFcErr: fmt.Errorf("some error"),
+			expErr:      status.Error(codes.Internal, fmt.Errorf("some error").Error()),
+			nvmeExists:  false,
+			fcExists:    true,
+			iscsiExists: true,
+		},
+		{
+			name:         "empty nqn with error from node_utils, one more fc ports",
+			returnNqnErr: fmt.Errorf("some error"),
+			returnFcs:    []string{"10000000c9934d9f", "10000000c9934d9h"},
+			expNodeId:    "test-host;;10000000c9934d9f:10000000c9934d9h",
+			nvmeExists:   true,
+			fcExists:     true,
+			iscsiExists:  true,
 		},
 		{
 			name:        "empty iqn with error, one fc port",
-			return_fcs:  []string{"10000000c9934d9f"},
-			expNodeId:   "test-host;10000000c9934d9f",
-			iscsiExists: true,
+			returnFcs:   []string{"10000000c9934d9f"},
+			expNodeId:   "test-host;;;10000000c9934d9f",
+			nvmeExists:  false,
 			fcExists:    true,
+			iscsiExists: true,
 		},
 		{
 			name:        "empty iqn with error from node_utils, one more fc ports",
-			return_iqn:  "",
-			return_fcs:  []string{"10000000c9934d9f", "10000000c9934d9h"},
-			expNodeId:   "test-host;10000000c9934d9f:10000000c9934d9h",
-			iscsiExists: true,
+			returnIqn:   "",
+			returnFcs:   []string{"10000000c9934d9f", "10000000c9934d9h"},
+			expNodeId:   "test-host;;10000000c9934d9f:10000000c9934d9h",
+			nvmeExists:  false,
 			fcExists:    true,
+			iscsiExists: true,
 		},
 		{
 			name:        "good iqn and good fcs",
-			return_iqn:  "iqn.1994-07.com.redhat:e123456789",
-			return_fcs:  []string{"10000000c9934d9f", "10000000c9934d9h"},
-			expNodeId:   "test-host;10000000c9934d9f:10000000c9934d9h;iqn.1994-07.com.redhat:e123456789",
+			returnIqn:   "iqn.1994-07.com.redhat:e123456789",
+			returnFcs:   []string{"10000000c9934d9f", "10000000c9934d9h"},
+			expNodeId:   "test-host;;10000000c9934d9f:10000000c9934d9h;iqn.1994-07.com.redhat:e123456789",
+			nvmeExists:  false,
+			fcExists:    true,
 			iscsiExists: true,
-			fcExists:    true,
 		},
 		{
-			name:        "iqn and fc path are inexistent",
+			name:        "good nqn, good fcs and good iqn",
+			returnNqn:   "nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1",
+			returnIqn:   "iqn.1994-07.com.redhat:e123456789",
+			returnFcs:   []string{"10000000c9934d9f", "10000000c9934d9h"},
+			expNodeId:   "test-host;nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1;10000000c9934d9f:10000000c9934d9h;iqn.1994-07.com.redhat:e123456789",
+			nvmeExists:  true,
+			fcExists:    true,
+			iscsiExists: true,
+		},
+		{
+			name:        "nqn, fc and iqn path are inexistent",
 			iscsiExists: false,
+			nvmeExists:  false,
 			fcExists:    false,
-			expErr:      status.Error(codes.Internal, fmt.Errorf("Cannot find valid NVME nqn, fc wwns or iscsi iqn").Error()),
+			expErr:      status.Error(codes.Internal, fmt.Errorf("Cannot find valid nvme nqn, fc wwns or iscsi iqn").Error()),
 		},
 		{
-			name:        "iqn path is inexistsent",
-			iscsiExists: false,
+			name:        "nqn and iqn path is inexistsent",
+			nvmeExists:  false,
 			fcExists:    true,
-			return_fcs:  []string{"10000000c9934d9f"},
-			expNodeId:   "test-host;10000000c9934d9f",
+			iscsiExists: false,
+			returnFcs:   []string{"10000000c9934d9f"},
+			expNodeId:   "test-host;;10000000c9934d9f",
 		},
 		{
 			name:        "fc path is inexistent",
-			iscsiExists: true,
+			nvmeExists:  true,
 			fcExists:    false,
-			return_iqn:  "iqn.1994-07.com.redhat:e123456789",
-			expNodeId:   "test-host;;iqn.1994-07.com.redhat:e123456789",
+			iscsiExists: true,
+			returnNqn:   "nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1",
+			returnIqn:   "iqn.1994-07.com.redhat:e123456789",
+			expNodeId:   "test-host;nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1;;iqn.1994-07.com.redhat:e123456789",
 		}, {
-			name:              "generate NodeID returns error",
-			return_iqn:        "iqn.1994-07.com.redhat:e123456789",
-			return_fcs:        []string{"10000000c9934d9f", "10000000c9934d9h"},
-			return_nodeId_err: fmt.Errorf("some error"),
-			expErr:            status.Error(codes.Internal, fmt.Errorf("some error").Error()),
-			iscsiExists:       true,
-			fcExists:          true,
+			name:            "generate NodeID returns error",
+			returnIqn:       "iqn.1994-07.com.redhat:e123456789",
+			returnFcs:       []string{"10000000c9934d9f", "10000000c9934d9h"},
+			returnNodeidErr: fmt.Errorf("some error"),
+			expErr:          status.Error(codes.Internal, fmt.Errorf("some error").Error()),
+			nvmeExists:      false,
+			fcExists:        true,
+			iscsiExists:     true,
 		},
 	}
 	for _, tc := range testCases {
@@ -1216,23 +1247,26 @@ func TestNodeGetInfo(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			fake_nodeutils := mocks.NewMockNodeUtilsInterface(mockCtrl)
-			d := newTestNodeService(fake_nodeutils, nil, nil)
-			fake_nodeutils.EXPECT().GetTopologyLabels(context.TODO(), d.Hostname).Return(topologySegments, nil)
-			fake_nodeutils.EXPECT().IsPathExists(driver.NvmeFullPath).Return(false)
-			fake_nodeutils.EXPECT().IsFCExists().Return(tc.fcExists)
-			if tc.fcExists {
-				fake_nodeutils.EXPECT().ParseFCPorts().Return(tc.return_fcs, tc.return_fc_err)
+			fakeNodeutils := mocks.NewMockNodeUtilsInterface(mockCtrl)
+			d := newTestNodeService(fakeNodeutils, nil, nil)
+			fakeNodeutils.EXPECT().GetTopologyLabels(context.TODO(), d.Hostname).Return(topologySegments, nil)
+			fakeNodeutils.EXPECT().IsPathExists(driver.NvmeFullPath).Return(tc.nvmeExists)
+			fakeNodeutils.EXPECT().IsFCExists().Return(tc.fcExists)
+			if tc.nvmeExists {
+				fakeNodeutils.EXPECT().ParseNvmeNqn().Return(tc.returnNqn, tc.returnNqnErr)
 			}
-			if tc.return_fc_err == nil {
-				fake_nodeutils.EXPECT().IsPathExists(driver.IscsiFullPath).Return(tc.iscsiExists)
+			if tc.fcExists {
+				fakeNodeutils.EXPECT().ParseFCPorts().Return(tc.returnFcs, tc.returnFcErr)
+			}
+			if tc.returnFcErr == nil {
+				fakeNodeutils.EXPECT().IsPathExists(driver.IscsiFullPath).Return(tc.iscsiExists)
 				if tc.iscsiExists {
-					fake_nodeutils.EXPECT().ParseIscsiInitiators().Return(tc.return_iqn, tc.return_iqn_err)
+					fakeNodeutils.EXPECT().ParseIscsiInitiators().Return(tc.returnIqn, tc.returnIqnErr)
 				}
 			}
 
-			if (tc.iscsiExists || tc.fcExists) && tc.return_fc_err == nil {
-				fake_nodeutils.EXPECT().GenerateNodeID("test-host", "", tc.return_fcs, tc.return_iqn).Return(tc.expNodeId, tc.return_nodeId_err)
+			if tc.returnNqn != "" || len(tc.returnFcs) > 0 || tc.returnIqn != "" {
+				fakeNodeutils.EXPECT().GenerateNodeID("test-host", tc.returnNqn, tc.returnFcs, tc.returnIqn).Return(tc.expNodeId, tc.returnNodeidErr)
 			}
 
 			expTopology := &csi.Topology{Segments: topologySegments}

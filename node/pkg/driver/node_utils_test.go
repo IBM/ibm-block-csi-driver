@@ -36,7 +36,7 @@ import (
 var (
 	nodeUtils    = driver.NewNodeUtils(&executer.Executer{}, nil)
 	hostName     = "test-hostname"
-	longHostName = strings.Repeat("test-hostname", 15)
+	longHostName = strings.Repeat(hostName, 15)
 	nvmeNQN      = "nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1"
 	fcWWNs       = []string{"10000000c9934d9f", "10000000c9934d9h", "10000000c9934d9a", "10000000c9934d9b", "10000000c9934d9z"}
 	iscsiIQN     = "iqn.1994-07.com.redhat:e123456789"
@@ -188,10 +188,10 @@ func TestParseFCPortsName(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 			devicePath := "/sys/class/fc_host/host*/port_name"
-			fake_executer.EXPECT().FilepathGlob(devicePath).Return(fpaths, tc.err)
-			nodeUtils := driver.NewNodeUtils(fake_executer, nil)
+			fakeExecuter.EXPECT().FilepathGlob(devicePath).Return(fpaths, tc.err)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil)
 
 			fcs, err := nodeUtils.ParseFCPorts()
 
@@ -327,7 +327,7 @@ func TestGenerateNodeID(t *testing.T) {
 			nvmeNQN:   nvmeNQN,
 			fcWWNs:    []string{},
 			iscsiIQN:  "",
-			expNodeId: fmt.Sprintf("%s;%s;", hostName, nvmeNQN),
+			expNodeId: fmt.Sprintf("%s;%s", hostName, nvmeNQN),
 		},
 		{name: "success many fc ports and iscsi port",
 			hostName:  hostName,
@@ -364,8 +364,8 @@ func TestGenerateNodeID(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
-			nodeUtils := driver.NewNodeUtils(fake_executer, nil)
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil)
 
 			nodeId, err := nodeUtils.GenerateNodeID(tc.hostName, tc.nvmeNQN, tc.fcWWNs, tc.iscsiIQN)
 
