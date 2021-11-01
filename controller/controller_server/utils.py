@@ -484,10 +484,12 @@ def get_node_id_info(node_id):
     logger.debug("getting node info for node id : {0}".format(node_id))
     split_node = node_id.split(config.PARAMETERS_NODE_ID_DELIMITER)
     hostname, nvme_nqn, fc_wwns, iscsi_iqn = "", "", "", ""
-    if len(split_node) == config.SUPPORTED_CONNECTIVITY_TYPES + 1:
+    if len(split_node) == 4:
         hostname, nvme_nqn, fc_wwns, iscsi_iqn = split_node
     elif len(split_node) == 3:
         hostname, nvme_nqn, fc_wwns = split_node
+    elif len(split_node) == 2:
+        hostname, nvme_nqn = split_node
     else:
         raise array_errors.HostNotFoundError(node_id)
     logger.debug("node name : {0}, nvme_nqn: {1}, fc_wwns : {2}, iscsi_iqn : {3} ".format(

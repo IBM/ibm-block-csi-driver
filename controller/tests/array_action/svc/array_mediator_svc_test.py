@@ -686,8 +686,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
     def test_get_host_by_identifiers_no_other_ports_return_nvme_host(self, result_reader_iter):
-        host_with_iqn_list = self._get_host_as_dictionary('host_id_s', 'test_host_s', nqn_list=['nqn.test.s'])
-        self._prepare_mocks_for_get_host_by_identifiers(result_reader_iter, special_host=host_with_iqn_list)
+        host_with_nqn_list = self._get_host_as_dictionary('host_id_s', 'test_host_s', nqn_list=['nqn.test.s'])
+        self._prepare_mocks_for_get_host_by_identifiers(result_reader_iter, special_host=host_with_nqn_list)
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
             Initiators('nqn.test.s', ['Test_wwn'], 'Test_iqn'))
         self.assertEqual('test_host_s', hostname)
@@ -767,18 +767,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
             current_element = SVCListResultsElement()
             current_element.add(HOST_ID_PARAM, host_dict.get(HOST_ID_PARAM))
             current_element.add(HOST_NAME_PARAM, host_dict.get(HOST_NAME_PARAM))
-            nvme_nqn_list = host_dict.get(HOST_NQN_PARAM)
-            if nvme_nqn_list:
-                for nqn in nvme_nqn_list:
-                    current_element.add(HOST_NQN_PARAM, nqn)
-            wwpns_list = host_dict.get(HOST_WWPNS_PARAM)
-            if wwpns_list:
-                for wwpn in wwpns_list:
-                    current_element.add(HOST_WWPNS_PARAM, wwpn)
-            iscsi_names_list = host_dict.get(HOST_ISCSI_NAMES_PARAM)
-            if iscsi_names_list:
-                for iscsi_name in iscsi_names_list:
-                    current_element.add(HOST_ISCSI_NAMES_PARAM, iscsi_name)
+            nvme_nqn_list = host_dict.get(HOST_NQN_PARAM, [])
+            for nqn in nvme_nqn_list:
+                current_element.add(HOST_NQN_PARAM, nqn)
+            wwpns_list = host_dict.get(HOST_WWPNS_PARAM, [])
+            for wwpn in wwpns_list:
+                current_element.add(HOST_WWPNS_PARAM, wwpn)
+            iscsi_names_list = host_dict.get(HOST_ISCSI_NAMES_PARAM, [])
+            for iscsi_name in iscsi_names_list:
+                current_element.add(HOST_ISCSI_NAMES_PARAM, iscsi_name)
             current_element.add(HOST_PORTSET_ID, host_dict.get(HOST_PORTSET_ID))
             detailed_hosts_list.append(current_element)
         return iter(detailed_hosts_list)

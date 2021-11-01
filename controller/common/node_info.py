@@ -67,4 +67,4 @@ class Initiators:
         return self._nvme_nqn_lowercase in host_nqns_lower
 
     def __str__(self):
-        return "nvme_nqn: " + self.nvme_nqn + ", fc_wwns: " + ",".join(self.fc_wwns) + " iscsi_iqn: " + self.iscsi_iqn
+        return "nvme_nqn: {}, fc_wwns : {}, iscsi_iqn : {} ".format(self.nvme_nqn, self.fc_wwns, self.iscsi_iqn)

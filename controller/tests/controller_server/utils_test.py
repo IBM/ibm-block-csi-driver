@@ -409,7 +409,7 @@ class TestUtils(unittest.TestCase):
         node_id_info = NodeIdInfo("{};{};{}".format(host_name, nvme_nqn, fc_wwns))
         self._check_node_id_parameters(node_id_info, nvme_nqn, fc_wwns, "")
 
-        node_id_info = NodeIdInfo("{};{};".format(host_name, nvme_nqn))
+        node_id_info = NodeIdInfo("{};{}".format(host_name, nvme_nqn))
         self._check_node_id_parameters(node_id_info, nvme_nqn, "", "")
 
         node_id_info = NodeIdInfo("{};;{}".format(host_name, fc_wwns))
