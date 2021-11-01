@@ -177,8 +177,7 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 	}
 	return true
 }
-
-func parseFromFile(path string, prefix string, portType string) (string, error) {
+func readFile(path string) (string, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return "", err
@@ -193,25 +192,29 @@ func parseFromFile(path string, prefix string, portType string) (string, error) 
 
 	fileOutString := string(fileOut)
 
-	if prefix != "" {
-		fileSplit := strings.Split(fileOutString, prefix)
-		if len(fileSplit) != 2 {
-			return "", fmt.Errorf(ErrorWhileTryingToReadPort, portType, string(fileOut))
-		}
-		fileOutString = fileSplit[1]
-	}
-
-	iscsiIqn := strings.TrimSpace(fileOutString)
-
-	return iscsiIqn, nil
+	return fileOutString, nil
 }
 
-func (n NodeUtils) ParseIscsiInitiators() (string, error) {
-	return parseFromFile(IscsiFullPath, "InitiatorName=", device_connectivity.ConnectionTypeISCSI)
+func readAfterPrefix(path string, prefix string, portType string) (string, error) {
+	fileOutString, err := readFile(path)
+	if err != nil {
+		return "", err
+	}
+
+	if prefix != "" {
+		if !strings.Contains(fileOutString, prefix) {
+			return "", fmt.Errorf(ErrorWhileTryingToReadPort, portType, string(fileOut))
+		}
+		fileOutString = strings.TrimPrefix(fileOutString, prefix)
+	}
+
+	trimmedOut := strings.TrimSpace(fileOutString)
+
+	return trimmedOut, nil
 }
 
 func (n NodeUtils) ParseNvmeNqn() (string, error) {
-	return parseFromFile(NvmeFullPath, "", device_connectivity.ConnectionTypeNVMEoFC)
+	return readAfterPrefix(NvmeFullPath, "", device_connectivity.ConnectionTypeNVMEoFC)
 }
 
 func (n NodeUtils) ParseFCPorts() ([]string, error) {
@@ -228,7 +231,7 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 	}
 
 	for _, fpath := range fpaths {
-		fcPort, err = parseFromFile(fpath, "0x", device_connectivity.ConnectionTypeFC)
+		fcPort, err = readAfterPrefix(fpath, "0x", device_connectivity.ConnectionTypeFC)
 		if err != nil {
 			errs = append(errs, err)
 		} else {
@@ -245,6 +248,10 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 	}
 
 	return fcPorts, nil
+}
+
+func (n NodeUtils) ParseIscsiInitiators() (string, error) {
+	return readAfterPrefix(IscsiFullPath, "InitiatorName=", device_connectivity.ConnectionTypeISCSI)
 }
 
 func (n NodeUtils) IsFCExists() bool {
@@ -455,7 +462,8 @@ func (n NodeUtils) GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []stri
 		}
 	}
 
-	return nodeId.String(), nil
+	finalNodeId := strings.TrimSuffix(nodeId.String(), ";")
+	return finalNodeId, nil
 }
 
 func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error) {

@@ -63,7 +63,7 @@ var (
 
 const (
 	DevPath                     = "/dev"
-	ConnectionTypeNVMEoFC       = "nvmeof"
+	ConnectionTypeNVMEoFC       = "nvmeofc"
 	ConnectionTypeFC            = "fc"
 	ConnectionTypeISCSI         = "iscsi"
 	WaitForMpathRetries         = 5
