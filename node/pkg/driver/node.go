@@ -718,7 +718,10 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 
 	nvmeExists := d.NodeUtils.IsPathExists(NvmeFullPath)
 	if nvmeExists {
-		nvmeNQN, _ = d.NodeUtils.ParseNvmeNqn()
+		nvmeNQN, err = d.NodeUtils.ParseNvmeNqn()
+		if err != nil {
+			logger.Warning(err)
+		}
 	}
 
 	fcExists := d.NodeUtils.IsFCExists()
@@ -731,7 +734,10 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 
 	iscsiExists := d.NodeUtils.IsPathExists(IscsiFullPath)
 	if iscsiExists {
-		iscsiIQN, _ = d.NodeUtils.ParseIscsiInitiators()
+		iscsiIQN, err = d.NodeUtils.ParseIscsiInitiators()
+		if err != nil {
+			logger.Warning(err)
+		}
 	}
 
 	if nvmeNQN == "" && fcWWNs == nil && iscsiIQN == "" {
