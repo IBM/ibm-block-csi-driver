@@ -112,6 +112,12 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, c
 			return "", -1, nil, err
 		}
 	}
+	if connectivityType == device_connectivity.ConnectionTypeFC {
+		wwns := strings.Split(publishContext[configYaml.Controller.Publish_context_fc_initiators], PublishContextSeparator)
+		for _, wwn := range wwns {
+			ipsByArrayInitiator[wwn] = nil
+		}
+	}
 	if connectivityType == device_connectivity.ConnectionTypeISCSI {
 		iqns := strings.Split(publishContext[configYaml.Controller.Publish_context_array_iqn], PublishContextSeparator)
 		for _, iqn := range iqns {
@@ -120,12 +126,6 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, c
 			} else {
 				logger.Errorf("Publish context does not contain any iscsi target IP for {%v}", iqn)
 			}
-		}
-	}
-	if connectivityType == device_connectivity.ConnectionTypeFC {
-		wwns := strings.Split(publishContext[configYaml.Controller.Publish_context_fc_initiators], PublishContextSeparator)
-		for _, wwn := range wwns {
-			ipsByArrayInitiator[wwn] = nil
 		}
 	}
 
