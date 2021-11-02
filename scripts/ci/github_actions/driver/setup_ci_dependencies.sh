@@ -15,7 +15,7 @@ get_driver_version (){
 
 install_ci_dependencies
 driver_version=$(get_driver_version)
-triggering_branch = ${CI_ACTION_REF_NAME}
+triggering_branch=${CI_ACTION_REF_NAME}
 driver_image_tags=$(scripts/ci/get_image_tags_from_branch.sh ${triggering_branch} ${driver_version} ${build_number} ${GITHUB_SHA})
 driver_images_specific_tag=$(echo $driver_image_tags | awk '{print$1}')
 
