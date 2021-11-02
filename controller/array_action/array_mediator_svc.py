@@ -89,8 +89,8 @@ def build_kwargs_from_parameters(space_efficiency, pool_name, volume_name,
             cli_kwargs.update({'compressed': True})
         elif space_efficiency == config.SPACE_EFFICIENCY_DEDUPLICATED_THIN:
             cli_kwargs.update({'deduplicated': True, 'thin': True})
-        elif space_efficiency in [config.SPACE_EFFICIENCY_DEDUPLICATED,
-                                  config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED]:
+        elif space_efficiency in (config.SPACE_EFFICIENCY_DEDUPLICATED,
+                                  config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED):
             cli_kwargs.update({'deduplicated': True, 'compressed': True})
     return cli_kwargs
 

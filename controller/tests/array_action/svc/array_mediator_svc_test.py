@@ -151,20 +151,20 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkvolume.assert_called_with(name="test_volume", unit="b", size=1024, pool="pool_name",
                                                             compressed=True)
 
-    def test_create_volume_with_deduplicated_backward_compatibility_space_efficiency_success(self):
-        self._test_create_volume_success(config.SPACE_EFFICIENCY_DEDUPLICATED)
+    def test_create_volume_with_deduplicated_thin_space_efficiency_success(self):
+        self._test_create_volume_success(config.SPACE_EFFICIENCY_DEDUPLICATED_THIN)
         self.svc.client.svctask.mkvolume.assert_called_with(name="test_volume", unit="b", size=1024, pool="pool_name",
-                                                            deduplicated=True, compressed=True)
+                                                            deduplicated=True, thin=True)
 
     def test_create_volume_with_deduplicated_compressed_space_efficiency_success(self):
         self._test_create_volume_success(config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED)
         self.svc.client.svctask.mkvolume.assert_called_with(name="test_volume", unit="b", size=1024, pool="pool_name",
                                                             deduplicated=True, compressed=True)
 
-    def test_create_volume_with_deduplicated_thin_space_efficiency_success(self):
-        self._test_create_volume_success(config.SPACE_EFFICIENCY_DEDUPLICATED_THIN)
+    def test_create_volume_with_deduplicated_backward_compatibility_space_efficiency_success(self):
+        self._test_create_volume_success(config.SPACE_EFFICIENCY_DEDUPLICATED)
         self.svc.client.svctask.mkvolume.assert_called_with(name="test_volume", unit="b", size=1024, pool="pool_name",
-                                                            deduplicated=True, thin=True)
+                                                            deduplicated=True, compressed=True)
 
     def _test_create_volume_with_default_space_efficiency_success(self, space_efficiency):
         self._test_create_volume_success(space_efficiency)
