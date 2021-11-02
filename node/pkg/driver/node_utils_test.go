@@ -74,7 +74,7 @@ func TestParseNVMEnqn(t *testing.T) {
 
 				defer func() {
 					os.Remove(tmpFile.Name())
-					driver.IscsiFullPath = "/host/etc/nvme/hostnqn"
+					driver.NvmeFullPath = "/host/etc/nvme/hostnqn"
 				}()
 
 				fmt.Println("Created File: " + tmpFile.Name())
@@ -350,7 +350,7 @@ func TestGenerateNodeID(t *testing.T) {
 			iscsiIQN: "",
 			expErr:   errors.New(fmt.Sprintf("could not fit any ports in node id: %s;;, length limit: 192", longHostName)),
 		},
-		{name: "fail long hostName on iscsi ports",
+		{name: "fail long hostName on iscsi port",
 			hostName: longHostName,
 			nvmeNQN:  "",
 			fcWWNs:   []string{},

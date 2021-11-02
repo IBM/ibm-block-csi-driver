@@ -1146,7 +1146,7 @@ func TestNodeGetInfo(t *testing.T) {
 		returnFcErr     error
 		returnIqn       string
 		returnIqnErr    error
-		returnNodeidErr error
+		returnNodeIdErr error
 		expErr          error
 		expNodeId       string
 		nvmeExists      bool
@@ -1208,9 +1208,9 @@ func TestNodeGetInfo(t *testing.T) {
 		},
 		{
 			name:        "nqn, fc and iqn path are inexistent",
-			iscsiExists: false,
 			nvmeExists:  false,
 			fcExists:    false,
+			iscsiExists: false,
 			expErr:      status.Error(codes.Internal, fmt.Errorf("Cannot find valid nvme nqn, fc wwns or iscsi iqn").Error()),
 		},
 		{
@@ -1233,7 +1233,7 @@ func TestNodeGetInfo(t *testing.T) {
 			name:            "generate NodeID returns error",
 			returnIqn:       "iqn.1994-07.com.redhat:e123456789",
 			returnFcs:       []string{"10000000c9934d9f", "10000000c9934d9h"},
-			returnNodeidErr: fmt.Errorf("some error"),
+			returnNodeIdErr: fmt.Errorf("some error"),
 			expErr:          status.Error(codes.Internal, fmt.Errorf("some error").Error()),
 			nvmeExists:      false,
 			fcExists:        true,
@@ -1266,7 +1266,7 @@ func TestNodeGetInfo(t *testing.T) {
 			}
 
 			if tc.returnNqn != "" || len(tc.returnFcs) > 0 || tc.returnIqn != "" {
-				fakeNodeutils.EXPECT().GenerateNodeID("test-host", tc.returnNqn, tc.returnFcs, tc.returnIqn).Return(tc.expNodeId, tc.returnNodeidErr)
+				fakeNodeutils.EXPECT().GenerateNodeID("test-host", tc.returnNqn, tc.returnFcs, tc.returnIqn).Return(tc.expNodeId, tc.returnNodeIdErr)
 			}
 
 			expTopology := &csi.Topology{Segments: topologySegments}
