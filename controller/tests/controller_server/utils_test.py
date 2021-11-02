@@ -416,11 +416,12 @@ class TestUtils(unittest.TestCase):
         self._check_node_id_parameters(node_id_info, "", fc_wwns, "")
 
     def test_choose_connectivity_types(self):
-        iscsi = ISCSI_CONNECTIVITY_TYPE
-        fc = FC_CONNECTIVITY_TYPE
         nvme = NVME_OVER_FC_CONNECTIVITY_TYPE
-        expected_chosen_by_connectivities_found = {(iscsi, fc, nvme): nvme, (fc, iscsi): fc, (iscsi,): iscsi, (fc,): fc,
-                                                   (nvme,): nvme}
+        fc = FC_CONNECTIVITY_TYPE
+        iscsi = ISCSI_CONNECTIVITY_TYPE
+        expected_chosen_by_connectivities_found = {(nvme, fc, iscsi): nvme, (fc, iscsi): fc, (nvme,): nvme, (fc,): fc,
+                                                   (iscsi,): iscsi
+                                                   }
         for connectivities_found, expected_chosen_connectivity in expected_chosen_by_connectivities_found.items():
             actual_chosen = utils.choose_connectivity_type(list(connectivities_found))
             self.assertEqual(actual_chosen, expected_chosen_connectivity)
