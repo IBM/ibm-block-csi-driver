@@ -15,10 +15,11 @@ get_driver_version (){
 
 install_ci_dependencies
 driver_version=$(get_driver_version)
-driver_image_tags=$(scripts/ci/get_image_tags_from_branch.sh ${CI_ACTION_REF_NAME} ${driver_version} ${build_number} ${GITHUB_SHA})
+triggering_branch = ${CI_ACTION_REF_NAME}
+driver_image_tags=$(scripts/ci/get_image_tags_from_branch.sh ${triggering_branch} ${driver_version} ${build_number} ${GITHUB_SHA})
 driver_images_specific_tag=$(echo $driver_image_tags | awk '{print$1}')
 
-if [ "$CI_ACTION_REF_NAME" == "develop" ]; then
+if [ "$triggering_branch" == "develop" ]; then
   docker_image_branch_tag=latest
 else
   docker_image_branch_tag=$(echo $driver_image_tags | awk '{print$2}')

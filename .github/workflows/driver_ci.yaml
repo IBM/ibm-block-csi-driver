@@ -73,7 +73,7 @@ jobs:
 
   k8s_yamls_validation:
     runs-on: ubuntu-latest
-    name: "CSI deployment k8s yamls validation"
+    name: "Deployment k8s yamls validation"
     steps:
       - name: Checkout
         uses: actions/checkout@v2
