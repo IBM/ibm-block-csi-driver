@@ -2,13 +2,11 @@
 
 IBM® block storage CSI driver 1.7.0 introduces the enhancements that are detailed in the following section.
 
-**General availability date:** 30 September 2021
+**General availability date:** 30 December 2021
 
-## Now supports CSI Topology
+## New HyperSwap support for IBM Spectrum Virtualize Family storage systems
 
-IBM® block storage CSI driver 1.7.0 is now topology aware. Using this feature, volume access can be limited to a subset of nodes, based on regions and availability zones. Nodes can be located in various regions within an availability zone, or across the different availability zones. Using CSI Topology feature can ease volume provisioning for workloads within a multi-zone architecture.
-
-For more information, see [CSI Topology Feature](https://kubernetes-csi.github.io/docs/topology.html).
+IBM® block storage CSI driver 1.7.0 now supports HyperSwap implementation, When using IBM Spectrum Virtualize Family storage systems.
 
 ## New volume replication support for IBM Spectrum Virtualize Family storage systems
 
