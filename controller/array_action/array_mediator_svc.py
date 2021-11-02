@@ -87,11 +87,11 @@ def build_kwargs_from_parameters(space_efficiency, pool_name, volume_name,
             cli_kwargs.update({'thin': True})
         elif space_efficiency == config.SPACE_EFFICIENCY_COMPRESSED:
             cli_kwargs.update({'compressed': True})
-        elif config.SPACE_EFFICIENCY_DEDUPLICATED in space_efficiency:
-            if config.SPACE_EFFICIENCY_THIN in space_efficiency:
-                cli_kwargs.update({'thin': True, 'deduplicated': True})
-            else:
-                cli_kwargs.update({'compressed': True, 'deduplicated': True})
+        elif space_efficiency == config.SPACE_EFFICIENCY_DEDUPLICATED_THIN:
+            cli_kwargs.update({'deduplicated': True, 'thin': True})
+        elif space_efficiency in [config.SPACE_EFFICIENCY_DEDUPLICATED,
+                                  config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED]:
+            cli_kwargs.update({'deduplicated': True, 'compressed': True})
     return cli_kwargs
 
 
@@ -131,11 +131,9 @@ def _get_cli_volume_space_efficiency(cli_volume):
     if hasattr(cli_volume, "deduplicated_copy"):
         if cli_volume.deduplicated_copy == YES:
             if cli_volume.se_copy == YES:
-                space_efficiency = config.SPACE_EFFICIENCY_DEDUPLICATED_DELIMITER.join(
-                    [config.SPACE_EFFICIENCY_DEDUPLICATED, config.SPACE_EFFICIENCY_THIN])
+                space_efficiency = config.SPACE_EFFICIENCY_DEDUPLICATED_THIN
             else:
-                space_efficiency = config.SPACE_EFFICIENCY_DEDUPLICATED_DELIMITER.join(
-                    [config.SPACE_EFFICIENCY_DEDUPLICATED, config.SPACE_EFFICIENCY_COMPRESSED])
+                space_efficiency = config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED
     return space_efficiency
 
 
@@ -351,16 +349,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def validate_supported_space_efficiency(self, space_efficiency):
         logger.debug("validate_supported_space_efficiency for "
                      "space efficiency : {0}".format(space_efficiency))
-        deduplication_check = space_efficiency.split(config.SPACE_EFFICIENCY_DEDUPLICATED_DELIMITER)
-        if len(deduplication_check) == 2:
-            if deduplication_check[0] != config.SPACE_EFFICIENCY_DEDUPLICATED or deduplication_check[1] not in \
-                    [config.SPACE_EFFICIENCY_THIN, config.SPACE_EFFICIENCY_COMPRESSED]:
-                raise array_errors.SpaceEfficiencyNotSupported(
-                    space_efficiency)
-        elif (space_efficiency and space_efficiency.lower() not in
+        if (space_efficiency and space_efficiency.lower() not in
                 [config.SPACE_EFFICIENCY_THIN, config.SPACE_EFFICIENCY_THICK,
                  config.SPACE_EFFICIENCY_COMPRESSED,
-                 config.SPACE_EFFICIENCY_DEDUPLICATED]):
+                 config.SPACE_EFFICIENCY_DEDUPLICATED,
+                 config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED,
+                 config.SPACE_EFFICIENCY_DEDUPLICATED_THIN]):
             logger.error("space efficiency value is not "
                          "supported {0}".format(space_efficiency))
             raise array_errors.SpaceEfficiencyNotSupported(
