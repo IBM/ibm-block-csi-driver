@@ -358,8 +358,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 [config.SPACE_EFFICIENCY_THIN, config.SPACE_EFFICIENCY_THICK,
                  config.SPACE_EFFICIENCY_COMPRESSED,
                  config.SPACE_EFFICIENCY_DEDUPLICATED,
-                 config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED,
-                 config.SPACE_EFFICIENCY_DEDUPLICATED_THIN]):
+                 config.SPACE_EFFICIENCY_DEDUPLICATED_THIN,
+                 config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED]):
             logger.error("space efficiency value is not "
                          "supported {0}".format(space_efficiency))
             raise array_errors.SpaceEfficiencyNotSupported(
