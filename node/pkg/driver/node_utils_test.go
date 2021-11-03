@@ -138,7 +138,7 @@ func TestParseFCPortsName(t *testing.T) {
 			expFCPorts:    []string{"10000000c9934d9f"},
 		},
 		{
-			name:          "one fc port file with wrong content, another is good",
+			name:          "one fc port file with wrong content, another is valid",
 			file_contents: []string{"wrong content", "0x10000000c9934dab"},
 			expFCPorts:    []string{"10000000c9934dab"},
 		},
