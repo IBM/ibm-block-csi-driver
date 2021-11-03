@@ -602,8 +602,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         deduplicated_compressed_space_efficiency = config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED
         self.svc.validate_supported_space_efficiency(deduplicated_compressed_space_efficiency)
 
-    def _test_test_build_kwargs_from_parameters(self, space_efficiency, pool, name, size, thin=False, compressed=False,
-                                                deduplicated=False):
+    def _test_build_kwargs_from_parameters(self, space_efficiency, pool, name, size, thin=False, compressed=False,
+                                           deduplicated=False):
         expected_kwargs = {'name': name, 'unit': 'b', 'size': size, 'pool': pool}
         if thin:
             expected_kwargs.update({'thin': True})
@@ -611,20 +611,20 @@ class TestArrayMediatorSVC(unittest.TestCase):
             expected_kwargs.update({'compressed': True})
         if deduplicated:
             expected_kwargs.update({'deduplicated': True})
-        returned_kwargs = build_kwargs_from_parameters(space_efficiency, pool, name, size)
-        self.assertDictEqual(returned_kwargs, expected_kwargs)
+        actual_kwargs = build_kwargs_from_parameters(space_efficiency, pool, name, size)
+        self.assertDictEqual(actual_kwargs, expected_kwargs)
 
     def test_build_kwargs_from_parameters(self):
         size = self.svc._convert_size_bytes(1000)
 
-        self._test_test_build_kwargs_from_parameters('Thin', 'P1', 'V1', size, thin=True)
-        self._test_test_build_kwargs_from_parameters('compressed', 'P2', 'V2', size, compressed=True)
-        self._test_test_build_kwargs_from_parameters('dedup_thin', 'P3', 'V3', self.svc._convert_size_bytes(2048),
-                                                     thin=True, deduplicated=True)
-        self._test_test_build_kwargs_from_parameters('dedup_compressed', 'P3', 'V3', self.svc._convert_size_bytes(2048),
-                                                     compressed=True, deduplicated=True)
-        self._test_test_build_kwargs_from_parameters('Deduplicated', 'P3', 'V3', self.svc._convert_size_bytes(2048),
-                                                     compressed=True, deduplicated=True)
+        self._test_build_kwargs_from_parameters('Thin', 'P1', 'V1', size, thin=True)
+        self._test_build_kwargs_from_parameters('compressed', 'P2', 'V2', size, compressed=True)
+        self._test_build_kwargs_from_parameters('dedup_thin', 'P3', 'V3', self.svc._convert_size_bytes(2048),
+                                                thin=True, deduplicated=True)
+        self._test_build_kwargs_from_parameters('dedup_compressed', 'P3', 'V3', self.svc._convert_size_bytes(2048),
+                                                compressed=True, deduplicated=True)
+        self._test_build_kwargs_from_parameters('Deduplicated', 'P3', 'V3', self.svc._convert_size_bytes(2048),
+                                                compressed=True, deduplicated=True)
 
     def test_properties(self):
         self.assertEqual(SVCArrayMediator.port, 22)

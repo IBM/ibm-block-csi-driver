@@ -95,8 +95,8 @@ def build_kwargs_from_parameters(space_efficiency, pool_name, volume_name,
         'size': volume_size,
         'pool': pool_name
     })
-    array_space_efficiency = _get_array_space_efficiency(space_efficiency)
-    cli_kwargs.update(array_space_efficiency)
+    space_efficiency_kwargs = _get_array_space_efficiency(space_efficiency)
+    cli_kwargs.update(space_efficiency_kwargs)
     return cli_kwargs
 
 
