@@ -419,9 +419,10 @@ class TestUtils(unittest.TestCase):
         nvme = NVME_OVER_FC_CONNECTIVITY_TYPE
         fc = FC_CONNECTIVITY_TYPE
         iscsi = ISCSI_CONNECTIVITY_TYPE
-        expected_chosen_by_connectivities_found = {(nvme, fc, iscsi): nvme, (fc, iscsi): fc, (nvme,): nvme, (fc,): fc,
-                                                   (iscsi,): iscsi
-                                                   }
+        expected_chosen_by_connectivities_found = {
+            (nvme, fc, iscsi): nvme, (fc, iscsi): fc,
+            (nvme,): nvme, (fc,): fc, (iscsi,): iscsi
+        }
         for connectivities_found, expected_chosen_connectivity in expected_chosen_by_connectivities_found.items():
             actual_chosen = utils.choose_connectivity_type(list(connectivities_found))
             self.assertEqual(actual_chosen, expected_chosen_connectivity)
