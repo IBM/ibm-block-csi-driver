@@ -71,7 +71,7 @@ def is_warning_message(ex):
     return False
 
 
-def _get_array_space_efficiency(space_efficiency):
+def _get_space_efficiency_kwargs(space_efficiency):
     if space_efficiency:
         space_efficiency = space_efficiency.lower()
         if space_efficiency == config.SPACE_EFFICIENCY_THIN:
@@ -95,7 +95,7 @@ def build_kwargs_from_parameters(space_efficiency, pool_name, volume_name,
         'size': volume_size,
         'pool': pool_name
     })
-    space_efficiency_kwargs = _get_array_space_efficiency(space_efficiency)
+    space_efficiency_kwargs = _get_space_efficiency_kwargs(space_efficiency)
     cli_kwargs.update(space_efficiency_kwargs)
     return cli_kwargs
 
