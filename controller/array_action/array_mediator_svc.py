@@ -71,6 +71,21 @@ def is_warning_message(ex):
     return False
 
 
+def _get_array_space_efficiency(space_efficiency):
+    if space_efficiency:
+        space_efficiency = space_efficiency.lower()
+        if space_efficiency == config.SPACE_EFFICIENCY_THIN:
+            return {'thin': True}
+        elif space_efficiency == config.SPACE_EFFICIENCY_COMPRESSED:
+            return {'compressed': True}
+        elif space_efficiency == config.SPACE_EFFICIENCY_DEDUPLICATED_THIN:
+            return {'deduplicated': True, 'thin': True}
+        elif space_efficiency in (config.SPACE_EFFICIENCY_DEDUPLICATED,
+                                  config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED):
+            return {'deduplicated': True, 'compressed': True}
+    return {}
+
+
 def build_kwargs_from_parameters(space_efficiency, pool_name, volume_name,
                                  volume_size):
     cli_kwargs = {}
@@ -80,18 +95,8 @@ def build_kwargs_from_parameters(space_efficiency, pool_name, volume_name,
         'size': volume_size,
         'pool': pool_name
     })
-    # if space efficiency == None, create default space efficiency volume thick
-    if space_efficiency:
-        space_efficiency = space_efficiency.lower()
-        if space_efficiency == config.SPACE_EFFICIENCY_THIN:
-            cli_kwargs.update({'thin': True})
-        elif space_efficiency == config.SPACE_EFFICIENCY_COMPRESSED:
-            cli_kwargs.update({'compressed': True})
-        elif space_efficiency == config.SPACE_EFFICIENCY_DEDUPLICATED_THIN:
-            cli_kwargs.update({'deduplicated': True, 'thin': True})
-        elif space_efficiency in (config.SPACE_EFFICIENCY_DEDUPLICATED,
-                                  config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED):
-            cli_kwargs.update({'deduplicated': True, 'compressed': True})
+    array_space_efficiency = _get_array_space_efficiency(space_efficiency)
+    cli_kwargs.update(array_space_efficiency)
     return cli_kwargs
 
 
