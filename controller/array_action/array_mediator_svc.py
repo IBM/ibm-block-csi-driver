@@ -76,12 +76,12 @@ def _get_array_space_efficiency(space_efficiency):
         space_efficiency = space_efficiency.lower()
         if space_efficiency == config.SPACE_EFFICIENCY_THIN:
             return {'thin': True}
-        elif space_efficiency == config.SPACE_EFFICIENCY_COMPRESSED:
+        if space_efficiency == config.SPACE_EFFICIENCY_COMPRESSED:
             return {'compressed': True}
-        elif space_efficiency == config.SPACE_EFFICIENCY_DEDUPLICATED_THIN:
+        if space_efficiency == config.SPACE_EFFICIENCY_DEDUPLICATED_THIN:
             return {'deduplicated': True, 'thin': True}
-        elif space_efficiency in (config.SPACE_EFFICIENCY_DEDUPLICATED,
-                                  config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED):
+        if space_efficiency in (config.SPACE_EFFICIENCY_DEDUPLICATED,
+                                config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED):
             return {'deduplicated': True, 'compressed': True}
     return {}
 
