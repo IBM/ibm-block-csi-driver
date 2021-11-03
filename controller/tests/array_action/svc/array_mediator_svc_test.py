@@ -659,21 +659,22 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
     def test_get_host_by_identifiers_no_other_ports_return_iscsi_host(self, result_reader_iter):
-        host_with_iqn = self._get_host_as_dictionary('host_id_s', 'test_host_s', iscsi_names_list=['iqn.test.s'])
+        host_with_iqn = self._get_host_as_dictionary('host_id_costume', 'test_costume_host',
+                                                     iscsi_names_list=['iqn.test.costume'])
         self._prepare_mocks_for_get_host_by_identifiers(result_reader_iter, special_host=host_with_iqn)
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('Test_nqn', ['Test_wwn'], 'iqn.test.s'))
-        self.assertEqual('test_host_s', hostname)
+            Initiators('Test_nqn', ['Test_wwn'], 'iqn.test.costume'))
+        self.assertEqual('test_costume_host', hostname)
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_types)
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
     def test_get_host_by_identifiers_return_iscsi_host_with_list_iqn(self, result_reader_iter):
-        host_with_iqn_list = self._get_host_as_dictionary('host_id_s', 'test_host_s', wwpns_list=['wwns'],
+        host_with_iqn_list = self._get_host_as_dictionary('host_id_costume', 'test_costume_host', wwpns_list=['wwns'],
                                                           iscsi_names_list=['iqn.test.s1', 'iqn.test.s2'])
         self._prepare_mocks_for_get_host_by_identifiers(result_reader_iter, special_host=host_with_iqn_list)
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
             Initiators('Test_nqn', ['Test_wwn'], 'iqn.test.s1'))
-        self.assertEqual('test_host_s', hostname)
+        self.assertEqual('test_costume_host', hostname)
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_types)
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
@@ -686,11 +687,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
     def test_get_host_by_identifiers_no_other_ports_return_nvme_host(self, result_reader_iter):
-        host_with_nqn = self._get_host_as_dictionary('host_id_s', 'test_host_s', nqn_list=['nqn.test.s'])
+        host_with_nqn = self._get_host_as_dictionary('host_id_costume', 'test_costume_host',
+                                                     nqn_list=['nqn.test.costume'])
         self._prepare_mocks_for_get_host_by_identifiers(result_reader_iter, special_host=host_with_nqn)
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('nqn.test.s', ['Test_wwn'], 'Test_iqn'))
-        self.assertEqual('test_host_s', hostname)
+            Initiators('nqn.test.costume', ['Test_wwn'], 'Test_iqn'))
+        self.assertEqual('test_costume_host', hostname)
         self.assertEqual([config.NVME_OVER_FC_CONNECTIVITY_TYPE], connectivity_types)
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
@@ -714,11 +716,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
     def test_get_host_by_identifiers_no_other_ports_return_fc_host(self, result_reader_iter):
-        host_with_wwpn = self._get_host_as_dictionary('host_id_s', 'test_host_s', wwpns_list=['WWNs'])
+        host_with_wwpn = self._get_host_as_dictionary('host_id_costume', 'test_costume_host', wwpns_list=['WWNs'])
         self._prepare_mocks_for_get_host_by_identifiers(result_reader_iter, special_host=host_with_wwpn)
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
             Initiators('Test_nqn', ['Test_wwn', 'WWNs'], 'Test_iqn'))
-        self.assertEqual('test_host_s', hostname)
+        self.assertEqual('test_costume_host', hostname)
         self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_types)
 
     @patch("controller.array_action.svc_cli_result_reader.SVCListResultsReader.__iter__")
