@@ -185,14 +185,15 @@ func readFile(path string) (string, error) {
 
 	defer file.Close()
 
-	contentByte, err := ioutil.ReadAll(file)
+	RawContent, err := ioutil.ReadAll(file)
 	if err != nil {
 		return "", err
 	}
 
-	contentString := string(contentByte)
+	content := string(RawContent)
+	trimmedContent := strings.TrimSpace(content)
 
-	return contentString, nil
+	return trimmedContent, nil
 }
 
 func readAfterPrefix(path string, prefix string, portType string) (string, error) {
@@ -201,20 +202,16 @@ func readAfterPrefix(path string, prefix string, portType string) (string, error
 		return "", err
 	}
 
-	if prefix != "" {
-		if !strings.HasPrefix(fileContent, prefix) {
-			return "", fmt.Errorf(ErrorWhileTryingToReadPort, portType, fileContent)
-		}
-		fileContent = strings.TrimPrefix(fileContent, prefix)
+	if !strings.HasPrefix(fileContent, prefix) {
+		return "", fmt.Errorf(ErrorWhileTryingToReadPort, portType, fileContent)
 	}
+	contentPostfix := strings.TrimPrefix(fileContent, prefix)
 
-	trimmedContent := strings.TrimSpace(fileContent)
-
-	return trimmedContent, nil
+	return contentPostfix, nil
 }
 
 func (n NodeUtils) ParseNvmeNqn() (string, error) {
-	return readAfterPrefix(NvmeFullPath, "", device_connectivity.ConnectionTypeNVMEoFC)
+	return readFile(NvmeFullPath)
 }
 
 func (n NodeUtils) ParseFCPorts() ([]string, error) {
