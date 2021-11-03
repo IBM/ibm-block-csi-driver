@@ -1245,7 +1245,7 @@ func TestNodeGetInfo(t *testing.T) {
 			fakeNodeutils.EXPECT().IsPathExists(driver.NvmeFullPath).Return(tc.nvmeExists)
 			fakeNodeutils.EXPECT().IsFCExists().Return(tc.fcExists)
 			if tc.nvmeExists {
-				fakeNodeutils.EXPECT().ParseNvmeNqn().Return(tc.returnNqn, tc.returnNqnErr)
+				fakeNodeutils.EXPECT().ReadNvmeNqn().Return(tc.returnNqn, tc.returnNqnErr)
 			}
 			if tc.fcExists {
 				fakeNodeutils.EXPECT().ParseFCPorts().Return(tc.returnFcs, tc.returnFcErr)

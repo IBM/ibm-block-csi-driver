@@ -42,7 +42,7 @@ var (
 	iscsiIQN     = "iqn.1994-07.com.redhat:e123456789"
 )
 
-func TestParseNVMEnqn(t *testing.T) {
+func TestReadNvmeNqn(t *testing.T) {
 	testCases := []struct {
 		name         string
 		file_content string
@@ -93,7 +93,7 @@ func TestParseNVMEnqn(t *testing.T) {
 			}
 
 			driver.NvmeFullPath = filePath
-			nqn, err := nodeUtils.ParseNvmeNqn()
+			nqn, err := nodeUtils.ReadNvmeNqn()
 
 			if tc.expErr != nil {
 				if err.Error() != tc.expErr.Error() {

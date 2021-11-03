@@ -60,7 +60,7 @@ const (
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
 
 type NodeUtilsInterface interface {
-	ParseNvmeNqn() (string, error)
+	ReadNvmeNqn() (string, error)
 	ParseFCPorts() ([]string, error)
 	ParseIscsiInitiators() (string, error)
 	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, map[string][]string, error)
@@ -185,12 +185,12 @@ func readFile(path string) (string, error) {
 
 	defer file.Close()
 
-	RawContent, err := ioutil.ReadAll(file)
+	rawContent, err := ioutil.ReadAll(file)
 	if err != nil {
 		return "", err
 	}
 
-	content := string(RawContent)
+	content := string(rawContent)
 	trimmedContent := strings.TrimSpace(content)
 
 	return trimmedContent, nil
@@ -210,14 +210,13 @@ func readAfterPrefix(path string, prefix string, portType string) (string, error
 	return contentPostfix, nil
 }
 
-func (n NodeUtils) ParseNvmeNqn() (string, error) {
+func (n NodeUtils) ReadNvmeNqn() (string, error) {
 	return readFile(NvmeFullPath)
 }
 
 func (n NodeUtils) ParseFCPorts() ([]string, error) {
 	var errs []error
 	var fcPorts []string
-	var fcPort string
 
 	fpaths, err := n.Executer.FilepathGlob(FCPortPath)
 	if fpaths == nil {
@@ -228,7 +227,7 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 	}
 
 	for _, fpath := range fpaths {
-		fcPort, err = readAfterPrefix(fpath, "0x", device_connectivity.ConnectionTypeFC)
+		fcPort, err := readAfterPrefix(fpath, "0x", device_connectivity.ConnectionTypeFC)
 		if err != nil {
 			errs = append(errs, err)
 		} else {
