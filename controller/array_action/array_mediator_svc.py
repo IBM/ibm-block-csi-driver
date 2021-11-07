@@ -320,7 +320,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def _expand_cli_volume(self, cli_volume, increase_in_bytes):
         volume_name = cli_volume.name
         try:
-            self.client.svctask.expandvolume(volume_name=volume_name, unit='b', size=increase_in_bytes)
+            self.client.svctask.expandvolume(object_id=volume_name, unit='b', size=increase_in_bytes)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 logger.warning("Failed to expand volume {}".format(volume_name))
