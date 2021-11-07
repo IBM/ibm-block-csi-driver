@@ -93,33 +93,6 @@ Use the following command for general troubleshooting:
 
     kubectl get -n <namespace>  csidriver,sa,clusterrole,clusterrolebinding,statefulset,pod,daemonset | grep ibm-block-csi
 
-For example:
-
-    $> kubectl get -n <namespace>  csidriver,sa,clusterrole,clusterrolebinding,statefulset,pod,daemonset | grep ibm-block-csi
-    csidriver.storage.k8s.io/ibm-block-csi-driver 7d
-
-    serviceaccount/ibm-block-csi-controller-sa 1 2h
-    serviceaccount/ibm-block-csi-node-sa 1 2h
-    serviceaccount/ibm-block-csi-operator 1 2h
-
-    clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-attacher-clusterrole 2h
-    clusterrole.rbac.authorization.k8s.io/ibm-block-csi-external-provisioner-clusterrole 2h
-    clusterrole.rbac.authorization.k8s.io/ibm-block-csi-operator 2h
-
-    clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-external-attacher-clusterrolebinding 2h
-    clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-external-provisioner-clusterrolebinding 2h
-    clusterrolebinding.rbac.authorization.k8s.io/ibm-block-csi-operator 2h
-
-
-    statefulset.apps/ibm-block-csi-controller 1 1 2h
-    pod/ibm-block-csi-controller-0 7/7 Running 0 2h
-    pod/ibm-block-csi-node-nbtsg 3/3 Running 0 2h
-    pod/ibm-block-csi-node-wd5tm 3/3 Running 0 2h
-    pod/ibm-block-csi-operator-7684549698-hzmfh 1/1 Running 0 2h
-
-    daemonset.extensions/ibm-block-csi-node 2 2 2 2 2 <none> 2h
-  
-
 ### Error during automatic iSCSI login
 
 If an error during automatic iSCSI login occurs, perform the following steps for manual login:
