@@ -22,12 +22,12 @@
     1. Delete the StatefulSet.
 
         <pre>
-        $> kubectl delete statefulset/demo-statefulset-file-system
-        statefulset/demo-statefulset-file-system deleted
+        $> kubectl delete statefulset/statefulset-name
+        statefulset/statefulset-name deleted
 
-    2. Wait until the pod is deleted. Once deleted, the `"demo-statefulset-file-system" not found` is returned.
+    2. Wait until the pod is deleted. Once deleted, the `"statefulset-name" not found` is returned.
 
-            $> kubectl get statefulset/demo-statefulset-file-system
+            $> kubectl get statefulset/statefulset-name
             Error from server (NotFound): statefulsets.apps <statefulset-name> not found
 
     3. Verify that the multipath was deleted and that the PV mountpoint no longer exists by establishing an SSH connection and logging into the worker node.
@@ -45,22 +45,21 @@
 
         <pre>
         $> kubectl create -f demo-statefulset-file-system.yaml
-        statefulset/demo-statefulset-file-system created
+        statefulset/statefulset-name created
             
         $> kubectl exec demo-statefulset-file-system-0 -- ls /data/FILE
         /data/FILE
 
-6. Delete StatefulSet and the PVC.
+5. Delete StatefulSet and the PVC.
 
-    <pre>
-    $> kubectl delete statefulset/demo-statefulset-file-system
-    statefulset/demo-statefulset-file-system deleted
-        
-    $> kubectl get statefulset/demo-statefulset-file-system
-    Error from server (NotFound): statefulsets.apps <StatefulSet name> not found.
-        
-    $> kubectl delete pvc/demo-pvc-file-system
-    persistentvolumeclaim/demo-pvc-file-system deleted
-        
-    $> kubectl get pv,pvc
-    No resources found.
+        $> kubectl delete statefulset/statefulset-name
+        statefulset/statefulset-name deleted
+            
+        $> kubectl get statefulset/statefulset-name
+        Error from server (NotFound): statefulsets.apps <statefulset-name> not found.
+            
+        $> kubectl delete pvc/demo-pvc-file-system
+        persistentvolumeclaim/demo-pvc-file-system deleted
+            
+        $> kubectl get pv,pvc
+        No resources found.

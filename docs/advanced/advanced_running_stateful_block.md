@@ -22,26 +22,26 @@
 4. Delete StatefulSet and then recreate, in order to validate that the data (`test_block` in `/dev/block`) remains in the persistent volume.
     1. Delete the StatefulSet.
         <pre>
-        $> kubectl delete statefulset/demo-statefulset-raw-block
-        statefulset/demo-statefulset-raw-block deleted
-    2. Wait until the pod is deleted. Once deleted, the `"demo-statefulset-raw-block" not found` is returned.
+        $> kubectl delete statefulset/statefulset-name
+        statefulset/statefulset-name deleted
+    2. Wait until the pod is deleted. Once deleted, the `"statefulset-name" not found` is returned.
            
-            $> kubectl get statefulset/demo-statefulset-raw-block
+            $> kubectl get statefulset/statefulset-name
             Error from server (NotFound): statefulsets.apps <statefulset-name> not found
     3. Recreate the StatefulSet and verify that the content written to `/dev/block` exists.
         <pre>
         $> kubectl create -f demo-statefulset-raw-block.yaml
-        statefulset/demo-statefulset-raw-block created
+        statefulset/statefulset-name created
             
         $> kubectl exec demo-statefulset-raw-block-0 -- bash -c "od -An -c -N 10 /dev/block"
         t   e   s   t   _   b   l   o   c   k
-6. Delete StatefulSet and the PVC.
+5. Delete StatefulSet and the PVC.
     <pre>
-    $> kubectl delete statefulset/demo-statefulset-raw-block
-    statefulset/demo-statefulset-raw-block deleted
+    $> kubectl delete statefulset/statefulset-name
+    statefulset/statefulset-name deleted
         
-    $> kubectl get statefulset/demo-statefulset-raw-block
-    Error from server (NotFound): statefulsets.apps "demo-statefulset-raw-block" not found
+    $> kubectl get statefulset/statefulset-name
+    Error from server (NotFound): statefulsets.apps "statefulset-name" not found
         
     $> kubectl delete pvc/demo-pvc-raw-block
     persistentvolumeclaim/demo-pvc-raw-block deleted
