@@ -25,9 +25,9 @@
         $> kubectl delete statefulset/demo-statefulset-raw-block
         statefulset/demo-statefulset-raw-block deleted
     2. Wait until the pod is deleted. Once deleted, the `"demo-statefulset-raw-block" not found` is returned.
-        <pre>
-        $> kubectl get statefulset/demo-statefulset-raw-block
-        Error from server (NotFound): statefulsets.apps <StatefulSet name> not found
+           
+            $> kubectl get statefulset/demo-statefulset-raw-block
+            Error from server (NotFound): statefulsets.apps <statefulset-name> not found
     3. Recreate the StatefulSet and verify that the content written to `/dev/block` exists.
         <pre>
         $> kubectl create -f demo-statefulset-raw-block.yaml
