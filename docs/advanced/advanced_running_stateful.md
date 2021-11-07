@@ -69,15 +69,15 @@ Use this for advanced information on running a stateful container for raw block 
                 /data/FILE
       
 5. Delete StatefulSet and the PVC.
-    <pre>
-    $> kubectl delete statefulset/statefulset-name
-    statefulset/statefulset-name deleted
-        
-    $> kubectl get statefulset/statefulset-name
-    Error from server (NotFound): statefulsets.apps "statefulset-name" not found
-        
-    $> kubectl delete pvc/demo-pvc-raw-block
-    persistentvolumeclaim/demo-pvc-raw-block deleted
-        
-    $> kubectl get pv,pvc
-    No resources found.
+    
+        $> kubectl delete statefulset/statefulset-name
+        statefulset/statefulset-name deleted
+            
+        $> kubectl get statefulset/statefulset-name
+        Error from server (NotFound): statefulsets.apps "<statefulset-name>" not found
+            
+        $> kubectl delete pvc/demo-pvc-raw-block
+        persistentvolumeclaim/demo-pvc-raw-block deleted
+            
+        $> kubectl get pv,pvc
+        No resources found.
