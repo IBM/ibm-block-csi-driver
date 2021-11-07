@@ -7,7 +7,7 @@ Use this section for advanced troubleshooting information for your CSI driver.
 
 ## Verifying the CSI driver is running
 
-  Verify that the CSI driver is running. (Make sure the csi-controller pod status is _Running_), using the `$> kubectl get all -n <namespace> -l csi` command.
+  Verify that the CSI driver is running. (Make sure that all components are in the  _Running_ state), using the `$> kubectl get all -n <namespace> -l csi` command.
 
 ## Multipath troubleshooting
 
