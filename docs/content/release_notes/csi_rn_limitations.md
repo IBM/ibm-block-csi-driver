@@ -13,8 +13,6 @@ The following limitations apply when using volume snapshots with the IBM block s
 -   When deleting a PersistentVolumeClaim (PVC), the persistent volume (PV) remains until all snapshots of the specific PV are deleted.
 -   When using the CSI (Container Storage Interface) driver with IBM Spectrum® Virtualize Family products, a snapshot can only be used to provision a new volume of equal size.
 
-**Note:** For volume snapshot limitations pertaining specifically to HyperSwap usage, see [HyperSwap usage limitations](#hyperSwap-usage-limitations).
-
 ## Volume clone limitations
 
 The following limitations apply when using volume clones with the IBM block storage CSI driver:
@@ -35,8 +33,6 @@ The following limitations apply when expanding volumes with the IBM block storag
 -   When expanding a PVC while not in use by a pod, the volume size immediately increases on the storage side. However, PVC size only increases after a pod uses the PVC.
 -   When expanding a filesystem PVC for a volume that was previously formatted but is now no longer being used by a pod, any copy or replication operations performed on the PVC (such as snapshots or cloning) results in a copy with the newer, larger, size on the storage. However, its filesystem has the original, smaller, size.
 
-**Note:** For volume expansion limitations pertaining specifically to HyperSwap usage, see [HyperSwap usage limitations](#hyperSwap-usage-limitations).
-
 ## Volume replication limitations
 
 When a role switch is conducted, this is not reflected within the other orchestration platform replication objects.
@@ -53,8 +49,4 @@ When a role switch is conducted, this is not reflected within the other orchestr
 
 **Important:** The HyperSwap feature is only supported for use with IBM Spectrum Virtualize Family storage systems.
 
-The following IBM block storage CSI driver features are not supported on the volumes where HyperSwap is being used:
-
-- Volume snapshots
-- Volume cloning
-- Volume expansion
+Volume cloning does not work on volumes using the HyperSwap feature.
