@@ -60,8 +60,9 @@ const (
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
 
 type NodeUtilsInterface interface {
-	ParseIscsiInitiators() (string, error)
+	ReadNvmeNqn() (string, error)
 	ParseFCPorts() ([]string, error)
+	ParseIscsiInitiators() (string, error)
 	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, map[string][]string, error)
 	GetArrayInitiators(ipsByArrayInitiator map[string][]string) []string
 	GetSysDevicesFromMpath(baseDevice string) (string, error)
@@ -81,7 +82,7 @@ type NodeUtilsInterface interface {
 	FormatDevice(devicePath string, fsType string)
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
-	GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN string) (string, error)
+	GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []string, iscsiIQN string) (string, error)
 	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
 }
 
@@ -97,40 +98,26 @@ func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface) 
 	}
 }
 
-func (n NodeUtils) ParseIscsiInitiators() (string, error) {
-	file, err := os.Open(IscsiFullPath)
-	if err != nil {
-		return "", err
-	}
-
-	defer file.Close()
-
-	fileOut, err := ioutil.ReadAll(file)
-	if err != nil {
-		return "", err
-	}
-
-	fileSplit := strings.Split(string(fileOut), "InitiatorName=")
-	if len(fileSplit) != 2 {
-		return "", fmt.Errorf(ErrorWhileTryingToReadIQN, string(fileOut))
-	}
-
-	iscsiIqn := strings.TrimSpace(fileSplit[1])
-
-	return iscsiIqn, nil
-}
-
 func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, map[string][]string, error) {
 	// this will return :  connectivityType, lun, ipsByArrayInitiator, error
 	ipsByArrayInitiator := make(map[string][]string)
 	strLun := publishContext[configYaml.Controller.Publish_context_lun_parameter]
 
-	lun, err := strconv.Atoi(strLun)
-	if err != nil {
-		return "", -1, nil, err
-	}
-
+	var lun int
+	var err error
 	connectivityType := publishContext[configYaml.Controller.Publish_context_connectivity_parameter]
+	if connectivityType != device_connectivity.ConnectionTypeNVMEoFC {
+		lun, err = strconv.Atoi(strLun)
+		if err != nil {
+			return "", -1, nil, err
+		}
+	}
+	if connectivityType == device_connectivity.ConnectionTypeFC {
+		wwns := strings.Split(publishContext[configYaml.Controller.Publish_context_fc_initiators], PublishContextSeparator)
+		for _, wwn := range wwns {
+			ipsByArrayInitiator[wwn] = nil
+		}
+	}
 	if connectivityType == device_connectivity.ConnectionTypeISCSI {
 		iqns := strings.Split(publishContext[configYaml.Controller.Publish_context_array_iqn], PublishContextSeparator)
 		for _, iqn := range iqns {
@@ -139,12 +126,6 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, c
 			} else {
 				logger.Errorf("Publish context does not contain any iscsi target IP for {%v}", iqn)
 			}
-		}
-	}
-	if connectivityType == device_connectivity.ConnectionTypeFC {
-		wwns := strings.Split(publishContext[configYaml.Controller.Publish_context_fc_initiators], PublishContextSeparator)
-		for _, wwn := range wwns {
-			ipsByArrayInitiator[wwn] = nil
 		}
 	}
 
@@ -196,6 +177,42 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 	}
 	return true
 }
+func readFile(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+
+	defer file.Close()
+
+	rawContent, err := ioutil.ReadAll(file)
+	if err != nil {
+		return "", err
+	}
+
+	content := string(rawContent)
+	trimmedContent := strings.TrimSpace(content)
+
+	return trimmedContent, nil
+}
+
+func readAfterPrefix(path string, prefix string, portType string) (string, error) {
+	fileContent, err := readFile(path)
+	if err != nil {
+		return "", err
+	}
+
+	if !strings.HasPrefix(fileContent, prefix) {
+		return "", fmt.Errorf(ErrorWhileTryingToReadPort, portType, fileContent)
+	}
+	contentPostfix := strings.TrimPrefix(fileContent, prefix)
+
+	return contentPostfix, nil
+}
+
+func (n NodeUtils) ReadNvmeNqn() (string, error) {
+	return readFile(NvmeFullPath)
+}
 
 func (n NodeUtils) ParseFCPorts() ([]string, error) {
 	var errs []error
@@ -210,37 +227,27 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 	}
 
 	for _, fpath := range fpaths {
-		file, err := os.Open(fpath)
+		fcPort, err := readAfterPrefix(fpath, "0x", device_connectivity.ConnectionTypeFC)
 		if err != nil {
-			errs = append(errs, err)
-			break
-		}
-		defer file.Close()
-
-		fileOut, err := ioutil.ReadAll(file)
-		if err != nil {
-			errs = append(errs, err)
-			break
-		}
-
-		fileSplit := strings.Split(string(fileOut), "0x")
-		if len(fileSplit) != 2 {
-			err := fmt.Errorf(ErrorWhileTryingToReadFC, string(fileOut))
 			errs = append(errs, err)
 		} else {
-			fcPorts = append(fcPorts, strings.TrimSpace(fileSplit[1]))
+			fcPorts = append(fcPorts, fcPort)
 		}
 	}
 
 	if errs != nil {
 		err := errors.NewAggregate(errs)
-		logger.Errorf("errors occured while looking for FC ports: {%v}", err)
+		logger.Errorf("errors occured while looking for fc ports: {%v}", err)
 		if fcPorts == nil {
 			return nil, err
 		}
 	}
 
 	return fcPorts, nil
+}
+
+func (n NodeUtils) ParseIscsiInitiators() (string, error) {
+	return readAfterPrefix(IscsiFullPath, "InitiatorName=", device_connectivity.ConnectionTypeISCSI)
 }
 
 func (n NodeUtils) IsFCExists() bool {
@@ -414,16 +421,24 @@ func (n NodeUtils) GetPodPath(origPath string) string {
 	return path.Join(PrefixChrootOfHostRoot, origPath)
 }
 
-func (n NodeUtils) GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN string) (string, error) {
+func (n NodeUtils) GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []string, iscsiIQN string) (string, error) {
 	var nodeId strings.Builder
 	nodeId.Grow(MaxNodeIdLength)
 	nodeId.WriteString(hostName)
 	nodeId.WriteString(NodeIdDelimiter)
 
+	if len(nvmeNQN) > 0 {
+		if nodeId.Len()+len(nvmeNQN)+len(NodeIdDelimiter) <= MaxNodeIdLength {
+			nodeId.WriteString(nvmeNQN)
+		} else {
+			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
+		}
+	}
+	nodeId.WriteString(NodeIdDelimiter)
 	if len(fcWWNs) > 0 {
 		if nodeId.Len()+len(fcWWNs[0]) <= MaxNodeIdLength {
 			nodeId.WriteString(fcWWNs[0])
-		} else {
+		} else if nvmeNQN == "" {
 			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
 		}
 
@@ -438,12 +453,13 @@ func (n NodeUtils) GenerateNodeID(hostName string, fcWWNs []string, iscsiIQN str
 		if nodeId.Len()+len(NodeIdDelimiter)+len(iscsiIQN) <= MaxNodeIdLength {
 			nodeId.WriteString(NodeIdDelimiter)
 			nodeId.WriteString(iscsiIQN)
-		} else if len(fcWWNs) == 0 {
+		} else if len(fcWWNs) == 0 && nvmeNQN == "" {
 			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
 		}
 	}
 
-	return nodeId.String(), nil
+	finalNodeId := strings.TrimSuffix(nodeId.String(), ";")
+	return finalNodeId, nil
 }
 
 func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error) {

@@ -303,28 +303,29 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_map_volume_host_not_found(self):
         self.client_mock.map_volume_to_host.side_effect = NotFound("404")
         with self.assertRaises(array_errors.HostNotFoundError):
-            self.array.map_volume("fake_name", "fake_host")
+            self.array.map_volume("fake_name", "fake_host", "fake_connectivity_type")
 
     def test_map_volume_volume_not_found(self):
         self.client_mock.map_volume_to_host.side_effect = ClientException("500", "[BE586015]")
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.array.map_volume("fake_name", "fake_host")
+            self.array.map_volume("fake_name", "fake_host", "fake_connectivity_type")
 
     def test_map_volume_no_available_lun(self):
         self.client_mock.map_volume_to_host.side_effect = InternalServerError("500", "[BE74121B]")
         with self.assertRaises(array_errors.NoAvailableLunError):
-            self.array.map_volume("fake_name", "fake_host")
+            self.array.map_volume("fake_name", "fake_host", "fake_connectivity_type")
 
     def test_map_volume_fail_with_ClientException(self):
         self.client_mock.map_volume_to_host.side_effect = ClientException("500")
         with self.assertRaises(array_errors.MappingError):
-            self.array.map_volume("fake_name", "fake_host")
+            self.array.map_volume("fake_name", "fake_host", "fake_connectivity_type")
 
     def test_map_volume(self):
         scsi_id = "6005076306FFD3010000000000000001"
         host_name = "test_name"
+        connectivity_type = "fake_connectivity_type"
         self.client_mock.map_volume_to_host.return_value = Munch({"lunid": "01"})
-        lun = self.array.map_volume(scsi_id, host_name)
+        lun = self.array.map_volume(scsi_id, host_name, connectivity_type)
         self.assertEqual(lun, 1)
         self.client_mock.map_volume_to_host.assert_called_once_with(host_name, scsi_id[-4:])
 
@@ -416,7 +417,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             })
         ]
         host, connectivity_type = self.array.get_host_by_host_identifiers(
-            Initiators('', [wwpn1, wwpn2])
+            Initiators('', [wwpn1, wwpn2], '')
         )
         self.assertEqual(host, host_name)
         self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_type)
@@ -432,7 +433,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             })
         ]
         host, connectivity_type = self.array.get_host_by_host_identifiers(
-            Initiators('', [wwpn1, "another_wwpn"])
+            Initiators('', [wwpn1, "another_wwpn"], '')
         )
         self.assertEqual(host, host_name)
         self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_type)
@@ -449,7 +450,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         ]
         with self.assertRaises(array_errors.HostNotFoundError):
             self.array.get_host_by_host_identifiers(
-                Initiators('', ["new_wwpn", "another_wwpn"])
+                Initiators('', ["new_wwpn", "another_wwpn"], '')
             )
 
     def test_get_snapshot_not_exist_return_none(self):

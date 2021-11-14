@@ -401,7 +401,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     @convert_scsi_ids_to_array_ids()
-    def map_volume(self, volume_id, host_name):
+    def map_volume(self, volume_id, host_name, connectivity_type):
         logger.debug("Mapping volume {} to host {}".format(volume_id, host_name))
         try:
             mapping = self.client.map_volume_to_host(host_name, volume_id)

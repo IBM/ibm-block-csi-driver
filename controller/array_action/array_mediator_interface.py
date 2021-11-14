@@ -151,13 +151,14 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def map_volume(self, volume_id, host_name):
+    def map_volume(self, volume_id, host_name, connectivity_type):
         """
         This function will find the next available lun for the host and map the volume to it.
 
         Args:
            volume_id : the volume WWN.
            host_name : the name of the host to map the volume to.
+           connectivity_type : connectivity type (e.g. iscsi, fc, etc...)
 
         Returns:
            lun : the lun_id the volume was mapped to.
