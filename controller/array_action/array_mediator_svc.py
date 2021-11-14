@@ -994,7 +994,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                                                     other_system_id, as_master=True)
         rcrelationships.extend(self._get_rcrelationships(cli_volume_id, other_cli_volume_id,
                                                          other_system_id, as_master=False))
-        if len(rcrelationships) != 1:
+        if len(rcrelationships) > 1:
             error_message = ('found {0} rcrelationships for volume id {1} '
                              'with volume id {2} of system {3}: {4}'.format(len(rcrelationships),
                                                                             cli_volume_id,
