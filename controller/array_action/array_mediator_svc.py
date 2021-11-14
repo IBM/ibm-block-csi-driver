@@ -1003,7 +1003,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                                                                             rcrelationships))
             logger.error(error_message)
             raise RuntimeError(error_message)
-        return rcrelationships[0]
+        return rcrelationships[0] if rcrelationships else None
 
     def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
         rcrelationship = self._get_rcrelationship(volume_internal_id, other_volume_internal_id, other_system_id)
