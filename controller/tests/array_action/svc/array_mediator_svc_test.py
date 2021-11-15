@@ -23,6 +23,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with patch("controller.array_action.array_mediator_svc.SVCArrayMediator._connect"):
             self.svc = SVCArrayMediator("user", "password", self.endpoint)
         self.svc.client = Mock()
+        self.svc.client.svcinfo.lssystem.return_value = [Munch({'location': 'local', 'id_alias': 'fake_identifier'})]
         node = Munch({'id': '1', 'name': 'node1', 'iscsi_name': 'iqn.1986-03.com.ibm:2145.v7k1.node1',
                       'status': 'online'})
         self.svc.client.svcinfo.lsnode.return_value = [node]
