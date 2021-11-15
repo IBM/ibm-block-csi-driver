@@ -638,7 +638,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return volume_site_name == site_name
 
     def _get_rcrelationships_as_master_in_cluster(self, volume_name):
-        filter_value = 'master_vdisk_name={}:aux_cluster_id={}'.format(volume_name, self._identifier)
+        filter_value = 'master_vdisk_name={}:aux_cluster_id={}'.format(volume_name, self.identifier)
         return self._lsrcrelationship(filter_value).as_list
 
     def _get_cli_volume_in_pool_site(self, volume_name, pool_name):
@@ -648,7 +648,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         pool_site_name = self._get_pool_site(pool_name)
         if self._is_cli_volume_in_site(cli_volume, pool_site_name):
             return cli_volume
-        rcrelationships = self._get_rcrelationships_as_master_in_cluster(cli_volume.name)
+        rcrelationships = self._get_rcrelationships_as_master_in_cluster(volume_name)
         for rcrelationship in rcrelationships:
             other_cli_volume = self._get_cli_volume(rcrelationship.aux_vdisk_name)
             if self._is_cli_volume_in_site(other_cli_volume, pool_site_name):
@@ -944,7 +944,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return cli_host.get(HOST_PORTSET_ID)
 
     def _get_replication_endpoint_type(self, rcrelationship):
-        if self._identifier == rcrelationship.master_cluster_id:
+        if self.identifier == rcrelationship.master_cluster_id:
             return ENDPOINT_TYPE_MASTER
         return ENDPOINT_TYPE_AUX
 
