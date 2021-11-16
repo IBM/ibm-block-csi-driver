@@ -24,6 +24,15 @@ _<a name=spaceefficiency>**Table:**</a> `SpaceEfficiency` parameter definitions 
 
 - The IBM DS8000 Family `pool` value is the pool ID and not the pool name as is used in other storage systems.
 - Be sure that the `pool` value is the name of an existing pool on the storage system.
+- To create a volume with HyperSwap on IBM Spectrum Virtualize storage systems, put a colon (:) between the two pools within the `pool` value. For example:
+  
+  ```
+  pool: demo-pool1:demo-pool2 
+  ```
+   **Important:** The two pools must be from different sites.
+   
+  For more information about the HyperSwap limitations and requirements, see [Limitations](../release_notes/csi_rn_limitations.md) within the release notes and [Compatibility and requirements](../installation/csi_ug_requirements.md) within this guide.
+
 - The `allowVolumeExpansion` parameter is optional but is necessary for using volume expansion. The default value is _false_.
 
 **Note:** Be sure to set the value to true to allow volume expansion.
@@ -31,7 +40,7 @@ _<a name=spaceefficiency>**Table:**</a> `SpaceEfficiency` parameter definitions 
 - The `csi.storage.k8s.io/fstype` parameter is optional. The values that are allowed are _ext4_ or _xfs_. The default value is _ext4_.
 - The `volume_name_prefix` parameter is optional.
 
-**Note:** For IBM DS8000 Family, the maximum prefix length is 5 characters. The maximum prefix length for other systems is 20 characters. <br /><br />For storage systems that use Spectrum Virtualize, the `CSI` prefix is added as default if not specified by the user.
+**Note:** For IBM DS8000 Family, the maximum prefix length is five characters. The maximum prefix length for other systems is 20 characters. <br /><br />For storage systems that use Spectrum Virtualize, the `CSI` prefix is added as default if not specified by the user.
 
     
     kind: StorageClass

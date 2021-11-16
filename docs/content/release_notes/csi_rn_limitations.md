@@ -13,6 +13,8 @@ The following limitations apply when using volume snapshots with the IBM block s
 -   When deleting a PersistentVolumeClaim (PVC), the persistent volume (PV) remains until all snapshots of the specific PV are deleted.
 -   When using the CSI (Container Storage Interface) driver with IBM Spectrum® Virtualize Family products, a snapshot can only be used to provision a new volume of equal size.
 
+**Note:** For volume snapshot limitations pertaining specifically to HyperSwap usage, see [HyperSwap usage limitations](#hyperSwap-usage-limitations).
+
 ## Volume clone limitations
 
 The following limitations apply when using volume clones with the IBM block storage CSI driver:
@@ -23,13 +25,15 @@ The following limitations apply when using volume clones with the IBM block stor
 
 -   A PVC and its clone need to both have the same volume mode (**Filesystem** or **Block**).
 
+**Note:** For volume clone limitations pertaining specifically to HyperSwap usage, see [HyperSwap usage limitations](#hyperSwap-usage-limitations).
+
 ## Volume expansion limitations
 
 The following limitations apply when expanding volumes with the IBM block storage CSI driver:
 
 -   When using the CSI driver with IBM Spectrum Virtualize Family and IBM DS8000 Family products, during size expansion of a PersistentVolumeClaim (PVC), the size remains until all snapshots of the specific PVC are deleted.
 -   When expanding a PVC while not in use by a pod, the volume size immediately increases on the storage side. However, PVC size only increases after a pod uses the PVC.
--   When expanding a filesystem PVC for a volume that was previously formatted but is now no longer being used by a pod, any copy or replication operations performed on the PVC (such as snapshots or cloning) results in a copy with the newer, larger, size on the storage. However, its filesystem has the original, smaller, size.
+-   When expanding a file system PVC for a volume that was previously formatted but is now no longer being used by a pod, any copy or replication operations performed on the PVC (such as snapshots or cloning) results in a copy with the newer, larger, size on the storage. However, its file system has the original, smaller, size.
 
 ## Volume replication limitations
 
@@ -42,3 +46,14 @@ When a role switch is conducted, this is not reflected within the other orchestr
  3. Import the volumes, by using the latest import procedure (version 1.7.0 or later) (see **CSI driver configuration** > **Advanced configuration** > **Importing an existing volume** in the user information).
       
     For more information, see the [Change the Reclaim Policy of a PersistentVolume](https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy/) information in the Kubernetes documentation.
+
+## HyperSwap usage limitations
+
+**Important:** The HyperSwap feature is only supported for use with IBM Spectrum Virtualize Family storage systems.
+
+The following IBM block storage CSI driver features are not supported on volumes where HyperSwap is used:
+
+- A HyperSwap volume cannot be created from a snapshot.
+
+    **Note:** A snapshot can be created from a HyperSwap volume.
+ - Volume cloning.
