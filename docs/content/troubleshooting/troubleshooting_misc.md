@@ -39,5 +39,3 @@ If the following error occurs during stateful application pod creation (the pod 
     3.  Restart the multipath daemon again, using the `systemctl restart multipathd` command.
     
     The multipath devices should be running properly and the pod should come up immediately.
-
-

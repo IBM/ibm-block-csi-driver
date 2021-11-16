@@ -3,7 +3,7 @@
 When using the CSI Topology feature, different parameters must be taken into account when creating a VolumeSnapshotClass YAML file with specific `by_management_id` requirements. Use this information to help define a VolumeSnapshotClass that is topology aware and enables the creation and deletion of volume snapshots.
 
 **Note:** 
-  - For information and parameter definitions that are not related to topology awareness, be sure to see the information that is provided in [Creating a VolumeSnapshotClass](csi_ug_config_create_vol_snapshotclass.md), in addition to the current section.
+  - For information and parameter definitions that are not related to topology awareness, be sure to see the information that is provided in [Creating a VolumeSnapshotClass](creating_volumesnapshotclass.md), in addition to the current section.
   
   - IBM® FlashCopy® function is referred to as the more generic volume snapshots and cloning within this documentation set. Not all supported products use the FlashCopy function terminology.
 

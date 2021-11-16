@@ -94,7 +94,7 @@ Use this procedure to help build a PV YAML file for your volumes.
 
 2. Take the `volume_name` and other optional information (collected before the procedure) and insert it into the YAML file (under `spec.csi.volumeAttributes`).
 
-    **Important:** If using the CSI Topology feature, the `spec.csi.volumeHandle` contains the management ID (see [Creating a StorageClass with topology awareness](csi_ug_config_create_storageclasses_topology.md)). In the example below, the `spec.csi.volumeHandle` would read similar to the following: `SVC:demo-system-id-1:0;600507640082000B08000000000004FF`.
+    **Important:** If using the CSI Topology feature, the `spec.csi.volumeHandle` contains the management ID (see [Creating a StorageClass with topology awareness](creating_volumestrorageclass_topology.md)). In the example below, the `spec.csi.volumeHandle` would read similar to the following: `SVC:demo-system-id-1:0;600507640082000B08000000000004FF`.
     
         apiVersion: v1
         kind: PersistentVolume
@@ -127,7 +127,7 @@ Use this procedure to help build a PV YAML file for your volumes.
     **Note:**
 
     - Be sure to include the `storageClassName`.
-    - For more information about creating a PVC YAML file, see [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
+    - For more information about creating a PVC YAML file, see [Creating a PersistentVolumeClaim (PVC)](creating_pvc.md).
     
     ```
     apiVersion: v1

@@ -9,9 +9,9 @@ Use this information to upgrade the IBM® block storage CSI driver.
     
   **Note:** For more information about automatic upgrades, see https://olm.operatorframework.io/docs/concepts/crds/subscription/.
 
-- To manually upgrade the CSI driver with the OpenShift web console, see [Manual upgrade with OpenShift](csi_ug_upgrade_ocp_manual.md).
+- To manually upgrade the CSI driver with the OpenShift web console, see [Manual upgrade with OpenShift](upgrade_manual_openshift.md).
 
-- To manually upgrade the CSI (Container Storage Interface) driver from a previous version with GitHub, perform step 1 of the [installation procedure](csi_ug_install_operator_github.md) for the latest version.
+- To manually upgrade the CSI (Container Storage Interface) driver from a previous version with GitHub, perform step 1 of the [installation procedure](install_driver_github.md) for the latest version.
 
 
 

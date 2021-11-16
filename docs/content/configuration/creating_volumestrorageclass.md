@@ -2,7 +2,7 @@
 
 Create a storage class YAML file in order to define the storage parameters, such as pool name, secret reference, `SpaceEfficiency`, and `fstype`.
 
-**Note:** If you are using the CSI Topology feature, in addition to the information and parameter definitions provided here, be sure to follow the steps in [Creating a StorageClass with topology awareness](csi_ug_config_create_storageclasses_topology.md).
+**Note:** If you are using the CSI Topology feature, in addition to the information and parameter definitions provided here, be sure to follow the steps in [Creating a StorageClass with topology awareness](creating_volumestrorageclass_topology.md).
 
 Use the following procedure to create and apply the storage classes.
 
@@ -10,7 +10,7 @@ Use the following procedure to create and apply the storage classes.
 
 Create a storage class YAML file, similar to the following `demo-storageclass.yaml` and update the storage parameters as needed.
 
-When configuring the file, be sure to use the same array secret and array secret namespace as defined in [Creating a Secret](csi_ug_config_create_secret.md).
+When configuring the file, be sure to use the same array secret and array secret namespace as defined in [Creating a Secret](creating_secret.md).
 
 Use the `SpaceEfficiency` parameters for each storage system, as defined in [the following table](#spaceefficiency). These values are not case-sensitive.
 
@@ -31,7 +31,7 @@ _<a name=spaceefficiency>**Table:**</a> `SpaceEfficiency` parameter definitions 
   ```
    **Important:** The two pools must be from different sites.
    
-  For more information about the HyperSwap limitations and requirements, see [Limitations](../release_notes/csi_rn_limitations.md) within the release notes and [Compatibility and requirements](../installation/csi_ug_requirements.md) within this guide.
+  For more information about the HyperSwap limitations and requirements, see [Limitations](../release_notes/limitations.md) within the release notes and [Compatibility and requirements](../installation/install_compatibility_requirements.md) within this guide.
 
 - The `allowVolumeExpansion` parameter is optional but is necessary for using volume expansion. The default value is _false_.
 

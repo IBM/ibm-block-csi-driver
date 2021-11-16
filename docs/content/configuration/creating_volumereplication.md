@@ -2,15 +2,15 @@
 
 Create a VolumeReplication YAML file to replicate a specific PersistentVolumeClaim (PVC).
 
-VolumeReplicationClass needs to be present before a VolumeReplication can be created. For more information, see [Creating a VolumeReplicationClass](csi_ug_config_create_vol_replicationclass.md).
+VolumeReplicationClass needs to be present before a VolumeReplication can be created. For more information, see [Creating a VolumeReplicationClass](creating_volumereplicationclass.md).
 
 **Note:** Remote copy function is referred to as the more generic volume replication within this documentation set. Not all supported products use the remote-copy function terminology.
 
-When replicating a volume, be sure to follow all of the replication configurations, found in [Compatibility and requirements](../installation/csi_ug_requirements.md) before volume replication.
+When replicating a volume, be sure to follow all of the replication configurations, found in [Compatibility and requirements](../installation/install_compatibility_requirements.md) before volume replication.
 
 1.  Replicate a specific PersistentVolumeClaim (PVC) using the `demo-volumereplication.yaml`.
 
-    For more information about PVC configuration, see [Creating a PersistentVolumeClaim (PVC)](csi_ug_config_create_pvc.md).
+    For more information about PVC configuration, see [Creating a PersistentVolumeClaim (PVC)](creating_pvc.md).
 
     **Note:** Use the `spec.csi.volumeHandle` of the relevant target PersistentVolume (PV) for the `replicationHandle` value.
 

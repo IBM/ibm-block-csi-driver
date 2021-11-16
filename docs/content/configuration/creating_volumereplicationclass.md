@@ -6,9 +6,9 @@ Create a VolumeReplicationClass YAML file to enable volume replication.
 
 In order to enable volume replication for your storage system, create a VolumeReplicationClass YAML file, similar to the following `demo-volumereplicationclass.yaml`.
 
-When configuring the file, be sure to use the same array secret and array secret namespace as defined in [Creating a Secret](csi_ug_config_create_secret.md).
+When configuring the file, be sure to use the same array secret and array secret namespace as defined in [Creating a Secret](creating_secret.md).
 
-For information on obtaining your storage system `system_id`, see [Finding a `system_id`](csi_ug_config_replication_find_systemid.md).
+For information on obtaining your storage system `system_id`, see [Finding a `system_id`](finding_systemid.md).
 
 ```
 apiVersion: replication.storage.openshift.io/v1alpha1
