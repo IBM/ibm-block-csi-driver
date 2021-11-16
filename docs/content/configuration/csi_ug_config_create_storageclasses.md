@@ -35,12 +35,12 @@ _<a name=spaceefficiency>**Table:**</a> `SpaceEfficiency` parameter definitions 
 
 - The `allowVolumeExpansion` parameter is optional but is necessary for using volume expansion. The default value is _false_.
 
-**Note:** Be sure to set the value to true to allow volume expansion.
+  **Note:** Be sure to set the value to true to allow volume expansion.
 
 - The `csi.storage.k8s.io/fstype` parameter is optional. The values that are allowed are _ext4_ or _xfs_. The default value is _ext4_.
 - The `volume_name_prefix` parameter is optional.
 
-**Note:** For IBM DS8000 Family, the maximum prefix length is five characters. The maximum prefix length for other systems is 20 characters. <br /><br />For storage systems that use Spectrum Virtualize, the `CSI` prefix is added as default if not specified by the user.
+  **Note:** For IBM DS8000 Family, the maximum prefix length is five characters. The maximum prefix length for other systems is 20 characters. <br /><br />For storage systems that use Spectrum Virtualize, the `CSI` prefix is added as default if not specified by the user.
 
     
     kind: StorageClass
