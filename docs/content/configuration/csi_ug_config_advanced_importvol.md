@@ -15,7 +15,7 @@ Before starting to import an existing volume, find the following information in 
 
 To find the `volumeHandle`, use one of the following procedures:
 
-- **For Spectrum Virtualize Family**
+- **For Spectrum Virtualize family**
 
   The `volumeHandle` is formatted as `SVC:id;vdisk_UID`.
 
@@ -86,7 +86,7 @@ To find the `volumeHandle`, use one of the following procedures:
 
 Use this procedure to help build a PV YAML file for your volumes.
 
-**Note:** These steps are set up for importing volumes from a Spectrum Virtualize Family system. Change parameters, as needed.
+**Note:** These steps are set up for importing volumes from a Spectrum Virtualize family system. Change parameters, as needed.
 
 1. Create a persistent volume (PV) YAML file.
 
