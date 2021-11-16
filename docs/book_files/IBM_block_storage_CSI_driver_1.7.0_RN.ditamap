@@ -3,7 +3,7 @@
 <?Pub Sty _display FontColor="red"?><?Pub Inc?><ibmbook xml:lang="en-us">
 <ibmbooktitle>
 <ibmbooklibrary><titleline><tm trademark="IBM" tmtype="reg">IBM</tm> block storage CSI
-driver</titleline><titleline>1.7.0</titleline></ibmbooklibrary>
+driver</titleline><titleline>1.8.0</titleline></ibmbooklibrary>
 <ibmmainbooktitle><titleline>Release <tm trademark="Notes" tmtype="reg" tmclass="IGNORE"
 >Notes</tm></titleline></ibmmainbooktitle>
 </ibmbooktitle>
