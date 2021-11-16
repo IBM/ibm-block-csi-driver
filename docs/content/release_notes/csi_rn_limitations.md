@@ -53,5 +53,7 @@ When a role switch is conducted, this is not reflected within the other orchestr
 
 The following IBM block storage CSI driver features are not supported on the volumes where HyperSwap is being used:
 
-- Volume snapshots
-- Volume cloning
+- A HyperSwap volume cannot be created from a snapshot.
+
+    **Note:** A snapshot can be created from a HyperSwap volume.
+ - Volume cloning.
