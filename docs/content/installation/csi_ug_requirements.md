@@ -95,3 +95,5 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
       **Important:** This label-prefix must be found on the nodes in the cluster **before** installing the IBM® block storage CSI driver. If the nodes do not have the proper label-prefix before installation, CSI Topology cannot be used with the CSI driver.
 
       For more information, see [Configuring for CSI Topology](../configuration/csi_ug_config_topology.md).
+
+7. (Optional)  If planning on using HyperSwap on your storage system, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Planning** > **Planning for high availability** > **Planning for a HyperSwap topology system**.

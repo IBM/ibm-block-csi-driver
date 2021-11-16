@@ -31,7 +31,8 @@ _<a name=spaceefficiency>**Table:**</a> `SpaceEfficiency` parameter definitions 
   ```
    **Important:** The two pools must be from different sites.
    
-  For more information about the HyperSwap limitations, see [Limitations](content\release_notes\csi_rn_limitations.md) within the release notes.
+  For more information about the HyperSwap limitations, see [Limitations](content\release_notes\csi_rn_limitations.md) within the release notes and [Compatibility and requirements](content\installation\csi_ug_requirements.md).
+
 - The `allowVolumeExpansion` parameter is optional but is necessary for using volume expansion. The default value is _false_.
 
 **Note:** Be sure to set the value to true to allow volume expansion.
