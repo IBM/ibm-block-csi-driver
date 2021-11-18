@@ -422,9 +422,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                            different_pool_site=False):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         self.svc.client.svctask.mkfcmap.return_value = Mock()
-        source_vol_to_copy_from = self._get_custom_dedup_cli_volume(support_deduplicated_copy,
-                                                                    source_has_deduplicated_copy)
-        vols_to_return = [source_vol_to_copy_from, source_vol_to_copy_from]
+        source_volume_to_copy_from = self._get_custom_dedup_cli_volume(support_deduplicated_copy,
+                                                                       source_has_deduplicated_copy)
+        volumes_to_return = [source_volume_to_copy_from, source_volume_to_copy_from]
 
         if different_pool_site:
             pools_to_return = [Munch({'site_name': 'pool_site'}),
@@ -433,21 +433,24 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                Munch({'site_name': 'pool_site'})]
             self.svc.client.svcinfo.lsmdiskgrp.side_effect = self._mock_cli_objects(pools_to_return)
 
-            aux_vols = [self._get_cli_volume(name='other_volume', pool_name='other_volume_pool'),
-                        self._get_custom_dedup_cli_volume(support_deduplicated_copy, source_has_deduplicated_copy,
-                                                          name='relevant_volume', pool_name='relevant_volume_pool')]
-            vols_to_return.extend(aux_vols)
+            auxiliary_volumes = [self._get_cli_volume(name='other_volume', pool_name='other_volume_pool'),
+                                 self._get_custom_dedup_cli_volume(support_deduplicated_copy,
+                                                                   source_has_deduplicated_copy,
+                                                                   name='relevant_volume',
+                                                                   pool_name='relevant_volume_pool')]
+            volumes_to_return.extend(auxiliary_volumes)
 
             rcrelationships_to_return = [Munch({'aux_vdisk_name': 'other_volume'}),
                                          Munch({'aux_vdisk_name': 'relevant_volume'})]
             self.svc.client.svcinfo.lsrcrelationship.return_value = Mock(as_list=rcrelationships_to_return)
 
-        target_vol_after_creation = self._get_mapless_target_cli_volume()
-        target_vol_after_mapping = self._get_mapped_target_cli_volume()
-        target_vol_for_rollback = self._get_mapped_target_cli_volume()
-        vols_to_return.extend([target_vol_after_creation, target_vol_after_mapping, target_vol_for_rollback])
+        target_volume_after_creation = self._get_mapless_target_cli_volume()
+        target_volume_after_mapping = self._get_mapped_target_cli_volume()
+        target_volume_for_rollback = self._get_mapped_target_cli_volume()
+        volumes_to_return.extend([target_volume_after_creation, target_volume_after_mapping,
+                                  target_volume_for_rollback])
 
-        self.svc.client.svcinfo.lsvdisk.side_effect = self._mock_cli_objects(vols_to_return)
+        self.svc.client.svcinfo.lsvdisk.side_effect = self._mock_cli_objects(volumes_to_return)
         self.svc.client.svctask.startfcmap.return_value = Mock()
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
