@@ -10,11 +10,11 @@ To collect and display status and logs related to the different components of IB
 
 `kubectl get all -n <namespace>  -l csi`
 
-## Log collection for IBM block storage CSI driver controller
+### Log collection for IBM block storage CSI driver controller
 
 `kubectl log -f -n <namespace> ibm-block-csi-controller-0 -c ibm-block-csi-controller`
 
-## Log collection for IBM block storage CSI driver node (per worker node or PODID)
+### Log collection for IBM block storage CSI driver node (per worker node or PODID)
 
 `kubectl log -f -n <namespace> ibm-block-csi-node-<PODID> -c ibm-block-csi-node`
 
