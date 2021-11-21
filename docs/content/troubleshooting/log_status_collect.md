@@ -5,16 +5,6 @@ Use the CSI (Container Storage Interface) driver debug information for problem i
 **Note:** These procedures are applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.
 
 To collect and display status and logs related to the different components of IBM® block storage CSI driver, use the following Kubernetes commands and procedures:
-<dl>
-<dlentry>
-<dt>title1<dt/>
-<dd>entry1<dd/>
-</dlentry>
-<dlentry>
-<dt>title2<dt/>
-<dd><cmdname>cmdname 123</cmdname><pre>&lt;namespace> pre</pre><screen>123 screen</screen></dd>
-</dlentry>
-</dl>
 
 ## Status collection for CSI pods, daemonset, and statefulset
 
