@@ -6,9 +6,9 @@ Use the CSI (Container Storage Interface) driver debug information for problem i
 
 To collect and display status and logs related to the different components of IBM® block storage CSI driver, use the following Kubernetes commands and procedures:
 <dl><dlentry>
-<dt>title</dt>
+    <dt><b>title</b></dt>
 <dd>This is my text</dd>
-<dt>new title </dt>
+<dt><b>new title</b></dt>
 <dd>new text</dd></dlentry></dl>
 
 ## Status collection for CSI pods, daemonset, and statefulset
