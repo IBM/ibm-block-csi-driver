@@ -54,6 +54,7 @@ const (
 	resizeFsTimeoutMilliseconds = 30 * 1000
 	TimeOutMultipathdCmd        = 10 * 1000
 	multipathdCmd               = "multipathd"
+	nvmeCmd                     = "nvme"
 	minFilesInNonEmptyDir       = 1
 )
 
@@ -61,6 +62,7 @@ const (
 
 type NodeUtilsInterface interface {
 	ReadNvmeNqn() (string, error)
+	IsDevicesNvme(sysDevices []string) bool
 	ParseFCPorts() ([]string, error)
 	ParseIscsiInitiators() (string, error)
 	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, map[string][]string, error)
@@ -177,6 +179,22 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 	}
 	return true
 }
+
+func (n NodeUtils) IsDevicesNvme(sysDevices []string) bool {
+	args := []string{"list"}
+	out, err := n.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, nvmeCmd, args)
+	if err != nil {
+		return false
+	}
+	devices := string(out)
+	for _, deviceName := range sysDevices {
+		if strings.Contains(devices, deviceName) {
+			return true
+		}
+	}
+	return false
+}
+
 func readFile(path string) (string, error) {
 	file, err := os.Open(path)
 	if err != nil {
