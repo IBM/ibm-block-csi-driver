@@ -1,5 +1,6 @@
 from collections import defaultdict
 from io import StringIO
+from random import choice
 
 from pysvc import errors as svc_errors
 from pysvc.unified.client import connect
@@ -750,7 +751,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
         return luns_in_use
 
-    def get_first_free_lun(self, host_name):
+    def get_free_lun(self, host_name):
         logger.debug("getting first free lun id for "
                      "host :{0}".format(host_name))
         lun = None
@@ -761,15 +762,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         # can be mapped to a single host. (Note that some hosts such as linux
         # do not support more than 255 or 511 mappings today irrespective of
         # our constraint).
-        for candidate in range(self.MIN_LUN_NUMBER, self.MAX_LUN_NUMBER + 1):
-            if str(candidate) not in luns_in_use:
-                logger.debug("First available LUN number for {0} is "
-                             "{1}".format(host_name, str(candidate)))
-                lun = str(candidate)
-                break
+        lun_range = list(range(self.MIN_LUN_NUMBER, self.MAX_LUN_NUMBER + 1))
+        lun_range_str = [str(lun) for lun in lun_range]
+        free_luns = (list(set(lun_range_str) - set(luns_in_use)))
+        if free_luns:
+            lun = choice(free_luns)
         if not lun:
             raise array_errors.NoAvailableLunError(host_name)
-        logger.debug("The first available lun is : {0}".format(lun))
+        logger.debug("The chosen available lun is : {0}".format(lun))
         return lun
 
     def map_volume(self, volume_id, host_name, connectivity_type):
@@ -784,7 +784,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         lun = ""
         try:
             if connectivity_type != config.NVME_OVER_FC_CONNECTIVITY_TYPE:
-                lun = self.get_first_free_lun(host_name)
+                lun = self.get_free_lun(host_name)
                 cli_kwargs.update({'scsi': lun})
             self.client.svctask.mkvdiskhostmap(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
