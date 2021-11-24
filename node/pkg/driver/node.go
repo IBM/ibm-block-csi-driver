@@ -630,7 +630,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	}
 
 	sysDevices := strings.Split(rawSysDevices, ",")
-	if !d.NodeUtils.IsDevicesNvme(sysDevices) {
+	if !d.NodeUtils.DevicesAreNvme(sysDevices) {
 		err = d.NodeUtils.RescanPhysicalDevices(sysDevices)
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())

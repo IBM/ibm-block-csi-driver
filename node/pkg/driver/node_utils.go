@@ -62,7 +62,7 @@ const (
 
 type NodeUtilsInterface interface {
 	ReadNvmeNqn() (string, error)
-	IsDevicesNvme(sysDevices []string) bool
+	DevicesAreNvme(sysDevices []string) bool
 	ParseFCPorts() ([]string, error)
 	ParseIscsiInitiators() (string, error)
 	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, map[string][]string, error)
@@ -180,7 +180,7 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 	return true
 }
 
-func (n NodeUtils) IsDevicesNvme(sysDevices []string) bool {
+func (n NodeUtils) DevicesAreNvme(sysDevices []string) bool {
 	args := []string{"list"}
 	out, err := n.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, nvmeCmd, args)
 	if err != nil {
@@ -189,6 +189,7 @@ func (n NodeUtils) IsDevicesNvme(sysDevices []string) bool {
 	devices := string(out)
 	for _, deviceName := range sysDevices {
 		if strings.Contains(devices, deviceName) {
+			logger.Debugf("found device {%s} in nvme list", deviceName)
 			return true
 		}
 	}
