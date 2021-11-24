@@ -752,7 +752,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return luns_in_use
 
     def get_free_lun(self, host_name):
-        logger.debug("getting first free lun id for "
+        logger.debug("getting random free lun id for "
                      "host :{0}".format(host_name))
         lun = None
         luns_in_use = self._get_used_lun_ids_from_host(host_name)
