@@ -53,7 +53,7 @@
 * [Using IBM block storage CSI driver](content/using/csi_ug_using.md)
 	* [Sample configurations for running a stateful container](content/using/csi_ug_using_sample.md)
 * [Troubleshooting](content/troubleshooting/csi_ug_troubleshooting.md)
-	* [Detecting errors and log collection](content/troubleshooting/log_status_collection.md)
+	* [Detecting errors and log collection](content/troubleshooting/log_status_collect.md)
 	* [Recovering a pod volume attachment from a crashed Kubernetes node](content/troubleshooting/recovering_vol_attach_crashed_k8s.md)
 	* [Miscellaneous troubleshooting](content/troubleshooting/troubleshooting_misc.md)
 * [Notices](.book_files/storage_csi_notices.md)
