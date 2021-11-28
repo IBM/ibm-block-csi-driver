@@ -33,6 +33,8 @@ import (
 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
+const MaxNodeIdLength = 128
+
 var (
 	nodeUtils    = driver.NewNodeUtils(&executer.Executer{}, nil)
 	hostName     = "test-hostname"
@@ -341,21 +343,21 @@ func TestGenerateNodeID(t *testing.T) {
 			nvmeNQN:  nvmeNQN,
 			fcWWNs:   []string{},
 			iscsiIQN: "",
-			expErr:   errors.New(fmt.Sprintf("could not fit any ports in node id: %s;, length limit: 128", longHostName)),
+			expErr:   errors.New(fmt.Sprintf("could not fit any ports in node id: %s;, length limit: %d", longHostName, MaxNodeIdLength)),
 		},
 		{name: "fail long hostName on fc ports",
 			hostName: longHostName,
 			nvmeNQN:  "",
 			fcWWNs:   fcWWNs[:2],
 			iscsiIQN: "",
-			expErr:   errors.New(fmt.Sprintf("could not fit any ports in node id: %s;;, length limit: 128", longHostName)),
+			expErr:   errors.New(fmt.Sprintf("could not fit any ports in node id: %s;;, length limit: %d", longHostName, MaxNodeIdLength)),
 		},
 		{name: "fail long hostName on iscsi port",
 			hostName: longHostName,
 			nvmeNQN:  "",
 			fcWWNs:   []string{},
 			iscsiIQN: iscsiIQN,
-			expErr:   errors.New(fmt.Sprintf("could not fit any ports in node id: %s;;, length limit: 128", longHostName)),
+			expErr:   errors.New(fmt.Sprintf("could not fit any ports in node id: %s;;, length limit: %d", longHostName, MaxNodeIdLength)),
 		},
 	}
 	for _, tc := range testCases {
