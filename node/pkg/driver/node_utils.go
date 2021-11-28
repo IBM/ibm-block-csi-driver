@@ -186,9 +186,9 @@ func (n NodeUtils) DevicesAreNvme(sysDevices []string) bool {
 	if err != nil {
 		return false
 	}
-	devices := string(out)
+	nvmeDevices := string(out)
 	for _, deviceName := range sysDevices {
-		if strings.Contains(devices, deviceName) {
+		if strings.Contains(nvmeDevices, deviceName) {
 			logger.Debugf("found device {%s} in nvme list", deviceName)
 			return true
 		}
