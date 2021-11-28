@@ -52,7 +52,7 @@ const (
 	NodeIdFcDelimiter           = ":"
 	mkfsTimeoutMilliseconds     = 15 * 60 * 1000
 	resizeFsTimeoutMilliseconds = 30 * 1000
-	TimeOutMultipathdCmd        = 10 * 1000
+	TimeOutGeneralCmd           = 10 * 1000
 	multipathdCmd               = "multipathd"
 	nvmeCmd                     = "nvme"
 	minFilesInNonEmptyDir       = 1
@@ -182,7 +182,7 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 
 func (n NodeUtils) DevicesAreNvme(sysDevices []string) bool {
 	args := []string{"list"}
-	out, err := n.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, nvmeCmd, args)
+	out, err := n.Executer.ExecuteWithTimeout(TimeOutGeneralCmd, nvmeCmd, args)
 	if err != nil {
 		return false
 	}
@@ -364,13 +364,13 @@ func (n NodeUtils) ExpandFilesystem(devicePath string, volumePath string, fsType
 func (n NodeUtils) ExpandMpathDevice(mpathDevice string) error {
 	logger.Infof("ExpandMpathDevice: [%s] ", mpathDevice)
 	args := []string{"resize", "map", mpathDevice}
-	output, err := n.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
+	output, err := n.Executer.ExecuteWithTimeout(TimeOutGeneralCmd, multipathdCmd, args)
 	if err != nil {
 		return fmt.Errorf("multipathd resize failed: %v\narguments: %v\nOutput: %s\n", err, args, string(output))
 	}
 
 	args = []string{"reconfigure"}
-	output, err = n.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
+	output, err = n.Executer.ExecuteWithTimeout(TimeOutGeneralCmd, multipathdCmd, args)
 	if err != nil {
 		return fmt.Errorf("multipathd reconfigure failed: %v\narguments: %v\nOutput: %s\n", err, args, string(output))
 	}
