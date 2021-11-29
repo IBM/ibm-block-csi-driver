@@ -762,9 +762,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         # can be mapped to a single host. (Note that some hosts such as linux
         # do not support more than 255 or 511 mappings today irrespective of
         # our constraint).
-        lun_range = range(self.MIN_LUN_NUMBER, self.MAX_LUN_NUMBER + 1)
-        lun_range_str = {str(lun) for lun in lun_range}
-        free_luns = list(lun_range_str - set(luns_in_use))
+        lun_range_gen = range(self.MIN_LUN_NUMBER, self.MAX_LUN_NUMBER + 1)
+        lun_range = {str(lun) for lun in lun_range_gen}
+        free_luns = list(lun_range - set(luns_in_use))
         if free_luns:
             lun = choice(free_luns)
         if not lun:
