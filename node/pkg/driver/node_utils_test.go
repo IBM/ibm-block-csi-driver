@@ -33,15 +33,14 @@ import (
 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
-const MaxNodeIdLength = 128
-
 var (
-	nodeUtils    = driver.NewNodeUtils(&executer.Executer{}, nil)
-	hostName     = "test-hostname"
-	longHostName = strings.Repeat(hostName, 15)
-	nvmeNQN      = "nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1"
-	fcWWNs       = []string{"10000000c9934d9f", "10000000c9934d9h", "10000000c9934d9a", "10000000c9934d9b", "10000000c9934d9z"}
-	iscsiIQN     = "iqn.1994-07.com.redhat:e123456789"
+	nodeUtils       = driver.NewNodeUtils(&executer.Executer{}, nil)
+	maxNodeIdLength = driver.MaxNodeIdLength
+	hostName        = "test-hostname"
+	longHostName    = strings.Repeat(hostName, 15)
+	nvmeNQN         = "nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1"
+	fcWWNs          = []string{"10000000c9934d9f", "10000000c9934d9h", "10000000c9934d9a", "10000000c9934d9b", "10000000c9934d9z"}
+	iscsiIQN        = "iqn.1994-07.com.redhat:e123456789"
 )
 
 func TestReadNvmeNqn(t *testing.T) {
@@ -343,21 +342,21 @@ func TestGenerateNodeID(t *testing.T) {
 			nvmeNQN:  nvmeNQN,
 			fcWWNs:   []string{},
 			iscsiIQN: "",
-			expErr:   errors.New(fmt.Sprintf("could not fit any ports in node id: %s;, length limit: %d", longHostName, MaxNodeIdLength)),
+			expErr:   errors.New(fmt.Sprintf("could not fit any ports in node id: %s;, length limit: %d", longHostName, maxNodeIdLength)),
 		},
 		{name: "fail long hostName on fc ports",
 			hostName: longHostName,
 			nvmeNQN:  "",
 			fcWWNs:   fcWWNs[:2],
 			iscsiIQN: "",
-			expErr:   errors.New(fmt.Sprintf("could not fit any ports in node id: %s;;, length limit: %d", longHostName, MaxNodeIdLength)),
+			expErr:   errors.New(fmt.Sprintf("could not fit any ports in node id: %s;;, length limit: %d", longHostName, maxNodeIdLength)),
 		},
 		{name: "fail long hostName on iscsi port",
 			hostName: longHostName,
 			nvmeNQN:  "",
 			fcWWNs:   []string{},
 			iscsiIQN: iscsiIQN,
-			expErr:   errors.New(fmt.Sprintf("could not fit any ports in node id: %s;;, length limit: %d", longHostName, MaxNodeIdLength)),
+			expErr:   errors.New(fmt.Sprintf("could not fit any ports in node id: %s;;, length limit: %d", longHostName, maxNodeIdLength)),
 		},
 	}
 	for _, tc := range testCases {
