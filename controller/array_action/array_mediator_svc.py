@@ -317,10 +317,13 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         all_fcmaps.extend(self._get_fcmaps_as_source_if_exist(object_name))
         return all_fcmaps
 
-    def _expand_cli_volume(self, cli_volume, increase_in_bytes):
+    def _expand_cli_volume(self, cli_volume, increase_in_bytes, is_hyperswap):
         volume_name = cli_volume.name
         try:
-            self.client.svctask.expandvdisksize(vdisk_id=volume_name, unit='b', size=increase_in_bytes)
+            if is_hyperswap:
+                self.client.svctask.expandvolume(object_id=volume_name, unit='b', size=increase_in_bytes)
+            else:
+                self.client.svctask.expandvdisksize(vdisk_id=volume_name, unit='b', size=increase_in_bytes)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 logger.warning("Failed to expand volume {}".format(volume_name))
@@ -336,11 +339,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         volume_name = cli_volume.name
         fcmaps = self._get_object_fcmaps(volume_name)
         self._safe_delete_fcmaps(volume_name, fcmaps)
+        is_hyperswap = any(self._is_in_remote_copy_relationship(fcmap) for fcmap in fcmaps)
 
         current_size = int(cli_volume.capacity)
         final_size = self._convert_size_bytes(required_bytes)
         increase_in_bytes = final_size - current_size
-        self._expand_cli_volume(cli_volume, increase_in_bytes)
+        self._expand_cli_volume(cli_volume, increase_in_bytes, is_hyperswap)
         logger.info(
             "Finished volume expansion. id : {0}. volume increased by {1} bytes".format(volume_id, increase_in_bytes))
 

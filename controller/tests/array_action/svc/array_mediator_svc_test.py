@@ -1071,7 +1071,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsfcmap.side_effect = [fcmaps_as_target, fcmaps_as_source]
         self.svc.expand_volume('vol_id', 1024)
 
-        self.svc.client.svctask.expandvdisksize.assert_called_once_with(vdisk_id='test_volume', unit='b', size=512)
+        self.svc.client.svctask.expandvolume.assert_called_once_with(object_id='test_volume', unit='b', size=512)
         self.svc.client.svctask.rmfcmap.assert_not_called()
 
     def test_expand_volume_raise_object_not_found(self):
