@@ -62,7 +62,7 @@ var (
 const (
 	FCPath          = "/sys/class/fc_host"
 	FCPortPath      = "/sys/class/fc_host/host*/port_name"
-	MaxNodeIdLength = 192
+	MaxNodeIdLength = 128
 )
 
 //go:generate mockgen -destination=../../mocks/mock_NodeMounter.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeMounter
@@ -630,12 +630,17 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	}
 
 	sysDevices := strings.Split(rawSysDevices, ",")
-
-	err = d.NodeUtils.RescanPhysicalDevices(sysDevices)
+	devicesAreNvme, err := d.NodeUtils.DevicesAreNvme(sysDevices)
 	if err != nil {
+		logger.Errorf("Error while trying to check if sys devices are nvme devices : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-
+	if !devicesAreNvme {
+		err = d.NodeUtils.RescanPhysicalDevices(sysDevices)
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
 	err = d.NodeUtils.ExpandMpathDevice(baseDevice)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())

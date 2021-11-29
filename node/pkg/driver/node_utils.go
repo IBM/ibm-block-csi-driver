@@ -52,8 +52,11 @@ const (
 	NodeIdFcDelimiter           = ":"
 	mkfsTimeoutMilliseconds     = 15 * 60 * 1000
 	resizeFsTimeoutMilliseconds = 30 * 1000
-	TimeOutMultipathdCmd        = 10 * 1000
+	TimeOutGeneralCmd           = 10 * 1000
+	TimeOutMultipathdCmd        = TimeOutGeneralCmd
+	TimeOutNvmeCmd              = TimeOutGeneralCmd
 	multipathdCmd               = "multipathd"
+	nvmeCmd                     = "nvme"
 	minFilesInNonEmptyDir       = 1
 )
 
@@ -61,6 +64,7 @@ const (
 
 type NodeUtilsInterface interface {
 	ReadNvmeNqn() (string, error)
+	DevicesAreNvme(sysDevices []string) (bool, error)
 	ParseFCPorts() ([]string, error)
 	ParseIscsiInitiators() (string, error)
 	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, map[string][]string, error)
@@ -177,6 +181,26 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 	}
 	return true
 }
+
+func (n NodeUtils) DevicesAreNvme(sysDevices []string) (bool, error) {
+	args := []string{"list"}
+	if err := n.Executer.IsExecutable(nvmeCmd); err != nil {
+		return false, nil
+	}
+	out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args)
+	if err != nil {
+		return false, err
+	}
+	nvmeDevices := string(out)
+	for _, deviceName := range sysDevices {
+		if strings.Contains(nvmeDevices, deviceName) {
+			logger.Debugf("found device {%s} in nvme list", deviceName)
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func readFile(path string) (string, error) {
 	file, err := os.Open(path)
 	if err != nil {

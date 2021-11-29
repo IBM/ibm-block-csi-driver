@@ -318,10 +318,13 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         all_fcmaps.extend(self._get_fcmaps_as_source_if_exist(object_name))
         return all_fcmaps
 
-    def _expand_cli_volume(self, cli_volume, increase_in_bytes):
+    def _expand_cli_volume(self, cli_volume, increase_in_bytes, is_hyperswap):
         volume_name = cli_volume.name
         try:
-            self.client.svctask.expandvdisksize(vdisk_id=volume_name, unit='b', size=increase_in_bytes)
+            if is_hyperswap:
+                self.client.svctask.expandvolume(object_id=volume_name, unit='b', size=increase_in_bytes)
+            else:
+                self.client.svctask.expandvdisksize(vdisk_id=volume_name, unit='b', size=increase_in_bytes)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if not is_warning_message(ex.my_message):
                 logger.warning("Failed to expand volume {}".format(volume_name))
@@ -337,11 +340,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         volume_name = cli_volume.name
         fcmaps = self._get_object_fcmaps(volume_name)
         self._safe_delete_fcmaps(volume_name, fcmaps)
+        is_hyperswap = any(self._is_in_remote_copy_relationship(fcmap) for fcmap in fcmaps)
 
         current_size = int(cli_volume.capacity)
         final_size = self._convert_size_bytes(required_bytes)
         increase_in_bytes = final_size - current_size
-        self._expand_cli_volume(cli_volume, increase_in_bytes)
+        self._expand_cli_volume(cli_volume, increase_in_bytes, is_hyperswap)
         logger.info(
             "Finished volume expansion. id : {0}. volume increased by {1} bytes".format(volume_id, increase_in_bytes))
 
@@ -627,10 +631,39 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self._rollback_create_snapshot(target_volume_name)
             raise ex
 
+    def _get_pool_site(self, pool):
+        filter_value = 'name={}'.format(pool)
+        cli_pool = self.client.svcinfo.lsmdiskgrp(filtervalue=filter_value).as_single_element
+        if cli_pool:
+            return cli_pool.site_name
+        raise array_errors.PoolDoesNotExist(pool, self.endpoint)
+
+    def _is_cli_volume_in_site(self, cli_volume, site_name):
+        volume_site_name = self._get_pool_site(cli_volume.mdisk_grp_name)
+        return volume_site_name == site_name
+
+    def _get_rcrelationships_as_master_in_cluster(self, volume_name):
+        filter_value = 'master_vdisk_name={}:aux_cluster_id={}'.format(volume_name, self.identifier)
+        return self._lsrcrelationship(filter_value).as_list
+
+    def _get_cli_volume_in_pool_site(self, volume_name, pool_name):
+        cli_volume = self._get_cli_volume(volume_name)
+        if not pool_name:
+            return cli_volume
+        pool_site_name = self._get_pool_site(pool_name)
+        if self._is_cli_volume_in_site(cli_volume, pool_site_name):
+            return cli_volume
+        rcrelationships = self._get_rcrelationships_as_master_in_cluster(volume_name)
+        for rcrelationship in rcrelationships:
+            other_cli_volume = self._get_cli_volume(rcrelationship.aux_vdisk_name)
+            if self._is_cli_volume_in_site(other_cli_volume, pool_site_name):
+                return other_cli_volume
+        raise RuntimeError('could not find a volume for {} in site {}'.format(volume_name, pool_site_name))
+
     def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         source_volume_name = self._get_volume_name_by_wwn(volume_id)
-        source_cli_volume = self._get_cli_volume(source_volume_name)
+        source_cli_volume = self._get_cli_volume_in_pool_site(source_volume_name, pool)
         target_cli_volume = self._create_snapshot(snapshot_name, source_cli_volume, space_efficiency, pool)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         return self._generate_snapshot_response(target_cli_volume, source_cli_volume.vdisk_UID)
@@ -915,7 +948,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return cli_host.get(HOST_PORTSET_ID)
 
     def _get_replication_endpoint_type(self, rcrelationship):
-        if self._identifier == rcrelationship.master_cluster_id:
+        if self.identifier == rcrelationship.master_cluster_id:
             return ENDPOINT_TYPE_MASTER
         return ENDPOINT_TYPE_AUX
 
@@ -965,12 +998,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                            is_ready=is_ready,
                            is_primary=is_primary)
 
-    def _get_lsrcrelationship(self, filter_value):
+    def _lsrcrelationship(self, filter_value):
         return self.client.svcinfo.lsrcrelationship(filtervalue=filter_value)
 
     def _get_rcrelationship_by_name(self, replication_name, not_exist_error=True):
         filter_value = 'RC_rel_name={0}'.format(replication_name)
-        rcrelationship = self._get_lsrcrelationship(filter_value).as_single_element
+        rcrelationship = self._lsrcrelationship(filter_value).as_single_element
         if not rcrelationship and not_exist_error:
             raise array_errors.ObjectNotFoundError(replication_name)
         return rcrelationship
@@ -987,7 +1020,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                                                                           OTHER_END=other_endpoint_type,
                                                                           OTHER_VDISK_ID=other_cli_volume_id,
                                                                           OTHER_CLUSTER_ID=other_system_id)
-        return self._get_lsrcrelationship(filter_value).as_list
+        return self._lsrcrelationship(filter_value).as_list
 
     def _get_rcrelationship(self, cli_volume_id, other_cli_volume_id, other_system_id):
         rcrelationships = self._get_rcrelationships(cli_volume_id, other_cli_volume_id,
