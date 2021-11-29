@@ -53,6 +53,8 @@ const (
 	mkfsTimeoutMilliseconds     = 15 * 60 * 1000
 	resizeFsTimeoutMilliseconds = 30 * 1000
 	TimeOutGeneralCmd           = 10 * 1000
+	TimeOutMultipathdCmd        = TimeOutGeneralCmd
+	TimeOutNvmeCmd              = TimeOutGeneralCmd
 	multipathdCmd               = "multipathd"
 	nvmeCmd                     = "nvme"
 	minFilesInNonEmptyDir       = 1
@@ -62,7 +64,7 @@ const (
 
 type NodeUtilsInterface interface {
 	ReadNvmeNqn() (string, error)
-	DevicesAreNvme(sysDevices []string) bool
+	DevicesAreNvme(sysDevices []string) (bool, error)
 	ParseFCPorts() ([]string, error)
 	ParseIscsiInitiators() (string, error)
 	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, map[string][]string, error)
@@ -180,20 +182,23 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 	return true
 }
 
-func (n NodeUtils) DevicesAreNvme(sysDevices []string) bool {
+func (n NodeUtils) DevicesAreNvme(sysDevices []string) (bool, error) {
 	args := []string{"list"}
-	out, err := n.Executer.ExecuteWithTimeout(TimeOutGeneralCmd, nvmeCmd, args)
+	if err := n.Executer.IsExecutable(nvmeCmd); err != nil {
+		return false, nil
+	}
+	out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args)
 	if err != nil {
-		return false
+		return false, err
 	}
 	nvmeDevices := string(out)
 	for _, deviceName := range sysDevices {
 		if strings.Contains(nvmeDevices, deviceName) {
 			logger.Debugf("found device {%s} in nvme list", deviceName)
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 func readFile(path string) (string, error) {
@@ -364,13 +369,13 @@ func (n NodeUtils) ExpandFilesystem(devicePath string, volumePath string, fsType
 func (n NodeUtils) ExpandMpathDevice(mpathDevice string) error {
 	logger.Infof("ExpandMpathDevice: [%s] ", mpathDevice)
 	args := []string{"resize", "map", mpathDevice}
-	output, err := n.Executer.ExecuteWithTimeout(TimeOutGeneralCmd, multipathdCmd, args)
+	output, err := n.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
 	if err != nil {
 		return fmt.Errorf("multipathd resize failed: %v\narguments: %v\nOutput: %s\n", err, args, string(output))
 	}
 
 	args = []string{"reconfigure"}
-	output, err = n.Executer.ExecuteWithTimeout(TimeOutGeneralCmd, multipathdCmd, args)
+	output, err = n.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
 	if err != nil {
 		return fmt.Errorf("multipathd reconfigure failed: %v\narguments: %v\nOutput: %s\n", err, args, string(output))
 	}

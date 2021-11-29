@@ -1003,7 +1003,7 @@ func TestNodeExpandVolume(t *testing.T) {
 
 				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(rawSysDevices, nil)
-				mockNodeUtils.EXPECT().DevicesAreNvme(sysDevices).Return(false)
+				mockNodeUtils.EXPECT().DevicesAreNvme(sysDevices).Return(false, nil)
 				mockNodeUtils.EXPECT().RescanPhysicalDevices(sysDevices).Return(dummyError)
 
 				_, err := node.NodeExpandVolume(context.TODO(), expandRequest)
@@ -1022,7 +1022,7 @@ func TestNodeExpandVolume(t *testing.T) {
 
 				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(rawSysDevices, nil)
-				mockNodeUtils.EXPECT().DevicesAreNvme(sysDevices).Return(false)
+				mockNodeUtils.EXPECT().DevicesAreNvme(sysDevices).Return(false, nil)
 				mockNodeUtils.EXPECT().RescanPhysicalDevices(sysDevices)
 				mockNodeUtils.EXPECT().ExpandMpathDevice(mpathDeviceName).Return(dummyError)
 
@@ -1042,7 +1042,7 @@ func TestNodeExpandVolume(t *testing.T) {
 
 				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(rawSysDevices, nil)
-				mockNodeUtils.EXPECT().DevicesAreNvme(sysDevices).Return(false)
+				mockNodeUtils.EXPECT().DevicesAreNvme(sysDevices).Return(false, nil)
 				mockNodeUtils.EXPECT().RescanPhysicalDevices(sysDevices)
 				mockNodeUtils.EXPECT().ExpandMpathDevice(mpathDeviceName)
 				mockMounter.EXPECT().GetDiskFormat(mpathDevice).Return("", dummyError)
@@ -1063,7 +1063,7 @@ func TestNodeExpandVolume(t *testing.T) {
 
 				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(rawSysDevices, nil)
-				mockNodeUtils.EXPECT().DevicesAreNvme(sysDevices).Return(false)
+				mockNodeUtils.EXPECT().DevicesAreNvme(sysDevices).Return(false, nil)
 				mockNodeUtils.EXPECT().RescanPhysicalDevices(sysDevices)
 				mockNodeUtils.EXPECT().ExpandMpathDevice(mpathDeviceName)
 				mockMounter.EXPECT().GetDiskFormat(mpathDevice).Return(fsType, nil)
@@ -1085,7 +1085,7 @@ func TestNodeExpandVolume(t *testing.T) {
 
 				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(rawSysDevices, nil)
-				mockNodeUtils.EXPECT().DevicesAreNvme(sysDevices).Return(true)
+				mockNodeUtils.EXPECT().DevicesAreNvme(sysDevices).Return(true, nil)
 				mockNodeUtils.EXPECT().ExpandMpathDevice(mpathDeviceName)
 				mockMounter.EXPECT().GetDiskFormat(mpathDevice).Return(fsType, nil)
 				mockNodeUtils.EXPECT().ExpandFilesystem(mpathDevice, stagingTargetPath, fsType)
@@ -1108,7 +1108,7 @@ func TestNodeExpandVolume(t *testing.T) {
 
 				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(mpathDeviceName).Return(rawSysDevices, nil)
-				mockNodeUtils.EXPECT().DevicesAreNvme(sysDevices).Return(false)
+				mockNodeUtils.EXPECT().DevicesAreNvme(sysDevices).Return(false, nil)
 				mockNodeUtils.EXPECT().RescanPhysicalDevices(sysDevices)
 				mockNodeUtils.EXPECT().ExpandMpathDevice(mpathDeviceName)
 				mockMounter.EXPECT().GetDiskFormat(mpathDevice).Return(fsType, nil)
