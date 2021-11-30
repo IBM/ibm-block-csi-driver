@@ -97,3 +97,7 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
       For more information, see [Configuring for CSI Topology](../configuration/configuring_topology.md).
 
 7. (Optional) If planning on using HyperSwap on your storage system, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Planning** > **Planning for high availability** > **Planning for a HyperSwap topology system**.
+
+8. (Optional) If using NVMe over Fibre Channel host attachment, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Configuring** > **Host attachment** > **NVMe over Fibre Channel host attachments**.
+
+    **Note:** Be sure that storage system is using one of the fully supported HBAs compatibile with NVMe-oF/FC, as listed in the [IBM® System Storage® Interoperation Center (SSIC)](https://www-03.ibm.com/systems/support/storage/ssic/interoperability.wss).
