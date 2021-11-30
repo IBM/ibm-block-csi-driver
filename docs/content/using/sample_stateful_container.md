@@ -14,7 +14,7 @@ Use this information to run a stateful container on StatefulSet volumes using ei
 
     **Remember:** The `SpaceEfficiency` values for Spectrum Virtualize family are: `thick`, `thin`, `compressed`, or `deduplicated`. These values are not case specific.
     
-    For DS8000 Family systems, the default value is `none`, but can be set to `thin`, if required. These values are not case specific. For more information, see [Creating a StorageClass](../configuration/creating_volumestrorageclass.md).
+    For DS8000 family systems, the default value is `none`, but can be set to `thin`, if required. These values are not case specific. For more information, see [Creating a StorageClass](../configuration/creating_volumestrorageclass.md).
     
     This parameter is not applicable for IBM FlashSystem A9000 and A9000R systems. These systems always include deduplication and compression.
 
