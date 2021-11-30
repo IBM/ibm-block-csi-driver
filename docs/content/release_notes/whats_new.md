@@ -12,6 +12,10 @@ IBM® block storage CSI driver 1.8.0 now supports HyperSwap implementation, when
 
 This version adds NVMe/FC support for supported IBM Spectrum Virtualize family storage systems using Red Hat® Enterprise Linux® (RHEL) operating systems. 
 
+## Increased StorageClass `SpaceEfficiency` parameter capabilities
+
+Version 1.8.0 increases the `SpaceEfficiency` deduplication parameter options for IBM Spectrum Virtualize family storage systems. For more information, see [Creating a StorageClass](../content/configuration/creating_volumestrorageclass.md).
+
 ## Additional support for Kubernetes 1.23 orchestration platforms for deployment
 
 This version adds support for orchestration platform Kubernetes 1.23, suitable for deployment of the CSI (Container Storage Interface) driver.
