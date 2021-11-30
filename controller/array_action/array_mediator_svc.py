@@ -767,7 +767,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         free_luns = list(lun_range - set(luns_in_use))
         if free_luns:
             lun = choice(free_luns)
-        if not lun:
+        else:
             raise array_errors.NoAvailableLunError(host_name)
         logger.debug("The chosen available lun is : {0}".format(lun))
         return lun
