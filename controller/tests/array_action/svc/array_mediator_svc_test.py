@@ -890,7 +890,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                       'host_id': '16', 'host_name': 'Test_W'})
         self.svc.client.svcinfo.lshostvdiskmap.return_value = [map1, map2]
         lun = self.svc._get_free_lun('Test_P')
-        self.assertNotIn(lun, [lun_in_use_0, lun_in_use_1])
+        self.assertNotIn(lun, (lun_in_use_0, lun_in_use_1))
 
     @patch.object(SVCArrayMediator, "MAX_LUN_NUMBER", 3)
     @patch.object(SVCArrayMediator, "MIN_LUN_NUMBER", 1)
