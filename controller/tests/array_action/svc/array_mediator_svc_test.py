@@ -880,15 +880,17 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(lun, '0')
 
     @patch.object(SVCArrayMediator, "MAX_LUN_NUMBER", 3)
-    @patch.object(SVCArrayMediator, "MIN_LUN_NUMBER", 1)
+    @patch.object(SVCArrayMediator, "MIN_LUN_NUMBER", 0)
     def test_get_free_lun_success(self):
-        map1 = Munch({'id': '51', 'name': 'peng', 'SCSI_id': '0',
+        lun_in_use_0 = '0'
+        lun_in_use_1 = '1'
+        map1 = Munch({'id': '51', 'name': 'peng', 'SCSI_id': lun_in_use_0,
                       'host_id': '12', 'host_name': 'Test_P'})
-        map2 = Munch({'id': '56', 'name': 'peng', 'SCSI_id': '1',
+        map2 = Munch({'id': '56', 'name': 'peng', 'SCSI_id': lun_in_use_1,
                       'host_id': '16', 'host_name': 'Test_W'})
         self.svc.client.svcinfo.lshostvdiskmap.return_value = [map1, map2]
         lun = self.svc._get_free_lun('Test_P')
-        self.assertNotIn(lun, ['0', '1'])
+        self.assertNotIn(lun, [lun_in_use_0, lun_in_use_1])
 
     @patch.object(SVCArrayMediator, "MAX_LUN_NUMBER", 3)
     @patch.object(SVCArrayMediator, "MIN_LUN_NUMBER", 1)
