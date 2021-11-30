@@ -34,7 +34,7 @@
 		* [Uninstalling the driver with OperatorHub.io](content/installation/uninstall_driver_operatorhub.md)
 	* [Upgrading the CSI driver](content/installation/upgrade.md)
 		* [Manual upgrade with OpenShift](content/installation/upgrade_manual_openshift.md)
-* [CSI driver configuration](content/configuration/configuring.md)
+* [Configuring](content/configuration/configuring.md)
 	* [Creating a Secret](content/configuration/creating_secret.md)
 	* [Creating a StorageClass](content/configuration/creating_volumestrorageclass.md)
 	* [Creating a PersistentVolumeClaim (PVC)](content/configuration/creating_pvc.md)
