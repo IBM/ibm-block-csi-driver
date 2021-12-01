@@ -28,6 +28,11 @@ import (
 	"testing"
 )
 
+var (
+	volumeUuid  = "6oui000vendorsi0vendorsie0000000"
+	volumeNguid = "vendorsie0000000oui0000vendorsi0"
+)
+
 func NewOsDeviceConnectivityHelperScsiGenericForTest(
 	executer executer.ExecuterInterface,
 	helper device_connectivity.OsDeviceConnectivityHelperInterface,
@@ -161,7 +166,7 @@ func TestGetMpathDevice(t *testing.T) {
 			},
 			getWwnByScsiInqReturn: []GetWwnByScsiInqReturn{
 				GetWwnByScsiInqReturn{
-					wwn: "600fakevolumeuuid000000000111",
+					wwn: volumeUuid,
 					err: nil,
 				},
 			},
@@ -191,7 +196,7 @@ func TestGetMpathDevice(t *testing.T) {
 
 			getWwnByScsiInqReturn: []GetWwnByScsiInqReturn{
 				GetWwnByScsiInqReturn{
-					wwn: "600fakevolumeuuid000000000111",
+					wwn: volumeUuid,
 					err: nil,
 				},
 			},
@@ -207,12 +212,12 @@ func TestGetMpathDevice(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 			fake_helper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
 			fake_mutex := &sync.Mutex{}
 
 			for _, r := range tc.getDmsPathReturn {
-				fake_helper.EXPECT().GetDmsPath("600fakevolumeuuid000000000111").Return(
+				fake_helper.EXPECT().GetDmsPath(volumeUuid, volumeNguid).Return(
 					r.dmPath,
 					r.err)
 			}
@@ -228,8 +233,8 @@ func TestGetMpathDevice(t *testing.T) {
 					r.err)
 			}
 
-			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fake_executer, fake_helper, fake_mutex)
-			DMPath, err := o.GetMpathDevice("Test:600FAKEVOLUMEUUID000000000111")
+			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fakeExecuter, fake_helper, fake_mutex)
+			DMPath, err := o.GetMpathDevice(fmt.Sprintf("Test:%s", volumeUuid))
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")
@@ -284,7 +289,7 @@ func TestGetDmsPath(t *testing.T) {
 			name: "Should fail when WaitForDmToExist found more than 1 dm for volume",
 			waitForDmToExistReturn: []WaitForDmToExistReturn{
 				WaitForDmToExistReturn{
-					out: "dm-1,600fakevolumeuuid000000000111\ndm-2,otheruuid\ndm-3,600fakevolumeuuid000000000111",
+					out: fmt.Sprintf("dm-1,%s\ndm-2,%s\ndm-3,%s", volumeUuid, "otheruuid", volumeUuid),
 					err: nil,
 				},
 			},
@@ -297,7 +302,7 @@ func TestGetDmsPath(t *testing.T) {
 			name: "Should succeed to GetDmPath with space in start of input",
 			waitForDmToExistReturn: []WaitForDmToExistReturn{
 				WaitForDmToExistReturn{
-					out: " dm-1,600fakevolumeuuid000000000111",
+					out: fmt.Sprintf(" dm-1,%s", volumeUuid),
 					err: nil,
 				},
 			},
@@ -310,7 +315,7 @@ func TestGetDmsPath(t *testing.T) {
 			name: "Should succeed to GetDmPath",
 			waitForDmToExistReturn: []WaitForDmToExistReturn{
 				WaitForDmToExistReturn{
-					out: "dm-1,600fakevolumeuuid000000000111\ndm-2,otheruuid\ndm-3,otheruuid2",
+					out: fmt.Sprintf("dm-1,%s\ndm-2,%s\ndm-3,%s", volumeUuid, "otheruuid", "otheruuid2"),
 					err: nil,
 				},
 			},
@@ -326,15 +331,15 @@ func TestGetDmsPath(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 			fake_helper := mocks.NewMockGetDmsPathHelperInterface(mockCtrl)
 
 			for _, r := range tc.waitForDmToExistReturn {
-				fake_helper.EXPECT().WaitForDmToExist("600fakevolumeuuid000000000111", 5, 1).Return(r.out, r.err)
+				fake_helper.EXPECT().WaitForDmToExist(volumeUuid, volumeNguid, 5, 1).Return(r.out, r.err)
 			}
 
-			helperGeneric := NewOsDeviceConnectivityHelperGenericForTest(fake_executer, fake_helper)
-			dmPath, err := helperGeneric.GetDmsPath("600FAKEVOLUMEUUID000000000111")
+			helperGeneric := NewOsDeviceConnectivityHelperGenericForTest(fakeExecuter, fake_helper)
+			dmPath, err := helperGeneric.GetDmsPath(volumeUuid, volumeNguid)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")
@@ -380,7 +385,7 @@ func TestHelperWaitForDmToExist(t *testing.T) {
 		},
 		{
 			name:         "Should succeed",
-			devices:      "dm-1,volumeUuid\ndm-2,otherUuid",
+			devices:      fmt.Sprintf("dm-1,%s\ndm-2,%s", volumeUuid, "otherUuid"),
 			cmdReturnErr: nil,
 			expErr:       nil,
 		},
@@ -392,12 +397,11 @@ func TestHelperWaitForDmToExist(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
-			volumeUuid := "volumeUuid"
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 			args := []string{"show", "maps", "raw", "format", "\"", "%d,%w", "\""}
-			fake_executer.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathdCmd, "multipathd", args).Return([]byte(tc.devices), tc.cmdReturnErr)
-			helperGeneric := device_connectivity.NewGetDmsPathHelperGeneric(fake_executer)
-			devices, err := helperGeneric.WaitForDmToExist(volumeUuid, 1, 1)
+			fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathdCmd, "multipathd", args).Return([]byte(tc.devices), tc.cmdReturnErr)
+			helperGeneric := device_connectivity.NewGetDmsPathHelperGeneric(fakeExecuter)
+			devices, err := helperGeneric.WaitForDmToExist(volumeUuid, volumeNguid, 1, 1)
 			if err != nil {
 				if err.Error() != tc.expErr.Error() {
 					t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())
@@ -439,7 +443,7 @@ func TestHelperGetWwnByScsiInq(t *testing.T) {
 		},
 		{
 			name:            "Should return error when wwn line not matching the expected pattern",
-			cmdReturn:       []byte("Vendor Specific Identifier Extension: 0xcea5f6\n\t\t\t  [600fakevolumeuuid000000000111]"),
+			cmdReturn:       []byte(fmt.Sprintf("Vendor Specific Identifier Extension: 0xcea5f6\n\t\t\t  [%s]", volumeUuid)),
 			wwn:             "",
 			cmdReturnErr:    nil,
 			expErrType:      reflect.TypeOf(&device_connectivity.ErrorNoRegexWwnMatchInScsiInq{}),
@@ -455,8 +459,8 @@ func TestHelperGetWwnByScsiInq(t *testing.T) {
 		},
 		{
 			name:            "Should succeed",
-			cmdReturn:       []byte("Vendor Specific Identifier Extension: 0xcea5f6\n\t\t\t  [0x600fakevolumeuuid000000000111]"),
-			wwn:             "600FAKEVOLUMEUUID000000000111",
+			cmdReturn:       []byte(fmt.Sprintf("Vendor Specific Identifier Extension: 0xcea5f6\n\t\t\t  [0x%s]", volumeUuid)),
+			wwn:             volumeUuid,
 			cmdReturnErr:    nil,
 			expErr:          nil,
 			sgInqExecutable: nil,
@@ -470,15 +474,15 @@ func TestHelperGetWwnByScsiInq(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 			args := []string{"-p", "0x83", device}
-			fake_executer.EXPECT().IsExecutable(sgInqCmd).Return(tc.sgInqExecutable)
+			fakeExecuter.EXPECT().IsExecutable(sgInqCmd).Return(tc.sgInqExecutable)
 
 			if tc.sgInqExecutable == nil {
-				fake_executer.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, sgInqCmd, args).Return(tc.cmdReturn, tc.cmdReturnErr)
+				fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, sgInqCmd, args).Return(tc.cmdReturn, tc.cmdReturnErr)
 			}
 
-			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fake_executer)
+			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter)
 			wwn, err := helperGeneric.GetWwnByScsiInq(device)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
@@ -626,18 +630,18 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 
-			fake_executer.EXPECT().FilepathGlob(device_connectivity.IscsiHostRexExPath).Return(tc.globReturnMatches, tc.globReturnErr)
+			fakeExecuter.EXPECT().FilepathGlob(device_connectivity.IscsiHostRexExPath).Return(tc.globReturnMatches, tc.globReturnErr)
 
 			var mcalls []*gomock.Call
 			for _, r := range tc.ioutilReadFileReturns {
-				call := fake_executer.EXPECT().IoutilReadFile(r.ReadFileParam).Return(r.data, r.err)
+				call := fakeExecuter.EXPECT().IoutilReadFile(r.ReadFileParam).Return(r.data, r.err)
 				mcalls = append(mcalls, call)
 			}
 			gomock.InOrder(mcalls...)
 
-			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fake_executer)
+			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter)
 
 			returnHostList, err := helperGeneric.GetHostsIdByArrayIdentifier(tc.arrayIdentifier)
 			if tc.expErr != nil || tc.expErrType != nil {
@@ -788,18 +792,18 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 
-			fake_executer.EXPECT().FilepathGlob(device_connectivity.FcHostSysfsPath).Return(tc.globReturnMatches, tc.globReturnErr)
+			fakeExecuter.EXPECT().FilepathGlob(device_connectivity.FcHostSysfsPath).Return(tc.globReturnMatches, tc.globReturnErr)
 
 			var mcalls []*gomock.Call
 			for _, r := range tc.ioutilReadFileReturns {
-				call := fake_executer.EXPECT().IoutilReadFile(r.ReadFileParam).Return(r.data, r.err)
+				call := fakeExecuter.EXPECT().IoutilReadFile(r.ReadFileParam).Return(r.data, r.err)
 				mcalls = append(mcalls, call)
 			}
 			gomock.InOrder(mcalls...)
 
-			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fake_executer)
+			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter)
 
 			returnHostList, err := helperGeneric.GetHostsIdByArrayIdentifier(tc.arrayIdentifier)
 			if tc.expErr != nil || tc.expErrType != nil {

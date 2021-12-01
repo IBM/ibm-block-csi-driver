@@ -6,6 +6,8 @@ from mock import patch, Mock
 import controller.array_action.errors as array_errors
 import controller.controller_server.utils as utils
 from controller.array_action import config as array_config
+from controller.array_action.config import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
+from controller.common.node_info import NodeIdInfo
 from controller.controller_server import config as controller_config
 from controller.controller_server.csi_controller_server import CSIControllerServicer
 from controller.controller_server.errors import ObjectIdError, ValidationException
@@ -383,51 +385,72 @@ class TestUtils(unittest.TestCase):
             utils.get_volume_id_info("badvolumeformat")
         self.assertIn("Wrong volume id format", str(ex.exception))
 
+    def _check_node_id_parameters(self, node_id_info, nvme_nqn, fc_wwns, iscsi_iqn):
+        self.assertEqual(node_id_info.node_name, "host-name")
+        self.assertEqual(node_id_info.initiators.nvme_nqn, nvme_nqn)
+        self.assertEqual(node_id_info.initiators.fc_wwns, fc_wwns.split(":"))
+        self.assertEqual(node_id_info.initiators.iscsi_iqn, iscsi_iqn)
+
     def test_get_node_id_info(self):
         with self.assertRaises(array_errors.HostNotFoundError) as ex:
-            utils.get_node_id_info("badnodeformat")
+            utils.get_node_id_info("bad-node-format")
             self.assertTrue("node" in str(ex))
+        host_name = "host-name"
+        nvme_nqn = "nqn.ibm"
+        fc_wwns = "wwn1:wwn2"
+        iscsi_iqn = "iqn.ibm"
 
-        hostname, fc_wwns, iscsi_iqn = utils.get_node_id_info("hostabc;;iqn.ibm")
-        self.assertEqual(hostname, "hostabc")
-        self.assertEqual(iscsi_iqn, "iqn.ibm")
-        self.assertEqual(fc_wwns, "")
+        node_id_info = NodeIdInfo("{};;;{}".format(host_name, iscsi_iqn))
+        self._check_node_id_parameters(node_id_info, "", "", iscsi_iqn)
 
-        hostname, fc_wwns, iscsi_iqn = utils.get_node_id_info("hostabc;wwn1:wwn2;iqn.ibm")
-        self.assertEqual(hostname, "hostabc")
-        self.assertEqual(iscsi_iqn, "iqn.ibm")
-        self.assertEqual(fc_wwns, "wwn1:wwn2")
+        node_id_info = NodeIdInfo("{};;{};{}".format(host_name, fc_wwns, iscsi_iqn))
+        self._check_node_id_parameters(node_id_info, "", fc_wwns, iscsi_iqn)
 
-        hostname, fc_wwns, iscsi_iqn = utils.get_node_id_info("hostabc;wwn1:wwn2")
-        self.assertEqual(hostname, "hostabc")
-        self.assertEqual(iscsi_iqn, "")
-        self.assertEqual(fc_wwns, "wwn1:wwn2")
+        node_id_info = NodeIdInfo("{};{};{}".format(host_name, nvme_nqn, fc_wwns))
+        self._check_node_id_parameters(node_id_info, nvme_nqn, fc_wwns, "")
+
+        node_id_info = NodeIdInfo("{};{}".format(host_name, nvme_nqn))
+        self._check_node_id_parameters(node_id_info, nvme_nqn, "", "")
+
+        node_id_info = NodeIdInfo("{};;{}".format(host_name, fc_wwns))
+        self._check_node_id_parameters(node_id_info, "", fc_wwns, "")
 
     def test_choose_connectivity_types(self):
-        res = utils.choose_connectivity_type(["iscsi"])
-        self.assertEqual(res, "iscsi")
+        nvme = NVME_OVER_FC_CONNECTIVITY_TYPE
+        fc = FC_CONNECTIVITY_TYPE
+        iscsi = ISCSI_CONNECTIVITY_TYPE
+        expected_chosen_by_connectivities_found = {
+            (nvme, fc, iscsi): nvme, (fc, iscsi): fc,
+            (nvme,): nvme, (fc,): fc, (iscsi,): iscsi
+        }
+        for connectivities_found, expected_chosen_connectivity in expected_chosen_by_connectivities_found.items():
+            actual_chosen = utils.choose_connectivity_type(list(connectivities_found))
+            self.assertEqual(actual_chosen, expected_chosen_connectivity)
 
-        res = utils.choose_connectivity_type(["fc"])
-        self.assertEqual(res, "fc")
-
-        res = utils.choose_connectivity_type(["iscsi", "fc"])
-        self.assertEqual(res, "fc")
+    def _check_publish_volume_response_parameters(self, lun, connectivity_type, array_initiators):
+        publish_volume_response = utils.generate_csi_publish_volume_response(lun, connectivity_type, self.config,
+                                                                             array_initiators)
+        self.assertEqual(publish_volume_response.publish_context["lun"], lun)
+        self.assertEqual(publish_volume_response.publish_context["connectivity_type"], connectivity_type)
+        if connectivity_type == NVME_OVER_FC_CONNECTIVITY_TYPE:
+            self.assertIsNone(publish_volume_response.publish_context.get("fc_wwns"))
+            self.assertIsNone(publish_volume_response.publish_context.get("array_iqn"))
+        elif connectivity_type == FC_CONNECTIVITY_TYPE:
+            self.assertEqual(publish_volume_response.publish_context["fc_wwns"], ",".join(array_initiators))
+            self.assertIsNone(publish_volume_response.publish_context.get("array_iqn"))
+        elif connectivity_type == ISCSI_CONNECTIVITY_TYPE:
+            self.assertEqual(publish_volume_response.publish_context["array_iqn"], ",".join(array_initiators.keys()))
+            for iqn, ips in array_initiators.items():
+                self.assertEqual(publish_volume_response.publish_context[iqn], ",".join(ips))
+            self.assertIsNone(publish_volume_response.publish_context.get("fc_wwns"))
 
     def test_generate_publish_volume_response_success(self):
-        res = utils.generate_csi_publish_volume_response(0, "iscsi", self.config,
-                                                         {"iqn": ["1.1.1.1", "2.2.2.2"],
-                                                          "iqn2": ["3.3.3.3", "::1"]})
-        self.assertEqual(res.publish_context["lun"], '0')
-        self.assertEqual(res.publish_context["connectivity_type"], "iscsi")
-        self.assertEqual(res.publish_context["array_iqn"], "iqn,iqn2")
-        self.assertEqual(res.publish_context["iqn"], "1.1.1.1,2.2.2.2")
-        self.assertEqual(res.publish_context["iqn2"], "3.3.3.3,::1")
+        self._check_publish_volume_response_parameters("", NVME_OVER_FC_CONNECTIVITY_TYPE, [])
 
-        res = utils.generate_csi_publish_volume_response(1, "fc", self.config,
-                                                         ["wwn1", "wwn2"])
-        self.assertEqual(res.publish_context["lun"], '1')
-        self.assertEqual(res.publish_context["connectivity_type"], "fc")
-        self.assertEqual(res.publish_context["fc_wwns"], "wwn1,wwn2")
+        self._check_publish_volume_response_parameters("1", FC_CONNECTIVITY_TYPE, ["wwn1", "wwn2"])
+
+        self._check_publish_volume_response_parameters("0", ISCSI_CONNECTIVITY_TYPE,
+                                                       {"iqn": ["1.1.1.1", "2.2.2.2"], "iqn2": ["3.3.3.3", "::1"]})
 
     def _test_validate_parameters_match_volume(self, volume_field, volume_value, parameter_field, parameter_value,
                                                default_space_efficiency=None):

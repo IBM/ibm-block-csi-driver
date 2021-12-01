@@ -423,7 +423,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         logger.debug("next random available lun is : {0}".format(lun))
         return lun
 
-    def map_volume(self, volume_id, host_name):
+    def map_volume(self, volume_id, host_name, connectivity_type):
         logger.debug("mapping volume : {0} to host : {1}".format(volume_id, host_name))
         vol_name = self._get_object_name_by_wwn(volume_id)
         lun = self._get_next_available_lun(host_name)
