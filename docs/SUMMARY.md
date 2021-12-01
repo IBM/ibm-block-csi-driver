@@ -1,6 +1,6 @@
 # Table of Contents
 
-* [Welcome](book_files/csi_block_storage_kc_welcome.md)
+* [Welcome](./.book_files/csi_block_storage_kc_welcome.md)
 * [What's new](book_files/csi_block_storage_kc_whatsnew.md)
 * [Release notes](book_files/csi_block_storage_kc_rn.md)
 	* [What's new in 1.8.0](content/release_notes/whats_new.md)
