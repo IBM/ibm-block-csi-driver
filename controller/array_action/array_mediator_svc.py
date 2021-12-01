@@ -1027,14 +1027,16 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                                                     other_system_id, as_master=True)
         rcrelationships.extend(self._get_rcrelationships(cli_volume_id, other_cli_volume_id,
                                                          other_system_id, as_master=False))
-        if len(rcrelationships) != 1:
-            logger.warning('found {0} rcrelationships for volume id {1} '
-                           'with volume id {2} of system {3}'.format(len(rcrelationships),
-                                                                     cli_volume_id,
-                                                                     other_cli_volume_id,
-                                                                     other_system_id))
-            return None
-        return rcrelationships[0]
+        if len(rcrelationships) > 1:
+            error_message = ('found {0} rcrelationships for volume id {1} '
+                             'with volume id {2} of system {3}: {4}'.format(len(rcrelationships),
+                                                                            cli_volume_id,
+                                                                            other_cli_volume_id,
+                                                                            other_system_id,
+                                                                            rcrelationships))
+            logger.error(error_message)
+            raise RuntimeError(error_message)
+        return rcrelationships[0] if rcrelationships else None
 
     def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
         rcrelationship = self._get_rcrelationship(volume_internal_id, other_volume_internal_id, other_system_id)
