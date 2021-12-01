@@ -1,8 +1,8 @@
 # Table of Contents
 
-* [Welcome](.book_files/csi_block_storage_kc_welcome.md)
-* [What's new](.book_files/csi_block_storage_kc_whatsnew.md)
-* [Release notes](.book_files/csi_block_storage_kc_rn.md)
+* [Welcome](book_files/csi_block_storage_kc_welcome.md)
+* [What's new](book_files/csi_block_storage_kc_whatsnew.md)
+* [Release notes](book_files/csi_block_storage_kc_rn.md)
 	* [What's new in 1.8.0](content/release_notes/whats_new.md)
 	* [Compatibility and requirements](content/release_notes/compatibility_requirements.md)
 		* [Supported storage systems](content/release_notes/supported_storage.md)
@@ -57,6 +57,6 @@
 	* [Log and status collection](content/troubleshooting/log_status_collect.md)
 	* [Recovering a pod volume attachment from a crashed Kubernetes node](content/troubleshooting/recovering_vol_attach_crashed_k8s.md)
 	* [Miscellaneous troubleshooting](content/troubleshooting/troubleshooting_misc.md)
-* [Notices](.book_files/storage_csi_notices.md)
-	* [Trademarks](.book_files/csi_trademarks.md)
-* [Publications and related information](.book_files/csi_block_storage_kc_pdfs.md)
+* [Notices](book_files/storage_csi_notices.md)
+	* [Trademarks](book_files/csi_trademarks.md)
+* [Publications and related information](book_files/csi_block_storage_kc_pdfs.md)

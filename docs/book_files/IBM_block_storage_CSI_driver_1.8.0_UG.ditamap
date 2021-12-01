@@ -48,8 +48,8 @@ navtitle="Feedback"/>
 </ibmfrontmatter>
 <chapter format="ditamap" href="csi_ug_content.ditamap"/>
 <ibmbackmatter>
-<notices href="../book_files/storage_csi_notices.md" navtitle="Notices" format="markdown">
-<topicref href="../book_files/csi_trademarks.md" navtitle="Trademarks" format="markdown"/>
+<notices href="storage_csi_notices.md" navtitle="Notices" format="markdown">
+<topicref href="csi_trademarks.md" navtitle="Trademarks" format="markdown"/>
 </notices>
 <backbooklists/>
 </ibmbackmatter>

@@ -40,8 +40,8 @@ driver</titleline><titleline>1.8.0</titleline></ibmbooklibrary>
 <chapter format="dita" href="csi_gettinginfohelpandservice.dita"
 navtitle="Getting information, help, and service"/>
 <ibmbackmatter>
-<notices href="../book_files/storage_csi_notices.md" navtitle="Notices" format="markdown">
-<topicref href="../book_files/csi_trademarks.md" navtitle="Trademarks" format="markdown"/>
+<notices href="storage_csi_notices.md" navtitle="Notices" format="markdown">
+<topicref href="csi_trademarks.md" navtitle="Trademarks" format="markdown"/>
 </notices>
 </ibmbackmatter>
 </ibmbook><?Pub *0000003083?><?tm 1593075443111 2 Notes||IBM ?>
