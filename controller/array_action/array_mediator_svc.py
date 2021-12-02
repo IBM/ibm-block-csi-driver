@@ -303,6 +303,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         fcmap = self._get_fcmap_as_target_if_exists(target_cli_object.name)
         if not fcmap:
             return None
+        if self._is_in_remote_copy_relationship(fcmap):
+            return None
         source_volume_name = fcmap.source_vdisk_name
         return self._get_wwn_by_volume_name_if_exists(source_volume_name)
 
