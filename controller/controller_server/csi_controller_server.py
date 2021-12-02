@@ -165,25 +165,27 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             If volume is a copy of another source - set context status to INTERNAL and return CreateVolumeResponse.
             In any other case return None.
         """
-        volume_name = volume.name
         volume_copy_source_id = volume.copy_source_id
         if not source_id and not volume_copy_source_id:
             return None
         if volume_copy_source_id == source_id:
-            return self._handle_volume_exists_with_same_source(context, source_id, source_type, volume_name, volume,
+            return self._handle_volume_exists_with_same_source(context, source_id, source_type, volume,
                                                                system_id)
-        return self._handle_volume_exists_with_different_source(context, source_id, source_type, volume_name)
+        return self._handle_volume_exists_with_different_source(context, source_id, source_type, volume)
 
-    def _handle_volume_exists_with_same_source(self, context, source_id, source_type, volume_name, volume, system_id):
+    def _handle_volume_exists_with_same_source(self, context, source_id, source_type, volume, system_id):
         logger.debug(
-            "Volume {0} exists and it is a copy of {1} {2}.".format(volume_name, source_type, source_id))
+            "Volume {0} exists and it is a copy of {1} {2}.".format(volume.name, source_type, source_id))
         context.set_code(grpc.StatusCode.OK)
         return utils.generate_csi_create_volume_response(volume, system_id, source_type)
 
-    def _handle_volume_exists_with_different_source(self, context, source_id, source_type, volume_name):
-        logger.debug(
-            "Volume {0} exists but it is not a copy of {1} {2}.".format(volume_name, source_type, source_id))
-        message = "Volume already exists but it was created from a different source."
+    def _handle_volume_exists_with_different_source(self, context, source_id, source_type, volume):
+        message = ("Volume {0} already exists but was not created from the "
+                   "requested source {1} {2}. actual source: {3}".format(volume.name,
+                                                                         source_type,
+                                                                         source_id,
+                                                                         volume.copy_source_id))
+        logger.debug(message)
         return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS, csi_pb2.CreateVolumeResponse)
 
     @handle_common_exceptions(csi_pb2.DeleteVolumeResponse)
