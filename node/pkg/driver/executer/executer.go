@@ -98,6 +98,9 @@ func (e *Executer) FileWriteString(f *os.File, s string) (n int, err error) {
 }
 
 func (e *Executer) IsExecutable(path string) error {
-	_, err := exec.LookPath(path)
-	return err
+	cmd := exec.Command("command", "-v", path)
+	if err := cmd.Run(); err != nil {
+		return err
+	}
+	return nil
 }
