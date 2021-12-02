@@ -187,6 +187,8 @@ func (n NodeUtils) DevicesAreNvme(sysDevices []string) (bool, error) {
 	args := []string{"list"}
 	out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args)
 	if err != nil {
+		//TODO remove logger err.Error()
+		logger.Debugf("{%v}", err.Error())
 		if strings.HasSuffix(err.Error(), NoSuchFileOrDirectoryErr) {
 			return false, nil
 		}
