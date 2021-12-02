@@ -46,19 +46,19 @@ var (
 const (
 	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
 	// Command lines inside the container will show /host prefix.
-	PrefixChrootOfHostRoot      = "/host"
-	PublishContextSeparator     = ","
-	NodeIdDelimiter             = ";"
-	NodeIdFcDelimiter           = ":"
-	mkfsTimeoutMilliseconds     = 15 * 60 * 1000
-	resizeFsTimeoutMilliseconds = 30 * 1000
-	TimeOutGeneralCmd           = 10 * 1000
-	TimeOutMultipathdCmd        = TimeOutGeneralCmd
-	TimeOutNvmeCmd              = TimeOutGeneralCmd
-	multipathdCmd               = "multipathd"
-	nvmeCmd                     = "nvme"
-	minFilesInNonEmptyDir       = 1
-	NoSuchFileOrDirectoryErr    = "No such file or directory"
+	PrefixChrootOfHostRoot            = "/host"
+	PublishContextSeparator           = ","
+	NodeIdDelimiter                   = ";"
+	NodeIdFcDelimiter                 = ":"
+	mkfsTimeoutMilliseconds           = 15 * 60 * 1000
+	resizeFsTimeoutMilliseconds       = 30 * 1000
+	TimeOutGeneralCmd                 = 10 * 1000
+	TimeOutMultipathdCmd              = TimeOutGeneralCmd
+	TimeOutNvmeCmd                    = TimeOutGeneralCmd
+	multipathdCmd                     = "multipathd"
+	nvmeCmd                           = "nvme"
+	minFilesInNonEmptyDir             = 1
+	noSuchFileOrDirectoryErrorMessage = "No such file or directory"
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
@@ -188,7 +188,7 @@ func (n NodeUtils) DevicesAreNvme(sysDevices []string) (bool, error) {
 	out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args)
 	if err != nil {
 		outMessage := strings.TrimSpace(string(out))
-		if strings.HasSuffix(outMessage, NoSuchFileOrDirectoryErr) {
+		if strings.HasSuffix(outMessage, noSuchFileOrDirectoryErrorMessage) {
 			return false, nil
 		}
 		return false, err
