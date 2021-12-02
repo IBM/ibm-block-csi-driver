@@ -180,11 +180,15 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         return utils.generate_csi_create_volume_response(volume, system_id, source_type)
 
     def _handle_volume_exists_with_different_source(self, context, source_id, source_type, volume):
-        message = ("Volume {0} already exists but was not created from the "
-                   "requested source {1} {2}. actual source: {3}".format(volume.name,
-                                                                         source_type,
-                                                                         source_id,
-                                                                         volume.copy_source_id))
+        if source_id:
+            message = ("Volume {0} already exists but was not created from the "
+                       "requested source {1} {2}. actual source: {3}".format(volume.name,
+                                                                             source_type,
+                                                                             source_id,
+                                                                             volume.copy_source_id))
+        else:
+            message = "Volume {0} already exists but was created from a source: {1}".format(volume.name,
+                                                                                            volume.copy_source_id)
         logger.debug(message)
         return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS, csi_pb2.CreateVolumeResponse)
 
