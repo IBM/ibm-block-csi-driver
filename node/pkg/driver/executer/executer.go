@@ -98,9 +98,12 @@ func (e *Executer) FileWriteString(f *os.File, s string) (n int, err error) {
 }
 
 func (e *Executer) IsExecutable(path string) error {
+	logger.Debugf("Checking if {%v} is executable", path)
 	cmd := exec.Command("command", "-v", path)
 	if err := cmd.Run(); err != nil {
+		logger.Debugf("{%v} is not executable", path)
 		return err
 	}
+	logger.Debugf("{%v} is executable with cmd: {%v}", path, cmd)
 	return nil
 }
