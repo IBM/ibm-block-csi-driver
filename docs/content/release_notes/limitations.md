@@ -4,14 +4,14 @@ As opposed to known issues, limitations are functionality restrictions that are 
 
 ## IBM® DS8000® usage limitations
 
-Connectivity limits on the storage side might be reached with DS8000 Family products due to too many open connections. This occurs due to connection closing lag times from the storage side.
+Connectivity limits on the storage side might be reached with DS8000 family products due to too many open connections. This occurs due to connection closing lag times from the storage side.
 
 ## Volume snapshot limitations
 
 The following limitations apply when using volume snapshots with the IBM block storage CSI driver:
 
 -   When deleting a PersistentVolumeClaim (PVC), the persistent volume (PV) remains until all snapshots of the specific PV are deleted.
--   When using the CSI (Container Storage Interface) driver with IBM Spectrum® Virtualize Family products, a snapshot can only be used to provision a new volume of equal size.
+-   When using the CSI (Container Storage Interface) driver with IBM Spectrum® Virtualize family products, a snapshot can only be used to provision a new volume of equal size.
 
 **Note:** For volume snapshot limitations pertaining specifically to HyperSwap usage, see [HyperSwap usage limitations](#hyperSwap-usage-limitations).
 
@@ -31,7 +31,7 @@ The following limitations apply when using volume clones with the IBM block stor
 
 The following limitations apply when expanding volumes with the IBM block storage CSI driver:
 
--   When using the CSI driver with IBM Spectrum Virtualize family and IBM DS8000 Family products, during size expansion of a PersistentVolumeClaim (PVC), the size remains until all snapshots of the specific PVC are deleted.
+-   When using the CSI driver with IBM Spectrum Virtualize family and IBM DS8000 family products, during size expansion of a PersistentVolumeClaim (PVC), the size remains until all snapshots of the specific PVC are deleted.
 -   When expanding a PVC while not in use by a pod, the volume size immediately increases on the storage side. However, PVC size only increases after a pod uses the PVC.
 -   When expanding a file system PVC for a volume that was previously formatted but is now no longer being used by a pod, any copy or replication operations performed on the PVC (such as snapshots or cloning) results in a copy with the newer, larger, size on the storage. However, its file system has the original, smaller, size.
 
