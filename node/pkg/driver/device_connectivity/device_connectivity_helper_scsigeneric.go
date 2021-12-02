@@ -59,6 +59,8 @@ type WaitForMpathResult struct {
 var (
 	TimeOutMultipathCmd  = 60 * 1000
 	TimeOutMultipathdCmd = 10 * 1000
+	TimeOutBlockDevCmd   = 10 * 1000
+	TimeOutSgInqCmd      = 3 * 1000
 )
 
 const (
@@ -68,9 +70,10 @@ const (
 	ConnectionTypeISCSI         = "iscsi"
 	WaitForMpathRetries         = 5
 	WaitForMpathWaitIntervalSec = 1
-	FC_HOST_SYSFS_PATH          = "/sys/class/fc_remote_ports/rport-*/port_name"
+	FcHostSysfsPath             = "/sys/class/fc_remote_ports/rport-*/port_name"
 	IscsiHostRexExPath          = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
-	MpathdSeparator             = ","
+	blockDevCmd                 = "blockdev"
+	mpathdSeparator             = ","
 	multipathdCmd               = "multipathd"
 	multipathCmd                = "multipath"
 	VolumeIdDelimiter           = ":"
@@ -190,7 +193,33 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	return dmPath, nil
 }
 
+func (r OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(deviceName string) error {
+	devicePath := filepath.Join(DevPath, deviceName)
+	_, err := r.Executer.ExecuteWithTimeout(TimeOutBlockDevCmd, blockDevCmd, []string{"--flushbufs", devicePath})
+	if err != nil {
+		logger.Errorf("blockdev --flushbufs {%v} did not succeed to flush the device buffers. err={%v}", devicePath,
+			err.Error())
+		return err
+	}
+	return nil
+}
+
+func (r OsDeviceConnectivityHelperScsiGeneric) flushDevicesBuffers(deviceNames []string) error {
+	for _, deviceName := range deviceNames {
+		err := r.flushDeviceBuffers(deviceName)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice string) error {
+	err := r.flushDeviceBuffers(mpathDevice)
+	if err != nil {
+		return err
+	}
+
 	// mpathdevice is dm-4 for example
 	logger.Debugf("Flushing mpath device : {%v}", mpathDevice)
 
@@ -199,7 +228,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice 
 	logger.Debugf("Try to acquire lock for running the command multipath -f {%v} (to avoid concurrent multipath commands)", mpathDevice)
 	r.MutexMultipathF.Lock()
 	logger.Debugf("Acquired lock for multipath -f command")
-	_, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathCmd, "multipath", []string{"-f", fullDevice})
+	_, err = r.Executer.ExecuteWithTimeout(TimeOutMultipathCmd, multipathCmd, []string{"-f", fullDevice})
 	r.MutexMultipathF.Unlock()
 
 	if err != nil {
@@ -211,12 +240,16 @@ func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice 
 		}
 	}
 
-	logger.Debugf("Finshed flushing mpath device : {%v}", mpathDevice)
+	logger.Debugf("Finished flushing mpath device : {%v}", mpathDevice)
 	return nil
-
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices []string) error {
+	flushErr := r.flushDevicesBuffers(sysDevices)
+	if flushErr != nil {
+		return flushErr
+	}
+
 	// sysDevices  = sdb, sda,...
 	logger.Debugf("Removing scsi device : {%v}", sysDevices)
 	// NOTE: this func could be also relevant for SCSI (not only for iSCSI)
@@ -250,7 +283,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 			return err // TODO: maybe we need to just swallow the error and continnue??
 		}
 	}
-	logger.Debugf("Finshed to remove SCSI devices : {%v}", sysDevices)
+	logger.Debugf("Finished removing SCSI devices : {%v}", sysDevices)
 	return nil
 }
 
@@ -299,7 +332,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 		targetFilePath = IscsiHostRexExPath
 		regexpValue = "host([0-9]+)"
 	} else {
-		targetFilePath = FC_HOST_SYSFS_PATH
+		targetFilePath = FcHostSysfsPath
 		regexpValue = "rport-([0-9]+)"
 	}
 
@@ -313,17 +346,16 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 	logger.Debugf("targetname files matches were found : {%v}", matches)
 
 	re := regexp.MustCompile(regexpValue)
+	logger.Debugf("Check if any match is relevant for storage target (%s).", arrayIdentifier)
 	for _, targetPath := range matches {
-		logger.Debugf("Check if targetname path (%s) is relevant for storage target (%s).", targetPath, arrayIdentifier)
 		targetName, err := o.Executer.IoutilReadFile(targetPath)
 		if err != nil {
 			logger.Warningf("Could not read target name from file : {%v}, error : {%v}", targetPath, err)
 			continue
 		}
 		identifierFromHost := strings.TrimSpace(string(targetName))
-		//For FC WWNs from the host, the value will like this: 0x500507680b26c0aa, but the arrayIdentifier doesn't has this prefix
+		//For FC WWNs from the host, the value will like this: 0x500507680b26c0aa, but the arrayIdentifier doesn't have this prefix
 		if strings.HasPrefix(identifierFromHost, "0x") {
-			logger.Tracef("Remove the 0x prefix for: {%v}", identifierFromHost)
 			identifierFromHost = strings.TrimLeft(identifierFromHost, "0x")
 		}
 		if strings.EqualFold(identifierFromHost, arrayIdentifier) {
@@ -397,7 +429,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 	args := []string{"-p", "0x83", dev}
 	// add timeout in case the call never comes back.
 	logger.Debugf("Calling [%s] with timeout", sgInqCmd)
-	outputBytes, err := o.Executer.ExecuteWithTimeout(3000, sgInqCmd, args)
+	outputBytes, err := o.Executer.ExecuteWithTimeout(TimeOutSgInqCmd, sgInqCmd, args)
 	if err != nil {
 		return "", err
 	}
@@ -461,6 +493,7 @@ func (o OsDeviceConnectivityHelperGeneric) ReloadMultipath() error {
 	logger.Infof("ReloadMultipath: reload finished successfully")
 	return nil
 }
+
 func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeId string, volumeNguid string) (string, error) {
 	volumeUuidLower := strings.ToLower(volumeId)
 
@@ -478,7 +511,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeId string, volumeNgu
 	scanner := bufio.NewScanner(strings.NewReader(mpathdOutput))
 	for scanner.Scan() {
 		deviceLine := scanner.Text()
-		lineParts := strings.Split(deviceLine, MpathdSeparator)
+		lineParts := strings.Split(deviceLine, mpathdSeparator)
 		dm, uuid := lineParts[0], lineParts[1]
 		if strings.Contains(uuid, volumeUuidLower) || strings.Contains(uuid, volumeNguid) {
 			dmPath := filepath.Join(DevPath, filepath.Base(strings.TrimSpace(dm)))
@@ -524,7 +557,7 @@ func ConvertScsiIdToNguid(scsiId string) string {
 }
 
 func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeUuid string, volumeNguid string, maxRetries int, intervalSeconds int) (string, error) {
-	formatTemplate := strings.Join([]string{"%d", "%w"}, MpathdSeparator)
+	formatTemplate := strings.Join([]string{"%d", "%w"}, mpathdSeparator)
 	args := []string{"show", "maps", "raw", "format", "\"", formatTemplate, "\""}
 	var err error
 	for i := 0; i < maxRetries; i++ {

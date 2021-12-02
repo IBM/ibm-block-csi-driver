@@ -479,7 +479,7 @@ func TestHelperGetWwnByScsiInq(t *testing.T) {
 			fakeExecuter.EXPECT().IsExecutable(sgInqCmd).Return(tc.sgInqExecutable)
 
 			if tc.sgInqExecutable == nil {
-				fakeExecuter.EXPECT().ExecuteWithTimeout(3000, sgInqCmd, args).Return(tc.cmdReturn, tc.cmdReturnErr)
+				fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, sgInqCmd, args).Return(tc.cmdReturn, tc.cmdReturnErr)
 			}
 
 			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter)
@@ -794,7 +794,7 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 
-			fakeExecuter.EXPECT().FilepathGlob(device_connectivity.FC_HOST_SYSFS_PATH).Return(tc.globReturnMatches, tc.globReturnErr)
+			fakeExecuter.EXPECT().FilepathGlob(device_connectivity.FcHostSysfsPath).Return(tc.globReturnMatches, tc.globReturnErr)
 
 			var mcalls []*gomock.Call
 			for _, r := range tc.ioutilReadFileReturns {
