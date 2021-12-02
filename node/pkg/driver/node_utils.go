@@ -58,6 +58,7 @@ const (
 	multipathdCmd               = "multipathd"
 	nvmeCmd                     = "nvme"
 	minFilesInNonEmptyDir       = 1
+	NoSuchFileOrDirectoryErr    = "No such file or directory"
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
@@ -184,11 +185,11 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 
 func (n NodeUtils) DevicesAreNvme(sysDevices []string) (bool, error) {
 	args := []string{"list"}
-	if err := n.Executer.IsExecutable(nvmeCmd); err != nil {
-		return false, nil
-	}
 	out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args)
 	if err != nil {
+		if strings.HasSuffix(err.Error(), NoSuchFileOrDirectoryErr) {
+			return false, nil
+		}
 		return false, err
 	}
 	nvmeDevices := string(out)
