@@ -22,7 +22,7 @@
 	* [Limitations](content/release_notes/limitations.md)
 	* [Known issues](content/release_notes/known_issues.md)
 * [Overview](content/overview.md)
-* [Installing](content/installation/installing.md)
+* [Installing](content/installation/installation.md)
 	* [Compatibility and requirements](content/installation/install_compatibility_requirements.md)
 	* [Installing the operator and driver](content/installation/install_operator_driver.md)
 		* [Installing the driver with OpenShift web console](content/installation/install_driver_openshift_web.md)
