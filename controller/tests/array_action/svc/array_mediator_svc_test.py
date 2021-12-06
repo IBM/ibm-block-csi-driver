@@ -877,13 +877,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lshostvdiskmap.side_effect = [
             svc_errors.CommandExecutionError('Failed')]
         with self.assertRaises(array_errors.HostNotFoundError):
-            self.svc._get_free_lun('host')
+            self.svc._get_free_lun('host', config.ISCSI_CONNECTIVITY_TYPE)
 
     @patch("controller.array_action.array_mediator_svc.choice")
     def test_get_free_lun_with_no_host_mappings(self, random_choice):
         random_choice.return_value = '0'
         self.svc.client.svcinfo.lshostvdiskmap.return_value = []
-        lun = self.svc._get_free_lun('host')
+        lun = self.svc._get_free_lun('host', config.ISCSI_CONNECTIVITY_TYPE)
         self.assertEqual(lun, '0')
 
     @patch.object(SVCArrayMediator, "MAX_LUN_NUMBER", 3)
@@ -896,7 +896,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         map2 = Munch({'id': '56', 'name': 'peng', 'SCSI_id': lun_in_use_1,
                       'host_id': '16', 'host_name': 'Test_W'})
         self.svc.client.svcinfo.lshostvdiskmap.return_value = [map1, map2]
-        lun = self.svc._get_free_lun('Test_P')
+        lun = self.svc._get_free_lun('Test_P', config.ISCSI_CONNECTIVITY_TYPE)
         self.assertNotIn(lun, (lun_in_use_0, lun_in_use_1))
 
     @patch.object(SVCArrayMediator, "MAX_LUN_NUMBER", 3)
@@ -911,7 +911,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lshostvdiskmap.return_value = [map1, map2,
                                                                map3]
         with self.assertRaises(array_errors.NoAvailableLunError):
-            self.svc._get_free_lun('Test_P')
+            self.svc._get_free_lun('Test_P', config.ISCSI_CONNECTIVITY_TYPE)
 
     @patch("controller.array_action.array_mediator_svc.SVCArrayMediator._get_free_lun")
     def _test_map_volume_mkvdiskhostmap_error(self, client_error, expected_error, mock_get_free_lun):
