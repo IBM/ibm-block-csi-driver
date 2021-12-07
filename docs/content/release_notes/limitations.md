@@ -58,7 +58,7 @@ The following IBM block storage CSI driver features are not supported on volumes
     **Note:** A snapshot can be created from a HyperSwap volume.
  - Volume cloning.
 
- ## NVMe/FC usage limitations
+## NVMe/FC usage limitations
 
  Currently NVMe/FC support is only for Red Hat® Enterprise Linux® (RHEL) operating systems.
  
