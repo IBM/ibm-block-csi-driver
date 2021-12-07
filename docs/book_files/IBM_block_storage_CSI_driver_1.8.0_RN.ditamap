@@ -34,7 +34,7 @@ driver</titleline><titleline>1.8.0</titleline></ibmbooklibrary>
 <toc outputclass="onecolumn" />
 </frontbooklists>
 </ibmfrontmatter>
-<chapter format="markdown" href="../content/csi_overview.md" navtitle="Overview" scope="local"/>
+<chapter format="markdown" href="../content/overview.md" navtitle="Overview" scope="local"/>
 <chapter format="ditamap" href="csi_rn_content.ditamap"/>
 <chapter href="csi_relatedpubs.dita" navtitle="Related information and publications" format="dita"/>
 <chapter format="dita" href="csi_gettinginfohelpandservice.dita"
