@@ -8,9 +8,9 @@
 <chapter href="../content/installation/installation.md" format="markdown">
 <topicref href="../content/installation/install_compatibility_requirements.md" format="markdown"/>
 <topicref href="../content/installation/install_operator_driver.md" format="markdown">
-<topicref href="../content/installation/install_driver_openshift_web.md"/>
-<topicref href="../content/installation/install_driver_github.md"/>
-<topicref href="../content/installation/install_driver_operatorhub.md"/>
+<topicref href="../content/installation/install_driver_openshift_web.md" format="markdown"/>
+<topicref href="../content/installation/install_driver_github.md" format="markdown"/>
+<topicref href="../content/installation/install_driver_operatorhub.md" format="markdown"/>
 </topicref>
 <topicref href="../content/installation/uninstalling.md" format="markdown">
 <topicref href="../content/installation/uninstall_driver_openshift_web.md" format="markdown"/>
