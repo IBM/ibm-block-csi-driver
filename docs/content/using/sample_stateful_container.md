@@ -2,7 +2,7 @@
 
 You can use the CSI (Container Storage Interface) driver for running stateful containers with a storage volume provisioned from IBM® block storage systems.
 
-These instructions illustrate the general flow for a basic configuration required for running a stateful container with volumes provisioned on storage system.
+These instructions illustrate the general flow for a basic configuration required for running a stateful container with volumes provisioned on a storage system.
 
 **Note:** The secret names given are user specified. To implement order and help any debugging that may be required, provide system type indicators to each secret name when managing different system storage types.
 
@@ -12,7 +12,7 @@ Use this information to run a stateful container on StatefulSet volumes using ei
 
 2. Create a storage class, as described in [Creating a StorageClass](../configuration/creating_volumestrorageclass.md).
 
-    **Remember:** The `SpaceEfficiency` values for Spectrum Virtualize family are: `thick`, `thin`, `compressed`, or `deduplicated`. These values are not case specific.
+    **Remember:** The `SpaceEfficiency` values for Spectrum Virtualize family are: `thick`, `thin`, `compressed`, `dedup_thin`, or `dedup_compressed`. These values are not case specific.
     
     For DS8000 family systems, the default value is `none`, but can be set to `thin`, if required. These values are not case specific. For more information, see [Creating a StorageClass](../configuration/creating_volumestrorageclass.md).
     
