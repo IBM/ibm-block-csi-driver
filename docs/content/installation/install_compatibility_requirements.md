@@ -33,7 +33,7 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
 
    **Important:** Be sure to configure each worker with storage connectivity according to your storage system instructions. For more information, find your storage system documentation in [IBM Documentation](http://www.ibm.com/docs/).
 
-   **Additional configuration steps for OpenShift® Container Platform users (RHEL and RHCOS).** Other users can continue to step 3.
+   **Additional configuration steps for OpenShift® Container Platform users (RHEL and RHCOS).** Other users can skip these additional configuration steps.
 
    Download and save the following YAML file:
 
