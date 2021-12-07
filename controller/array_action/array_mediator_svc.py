@@ -49,6 +49,8 @@ HOST_ISCSI_NAMES_PARAM = 'iscsi_name'
 HOST_PORTSET_ID = 'portset_id'
 HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
 
+LUN_INTERVAL = 128
+
 FCMAP_STATUS_DONE = 'idle_or_copied'
 RCRELATIONSHIP_STATE_IDLE = 'idling'
 RCRELATIONSHIP_STATE_READY = 'consistent_synchronized'
@@ -786,7 +788,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
         return luns_in_use
 
-    def _get_free_lun(self, host_name, connectivity_type):
+    def _get_free_lun(self, host_name):
         logger.debug("getting random free lun id for "
                      "host :{0}".format(host_name))
         lun = None
@@ -797,14 +799,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         # can be mapped to a single host. (Note that some hosts such as linux
         # do not support more than 255 or 511 mappings today irrespective of
         # our constraint).
-        max_lun_number = self.MAX_LUN_NUMBER
-        if connectivity_type == config.FC_CONNECTIVITY_TYPE:
-            max_lun_number = config.LPFC_MAX_LUNS
-        lun_range_gen = range(self.MIN_LUN_NUMBER, max_lun_number + 1)
-        lun_range = {str(lun) for lun in lun_range_gen}
-        free_luns = list(lun_range - set(luns_in_use))
+        lun_range_gen = range(self.MIN_LUN_NUMBER, self.MAX_LUN_NUMBER + 1)
+        lun_range = [str(lun) for lun in lun_range_gen]
+        free_luns = [x for x in lun_range if x not in luns_in_use]
+        free_luns_in_interval = free_luns[:LUN_INTERVAL]
         if free_luns:
-            lun = choice(free_luns)
+            lun = choice(free_luns_in_interval)
         else:
             raise array_errors.NoAvailableLunError(host_name)
         logger.debug("The chosen available lun is : {0}".format(lun))
@@ -822,7 +822,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         lun = ""
         try:
             if connectivity_type != config.NVME_OVER_FC_CONNECTIVITY_TYPE:
-                lun = self._get_free_lun(host_name, connectivity_type)
+                lun = self._get_free_lun(host_name)
                 cli_kwargs.update({'scsi': lun})
             self.client.svctask.mkvdiskhostmap(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
