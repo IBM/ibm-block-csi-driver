@@ -8,25 +8,18 @@
 <chapter href="../content/installation/installation.md" format="markdown">
 <topicref href="../content/installation/install_compatibility_requirements.md" format="markdown"/>
 <topicref href="../content/installation/install_operator_driver.md" format="markdown">
-<topicref href="../content/installation/install_driver_openshift_web.md"
-navtitle="Installing the operator with OpenShift" format="markdown"/>
-<topicref href="../content/installation/install_driver_github.md"
-navtitle="Installing the operator from GitHub" format="markdown"/>
-<topicref href="../content/installation/install_driver_operatorhub.md"
-navtitle="installing the operator from OperatorHub.io" format="markdown"/>
+<topicref href="../content/installation/install_driver_openshift_web.md"/>
+<topicref href="../content/installation/install_driver_github.md"/>
+<topicref href="../content/installation/install_driver_operatorhub.md"/>
 </topicref>
-<topicref href="../content/installation/uninstalling.md" navtitle="Uninstalling" format="markdown">
-<topicref href="../content/installation/upgrade_manual_openshift.md" navtitle="Uninstalling via CLI commands"
-format="markdown"/>
-<topicref href="../content/installation/uninstall_driver_github.md" navtitle="Uninstalling via CLI commands"
-format="markdown"/>
-<topicref href="../content/installation/uninstall_driver_operatorhub.md" navtitle="Uninstalling via CLI commands"
-format="markdown"/>
+<topicref href="../content/installation/uninstalling.md" format="markdown">
+<topicref href="../content/installation/uninstall_driver_openshift_web.md" format="markdown"/>
+<topicref href="../content/installation/uninstall_driver_github.md" format="markdown"/>
+<topicref href="../content/installation/uninstall_driver_operatorhub.md" format="markdown"/>
 </topicref>
-<topicref href="../content/installation/upgrade.md" navtitle="Upgrading the CSI driver" format="markdown">
+<topicref href="../content/installation/upgrade.md" format="markdown">
 <!--<topicref href="../content/installation/csi_ug_upgrade_openshift.md" navtitle="Installing the driver with the OpenShift web console" format="markdown"/>-->
-<topicref href="../content/installation/upgrade_manual_openshift.md"
-navtitle="Installing the driver with the OpenShift web console" format="markdown"/>
+<topicref href="../content/installation/upgrade_manual_openshift.md" format="markdown"/>
 </topicref>
 </chapter>
 <chapter href="../content/configuration/configuring.md" format="markdown">
@@ -43,7 +36,7 @@ format="markdown">
 href="../content/configuration/finding_systemid.md"/>
 </topicref>
 <topicref href="../content/configuration/creating_volumereplication.md" format="markdown"/>
-<topicref href="../content/configuration/expanding_pvc.md" navtitle="Expanding a volume" product="volexpand" format="markdown"/>
+<topicref href="../content/configuration/expanding_pvc.md" product="volexpand" format="markdown"/>
 <topicref href="../content/configuration/configuring_topology.md" format="markdown">
 <topicref href="../content/configuration/creating_secret_topology_aware.md" format="markdown"/>
 <topicref href="../content/configuration/creating_storageclass_topology_aware.md"
@@ -51,21 +44,17 @@ format="markdown"/>
 <topicref href="../content/configuration/creating_volumereplicationclass_topology_aware.md"
 format="markdown"/>
 </topicref>
-<topicref href="../content/configuration/advanced_configuration.md"
-navtitle="Advanced configuration" format="markdown">
-<topicref href="../content/configuration/importing_existing_volume.md"
-navtitle="Advanced configuration" format="markdown"/>
+<topicref href="../content/configuration/advanced_configuration.md" format="markdown">
+<topicref href="../content/configuration/importing_existing_volume.md" format="markdown"/>
 </topicref>
 </chapter>
-<chapter href="../content/using/using.md" format="markdown" navtitle="Using IBM block storage CSI driver">
-<topicref href="../content/using/sample_stateful_container.md"
-navtitle="Sample configurations for running a stateful container" format="markdown"/>
+<chapter href="../content/using/using.md" format="markdown">
+<topicref href="../content/using/sample_stateful_container.md" format="markdown"/>
 </chapter>
 <chapter href="../content/troubleshooting/troubleshooting.md" format="markdown">
-<topicref href="../content/troubleshooting/log_status_collect.md" navtitle="Detecting errors" format="markdown"/>
-<topicref href="../content/troubleshooting/recovering_vol_attach_crashed_k8s.md"
-navtitle="Recovering a pod volume attachment from a crashed Kubernetes node" format="markdown"/>
-<topicref href="../content/troubleshooting/troubleshooting_misc.md" navtitle="Detecting errors" format="markdown"/>
+<topicref href="../content/troubleshooting/log_status_collect.md" format="markdown"/>
+<topicref href="../content/troubleshooting/recovering_vol_attach_crashed_k8s.md" format="markdown"/>
+<topicref href="../content/troubleshooting/troubleshooting_misc.md" format="markdown"/>
 </chapter>
 </ibmbook>
 <?Pub *0000016021?>
