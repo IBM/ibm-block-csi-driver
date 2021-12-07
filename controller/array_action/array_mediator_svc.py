@@ -801,7 +801,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         # our constraint).
         lun_range_gen = range(self.MIN_LUN_NUMBER, self.MAX_LUN_NUMBER + 1)
         lun_range = [str(lun) for lun in lun_range_gen]
-        free_luns = [x for x in lun_range if x not in luns_in_use]
+        free_luns = [lun for lun in lun_range if lun not in luns_in_use]
         free_luns_in_interval = free_luns[:LUN_INTERVAL]
         if free_luns:
             lun = choice(free_luns_in_interval)
