@@ -20,4 +20,3 @@ Perform the following steps in order to uninstall the CSI driver and operator th
 <a name="operator"></a>5.  From the **Installed Operators** page, click on the **more** menu for the **Operator for IBM block storage CSI driver** and select **Uninstall Operator**.
 
 
-
