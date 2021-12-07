@@ -19,7 +19,7 @@ _<a name=spaceefficiency>**Table:**</a> `SpaceEfficiency` parameter definitions 
 |Storage system type|SpaceEfficiency parameter options|
 |-------------------|---------------------------------|
 |IBM FlashSystem® A9000 and A9000R|Always includes deduplication and compression. No need to specify during configuration.|
-|IBM Spectrum® Virtualize family|- `thick` (default value)<br />- `thin`<br />- `compressed`<br />- `dedup_thin` (creates volumes that are deduplicated with thin-provisioning)<br />- `dedup_compressed` (creates deduplicated and compressed volumes)<br />- `deduplicated` (creates deduplicated and compressed volumes, like `dedup_compressed`)<br /><br /> **Note:** <br />- The `deduplicated` value is deprecated. Use `dedup_compressed`, if possible.<br />- If not specified, the default value is `thick`.|
+|IBM Spectrum® Virtualize family|- `thick` (default value)<br />- `thin`<br />- `compressed`<br />- `dedup_thin` (creates volumes that are deduplicated with thin-provisioning)<br />- `dedup_compressed` (creates deduplicated and compressed volumes)<br /><br /> **Note:** <br />- The `deduplicated` value is deprecated. Use `dedup_compressed`, if possible. When used, `deduplicated` provide the same results as `dedup_compressed`.<br />- If not specified, the default value is `thick`.|
 |IBM® DS8000® family| - `none` (default value) <br />- `thin`<br /><br /> **Note:** If not specified, the default value is `none`.|
 
 - The IBM DS8000 family `pool` value is the pool ID and not the pool name as is used in other storage systems.
