@@ -31,7 +31,7 @@ navtitle="Installing the driver with the OpenShift web console" format="markdown
 </chapter>
 <chapter href="../content/configuration/configuring.md" format="markdown">
 <topicref href="../content/configuration/creating_secret.md" format="markdown"/>
-<topicref href="../content/configuration/creating_volumestrorageclass.md" format="markdown"/>
+<topicref href="../content/configuration/creating_volumestorageclass.md" format="markdown"/>
 <topicref href="../content/configuration/creating_pvc.md" format="markdown"/>
 <topicref href="../content/configuration/creating_statefulset.md" format="markdown"/>
 <topicref href="../content/configuration/creating_volumesnapshotclass.md"
@@ -46,7 +46,7 @@ href="../content/configuration/finding_systemid.md"/>
 <topicref href="../content/configuration/expanding_pvc.md" navtitle="Expanding a volume" product="volexpand" format="markdown"/>
 <topicref href="../content/configuration/configuring_topology.md" format="markdown">
 <topicref href="../content/configuration/creating_secret_topology_aware.md" format="markdown"/>
-<topicref href="../content/configuration/creating_strorageclass_topology_aware.md"
+<topicref href="../content/configuration/creating_storageclass_topology_aware.md"
 format="markdown"/>
 <topicref href="../content/configuration/creating_volumereplicationclass_topology_aware.md"
 format="markdown"/>
