@@ -20,7 +20,7 @@ To help pinpoint potential causes for stateful pod failure:
     View the logs.
 
 ## Status and log collection
-To collect and display status and logs related to the different components of IBM® block storage CSI driver, use the Kubernetes found in this section.
+To collect and display status and logs related to the different components of IBM® block storage CSI driver, use the Kubernetes commands found in this section.
 
 Before you begin collecting logs, at the master host level, create a directory for the logs.
 
@@ -29,12 +29,12 @@ For example:
 ```
 mkdir logs
 ```
-Save logs and status reports directly to the created directory by adding in `> logs/<log_filename>` to the end of collection command.
+Save logs and status reports directly to the created directory by adding in the following string at the end of collection command: `> logs/<log_filename>`
 
-**Important:** When gathering logs from the storage system, be sure that the logs cover any relevant time frames for the specific issues that you are trying to debug.
+**Important:** Be sure that the logs cover any relevant timeframes for the specific issues that you are trying to debug when gathering logs from the storage system.
 
 ### General status and log collection for IBM Support
-When engaging with IBM Support, be sure to run the following steps and copy the output to an external file, when sending log collections:
+Be sure to run the following steps and copy the output to an external file, when engaging IBM Support and sending log collections.
 
 1. Check the node status.
     
