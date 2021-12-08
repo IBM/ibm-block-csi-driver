@@ -56,17 +56,20 @@ To collect logs for all nodepods, use the following commands:
     
     for pod in $nodepods; kubectl logs -n <namespace> $pod -c $container > /tmp/logs_collection/${pod}_${container}.log;done;done
 
+
 ### Log collection for all CSI controller containers
 
 To collect logs for all pods and containers, use the following commands:
     
     for container in kubectl get -n default pod ibm-block-csi-controller-0 -o jsonpath='{.spec.containers[*].name}';do kubectl logs -n default ibm-block-csi-controller-0 -c $container > /tmp/logs_collection/ibm-block-csi-controller-0_${container}.log;done
 
+
 ### Log collection for CSI operator logs
 To collect CSI operator logs, use the following commands:
 
     operatorpod=`kubectl get pods --all-namespaces |grep ibm-block-csi-operator|awk '{print $2}'`
     kubectl logs $operatorpod -n <namespace> > logs/operator
+
 
 ### Collecting details of all CSI objects and components
 
@@ -76,6 +79,7 @@ For example:
 
     kubectl describe all -l csi -n <namespace> > logs/describe_ibm-block-csi-driver
 
+
 ### Status collection for CSI pods, daemonset, and statefulset
 `kubectl get all -n <namespace>  -l product=ibm-block-csi-driver`
 
@@ -84,12 +88,14 @@ For example:
     kubectl get all -n <namespace> -l csi > get_all_ibm-block-csi-driver
 
 
- ### Log collection for the CSI driver controller
+
+### Log collection for the CSI driver controller
 `kubectl log -f -n <namespace> ibm-block-csi-controller-0 -c ibm-block-csi-controller`
 
 For example:
 
     kubectl log -f -n <namespace> ibm-block-csi-controller-0 -c ibm-block-csi-controller > logs/ibm-block-csi-controller
+
 
 ### Log collection for the CSI driver node (per worker node or PODID)
 `kubectl log -f -n <namespace> ibm-block-csi-node-<PODID> -c ibm-block-csi-node`
@@ -98,6 +104,7 @@ For example:
     
     kubectl log -f -n <namespace> ibm-block-csi-node-<PODID> -c ibm-block-csi-node > logs/csi-node-<PODID>
 
+
 ### Log collection for unbound PVCs
 `kubectl describe pvc <pvc-name>`
 
@@ -105,12 +112,14 @@ For example:
 
     kubectl describe pvc <pvc-name> > logs/pvc_not_bounded
 
+
 ### Log collection for pods not in the _Running_ state
 `kubectl describe pod <not-running-pod-name>`
 
 For example:
 
     kubectl describe pod <pod-name> > logs/pod_not_running
+
 
 ### Log collection for Operator for IBM block storage CSI driver
 `kubectl log -f -n <namespace> ibm-block-csi-operator-<PODID> -c ibm-block-csi-operator`
