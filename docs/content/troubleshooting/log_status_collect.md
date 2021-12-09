@@ -20,16 +20,16 @@ To help pinpoint potential causes for stateful pod failure:
     View the logs.
 
 ## Status and log collection
-To collect and display status and logs related to the different components of IBM® block storage CSI driver, use the Kubernetes commands found in this section.
+To collect and display status and logs related to the different components of IBM® block storage CSI driver, use the Kubernetes commands that are found in this section.
 
-Before you begin collecting logs, at the master host level, create a directory for the logs.
+Before you begin collecting logs, create a directory for the logs on the control-plane or bastion server.
 
 For example:
 
 ```
 mkdir logs
 ```
-Save logs and status reports directly to the created directory by adding in the following string at the end of collection command: `> logs/<log_filename>`
+Save logs and status reports directly to the created directory by adding in the following string at the end of collection command: `> logs/<log_filename>`.
 
 **Important:** Be sure that the logs cover any relevant timeframes for the specific issues that you are trying to debug when gathering logs from the storage system.
 
@@ -46,7 +46,7 @@ Be sure to run the following steps and copy the output to an external file, when
 
     `kubectl get pvc`
 
-    - If the PVCs are not bound, (in the _XXX_ state) collect the events of all unbound PVCs. (See [Log collection for unbound PVCs](#log-collection-for-unbound-pvcs).)
+    - If the PVCs are not in the _Bound_ state collect the events of all unbound PVCs. (See [Log collection for unbound PVCs](#log-collection-for-unbound-pvcs).)
 
 ### Log collection for all CSI nodepods and their containers
 
@@ -119,7 +119,3 @@ For example:
 For example:
 
     kubectl describe pod <pod-name> > logs/pod_not_running
-
-
-### Log collection for Operator for IBM block storage CSI driver
-`kubectl log -f -n <namespace> ibm-block-csi-operator-<PODID> -c ibm-block-csi-operator`
