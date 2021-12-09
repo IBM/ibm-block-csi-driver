@@ -17,11 +17,11 @@ For IBM Cloud® Satellite users, see [cloud.ibm.com/docs/satellite](https://clou
 
         Port 7778
 
-    -   **IBM Spectrum® Virtualize Family includes IBM® SAN Volume Controller and IBM FlashSystem® family members that are built with IBM Spectrum® Virtualize (including FlashSystem 5xxx, 7200, 9100, 9200, 9200R)**
+    -   **IBM Spectrum® Virtualize family includes IBM® SAN Volume Controller and IBM FlashSystem® family members that are built with IBM Spectrum® Virtualize (including FlashSystem 5xxx, 7200, 9100, 9200, 9200R)**
 
         Port 22
 
-    -   **DS8000® Family systems**
+    -   **DS8000® family systems**
 
         Port 8452
 
@@ -33,7 +33,7 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
 
    **Important:** Be sure to configure each worker with storage connectivity according to your storage system instructions. For more information, find your storage system documentation in [IBM Documentation](http://www.ibm.com/docs/).
 
-   **Additional configuration steps for OpenShift® Container Platform users (RHEL and RHCOS).** Other users can continue to step 3.
+   **Additional configuration steps for OpenShift® Container Platform users (RHEL and RHCOS).** Other users can skip these additional configuration steps.
 
    Download and save the following YAML file:
 
@@ -97,3 +97,7 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
       For more information, see [Configuring for CSI Topology](../configuration/configuring_topology.md).
 
 7. (Optional) If planning on using HyperSwap on your storage system, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Planning** > **Planning for high availability** > **Planning for a HyperSwap topology system**.
+
+8. (Optional) If using NVMe over Fibre Channel host attachment, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Configuring** > **Host attachment** > **NVMe over Fibre Channel host attachments**.
+
+    **Note:** Be sure that storage system is using one of the fully supported HBAs compatibile with NVMe-oF/FC, as listed in the [IBM® System Storage® Interoperation Center (SSIC)](https://www-03.ibm.com/systems/support/storage/ssic/interoperability.wss).

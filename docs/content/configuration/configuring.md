@@ -7,7 +7,7 @@ Once the driver is installed and running (see [Installing the operator and drive
 Multiple YAML files per type can be created (with different configurations), according to your storage needs.
 
 - [Creating a Secret](creating_secret.md)
-- [Creating a StorageClass](creating_volumestrorageclass.md)
+- [Creating a StorageClass](creating_volumestorageclass.md)
 - [Creating a PersistentVolumeClaim (PVC)](creating_pvc.md)
 - [Creating a StatefulSet](creating_statefulset.md)
 - [Creating a VolumeSnapshotClass](creating_volumesnapshotclass.md)

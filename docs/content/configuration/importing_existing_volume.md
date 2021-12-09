@@ -8,7 +8,7 @@ Before starting to import an existing volume, find the following information in 
   
   Including:
 
-    - `pool_name`: _Name of Pool where volume is located_ (Listed as `pool_id` for DS8000® Family systems.)
+    - `pool_name`: _Name of Pool where volume is located_ (Listed as `pool_id` for DS8000® family systems.)
     - `storage_type`: <`SVC` | `A9000` | `DS8K`>
     - `volume_name`: _Volume name_
     - `array_address`: _Array address_
@@ -60,7 +60,7 @@ To find the `volumeHandle`, use one of the following procedures:
     
     For more information, see [IBM Hyper-Scale Manager documentation](https://www.ibm.com/docs/en/hyper-scale-manager/).
 
-- **For DS8000 Family:**
+- **For DS8000 family:**
 
   The `volumeHandle` is formatted as `DS8K:id;GUID`.
   The `id` is the last four digits of the `GUID`.
@@ -81,7 +81,7 @@ To find the `volumeHandle`, use one of the following procedures:
 
         The Properties window is displayed. Use the **GUID** value.
 
-    For more information about DS8000 Family products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).
+    For more information about DS8000 family products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).
   
 
 Use this procedure to help build a PV YAML file for your volumes.
@@ -94,7 +94,7 @@ Use this procedure to help build a PV YAML file for your volumes.
 
 2. Take the `volume_name` and other optional information (collected before the procedure) and insert it into the YAML file (under `spec.csi.volumeAttributes`).
 
-    **Important:** If using the CSI Topology feature, the `spec.csi.volumeHandle` contains the management ID (see [Creating a StorageClass with topology awareness](creating_volumestrorageclass_topology.md)). In the example below, the `spec.csi.volumeHandle` would read similar to the following: `SVC:demo-system-id-1:0;600507640082000B08000000000004FF`.
+    **Important:** If using the CSI Topology feature, the `spec.csi.volumeHandle` contains the management ID (see [Creating a StorageClass with topology awareness](creating_storageclass_topology_aware.md)). In the example below, the `spec.csi.volumeHandle` would read similar to the following: `SVC:demo-system-id-1:0;600507640082000B08000000000004FF`.
     
         apiVersion: v1
         kind: PersistentVolume
