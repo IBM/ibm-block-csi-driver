@@ -2,7 +2,7 @@
 
 IBM® block storage CSI driver 1.8.0 introduces the enhancements that are detailed in the following section.
 
-**General availability date:** 18 December 2021
+**General availability date:** 16 December 2021
 
 ## New HyperSwap support for IBM Spectrum Virtualize family storage systems
 
