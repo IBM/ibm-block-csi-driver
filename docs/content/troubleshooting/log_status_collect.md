@@ -44,27 +44,27 @@ Be sure to run the following steps and copy the output to an external file, when
     `kubectl get nodes`
 2. Check the CSI driver component status.
 
-    `kubectl get -n <namespace> pod -o wide | grep ibm-block-csi`
+    `kubectl get -all-namespaces pod -o wide | grep ibm-block-csi`
 3. Check if the PersistentVolumeClaims (PVCs) are _Bound_.
 
     `kubectl get pvc`
 
-    - If the PVCs are not in the _Bound_ state collect the events of all unbound PVCs. (See [Log collection for unbound PVCs](#log-collection-for-unbound-pvcs).)
+    **Note:** If the PVCs are not in the _Bound_ state collect the events of all unbound PVCs. (See [Log collection for unbound PVCs](#log-collection-for-unbound-pvcs).)
 
-### Log collection for all CSI node pods and their containers
+### Log collection for all CSI driver node pods and their containers
 
-To collect logs for all node pods, use the following commands:
+To collect logs for all CSI driver node pods, use the following commands:
 
-    nodepods=`kubectl get -n <namespace> pod -l app.kubernetes.io/component=csi-node --output=jsonpath={.items..metadata.name}`
+    nodepods=`kubectl get pods -l product=ibm-block-csi-driver -l app.kubernetes.io/component=csi-node --output=jsonpath={.items..metadata.name}`
     
-    for pod in $nodepods; kubectl logs -n <namespace> $pod -c $container > logs/${pod}_${container}.log;done;done
+    for pod in $nodepods;do for container in `kubectl get -n <namespace> pod $pod -o jsonpath='{.spec.containers[*].name}'`;do kubectl logs -n <namespace> $pod -c $container > logs/${pod}_${container}.log;done;done
 
 
 ### Log collection for all CSI controller containers
 
 To collect logs for all pods and containers, use the following commands:
     
-    for container in kubectl get -n <namespace> pod ibm-block-csi-controller-0 -o jsonpath='{.spec.containers[*].name}';do kubectl logs -n <namespace> ibm-block-csi-controller-0 -c $container > logs/ibm-block-csi-controller-0_${container}.log;done
+    for container in `kubectl get -n <namespace> pod ibm-block-csi-controller-0 -o jsonpath='{.spec.containers[*].name}'`;do kubectl logs -n <namespace> ibm-block-csi-controller-0 -c $container > logs/ibm-block-csi-controller-0_${container}.log;done
 
 
 ### Log collection for CSI operator logs
@@ -75,7 +75,6 @@ To collect CSI operator logs, use the following commands:
 
 
 ### Collecting details of all CSI objects and components
-
 `kubectl describe all -l product=ibm-block-csi-driver -n <namespace> > logs/describe_ibm-block-csi-driver`
 
 
@@ -84,20 +83,19 @@ To collect CSI operator logs, use the following commands:
 
 
 
-
 ### Log collection for the CSI driver controller
-`kubectl log -f -n <namespace> ibm-block-csi-controller-0 -c ibm-block-csi-controller > logs/ibm-block-csi-controller`
+`kubectl logs -f -n <namespace> ibm-block-csi-controller-0 -c ibm-block-csi-controller > logs/ibm-block-csi-controller`
 
 
 ### Log collection for the CSI driver node (per worker node or PODID)
-`kubectl log -f -n <namespace> ibm-block-csi-node-<PODID> -c ibm-block-csi-node > logs/csi-node-<PODID>`
+`kubectl logs -f -n <namespace> ibm-block-csi-node-<PODID> -c ibm-block-csi-node > logs/csi-node-<PODID>`
 
 
 
-### Log collection for unbound PVCs
+### Details collection for unbound PVCs
 `kubectl describe pvc <pvc-name> > logs/pvc_not_bounded`
 
 
 
-### Log collection for pods not in the _Running_ state
+### Details collection for pods not in the _Running_ state
 `kubectl describe pod <not-running-pod-name> > logs/pod_not_running`
