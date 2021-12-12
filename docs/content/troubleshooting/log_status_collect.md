@@ -30,9 +30,9 @@ For example:
 ```
 mkdir logs
 ```
-Save logs and status reports directly to the created directory by adding in the following string at the end of collection command: `> logs/<log_filename>`.
+Save logs and status reports directly to the created directory by adding in the following string at the end of the collection command: `> logs/<log_filename>`.
 
-**Important:** Be sure that the logs cover any relevant timeframes for the specific issues that you are trying to debug when gathering logs from the storage system.
+**Important:** Be sure that the logs cover any relevant time frames for the specific issues that you are trying to debug when gathering logs from the storage system.
 
 **Note:** All commands here are listed with the collection command with the `logs` folder name example. Change the folder name according as needed.
 
