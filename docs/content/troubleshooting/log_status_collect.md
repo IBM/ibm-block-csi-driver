@@ -79,7 +79,7 @@ To collect CSI operator logs, use the following commands:
 
 
 ### Status collection for CSI pods, daemonset, and statefulset
-`kubectl get all -n <namespace>  -l product=ibm-block-csi-driver > logs/get_all_ibm-block-csi-driver`
+`kubectl get all -n <namespace> -l product=ibm-block-csi-driver > logs/get_all_ibm-block-csi-driver`
 
 
 
