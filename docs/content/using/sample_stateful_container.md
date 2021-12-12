@@ -12,7 +12,7 @@ Use this information to run a stateful container on StatefulSet volumes using ei
 
 2. Create a storage class, as described in [Creating a StorageClass](../configuration/creating_volumestorageclass.md).
 
-    **Note:** Use the `SpaceEfficiency` parameters available for your storage system, as specified in the [`SpaceEfficiency` parameter definitions per storage system type](../configuration/creating-a-storageclass#spaceefficiency-parameter-definitions-per-storage-system-type) table. 
+    **Note:** Use the `SpaceEfficiency` parameters available for your storage system, as specified in the [`SpaceEfficiency` parameter definitions per storage system type](../configuration/creating_volumestorageclass.md#spaceefficiency-parameter-definitions-per-storage-system-type) table. 
     
     values for Spectrum Virtualize family are: `thick`, `thin`, `compressed`, `dedup_thin`, or `dedup_compressed`. These values are not case specific.
     
