@@ -15,3 +15,7 @@ This version adds NVMe-oF/FC support for supported IBM Spectrum Virtualize famil
 ## Increased StorageClass `SpaceEfficiency` parameter capabilities
 
 Version 1.8.0 increases the `SpaceEfficiency` deduplication parameter options for IBM Spectrum Virtualize family storage systems. For more information, see [Creating a StorageClass](../configuration/creating_volumestorageclass.md).
+
+## Additional orchestration support for OpenShift 4.9 for deployment
+
+This version adds support for orchestration platform Red Hat OpenShift 4.9, suitable for deployment of the CSI (Container Storage Interface) driver.
