@@ -12,11 +12,7 @@ Use this information to run a stateful container on StatefulSet volumes using ei
 
 2. Create a storage class, as described in [Creating a StorageClass](../configuration/creating_volumestorageclass.md).
 
-    **Remember:** The `SpaceEfficiency` values for Spectrum Virtualize family are: `thick`, `thin`, `compressed`, `dedup_thin`, or `dedup_compressed`. These values are not case specific.
-    
-    For DS8000 family systems, the default value is `none`, but can be set to `thin`, if required. These values are not case specific. For more information, see [Creating a StorageClass](../configuration/creating_volumestorageclass.md).
-    
-    This parameter is not applicable for IBM FlashSystem A9000 and A9000R systems. These systems always include deduplication and compression.
+     **Note:** Use the `SpaceEfficiency` parameters available for your storage system, as specified in the [`SpaceEfficiency` parameter definitions per storage system type]
 
 3. Create a PVC with the size of 1 Gb, as described in [Creating a PersistentVolumeClaim (PVC)](../configuration/creating_pvc.md).
 
