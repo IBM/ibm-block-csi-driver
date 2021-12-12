@@ -19,6 +19,7 @@ To help pinpoint potential causes for stateful pod failure:
     ```
     View the logs.
 
+
 ## Status and log collection
 To collect and display status and logs related to the different components of IBM® block storage CSI driver, use the Kubernetes commands that are found in this section.
 
@@ -32,6 +33,8 @@ mkdir logs
 Save logs and status reports directly to the created directory by adding in the following string at the end of collection command: `> logs/<log_filename>`.
 
 **Important:** Be sure that the logs cover any relevant timeframes for the specific issues that you are trying to debug when gathering logs from the storage system.
+
+**Note:** All commands here are listed with the collection command with the `logs` folder name example. Change the folder name according as needed.
 
 ### General status and log collection for IBM Support
 Be sure to run the following steps and copy the output to an external file, when engaging IBM Support and sending log collections.
@@ -73,49 +76,28 @@ To collect CSI operator logs, use the following commands:
 
 ### Collecting details of all CSI objects and components
 
-`kubectl describe all -l product=ibm-block-csi-driver -n <namespace>`
-
-For example:
-
-    kubectl describe all -l product=ibm-block-csi-driver -n <namespace> > logs/describe_ibm-block-csi-driver
+`kubectl describe all -l product=ibm-block-csi-driver -n <namespace> > logs/describe_ibm-block-csi-driver`
 
 
 ### Status collection for CSI pods, daemonset, and statefulset
-`kubectl get all -n <namespace>  -l product=ibm-block-csi-driver`
+`kubectl get all -n <namespace>  -l product=ibm-block-csi-driver > logs/get_all_ibm-block-csi-driver`
 
-For example:
-
-    kubectl get all -n <namespace> -l product=ibm-block-csi-driver > logs/get_all_ibm-block-csi-driver
 
 
 
 ### Log collection for the CSI driver controller
-`kubectl log -f -n <namespace> ibm-block-csi-controller-0 -c ibm-block-csi-controller`
-
-For example:
-
-    kubectl log -f -n <namespace> ibm-block-csi-controller-0 -c ibm-block-csi-controller > logs/ibm-block-csi-controller
+`kubectl log -f -n <namespace> ibm-block-csi-controller-0 -c ibm-block-csi-controller > logs/ibm-block-csi-controller`
 
 
 ### Log collection for the CSI driver node (per worker node or PODID)
-`kubectl log -f -n <namespace> ibm-block-csi-node-<PODID> -c ibm-block-csi-node`
+`kubectl log -f -n <namespace> ibm-block-csi-node-<PODID> -c ibm-block-csi-node > logs/csi-node-<PODID>`
 
-For example:
-    
-    kubectl log -f -n <namespace> ibm-block-csi-node-<PODID> -c ibm-block-csi-node > logs/csi-node-<PODID>
 
 
 ### Log collection for unbound PVCs
-`kubectl describe pvc <pvc-name>`
+`kubectl describe pvc <pvc-name> > logs/pvc_not_bounded`
 
-For example:
-
-    kubectl describe pvc <pvc-name> > logs/pvc_not_bounded
 
 
 ### Log collection for pods not in the _Running_ state
-`kubectl describe pod <not-running-pod-name>`
-
-For example:
-
-    kubectl describe pod <pod-name> > logs/pod_not_running
+`kubectl describe pod <not-running-pod-name> > logs/pod_not_running`
