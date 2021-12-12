@@ -10,7 +10,7 @@ To help pinpoint potential causes for stateful pod failure:
 
 1.  Verify that all CSI pods are running.
     ```
-    kubectl get pods -n <namespace> -l csi
+    kubectl get pods -n <namespace> -l product=ibm-block-csi-driver
     ```
 
 2.  If a pod is not in a _Running_ state, run the following command:
@@ -77,7 +77,7 @@ To collect CSI operator logs, use the following commands:
 
 For example:
 
-    kubectl describe all -l csi -n <namespace> > logs/describe_ibm-block-csi-driver
+    kubectl describe all -l product=ibm-block-csi-driver -n <namespace> > logs/describe_ibm-block-csi-driver
 
 
 ### Status collection for CSI pods, daemonset, and statefulset
@@ -85,7 +85,7 @@ For example:
 
 For example:
 
-    kubectl get all -n <namespace> -l csi > get_all_ibm-block-csi-driver
+    kubectl get all -n <namespace> -l product=ibm-block-csi-driver > get_all_ibm-block-csi-driver
 
 
 
