@@ -19,7 +19,7 @@ The `persistentvolumeclaim/<pvc-name> created` message is emitted.
 Use the following sections, according to your PVC needs:
 
 - [Creating PVC for volume with `Filesystem`](#creating-pvc-for-volume-with-filesystem)
-- [Creating PVC for raw block volume](#Creating-pvc-for-raw-block-volume)
+- [Creating PVC for raw block volume](#creating-pvc-for-raw-block-volume)
 - Creating PVC from volume snapshot
 - Creating a volume clone from an existing PVC
 
