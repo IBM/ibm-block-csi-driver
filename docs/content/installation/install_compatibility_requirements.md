@@ -60,7 +60,7 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
 
         **Note:** 
             - NVMe-oF/FC is only supported on IBM Spectrum Virtualize family products.
-            - Be sure that storage system is using one of the fully supported HBAs compatible with NVMe-oF/FC, as listed in the [IBM® System Storage® Interoperation Center (SSIC)](https://www-03.ibm.com/systems/support/storage/ssic/interoperability.wss).
+            - Be sure that storage system is using one of the fully supported HBAs compatible with your host connection, as listed in the [IBM® System Storage® Interoperation Center (SSIC)](https://www-03.ibm.com/systems/support/storage/ssic/interoperability.wss).
 
     2. For Fibre Channel, configure the relevant zoning from the storage to the host.
 
