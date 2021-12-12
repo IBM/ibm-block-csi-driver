@@ -85,7 +85,7 @@ For example:
 
 For example:
 
-    kubectl get all -n <namespace> -l product=ibm-block-csi-driver > get_all_ibm-block-csi-driver
+    kubectl get all -n <namespace> -l product=ibm-block-csi-driver > logs/get_all_ibm-block-csi-driver
 
 
 
