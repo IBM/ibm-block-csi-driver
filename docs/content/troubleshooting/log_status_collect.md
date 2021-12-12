@@ -51,9 +51,9 @@ Be sure to run the following steps and copy the output to an external file, when
 
     - If the PVCs are not in the _Bound_ state collect the events of all unbound PVCs. (See [Log collection for unbound PVCs](#log-collection-for-unbound-pvcs).)
 
-### Log collection for all CSI nodepods and their containers
+### Log collection for all CSI node pods and their containers
 
-To collect logs for all nodepods, use the following commands:
+To collect logs for all node pods, use the following commands:
 
     nodepods=`kubectl get -n <namespace> pod -l app.kubernetes.io/component=csi-node --output=jsonpath={.items..metadata.name}`
     
