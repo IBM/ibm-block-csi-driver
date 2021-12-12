@@ -61,7 +61,7 @@ To collect logs for all nodepods, use the following commands:
 
 To collect logs for all pods and containers, use the following commands:
     
-    for container in kubectl get -n default pod ibm-block-csi-controller-0 -o jsonpath='{.spec.containers[*].name}';do kubectl logs -n default ibm-block-csi-controller-0 -c $container > /tmp/logs_collection/ibm-block-csi-controller-0_${container}.log;done
+    for container in kubectl get -n <namespace> pod ibm-block-csi-controller-0 -o jsonpath='{.spec.containers[*].name}';do kubectl logs -n <namespace> ibm-block-csi-controller-0 -c $container > /tmp/logs_collection/ibm-block-csi-controller-0_${container}.log;done
 
 
 ### Log collection for CSI operator logs
