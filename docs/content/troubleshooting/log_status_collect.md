@@ -51,7 +51,7 @@ Be sure to run the following steps and copy the output to an external file, when
 
     **Note:** If the PVCs are not in the _Bound_ state collect the events of all unbound PVCs. (See [Log collection for unbound PVCs](#log-collection-for-unbound-pvcs).)
 
-### Log collection for all CSI driver node pods and their containers
+#### Log collection for all CSI driver node pods and their containers
 
 To collect logs for all CSI driver node pods, use the following commands:
 
@@ -60,14 +60,14 @@ To collect logs for all CSI driver node pods, use the following commands:
     for pod in $nodepods;do for container in `kubectl get -n <namespace> pod $pod -o jsonpath='{.spec.containers[*].name}'`;do kubectl logs -n <namespace> $pod -c $container > logs/${pod}_${container}.log;done;done
 
 
-### Log collection for all CSI controller containers
+#### Log collection for all CSI controller containers
 
 To collect logs for all controller containers, use the following commands:
     
     for container in `kubectl get -n <namespace> pod ibm-block-csi-controller-0 -o jsonpath='{.spec.containers[*].name}'`;do kubectl logs -n <namespace> ibm-block-csi-controller-0 -c $container > logs/ibm-block-csi-controller-0_${container}.log;done
 
 
-### Log collection for CSI operator logs
+#### Log collection for CSI operator logs
 To collect CSI operator logs, use the following commands:
 
     operatorpod=`kubectl get pods --all-namespaces |grep ibm-block-csi-operator|awk '{print $2}'`
