@@ -47,7 +47,7 @@ Be sure to run the following steps and copy the output to an external file, when
     `kubectl get -all-namespaces pod -o wide | grep ibm-block-csi`
 3. Check if the PersistentVolumeClaims (PVCs) are _Bound_.
 
-    `kubectl get pvc`
+    `kubectl get -n <pvcs_namespace> pvc -o=jsonpath='{.items[?(@.metadata.annotations.volume\.beta\.kubernetes\.io/storage-provisioner=="block.csi.ibm.com")].metadata.name}'`
 
     **Note:** If the PVCs are not in the _Bound_ state collect the events of all unbound PVCs. (See [Log collection for unbound PVCs](#log-collection-for-unbound-pvcs).)
 
@@ -62,7 +62,7 @@ To collect logs for all CSI driver node pods, use the following commands:
 
 ### Log collection for all CSI controller containers
 
-To collect logs for all pods and containers, use the following commands:
+To collect logs for all controller containers, use the following commands:
     
     for container in `kubectl get -n <namespace> pod ibm-block-csi-controller-0 -o jsonpath='{.spec.containers[*].name}'`;do kubectl logs -n <namespace> ibm-block-csi-controller-0 -c $container > logs/ibm-block-csi-controller-0_${container}.log;done
 
