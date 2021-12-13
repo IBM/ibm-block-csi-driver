@@ -93,9 +93,9 @@ To collect CSI operator logs, use the following commands:
 
 
 ### Details collection for unbound PVCs
-`kubectl describe pvc <pvc-name> > logs/pvc_not_bounded`
+`kubectl describe -n <pvc_namespace> pvc <pvc-name> > logs/pvc_not_bounded`
 
 
 
 ### Details collection for pods not in the _Running_ state
-`kubectl describe pod <not-running-pod-name> > logs/pod_not_running`
+`kubectl describe -n <pod_namespace> pod <not-running-pod-name> > logs/pod_not_running`
