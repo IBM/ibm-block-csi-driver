@@ -53,18 +53,18 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
 
 2. Configure your storage system host attachment.
 
-    **Important:** Be sure to configure your storage system host attachment according to your storage system instructions. For more information, find your storage system documentation in [IBM Documentation](http://www.ibm.com/docs/).
+    **Important:** The CSI driver does not define hosts on your storage system.
+    
+    Be sure to configure your storage system host attachment according to your storage system instructions.
 
-
-    1. Define the host of each worker node on the relevant storage systems with the valid WWPN (for Fibre Channel), NQN (for NVMe-oF/FC), or IQN (for iSCSI) of the node.
-
-        **Note:** 
-            - NVMe-oF/FC is only supported on IBM Spectrum Virtualize family products.
-            - Be sure that storage system is using one of the fully supported HBAs compatible with your host connection, as listed in the [IBM® System Storage® Interoperation Center (SSIC)](https://www-03.ibm.com/systems/support/storage/ssic/interoperability.wss).
-
-    2. For Fibre Channel, configure the relevant zoning from the storage to the host.
-
-    3. Ensure proper connectivity.
+    The CSI driver supports the following connectivity for each worker node: Fibre Channel (WWPN), NVMe®/FC (NQN), and iSCSI (IQN).
+        
+    **Note:** 
+        - The CSI driver only supports NVMe®/FC on IBM Spectrum Virtualize family products.
+        - For Fibre Channel connectivity be sure that storage system is using one of the fully supported HBAs compatible with your host connection, as listed in the [IBM® System Storage® Interoperation Center (SSIC)](https://www-03.ibm.com/systems/support/storage/ssic/interoperability.wss).
+        - IBM DS8000 family storage systems only supports Fibre Channel connectivity.
+       
+    For more information, find your storage system documentation in [IBM Documentation](http://www.ibm.com/docs/).
 
 3. **For RHEL OS users:** Ensure that the following packages are installed.
 
