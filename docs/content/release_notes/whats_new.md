@@ -2,7 +2,7 @@
 
 IBM® block storage CSI driver 1.8.0 introduces the enhancements that are detailed in the following section.
 
-**General availability date:** 13 December 2021
+**General availability date:** 17 December 2021
 
 ## New HyperSwap support for IBM Spectrum Virtualize family storage systems
 
@@ -16,6 +16,6 @@ This version adds NVMe-oF/FC support for supported IBM Spectrum Virtualize famil
 
 Version 1.8.0 increases the `SpaceEfficiency` deduplication parameter options for IBM Spectrum Virtualize family storage systems. For more information, see [Creating a StorageClass](../configuration/creating_volumestorageclass.md).
 
-## Additional orchestration support for OpenShift 4.9 for deployment
+## Additional orchestration support for OpenShift 4.7 and 4.9 for deployment
 
-This version adds support for orchestration platform Red Hat OpenShift 4.9, suitable for deployment of the CSI (Container Storage Interface) driver.
+This version reintroduces Red Hat OpenShift 4.7 and adds new support for orchestration platform Red Hat OpenShift 4.9, suitable for deployment of the CSI (Container Storage Interface) driver.
