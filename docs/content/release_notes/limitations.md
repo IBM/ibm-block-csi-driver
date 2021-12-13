@@ -58,9 +58,16 @@ The following IBM block storage CSI driver features are not supported on volumes
     **Note:** A snapshot can be created from a HyperSwap volume.
  - Volume cloning.
 
-## NVMe/FC usage limitations
+## NVMe®/FC usage limitations
 
- Currently NVMe/FC support is only for Red Hat® Enterprise Linux® (RHEL) operating systems.
+ Red Hat® Enterprise Linux CoreOS (RHCOS) does not support NVMe®/FC.
  
  For other limitations with your storage system, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Configuring** > **Host attachment** > **NVMe over Fibre Channel host attachments** > **FC-NVMe limitations and SAN configuration guidelines**.
  
+ ## Volume attach limitations
+
+ In cases where a volume cleanup consistently fails, eventually the orchestrator incorrectly resorts to detaching the volume. As a result, subsequent volume attachment disruptions may occur on the worker node.
+ 
+ This limitation is tracked in the following places:
+    - Red Hat Bug [2022328](https://bugzilla.redhat.com/show_bug.cgi?id=2022328)
+    - Kubernetes Issue [106710](https://github.com/kubernetes/kubernetes/issues/106710)
