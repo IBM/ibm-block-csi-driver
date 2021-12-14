@@ -52,7 +52,7 @@ Use the following steps to install the operator and driver, with [GitHub](https:
     
     4.  Verify that the driver is running:
         ```
-        $> kubectl get pods -n <namespace> -l csi
+        $> kubectl get pods -n <namespace> -l product=ibm-block-csi-driver
         NAME                                    READY   STATUS  RESTARTS AGE
         ibm-block-csi-controller-0              7/7     Running 0        9m36s
         ibm-block-csi-node-jvmvh                3/3     Running 0        9m36s

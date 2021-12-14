@@ -18,12 +18,12 @@ The `persistentvolumeclaim/<pvc-name> created` message is emitted.
 
 Use the following sections, according to your PVC needs:
 
-- [Creating PVC for volume with `Filesystem`](#creating-pvc-for-volume-with-filesystem)
-- [Creating PVC for raw block volume](#Creating-PVC-for-raw-block-volume)
-- Creating PVC from volume snapshot
-- Creating a volume clone from an existing PVC
+- [Creating a PVC for volume with file system](#creating-a-pvc-for-volume-with-file-system)
+- [Creating a PVC for raw block volume](#creating-a-pvc-for-raw-block-volume)
+- [Creating a PVC from volume snapshot](#creating-a-pvc-from-volume-snapshot)
+- [Creating a volume clone from an existing PVC](#creating-a-volume-clone-from-an-existing-pvc)
 
-## Creating PVC for volume with `Filesystem`
+## Creating a PVC for volume with file system
 
 Create a PVC YAML file, similar to the following `demo-pvc-file-system.yaml` file, with the size of 1 Gb, with `volumeMode` defined as `Filesystem`.
 
@@ -42,7 +42,7 @@ Create a PVC YAML file, similar to the following `demo-pvc-file-system.yaml` fil
           storage: 1Gi
       storageClassName: demo-storageclass
 
-## Creating PVC for raw block volume
+## Creating a PVC for raw block volume
 
 Create a PVC YAML file, similar to the following `demo-pvc-raw-block.yaml` file, with the size of 1 Gb, with `volumeMode` defined as `Block`.
 
@@ -59,7 +59,7 @@ Create a PVC YAML file, similar to the following `demo-pvc-raw-block.yaml` file,
           storage: 1Gi
       storageClassName: demo-storageclass
 
-## <a name=PVC-vol-snapshot></a>Creating PVC from volume snapshot
+## Creating a PVC from volume snapshot
 
 To create a PVC from an existing volume snapshot, create a PVC YAML file, similar to the following `demo-pvc-from-snapshot.yaml` file, with the size of 1 Gb.
 
@@ -82,7 +82,7 @@ Update the `dataSource` parameters to reflect the existing volume snapshot infor
         kind: VolumeSnapshot
         apiGroup: snapshot.storage.k8s.io
 
-## <a name=vol-clone-PVC></a>Creating a volume clone from an existing PVC
+## Creating a volume clone from an existing PVC
 
 **Note:** IBM FlashCopy® function is referred to as the more generic volume snapshots and cloning within this documentation set. Not all supported products use the FlashCopy function terminology.
 

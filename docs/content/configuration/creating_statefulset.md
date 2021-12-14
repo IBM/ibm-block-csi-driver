@@ -8,7 +8,14 @@ StatefulSets can include file system volumes, raw block volumes, or both.
 
 **Important:** When defining the StatefulSet configuration, be sure to define volumes according to the PVC volume mode.
 
-Use the following sections for YAML creation of StatefulSets with file system, raw block volume, and mixed volume modes. After each YAML file creation, use the `kubectl apply` command.
+Use the following sections for YAML creation of StatefulSets with file system, raw block volume, and mixed volume modes.
+
+  - [Creating a StatefulSet with file system volumes](#creating-a-statefulset-with-file-system-volumes)
+  - [Creating a StatefulSet with raw block volume](#creating-a-statefulset-with-raw-block-volume)
+  - [Creating a StatefulSet with both raw block and file system volumes](#creating-a-statefulset-with-both-raw-block-and-file-system-volumes)
+
+
+After each YAML file creation, use the `kubectl apply` command.
 
 ```
 kubectl apply -f <filename>.yaml

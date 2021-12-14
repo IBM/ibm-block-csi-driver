@@ -14,7 +14,7 @@ When configuring the file, be sure to use the same array secret and array secret
 
 Use the `SpaceEfficiency` parameters for each storage system, as defined in [the following table](#spaceefficiency). These values are not case-sensitive.
 
-_<a name=spaceefficiency>**Table:**</a> `SpaceEfficiency` parameter definitions per storage system type_
+#### `SpaceEfficiency` parameter definitions per storage system type
 
 |Storage system type|SpaceEfficiency parameter options|
 |-------------------|---------------------------------|
