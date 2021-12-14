@@ -69,5 +69,6 @@ The following IBM block storage CSI driver features are not supported on volumes
  In cases where a volume cleanup consistently fails, eventually the orchestrator incorrectly resorts to detaching the volume. As a result, subsequent volume attachment disruptions may occur on the worker node.
  
  This limitation is tracked in the following places:
-    - Red Hat Bug [2022328](https://bugzilla.redhat.com/show_bug.cgi?id=2022328)
-    - Kubernetes Issue [106710](https://github.com/kubernetes/kubernetes/issues/106710)
+
+- Red Hat Bug [2022328](https://bugzilla.redhat.com/show_bug.cgi?id=2022328)
+- Kubernetes Issue [106710](https://github.com/kubernetes/kubernetes/issues/106710)

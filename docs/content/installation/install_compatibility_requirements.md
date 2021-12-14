@@ -60,9 +60,9 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
     The CSI driver supports the following connectivity for each worker node: Fibre Channel (WWPN), NVMe®/FC (NQN), and iSCSI (IQN).
         
     **Note:** 
-        - The CSI driver supports NVMe®/FC only on IBM Spectrum Virtualize family products.
-        - For Fibre Channel connectivity be sure that storage system is using one of the fully supported HBAs compatible with your host connection, as listed in the [IBM® System Storage® Interoperation Center (SSIC)](https://www-03.ibm.com/systems/support/storage/ssic/interoperability.wss).
-        - IBM DS8000 family storage systems only supports Fibre Channel connectivity.
+    - The CSI driver supports NVMe®/FC only on IBM Spectrum Virtualize family products.
+    - For Fibre Channel connectivity be sure that storage system is using one of the fully supported HBAs compatible with your host connection, as listed in the [IBM® System Storage® Interoperation Center (SSIC)](https://www-03.ibm.com/systems/support/storage/ssic/interoperability.wss).
+    - IBM DS8000 family storage systems only supports Fibre Channel connectivity.
        
     For more information, find your storage system documentation in [IBM Documentation](http://www.ibm.com/docs/).
 
