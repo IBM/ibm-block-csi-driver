@@ -288,20 +288,17 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 array_mediator.unmap_volume_by_initiators(volume_id, initiators)
 
-            logger.info("finished ControllerUnpublishVolume")
-            return csi_pb2.ControllerUnpublishVolumeResponse()
         except ObjectIdError as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
                                     array_errors.VolumeAlreadyUnmappedError)
         except array_errors.HostNotFoundError:
             logger.debug("Idempotent case. host not found.")
-            return csi_pb2.ControllerUnpublishVolumeResponse()
         except array_errors.VolumeAlreadyUnmappedError:
             logger.debug("Idempotent case. volume is already unmapped.")
-            return csi_pb2.ControllerUnpublishVolumeResponse()
         except array_errors.ObjectNotFoundError:
             logger.debug("Idempotent case. volume is already deleted.")
-            return csi_pb2.ControllerUnpublishVolumeResponse()
+        logger.info("finished ControllerUnpublishVolume")
+        return csi_pb2.ControllerUnpublishVolumeResponse()
 
     @handle_common_exceptions(csi_pb2.ValidateVolumeCapabilitiesResponse)
     def ValidateVolumeCapabilities(self, request, context):
