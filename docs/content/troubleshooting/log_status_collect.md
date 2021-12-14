@@ -30,7 +30,7 @@ For example:
 ```
 mkdir logs
 ```
-Save logs and status reports directly to the created directory by adding in the following string at the end of the collection command: `> logs/<log_filename>`.
+Save logs and status reports directly to the created directory by adding in the following string at the end of the collection command: `> logs/<log_filename>.log`.
 
 **Important:** Be sure that the logs cover any relevant time frames for the specific issues that you are trying to debug when gathering logs from the storage system.
 
@@ -75,31 +75,31 @@ To collect logs for all controller containers, use the following commands:
 To collect CSI operator logs, use the following commands:
 
     operatorpod=`kubectl get pods --all-namespaces |grep ibm-block-csi-operator|awk '{print $2}'`
-    kubectl logs $operatorpod -n <namespace> > logs/operator
+    kubectl logs $operatorpod -n <namespace> > logs/operator.log
 
 
 ### Collecting details of all CSI objects and components
-`kubectl describe all -l product=ibm-block-csi-driver -n <namespace> > logs/describe_ibm-block-csi-driver`
+`kubectl describe all -l product=ibm-block-csi-driver -n <namespace> > logs/describe_ibm-block-csi-driver.log`
 
 
 ### Status collection for CSI pods, daemonset, and statefulset
-`kubectl get all -n <namespace> -l product=ibm-block-csi-driver > logs/get_all_ibm-block-csi-driver`
+`kubectl get all -n <namespace> -l product=ibm-block-csi-driver > logs/get_all_ibm-block-csi-driver.log`
 
 
 
 ### Log collection for the CSI driver controller
-`kubectl logs -f -n <namespace> ibm-block-csi-controller-0 -c ibm-block-csi-controller > logs/ibm-block-csi-controller`
+`kubectl logs -f -n <namespace> ibm-block-csi-controller-0 -c ibm-block-csi-controller > logs/ibm-block-csi-controller.log`
 
 
 ### Log collection for the CSI driver node (per worker node or PODID)
-`kubectl logs -f -n <namespace> ibm-block-csi-node-<PODID> -c ibm-block-csi-node > logs/csi-node-<PODID>`
+`kubectl logs -f -n <namespace> ibm-block-csi-node-<PODID> -c ibm-block-csi-node > logs/csi-node-<PODID>.log`
 
 
 
 ### Details collection for unbound PVCs
-`kubectl describe -n <pvc_namespace> pvc <pvc-name> > logs/pvc_not_bounded`
+`kubectl describe -n <pvc_namespace> pvc <pvc-name> > logs/pvc_not_bounded.log`
 
 
 
 ### Details collection for pods not in the _Running_ state
-`kubectl describe -n <pod_namespace> pod <not-running-pod-name> > logs/pod_not_running`
+`kubectl describe -n <pod_namespace> pod <not-running-pod-name> > logs/pod_not_running.log`
