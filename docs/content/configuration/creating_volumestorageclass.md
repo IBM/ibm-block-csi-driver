@@ -35,28 +35,29 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in [the
 
 - The `allowVolumeExpansion` parameter is optional but is necessary for using volume expansion. The default value is _false_.
 
-  **Note:** Be sure to set the value to true to allow volume expansion.
+  **Note:** Be sure to set the value to _true_ to allow volume expansion.
 
 - The `csi.storage.k8s.io/fstype` parameter is optional. The values that are allowed are _ext4_ or _xfs_. The default value is _ext4_.
 - The `volume_name_prefix` parameter is optional.
 
-  **Note:** For IBM DS8000 family, the maximum prefix length is five characters. The maximum prefix length for other systems is 20 characters. <br /><br />For storage systems that use Spectrum Virtualize, the `CSI` prefix is added as default if not specified by the user.
+    **Note:**
+    For IBM DS8000 family, the maximum prefix length is five characters. The maximum prefix length for other systems is 20 characters. <br /><br />For storage systems that use Spectrum Virtualize, the `CSI` prefix is added as default if not specified by the user.
 
     
-    kind: StorageClass
-    apiVersion: storage.k8s.io/v1
-    metadata:
-      name: demo-storageclass
-    provisioner: block.csi.ibm.com
-    parameters:
-      pool: demo-pool
-      SpaceEfficiency: thin            # Optional.
-      volume_name_prefix: demo-prefix  # Optional.
+      kind: StorageClass
+      apiVersion: storage.k8s.io/v1
+      metadata:
+        name: demo-storageclass
+      provisioner: block.csi.ibm.com
+      parameters:
+        pool: demo-pool
+        SpaceEfficiency: thin            # Optional.
+        volume_name_prefix: demo-prefix  # Optional.
 
-      csi.storage.k8s.io/fstype: xfs   # Optional. Values ext4/xfs. The default is ext4.
-      csi.storage.k8s.io/secret-name: demo-secret
-      csi.storage.k8s.io/secret-namespace: default
-    allowVolumeExpansion: true
+        csi.storage.k8s.io/fstype: xfs   # Optional. Values ext4/xfs. The default is ext4.
+        csi.storage.k8s.io/secret-name: demo-secret
+        csi.storage.k8s.io/secret-namespace: default
+      allowVolumeExpansion: true
     
 
 Apply the storage class.
