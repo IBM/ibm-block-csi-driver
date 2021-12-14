@@ -293,6 +293,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         except ObjectIdError as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
                                     array_errors.VolumeAlreadyUnmappedError)
+        except array_errors.HostNotFoundError:
+            logger.debug("Idempotent case. host not found.")
+            return csi_pb2.ControllerUnpublishVolumeResponse()
         except array_errors.VolumeAlreadyUnmappedError:
             logger.debug("Idempotent case. volume is already unmapped.")
             return csi_pb2.ControllerUnpublishVolumeResponse()
