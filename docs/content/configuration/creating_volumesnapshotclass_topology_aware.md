@@ -25,7 +25,7 @@ deletionPolicy: Delete
 parameters:
   # non-csi.storage.k8s.io parameters may be specified in by_management_id per system and/or outside by_management_id as the cross-system default.
 
-  by_management_id: '{"demo-management-id-1":{"pool":"demo-pool-1","SpaceEfficiency":"dedup_compressed_","snapshot_name_prefix":"demo-prefix-1"},
+  by_management_id: '{"demo-management-id-1":{"pool":"demo-pool-1","SpaceEfficiency":"dedup_compressed","snapshot_name_prefix":"demo-prefix-1"},
                       "demo-management-id-2":{"pool":"demo-pool-2","snapshot_name_prefix":"demo-prefix-2"}}'  # Optional.
   pool: demo-pool                    # Optional. Use to create the snapshot on a different pool than the source.
   SpaceEfficiency: thin              # Optional. Use to create the snapshot with a different space efficiency than the source.
