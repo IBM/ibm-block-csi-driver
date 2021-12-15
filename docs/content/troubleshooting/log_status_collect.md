@@ -47,7 +47,7 @@ Be sure to run the following steps and copy the output to an external file, when
     `kubectl get -all-namespaces pod -o wide | grep ibm-block-csi`
 3. Check if the PersistentVolumeClaims (PVCs) are _Bound_.
 
-    `kubectl get -n default pvc -o=jsonpath='{range .items[?(@.metadata.annotations.volume\.beta\.kubernetes\.io/storage-provisioner=="block.csi.ibm.com")]}{"PVC NAME: "}{@.metadata.name}{" PVC STATUS: "}{@.status.phase}{"\n"}{end}'`
+    `kubectl get -n <namespace> pvc -o=jsonpath='{range .items[?(@.metadata.annotations.volume\.beta\.kubernetes\.io/storage-provisioner=="block.csi.ibm.com")]}{"PVC NAME: "}{@.metadata.name}{" PVC STATUS: "}{@.status.phase}{"\n"}{end}'`
 
     The output should be similar to the following:
 
