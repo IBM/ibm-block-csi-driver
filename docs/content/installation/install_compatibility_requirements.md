@@ -8,22 +8,22 @@ For IBM Cloud® Satellite users, see [cloud.ibm.com/docs/satellite](https://clou
 
 **Important:** When using Satellite, complete the following checks, configurations, and the installation process before assigning the hosts to your locations. </br>In addition, **do not** create a Kubernetes cluster. Creating the Kubernetes cluster is done through Satellite.
 
--   The CSI driver requires the following ports to be opened on the worker nodes OS firewall:
-    -   **For all iSCSI users**
+The CSI driver requires the following ports to be opened on the worker nodes OS firewall:
+ -   **For all iSCSI users**
 
         Port 3260
 
-    -   **FlashSystem A9000 and A9000R**
+ -   **FlashSystem A9000 and A9000R**
 
         Port 7778
 
-    -   **IBM Spectrum® Virtualize family includes IBM® SAN Volume Controller and IBM FlashSystem® family members that are built with IBM Spectrum® Virtualize (including FlashSystem 5xxx, 7200, 9100, 9200, 9200R)**
+ -   **IBM Spectrum® Virtualize family includes IBM® SAN Volume Controller and IBM FlashSystem® family members that are built with IBM Spectrum® Virtualize (including FlashSystem 5xxx, 7200, 9100, 9200, 9200R)**
 
         Port 22
 
-    -   **DS8000® family systems**
+ -   **DS8000® family systems**
 
-        Port 8452
+      Port 8452
 
 Complete these steps for each worker node in Kubernetes cluster to prepare your environment for installing the CSI (Container Storage Interface) driver.
 
