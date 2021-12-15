@@ -25,8 +25,6 @@ For IBM Cloud® Satellite users, see [cloud.ibm.com/docs/satellite](https://clou
 
         Port 8452
 
--   Be sure that multipathing is installed and running.
-
 Complete these steps for each worker node in Kubernetes cluster to prepare your environment for installing the CSI (Container Storage Interface) driver.
 
 1. Configure Linux® multipath devices on the host.
