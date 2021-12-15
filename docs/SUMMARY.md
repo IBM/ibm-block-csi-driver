@@ -48,7 +48,7 @@
 	* [Configuring for CSI Topology](content/configuration/configuring_topology.md)
 		* [Creating a Secret with topology awareness](content/configuration/creating_secret_topology_aware.md)
 		* [Creating a StorageClass with topology awareness](content/configuration/creating_storageclass_topology_aware.md)
-		* [Creating a VolumeSnapshotClass with topology awareness](content/configuration/creating_volumereplicationclass_topology_aware.md)
+		* [Creating a VolumeSnapshotClass with topology awareness](content/configuration/creating_volumesnapshotclass_topology_aware.md)
 	* [Advanced configuration](content/configuration/advanced_configuration.md)
 		* [Importing an existing volume](content/configuration/importing_existing_volume.md)
 * [Using IBM block storage CSI driver](content/using/using.md)

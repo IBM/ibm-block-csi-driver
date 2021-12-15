@@ -6,4 +6,4 @@ Use this information for specific configuring information when using CSI Topolog
 
 - [Creating a Secret with topology awareness](creating_secret_topology_aware.md)
 - [Creating a StorageClass with topology awareness](creating_storageclass_topology_aware.md)
-- [Creating a VolumeSnapshotClass with topology awareness](creating_volumereplicationclass_topology_aware.md)
+- [Creating a VolumeSnapshotClass with topology awareness](creating_volumesnapshotclass_topology_aware.md)
