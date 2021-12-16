@@ -15,10 +15,8 @@
  */
 package driver
 
-var ErrorWhileTryingToReadIQN = "Error while trying to get iqn  from string: %v."
+var ErrorWhileTryingToReadPort = "Error while trying to get %s port from string: %v."
 
 var ErrorUnsupportedConnectivityType = "Unsupported connectivity type : {%v}"
-
-var ErrorWhileTryingToReadFC = "Error while tring to get FC port from string: %v."
 
 var ErrorNoPortsCouldFitInNodeId = "could not fit any ports in node id: %v, length limit: %d"

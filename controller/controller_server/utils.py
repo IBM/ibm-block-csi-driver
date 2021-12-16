@@ -9,8 +9,8 @@ from google.protobuf.timestamp_pb2 import Timestamp
 import controller.array_action.errors as array_errors
 import controller.controller_server.config as config
 import controller.controller_server.messages as messages
-from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE, \
-                                           REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC
+from controller.array_action.config import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
+    ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.settings import NAME_PREFIX_SEPARATOR
 from controller.controller_server.controller_types import ArrayConnectionInfo, ObjectIdInfo, ObjectParameters
@@ -483,21 +483,25 @@ def get_object_id_info(full_object_id, object_type):
 def get_node_id_info(node_id):
     logger.debug("getting node info for node id : {0}".format(node_id))
     split_node = node_id.split(config.PARAMETERS_NODE_ID_DELIMITER)
-    hostname, fc_wwns, iscsi_iqn = "", "", ""
-    if len(split_node) == config.SUPPORTED_CONNECTIVITY_TYPES + 1:
-        hostname, fc_wwns, iscsi_iqn = split_node
+    hostname, nvme_nqn, fc_wwns, iscsi_iqn = "", "", "", ""
+    if len(split_node) == 4:
+        hostname, nvme_nqn, fc_wwns, iscsi_iqn = split_node
+    elif len(split_node) == 3:
+        hostname, nvme_nqn, fc_wwns = split_node
     elif len(split_node) == 2:
-        hostname, fc_wwns = split_node
+        hostname, nvme_nqn = split_node
     else:
         raise array_errors.HostNotFoundError(node_id)
-    logger.debug("node name : {0}, iscsi_iqn : {1}, fc_wwns : {2} ".format(
-        hostname, iscsi_iqn, fc_wwns))
-    return hostname, fc_wwns, iscsi_iqn
+    logger.debug("node name : {0}, nvme_nqn: {1}, fc_wwns : {2}, iscsi_iqn : {3} ".format(
+        hostname, nvme_nqn, fc_wwns, iscsi_iqn))
+    return hostname, nvme_nqn, fc_wwns, iscsi_iqn
 
 
 def choose_connectivity_type(connectivity_types):
-    # If connectivity type support FC and iSCSI at the same time, chose FC
     logger.debug("choosing connectivity type for connectivity types : {0}".format(connectivity_types))
+    if NVME_OVER_FC_CONNECTIVITY_TYPE in connectivity_types:
+        logger.debug("connectivity type is : {0}".format(NVME_OVER_FC_CONNECTIVITY_TYPE))
+        return NVME_OVER_FC_CONNECTIVITY_TYPE
     if FC_CONNECTIVITY_TYPE in connectivity_types:
         logger.debug("connectivity type is : {0}".format(FC_CONNECTIVITY_TYPE))
         return FC_CONNECTIVITY_TYPE
@@ -519,15 +523,15 @@ def generate_csi_publish_volume_response(lun, connectivity_type, config, array_i
         connectivity_param: connectivity_type
     }
 
-    if connectivity_type == ISCSI_CONNECTIVITY_TYPE:
+    if connectivity_type == FC_CONNECTIVITY_TYPE:
+        array_initiators_param = config["controller"]["publish_context_fc_initiators"]
+        publish_context[array_initiators_param] = separator.join(array_initiators)
+    elif connectivity_type == ISCSI_CONNECTIVITY_TYPE:
         for iqn, ips in array_initiators.items():
             publish_context[iqn] = separator.join(ips)
 
         array_initiators_param = config["controller"]["publish_context_array_iqn"]
         publish_context[array_initiators_param] = separator.join(array_initiators.keys())
-    else:
-        array_initiators_param = config["controller"]["publish_context_fc_initiators"]
-        publish_context[array_initiators_param] = separator.join(array_initiators)
 
     res = csi_pb2.ControllerPublishVolumeResponse(publish_context=publish_context)
 

@@ -1,6 +1,6 @@
 pipeline {
     parameters {
-        string(name: 'IMAGE_VERSION', defaultValue: "1.7.0")
+        string(name: 'IMAGE_VERSION', defaultValue: "1.8.0")
         string(name: 'DOCKER_REGISTRY', defaultValue: DEFAULT_DOCKER_REGISTRY)
         string(name: 'EMAIL_TO', defaultValue: "")
     }
@@ -39,9 +39,11 @@ pipeline {
         stage ('CSI-controller & node: Build and push images') {
             steps {
                 script {
-                    registryUrl = "https://${DOCKER_REGISTRY}"
-                    docker.withRegistry(registryUrl, registryCredentialsID) {
+                    registryUrl = "${DOCKER_REGISTRY}"
+                    withCredentials([usernamePassword(credentialsId: registryCredentialsID, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+                        sh 'docker login -u $USERNAME -p $PASSWORD ${DOCKER_REGISTRY}'
                         sh './scripts/ci/build_push_images.sh build/reports/images_url'
+                        sh 'docker logout ${DOCKER_REGISTRY}'
                     }
                 }
             }

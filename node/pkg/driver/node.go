@@ -50,11 +50,12 @@ var (
 	defaultFSType              = "ext4"
 	StageInfoFilename          = ".stageInfo.json"
 	supportedConnectivityTypes = map[string]bool{
-		device_connectivity.ConnectionTypeISCSI: true,
-		device_connectivity.ConnectionTypeFC:    true,
-		// TODO add nvme later on
+		device_connectivity.ConnectionTypeNVMEoFC: true,
+		device_connectivity.ConnectionTypeFC:      true,
+		device_connectivity.ConnectionTypeISCSI:   true,
 	}
 
+	NvmeFullPath  = "/host/etc/nvme/hostnqn"
 	IscsiFullPath = "/host/etc/iscsi/initiatorname.iscsi"
 )
 
@@ -242,9 +243,11 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong lun id %d.", lun)}
 	}
 
-	if len(ipsByArrayInitiator) == 0 {
-		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong arrayInitiators %v.",
-			ipsByArrayInitiator)}
+	if connectivityType != device_connectivity.ConnectionTypeNVMEoFC {
+		if len(ipsByArrayInitiator) == 0 {
+			return &RequestValidationError{fmt.Sprintf("PublishContext with wrong arrayInitiators %v.",
+				ipsByArrayInitiator)}
+		}
 	}
 
 	if connectivityType == device_connectivity.ConnectionTypeISCSI {
@@ -415,15 +418,28 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	case *csi.VolumeCapability_Block:
 		isFSVolume = false
 	}
+
+	if isFSVolume {
+		stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingPath)
+		isStagingNotMounted, err := d.NodeUtils.IsNotMountPoint(stagingPathWithHostPrefix)
+		if err != nil {
+			logger.Errorf("Existing mount check failed {%v}", err.Error())
+			return nil, err
+		}
+		if isStagingNotMounted {
+			return nil, status.Errorf(codes.InvalidArgument, "Staging path %v is not a mount point", stagingPath)
+		}
+	}
+
 	isTargetPathExists := d.NodeUtils.IsPathExists(targetPathWithHostPrefix)
 	if isTargetPathExists {
 		// check if already mounted
-		isMounted, err := d.isTargetMounted(targetPathWithHostPrefix, isFSVolume)
+		isTargetMounted, err := d.isTargetMounted(targetPathWithHostPrefix, isFSVolume)
 		if err != nil {
 			logger.Debugf("Existing mount check failed {%v}", err.Error())
 			return nil, err
 		}
-		if isMounted { // idempotent case
+		if isTargetMounted { // idempotent case
 			return &csi.NodePublishVolumeResponse{}, nil
 		}
 	} else {
@@ -627,12 +643,17 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	}
 
 	sysDevices := strings.Split(rawSysDevices, ",")
-
-	err = d.NodeUtils.RescanPhysicalDevices(sysDevices)
+	devicesAreNvme, err := d.NodeUtils.DevicesAreNvme(sysDevices)
 	if err != nil {
+		logger.Errorf("Error while trying to check if sys devices are nvme devices : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-
+	if !devicesAreNvme {
+		err = d.NodeUtils.RescanPhysicalDevices(sysDevices)
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
 	err = d.NodeUtils.ExpandMpathDevice(baseDevice)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -702,8 +723,9 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	logger.Debugf(">>>> NodeGetInfo: called with args %+v", *req)
 	defer logger.Debugf("<<<< NodeGetInfo")
 
-	var iscsiIQN string
+	var nvmeNQN string
 	var fcWWNs []string
+	var iscsiIQN string
 	var err error
 
 	topologyLabels, err := d.NodeUtils.GetTopologyLabels(ctx, d.Hostname)
@@ -711,6 +733,14 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	logger.Debugf("discovered topology labels : %v", topologyLabels)
+
+	nvmeExists := d.NodeUtils.IsPathExists(NvmeFullPath)
+	if nvmeExists {
+		nvmeNQN, err = d.NodeUtils.ReadNvmeNqn()
+		if err != nil {
+			logger.Warning(err)
+		}
+	}
 
 	fcExists := d.NodeUtils.IsFCExists()
 	if fcExists {
@@ -722,15 +752,18 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 
 	iscsiExists := d.NodeUtils.IsPathExists(IscsiFullPath)
 	if iscsiExists {
-		iscsiIQN, _ = d.NodeUtils.ParseIscsiInitiators()
+		iscsiIQN, err = d.NodeUtils.ParseIscsiInitiators()
+		if err != nil {
+			logger.Warning(err)
+		}
 	}
 
-	if fcWWNs == nil && iscsiIQN == "" {
-		err := fmt.Errorf("Cannot find valid fc wwns or iscsi iqn")
+	if nvmeNQN == "" && fcWWNs == nil && iscsiIQN == "" {
+		err := fmt.Errorf("Cannot find valid nvme nqn, fc wwns or iscsi iqn")
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	nodeId, err := d.NodeUtils.GenerateNodeID(d.Hostname, fcWWNs, iscsiIQN)
+	nodeId, err := d.NodeUtils.GenerateNodeID(d.Hostname, nvmeNQN, fcWWNs, iscsiIQN)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
