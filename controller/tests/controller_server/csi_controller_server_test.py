@@ -1035,7 +1035,7 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
 
         self.servicer.ControllerPublishVolume(self.request, self.context)
 
-        self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_publish_volume_get_host_by_host_identifiers_exception(self, storage_agent):
@@ -1322,7 +1322,7 @@ class TestUnpublishVolume(BaseControllerSetUp, CommonControllerTest):
 
         self.servicer.ControllerUnpublishVolume(self.request, self.context)
 
-        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_unpublish_volume_get_host_by_host_identifiers_multiple_hosts_found_error(self, storage_agent):

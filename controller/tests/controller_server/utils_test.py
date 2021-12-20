@@ -3,7 +3,6 @@ import unittest
 
 from mock import patch, Mock
 
-import controller.array_action.errors as array_errors
 import controller.controller_server.utils as utils
 from controller.array_action import config as array_config
 from controller.array_action.config import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
@@ -392,7 +391,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(node_id_info.initiators.iscsi_iqn, iscsi_iqn)
 
     def test_get_node_id_info(self):
-        with self.assertRaises(array_errors.HostNotFoundError) as ex:
+        with self.assertRaises(ValidationException) as ex:
             utils.get_node_id_info("bad-node-format")
             self.assertTrue("node" in str(ex))
         host_name = "host-name"

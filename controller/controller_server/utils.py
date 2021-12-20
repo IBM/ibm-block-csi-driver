@@ -6,7 +6,6 @@ from operator import eq
 import base58
 from google.protobuf.timestamp_pb2 import Timestamp
 
-import controller.array_action.errors as array_errors
 import controller.controller_server.config as config
 import controller.controller_server.messages as messages
 from controller.array_action.config import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
@@ -240,7 +239,7 @@ def _validate_object_id(object_id, object_type=config.VOLUME_TYPE_NAME,
         raise ObjectIdError(object_type, object_id)
     if len(object_id.split(config.PARAMETERS_OBJECT_ID_INFO_DELIMITER)) not in {config.MINIMUM_VOLUME_ID_PARTS,
                                                                                 config.MAXIMUM_VOLUME_ID_PARTS}:
-        raise ValidationException(messages.volume_id_wrong_format_message)
+        raise ValidationException(messages.wrong_format_message.format("volume id"))
 
 
 def validate_create_volume_request(request):
@@ -491,7 +490,7 @@ def get_node_id_info(node_id):
     elif len(split_node) == 2:
         hostname, nvme_nqn = split_node
     else:
-        raise array_errors.HostNotFoundError(node_id)
+        raise ValidationException(messages.wrong_format_message.format("node id"))
     logger.debug("node name : {0}, nvme_nqn: {1}, fc_wwns : {2}, iscsi_iqn : {3} ".format(
         hostname, nvme_nqn, fc_wwns, iscsi_iqn))
     return hostname, nvme_nqn, fc_wwns, iscsi_iqn
