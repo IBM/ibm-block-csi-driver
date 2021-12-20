@@ -43,6 +43,7 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	GetMpathDevice(volumeId string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
 	RemovePhysicalDevice(sysDevices []string) error
+	ValidateLun(lun int, sysDevices []string) error
 }
 
 type OsDeviceConnectivityHelperScsiGeneric struct {
@@ -72,10 +73,12 @@ const (
 	WaitForMpathWaitIntervalSec = 1
 	FcHostSysfsPath             = "/sys/class/fc_remote_ports/rport-*/port_name"
 	IscsiHostRexExPath          = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
+	SysDeviceSoftLinkToLun      = "/sys/block/%s/device"
 	blockDevCmd                 = "blockdev"
 	mpathdSeparator             = ","
 	multipathdCmd               = "multipathd"
 	multipathCmd                = "multipath"
+	contentListCmd              = "ls"
 	VolumeIdDelimiter           = ":"
 	VolumeStorageIdsDelimiter   = ";"
 	WwnOuiEnd                   = 7
@@ -285,6 +288,31 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 	}
 	logger.Debugf("Finished removing SCSI devices : {%v}", sysDevices)
 	return nil
+}
+
+func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(lun int, sysDevices []string) error {
+	for _, device := range sysDevices {
+		d := strings.Split(device, "/")
+		dd := d[len(d)-1]
+		softlinkPath := fmt.Sprintf(SysDeviceSoftLinkToLun, dd)
+		args := []string{"-ld", softlinkPath}
+		out, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, contentListCmd, args)
+		if err != nil {
+			return err
+		}
+		softLink := string(out)
+		softLinkSplit := strings.Split(softLink, ":")
+		linkedLun := softLinkSplit[len(softLinkSplit)-1]
+		linkedLunInt, err := strconv.Atoi(linkedLun)
+		if err != nil {
+			return err
+		}
+		if linkedLunInt != lun {
+			return fmt.Errorf("lun not valid, storage lun: %v, linkedLun: %v", lun, linkedLunInt)
+		}
+	}
+	return nil
+
 }
 
 // ============== OsDeviceConnectivityHelperInterface ==========================

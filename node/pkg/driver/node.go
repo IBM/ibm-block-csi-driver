@@ -159,6 +159,18 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		logger.Debugf("NodeStageVolume Finished: multipath device [%s] is ready to be mounted by NodePublishVolume API.", mpathDevice)
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
+	baseDevice := path.Base(mpathDevice)
+	rawSysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+	if err != nil {
+		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	sysDevices := strings.Split(rawSysDevices, ",")
+	err = osDeviceConnectivity.ValidateLun(lun, sysDevices)
+	if err != nil {
+		logger.Errorf("Error while trying to validate lun : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
 
 	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
 	if err != nil {
