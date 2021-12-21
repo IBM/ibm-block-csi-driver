@@ -301,7 +301,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(lun int, sysDevices [
 		if err != nil {
 			return err
 		}
-		softLink := string(out)
+		softLink := strings.TrimSpace(string(out))
 		softLinkSplit := strings.Split(softLink, ":")
 		linkedLun := softLinkSplit[len(softLinkSplit)-1]
 		linkedLunInt, err := strconv.Atoi(linkedLun)
