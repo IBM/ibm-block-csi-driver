@@ -427,6 +427,17 @@ def validate_delete_volume_request(request):
     logger.debug("delete volume validation finished")
 
 
+def _validate_node_id(node_id):
+    logger.debug("validating node id")
+
+    split_node = node_id.split(config.PARAMETERS_NODE_ID_DELIMITER)
+
+    if len(split_node) > 4 or len(split_node) < 2:
+        raise ValidationException(messages.wrong_format_message.format("node id"))
+
+    logger.debug("secrets validation finished")
+
+
 def validate_publish_volume_request(request):
     logger.debug("validating publish volume request")
 
@@ -437,6 +448,8 @@ def validate_publish_volume_request(request):
     validate_csi_volume_capability(request.volume_capability)
 
     validate_secrets(request.secrets)
+
+    _validate_node_id(request.node_id)
 
     logger.debug("publish volume request validation finished.")
 
@@ -490,7 +503,7 @@ def get_node_id_info(node_id):
     elif len(split_node) == 2:
         hostname, nvme_nqn = split_node
     else:
-        raise ValidationException(messages.wrong_format_message.format("node id"))
+        raise ValueError(messages.wrong_format_message.format("node id"))
     logger.debug("node name : {0}, nvme_nqn: {1}, fc_wwns : {2}, iscsi_iqn : {3} ".format(
         hostname, nvme_nqn, fc_wwns, iscsi_iqn))
     return hostname, nvme_nqn, fc_wwns, iscsi_iqn
@@ -544,6 +557,8 @@ def validate_unpublish_volume_request(request):
     _validate_object_id(request.volume_id)
 
     validate_secrets(request.secrets)
+
+    _validate_node_id(request.node_id)
 
     logger.debug("unpublish volume request validation finished.")
 
