@@ -1,15 +1,10 @@
 # Publications and related information
 
-The following Portable Document Format (PDF) publications and related online information sources are available for the IBM® block storage CSI driver.
+Download the Portable Document Format (PDF) publications of this product from the table of contents side bar.
+
+The PDF of this version collection is now available to download from the `Download PDF` button on the bottom of the table of contents side bar.
 
 To view a PDF file, you need Adobe™ Reader. You can download it at no charge from the [Adobe website](http://get.adobe.com/reader/).
-
-## Publications
-
-|IBM block storage CSI driver publication|Description|PDF download link|
-|----------------------------------------|-----------|-----------------|
-|*Release notes*|This publication describes requirements, compatibility, change log, and known issues information for version 1.7.0.<br />First Edition (September 2021) for version 1.7.0.|![PDF icon](PDF_icon.jpg) [Download](../pdf/IBM_block_storage_CSI_driver_1.7.0_RN.pdf)|
-|*User guide*|This publication describes how to prepare for, install, configure, and use IBM block storage CSI driver.<br />Third Edition (October 2021).|![PDF icon](PDF_icon.jpg) [Download](../pdf/IBM_block_storage_CSI_driver_1.7.0_UG.pdf)|
 
 ## Related information and publications
 

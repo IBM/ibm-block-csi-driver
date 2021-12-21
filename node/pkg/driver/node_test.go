@@ -554,8 +554,9 @@ func TestNodePublishVolume(t *testing.T) {
 	volumeId := "vol-test"
 	fsTypeXfs := "ext4"
 	targetPath := "/test/path"
+	stagingPath := "/test/staging"
 	targetPathWithHostPrefix := GetPodPath(targetPath)
-	stagingTargetPath := path.Join("/test/staging", driver.StageInfoFilename)
+	stagingPathWithHostPrefix := GetPodPath(stagingPath)
 	deviceName := "fakedev"
 	mpathDevice := filepath.Join(device_connectivity.DevPath, deviceName)
 	accessMode := &csi.VolumeCapability_AccessMode{
@@ -584,7 +585,7 @@ func TestNodePublishVolume(t *testing.T) {
 				node := newTestNodeService(nil, nil, nil)
 				req := &csi.NodePublishVolumeRequest{
 					PublishContext:    map[string]string{},
-					StagingTargetPath: stagingTargetPath,
+					StagingTargetPath: stagingPath,
 					TargetPath:        targetPath,
 					VolumeCapability:  fsVolCap,
 				}
@@ -614,7 +615,7 @@ func TestNodePublishVolume(t *testing.T) {
 				node := newTestNodeService(nil, nil, nil)
 				req := &csi.NodePublishVolumeRequest{
 					PublishContext:    map[string]string{},
-					StagingTargetPath: stagingTargetPath,
+					StagingTargetPath: stagingPath,
 					VolumeCapability:  fsVolCap,
 					VolumeId:          volumeId,
 				}
@@ -629,7 +630,7 @@ func TestNodePublishVolume(t *testing.T) {
 				node := newTestNodeService(nil, nil, nil)
 				req := &csi.NodePublishVolumeRequest{
 					PublishContext:    map[string]string{},
-					StagingTargetPath: stagingTargetPath,
+					StagingTargetPath: stagingPath,
 					TargetPath:        targetPath,
 					VolumeId:          volumeId,
 				}
@@ -644,7 +645,7 @@ func TestNodePublishVolume(t *testing.T) {
 				node := newTestNodeService(nil, nil, nil)
 				req := &csi.NodePublishVolumeRequest{
 					PublishContext:    map[string]string{},
-					StagingTargetPath: stagingTargetPath,
+					StagingTargetPath: stagingPath,
 					TargetPath:        targetPath,
 					VolumeCapability: &csi.VolumeCapability{
 						AccessMode: &csi.VolumeCapability_AccessMode{
@@ -668,13 +669,15 @@ func TestNodePublishVolume(t *testing.T) {
 				node := newTestNodeService(mockNodeUtils, nil, mockMounter)
 
 				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix).AnyTimes()
+				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix).AnyTimes()
+				mockNodeUtils.EXPECT().IsNotMountPoint(stagingPathWithHostPrefix).Return(false, nil)
 				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(true)
 				mockNodeUtils.EXPECT().IsNotMountPoint(targetPathWithHostPrefix).Return(false, nil)
 				mockNodeUtils.EXPECT().IsDirectory(targetPathWithHostPrefix).Return(false)
 
 				req := &csi.NodePublishVolumeRequest{
 					PublishContext:    map[string]string{},
-					StagingTargetPath: stagingTargetPath,
+					StagingTargetPath: stagingPath,
 					TargetPath:        targetPath,
 					VolumeCapability:  fsVolCap,
 					VolumeId:          volumeId,
@@ -695,13 +698,15 @@ func TestNodePublishVolume(t *testing.T) {
 				node := newTestNodeService(mockNodeUtils, nil, mockMounter)
 
 				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix).AnyTimes()
+				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix).AnyTimes()
+				mockNodeUtils.EXPECT().IsNotMountPoint(stagingPathWithHostPrefix).Return(false, nil)
 				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(false)
 				mockNodeUtils.EXPECT().MakeDir(targetPathWithHostPrefix).Return(nil)
-				mockMounter.EXPECT().Mount(stagingTargetPath, targetPath, fsTypeXfs, mountOptions)
+				mockMounter.EXPECT().Mount(stagingPath, targetPath, fsTypeXfs, mountOptions)
 
 				req := &csi.NodePublishVolumeRequest{
 					PublishContext:    map[string]string{},
-					StagingTargetPath: stagingTargetPath,
+					StagingTargetPath: stagingPath,
 					TargetPath:        targetPath,
 					VolumeCapability:  fsVolCap,
 					VolumeId:          volumeId,
@@ -723,13 +728,15 @@ func TestNodePublishVolume(t *testing.T) {
 				node := newTestNodeService(mockNodeUtils, nil, mockMounter)
 
 				mockNodeUtils.EXPECT().GetPodPath(targetPath).Return(targetPathWithHostPrefix).AnyTimes()
+				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix).AnyTimes()
+				mockNodeUtils.EXPECT().IsNotMountPoint(stagingPathWithHostPrefix).Return(false, nil)
 				mockNodeUtils.EXPECT().IsPathExists(targetPathWithHostPrefix).Return(true)
 				mockNodeUtils.EXPECT().IsNotMountPoint(targetPathWithHostPrefix).Return(false, nil)
 				mockNodeUtils.EXPECT().IsDirectory(targetPathWithHostPrefix).Return(true)
 
 				req := &csi.NodePublishVolumeRequest{
 					PublishContext:    map[string]string{},
-					StagingTargetPath: stagingTargetPath,
+					StagingTargetPath: stagingPath,
 					TargetPath:        targetPath,
 					VolumeCapability:  fsVolCap,
 					VolumeId:          volumeId,
@@ -759,7 +766,7 @@ func TestNodePublishVolume(t *testing.T) {
 
 				req := &csi.NodePublishVolumeRequest{
 					PublishContext:    map[string]string{},
-					StagingTargetPath: stagingTargetPath,
+					StagingTargetPath: stagingPath,
 					TargetPath:        targetPath,
 					VolumeCapability:  rawBlockVolumeCap,
 					VolumeId:          "vol-test",
@@ -789,7 +796,7 @@ func TestNodePublishVolume(t *testing.T) {
 
 				req := &csi.NodePublishVolumeRequest{
 					PublishContext:    map[string]string{},
-					StagingTargetPath: stagingTargetPath,
+					StagingTargetPath: stagingPath,
 					TargetPath:        targetPath,
 					VolumeCapability:  rawBlockVolumeCap,
 					VolumeId:          "vol-test",

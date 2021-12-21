@@ -430,15 +430,28 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	case *csi.VolumeCapability_Block:
 		isFSVolume = false
 	}
+
+	if isFSVolume {
+		stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingPath)
+		isStagingNotMounted, err := d.NodeUtils.IsNotMountPoint(stagingPathWithHostPrefix)
+		if err != nil {
+			logger.Errorf("Existing mount check failed {%v}", err.Error())
+			return nil, err
+		}
+		if isStagingNotMounted {
+			return nil, status.Errorf(codes.InvalidArgument, "Staging path %v is not a mount point", stagingPath)
+		}
+	}
+
 	isTargetPathExists := d.NodeUtils.IsPathExists(targetPathWithHostPrefix)
 	if isTargetPathExists {
 		// check if already mounted
-		isMounted, err := d.isTargetMounted(targetPathWithHostPrefix, isFSVolume)
+		isTargetMounted, err := d.isTargetMounted(targetPathWithHostPrefix, isFSVolume)
 		if err != nil {
 			logger.Debugf("Existing mount check failed {%v}", err.Error())
 			return nil, err
 		}
-		if isMounted { // idempotent case
+		if isTargetMounted { // idempotent case
 			return &csi.NodePublishVolumeResponse{}, nil
 		}
 	} else {
