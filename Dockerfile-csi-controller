@@ -26,7 +26,7 @@ RUN pip3 install -r /tmp/requirements.txt
 FROM registry.access.redhat.com/ubi8/python-38:1-68
 MAINTAINER IBM Storage
 
-ARG VERSION=1.8.0
+ARG VERSION=1.9.0
 ARG BUILD_NUMBER=0
 
 ###Required Labels
