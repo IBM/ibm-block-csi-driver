@@ -291,7 +291,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(lun int, sysDevices []string) error {
-	logger.Debugf("Validating lun {%v} on the host", lun)
+	logger.Debugf("Validating lun {%v} on devices: {%v}", lun, sysDevices)
 	for _, sysDevice := range sysDevices {
 		sysDeviceParts := strings.Split(sysDevice, "/")
 		device := sysDeviceParts[len(sysDeviceParts)-1]
