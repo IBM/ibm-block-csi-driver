@@ -27,16 +27,16 @@ class TestUtils(unittest.TestCase):
                                       "publish_context_array_iqn": "array_iqn",
                                       "publish_context_fc_initiators": "fc_wwns"}
                        }
-        self.util_method = ""
+        self.util_method = None
 
     def _test_validation_exception(self, method_arg, msg="", raised_error=ValidationException):
         with self.assertRaises(raised_error) as ex:
-            getattr(utils, self.util_method)(method_arg)
+            self.util_method(method_arg)
         if msg:
             self.assertIn(msg, str(ex.exception))
 
     def _test_validate_node_id_validation_exception(self, node_id):
-        self.util_method = "_validate_node_id"
+        self.util_method = utils._validate_node_id
         self._test_validation_exception(node_id)
 
     def test_validate_node_id_success(self):
@@ -52,7 +52,7 @@ class TestUtils(unittest.TestCase):
         self._test_validate_node_id_validation_exception(node_id)
 
     def _test_validate_secrets_validation_errors(self, secrets):
-        self.util_method = "validate_secrets"
+        self.util_method = utils.validate_secrets
         self._test_validation_exception(secrets)
 
     def test_validate_secrets_success(self):
@@ -150,7 +150,7 @@ class TestUtils(unittest.TestCase):
         self._test_get_pool_from_parameters(parameters, expected_pool=None)
 
     def test_validate_file_system_volume_capabilities(self):
-        self.util_method = "validate_csi_volume_capabilities"
+        self.util_method = utils.validate_csi_volume_capabilities
         access_mode = csi_pb2.VolumeCapability.AccessMode
 
         cap = test_utils.get_mock_volume_capability()
@@ -201,7 +201,7 @@ class TestUtils(unittest.TestCase):
     def test_validate_create_volume_request(self, validate_capabilities, validate_secrets):
         request = Mock()
         request.name = ""
-        self.util_method = "validate_create_volume_request"
+        self.util_method = utils.validate_create_volume_request
         self._test_validation_exception(request, "name")
 
         request.name = "name"
@@ -251,7 +251,7 @@ class TestUtils(unittest.TestCase):
     def test_validate_delete_snapshot_request(self):
         request = Mock()
         request.snapshot_id = ""
-        self.util_method = "validate_delete_snapshot_request"
+        self.util_method = utils.validate_delete_snapshot_request
 
         self._test_validation_exception(request)
 
@@ -316,7 +316,7 @@ class TestUtils(unittest.TestCase):
     def test_validate_publish_volume_request(self, validate_node_id, validate_capabilities, validate_secrets):
         request = Mock()
         request.readonly = True
-        self.util_method = "validate_publish_volume_request"
+        self.util_method = utils.validate_publish_volume_request
 
         self._test_validation_exception(request, "readonly")
 
@@ -344,7 +344,7 @@ class TestUtils(unittest.TestCase):
     def test_validate_unpublish_volume_request(self, validate_secrets, validate_node_id):
         request = Mock()
         request.volume_id = "somebadvolumename"
-        self.util_method = "validate_unpublish_volume_request"
+        self.util_method = utils.validate_unpublish_volume_request
 
         self._test_validation_exception(request, "volume", raised_error=ObjectIdError)
 
