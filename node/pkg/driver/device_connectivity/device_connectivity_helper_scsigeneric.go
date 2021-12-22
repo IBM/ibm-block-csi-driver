@@ -293,24 +293,17 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(lun int, sysDevices []string) error {
 	logger.Debugf("Validating lun {%v} on the host", lun)
 	for _, sysDevice := range sysDevices {
-		sysDeviceSplit := strings.Split(sysDevice, "/")
-		device := sysDeviceSplit[len(sysDeviceSplit)-1]
+		sysDeviceParts := strings.Split(sysDevice, "/")
+		device := sysDeviceParts[len(sysDeviceParts)-1]
+
 		softLinkPath := fmt.Sprintf(SysDeviceSoftLinkToLun, device)
-		//args := []string{"-ld", softLinkPath}
-		out, err := filepath.EvalSymlinks(softLinkPath)
+		softLink, err := filepath.EvalSymlinks(softLinkPath)
 		if err != nil {
 			return err
 		}
-		softLink := strings.TrimSpace(string(out))
-		logger.Debugf(softLink) //TODO: remove
-		softLinkSplit := strings.Split(softLink, ":")
-		linkedLun := softLinkSplit[len(softLinkSplit)-1]
-		linkedLunInt, err := strconv.Atoi(linkedLun)
-		if err != nil {
-			return err
-		}
-		if linkedLunInt != lun {
-			return fmt.Errorf("lun not valid, storage lun: %v, linkedLun: %v", lun, linkedLunInt)
+
+		if strings.HasSuffix(softLink, strconv.Itoa(lun)) {
+			return fmt.Errorf("lun not valid, storage lun: %v, linkedPath: %v to device: %v", lun, softLink, device)
 		}
 	}
 	logger.Debugf("Finished lun validation")
