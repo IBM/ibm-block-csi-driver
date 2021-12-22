@@ -302,7 +302,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(lun int, sysDevices [
 			return err
 		}
 
-		if strings.HasSuffix(softLink, strconv.Itoa(lun)) {
+		if !strings.HasSuffix(softLink, strconv.Itoa(lun)) {
 			return fmt.Errorf("lun not valid, storage lun: %v, linkedPath: %v to device: %v", lun, softLink, device)
 		}
 	}
