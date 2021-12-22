@@ -296,8 +296,8 @@ func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(lun int, sysDevices [
 		sysDeviceSplit := strings.Split(sysDevice, "/")
 		device := sysDeviceSplit[len(sysDeviceSplit)-1]
 		softLinkPath := fmt.Sprintf(SysDeviceSoftLinkToLun, device)
-		args := []string{"-ld", softLinkPath}
-		out, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, contentListCmd, args)
+		//args := []string{"-ld", softLinkPath}
+		out, err := filepath.EvalSymlinks(softLinkPath)
 		if err != nil {
 			return err
 		}
