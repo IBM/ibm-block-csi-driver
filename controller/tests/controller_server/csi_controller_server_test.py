@@ -1370,7 +1370,7 @@ class TestUnpublishVolume(BaseControllerSetUp, CommonControllerTest):
                                                             grpc.StatusCode.OK)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_unpublish_volume_unmap_volume_permission_denied_unmapping_error(self, storage_agent):
+    def test_unpublish_volume_unmap_volume_unmapping_error(self, storage_agent):
         self._test_unpublish_volume_unmap_volume_with_error(storage_agent, array_errors.UnmappingError("", "", ""),
                                                             grpc.StatusCode.INTERNAL)
 
