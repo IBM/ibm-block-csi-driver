@@ -430,12 +430,12 @@ def validate_delete_volume_request(request):
 def _validate_node_id(node_id):
     logger.debug("validating node id")
 
-    split_node = node_id.split(config.PARAMETERS_NODE_ID_DELIMITER)
+    delimiter_count = node_id.count(config.PARAMETERS_NODE_ID_DELIMITER)
 
-    if len(split_node) > 4 or len(split_node) < 2:
+    if not 1 <= delimiter_count <= 3:
         raise ValidationException(messages.wrong_format_message.format("node id"))
 
-    logger.debug("secrets validation finished")
+    logger.debug("node id validation finished")
 
 
 def validate_publish_volume_request(request):
