@@ -296,14 +296,14 @@ func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(lun int, sysDevices [
 		sysDeviceParts := strings.Split(sysDevice, "/")
 		device := sysDeviceParts[len(sysDeviceParts)-1]
 
-		softLinkPath := fmt.Sprintf(SysDeviceSoftLinkToLun, device)
-		softLink, err := filepath.EvalSymlinks(softLinkPath)
+		symbolicLinkPath := fmt.Sprintf(SysDeviceSoftLinkToLun, device)
+		destinationFile, err := filepath.EvalSymlinks(symbolicLinkPath)
 		if err != nil {
 			return err
 		}
 
-		if !strings.HasSuffix(softLink, strconv.Itoa(lun)) {
-			return fmt.Errorf("lun not valid, storage lun: %v, linkedPath: %v to device: %v", lun, softLink, device)
+		if !strings.HasSuffix(destinationFile, strconv.Itoa(lun)) {
+			return fmt.Errorf("lun not valid, storage lun: %v, linkedPath: %v to device: %v", lun, destinationFile, device)
 		}
 	}
 	logger.Debugf("Finished lun validation")
