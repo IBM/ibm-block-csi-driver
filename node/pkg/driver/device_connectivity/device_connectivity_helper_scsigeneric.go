@@ -78,7 +78,6 @@ const (
 	mpathdSeparator             = ","
 	multipathdCmd               = "multipathd"
 	multipathCmd                = "multipath"
-	contentListCmd              = "ls"
 	VolumeIdDelimiter           = ":"
 	VolumeStorageIdsDelimiter   = ";"
 	WwnOuiEnd                   = 7
