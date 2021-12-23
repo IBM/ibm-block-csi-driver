@@ -78,7 +78,7 @@ func TestNodeStageVolume(t *testing.T) {
 	lun := 10
 	mpathDeviceName := "dm-2"
 	mpathDevice := "/dev/" + mpathDeviceName
-	rawSysDevices := "/dev/d1,/dev/d2"
+	rawSysDevices := "/dev/sda,/dev/sdb"
 	sysDevices := strings.Split(rawSysDevices, ",")
 	fsType := "ext4"
 	ipsByArrayInitiator := map[string][]string{"iqn.1994-05.com.redhat:686358c930fe": {"1.2.3.4", "[::1]"}}
