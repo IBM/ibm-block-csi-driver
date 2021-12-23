@@ -28,11 +28,11 @@ class TestUtils(unittest.TestCase):
                                       "publish_context_fc_initiators": "fc_wwns"}
                        }
 
-    def _test_validation_exception(self, util_function, method_arg, msg="", raised_error=ValidationException):
+    def _test_validation_exception(self, util_function, function_arg, str_in_msg="", raised_error=ValidationException):
         with self.assertRaises(raised_error) as context:
-            util_function(method_arg)
-        if msg:
-            self.assertIn(msg, str(context.exception))
+            util_function(function_arg)
+        if str_in_msg:
+            self.assertIn(str_in_msg, str(context.exception))
 
     def _test_validate_node_id_validation_exception(self, node_id):
         self._test_validation_exception(utils._validate_node_id, node_id)
@@ -196,7 +196,7 @@ class TestUtils(unittest.TestCase):
         utils.validate_csi_volume_capabilities([caps])
 
     def _test_validate_create_volume_request_validation_exception(self, request, msg):
-        self._test_validation_exception(utils.validate_create_volume_request, request, msg=msg)
+        self._test_validation_exception(utils.validate_create_volume_request, request, str_in_msg=msg)
 
     @patch('controller.controller_server.utils.validate_secrets')
     @patch('controller.controller_server.utils.validate_csi_volume_capabilities')
@@ -311,7 +311,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual("9.1.1.1,9.1.1.2", res.volume.volume_context['array_address'])
 
     def _test_validate_publish_volume_request_validation_exception(self, request, msg):
-        self._test_validation_exception(utils.validate_publish_volume_request, request, msg=msg)
+        self._test_validation_exception(utils.validate_publish_volume_request, request, str_in_msg=msg)
 
     @patch('controller.controller_server.utils.validate_secrets')
     @patch('controller.controller_server.utils.validate_csi_volume_capability')
@@ -341,9 +341,9 @@ class TestUtils(unittest.TestCase):
 
         utils.validate_publish_volume_request(request)
 
-    def _test_validate_unpublish_volume_request_validation_exception(self, request, msg,
+    def _test_validate_unpublish_volume_request_validation_exception(self, request, str_in_msg,
                                                                      raised_error=ValidationException):
-        self._test_validation_exception(utils.validate_unpublish_volume_request, request, msg=msg,
+        self._test_validation_exception(utils.validate_unpublish_volume_request, request, str_in_msg=str_in_msg,
                                         raised_error=raised_error)
 
     @patch('controller.controller_server.utils._validate_node_id')
@@ -391,15 +391,16 @@ class TestUtils(unittest.TestCase):
     def test_get_volume_id_info_with_internal_id_system_id(self):
         self._test_get_volume_id_info(object_id="volume-id", system_id="system_id", internal_id="0")
 
-    def _test_get_volume_id_info_validation_exception(self, node_id, msg, raised_error):
-        self._test_validation_exception(utils.get_volume_id_info, node_id, msg=msg, raised_error=raised_error)
+    def _test_get_volume_id_info_validation_exception(self, node_id, str_in_msg, raised_error):
+        self._test_validation_exception(utils.get_volume_id_info, node_id, str_in_msg=str_in_msg,
+                                        raised_error=raised_error)
 
     def test_get_volume_id_info_too_many_semicolons_fail(self):
-        self._test_get_volume_id_info_validation_exception("xiv:0;volume;id", msg="Wrong volume id format",
+        self._test_get_volume_id_info_validation_exception("xiv:0;volume;id", str_in_msg="Wrong volume id format",
                                                            raised_error=ObjectIdError)
 
     def test_get_volume_id_info_no_id_fail(self):
-        self._test_get_volume_id_info_validation_exception("badvolumeformat", msg="Wrong volume id format",
+        self._test_get_volume_id_info_validation_exception("badvolumeformat", str_in_msg="Wrong volume id format",
                                                            raised_error=ObjectIdError)
 
     def _check_node_id_parameters(self, node_id_info, nvme_nqn, fc_wwns, iscsi_iqn):
@@ -409,7 +410,8 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(node_id_info.initiators.iscsi_iqn, iscsi_iqn)
 
     def test_get_node_id_info(self):
-        self._test_validation_exception(utils.get_node_id_info, "bad-node-format", msg="node", raised_error=ValueError)
+        self._test_validation_exception(utils.get_node_id_info, "bad-node-format", str_in_msg="node",
+                                        raised_error=ValueError)
         host_name = "host-name"
         nvme_nqn = "nqn.ibm"
         fc_wwns = "wwn1:wwn2"
