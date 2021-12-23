@@ -73,7 +73,7 @@ const (
 	WaitForMpathWaitIntervalSec = 1
 	FcHostSysfsPath             = "/sys/class/fc_remote_ports/rport-*/port_name"
 	IscsiHostRexExPath          = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
-	sysDeviceSymbolicLinkToLun  = "/sys/block/%s/device"
+	sysDeviceSymLinkToLun       = "/sys/block/%s/device"
 	blockDevCmd                 = "blockdev"
 	mpathdSeparator             = ","
 	multipathdCmd               = "multipathd"
@@ -295,8 +295,8 @@ func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(lun int, sysDevices [
 		sysDeviceParts := strings.Split(sysDevice, "/")
 		device := sysDeviceParts[len(sysDeviceParts)-1]
 
-		symbolicLinkPath := fmt.Sprintf(sysDeviceSymbolicLinkToLun, device)
-		destinationFile, err := filepath.EvalSymlinks(symbolicLinkPath)
+		symLinkPath := fmt.Sprintf(sysDeviceSymLinkToLun, device)
+		destinationFile, err := filepath.EvalSymlinks(symLinkPath)
 		if err != nil {
 			return err
 		}
