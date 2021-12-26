@@ -1035,7 +1035,7 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
 
         self.servicer.ControllerPublishVolume(self.request, self.context)
 
-        self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_publish_volume_get_host_by_host_identifiers_exception(self, storage_agent):
@@ -1322,10 +1322,10 @@ class TestUnpublishVolume(BaseControllerSetUp, CommonControllerTest):
 
         self.servicer.ControllerUnpublishVolume(self.request, self.context)
 
-        self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_unpublish_volume_get_host_by_host_identifiers_exception(self, storage_agent):
+    def test_unpublish_volume_get_host_by_host_identifiers_multiple_hosts_found_error(self, storage_agent):
         self.mediator.get_host_by_host_identifiers = Mock()
         self.mediator.get_host_by_host_identifiers.side_effect = [array_errors.MultipleHostsFoundError("", "")]
         storage_agent.return_value = self.storage_agent
@@ -1334,38 +1334,45 @@ class TestUnpublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertTrue("Multiple hosts" in self.context.details)
         self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
 
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_unpublish_volume_get_host_by_host_identifiers_host_not_found_error(self, storage_agent):
+        self.mediator.get_host_by_host_identifiers = Mock()
         self.mediator.get_host_by_host_identifiers.side_effect = [array_errors.HostNotFoundError("")]
         storage_agent.return_value = self.storage_agent
 
         self.servicer.ControllerUnpublishVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+
+    def _test_unpublish_volume_unmap_volume_with_error(self, storage_agent, array_error, status_code):
+        self.mediator.unmap_volume.side_effect = [array_error]
+        storage_agent.return_value = self.storage_agent
+        self.servicer.ControllerUnpublishVolume(self.request, self.context)
+        self.assertEqual(self.context.code, status_code)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_unpublish_volume_unmap_volume_excpetions(self, storage_agent):
-        self.mediator.unmap_volume.side_effect = [array_errors.ObjectNotFoundError("volume")]
-        storage_agent.return_value = self.storage_agent
-        self.servicer.ControllerUnpublishVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+    def test_unpublish_volume_unmap_volume_object_not_found_error(self, storage_agent):
+        self._test_unpublish_volume_unmap_volume_with_error(storage_agent, array_errors.ObjectNotFoundError("volume"),
+                                                            grpc.StatusCode.OK)
 
-        self.mediator.unmap_volume.side_effect = [array_errors.VolumeAlreadyUnmappedError("")]
-        storage_agent.return_value = self.storage_agent
-        self.servicer.ControllerUnpublishVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_unpublish_volume_unmap_volume_volume_already_unmapped_error(self, storage_agent):
+        self._test_unpublish_volume_unmap_volume_with_error(storage_agent, array_errors.VolumeAlreadyUnmappedError(""),
+                                                            grpc.StatusCode.OK)
 
-        self.mediator.unmap_volume.side_effect = [array_errors.PermissionDeniedError("msg")]
-        storage_agent.return_value = self.storage_agent
-        self.servicer.ControllerUnpublishVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.PERMISSION_DENIED)
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_unpublish_volume_unmap_volume_permission_denied_error(self, storage_agent):
+        self._test_unpublish_volume_unmap_volume_with_error(storage_agent, array_errors.PermissionDeniedError("msg"),
+                                                            grpc.StatusCode.PERMISSION_DENIED)
 
-        self.mediator.unmap_volume.side_effect = [array_errors.HostNotFoundError("host")]
-        storage_agent.return_value = self.storage_agent
-        self.servicer.ControllerUnpublishVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_unpublish_volume_unmap_volume_host_not_found_error(self, storage_agent):
+        self._test_unpublish_volume_unmap_volume_with_error(storage_agent, array_errors.HostNotFoundError("host"),
+                                                            grpc.StatusCode.OK)
 
-        self.mediator.unmap_volume.side_effect = [array_errors.UnmappingError("", "", "")]
-        storage_agent.return_value = self.storage_agent
-        self.servicer.ControllerUnpublishVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_unpublish_volume_unmap_volume_unmapping_error(self, storage_agent):
+        self._test_unpublish_volume_unmap_volume_with_error(storage_agent, array_errors.UnmappingError("", "", ""),
+                                                            grpc.StatusCode.INTERNAL)
 
 
 class TestGetCapabilities(BaseControllerSetUp):
