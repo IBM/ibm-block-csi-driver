@@ -377,7 +377,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_get_array_fc_wwns_fail_with_ClientException(self):
         self.client_mock.get_host.side_effect = ClientException("500")
         with self.assertRaises(ClientException):
-            self.array.get_array_fc_wwns()
+            self.array.get_array_fc_wwns(None)
 
     def test_get_array_fc_wwns_skip_offline_port(self):
         wwpn1 = "fake_wwpn"
@@ -393,7 +393,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                     LOGIN_PORT_STATE: "offline",
                 }
             ]})
-        self.assertListEqual(self.array.get_array_fc_wwns(), [wwpn1])
+        self.assertListEqual(self.array.get_array_fc_wwns(None), [wwpn1])
 
     def test_get_array_fc_wwns(self):
         wwpn = "fake_wwpn"
@@ -404,7 +404,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                     LOGIN_PORT_STATE: LOGIN_PORT_STATE_ONLINE
                 }
             ]})
-        self.assertListEqual(self.array.get_array_fc_wwns(), [wwpn])
+        self.assertListEqual(self.array.get_array_fc_wwns(None), [wwpn])
 
     def test_get_host_by_identifiers(self):
         host_name = "test_host"
