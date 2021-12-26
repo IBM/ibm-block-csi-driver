@@ -3,6 +3,7 @@ import unittest
 
 from mock import patch, Mock
 
+import controller.array_action.errors as array_errors
 import controller.controller_server.utils as utils
 from controller.array_action import config as array_config
 from controller.array_action.config import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
@@ -35,7 +36,7 @@ class TestUtils(unittest.TestCase):
             self.assertIn(str_in_msg, str(context.exception))
 
     def _test_validate_node_id_validation_exception(self, node_id):
-        self._test_validation_exception(utils._validate_node_id, node_id)
+        self._test_validation_exception(utils._validate_node_id, node_id, raised_error=array_errors.HostNotFoundError)
 
     def test_validate_node_id_success(self):
         node_id = "test-host;nqn;fc"
