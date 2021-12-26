@@ -272,16 +272,15 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             return self.client.svcinfo.lsvdisk(bytes=True, object_id=volume_name).as_single_element
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if not is_warning_message(ex.my_message):
-                if (OBJ_NOT_FOUND in ex.my_message or
-                        NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message):
-                    logger.info("volume not found")
-                    if not_exist_err:
-                        raise array_errors.ObjectNotFoundError(volume_name)
-                elif any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
-                    raise array_errors.IllegalObjectName(ex.my_message)
-                else:
-                    raise ex
+            if (OBJ_NOT_FOUND in ex.my_message or
+                    NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message):
+                logger.info("volume not found")
+                if not_exist_err:
+                    raise array_errors.ObjectNotFoundError(volume_name)
+            elif any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
+                raise array_errors.IllegalObjectName(ex.my_message)
+            else:
+                raise ex
         return None
 
     def _get_cli_volume(self, volume_name, not_exist_err=True):
@@ -401,11 +400,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             return self.client.svcinfo.lsvdisk(bytes=True, filtervalue=filter_value).as_single_element
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if not is_warning_message(ex.my_message):
-                if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, INVALID_FILTER_VALUE)):
-                    raise array_errors.IllegalObjectID(ex.my_message)
-                raise ex
-        return None
+            if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, INVALID_FILTER_VALUE)):
+                raise array_errors.IllegalObjectID(ex.my_message)
+            raise ex
 
     def _get_cli_volume_by_wwn(self, volume_id, not_exist_err=False):
         cli_volume = self._lsvdisk_by_uid(volume_id)
