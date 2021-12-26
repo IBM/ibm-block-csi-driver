@@ -14,7 +14,7 @@ from controller.common.csi_logger import get_stdout_logger
 from controller.common.node_info import NodeIdInfo
 from controller.common.utils import set_current_thread_name
 from controller.controller_server import messages as controller_messages
-from controller.controller_server.errors import ObjectIdError, ValidationException
+from controller.controller_server.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controller.controller_server.exception_handler import handle_common_exceptions, handle_exception, \
     build_error_response
 from controller.csi_general import csi_pb2
@@ -232,8 +232,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
     def ControllerPublishVolume(self, request, context):
         set_current_thread_name(request.volume_id)
         logger.info("ControllerPublishVolume")
-        utils.validate_publish_volume_request(request)
         try:
+            utils.validate_publish_volume_request(request)
+
             volume_id_info = utils.get_volume_id_info(request.volume_id)
             system_id = volume_id_info.system_id
             array_type = volume_id_info.array_type
@@ -261,7 +262,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         except (array_errors.LunAlreadyInUseError, array_errors.NoAvailableLunError) as ex:
             return handle_exception(ex, context, grpc.StatusCode.RESOURCE_EXHAUSTED,
                                     csi_pb2.ControllerPublishVolumeResponse)
-        except (array_errors.NoIscsiTargetsFoundError, ObjectIdError) as ex:
+        except (array_errors.NoIscsiTargetsFoundError, ObjectIdError, InvalidNodeId) as ex:
             return handle_exception(ex, context, grpc.StatusCode.NOT_FOUND, csi_pb2.ControllerPublishVolumeResponse)
         except array_errors.UnsupportedConnectivityTypeError as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
@@ -271,8 +272,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
     def ControllerUnpublishVolume(self, request, context):
         set_current_thread_name(request.volume_id)
         logger.info("ControllerUnpublishVolume")
-        utils.validate_unpublish_volume_request(request)
         try:
+            utils.validate_unpublish_volume_request(request)
+
             volume_id_info = utils.get_volume_id_info(request.volume_id)
             system_id = volume_id_info.system_id
             array_type = volume_id_info.array_type
@@ -291,8 +293,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         except ObjectIdError as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
                                     array_errors.VolumeAlreadyUnmappedError)
-        except array_errors.HostNotFoundError:
-            logger.debug("Idempotent case. host not found.")
+        except (array_errors.HostNotFoundError, InvalidNodeId) as ex:
+            logger.debug("Idempotent case. {}.".format(str(ex)))
         except array_errors.VolumeAlreadyUnmappedError:
             logger.debug("Idempotent case. volume is already unmapped.")
         except array_errors.ObjectNotFoundError:

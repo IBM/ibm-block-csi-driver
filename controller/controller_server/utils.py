@@ -8,13 +8,12 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 import controller.controller_server.config as config
 import controller.controller_server.messages as messages
-from controller.array_action import errors as array_errors
 from controller.array_action.config import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
     ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.settings import NAME_PREFIX_SEPARATOR
 from controller.controller_server.controller_types import ArrayConnectionInfo, ObjectIdInfo, ObjectParameters
-from controller.controller_server.errors import ObjectIdError, ValidationException
+from controller.controller_server.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controller.csi_general import csi_pb2
 
 logger = get_stdout_logger()
@@ -434,8 +433,7 @@ def _validate_node_id(node_id):
     delimiter_count = node_id.count(config.PARAMETERS_NODE_ID_DELIMITER)
 
     if not 1 <= delimiter_count <= 3:
-        logger.error(messages.wrong_format_message.format("node id"))
-        raise array_errors.HostNotFoundError(node_id)
+        raise InvalidNodeId(node_id)
 
     logger.debug("node id validation finished")
 
