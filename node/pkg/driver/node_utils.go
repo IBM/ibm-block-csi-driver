@@ -70,7 +70,7 @@ type NodeUtilsInterface interface {
 	ParseIscsiInitiators() (string, error)
 	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, map[string][]string, error)
 	GetArrayInitiators(ipsByArrayInitiator map[string][]string) []string
-	GetSysDevicesFromMpath(device string) ([]string, error)
+	GetSysDevicesFromMpath(baseDevice string) ([]string, error)
 
 	// TODO refactor and move all staging methods to dedicate interface.
 	ClearStageInfoFile(filePath string) error
@@ -154,10 +154,10 @@ func (n NodeUtils) ClearStageInfoFile(filePath string) error {
 	return os.Remove(filePath)
 }
 
-func (n NodeUtils) GetSysDevicesFromMpath(device string) ([]string, error) {
+func (n NodeUtils) GetSysDevicesFromMpath(baseDevice string) ([]string, error) {
 	// this will return the 	/sys/block/dm-3/slaves/
-	logger.Debugf("GetSysDevicesFromMpath with param : {%v}", device)
-	deviceSlavePath := path.Join("/sys", "block", device, "slaves")
+	logger.Debugf("GetSysDevicesFromMpath with param : {%v}", baseDevice)
+	deviceSlavePath := path.Join("/sys", "block", baseDevice, "slaves")
 	logger.Debugf("looking in path : {%v}", deviceSlavePath)
 	slaves, err := ioutil.ReadDir(deviceSlavePath)
 	if err != nil {
