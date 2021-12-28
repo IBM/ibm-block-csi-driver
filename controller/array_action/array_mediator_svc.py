@@ -336,6 +336,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 logger.warning("exception encountered during volume expansion of {}: {}".format(volume_name,
                                                                                                 ex.my_message))
             else:
+                logger.error("Failed to expand volume {}".format(volume_name))
                 if OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message:
                     raise array_errors.ObjectNotFoundError(volume_name)
                 if NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND in ex.my_message:
