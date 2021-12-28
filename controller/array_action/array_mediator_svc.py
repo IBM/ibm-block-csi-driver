@@ -442,6 +442,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 logger.warning("exception encountered during creation of volume {0}: {1}".format(name,
                                                                                                  ex.my_message))
             else:
+                logger.error("Cannot create volume {0}, Reason is: {1}".format(name, ex))
                 if OBJ_ALREADY_EXIST in ex.my_message:
                     raise array_errors.VolumeAlreadyExists(name, self.endpoint)
                 if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
@@ -490,6 +491,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 logger.warning("exception encountered during deletion of volume {}: {}".format(volume_name,
                                                                                                ex.my_message))
             else:
+                logger.error("Failed to delete volume {}".format(volume_name))
                 if (OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message) and not_exist_err:
                     raise array_errors.ObjectNotFoundError(volume_name)
                 raise ex
@@ -851,8 +853,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                                                                                                          host_name,
                                                                                                          ex.my_message))
             else:
-                logger.error(msg="Map volume {0} to host {1} failed. Reason "
-                                 "is: {2}".format(volume_name, host_name, ex))
+                logger.error("Map volume {0} to host {1} failed. Reason "
+                             "is: {2}".format(volume_name, host_name, ex))
                 if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
                     raise array_errors.HostNotFoundError(host_name)
                 if SPECIFIED_OBJ_NOT_EXIST in ex.my_message:
@@ -883,8 +885,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                                                                       host_name,
                                                                       ex.my_message))
             else:
-                logger.error(msg="unmapping volume {0} from host {1} failed. Reason "
-                                 "is: {2}".format(volume_name, host_name, ex))
+                logger.error("unmapping volume {0} from host {1} failed. Reason "
+                             "is: {2}".format(volume_name, host_name, ex))
                 if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
                     raise array_errors.HostNotFoundError(host_name)
                 if OBJ_NOT_FOUND in ex.my_message:
@@ -952,8 +954,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             return self.client.svcinfo.lsfabric(host=host_name)
         except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.error(msg="Failed to get array fc wwn. Reason "
-                             "is: {0}".format(ex))
+            logger.error("Failed to get array fc wwn. Reason "
+                         "is: {0}".format(ex))
             raise ex
 
     def get_array_fc_wwns(self, host_name):
