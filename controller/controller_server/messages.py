@@ -1,6 +1,6 @@
 ValidationException_message = "Validation error has occurred : {0}"
 
-ObjectIdError_message = "Wrong {0} id format : {1}"
+wrong_id_format_message = "Wrong {0} id format : {1}"
 
 # validation error messages
 invalid_secret_config_message = "got an invalid secret config"

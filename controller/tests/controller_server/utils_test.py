@@ -9,7 +9,7 @@ from controller.array_action.config import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CO
 from controller.common.node_info import NodeIdInfo
 from controller.controller_server import config as controller_config
 from controller.controller_server.csi_controller_server import CSIControllerServicer
-from controller.controller_server.errors import ObjectIdError, ValidationException
+from controller.controller_server.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controller.controller_server.test_settings import pool, user, password, array
 from controller.csi_general import csi_pb2
 from controller.tests import utils as test_utils
@@ -35,7 +35,7 @@ class TestUtils(unittest.TestCase):
             self.assertIn(str_in_msg, str(context.exception))
 
     def _test_validate_node_id_validation_exception(self, node_id):
-        self._test_validation_exception(utils._validate_node_id, node_id)
+        self._test_validation_exception(utils._validate_node_id, node_id, raised_error=InvalidNodeId)
 
     def test_validate_node_id_success(self):
         node_id = "test-host;nqn;fc"

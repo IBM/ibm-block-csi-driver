@@ -13,7 +13,7 @@ from controller.array_action.config import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CO
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.settings import NAME_PREFIX_SEPARATOR
 from controller.controller_server.controller_types import ArrayConnectionInfo, ObjectIdInfo, ObjectParameters
-from controller.controller_server.errors import ObjectIdError, ValidationException
+from controller.controller_server.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controller.csi_general import csi_pb2
 
 logger = get_stdout_logger()
@@ -433,7 +433,7 @@ def _validate_node_id(node_id):
     delimiter_count = node_id.count(config.PARAMETERS_NODE_ID_DELIMITER)
 
     if not 1 <= delimiter_count <= 3:
-        raise ValidationException(messages.wrong_format_message.format("node id"))
+        raise InvalidNodeId(node_id)
 
     logger.debug("node id validation finished")
 
