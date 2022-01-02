@@ -615,7 +615,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def get_iscsi_targets_by_iqn(self, host_name):
         return {}
 
-    def get_array_fc_wwns(self, host_name=None):
+    def get_array_fc_wwns(self, host_name):
         logger.debug("Getting the connected fc port wwpns for host {} from array".format(host_name))
 
         try:
