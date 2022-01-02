@@ -27,15 +27,6 @@ class Snapshot:
     array_type: str
 
 
-class Host:
-    def __init__(self, host_id, host_name, nqn, wwns, iscsi_names):
-        self.id = host_id
-        self.name = host_name
-        self.nqn = nqn
-        self.wwns = wwns
-        self.iscsi_names = iscsi_names
-
-
 class Replication:
     def __init__(self, name, volume_internal_id, other_volume_internal_id, copy_type, is_ready, is_primary=None):
         self.name = name

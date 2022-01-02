@@ -4,16 +4,15 @@ from random import choice
 
 from pysvc import errors as svc_errors
 from pysvc.unified.client import connect
-from pysvc.unified.response import CLIFailureError
+from pysvc.unified.response import CLIFailureError, SVCResponse
 from retry import retry
 
 import controller.array_action.config as config
 import controller.array_action.errors as array_errors
 import controller.controller_server.config as controller_config
-from controller.array_action.array_action_types import Volume, Snapshot, Host, Replication
+from controller.array_action.array_action_types import Volume, Snapshot, Replication
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
-from controller.array_action.svc_cli_result_reader import SVCListResultsReader
-from controller.array_action.utils import classproperty, bytes_to_string, convert_scsi_id_to_nguid
+from controller.array_action.utils import classproperty, convert_scsi_id_to_nguid
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 
@@ -40,13 +39,11 @@ NOT_REDUCTION_POOL = 'CMMVC9301E'
 NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND = 'CMMVC5860E'
 NOT_ENOUGH_EXTENTS_IN_POOL_CREATE = 'CMMVC8710E'
 
-LIST_HOSTS_CMD_FORMAT = 'lshost {HOST_ID};'
-HOST_ID_PARAM = 'id'
-HOST_NAME_PARAM = 'name'
 HOST_NQN_PARAM = 'nqn'
 HOST_WWPNS_PARAM = 'WWPN'
 HOST_ISCSI_NAMES_PARAM = 'iscsi_name'
 HOST_PORTSET_ID = 'portset_id'
+LIST_HOSTS_CMD_FORMAT = 'lshost {HOST_ID};echo;'
 HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
 
 LUN_INTERVAL = 128
@@ -707,17 +704,20 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         nvme_host, fc_host, iscsi_host = None, None, None
         connectivity_types = set()
         for host in detailed_hosts_list:
-            if initiators.is_array_nvme_nqn_match(host.nqn):
+            host_nqns = host.get(HOST_NQN_PARAM, [])
+            if initiators.is_array_nvme_nqn_match(host_nqns):
                 nvme_host = host.name
                 connectivity_types.add(config.NVME_OVER_FC_CONNECTIVITY_TYPE)
                 logger.debug("found nvme nqn in list : {0} for host : "
                              "{1}".format(initiators.nvme_nqn, nvme_host))
-            if initiators.is_array_wwns_match(host.wwns):
+            host_wwns = host.get(HOST_WWPNS_PARAM, [])
+            if initiators.is_array_wwns_match(host_wwns):
                 fc_host = host.name
                 connectivity_types.add(config.FC_CONNECTIVITY_TYPE)
                 logger.debug("found fc wwns in list : {0} for host : "
                              "{1}".format(initiators.fc_wwns, fc_host))
-            if initiators.is_array_iscsi_iqns_match(host.iscsi_names):
+            host_iqns = host.get(HOST_ISCSI_NAMES_PARAM, [])
+            if initiators.is_array_iscsi_iqns_match(host_iqns):
                 iscsi_host = host.name
                 connectivity_types.add(config.ISCSI_CONNECTIVITY_TYPE)
                 logger.debug("found iscsi iqn in list : {0} for host : "
@@ -739,44 +739,15 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         # get all hosts details by sending a single batch of commands, in which each command is per host
         detailed_hosts_list_cmd = self._get_detailed_hosts_list_cmd(hosts_list)
         logger.debug("Sending getting detailed hosts list commands batch")
-        detailed_hosts_list_output, detailed_hosts_list_errors = self._send_raw_cli_command(detailed_hosts_list_cmd)
-        if detailed_hosts_list_errors:
-            logger.error("Errors returned from getting detailed hosts list: {0}".format(detailed_hosts_list_errors))
-
-        return self._get_detailed_hosts_by_raw_output(detailed_hosts_list_output)
-
-    def _get_detailed_hosts_by_raw_output(self, detailed_hosts_list_raw_output):
-        logger.debug("Reading detailed hosts list commands batch response")
-        hosts_reader = SVCListResultsReader(detailed_hosts_list_raw_output)
-        res = []
-        for host_details in hosts_reader:
-            host_id = host_details.get(HOST_ID_PARAM)
-            host_name = host_details.get(HOST_NAME_PARAM)
-            nqn = host_details.get_as_list(HOST_NQN_PARAM)
-            wwns = host_details.get_as_list(HOST_WWPNS_PARAM)
-            iscsi_names = host_details.get_as_list(HOST_ISCSI_NAMES_PARAM)
-            host = Host(host_id, host_name, nqn, wwns, iscsi_names)
-            res.append(host)
-        return res
+        raw_response = self.client.send_raw_command(detailed_hosts_list_cmd)
+        response = SVCResponse(raw_response, {'delim': ' '})
+        return response.as_list
 
     def _get_detailed_hosts_list_cmd(self, host_list):
         writer = StringIO()
         for host in host_list:
-            host_id = host.get(HOST_ID_PARAM)
-            writer.write(LIST_HOSTS_CMD_FORMAT.format(HOST_ID=host_id))
+            writer.write(LIST_HOSTS_CMD_FORMAT.format(HOST_ID=host.id))
         return writer.getvalue()
-
-    def _send_raw_cli_command(self, cmd):
-        output_as_bytes, errors_as_bytes = self.client.send_raw_command(cmd)
-        output_as_str = bytes_to_string(output_as_bytes)
-        errors_as_str = bytes_to_string(errors_as_bytes)
-        formatted_errors_as_str = self._truncate_error_msg(errors_as_str)
-        return output_as_str, formatted_errors_as_str
-
-    def _truncate_error_msg(self, detailed_host_list_errors):
-        if len(detailed_host_list_errors) <= HOSTS_LIST_ERR_MSG_MAX_LENGTH:
-            return detailed_host_list_errors
-        return "{0} ...".format(detailed_host_list_errors[HOSTS_LIST_ERR_MSG_MAX_LENGTH])
 
     def _lsvdiskhostmap(self, volume_name):
         try:
