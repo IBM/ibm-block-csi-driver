@@ -282,7 +282,7 @@ def validate_create_snapshot_request(request):
 
     logger.debug("validating source volume id")
     if not request.source_volume_id:
-        raise ValidationException(messages.snapshot_src_volume_id_is_missing)
+        raise ValidationException(messages.snapshot_source_volume_id_is_missing)
     logger.debug("request validation finished.")
 
 
@@ -351,39 +351,39 @@ def generate_csi_create_volume_response(new_volume, system_id=None, source_type=
             volume_source = csi_pb2.VolumeContentSource.VolumeSource(volume_id=new_volume.copy_source_id)
             content_source = csi_pb2.VolumeContentSource(volume=volume_source)
 
-    res = csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(
+    response = csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(
         capacity_bytes=new_volume.capacity_bytes,
         volume_id=get_volume_id(new_volume, system_id),
         content_source=content_source,
         volume_context=volume_context))
 
-    logger.debug("finished creating volume response : {0}".format(res))
-    return res
+    logger.debug("finished creating volume response : {0}".format(response))
+    return response
 
 
 def generate_csi_create_snapshot_response(new_snapshot, system_id, source_volume_id):
     logger.debug("creating create snapshot response for snapshot : {0}".format(new_snapshot))
 
-    res = csi_pb2.CreateSnapshotResponse(snapshot=csi_pb2.Snapshot(
+    response = csi_pb2.CreateSnapshotResponse(snapshot=csi_pb2.Snapshot(
         size_bytes=new_snapshot.capacity_bytes,
         snapshot_id=get_snapshot_id(new_snapshot, system_id),
         source_volume_id=source_volume_id,
         creation_time=get_current_timestamp(),
         ready_to_use=new_snapshot.is_ready))
 
-    logger.debug("finished creating snapshot response : {0}".format(res))
-    return res
+    logger.debug("finished creating snapshot response : {0}".format(response))
+    return response
 
 
 def generate_csi_expand_volume_response(capacity_bytes, node_expansion_required=True):
     logger.debug("creating response for expand volume")
-    res = csi_pb2.ControllerExpandVolumeResponse(
+    response = csi_pb2.ControllerExpandVolumeResponse(
         capacity_bytes=capacity_bytes,
         node_expansion_required=node_expansion_required,
     )
 
     logger.debug("finished creating expand volume response")
-    return res
+    return response
 
 
 def _get_supported_capability(volume_capability):
@@ -407,13 +407,14 @@ def generate_csi_validate_volume_capabilities_response(volume_context, volume_ca
         supported_capability = _get_supported_capability(volume_capability=capability)
         capabilities.append(supported_capability)
 
-    res = csi_pb2.ValidateVolumeCapabilitiesResponse(confirmed=csi_pb2.ValidateVolumeCapabilitiesResponse.Confirmed(
+    confirmed = csi_pb2.ValidateVolumeCapabilitiesResponse.Confirmed(
         volume_context=volume_context,
         volume_capabilities=capabilities,
-        parameters=parameters))
+        parameters=parameters)
+    response = csi_pb2.ValidateVolumeCapabilitiesResponse(confirmed=confirmed)
 
     logger.debug("finished creating validate volume capabilities response")
-    return res
+    return response
 
 
 def validate_delete_volume_request(request):
@@ -545,10 +546,10 @@ def generate_csi_publish_volume_response(lun, connectivity_type, config, array_i
         array_initiators_param = config["controller"]["publish_context_array_iqn"]
         publish_context[array_initiators_param] = separator.join(array_initiators.keys())
 
-    res = csi_pb2.ControllerPublishVolumeResponse(publish_context=publish_context)
+    response = csi_pb2.ControllerPublishVolumeResponse(publish_context=publish_context)
 
-    logger.debug("publish volume response is :{0}".format(res))
-    return res
+    logger.debug("publish volume response is :{0}".format(response))
+    return response
 
 
 def validate_unpublish_volume_request(request):
@@ -582,9 +583,9 @@ def validate_addons_request(request):
 
 
 def get_current_timestamp():
-    res = Timestamp()
-    res.GetCurrentTime()
-    return res
+    timestamp = Timestamp()
+    timestamp.GetCurrentTime()
+    return timestamp
 
 
 def hash_string(string):

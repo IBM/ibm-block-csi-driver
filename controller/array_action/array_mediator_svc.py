@@ -764,15 +764,15 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.debug("volume name : {0}".format(vol_name))
         try:
             mapping_list = self.client.svcinfo.lsvdiskhostmap(vdisk_name=vol_name)
-            res = {}
+            luns_by_host = {}
             for mapping in mapping_list:
                 logger.debug("mapping for volume is :{0}".format(mapping))
-                res[mapping.get('host_name', '')] = mapping.get('SCSI_id', '')
+                luns_by_host[mapping.get('host_name', '')] = mapping.get('SCSI_id', '')
         except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.error(ex)
             raise array_errors.ObjectNotFoundError(volume_id)
 
-        return res
+        return luns_by_host
 
     def _get_used_lun_ids_from_host(self, host_name):
         logger.debug("getting used lun ids for host :{0}".format(host_name))

@@ -267,9 +267,9 @@ class TestUtils(unittest.TestCase):
         new_volume.copy_source_id = None
 
         get_volume_id.return_value = "a9k:name"
-        res = utils.generate_csi_create_volume_response(new_volume)
+        response = utils.generate_csi_create_volume_response(new_volume)
 
-        self.assertEqual(10, res.volume.capacity_bytes)
+        self.assertEqual(10, response.volume.capacity_bytes)
 
         get_volume_id.side_effect = [Exception("err")]
 
@@ -288,10 +288,10 @@ class TestUtils(unittest.TestCase):
         new_volume.copy_source_id = None
 
         get_volume_id.return_value = "svc:name"
-        res = utils.generate_csi_create_volume_response(new_volume)
+        response = utils.generate_csi_create_volume_response(new_volume)
 
-        self.assertEqual(10, res.volume.capacity_bytes)
-        self.assertEqual("9.1.1.1", res.volume.volume_context['array_address'])
+        self.assertEqual(10, response.volume.capacity_bytes)
+        self.assertEqual("9.1.1.1", response.volume.volume_context['array_address'])
 
     @patch("controller.controller_server.utils.get_volume_id")
     def test_get_create_volume_response_with_Multiple_IP(self, get_volume_id):
@@ -305,10 +305,10 @@ class TestUtils(unittest.TestCase):
         new_volume.copy_source_id = None
 
         get_volume_id.return_value = "svc:name"
-        res = utils.generate_csi_create_volume_response(new_volume)
+        response = utils.generate_csi_create_volume_response(new_volume)
 
-        self.assertEqual(10, res.volume.capacity_bytes)
-        self.assertEqual("9.1.1.1,9.1.1.2", res.volume.volume_context['array_address'])
+        self.assertEqual(10, response.volume.capacity_bytes)
+        self.assertEqual("9.1.1.1,9.1.1.2", response.volume.volume_context['array_address'])
 
     def _test_validate_publish_volume_request_validation_exception(self, request, msg):
         self._test_validation_exception(utils.validate_publish_volume_request, request, str_in_msg=msg)

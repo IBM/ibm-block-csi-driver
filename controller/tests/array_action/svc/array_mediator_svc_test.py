@@ -810,16 +810,16 @@ class TestArrayMediatorSVC(unittest.TestCase):
             set(connectivity_types))
 
     def _get_host_as_dictionary(self, id, name, nqn_list=None, wwpns_list=None, iscsi_names_list=None, portset_id=None):
-        res = {HOST_ID_PARAM: id, HOST_NAME_PARAM: name}
+        host = {HOST_ID_PARAM: id, HOST_NAME_PARAM: name}
         if iscsi_names_list:
-            res[HOST_ISCSI_NAMES_PARAM] = iscsi_names_list
+            host[HOST_ISCSI_NAMES_PARAM] = iscsi_names_list
         if wwpns_list:
-            res[HOST_WWPNS_PARAM] = wwpns_list
+            host[HOST_WWPNS_PARAM] = wwpns_list
         if portset_id:
-            res[HOST_PORTSET_ID] = portset_id
+            host[HOST_PORTSET_ID] = portset_id
         if nqn_list:
-            res[HOST_NQN_PARAM] = nqn_list
-        return res
+            host[HOST_NQN_PARAM] = nqn_list
+        return host
 
     def _get_hosts_list_result(self, hosts_dict):
         return [Munch(host_dict) for host_dict in hosts_dict]
