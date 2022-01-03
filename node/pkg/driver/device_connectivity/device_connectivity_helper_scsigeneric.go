@@ -72,6 +72,7 @@ const (
 	WaitForMpathWaitIntervalSec = 1
 	FcHostSysfsPath             = "/sys/class/fc_remote_ports/rport-*/port_name"
 	IscsiHostRexExPath          = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
+	deviceDeletePath            = "/sys/block/%s/device/delete"
 	blockDevCmd                 = "blockdev"
 	mpathdSeparator             = ","
 	multipathdCmd               = "multipathd"
@@ -252,7 +253,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 	}
 
 	// sysDevices  = sdb, sda,...
-	logger.Debugf("Removing scsi device : {%v}", sysDevices)
+	logger.Debugf("Removing scsi device : {%v} by open the devices delete file : {%v}", sysDevices, fmt.Sprintf(deviceDeletePath, "<deviceName>"))
 	// NOTE: this func could be also relevant for SCSI (not only for iSCSI)
 	var (
 		f   *os.File
@@ -264,8 +265,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 			continue
 		}
 
-		filename := fmt.Sprintf("/sys/block/%s/device/delete", deviceName)
-		logger.Debugf("Delete scsi device by open the device delete file : {%v}", filename)
+		filename := fmt.Sprintf(deviceDeletePath, deviceName)
 
 		if f, err = os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200); err != nil {
 			if os.IsNotExist(err) {
@@ -344,7 +344,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 		return nil, err
 	}
 
-	logger.Debugf("targetname files matches were found : {%v}", matches)
+	logger.Debugf("{%v} targetname files matches were found", len(matches))
 
 	re := regexp.MustCompile(regexpValue)
 	logger.Debugf("Check if any match is relevant for storage target (%s).", arrayIdentifier)
