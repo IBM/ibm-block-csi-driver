@@ -59,8 +59,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             array_connection_info = utils.get_array_connection_info_from_secrets(
                 secrets=secrets,
                 topologies=topologies)
+            system_id = array_connection_info.system_id
             volume_parameters = utils.get_volume_parameters(parameters=request.parameters,
-                                                            system_id=array_connection_info.system_id)
+                                                            system_id=system_id)
             pool = volume_parameters.pool
             if not pool:
                 raise ValidationException(controller_messages.pool_should_not_be_empty_message)
@@ -104,9 +105,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
                                                     csi_pb2.CreateVolumeResponse)
 
-                    response = self._handle_existing_volume_source(volume, source_id, source_type,
-                                                                   array_connection_info.system_id,
-                                                                   context)
+                    response = self._get_create_volume_response_for_existing_volume_source(volume, source_id,
+                                                                                           source_type, system_id,
+                                                                                           context)
                     if response:
                         return response
 
@@ -153,7 +154,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.debug("Rollback copy volume from source. Deleting volume {0}".format(volume_id))
         array_mediator.delete_volume(volume_id)
 
-    def _handle_existing_volume_source(self, volume, source_id, source_type, system_id, context):
+    def _get_create_volume_response_for_existing_volume_source(self, volume, source_id, source_type, system_id,
+                                                               context):
         """
         Args:
             volume              : volume fetched or created in CreateVolume
