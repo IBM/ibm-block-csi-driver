@@ -29,7 +29,7 @@ import (
 
 //go:generate mockgen -destination=../../../mocks/mock_executer.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer ExecuterInterface
 type ExecuterInterface interface { // basic host dependent functions
-	ExecuteWithTimeout(mSeconds int, command string, args []string) ([]byte, error)
+	ExecuteWithTimeout(mSeconds int, command string, args []string, logRequired bool) ([]byte, error)
 	OsOpenFile(name string, flag int, perm os.FileMode) (*os.File, error)
 	OsReadlink(name string) (string, error)
 	FilepathGlob(pattern string) (matches []string, err error)
@@ -42,9 +42,10 @@ type ExecuterInterface interface { // basic host dependent functions
 type Executer struct {
 }
 
-func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []string) ([]byte, error) {
-	logger.Debugf("Executing command : {%v} with args : {%v}. and timeout : {%v} mseconds", command, args, mSeconds)
-
+func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []string, logRequired bool) ([]byte, error) {
+	if logRequired {
+		logger.Debugf("Executing command : {%v} with args : {%v}. and timeout : {%v} mseconds", command, args, mSeconds)
+	}
 	// Create a new context and add a timeout to it
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(mSeconds)*time.Millisecond)
 	defer cancel() // The cancel should be deferred so resources are cleaned up
@@ -64,7 +65,9 @@ func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []strin
 	}
 
 	// If there's no context error, we know the command completed (or errored).
-	logger.Debugf("Output from command: %s", string(out))
+	if logRequired {
+		logger.Debugf("Output from command: %s", string(out))
+	}
 	if err != nil {
 		logger.Debugf("Non-zero exit code: %s", err)
 	}

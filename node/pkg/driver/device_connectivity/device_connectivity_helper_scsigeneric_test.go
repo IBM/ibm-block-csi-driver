@@ -399,7 +399,7 @@ func TestHelperWaitForDmToExist(t *testing.T) {
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 			args := []string{"show", "maps", "raw", "format", "\"", "%d,%w", "\""}
-			fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathdCmd, "multipathd", args).Return([]byte(tc.devices), tc.cmdReturnErr)
+			fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathdCmd, "multipathd", args, false).Return([]byte(tc.devices), tc.cmdReturnErr)
 			helperGeneric := device_connectivity.NewGetDmsPathHelperGeneric(fakeExecuter)
 			devices, err := helperGeneric.WaitForDmToExist(volumeUuid, volumeNguid, 1, 1)
 			if err != nil {
@@ -479,7 +479,7 @@ func TestHelperGetWwnByScsiInq(t *testing.T) {
 			fakeExecuter.EXPECT().IsExecutable(sgInqCmd).Return(tc.sgInqExecutable)
 
 			if tc.sgInqExecutable == nil {
-				fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, sgInqCmd, args).Return(tc.cmdReturn, tc.cmdReturnErr)
+				fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, sgInqCmd, args, true).Return(tc.cmdReturn, tc.cmdReturnErr)
 			}
 
 			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter)

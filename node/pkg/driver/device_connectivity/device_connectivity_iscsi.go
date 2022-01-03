@@ -45,7 +45,7 @@ func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface) OsDeviceC
 }
 
 func (r OsDeviceConnectivityIscsi) iscsiCmd(args ...string) (string, error) {
-	out, err := r.Executer.ExecuteWithTimeout(int(iscsiCmdTimeout.Seconds()*1000), "iscsiadm", args)
+	out, err := r.Executer.ExecuteWithTimeout(int(iscsiCmdTimeout.Seconds()*1000), "iscsiadm", args, true)
 	return string(out), err
 }
 

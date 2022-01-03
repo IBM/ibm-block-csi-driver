@@ -185,7 +185,7 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 
 func (n NodeUtils) DevicesAreNvme(sysDevices []string) (bool, error) {
 	args := []string{"list"}
-	out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args)
+	out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args, false)
 	if err != nil {
 		outMessage := strings.TrimSpace(string(out))
 		if strings.HasSuffix(outMessage, noSuchFileOrDirectoryErrorMessage) {
@@ -360,7 +360,7 @@ func (n NodeUtils) ExpandFilesystem(devicePath string, volumePath string, fsType
 	}
 
 	logger.Debugf("Resizing the device: {%v} with fs_type = {%v}", devicePath, fsType)
-	_, err := n.Executer.ExecuteWithTimeout(resizeFsTimeoutMilliseconds, cmd, args)
+	_, err := n.Executer.ExecuteWithTimeout(resizeFsTimeoutMilliseconds, cmd, args, true)
 	if err != nil {
 		logger.Errorf("Failed to resize filesystem, error: %v", err)
 		return err
@@ -371,13 +371,13 @@ func (n NodeUtils) ExpandFilesystem(devicePath string, volumePath string, fsType
 func (n NodeUtils) ExpandMpathDevice(mpathDevice string) error {
 	logger.Infof("ExpandMpathDevice: [%s] ", mpathDevice)
 	args := []string{"resize", "map", mpathDevice}
-	output, err := n.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
+	output, err := n.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args, true)
 	if err != nil {
 		return fmt.Errorf("multipathd resize failed: %v\narguments: %v\nOutput: %s\n", err, args, string(output))
 	}
 
 	args = []string{"reconfigure"}
-	output, err = n.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
+	output, err = n.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args, true)
 	if err != nil {
 		return fmt.Errorf("multipathd reconfigure failed: %v\narguments: %v\nOutput: %s\n", err, args, string(output))
 	}
@@ -431,7 +431,7 @@ func (n NodeUtils) FormatDevice(devicePath string, fsType string) {
 	}
 
 	logger.Debugf("Formatting the device with fs_type = {%v}", fsType)
-	_, err := n.Executer.ExecuteWithTimeout(mkfsTimeoutMilliseconds, "mkfs."+fsType, args)
+	_, err := n.Executer.ExecuteWithTimeout(mkfsTimeoutMilliseconds, "mkfs."+fsType, args, true)
 	if err != nil {
 		logger.Errorf("Failed to run mkfs, error: %v", err)
 	}

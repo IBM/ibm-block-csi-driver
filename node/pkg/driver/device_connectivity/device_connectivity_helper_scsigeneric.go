@@ -195,7 +195,8 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 
 func (r OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(deviceName string) error {
 	devicePath := filepath.Join(DevPath, deviceName)
-	_, err := r.Executer.ExecuteWithTimeout(TimeOutBlockDevCmd, blockDevCmd, []string{"--flushbufs", devicePath})
+	logger.Debugf("executing command : {--flushbufs} on device : {%v}.", deviceName)
+	_, err := r.Executer.ExecuteWithTimeout(TimeOutBlockDevCmd, blockDevCmd, []string{"--flushbufs", devicePath}, false)
 	if err != nil {
 		logger.Errorf("blockdev --flushbufs {%v} did not succeed to flush the device buffers. err={%v}", devicePath,
 			err.Error())
@@ -228,7 +229,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice 
 	logger.Debugf("Try to acquire lock for running the command multipath -f {%v} (to avoid concurrent multipath commands)", mpathDevice)
 	r.MutexMultipathF.Lock()
 	logger.Debugf("Acquired lock for multipath -f command")
-	_, err = r.Executer.ExecuteWithTimeout(TimeOutMultipathCmd, multipathCmd, []string{"-f", fullDevice})
+	_, err = r.Executer.ExecuteWithTimeout(TimeOutMultipathCmd, multipathCmd, []string{"-f", fullDevice}, false)
 	r.MutexMultipathF.Unlock()
 
 	if err != nil {
@@ -429,7 +430,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 	args := []string{"-p", "0x83", dev}
 	// add timeout in case the call never comes back.
 	logger.Debugf("Calling [%s] with timeout", sgInqCmd)
-	outputBytes, err := o.Executer.ExecuteWithTimeout(TimeOutSgInqCmd, sgInqCmd, args)
+	outputBytes, err := o.Executer.ExecuteWithTimeout(TimeOutSgInqCmd, sgInqCmd, args, true)
 	if err != nil {
 		return "", err
 	}
@@ -480,13 +481,13 @@ func (o OsDeviceConnectivityHelperGeneric) ReloadMultipath() error {
 	}
 
 	args := []string{}
-	_, err := o.Executer.ExecuteWithTimeout(TimeOutMultipathCmd, multipathCmd, args)
+	_, err := o.Executer.ExecuteWithTimeout(TimeOutMultipathCmd, multipathCmd, args, false)
 	if err != nil {
 		return err
 	}
 
 	args = []string{"-r"}
-	_, err = o.Executer.ExecuteWithTimeout(TimeOutMultipathCmd, multipathCmd, args)
+	_, err = o.Executer.ExecuteWithTimeout(TimeOutMultipathCmd, multipathCmd, args, false)
 	if err != nil {
 		return err
 	}
@@ -560,9 +561,10 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeUuid string, volumeNguid
 	formatTemplate := strings.Join([]string{"%d", "%w"}, mpathdSeparator)
 	args := []string{"show", "maps", "raw", "format", "\"", formatTemplate, "\""}
 	var err error
+	logger.Debugf("Waiting for dm to exist, executing command : {%v} with args : {%v}.", multipathdCmd, args)
 	for i := 0; i < maxRetries; i++ {
 		err = nil
-		out, err := o.executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
+		out, err := o.executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args, false)
 		if err != nil {
 			return "", err
 		}
