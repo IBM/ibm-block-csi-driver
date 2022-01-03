@@ -444,9 +444,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def _get_api_volume_from_volumes(self, volume_candidates, volume_name):
         for volume in volume_candidates:
-            logger.info("Checking volume: {}".format(volume.name))
             if volume.name == volume_name:
-                logger.debug("Found volume: {}".format(volume))
+                logger.debug("Found volume: {} with id: {}".format(volume.name, volume.id))
                 volume.flashcopy = self.client.get_flashcopies_by_volume(volume.id)
                 return volume
         return None
