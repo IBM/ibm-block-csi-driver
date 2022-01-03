@@ -59,8 +59,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             array_connection_info = utils.get_array_connection_info_from_secrets(
                 secrets=secrets,
                 topologies=topologies)
+            system_id = array_connection_info.system_id
             volume_parameters = utils.get_volume_parameters(parameters=request.parameters,
-                                                            system_id=array_connection_info.system_id)
+                                                            system_id=system_id)
             pool = volume_parameters.pool
             if not pool:
                 raise ValidationException(controller_messages.pool_should_not_be_empty_message)
@@ -104,11 +105,11 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
                                                     csi_pb2.CreateVolumeResponse)
 
-                    copy_source_res = self._handle_existing_volume_source(volume, source_id, source_type,
-                                                                          array_connection_info.system_id,
-                                                                          context)
-                    if copy_source_res:
-                        return copy_source_res
+                    response = self._get_create_volume_response_for_existing_volume_source(volume, source_id,
+                                                                                           source_type, system_id,
+                                                                                           context)
+                    if response:
+                        return response
 
                 if source_id:
                     self._copy_to_existing_volume_from_source(volume, source_id,
@@ -116,9 +117,10 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                               array_mediator)
                     volume.copy_source_id = source_id
 
-                res = utils.generate_csi_create_volume_response(volume, array_connection_info.system_id, source_type)
+                response = utils.generate_csi_create_volume_response(volume, array_connection_info.system_id,
+                                                                     source_type)
                 logger.info("finished create volume")
-                return res
+                return response
         except array_errors.InvalidArgumentError as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT, csi_pb2.CreateVolumeResponse)
         except array_errors.VolumeAlreadyExists as ex:
@@ -152,7 +154,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.debug("Rollback copy volume from source. Deleting volume {0}".format(volume_id))
         array_mediator.delete_volume(volume_id)
 
-    def _handle_existing_volume_source(self, volume, source_id, source_type, system_id, context):
+    def _get_create_volume_response_for_existing_volume_source(self, volume, source_id, source_type, system_id,
+                                                               context):
         """
         Args:
             volume              : volume fetched or created in CreateVolume
@@ -223,10 +226,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 return handle_exception(ex, context, grpc.StatusCode.PERMISSION_DENIED,
                                         csi_pb2.DeleteVolumeResponse)
 
-        logger.debug("generating delete volume response")
-        res = csi_pb2.DeleteVolumeResponse()
         logger.info("finished DeleteVolume")
-        return res
+        return csi_pb2.DeleteVolumeResponse()
 
     @handle_common_exceptions(csi_pb2.ControllerPublishVolumeResponse)
     def ControllerPublishVolume(self, request, context):
@@ -250,11 +251,11 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 lun, connectivity_type, array_initiators = array_mediator.map_volume_by_initiators(volume_id,
                                                                                                    initiators)
             logger.info("finished ControllerPublishVolume")
-            res = utils.generate_csi_publish_volume_response(lun,
-                                                             connectivity_type,
-                                                             self.cfg,
-                                                             array_initiators)
-            return res
+            response = utils.generate_csi_publish_volume_response(lun,
+                                                                  connectivity_type,
+                                                                  self.cfg,
+                                                                  array_initiators)
+            return response
 
         except array_errors.VolumeMappedToMultipleHostsError as ex:
             return handle_exception(ex, context, grpc.StatusCode.FAILED_PRECONDITION,
@@ -391,9 +392,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     snapshot = array_mediator.create_snapshot(volume_id, snapshot_final_name, space_efficiency, pool)
 
                 logger.debug("generating create snapshot response")
-                res = utils.generate_csi_create_snapshot_response(snapshot, system_id, source_volume_id)
+                response = utils.generate_csi_create_snapshot_response(snapshot, system_id, source_volume_id)
                 logger.info("finished create snapshot")
-                return res
+                return response
         except (ObjectIdError, array_errors.SnapshotSourcePoolMismatch, array_errors.SpaceEfficiencyNotSupported) as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
                                     csi_pb2.CreateSnapshotResponse)
@@ -433,10 +434,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.OK)
             return csi_pb2.DeleteSnapshotResponse()
 
-        logger.debug("generating delete snapshot response")
-        res = csi_pb2.DeleteSnapshotResponse()
         logger.info("finished DeleteSnapshot")
-        return res
+        return csi_pb2.DeleteSnapshotResponse()
 
     @handle_common_exceptions(csi_pb2.GetCapacityResponse)
     def GetCapacity(self, request, context):
@@ -488,9 +487,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 if not volume_after_expand:
                     raise array_errors.ObjectNotFoundError(volume_id)
 
-            res = utils.generate_csi_expand_volume_response(volume_after_expand.capacity_bytes)
+            response = utils.generate_csi_expand_volume_response(volume_after_expand.capacity_bytes)
             logger.info("finished expanding volume")
-            return res
+            return response
 
         except array_errors.NotEnoughSpaceInPool as ex:
             return handle_exception(ex, context, grpc.StatusCode.RESOURCE_EXHAUSTED,
@@ -500,7 +499,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.info("ControllerGetCapabilities")
         types = csi_pb2.ControllerServiceCapability.RPC.Type
 
-        res = csi_pb2.ControllerGetCapabilitiesResponse(
+        response = csi_pb2.ControllerGetCapabilitiesResponse(
             capabilities=[csi_pb2.ControllerServiceCapability(
                 rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_VOLUME"))),
                 csi_pb2.ControllerServiceCapability(
@@ -513,7 +512,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("EXPAND_VOLUME")))])
 
         logger.info("finished ControllerGetCapabilities")
-        return res
+        return response
 
     def get_identity_config(self, attribute_name):
         return self.cfg['identity'][attribute_name]

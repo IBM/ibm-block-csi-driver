@@ -394,12 +394,12 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         vol_name = self._get_object_name_by_wwn(volume_id)
         logger.debug("volume name : {0}".format(vol_name))
         mapping_list = self.client.cmd.vol_mapping_list(vol=vol_name).as_list
-        res = {}
+        luns_by_host = {}
         for mapping in mapping_list:
             logger.debug("mapping for volume is :{0}".format(mapping))
-            res[mapping.host] = mapping.lun
+            luns_by_host[mapping.host] = mapping.lun
 
-        return res
+        return luns_by_host
 
     def _get_next_available_lun(self, host_name):
         logger.debug("getting host mapping list for host :{0}".format(host_name))
