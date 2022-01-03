@@ -698,25 +698,29 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._delete_object(cli_volume, is_snapshot=True)
         logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
 
+    def _get_host_ports(self, host, attribute_name):
+        ports = host.get(attribute_name, [])
+        return ports if isinstance(ports, list) else [ports]
+
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host name for initiators : {0}".format(initiators))
         detailed_hosts_list = self._get_detailed_hosts_list()
         nvme_host, fc_host, iscsi_host = None, None, None
         connectivity_types = set()
         for host in detailed_hosts_list:
-            host_nqns = host.get(HOST_NQN_PARAM, [])
+            host_nqns = self._get_host_ports(host, HOST_NQN_PARAM)
             if initiators.is_array_nvme_nqn_match(host_nqns):
                 nvme_host = host.name
                 connectivity_types.add(config.NVME_OVER_FC_CONNECTIVITY_TYPE)
                 logger.debug("found nvme nqn in list : {0} for host : "
                              "{1}".format(initiators.nvme_nqn, nvme_host))
-            host_wwns = host.get(HOST_WWPNS_PARAM, [])
+            host_wwns = self._get_host_ports(host, HOST_WWPNS_PARAM)
             if initiators.is_array_wwns_match(host_wwns):
                 fc_host = host.name
                 connectivity_types.add(config.FC_CONNECTIVITY_TYPE)
                 logger.debug("found fc wwns in list : {0} for host : "
                              "{1}".format(initiators.fc_wwns, fc_host))
-            host_iqns = host.get(HOST_ISCSI_NAMES_PARAM, [])
+            host_iqns = self._get_host_ports(host, HOST_ISCSI_NAMES_PARAM)
             if initiators.is_array_iscsi_iqns_match(host_iqns):
                 iscsi_host = host.name
                 connectivity_types.add(config.ISCSI_CONNECTIVITY_TYPE)
