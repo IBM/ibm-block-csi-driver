@@ -791,11 +791,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         volume_name = self._get_volume_name_by_wwn(volume_id)
         logger.debug("volume name : {0}".format(volume_name))
         mapping_list = self._lsvdiskhostmap(volume_name)
-        res = {}
+        luns_by_host = {}
         for mapping in mapping_list:
             logger.debug("mapping for volume is :{0}".format(mapping))
-            res[mapping.get('host_name', '')] = mapping.get('SCSI_id', '')
-        return res
+            luns_by_host[mapping.get('host_name', '')] = mapping.get('SCSI_id', '')
+        return luns_by_host
 
     def _get_used_lun_ids_from_host(self, host_name):
         logger.debug("getting used lun ids for host :{0}".format(host_name))

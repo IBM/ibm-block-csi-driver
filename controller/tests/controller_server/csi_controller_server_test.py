@@ -63,10 +63,10 @@ class CommonControllerTest:
         storage_agent.return_value = self.storage_agent
         self.request.name = ""
         context = utils.FakeContext()
-        res = self.get_tested_method()(self.request, context)
+        response = self.get_tested_method()(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertIn("name", context.details)
-        self.assertEqual(res, self.get_tested_method_response_class()())
+        self.assertEqual(response, self.get_tested_method_response_class()())
 
     def _test_request_with_wrong_secrets_parameters(self, secrets, message="secret"):
         context = utils.FakeContext()
@@ -1059,11 +1059,11 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_volume_mappings.return_value = {self.hostname: 2}
         storage_agent.return_value = self.storage_agent
 
-        res = self.servicer.ControllerPublishVolume(self.request, self.context)
+        response = self.servicer.ControllerPublishVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '2')
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "iscsi")
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '2')
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "iscsi")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_publish_volume_with_connectivity_type_fc(self, storage_agent):
@@ -1072,12 +1072,12 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
         storage_agent.return_value = self.storage_agent
 
-        res = self.servicer.ControllerPublishVolume(self.request, self.context)
+        response = self.servicer.ControllerPublishVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '1')
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "fc")
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_ARRAY_FC_INITIATORS"], "500143802426baf4")
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '1')
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "fc")
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_ARRAY_FC_INITIATORS"], "500143802426baf4")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_publish_volume_with_connectivity_type_iscsi(self, storage_agent):
@@ -1086,17 +1086,17 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
         storage_agent.return_value = self.storage_agent
 
-        res = self.servicer.ControllerPublishVolume(self.request, self.context)
+        response = self.servicer.ControllerPublishVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '1')
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '1')
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
                          "iscsi")
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_ARRAY_IQN"],
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_ARRAY_IQN"],
                          "iqn1,iqn2")
-        self.assertEqual(res.publish_context["iqn1"],
+        self.assertEqual(response.publish_context["iqn1"],
                          "1.1.1.1,2.2.2.2")
-        self.assertEqual(res.publish_context["iqn2"],
+        self.assertEqual(response.publish_context["iqn2"],
                          "[::1]")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -1105,17 +1105,17 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi"]
         storage_agent.return_value = self.storage_agent
 
-        res = self.servicer.ControllerPublishVolume(self.request, self.context)
+        response = self.servicer.ControllerPublishVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '1')
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '1')
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
                          "iscsi")
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_ARRAY_IQN"],
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_ARRAY_IQN"],
                          "iqn1,iqn2")
-        self.assertEqual(res.publish_context["iqn1"],
+        self.assertEqual(response.publish_context["iqn1"],
                          "1.1.1.1,2.2.2.2")
-        self.assertEqual(res.publish_context["iqn2"],
+        self.assertEqual(response.publish_context["iqn2"],
                          "[::1]")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -1127,14 +1127,14 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_iscsi_targets_by_iqn.return_value = {}
         storage_agent.return_value = self.storage_agent
 
-        res = self.servicer.ControllerPublishVolume(self.request, self.context)
+        response = self.servicer.ControllerPublishVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '1')
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '1')
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
                          "fc")
         self.assertEqual(
-            res.publish_context["PUBLISH_CONTEXT_ARRAY_FC_INITIATORS"],
+            response.publish_context["PUBLISH_CONTEXT_ARRAY_FC_INITIATORS"],
             "500143802426baf4")
 
         self.request.node_id = "hostname;;500143802426baf4:500143806626bae2"
@@ -1144,14 +1144,14 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
                                                         "500143806626bae2"]
         storage_agent.return_value = self.storage_agent
 
-        res = self.servicer.ControllerPublishVolume(self.request, self.context)
+        response = self.servicer.ControllerPublishVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '1')
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '1')
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
                          "fc")
         self.assertEqual(
-            res.publish_context["PUBLISH_CONTEXT_ARRAY_FC_INITIATORS"],
+            response.publish_context["PUBLISH_CONTEXT_ARRAY_FC_INITIATORS"],
             "500143802426baf4,500143806626bae2")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -1206,11 +1206,11 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.map_volume.side_effect = [array_errors.LunAlreadyInUseError("", ""), 2]
         storage_agent.return_value = self.storage_agent
 
-        res = self.servicer.ControllerPublishVolume(self.request, self.context)
+        response = self.servicer.ControllerPublishVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '2')
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "iscsi")
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '2')
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "iscsi")
 
         self.mediator.map_volume.side_effect = [
             array_errors.LunAlreadyInUseError("", ""), 2]
@@ -1220,11 +1220,11 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
         storage_agent.return_value = self.storage_agent
 
-        res = self.servicer.ControllerPublishVolume(self.request, self.context)
+        response = self.servicer.ControllerPublishVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '2')
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '2')
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
                          "fc")
 
         self.mediator.map_volume.side_effect = [array_errors.LunAlreadyInUseError("", ""),
@@ -1234,8 +1234,8 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.servicer.ControllerPublishVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_LUN"], '2')
-        self.assertEqual(res.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "fc")
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '2')
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "fc")
 
         self.mediator.map_volume.side_effect = [
                                                    array_errors.LunAlreadyInUseError("", "")] * (
@@ -1541,8 +1541,8 @@ class TestIdentityServer(BaseControllerSetUp):
         request = Mock()
         context = Mock()
         request.volume_capabilities = []
-        res = self.servicer.GetPluginInfo(request, context)
-        self.assertEqual(res, csi_pb2.GetPluginInfoResponse(name=plugin_name, vendor_version=version))
+        response = self.servicer.GetPluginInfo(request, context)
+        self.assertEqual(response, csi_pb2.GetPluginInfoResponse(name=plugin_name, vendor_version=version))
 
     @patch.object(CSIControllerServicer, "get_identity_config")
     def test_identity_plugin_get_info_fails_when_attributes_from_config_are_missing(self, identity_config):
@@ -1551,12 +1551,12 @@ class TestIdentityServer(BaseControllerSetUp):
 
         identity_config.side_effect = ["name", Exception(), Exception(), "1.1.0"]
 
-        res = self.servicer.GetPluginInfo(request, context)
+        response = self.servicer.GetPluginInfo(request, context)
         context.set_code.assert_called_once_with(grpc.StatusCode.INTERNAL)
-        self.assertEqual(res, csi_pb2.GetPluginInfoResponse())
+        self.assertEqual(response, csi_pb2.GetPluginInfoResponse())
 
-        res = self.servicer.GetPluginInfo(request, context)
-        self.assertEqual(res, csi_pb2.GetPluginInfoResponse())
+        response = self.servicer.GetPluginInfo(request, context)
+        self.assertEqual(response, csi_pb2.GetPluginInfoResponse())
         context.set_code.assert_called_with(grpc.StatusCode.INTERNAL)
 
     @patch.object(CSIControllerServicer, "get_identity_config")
@@ -1566,12 +1566,12 @@ class TestIdentityServer(BaseControllerSetUp):
 
         identity_config.side_effect = ["", "1.1.0", "name", ""]
 
-        res = self.servicer.GetPluginInfo(request, context)
+        response = self.servicer.GetPluginInfo(request, context)
         context.set_code.assert_called_once_with(grpc.StatusCode.INTERNAL)
-        self.assertEqual(res, csi_pb2.GetPluginInfoResponse())
+        self.assertEqual(response, csi_pb2.GetPluginInfoResponse())
 
-        res = self.servicer.GetPluginInfo(request, context)
-        self.assertEqual(res, csi_pb2.GetPluginInfoResponse())
+        response = self.servicer.GetPluginInfo(request, context)
+        self.assertEqual(response, csi_pb2.GetPluginInfoResponse())
         self.assertEqual(context.set_code.call_args_list,
                          [call(grpc.StatusCode.INTERNAL), call(grpc.StatusCode.INTERNAL)])
 
