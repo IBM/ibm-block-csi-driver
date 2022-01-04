@@ -82,6 +82,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                 self.password,
                 self.endpoint
             )
+            self.client.cmd.custom_event(description="IBM block storage CSI driver is connected")
 
         except xcli_errors.CredentialsError:
             raise array_errors.CredentialsError(self.endpoint)
