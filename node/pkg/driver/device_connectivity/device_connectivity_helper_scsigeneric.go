@@ -196,7 +196,6 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 
 func (r OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(deviceName string) error {
 	devicePath := filepath.Join(DevPath, deviceName)
-	logger.Debugf("executing command : {--flushbufs} on device : {%v}.", deviceName)
 	_, err := r.Executer.ExecuteWithTimeout(TimeOutBlockDevCmd, blockDevCmd, []string{"--flushbufs", devicePath}, false)
 	if err != nil {
 		logger.Errorf("blockdev --flushbufs {%v} did not succeed to flush the device buffers. err={%v}", devicePath,
@@ -207,6 +206,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(deviceName str
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) flushDevicesBuffers(deviceNames []string) error {
+	logger.Debugf("executing command : {%v --flushbufs} on devices : {%v}.", blockDevCmd, deviceNames)
 	for _, deviceName := range deviceNames {
 		err := r.flushDeviceBuffers(deviceName)
 		if err != nil {
@@ -481,13 +481,13 @@ func (o OsDeviceConnectivityHelperGeneric) ReloadMultipath() error {
 	}
 
 	args := []string{}
-	_, err := o.Executer.ExecuteWithTimeout(TimeOutMultipathCmd, multipathCmd, args, false)
+	_, err := o.Executer.ExecuteWithTimeout(TimeOutMultipathCmd, multipathCmd, args, true)
 	if err != nil {
 		return err
 	}
 
 	args = []string{"-r"}
-	_, err = o.Executer.ExecuteWithTimeout(TimeOutMultipathCmd, multipathCmd, args, false)
+	_, err = o.Executer.ExecuteWithTimeout(TimeOutMultipathCmd, multipathCmd, args, true)
 	if err != nil {
 		return err
 	}

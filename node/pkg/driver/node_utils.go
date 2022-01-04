@@ -185,7 +185,7 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 
 func (n NodeUtils) DevicesAreNvme(sysDevices []string) (bool, error) {
 	args := []string{"list"}
-	out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args, false)
+	out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args, true)
 	if err != nil {
 		outMessage := strings.TrimSpace(string(out))
 		if strings.HasSuffix(outMessage, noSuchFileOrDirectoryErrorMessage) {
