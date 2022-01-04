@@ -253,7 +253,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 	}
 
 	// sysDevices  = sdb, sda,...
-	logger.Debugf("Removing scsi device : {%v} by open the devices delete file : {%v}", sysDevices, fmt.Sprintf(deviceDeletePath, "<deviceName>"))
+	logger.Debugf(`Removing scsi device : {%v} by writing "1" to the delete file of each device: {%v}`, sysDevices, fmt.Sprintf(deviceDeletePath, "<deviceName>"))
 	// NOTE: this func could be also relevant for SCSI (not only for iSCSI)
 	var (
 		f   *os.File
