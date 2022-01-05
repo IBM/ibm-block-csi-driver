@@ -159,16 +159,16 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise array_errors.IllegalObjectName(ex.status)
 
-    def get_volume(self, volume_name, pool=None):
-        logger.debug("Get volume : {}".format(volume_name))
-        cli_volume = self._get_cli_object_by_name(volume_name)
+    def get_volume(self, name, pool=None):
+        logger.debug("Get volume : {}".format(name))
+        cli_volume = self._get_cli_object_by_name(name)
 
         logger.debug("cli volume returned : {}".format(cli_volume))
         if not cli_volume:
-            raise array_errors.ObjectNotFoundError(volume_name)
+            raise array_errors.ObjectNotFoundError(name)
 
         if cli_volume.master_name:
-            raise array_errors.VolumeNameBelongsToSnapshotError(volume_name, self.endpoint)
+            raise array_errors.VolumeNameBelongsToSnapshotError(name, self.endpoint)
 
         array_volume = self._generate_volume_response(cli_volume)
         return array_volume
