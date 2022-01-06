@@ -19,7 +19,7 @@ ARG CSI_PARAMS=csi_params
 RUN git clone https://github.com/ArbelNathan/csi-test /usr/local/go/src/github.com/ArbelNathan/csi-test
 RUN cd /usr/local/go/src/github.com/ArbelNathan/csi-test && \
 git fetch && \
-git checkout -b testing_unpublish && \
+git checkout testing_unpublish && \
 cd -
 RUN make -C /usr/local/go/src/github.com/ArbelNathan/csi-test
 
