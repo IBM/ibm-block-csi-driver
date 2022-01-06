@@ -17,10 +17,10 @@ FROM golang:1.16
 ARG CSI_PARAMS=csi_params
 
 RUN git clone https://github.com/ArbelNathan/csi-test /usr/local/go/src/github.com/ArbelNathan/csi-test
-#RUN cd /usr/local/go/src/github.com/ArbelNathan/csi-test && \
+RUN cd /usr/local/go/src/github.com/ArbelNathan/csi-test && \
 #git fetch && \
-#git checkout testing_unpublish && \
-#cd -
+git checkout testing_unpublish && \
+cd -
 RUN make -C /usr/local/go/src/github.com/ArbelNathan/csi-test
 
 COPY ./scripts/csi_test /usr/local/go/src/github.com/ArbelNathan/csi-test/ibm-driver
