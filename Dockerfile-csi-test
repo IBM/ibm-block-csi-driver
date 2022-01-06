@@ -15,29 +15,30 @@
 FROM golang:1.16
 
 ARG CSI_PARAMS=csi_params
+ARG CSI_LOCAL_BRANCH=/usr/local/go/src/github.com/ArbelNathan/csi-test
 
-RUN git clone https://github.com/ArbelNathan/csi-test /usr/local/go/src/github.com/kubernetes-csi/csi-test
-RUN cd /usr/local/go/src/github.com/kubernetes-csi/csi-test && \
+RUN git clone https://github.com/ArbelNathan/csi-test ${CSI_LOCAL_BRANCH}
+RUN cd ${CSI_LOCAL_BRANCH} && \
 git fetch --all --tags && \
 tag=$(git describe --tags `git rev-list --tags --max-count=1`) && \
 git checkout $tag -b testing_unpublish && \
 cd -
-RUN make -C /usr/local/go/src/github.com/kubernetes-csi/csi-test
+RUN make -C ${CSI_LOCAL_BRANCH}
 
-COPY ./scripts/csi_test /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver
+COPY ./scripts/csi_test ${CSI_LOCAL_BRANCH}/ibm-driver
 
 RUN groupadd -g 9999 appuser && \
     useradd -r -u 9999 -g appuser appuser
-RUN chown -R appuser:appuser /usr/local/go/src/github.com/kubernetes-csi/csi-test
+RUN chown -R appuser:appuser ${CSI_LOCAL_BRANCH}
 
 USER appuser
-WORKDIR /usr/local/go/src/github.com/kubernetes-csi/csi-test
+WORKDIR ${CSI_LOCAL_BRANCH}
 
 ENV JUNIT_OUTPUT="/tmp/test_results/out_client.xml"
-ENV SECRET_FILE="/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets"
-ENV PARAM_FILE="/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/${CSI_PARAMS}"
+ENV SECRET_FILE="${CSI_LOCAL_BRANCH}/ibm-driver/csi_secrets"
+ENV PARAM_FILE="${CSI_LOCAL_BRANCH}/ibm-driver/${CSI_PARAMS}"
 ENV ENDPOINT="/tmp/k8s_dir/nodecsi"
 ENV ENDPOINT_CONTROLLER="/tmp/k8s_dir/f"
-ENV TESTS_TO_SKIP_FILE="/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_tests_to_skip"
+ENV TESTS_TO_SKIP_FILE="${CSI_LOCAL_BRANCH}/ibm-driver/csi_tests_to_skip"
 
-ENTRYPOINT ["/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/entrypoint-csi-tests.sh"]
+ENTRYPOINT ["${CSI_LOCAL_BRANCH}/ibm-driver/entrypoint-csi-tests.sh"]
