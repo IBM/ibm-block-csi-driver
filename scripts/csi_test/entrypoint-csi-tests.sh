@@ -11,7 +11,7 @@ sed -i -e "s/POOL_NAME/${POOL_NAME}/g" ${PARAM_FILE}
 # get tests to skip
 TESTS=`cat ${TESTS_TO_SKIP_FILE}| sed -Ez '$ s/\n+$//' | tr '\n' "|"`
 
-/usr/local/go/src/github.com/kubernetes-csi/csi-test/cmd/csi-sanity/csi-sanity \
+/usr/local/go/src/github.com/ArbelNathan/csi-test/cmd/csi-sanity/csi-sanity \
 --csi.endpoint ${ENDPOINT} \
 --csi.controllerendpoint ${ENDPOINT_CONTROLLER} \
 --csi.secrets ${SECRET_FILE} \
