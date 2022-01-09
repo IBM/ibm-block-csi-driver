@@ -21,7 +21,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with patch("controller.array_action.array_mediator_svc.SVCArrayMediator._connect"):
             self.svc = SVCArrayMediator("user", "password", self.endpoint)
         self.svc.client = Mock()
-        self.svc.client.svcinfo.lssystem.return_value = [Munch({'location': 'local', 'id_alias': 'fake_identifier'})]
+        self.svc.client.svcinfo.lssystem.return_value = [Munch({'location': 'local',
+                                                                'id_alias': 'fake_identifier'})]
         node = Munch({'id': '1', 'name': 'node1', 'iscsi_name': 'iqn.1986-03.com.ibm:2145.v7k1.node1',
                       'status': 'online'})
         self.svc.client.svcinfo.lsnode.return_value = [node]
@@ -43,6 +44,16 @@ class TestArrayMediatorSVC(unittest.TestCase):
              'copy_rate': 'non_zero_value',
              'rc_controlled': 'no'})
 
+    @patch("controller.array_action.array_mediator_svc.connect")
+    def test_init_unsupported_system_version(self, connect_mock):
+        code_level_below_min_supported = '7.7.77.77 (build 777.77.7777777777777)'
+        svc_mock = Mock()
+        svc_mock.svcinfo.lssystem.return_value = [Munch({'location': 'local',
+                                                         'code_level': code_level_below_min_supported})]
+        connect_mock.return_value = svc_mock
+        with self.assertRaises(array_errors.UnsupportedStorageVersionError):
+            SVCArrayMediator("user", "password", self.endpoint)
+
     def test_raise_ManagementIPsNotSupportError_in_init(self):
         self.endpoint = ["IP_1", "IP_2"]
         with self.assertRaises(
@@ -54,9 +65,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
                 array_errors.StorageManagementIPsNotSupportError):
             SVCArrayMediator("user", "password", self.endpoint)
 
-    @patch("pysvc.unified.client.connect")
-    def test_connect_errors(self, mock_connect):
-        mock_connect.side_effect = [
+    @patch("controller.array_action.array_mediator_svc.connect")
+    def test_connect_errors(self, connect_mock):
+        connect_mock.side_effect = [
             svc_errors.IncorrectCredentials('Failed_a')]
         with self.assertRaises(array_errors.CredentialsError):
             self.svc._connect()

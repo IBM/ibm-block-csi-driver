@@ -2,6 +2,7 @@ from collections import defaultdict
 from io import StringIO
 from random import choice
 
+from packaging.version import Version
 from pysvc import errors as svc_errors
 from pysvc.unified.client import connect
 from pysvc.unified.response import CLIFailureError, SVCResponse
@@ -148,6 +149,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     BLOCK_SIZE_IN_BYTES = 512
     MAX_LUN_NUMBER = 511
     MIN_LUN_NUMBER = 0
+    MIN_SUPPORTED_VERSION = '7.8'
 
     @classproperty
     def array_type(self):
@@ -195,7 +197,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise array_errors.StorageManagementIPsNotSupportError(
                 endpoint)
         self.endpoint = endpoint[0]
-        self._identifier = None
+        self._cluster = None
 
         logger.debug("in init")
         self._connect()
@@ -205,6 +207,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             self.client = connect(self.endpoint, username=self.user,
                                   password=self.password)
+            if Version(self._code_level) < Version(self.MIN_SUPPORTED_VERSION):
+                raise array_errors.UnsupportedStorageVersionError(
+                    self._code_level, self.MIN_SUPPORTED_VERSION
+                )
         except (svc_errors.IncorrectCredentials,
                 svc_errors.StorageArrayClientException):
             raise array_errors.CredentialsError(self.endpoint)
@@ -213,18 +219,21 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if self.client:
             self.client.close()
 
-    def get_system_info(self):
-        for cluster in self.client.svcinfo.lssystem():
-            if cluster['location'] == 'local':
-                return cluster
-        return None
+    @property
+    def _system_info(self):
+        if self._cluster is None:
+            for cluster in self.client.svcinfo.lssystem():
+                if cluster.location == 'local':
+                    self._cluster = cluster
+        return self._cluster
+
+    @property
+    def _code_level(self):
+        return self._system_info.code_level.split(None, 1)[0]
 
     @property
     def identifier(self):
-        if self._identifier is None:
-            cluster = self.get_system_info()
-            self._identifier = cluster['id_alias']
-        return self._identifier
+        return self._system_info.id_alias
 
     def is_active(self):
         return self.client.transport.transport.get_transport().is_active()
