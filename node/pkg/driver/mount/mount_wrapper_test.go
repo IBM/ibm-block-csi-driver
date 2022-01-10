@@ -58,7 +58,7 @@ func TestMounterUnmount(t *testing.T) {
 
 			fake_executer := mocks.NewMockExecuterInterface(mockCtrl)
 			fake_executer.EXPECT().
-				ExecuteWithTimeout(int(timeout.Seconds()*1000), "umount", []string{target}, true).
+				ExecuteWithTimeout(int(timeout.Seconds()*1000), "umount", []string{target}).
 				Return(output, tc.execErr)
 
 			mounter := mount.NewWithExecutor("", fake_executer)
