@@ -72,7 +72,7 @@ const (
 	WaitForMpathWaitIntervalSec = 1
 	FcHostSysfsPath             = "/sys/class/fc_remote_ports/rport-*/port_name"
 	IscsiHostRexExPath          = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
-	deviceDeletePath            = "/sys/block/%s/device/delete"
+	deviceDeletePathFormat      = "/sys/block/%s/device/delete"
 	blockDevCmd                 = "blockdev"
 	mpathdSeparator             = ","
 	multipathdCmd               = "multipathd"
@@ -254,7 +254,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 	}
 
 	// sysDevices  = sdb, sda,...
-	logger.Debugf(`Removing scsi device : {%v} by writing "1" to the delete file of each device: {%v}`, sysDevices, fmt.Sprintf(deviceDeletePath, "<deviceName>"))
+	logger.Debugf(`Removing scsi device : {%v} by writing "1" to the delete file of each device: {%v}`, sysDevices, fmt.Sprintf(deviceDeletePathFormat, "<deviceName>"))
 	// NOTE: this func could be also relevant for SCSI (not only for iSCSI)
 	var (
 		f   *os.File
@@ -266,7 +266,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 			continue
 		}
 
-		filename := fmt.Sprintf(deviceDeletePath, deviceName)
+		filename := fmt.Sprintf(deviceDeletePathFormat, deviceName)
 
 		if f, err = os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200); err != nil {
 			if os.IsNotExist(err) {
