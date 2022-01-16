@@ -16,6 +16,7 @@ pipeline {
     stages {
         stage ('CSI-controller: static code analysis') {
             steps {
+                sh './controller/scripts/csi_pb2.sh'
                 sh './scripts/run_static_code_analysis.sh'
             }
         }
