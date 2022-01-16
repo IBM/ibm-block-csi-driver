@@ -206,14 +206,14 @@ func (r OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(deviceName str
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) flushDevicesBuffers(deviceNames []string) error {
-	logger.Debugf("executing commands : {%v --flushbufs} on devices : {%v}.", blockDevCmd, deviceNames)
+	logger.Debugf("executing commands : {%v --flushbufs} on devices : {%v} and timeout : {%v} mseconds.", blockDevCmd, deviceNames, TimeOutBlockDevCmd)
 	for _, deviceName := range deviceNames {
 		err := r.flushDeviceBuffers(deviceName)
 		if err != nil {
 			return err
 		}
 	}
-	logger.Debugf("Finished executing commands")
+	logger.Debugf("Finished executing commands: {%v --flushbufs}", blockDevCmd)
 	return nil
 }
 
@@ -562,7 +562,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeUuid string, volumeNguid
 	formatTemplate := strings.Join([]string{"%d", "%w"}, mpathdSeparator)
 	args := []string{"show", "maps", "raw", "format", "\"", formatTemplate, "\""}
 	var err error
-	logger.Debugf("Waiting for dm to exist, executing command : {%v} with args : {%v}.", multipathdCmd, args)
+	logger.Debugf("Waiting for dm to exist.")
 	for i := 0; i < maxRetries; i++ {
 		err = nil
 		out, err := o.executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
