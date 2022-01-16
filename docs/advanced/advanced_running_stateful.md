@@ -14,12 +14,9 @@ Use this for advanced information on running a stateful container for raw block 
 
     - For raw block configurations, the PV should be mounted inside the pod at `/dev/block`.
         
-            $> kubectl exec <stateful-name>-0 -- bash -c "echo "test_block" | dd conv=unblock of=/dev/block"
-            0+1 records in
-            0+1 records out
-            11 bytes copied, 9.3576e-05 s, 118 kB/s
+            $> kubectl exec demo-statefulset-raw-block-0 -- bash -c "echo -n "test_block" | dd conv=unblock of=/dev/block"
                 
-            $> kubectl exec <stateful-name>-0 -- bash -c "od -An -c -N 10 /dev/block"
+            $> kubectl exec demo-statefulset-raw-block-0 -- bash -c "od -An -c -N 10 /dev/block"
             t e s t _ b l o c k
 
     - For file system configurations, the PV should be mounted inside the pod at `/data`.
@@ -39,16 +36,13 @@ Use this for advanced information on running a stateful container for raw block 
             $> kubectl get statefulset/statefulset-name
             Error from server (NotFound): statefulsets.apps <statefulset-name> not found
 
-    3. **For file system configuration only:** Verify that the multipath was deleted and that the PV mountpoint no longer exists by establishing an SSH connection and logging into the worker node.
+    3. **For file system configuration only:** Verify that the multipath was deleted and that the volume device no longer exists in the output. Do this by establishing an SSH connection and logging into the worker node and using the following command sequence:
           
         <pre>
         $> ssh root@k8s-node1
             
         $>[k8s-node1] df | egrep pvc
         $>[k8s-node1] multipath -ll
-        $>[k8s-node1] lsblk /dev/sdb /dev/sdc
-        lsblk: /dev/sdb: not a block device
-        lsblk: /dev/sdc: not a block device
 
     4. Recreate the StatefulSet and verify that the data still exists.
 
