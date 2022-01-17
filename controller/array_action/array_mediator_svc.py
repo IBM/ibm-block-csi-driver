@@ -319,11 +319,17 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         source_volume_name = fcmap.source_vdisk_name
         return self._get_wwn_by_volume_name_if_exists(source_volume_name)
 
-    def _get_volume_pool(self, cli_volume):
+    def _get_volume_pools(self, cli_volume):
         pool = cli_volume.mdisk_grp_name
         if isinstance(pool, list):
-            return ':'.join(pool[1:])
-        return pool
+            pool_names = pool[:]
+            pool_names.remove('many')
+            return pool_names
+        return [pool]
+
+    def _get_volume_pool(self, cli_volume):
+        pools = self._get_volume_pools(cli_volume)
+        return ':'.join(pools)
 
     def get_volume(self, name, pool=None):
         cli_volume = self._get_cli_volume(name)
@@ -677,8 +683,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         raise array_errors.PoolDoesNotExist(pool, self.endpoint)
 
     def _is_cli_volume_in_site(self, cli_volume, site_name):
-        volume_site_name = self._get_pool_site(cli_volume.mdisk_grp_name)
-        return volume_site_name == site_name
+        volume_pools = self._get_volume_pools(cli_volume)
+        for pool in volume_pools:
+            volume_site_name = self._get_pool_site(pool)
+            if volume_site_name == site_name:
+                return True
+        return False
 
     def _get_rcrelationships_as_master_in_cluster(self, volume_name):
         filter_value = 'master_vdisk_name={}:aux_cluster_id={}'.format(volume_name, self.identifier)
