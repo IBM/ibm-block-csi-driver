@@ -122,6 +122,17 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.assertIsNone(volume.copy_source_id)
 
+    def _prepare_stretched_volume_mock(self):
+        cli_volume = self._get_cli_volume(pool_name=['many', 'pool1', 'pool2'])
+        self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=cli_volume)
+
+    def test_get_volume_stretched_return_correct_pools(self):
+        self._prepare_stretched_volume_mock()
+
+        volume = self.svc.get_volume("volume_name")
+
+        self.assertEqual(volume.pool, 'pool1:pool2')
+
     def test_get_volume_raise_exception(self):
         self._test_mediator_method_client_error(self.svc.get_volume, ("volume",),
                                                 self.svc.client.svcinfo.lsvdisk, Exception, Exception)
