@@ -18,7 +18,7 @@
 
 FROM registry.access.redhat.com/ubi8/python-38:1-77 as builder
 COPY controller/requirements.txt /tmp/
-COPY controller/scripts/csi_pb2.sh /tmp/csi_pb2.sh
+COPY controller/scripts/csi_pb2.sh /tmp/
 USER root
 RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
 USER default
