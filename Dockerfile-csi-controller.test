@@ -18,13 +18,14 @@
 
 FROM registry.access.redhat.com/ubi8/python-38:1-77 as builder
 COPY controller/requirements.txt /tmp/
+COPY controller/scripts/csi_pb2.sh /tmp/csi_pb2.sh
 USER root
 RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
 USER default
 RUN pip3 install --ignore-installed --default-timeout=100 --upgrade pip==21.2.4
 # avoid default boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
-RUN ./controller/scripts/csi_pb2.sh
+RUN ./tmp/csi_pb2.sh
 RUN pip3 install -r /tmp/requirements.txt
 
 # Requires to run local testing
