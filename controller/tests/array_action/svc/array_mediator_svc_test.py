@@ -439,38 +439,46 @@ class TestArrayMediatorSVC(unittest.TestCase):
         volume = self.svc.get_object_by_id("volume_id", "volume")
         self.assertEqual(volume.name, "volume_id")
 
-    def _get_custom_dedup_cli_volume(self, support_deduplicated_copy, with_deduplicated_copy, name='source_volume',
-                                     pool_name='pool_name'):
+    def _get_custom_cli_volume(self, support_deduplicated_copy, with_deduplicated_copy, name='source_volume',
+                               pool_name='pool_name'):
         volume = self._get_cli_volume(with_deduplicated_copy, name=name, pool_name=pool_name)
         if not support_deduplicated_copy:
             del volume.deduplicated_copy
         return volume
 
     def _prepare_mocks_for_create_snapshot(self, support_deduplicated_copy=True, source_has_deduplicated_copy=False,
-                                           different_pool_site=False):
+                                           different_pool_site=False, is_stretched=False):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         self.svc.client.svctask.mkfcmap.return_value = Mock()
-        source_volume_to_copy_from = self._get_custom_dedup_cli_volume(support_deduplicated_copy,
-                                                                       source_has_deduplicated_copy)
+        pool = ['many', 'pool1', 'pool2'] if is_stretched else 'pool_name'
+        source_volume_to_copy_from = self._get_custom_cli_volume(support_deduplicated_copy,
+                                                                 source_has_deduplicated_copy,
+                                                                 pool_name=pool)
         volumes_to_return = [source_volume_to_copy_from, source_volume_to_copy_from]
 
         if different_pool_site:
-            pools_to_return = [Munch({'site_name': 'pool_site'}),
-                               Munch({'site_name': 'source_volume_site'}),
-                               Munch({'site_name': 'other_volume_site'}),
-                               Munch({'site_name': 'pool_site'})]
-            self.svc.client.svcinfo.lsmdiskgrp.side_effect = self._mock_cli_objects(pools_to_return)
+            if is_stretched:
+                pools_to_return = [Munch({'site_name': 'pool_site'}),
+                                   Munch({'site_name': 'source_volume_site'}),
+                                   Munch({'site_name': 'pool_site'})]
+                self.svc.client.svcinfo.lsmdiskgrp.side_effect = self._mock_cli_objects(pools_to_return)
+            else:
+                pools_to_return = [Munch({'site_name': 'pool_site'}),
+                                   Munch({'site_name': 'source_volume_site'}),
+                                   Munch({'site_name': 'other_volume_site'}),
+                                   Munch({'site_name': 'pool_site'})]
+                self.svc.client.svcinfo.lsmdiskgrp.side_effect = self._mock_cli_objects(pools_to_return)
 
-            auxiliary_volumes = [self._get_cli_volume(name='other_volume', pool_name='other_volume_pool'),
-                                 self._get_custom_dedup_cli_volume(support_deduplicated_copy,
-                                                                   source_has_deduplicated_copy,
-                                                                   name='relevant_volume',
-                                                                   pool_name='relevant_volume_pool')]
-            volumes_to_return.extend(auxiliary_volumes)
+                auxiliary_volumes = [self._get_cli_volume(name='other_volume', pool_name='other_volume_pool'),
+                                     self._get_custom_cli_volume(support_deduplicated_copy,
+                                                                 source_has_deduplicated_copy,
+                                                                 name='relevant_volume',
+                                                                 pool_name='relevant_volume_pool')]
+                volumes_to_return.extend(auxiliary_volumes)
 
-            rcrelationships_to_return = [Munch({'aux_vdisk_name': 'other_volume'}),
-                                         Munch({'aux_vdisk_name': 'relevant_volume'})]
-            self.svc.client.svcinfo.lsrcrelationship.return_value = Mock(as_list=rcrelationships_to_return)
+                rcrelationships_to_return = [Munch({'aux_vdisk_name': 'other_volume'}),
+                                             Munch({'aux_vdisk_name': 'relevant_volume'})]
+                self.svc.client.svcinfo.lsrcrelationship.return_value = Mock(as_list=rcrelationships_to_return)
 
         target_volume_after_creation = self._get_mapless_target_cli_volume()
         target_volume_after_mapping = self._get_mapped_target_cli_volume()
@@ -546,11 +554,18 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
                                                                  pool='different_pool', thin=True)
 
-    def test_create_snapshot_with_different_site_success(self):
+    def test_create_snapshot_for_hyperswap_with_different_site_success(self):
         self._prepare_mocks_for_create_snapshot(different_pool_site=True)
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="different_pool")
         self.svc.client.svctask.mkfcmap.assert_called_once_with(source="relevant_volume", target="test_snapshot",
+                                                                copyrate=0)
+
+    def test_create_snapshot_for_stretched_with_different_site_success(self):
+        self._prepare_mocks_for_create_snapshot(different_pool_site=True, is_stretched=True)
+
+        self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="different_pool")
+        self.svc.client.svctask.mkfcmap.assert_called_once_with(source="source_volume", target="test_snapshot",
                                                                 copyrate=0)
 
     def test_create_snapshot_with_specified_source_volume_space_efficiency_success(self):
