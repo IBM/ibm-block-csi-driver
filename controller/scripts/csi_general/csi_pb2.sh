@@ -3,7 +3,7 @@ set -x
 
 CSI_VERSION="v1.5.0"
 ADDONS_VERSION="v0.1.1"
-PB2_DIR="controller/csi_general"
+PB2_DIR="csi_general"
 
 mkdir -p ./proto/${PB2_DIR}
 cd ./proto/${PB2_DIR}
@@ -19,3 +19,4 @@ python -m grpc_tools.protoc --proto_path=proto \
                             proto/${PB2_DIR}/*.proto
 
 rm -rf ./proto/
+touch ${PB2_DIR}/__init__.py

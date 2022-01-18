@@ -1,13 +1,13 @@
 import grpc
+from csi_general import replication_pb2 as pb2
 from mock import patch, Mock
 
 from controller.controller_server.addons_server import ReplicationControllerServicer
-from controller.csi_general import replication_pb2 as pb2
-from controller.tests import utils
-from controller.tests.controller_server.csi_controller_server_test import BaseControllerSetUp, CommonControllerTest
 from controller.controller_server.config import PARAMETERS_SYSTEM_ID, PARAMETERS_COPY_TYPE
 from controller.controller_server.test_settings import volume_name, volume_wwn, object_internal_id, \
     other_object_internal_id, replication_name, system_id, copy_type
+from controller.tests import utils
+from controller.tests.controller_server.csi_controller_server_test import BaseControllerSetUp, CommonControllerTest
 
 
 class TestControllerServicerEnableVolumeReplication(BaseControllerSetUp, CommonControllerTest):

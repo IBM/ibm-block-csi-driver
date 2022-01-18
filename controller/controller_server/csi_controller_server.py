@@ -2,6 +2,8 @@ import os.path
 
 import grpc
 import yaml
+from csi_general import csi_pb2
+from csi_general import csi_pb2_grpc
 from retry import retry
 
 import controller.array_action.errors as array_errors
@@ -17,8 +19,6 @@ from controller.controller_server import messages as controller_messages
 from controller.controller_server.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controller.controller_server.exception_handler import handle_common_exceptions, handle_exception, \
     build_error_response
-from controller.csi_general import csi_pb2
-from controller.csi_general import csi_pb2_grpc
 
 logger = get_stdout_logger()
 
