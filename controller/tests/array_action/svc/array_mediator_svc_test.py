@@ -554,17 +554,26 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
                                                                  pool='different_pool', thin=True)
 
-    def test_create_snapshot_for_hyperswap_with_different_site_success(self):
+    def test_create_snapshot_for_hyperswap_volume_with_different_site_success(self):
         self._prepare_mocks_for_create_snapshot(different_pool_site=True)
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="different_pool")
         self.svc.client.svctask.mkfcmap.assert_called_once_with(source="relevant_volume", target="test_snapshot",
                                                                 copyrate=0)
 
-    def test_create_snapshot_for_stretched_with_different_site_success(self):
+    def test_create_snapshot_for_stretched_volume_with_different_site_success(self):
         self._prepare_mocks_for_create_snapshot(different_pool_site=True, is_stretched=True)
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="different_pool")
+        self.svc.client.svctask.mkfcmap.assert_called_once_with(source="source_volume", target="test_snapshot",
+                                                                copyrate=0)
+
+    def test_create_snapshot_as_stretched_success(self):
+        self._prepare_mocks_for_create_snapshot()
+
+        self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="pool1:pool2")
+        self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
+                                                                 pool='pool1:pool2', thin=True)
         self.svc.client.svctask.mkfcmap.assert_called_once_with(source="source_volume", target="test_snapshot",
                                                                 copyrate=0)
 

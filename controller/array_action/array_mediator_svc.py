@@ -696,7 +696,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _get_cli_volume_in_pool_site(self, volume_name, pool_name):
         cli_volume = self._get_cli_volume(volume_name)
-        if not pool_name:
+        if not pool_name or ':' in pool_name:
             return cli_volume
         pool_site_name = self._get_pool_site(pool_name)
         if self._is_cli_volume_in_site(cli_volume, pool_site_name):
