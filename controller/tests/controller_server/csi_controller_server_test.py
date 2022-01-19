@@ -944,7 +944,7 @@ class TestDeleteVolume(BaseControllerSetUp, CommonControllerTest):
         self.delete_volume_returns_error(error=Exception("error"), return_code=grpc.StatusCode.INTERNAL)
 
     def test_delete_volume_has_snapshots(self):
-        self.delete_volume_returns_error(error=array_errors.ObjectIsStillInUseError("a", "b"),
+        self.delete_volume_returns_error(error=array_errors.ObjectIsStillInUseError("a", ["b"]),
                                          return_code=grpc.StatusCode.FAILED_PRECONDITION)
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.delete_volume")
@@ -1522,7 +1522,11 @@ class TestExpandVolume(BaseControllerSetUp, CommonControllerTest):
         self._expand_volume_returns_error(return_code=grpc.StatusCode.NOT_FOUND,
                                           err=array_errors.ObjectNotFoundError("name"))
 
-    def test_expand_volume_with_create_volume_with_other_exception(self):
+    def test_expand_volume_with_object_in_use_exception(self):
+        self._expand_volume_returns_error(return_code=grpc.StatusCode.INTERNAL,
+                                          err=array_errors.ObjectIsStillInUseError("a", ["b"]))
+
+    def test_expand_volume_with_other_exception(self):
         self._expand_volume_returns_error(return_code=grpc.StatusCode.INTERNAL,
                                           err=Exception("error"))
 
