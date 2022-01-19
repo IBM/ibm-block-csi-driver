@@ -23,9 +23,8 @@ COPY controller/requirements.txt /tmp/
 RUN pip3 install -r /tmp/requirements.txt
 
 USER root
-COPY controller/scripts/csi_general/csi_pb2.sh /tmp/
-RUN /tmp/csi_pb2.sh
-COPY controller/scripts/csi_general/setup.py .
+COPY controller/scripts/csi_general .
+RUN ./csi_pb2.sh
 RUN pip3 install .
 
 FROM registry.access.redhat.com/ubi8/python-38:1-77
