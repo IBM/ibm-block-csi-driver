@@ -27,7 +27,10 @@ COPY controller/requirements.txt /tmp/
 RUN pip3 install -r /tmp/requirements.txt
 
 USER root
-COPY --chown=root:root controller/scripts/csi_general .
+RUN groupadd -g 9999 appuser && \
+    useradd -r -u 9999 -g appuser appuser
+COPY --chown=appuser:appuser controller/scripts/csi_general .
+RUN chown -R appuser:appuser ./csi_pb2.sh
 RUN ./csi_pb2.sh
 RUN pip3 install .
 
