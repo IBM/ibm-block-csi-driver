@@ -447,17 +447,17 @@ class TestArrayMediatorSVC(unittest.TestCase):
         return volume
 
     def _prepare_mocks_for_create_snapshot(self, support_deduplicated_copy=True, source_has_deduplicated_copy=False,
-                                           different_pool_site=False, is_stretched=False):
+                                           different_pool_site=False, is_source_stretched=False):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         self.svc.client.svctask.mkfcmap.return_value = Mock()
-        pool = ['many', 'pool1', 'pool2'] if is_stretched else 'pool_name'
+        pool = ['many', 'pool1', 'pool2'] if is_source_stretched else 'pool_name'
         source_volume_to_copy_from = self._get_custom_cli_volume(support_deduplicated_copy,
                                                                  source_has_deduplicated_copy,
                                                                  pool_name=pool)
         volumes_to_return = [source_volume_to_copy_from, source_volume_to_copy_from]
 
         if different_pool_site:
-            if is_stretched:
+            if is_source_stretched:
                 pools_to_return = [Munch({'site_name': 'pool_site'}),
                                    Munch({'site_name': 'source_volume_site'}),
                                    Munch({'site_name': 'pool_site'})]
@@ -562,9 +562,18 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                                 copyrate=0)
 
     def test_create_snapshot_for_stretched_volume_with_different_site_success(self):
-        self._prepare_mocks_for_create_snapshot(different_pool_site=True, is_stretched=True)
+        self._prepare_mocks_for_create_snapshot(different_pool_site=True, is_source_stretched=True)
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="different_pool")
+        self.svc.client.svctask.mkfcmap.assert_called_once_with(source="source_volume", target="test_snapshot",
+                                                                copyrate=0)
+
+    def test_create_snapshot_for_stretched_volume_implicit_pool_success(self):
+        self._prepare_mocks_for_create_snapshot(is_source_stretched=True)
+
+        self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool=None)
+        self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
+                                                                 pool='pool1', thin=True)
         self.svc.client.svctask.mkfcmap.assert_called_once_with(source="source_volume", target="test_snapshot",
                                                                 copyrate=0)
 
