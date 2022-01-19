@@ -27,7 +27,7 @@ COPY controller/requirements.txt /tmp/
 RUN pip3 install -r /tmp/requirements.txt
 
 USER root
-COPY controller/scripts/csi_general .
+COPY --chown=root:root controller/scripts/csi_general .
 RUN ./csi_pb2.sh
 RUN pip3 install .
 
