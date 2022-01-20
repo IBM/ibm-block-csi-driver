@@ -76,11 +76,13 @@ func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []strin
 	out, err := e.ExecuteWithTimeoutSilently(mSeconds, command, args)
 
 	outAsStr := string(out)
+	noOutputMessage := ""
 	if strings.TrimSpace(outAsStr) != "" {
 		logger.Debugf("Output from command: %s", outAsStr)
+	} else {
+		noOutputMessage = " (no output)"
 	}
-
-	logger.Debugf("Finished executing command")
+	logger.Debugf("Finished executing command" + noOutputMessage)
 	return out, err
 }
 
