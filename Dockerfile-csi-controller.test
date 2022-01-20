@@ -26,11 +26,12 @@ ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
 COPY controller/requirements.txt /tmp/
 RUN pip3 install -r /tmp/requirements.txt
 
-
-COPY  controller/scripts/csi_general .
+USER root
+COPY controller/scripts/csi_general .
 RUN chmod 755 ./csi_pb2.sh
 RUN ./csi_pb2.sh
 RUN pip3 install .
+USER default
 
 # Requires to run local testing
 COPY controller/requirements-tests.txt /tmp/
