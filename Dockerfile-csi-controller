@@ -24,8 +24,10 @@ RUN pip3 install -r /tmp/requirements.txt
 
 USER root
 COPY controller/scripts/csi_general .
+RUN chmod 755 ./csi_pb2.sh
 RUN ./csi_pb2.sh
 RUN pip3 install .
+USER default
 
 FROM registry.access.redhat.com/ubi8/python-38:1-77
 MAINTAINER IBM Storage
