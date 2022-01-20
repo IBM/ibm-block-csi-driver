@@ -74,6 +74,7 @@ const (
 	IscsiHostRexExPath          = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
 	deviceDeletePathFormat      = "/sys/block/%s/device/delete"
 	blockDevCmd                 = "blockdev"
+	flushBufsFlag               = "--flushbufs"
 	mpathdSeparator             = ","
 	multipathdCmd               = "multipathd"
 	multipathCmd                = "multipath"
@@ -81,7 +82,6 @@ const (
 	VolumeStorageIdsDelimiter   = ";"
 	WwnOuiEnd                   = 7
 	WwnVendorIdentifierEnd      = 16
-	flushBufsFlag               = "--flushbufs"
 )
 
 func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperScsiGenericInterface {
@@ -199,7 +199,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(deviceName str
 	devicePath := filepath.Join(DevPath, deviceName)
 	_, err := r.Executer.ExecuteWithTimeoutSilently(TimeOutBlockDevCmd, blockDevCmd, []string{flushBufsFlag, devicePath})
 	if err != nil {
-		logger.Errorf("blockdev %v {%v} did not succeed to flush the device buffers. err={%v}", flushBufsFlag, devicePath,
+		logger.Errorf("%v %v {%v} did not succeed to flush the device buffers. err={%v}", blockDevCmd, flushBufsFlag, devicePath,
 			err.Error())
 		return err
 	}
