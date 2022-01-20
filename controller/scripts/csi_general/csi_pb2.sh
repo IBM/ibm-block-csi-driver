@@ -7,7 +7,7 @@ PB2_DIR="csi_general"
 
 mkdir -p ./proto/${PB2_DIR}
 cd ./proto/${PB2_DIR}
-
+pwd
 curl -O https://raw.githubusercontent.com/container-storage-interface/spec/${CSI_VERSION}/csi.proto
 curl -O https://raw.githubusercontent.com/csi-addons/spec/${ADDONS_VERSION}/replication.proto
 

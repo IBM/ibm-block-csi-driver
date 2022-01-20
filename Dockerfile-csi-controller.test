@@ -23,8 +23,9 @@ USER default
 RUN pip3 install --ignore-installed --default-timeout=100 --upgrade pip==21.2.4
 # avoid default boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
-COPY controller/requirements.txt /tmp/
-RUN pip3 install -r /tmp/requirements.txt
+WORKDIR /tmp
+COPY controller/requirements.txt .
+RUN pip3 install -r ./requirements.txt
 
 USER root
 COPY controller/scripts/csi_general .
@@ -34,8 +35,8 @@ RUN pip3 install .
 USER default
 
 # Requires to run local testing
-COPY controller/requirements-tests.txt /tmp/
-RUN pip3 install -r /tmp/requirements-tests.txt
+COPY controller/requirements-tests.txt .
+RUN pip3 install -r ./requirements-tests.txt
 
 
 FROM registry.access.redhat.com/ubi8/python-38:1-77
