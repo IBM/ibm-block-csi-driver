@@ -122,7 +122,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	volId := req.VolumeId
 	err = d.VolumeIdLocksMap.AddVolumeLock(volId, "NodeStageVolume")
 	if err != nil {
-		logger.Errorf("Another operation is being performed on volume : {%s}.", volId)
+		logger.Errorf("Another operation is being performed on volume : {%s}", volId)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
 
@@ -156,7 +156,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	volumeCap := req.GetVolumeCapability()
 	switch volumeCap.GetAccessType().(type) {
 	case *csi.VolumeCapability_Block:
-		logger.Debugf("NodeStageVolume Finished: multipath device [%s] is ready to be mounted by NodePublishVolume API.", mpathDevice)
+		logger.Debugf("NodeStageVolume Finished: multipath device [%s] is ready to be mounted by NodePublishVolume API", mpathDevice)
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
@@ -191,7 +191,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	logger.Debugf("NodeStageVolume Finished: staging path [%s] is ready to be mounted by NodePublishVolume API.", stagingPath)
+	logger.Debugf("NodeStageVolume Finished: staging path [%s] is ready to be mounted by NodePublishVolume API", stagingPath)
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
@@ -326,7 +326,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	logger.Debugf("Check if staging path {%s} is mounted", stagingPathWithHostPrefix)
 	isNotMounted, err := d.NodeUtils.IsNotMountPoint(stagingPathWithHostPrefix)
 	if err != nil {
-		logger.Warningf("Failed to check if (%s), is mounted.", stagingPathWithHostPrefix)
+		logger.Warningf("Failed to check if (%s), is mounted", stagingPathWithHostPrefix)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if !isNotMounted {
@@ -471,7 +471,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	logger.Debugf("NodePublishVolume Finished: targetPath {%v} is now a mount point.", targetPath)
+	logger.Debugf("NodePublishVolume Finished: targetPath {%v} is now a mount point", targetPath)
 
 	return &csi.NodePublishVolumeResponse{}, nil
 }
@@ -495,7 +495,7 @@ func (d *NodeService) isTargetMounted(targetPathWithHostPrefix string, isFSVolum
 	logger.Debugf("Check if target {%s} is mounted", targetPathWithHostPrefix)
 	isNotMounted, err := d.NodeUtils.IsNotMountPoint(targetPathWithHostPrefix)
 	if err != nil {
-		logger.Warningf("Failed to check if (%s), is mounted.", targetPathWithHostPrefix)
+		logger.Warningf("Failed to check if (%s), is mounted", targetPathWithHostPrefix)
 		return false, status.Error(codes.Internal, err.Error())
 	}
 	if isNotMounted {
@@ -507,7 +507,7 @@ func (d *NodeService) isTargetMounted(targetPathWithHostPrefix string, isFSVolum
 		} else if !isFSVolume && targetIsDir {
 			return true, status.Errorf(codes.AlreadyExists, "Required raw block volume but target {%s} is mounted and it is a directory.", targetPathWithHostPrefix)
 		}
-		logger.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume.", targetPathWithHostPrefix)
+		logger.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume", targetPathWithHostPrefix)
 		return true, nil
 	}
 }
