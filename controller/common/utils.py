@@ -11,12 +11,15 @@ def set_current_thread_name(name):
         name : name to set
     """
     current_thread = threading.current_thread()
+    key_lock = threading.Lock()
+    key_lock.acquire()
     for thread in threading.enumerate():
         if thread is not current_thread:
             if name == thread.getName():
                 raise VolumeAlreadyProcessingError(name)
     if name:
         current_thread.setName(name)
+    key_lock.release()
 
 
 def string_to_array(str_val, separator):
