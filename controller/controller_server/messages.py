@@ -2,6 +2,8 @@ ValidationException_message = "Validation error has occurred : {0}"
 
 wrong_id_format_message = "Wrong {0} id format : {1}"
 
+object_already_processing_message = "Object {0} is already processing. request cannot be completed."
+
 # validation error messages
 invalid_secret_config_message = "got an invalid secret config"
 insufficient_data_to_choose_a_storage_system_message = "insufficient data to choose a storage system"

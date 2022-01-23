@@ -1,5 +1,7 @@
 import threading
 
+from controller.controller_server.errors import VolumeAlreadyProcessingError
+
 
 def set_current_thread_name(name):
     """
@@ -8,8 +10,12 @@ def set_current_thread_name(name):
     Args:
         name : name to set
     """
+    current_thread = threading.current_thread()
+    for thread in threading.enumerate():
+        if thread is not current_thread:
+            if name == thread.getName():
+                raise VolumeAlreadyProcessingError(name)
     if name:
-        current_thread = threading.current_thread()
         current_thread.setName(name)
 
 

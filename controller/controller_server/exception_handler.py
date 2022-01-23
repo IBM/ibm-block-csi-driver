@@ -4,13 +4,14 @@ import grpc
 
 import controller.array_action.errors as array_errors
 from controller.common.csi_logger import get_stdout_logger
-from controller.controller_server.errors import ValidationException
+from controller.controller_server.errors import ValidationException, VolumeAlreadyProcessingError
 
 logger = get_stdout_logger()
 
 status_codes_by_exception = {
     NotImplementedError: grpc.StatusCode.UNIMPLEMENTED,
     ValidationException: grpc.StatusCode.INVALID_ARGUMENT,
+    VolumeAlreadyProcessingError: grpc.StatusCode.ABORTED,
     array_errors.IllegalObjectID: grpc.StatusCode.INVALID_ARGUMENT,
     array_errors.IllegalObjectName: grpc.StatusCode.INVALID_ARGUMENT,
     array_errors.PoolParameterIsMissing: grpc.StatusCode.INVALID_ARGUMENT,
