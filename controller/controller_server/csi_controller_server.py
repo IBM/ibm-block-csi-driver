@@ -17,6 +17,7 @@ from controller.controller_server import messages as controller_messages
 from controller.controller_server.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controller.controller_server.exception_handler import handle_common_exceptions, handle_exception, \
     build_error_response
+from controller.controller_server.sync_lock import SyncLock
 from controller.csi_general import csi_pb2
 from controller.csi_general import csi_pb2_grpc
 
@@ -34,10 +35,11 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         with open(path, 'r') as yamlfile:
             self.cfg = yaml.safe_load(yamlfile)  # TODO: add the following when possible : Loader=yaml.FullLoader)
+        self.sync_lock = SyncLock()
 
     @handle_common_exceptions(csi_pb2.CreateVolumeResponse)
     def CreateVolume(self, request, context):
-        set_current_thread_name(request.name)
+        self.sync_lock.add_volume_lock(request.name)
         logger.info("create volume")
         try:
             utils.validate_create_volume_request(request)
