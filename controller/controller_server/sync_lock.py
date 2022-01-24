@@ -21,7 +21,8 @@ class SyncLock:
         if lock_id in self._lock_ids[lock_key]:
             self._lock.release()
             logger.debug(
-                "Lock for action {}, Lock for volume: {} is already in use by other thread".format(action_name, lock_id))
+                "Lock for action {}, Lock for volume: {} is already in use by other thread".format(action_name,
+                                                                                                   lock_id))
             raise VolumeAlreadyProcessingError(lock_id)
         self._lock_ids[lock_key].add(lock_id)
         logger.debug("Lock for action: {}, Succeed to acquire lock for volume: {}".format(action_name, lock_id))
