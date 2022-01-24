@@ -32,7 +32,6 @@ COPY controller/scripts/csi_general .
 RUN chmod 755 ./csi_pb2.sh
 RUN ./csi_pb2.sh
 RUN pip3 install .
-USER default
 
 # Requires to run local testing
 COPY controller/requirements-tests.txt .
