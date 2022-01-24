@@ -17,7 +17,7 @@ from controller.controller_server import messages as controller_messages
 from controller.controller_server.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controller.controller_server.exception_handler import handle_common_exceptions, handle_exception, \
     build_error_response
-from controller.controller_server.sync_lock import SyncLock
+from controller.controller_server.sync_lock import SyncLock, handle_volume_lock
 from controller.csi_general import csi_pb2
 from controller.csi_general import csi_pb2_grpc
 
@@ -38,14 +38,13 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         self.sync_lock = SyncLock()
 
     @handle_common_exceptions(csi_pb2.CreateVolumeResponse)
+    @handle_volume_lock("name")
     def CreateVolume(self, request, context):
-        self.sync_lock.add_volume_lock(request.name)
         logger.info("create volume")
         try:
             utils.validate_create_volume_request(request)
         except ObjectIdError as ex:
-            return handle_exception(ex, context, grpc.StatusCode.NOT_FOUND,
-                                    csi_pb2.CreateVolumeResponse)
+            return handle_exception(ex, context, grpc.StatusCode.NOT_FOUND, csi_pb2.CreateVolumeResponse)
 
         logger.debug("volume name : {}".format(request.name))
 
