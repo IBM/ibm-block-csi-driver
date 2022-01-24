@@ -70,10 +70,10 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions() ([]string, error) {
 	output, err := r.iscsiCmd("-m", "session")
 	if err != nil {
 		if exitError, isExitError := err.(*exec.ExitError); isExitError && exitError.ExitCode() == iSCSIErrNoObjsFound {
-			logger.Debug("No active iSCSI sessions.")
+			logger.Debug("No active iSCSI sessions")
 			return []string{}, nil
 		}
-		logger.Error("Failed to check iSCSI sessions.")
+		logger.Error("Failed to check iSCSI sessions")
 		return nil, err
 	}
 	lines := strings.Split(strings.TrimSpace(output), "\n")

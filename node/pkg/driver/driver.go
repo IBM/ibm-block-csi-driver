@@ -132,7 +132,7 @@ func ReadConfigFile(configFilePath string) (ConfigFile, error) {
 	configYamlPath := configFilePath
 	if configYamlPath == "" {
 		configYamlPath = DefualtConfigFile
-		logger.Debugf("Not found config file environment variable %s. Set default value %s.", EnvNameDriverConfFile, configYamlPath)
+		logger.Debugf("Not found config file environment variable %s. Set default value %s", EnvNameDriverConfFile, configYamlPath)
 	} else {
 		logger.Debugf("Config file environment variable %s=%s", EnvNameDriverConfFile, configYamlPath)
 		logger.Info(logger.GetLevel())
