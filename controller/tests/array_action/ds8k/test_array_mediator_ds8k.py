@@ -111,6 +111,16 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.PoolParameterIsMissing):
             self.array.get_volume("fake_name")
 
+    def test_get_volume_with_cache(self):
+        volume = self.volume_response
+        self.array._volume_cache.update({volume.name: volume.id})
+        self.client_mock.get_volume.return_value = volume
+        volume = self.array.get_volume(
+            self.volume_response.name,
+            pool=self.volume_response.pool
+        )
+        self.assertEqual(volume.name, self.volume_response.name)
+
     def test_get_volume_with_pool_context(self):
         self.client_mock.get_volumes_by_pool.return_value = [
             self.volume_response,
@@ -614,6 +624,12 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.array.delete_snapshot("test_id")
         self.client_mock.delete_volume.assert_called_once()
         self.client_mock.delete_flashcopy.assert_called_once_with(self.flashcopy_response.id)
+
+    def test_delete_snapshot_with_cache(self):
+        self._prepare_mocks_for_snapshot()
+        self.array._volume_cache.update({"test_name": "test_id", "test_name_fake": "test_id_fake"})
+        self.array.delete_snapshot("test_id")
+        self.assertDictEqual(self.array._volume_cache, {"test_name_fake": "test_id_fake"})
 
     def test_delete_snapshot_flashcopy_fail_with_ClientException(self):
         self._prepare_mocks_for_snapshot()
