@@ -7,7 +7,6 @@ from controller.common.csi_logger import get_stdout_logger
 from controller.controller_server import config, utils
 from controller.controller_server.decorators import csi_method
 from controller.controller_server.exception_handler import build_error_response
-from controller.controller_server.sync_lock import SyncLock
 from controller.csi_general import replication_pb2 as pb2
 from controller.csi_general import replication_pb2_grpc as pb2_grpc
 
@@ -15,12 +14,9 @@ logger = get_stdout_logger()
 
 
 class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
-    def __init__(self):
-        self.sync_lock = SyncLock()
 
     @csi_method(error_response_type=pb2.EnableVolumeReplicationResponse, lock_request_attribute="volume_id")
     def EnableVolumeReplication(self, request, context):
-        logger.info("EnableVolumeReplication")
         utils.validate_addons_request(request)
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
@@ -58,7 +54,6 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
     @csi_method(error_response_type=pb2.DisableVolumeReplicationResponse, lock_request_attribute="volume_id")
     def DisableVolumeReplication(self, request, context):
-        logger.info("DisableVolumeReplication")
         utils.validate_addons_request(request)
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
@@ -135,7 +130,6 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
     @csi_method(error_response_type=pb2.ResyncVolumeResponse, lock_request_attribute="volume_id")
     def ResyncVolume(self, request, context):
-        logger.info("ResyncVolume")
         utils.validate_addons_request(request)
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)

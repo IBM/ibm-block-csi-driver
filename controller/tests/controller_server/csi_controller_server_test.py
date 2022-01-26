@@ -11,6 +11,7 @@ import controller.controller_server.config as config
 import controller.controller_server.errors as controller_errors
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.controller_server.csi_controller_server import CSIControllerServicer
+from controller.controller_server.sync_lock import SyncLock
 from controller.controller_server.test_settings import volume_name, snapshot_name, snapshot_volume_name, \
     clone_volume_name, snapshot_volume_wwn, pool, space_efficiency, object_internal_id
 from controller.csi_general import csi_pb2
@@ -95,7 +96,7 @@ class CommonControllerTest:
 
     def _test_request_already_processing(self, storage_agent, request_attribute, object_id):
         storage_agent.side_effect = self.storage_agent
-        with self.servicer.sync_lock(request_attribute, object_id, "test_request_already_processing"):
+        with SyncLock(request_attribute, object_id, "test_request_already_processing"):
             response = self.get_tested_method()(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.ABORTED)
         self.assertEqual(type(response), self.get_tested_method_response_class())
