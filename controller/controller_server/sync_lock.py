@@ -22,6 +22,7 @@ class SyncLock:
         self.lock_key = lock_key
         self.object_id = object_id
         self.action_name = action_name
+        return self
 
     def __enter__(self):
         if self.lock_key:
