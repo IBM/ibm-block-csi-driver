@@ -12,7 +12,7 @@ class SyncLock:
         self._lock = threading.Lock()
         self._ids_in_use = defaultdict(set)
 
-    def ids_in_use(self, lock_key, object_id):
+    def add_to_ids_in_use(self, lock_key, object_id):
         self._ids_in_use[lock_key].add(object_id)
 
     def add_object_lock(self, lock_key, object_id, action_name):
@@ -25,7 +25,7 @@ class SyncLock:
                 "Lock for action {}, with {}: {} is already in use by other thread".format(action_name, lock_key,
                                                                                            object_id))
             raise ObjectAlreadyProcessingError(object_id)
-        self._ids_in_use[lock_key].add(object_id)
+        self.add_to_ids_in_use(lock_key, object_id)
         logger.debug(
             "Lock for action: {}, Succeed to acquire lock for {}: {}".format(action_name, lock_key, object_id))
         self._lock.release()

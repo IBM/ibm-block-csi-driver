@@ -95,10 +95,10 @@ class CommonControllerTest:
 
     def _test_request_already_processing(self, storage_agent, request_attribute, object_id):
         storage_agent.side_effect = self.storage_agent
-        self.servicer.sync_lock.ids_in_use(request_attribute, object_id)
+        self.servicer.sync_lock.add_to_ids_in_use(request_attribute, object_id)
         response = self.get_tested_method()(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.ABORTED)
-        self.assertEqual(response, self.get_tested_method_response_class()())
+        self.assertEqual(type(response), type(self.get_tested_method_response_class()()))
 
     def _test_request_with_array_connection_exception(self, storage_agent):
         storage_agent.side_effect = [Exception("error")]
@@ -192,7 +192,7 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_already_processing(self, storage_agent):
-        self._test_request_already_processing(storage_agent, "name", "snapshot")
+        self._test_request_already_processing(storage_agent, "name", self.request.name)
 
     def _test_create_snapshot_with_by_system_id_parameter(self, storage_agent, system_id, expected_pool):
         system_id_part = ':{}'.format(system_id) if system_id else ''
@@ -443,7 +443,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_already_processing(self, storage_agent):
-        self._test_request_already_processing(storage_agent, "name", "volume")
+        self._test_request_already_processing(storage_agent, "name", self.request.name)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_succeeds(self, storage_agent):

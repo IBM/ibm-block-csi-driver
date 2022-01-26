@@ -403,7 +403,6 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     @csi_method(error_response_type=csi_pb2.DeleteSnapshotResponse, lock_request_attribute="snapshot_id")
     def DeleteSnapshot(self, request, context):
-
         logger.info("Delete snapshot")
         secrets = request.secrets
         utils.validate_delete_snapshot_request(request)
