@@ -10,16 +10,19 @@ class BaseControllerServerException(Exception):
 class ValidationException(BaseControllerServerException):
 
     def __init__(self, msg):
+        super().__init__()
         self.message = messages.ValidationException_message.format(msg)
 
 
 class InvalidNodeId(BaseControllerServerException):
 
     def __init__(self, node_id):
+        super().__init__()
         self.message = messages.wrong_id_format_message.format("node", node_id)
 
 
 class ObjectIdError(BaseControllerServerException):
 
     def __init__(self, object_type, object_id):
+        super().__init__()
         self.message = messages.wrong_id_format_message.format(object_type, object_id)
