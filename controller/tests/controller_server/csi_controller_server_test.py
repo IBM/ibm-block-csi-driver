@@ -98,7 +98,7 @@ class CommonControllerTest:
         self.servicer.sync_lock.add_to_ids_in_use(request_attribute, object_id)
         response = self.get_tested_method()(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.ABORTED)
-        self.assertEqual(type(response), type(self.get_tested_method_response_class()()))
+        self.assertEqual(type(response), self.get_tested_method_response_class())
 
     def _test_request_with_array_connection_exception(self, storage_agent):
         storage_agent.side_effect = [Exception("error")]
