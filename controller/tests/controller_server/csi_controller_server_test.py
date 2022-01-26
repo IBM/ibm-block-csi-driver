@@ -95,8 +95,8 @@ class CommonControllerTest:
 
     def _test_request_already_processing(self, storage_agent, request_attribute, object_id):
         storage_agent.side_effect = self.storage_agent
-        self.servicer.sync_lock.add_to_ids_in_use(request_attribute, object_id)
-        response = self.get_tested_method()(self.request, self.context)
+        with self.servicer.sync_lock(request_attribute, object_id, "test_request_already_processing"):
+            response = self.get_tested_method()(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.ABORTED)
         self.assertEqual(type(response), self.get_tested_method_response_class())
 

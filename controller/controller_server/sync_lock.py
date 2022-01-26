@@ -34,7 +34,7 @@ class SyncLock:
 
     def add_object_lock(self, lock_key, object_id, action_name):
         logger.debug(
-            ("Lock for action: {}, Try to acquire lock for {}: {}".format(action_name, lock_key, object_id)))
+            ("Trying to acquire lock for action {} with {}: {}".format(action_name, lock_key, object_id)))
         self._lock.acquire()
         if object_id in self._ids_in_use[lock_key]:
             self._lock.release()
@@ -44,11 +44,11 @@ class SyncLock:
             raise ObjectAlreadyProcessingError(object_id)
         self.add_to_ids_in_use(lock_key, object_id)
         logger.debug(
-            "Lock for action: {}, Succeed to acquire lock for {}: {}".format(action_name, lock_key, object_id))
+            "Succeed to acquire lock for action {} with {}: {}".format(action_name, lock_key, object_id))
         self._lock.release()
 
     def remove_object_lock(self, lock_key, lock_id, action_name):
-        logger.debug("Lock for action: {}, release lock for {}: {}".format(action_name, lock_key, lock_id))
+        logger.debug("Release lock for action {} with {}: {}".format(action_name, lock_key, lock_id))
         self._lock.acquire()
         self._ids_in_use[lock_key].remove(lock_id)
         self._lock.release()
