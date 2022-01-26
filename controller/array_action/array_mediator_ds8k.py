@@ -390,6 +390,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.debug("Getting volume {} in pool {}".format(name, pool))
         api_volume = self._get_api_object_by_name(name, pool)
         if api_volume:
+            with self._lock:
+                DS8KArrayMediator.VOLUME_CACHE.update({api_volume.name: api_volume.id})
             return self._generate_volume_response(api_volume)
         raise array_errors.ObjectNotFoundError(name)
 
@@ -537,6 +539,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         api_snapshot = self._get_api_snapshot(snapshot_name, pool)
         if api_snapshot is None:
             return None
+        with self._lock:
+            DS8KArrayMediator.VOLUME_CACHE.update({api_snapshot.name: api_snapshot.id})
         return self._generate_snapshot_response_with_verification(api_snapshot)
 
     def _create_similar_volume(self, target_volume_name, source_api_volume, space_efficiency, pool):
