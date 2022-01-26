@@ -253,7 +253,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
             # get the volume before creating again, to make sure it is not existing,
             # because volume name is not unique in ds8k.
-            api_volume = self._get_api_volume_by_name(
+            api_volume = self._get_api_object_by_name(
                 name,
                 pool_id=pool_id
             )
@@ -366,14 +366,16 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         self._delete_object(volume_id)
         logger.info("Finished deleting volume {}".format(volume_id))
 
-    def _get_api_object_by_name(self, name, pool):
-        cached_volume_id = self._volume_cache.get(name)
+    def _get_api_object_by_name(self, name, pool_id):
+        logger.debug("Looking in cache {} for object {}".format(self._volume_cache, name))
+        cached_volume_id = self._volume_cache.get(name, None)
         api_volume = None
         if cached_volume_id:
+            logger.debug("Found object: {}".format(cached_volume_id))
             api_volume = self._get_api_volume_by_id(volume_id=cached_volume_id)
         if not api_volume:
             api_volume = self._get_api_volume_by_name(volume_name=name,
-                                                      pool_id=pool)
+                                                      pool_id=pool_id)
         return api_volume
 
     def get_volume(self, name, pool=None):
