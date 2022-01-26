@@ -11,9 +11,25 @@ class SyncLock:
     def __init__(self):
         self._lock = threading.Lock()
         self._ids_in_use = defaultdict(set)
+        self.lock_key = ''
+        self.object_id = ''
+        self.action_name = ''
 
     def add_to_ids_in_use(self, lock_key, object_id):
         self._ids_in_use[lock_key].add(object_id)
+
+    def __call__(self, lock_key, object_id, action_name):
+        self.lock_key = lock_key
+        self.object_id = object_id
+        self.action_name = action_name
+
+    def __enter__(self):
+        if self.lock_key:
+            self.add_object_lock(self.lock_key, self.object_id, self.action_name)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if self.lock_key:
+            self.remove_object_lock(self.lock_key, self.object_id, self.action_name)
 
     def add_object_lock(self, lock_key, object_id, action_name):
         logger.debug(
