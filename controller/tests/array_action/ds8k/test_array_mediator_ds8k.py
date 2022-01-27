@@ -8,7 +8,7 @@ import controller.array_action.errors as array_errors
 from controller.array_action import config
 from controller.array_action.array_action_types import Volume, Snapshot
 from controller.array_action.array_mediator_ds8k import DS8KArrayMediator, FLASHCOPY_PERSISTENT_OPTION, \
-    FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET_OPTION
+    FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET_OPTION, volume_cache
 from controller.array_action.array_mediator_ds8k import LOGIN_PORT_WWPN, LOGIN_PORT_STATE, \
     LOGIN_PORT_STATE_ONLINE
 from controller.common.node_info import Initiators
@@ -70,7 +70,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         )
 
         self.array = DS8KArrayMediator("user", "password", self.endpoint)
-        self.array.VOLUME_CACHE.clear()
+        volume_cache.clear()
 
     def test_connect_with_incorrect_credentials(self):
         self.client_mock.get_system.side_effect = \
@@ -114,7 +114,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_get_volume_with_cache(self):
         volume = self.volume_response
-        self.array.VOLUME_CACHE.update({volume.name: volume.id})
+        volume_cache.update({volume.name: volume.id})
         self.client_mock.get_volume.return_value = volume
         volume = self.array.get_volume(
             self.volume_response.name,
@@ -628,9 +628,9 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_delete_snapshot_with_cache(self):
         self._prepare_mocks_for_snapshot()
-        self.array.VOLUME_CACHE.update({"test_name": "test_id", "test_name_fake": "test_id_fake"})
+        volume_cache.update({"test_name": "test_id", "test_name_fake": "test_id_fake"})
         self.array.delete_snapshot("test_id")
-        self.assertDictEqual(self.array.VOLUME_CACHE, {"test_name_fake": "test_id_fake"})
+        self.assertDictEqual(volume_cache, {"test_name_fake": "test_id_fake"})
 
     def test_delete_snapshot_flashcopy_fail_with_ClientException(self):
         self._prepare_mocks_for_snapshot()
