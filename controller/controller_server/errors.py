@@ -30,4 +30,5 @@ class ObjectIdError(BaseControllerServerException):
 
 class ObjectAlreadyProcessingError(BaseControllerServerException):
     def __init__(self, object_id_or_name):
+        super().__init__()
         self.message = messages.object_already_processing_message.format(object_id_or_name)
