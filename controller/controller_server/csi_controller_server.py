@@ -494,6 +494,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         except array_errors.NotEnoughSpaceInPool as ex:
             return handle_exception(ex, context, grpc.StatusCode.RESOURCE_EXHAUSTED,
                                     csi_pb2.ControllerExpandVolumeResponse)
+        except array_errors.ObjectIsStillInUseError as ex:
+            return handle_exception(ex, context, grpc.StatusCode.INTERNAL,
+                                    csi_pb2.ControllerExpandVolumeResponse)
 
     def ControllerGetCapabilities(self, request, context):
         logger.info("ControllerGetCapabilities")
