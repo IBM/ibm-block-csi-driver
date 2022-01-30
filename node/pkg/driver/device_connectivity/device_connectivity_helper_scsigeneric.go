@@ -94,7 +94,7 @@ func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterfac
 
 func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIdentifiers []string) error {
 	logger.Debugf("Rescan : Start rescan on specific lun, on lun : {%v}, with array identifiers : {%v}", lunId, arrayIdentifiers)
-	var hostIDs []int
+	var hostIDs = make(map[int]bool)
 	var errStrings []string
 	if len(arrayIdentifiers) == 0 {
 		e := &ErrorNotFoundArrayIdentifiers{lunId}
@@ -108,13 +108,15 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 			logger.Errorf(e.Error())
 			errStrings = append(errStrings, e.Error())
 		}
-		hostIDs = append(hostIDs, hostsId...)
+		for _, hostId := range hostsId {
+			hostIDs[hostId] = true
+		}
 	}
 	if len(hostIDs) == 0 && len(errStrings) != 0 {
 		err := errors.New(strings.Join(errStrings, ","))
 		return err
 	}
-	for _, hostNumber := range hostIDs {
+	for hostNumber := range hostIDs {
 
 		filename := fmt.Sprintf("/sys/class/scsi_host/host%d/scan", hostNumber)
 		f, err := r.Executer.OsOpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200)
