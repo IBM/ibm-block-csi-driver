@@ -51,6 +51,10 @@ class TestControllerServicerEnableVolumeReplication(BaseControllerSetUp, CommonC
                                                                  system_id, copy_type)
 
     @patch("controller.controller_server.addons_server.get_agent")
+    def test_enable_replication_already_processing(self, storage_agent):
+        self._test_request_already_processing(storage_agent, "volume_id", self.request.volume_id)
+
+    @patch("controller.controller_server.addons_server.get_agent")
     def test_enable_replication_with_wrong_secrets(self, storage_agent):
         self._test_request_with_wrong_secrets(storage_agent)
 

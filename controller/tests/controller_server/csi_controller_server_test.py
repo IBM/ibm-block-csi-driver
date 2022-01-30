@@ -11,6 +11,7 @@ import controller.controller_server.config as config
 import controller.controller_server.errors as controller_errors
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.controller_server.csi_controller_server import CSIControllerServicer
+from controller.controller_server.sync_lock import SyncLock
 from controller.controller_server.test_settings import volume_name, snapshot_name, snapshot_volume_name, \
     clone_volume_name, snapshot_volume_wwn, pool, space_efficiency, object_internal_id
 from controller.csi_general import csi_pb2
@@ -92,6 +93,13 @@ class CommonControllerTest:
         self._test_request_with_wrong_secrets_parameters(secrets, message="system id")
 
         self.request.secrets = []
+
+    def _test_request_already_processing(self, storage_agent, request_attribute, object_id):
+        storage_agent.side_effect = self.storage_agent
+        with SyncLock(request_attribute, object_id, "test_request_already_processing"):
+            response = self.get_tested_method()(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.ABORTED)
+        self.assertEqual(type(response), self.get_tested_method_response_class())
 
     def _test_request_with_array_connection_exception(self, storage_agent):
         storage_agent.side_effect = [Exception("error")]
@@ -182,6 +190,10 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.mediator.validate_supported_space_efficiency = Mock()
         self.request.parameters = {config.PARAMETERS_SPACE_EFFICIENCY: space_efficiency}
         self._test_create_snapshot_succeeds(storage_agent, expected_space_efficiency=space_efficiency)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_snapshot_already_processing(self, storage_agent):
+        self._test_request_already_processing(storage_agent, "name", self.request.name)
 
     def _test_create_snapshot_with_by_system_id_parameter(self, storage_agent, system_id, expected_pool):
         system_id_part = ':{}'.format(system_id) if system_id else ''
@@ -369,6 +381,10 @@ class TestDeleteSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.mediator.delete_snapshot.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_delete_snapshot_already_processing(self, storage_agent):
+        self._test_request_already_processing(storage_agent, "snapshot_id", self.request.snapshot_id)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_delete_snapshot_with_wrong_secrets(self, storage_agent):
         self._test_request_with_wrong_secrets(storage_agent)
 
@@ -425,6 +441,10 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
         self.assertEqual(response_volume.volume.volume_id, expected_volume_id)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_already_processing(self, storage_agent):
+        self._test_request_already_processing(storage_agent, "name", self.request.name)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_succeeds(self, storage_agent):
@@ -902,6 +922,10 @@ class TestDeleteVolume(BaseControllerSetUp, CommonControllerTest):
         self.request.volume_id = "xiv:0;volume-id"
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_delete_volume_already_processing(self, storage_agent):
+        self._test_request_already_processing(storage_agent, "volume_id", self.request.volume_id)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_delete_volume_with_wrong_secrets(self, storage_agent):
         self._test_request_with_wrong_secrets(storage_agent)
 
@@ -1009,6 +1033,10 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.servicer.ControllerPublishVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_publish_volume_already_processing(self, storage_agent):
+        self._test_request_already_processing(storage_agent, "volume_id", self.request.volume_id)
 
     @patch("controller.controller_server.utils.validate_publish_volume_request")
     def test_publish_volume_validateion_exception(self, publish_validation):
@@ -1297,6 +1325,10 @@ class TestUnpublishVolume(BaseControllerSetUp, CommonControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_unpublish_volume_already_processing(self, storage_agent):
+        self._test_request_already_processing(storage_agent, "volume_id", self.request.volume_id)
+
     @patch("controller.controller_server.utils.validate_unpublish_volume_request")
     def test_unpublish_volume_validation_exception(self, publish_validation):
         publish_validation.side_effect = [controller_errors.ValidationException("msg")]
@@ -1411,6 +1443,10 @@ class TestExpandVolume(BaseControllerSetUp, CommonControllerTest):
     def _prepare_expand_volume_mocks(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         self.mediator.expand_volume = Mock()
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_expand_volume_already_processing(self, storage_agent):
+        self._test_request_already_processing(storage_agent, "volume_id", self.request.volume_id)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_expand_volume_with_required_bytes_too_large_fail(self, storage_agent):
@@ -1612,6 +1648,10 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
     def _assertResponse(self, expected_status_code, expected_details_substring):
         self.assertEqual(self.context.code, expected_status_code)
         self.assertTrue(expected_details_substring in self.context.details)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_validate_volume_capabilities_already_processing(self, storage_agent):
+        self._test_request_already_processing(storage_agent, "volume_id", self.request.volume_id)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_capabilities_success(self, storage_agent):
