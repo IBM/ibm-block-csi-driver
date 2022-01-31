@@ -7,7 +7,6 @@ from controller.array_action.config import REPLICATION_DEFAULT_COPY_TYPE
 from controller.array_action.storage_agent import get_agent
 from controller.common.csi_logger import get_stdout_logger
 from controller.controller_server import config, utils
-from controller.controller_server.exception_handler import handle_common_exceptions, build_error_response
 from controller.controller_server.decorators import csi_method
 from controller.controller_server.exception_handler import build_error_response
 
