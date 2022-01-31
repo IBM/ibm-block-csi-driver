@@ -30,7 +30,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_volume(self, name, size_in_bytes, space_efficiency, pool):
+    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group):
         """
         This function should create a volume in the storage system.
 
@@ -39,6 +39,7 @@ class ArrayMediator(ABC):
             size_in_bytes    : size in bytes of the volume
             space_efficiency : space efficiency (None for default)
             pool             : pool name to create the volume in
+            io_group         : i/o group to create the volume in
 
         Returns:
             volume_id : the volume WWN.

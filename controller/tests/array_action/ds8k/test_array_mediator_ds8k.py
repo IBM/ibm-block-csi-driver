@@ -147,7 +147,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         size_in_bytes = self.volume_response.cap
         pool_id = self.volume_response.pool
         volume = self.array.create_volume(
-            name, size_in_bytes, space_efficiency, pool_id,
+            name, size_in_bytes, space_efficiency, pool_id, None
         )
         if space_efficiency == 'thin':
             space_efficiency = 'ese'
@@ -167,27 +167,27 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         ]
         pool_id = self.volume_response.pool
         with self.assertRaises(array_errors.VolumeAlreadyExists):
-            self.array.create_volume(self.volume_response.name, "1", 'thin', pool_id)
+            self.array.create_volume(self.volume_response.name, "1", 'thin', pool_id, None)
 
     def test_create_volume_fail_with_ClientException(self):
         self.client_mock.create_volume.side_effect = ClientException("500")
         with self.assertRaises(array_errors.VolumeCreationError):
-            self.array.create_volume("fake_name", 1, 'thin', "fake_pool")
+            self.array.create_volume("fake_name", 1, 'thin', "fake_pool", None)
 
     def test_create_volume_fail_with_pool_not_found(self):
         self.client_mock.create_volume.side_effect = NotFound("404", message="BE7A0001")
         with self.assertRaises(array_errors.PoolDoesNotExist):
-            self.array.create_volume("fake_name", 1, 'thin', "fake_pool")
+            self.array.create_volume("fake_name", 1, 'thin', "fake_pool", None)
 
     def test_create_volume_fail_with_incorrect_id(self):
         self.client_mock.get_volumes_by_pool.side_effect = InternalServerError("500", message="BE7A0005")
         with self.assertRaises(array_errors.PoolDoesNotExist):
-            self.array.create_volume("fake_name", 1, 'thin', "fake_pool")
+            self.array.create_volume("fake_name", 1, 'thin', "fake_pool", None)
 
     def test_create_volume_fail_with_no_space_in_pool(self):
         self.client_mock.get_volumes_by_pool.side_effect = InternalServerError("500", message="BE534459")
         with self.assertRaises(array_errors.NotEnoughSpaceInPool):
-            self.array.create_volume("fake_name", 1, 'thin', "fake_pool")
+            self.array.create_volume("fake_name", 1, 'thin', "fake_pool", None)
 
     def test_delete_volume(self):
         scsi_id = "6005076306FFD3010000000000000001"

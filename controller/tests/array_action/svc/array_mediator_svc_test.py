@@ -133,12 +133,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.get_volume("volume")
 
     def _test_create_volume_mkvolume_cli_failure_error(self, error_message_id, expected_error, volume_name="volume"):
-        self._test_mediator_method_client_cli_failure_error(self.svc.create_volume, (volume_name, 10, "thin", "pool"),
+        self._test_mediator_method_client_cli_failure_error(self.svc.create_volume,
+                                                            (volume_name, 10, "thin", "pool", None),
                                                             self.svc.client.svctask.mkvolume, error_message_id,
                                                             expected_error)
 
     def test_create_volume_raise_exceptions(self):
-        self._test_mediator_method_client_error(self.svc.create_volume, ("volume", 10, "thin", "pool"),
+        self._test_mediator_method_client_error(self.svc.create_volume, ("volume", 10, "thin", "pool", None),
                                                 self.svc.client.svctask.mkvolume, Exception, Exception)
         self._test_create_volume_mkvolume_cli_failure_error("Failed", CLIFailureError)
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC8710E", array_errors.NotEnoughSpaceInPool)
@@ -154,7 +155,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         vol_ret = Mock(as_single_element=self._get_cli_volume())
         self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
-        volume = self.svc.create_volume("test_volume", 1024, space_efficiency, "pool_name")
+        volume = self.svc.create_volume("test_volume", 1024, space_efficiency, "pool_name", None)
 
         self.assertEqual(volume.capacity_bytes, 1024)
         self.assertEqual(volume.array_type, 'SVC')
@@ -657,22 +658,25 @@ class TestArrayMediatorSVC(unittest.TestCase):
         deduplicated_compressed_space_efficiency = config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED
         self.svc.validate_supported_space_efficiency(deduplicated_compressed_space_efficiency)
 
-    def _test_build_kwargs_from_parameters(self, space_efficiency, pool, name, size, expected_space_efficiency_kwargs):
+    def _test_build_kwargs_from_parameters(self, space_efficiency, pool, io_group, name, size,
+                                           expected_space_efficiency_kwargs):
         expected_kwargs = {'name': name, 'unit': 'b', 'size': size, 'pool': pool}
         expected_kwargs.update(expected_space_efficiency_kwargs)
-        actual_kwargs = build_kwargs_from_parameters(space_efficiency, pool, name, size)
+        if io_group:
+            expected_kwargs['iogrp'] = io_group
+        actual_kwargs = build_kwargs_from_parameters(space_efficiency, pool, io_group, name, size)
         self.assertDictEqual(actual_kwargs, expected_kwargs)
 
     def test_build_kwargs_from_parameters(self):
         size = self.svc._convert_size_bytes(1000)
-
-        self._test_build_kwargs_from_parameters('Thin', 'P1', 'V1', size, {'thin': True})
-        self._test_build_kwargs_from_parameters('compressed', 'P2', 'V2', size, {'compressed': True})
-        self._test_build_kwargs_from_parameters('dedup_thin', 'P3', 'V3', self.svc._convert_size_bytes(2048),
-                                                {'thin': True, 'deduplicated': True})
-        self._test_build_kwargs_from_parameters('dedup_compressed', 'P3', 'V3', self.svc._convert_size_bytes(2048),
+        second_size = self.svc._convert_size_bytes(2048)
+        self._test_build_kwargs_from_parameters('Thin', 'P1', None, 'V1', size, {'thin': True})
+        self._test_build_kwargs_from_parameters('compressed', 'P2', None, 'V2', size, {'compressed': True})
+        self._test_build_kwargs_from_parameters('dedup_thin', 'P3', 'IOGRP1', 'V3', second_size,
+                                                {'iogrp': 'IOGRP1', 'thin': True, 'deduplicated': True})
+        self._test_build_kwargs_from_parameters('dedup_compressed', 'P3', None, 'V3', second_size,
                                                 {'compressed': True, 'deduplicated': True})
-        self._test_build_kwargs_from_parameters('Deduplicated', 'P3', 'V3', self.svc._convert_size_bytes(2048),
+        self._test_build_kwargs_from_parameters('Deduplicated', 'P3', None, 'V3', second_size,
                                                 {'compressed': True, 'deduplicated': True})
 
     def test_properties(self):

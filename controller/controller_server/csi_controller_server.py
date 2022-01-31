@@ -93,7 +93,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                     array_mediator.validate_supported_space_efficiency(space_efficiency)
                     volume = array_mediator.create_volume(volume_final_name, required_bytes, space_efficiency,
-                                                          pool)
+                                                          pool, volume_parameters.io_group)
                 else:
                     logger.debug("volume found : {}".format(volume))
 
