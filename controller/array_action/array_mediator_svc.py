@@ -188,15 +188,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return "CSI"
 
     def __init__(self, user, password, endpoint):
-        self.user = user
-        self.password = password
+        super().__init__(user, password, endpoint)
         self.client = None
         # SVC only accept one IP address
         if len(endpoint) == 0 or len(endpoint) > 1:
             logger.error("SVC only support one cluster IP")
             raise array_errors.StorageManagementIPsNotSupportError(
                 endpoint)
-        self.endpoint = endpoint[0]
+        self.endpoint = self.endpoint[0]
         self._cluster = None
 
         logger.debug("in init")
