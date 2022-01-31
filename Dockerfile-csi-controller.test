@@ -21,10 +21,10 @@ USER root
 RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
 USER default
 RUN pip3 install --ignore-installed --default-timeout=100 --upgrade pip==21.2.4
-# avoid default boringssl lib, since it does not support z systems
-ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
 WORKDIR /tmp
 COPY controller/requirements.txt .
+# avoid default- boringssl lib, since it does not support z systems
+ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
 RUN pip3 install -r ./requirements.txt
 
 USER root
