@@ -4,6 +4,7 @@ from hashlib import sha256
 from operator import eq
 
 import base58
+from csi_general import csi_pb2
 from google.protobuf.timestamp_pb2 import Timestamp
 
 import controller.controller_server.config as config
@@ -14,7 +15,6 @@ from controller.common.csi_logger import get_stdout_logger
 from controller.common.settings import NAME_PREFIX_SEPARATOR
 from controller.controller_server.controller_types import ArrayConnectionInfo, ObjectIdInfo, ObjectParameters
 from controller.controller_server.errors import ObjectIdError, ValidationException, InvalidNodeId
-from controller.csi_general import csi_pb2
 
 logger = get_stdout_logger()
 

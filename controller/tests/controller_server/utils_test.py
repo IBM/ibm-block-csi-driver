@@ -1,6 +1,7 @@
 import json
 import unittest
 
+from csi_general import csi_pb2
 from mock import patch, Mock
 
 import controller.controller_server.utils as utils
@@ -11,7 +12,6 @@ from controller.controller_server import config as controller_config
 from controller.controller_server.csi_controller_server import CSIControllerServicer
 from controller.controller_server.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controller.controller_server.test_settings import pool, user, password, array
-from controller.csi_general import csi_pb2
 from controller.tests import utils as test_utils
 from controller.tests.controller_server.csi_controller_server_test import ProtoBufMock
 from controller.tests.utils import get_fake_secret_config
