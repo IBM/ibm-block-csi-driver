@@ -310,6 +310,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                       'name': name,
                       'capacity': '1024',
                       'mdisk_grp_name': pool_name,
+                      'IO_group_name': 'iogrp0',
                       'FC_id': '',
                       'se_copy': se_copy,
                       'deduplicated_copy': deduplicated_copy,
@@ -534,7 +535,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="different_pool")
         self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
-                                                                 pool='different_pool', thin=True)
+                                                                 pool='different_pool', iogrp='iogrp0',
+                                                                 thin=True)
 
     def test_create_snapshot_with_different_site_success(self):
         self._prepare_mocks_for_create_snapshot(different_pool_site=True)
@@ -548,14 +550,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool=None)
         self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
-                                                                 pool='pool_name', compressed=True, deduplicated=True)
+                                                                 pool='pool_name', iogrp='iogrp0',
+                                                                 compressed=True, deduplicated=True)
 
     def test_create_snapshot_with_different_space_efficiency_success(self):
         self._prepare_mocks_for_create_snapshot(source_has_deduplicated_copy=True)
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency="thin", pool=None)
         self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
-                                                                 pool='pool_name', thin=True)
+                                                                 pool='pool_name', iogrp='iogrp0', thin=True)
 
     def test_create_snapshot_no_deduplicated_copy_success(self):
         self._prepare_mocks_for_create_snapshot(support_deduplicated_copy=False)

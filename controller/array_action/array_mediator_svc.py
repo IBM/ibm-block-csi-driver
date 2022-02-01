@@ -534,7 +534,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         size_in_bytes = int(source_cli_volume.capacity)
         if not pool:
             pool = source_cli_volume.mdisk_grp_name
-        self._create_cli_volume(target_volume_name, size_in_bytes, space_efficiency, pool, None)
+        io_group = source_cli_volume.IO_group_name
+        self._create_cli_volume(target_volume_name, size_in_bytes, space_efficiency, pool, io_group)
 
     def _create_fcmap(self, source_volume_name, target_volume_name, is_copy):
         logger.info("creating FlashCopy Mapping from '{0}' to '{1}'".format(source_volume_name, target_volume_name))
