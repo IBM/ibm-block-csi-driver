@@ -4,6 +4,7 @@ import unittest
 
 # from unittest import mock as umock
 import grpc
+from csi_general import csi_pb2
 from mock import patch, Mock, MagicMock, call
 
 import controller.array_action.errors as array_errors
@@ -14,7 +15,6 @@ from controller.controller_server.csi_controller_server import CSIControllerServ
 from controller.controller_server.sync_lock import SyncLock
 from controller.controller_server.test_settings import volume_name, snapshot_name, snapshot_volume_name, \
     clone_volume_name, snapshot_volume_wwn, pool, space_efficiency, object_internal_id
-from controller.csi_general import csi_pb2
 from controller.tests import utils
 from controller.tests.utils import ProtoBufMock
 

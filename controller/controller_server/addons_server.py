@@ -1,4 +1,6 @@
 import grpc
+from csi_general import replication_pb2 as pb2
+from csi_general import replication_pb2_grpc as pb2_grpc
 
 from controller.array_action import errors as array_errors
 from controller.array_action.config import REPLICATION_DEFAULT_COPY_TYPE
@@ -7,8 +9,6 @@ from controller.common.csi_logger import get_stdout_logger
 from controller.controller_server import config, utils
 from controller.controller_server.decorators import csi_method
 from controller.controller_server.exception_handler import build_error_response
-from controller.csi_general import replication_pb2 as pb2
-from controller.csi_general import replication_pb2_grpc as pb2_grpc
 
 logger = get_stdout_logger()
 
