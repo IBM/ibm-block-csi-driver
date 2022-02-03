@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 class ArrayMediator(ABC):
 
     @abstractmethod
-    def __init__(self, user, password, address):
+    def __init__(self, user, password, endpoint):
         """
         This is the init function for the class.
         it should establish the connection to the storage system.

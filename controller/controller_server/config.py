@@ -1,5 +1,6 @@
+from csi_general import csi_pb2
+
 from controller.common.settings import ALL_ARRAY_TYPES
-from controller.csi_general import csi_pb2
 
 SUPPORTED_FS_TYPES = ["ext4", "xfs"]
 

@@ -2,6 +2,8 @@ import os.path
 
 import grpc
 import yaml
+from csi_general import csi_pb2
+from csi_general import csi_pb2_grpc
 from retry import retry
 
 import controller.array_action.errors as array_errors
@@ -12,13 +14,11 @@ from controller.array_action.storage_agent import get_agent, detect_array_type
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.node_info import NodeIdInfo
-from controller.common.utils import set_current_thread_name
 from controller.controller_server import messages as controller_messages
+from controller.controller_server.decorators import csi_method
 from controller.controller_server.errors import ObjectIdError, ValidationException, InvalidNodeId
-from controller.controller_server.exception_handler import handle_common_exceptions, handle_exception, \
+from controller.controller_server.exception_handler import handle_exception, \
     build_error_response
-from controller.csi_general import csi_pb2
-from controller.csi_general import csi_pb2_grpc
 
 logger = get_stdout_logger()
 
@@ -35,15 +35,12 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         with open(path, 'r') as yamlfile:
             self.cfg = yaml.safe_load(yamlfile)  # TODO: add the following when possible : Loader=yaml.FullLoader)
 
-    @handle_common_exceptions(csi_pb2.CreateVolumeResponse)
+    @csi_method(error_response_type=csi_pb2.CreateVolumeResponse, lock_request_attribute="name")
     def CreateVolume(self, request, context):
-        set_current_thread_name(request.name)
-        logger.info("create volume")
         try:
             utils.validate_create_volume_request(request)
         except ObjectIdError as ex:
-            return handle_exception(ex, context, grpc.StatusCode.NOT_FOUND,
-                                    csi_pb2.CreateVolumeResponse)
+            return handle_exception(ex, context, grpc.StatusCode.NOT_FOUND, csi_pb2.CreateVolumeResponse)
 
         logger.debug("volume name : {}".format(request.name))
 
@@ -119,7 +116,6 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 response = utils.generate_csi_create_volume_response(volume, array_connection_info.system_id,
                                                                      source_type)
-                logger.info("finished create volume")
                 return response
         except array_errors.InvalidArgumentError as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT, csi_pb2.CreateVolumeResponse)
@@ -195,10 +191,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.debug(message)
         return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS, csi_pb2.CreateVolumeResponse)
 
-    @handle_common_exceptions(csi_pb2.DeleteVolumeResponse)
+    @csi_method(error_response_type=csi_pb2.DeleteVolumeResponse, lock_request_attribute="volume_id")
     def DeleteVolume(self, request, context):
-        set_current_thread_name(request.volume_id)
-        logger.info("DeleteVolume")
         secrets = request.secrets
         utils.validate_delete_volume_request(request)
 
@@ -226,13 +220,10 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 return handle_exception(ex, context, grpc.StatusCode.PERMISSION_DENIED,
                                         csi_pb2.DeleteVolumeResponse)
 
-        logger.info("finished DeleteVolume")
         return csi_pb2.DeleteVolumeResponse()
 
-    @handle_common_exceptions(csi_pb2.ControllerPublishVolumeResponse)
+    @csi_method(error_response_type=csi_pb2.ControllerPublishVolumeResponse, lock_request_attribute="volume_id")
     def ControllerPublishVolume(self, request, context):
-        set_current_thread_name(request.volume_id)
-        logger.info("ControllerPublishVolume")
         try:
             utils.validate_publish_volume_request(request)
 
@@ -250,7 +241,6 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 lun, connectivity_type, array_initiators = array_mediator.map_volume_by_initiators(volume_id,
                                                                                                    initiators)
-            logger.info("finished ControllerPublishVolume")
             response = utils.generate_csi_publish_volume_response(lun,
                                                                   connectivity_type,
                                                                   self.cfg,
@@ -269,10 +259,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
                                     csi_pb2.ControllerPublishVolumeResponse)
 
-    @handle_common_exceptions(csi_pb2.ControllerUnpublishVolumeResponse)
+    @csi_method(error_response_type=csi_pb2.ControllerUnpublishVolumeResponse, lock_request_attribute="volume_id")
     def ControllerUnpublishVolume(self, request, context):
-        set_current_thread_name(request.volume_id)
-        logger.info("ControllerUnpublishVolume")
         try:
             utils.validate_unpublish_volume_request(request)
 
@@ -300,12 +288,10 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.debug("Idempotent case. volume is already unmapped.")
         except array_errors.ObjectNotFoundError:
             logger.debug("Idempotent case. volume is already deleted.")
-        logger.info("finished ControllerUnpublishVolume")
         return csi_pb2.ControllerUnpublishVolumeResponse()
 
-    @handle_common_exceptions(csi_pb2.ValidateVolumeCapabilitiesResponse)
+    @csi_method(error_response_type=csi_pb2.ValidateVolumeCapabilitiesResponse, lock_request_attribute="volume_id")
     def ValidateVolumeCapabilities(self, request, context):
-        logger.info("ValidateVolumeCapabilities")
         try:
             utils.validate_validate_volume_capabilities_request(request)
 
@@ -331,7 +317,6 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             if request.parameters:
                 utils.validate_parameters_match_volume(request.parameters, volume)
 
-            logger.info("finished ValidateVolumeCapabilities")
             return utils.generate_csi_validate_volume_capabilities_response(request.volume_context,
                                                                             request.volume_capabilities,
                                                                             request.parameters)
@@ -342,15 +327,12 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
                                     csi_pb2.CreateSnapshotResponse)
 
-    @handle_common_exceptions(csi_pb2.ListVolumesResponse)
+    @csi_method(error_response_type=csi_pb2.ListVolumesResponse)
     def ListVolumes(self, request, context):
-        logger.info("ListVolumes")
         raise NotImplementedError()
 
-    @handle_common_exceptions(csi_pb2.CreateSnapshotResponse)
+    @csi_method(error_response_type=csi_pb2.CreateSnapshotResponse, lock_request_attribute="name")
     def CreateSnapshot(self, request, context):
-        set_current_thread_name(request.name)
-        logger.info("Create snapshot")
         utils.validate_create_snapshot_request(request)
         source_volume_id = request.source_volume_id
         logger.info("Snapshot base name : {}. Source volume id : {}".format(request.name, source_volume_id))
@@ -393,7 +375,6 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 logger.debug("generating create snapshot response")
                 response = utils.generate_csi_create_snapshot_response(snapshot, system_id, source_volume_id)
-                logger.info("finished create snapshot")
                 return response
         except (ObjectIdError, array_errors.SnapshotSourcePoolMismatch, array_errors.SpaceEfficiencyNotSupported) as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
@@ -405,10 +386,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             return handle_exception(ex, context, grpc.StatusCode.RESOURCE_EXHAUSTED,
                                     csi_pb2.CreateSnapshotResponse)
 
-    @handle_common_exceptions(csi_pb2.DeleteSnapshotResponse)
+    @csi_method(error_response_type=csi_pb2.DeleteSnapshotResponse, lock_request_attribute="snapshot_id")
     def DeleteSnapshot(self, request, context):
-        set_current_thread_name(request.snapshot_id)
-        logger.info("Delete snapshot")
         secrets = request.secrets
         utils.validate_delete_snapshot_request(request)
         try:
@@ -434,18 +413,14 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             context.set_code(grpc.StatusCode.OK)
             return csi_pb2.DeleteSnapshotResponse()
 
-        logger.info("finished DeleteSnapshot")
         return csi_pb2.DeleteSnapshotResponse()
 
-    @handle_common_exceptions(csi_pb2.GetCapacityResponse)
+    @csi_method(error_response_type=csi_pb2.GetCapacityResponse)
     def GetCapacity(self, request, context):
-        logger.info("GetCapacity")
         raise NotImplementedError()
 
-    @handle_common_exceptions(csi_pb2.ControllerExpandVolumeResponse)
+    @csi_method(error_response_type=csi_pb2.ControllerExpandVolumeResponse, lock_request_attribute="volume_id")
     def ControllerExpandVolume(self, request, context):
-        set_current_thread_name(request.volume_id)
-        logger.info("ControllerExpandVolume")
         secrets = request.secrets
         utils.validate_expand_volume_request(request)
         try:
@@ -488,11 +463,13 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     raise array_errors.ObjectNotFoundError(volume_id)
 
             response = utils.generate_csi_expand_volume_response(volume_after_expand.capacity_bytes)
-            logger.info("finished expanding volume")
             return response
 
         except array_errors.NotEnoughSpaceInPool as ex:
             return handle_exception(ex, context, grpc.StatusCode.RESOURCE_EXHAUSTED,
+                                    csi_pb2.ControllerExpandVolumeResponse)
+        except array_errors.ObjectIsStillInUseError as ex:
+            return handle_exception(ex, context, grpc.StatusCode.INTERNAL,
                                     csi_pb2.ControllerExpandVolumeResponse)
 
     def ControllerGetCapabilities(self, request, context):
@@ -517,9 +494,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
     def get_identity_config(self, attribute_name):
         return self.cfg['identity'][attribute_name]
 
-    @handle_common_exceptions(csi_pb2.GetPluginInfoResponse)
+    @csi_method(error_response_type=csi_pb2.GetPluginInfoResponse)
     def GetPluginInfo(self, _, context):
-        logger.info("GetPluginInfo")
         name = self.get_identity_config("name")
         version = self.get_identity_config("version")
 
@@ -527,7 +503,6 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             message = "plugin name or version cannot be empty"
             return build_error_response(message, context, grpc.StatusCode.INTERNAL, csi_pb2.GetPluginInfoResponse)
 
-        logger.info("finished GetPluginInfo")
         return csi_pb2.GetPluginInfoResponse(name=name, vendor_version=version)
 
     def _get_volume_final_name(self, volume_parameters, name, array_mediator):

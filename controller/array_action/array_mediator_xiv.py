@@ -65,9 +65,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         return None
 
     def __init__(self, user, password, endpoint):
-        self.user = user
-        self.password = password
-        self.endpoint = endpoint
+        super().__init__(user, password, endpoint)
         self.client = None
         self._identifier = None
 

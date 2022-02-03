@@ -159,10 +159,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return None
 
     def __init__(self, user, password, endpoint):
-        self.user = user
+        super().__init__(user, password, endpoint)
         self.service_address = \
-            endpoint[0] if isinstance(endpoint, list) else endpoint
-        self.password = password
+            self.endpoint[0] if isinstance(self.endpoint, list) else self.endpoint
 
         self._connect()
         self._lock = RLock()

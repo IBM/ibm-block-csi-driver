@@ -1,13 +1,13 @@
 import grpc
+from csi_general import replication_pb2 as pb2
 from mock import patch, Mock
 
 from controller.controller_server.addons_server import ReplicationControllerServicer
-from controller.csi_general import replication_pb2 as pb2
-from controller.tests import utils
-from controller.tests.controller_server.csi_controller_server_test import BaseControllerSetUp, CommonControllerTest
 from controller.controller_server.config import PARAMETERS_SYSTEM_ID, PARAMETERS_COPY_TYPE
 from controller.controller_server.test_settings import volume_name, volume_wwn, object_internal_id, \
     other_object_internal_id, replication_name, system_id, copy_type
+from controller.tests import utils
+from controller.tests.controller_server.csi_controller_server_test import BaseControllerSetUp, CommonControllerTest
 
 
 class TestControllerServicerEnableVolumeReplication(BaseControllerSetUp, CommonControllerTest):
@@ -49,6 +49,10 @@ class TestControllerServicerEnableVolumeReplication(BaseControllerSetUp, CommonC
         self.mediator.get_replication.assert_called_once_with(object_internal_id, other_object_internal_id, system_id)
         self.mediator.create_replication.assert_called_once_with(object_internal_id, other_object_internal_id,
                                                                  system_id, copy_type)
+
+    @patch("controller.controller_server.addons_server.get_agent")
+    def test_enable_replication_already_processing(self, storage_agent):
+        self._test_request_already_processing(storage_agent, "volume_id", self.request.volume_id)
 
     @patch("controller.controller_server.addons_server.get_agent")
     def test_enable_replication_with_wrong_secrets(self, storage_agent):
