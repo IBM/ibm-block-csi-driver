@@ -115,12 +115,15 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_get_volume_with_cache(self):
         volume = self.volume_response
         volume_cache.update({volume.name: volume.id})
+        self.assertDictEqual(volume_cache, {volume.name: volume.id})
         self.client_mock.get_volume.return_value = volume
         volume = self.array.get_volume(
             self.volume_response.name,
             pool=self.volume_response.pool
         )
         self.assertEqual(volume.name, self.volume_response.name)
+        self.assertDictEqual(volume_cache, {})
+        self.client_mock.get_volumes_by_pool.assert_not_called()
 
     def test_get_volume_with_pool_context(self):
         self.client_mock.get_volumes_by_pool.return_value = [
@@ -131,6 +134,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             pool=self.volume_response.pool
         )
         self.assertEqual(volume.name, self.volume_response.name)
+        self.client_mock.get_volumes_by_pool.assert_called_once_with(self.volume_response.pool)
 
     def test_get_volume_with_pool_context_not_found(self):
         self.client_mock.get_volumes_by_pool.return_value = [
@@ -143,15 +147,20 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             )
 
     def test_create_volume_with_default_space_efficiency_success(self):
-        self._test_create_volume_with_space_efficiency_success('none')
+        self._test_create_volume_success(space_efficiency='none')
 
     def test_create_volume_with_thin_space_efficiency_success(self):
-        self._test_create_volume_with_space_efficiency_success('thin')
+        self._test_create_volume_success(space_efficiency='thin')
 
     def test_create_volume_with_empty_space_efficiency_success(self):
-        self._test_create_volume_with_space_efficiency_success('')
+        self._test_create_volume_success(space_efficiency='')
 
-    def _test_create_volume_with_space_efficiency_success(self, space_efficiency):
+    def test_create_volume_with_empty_cache(self):
+        self.assertDictEqual(volume_cache, {})
+        self._test_create_volume_success()
+        self.assertDictEqual(volume_cache, {'test_name': '0001'})
+
+    def _test_create_volume_success(self, space_efficiency=''):
         self.client_mock.create_volume.return_value = self.volume_response
         self.client_mock.get_volume.return_value = self.volume_response
         name = self.volume_response.name
@@ -172,14 +181,6 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         )
         self.assertEqual(volume.name, self.volume_response.name)
 
-    def test_create_volume_raise_already_exists(self):
-        self.client_mock.get_volumes_by_pool.return_value = [
-            self.volume_response,
-        ]
-        pool_id = self.volume_response.pool
-        with self.assertRaises(array_errors.VolumeAlreadyExists):
-            self.array.create_volume(self.volume_response.name, "1", 'thin', pool_id)
-
     def test_create_volume_fail_with_ClientException(self):
         self.client_mock.create_volume.side_effect = ClientException("500")
         with self.assertRaises(array_errors.VolumeCreationError):
@@ -191,12 +192,12 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             self.array.create_volume("fake_name", 1, 'thin', "fake_pool")
 
     def test_create_volume_fail_with_incorrect_id(self):
-        self.client_mock.get_volumes_by_pool.side_effect = InternalServerError("500", message="BE7A0005")
+        self.client_mock.create_volume.side_effect = InternalServerError("500", message="BE7A0005")
         with self.assertRaises(array_errors.PoolDoesNotExist):
             self.array.create_volume("fake_name", 1, 'thin', "fake_pool")
 
     def test_create_volume_fail_with_no_space_in_pool(self):
-        self.client_mock.get_volumes_by_pool.side_effect = InternalServerError("500", message="BE534459")
+        self.client_mock.create_volume.side_effect = InternalServerError("500", message="BE534459")
         with self.assertRaises(array_errors.NotEnoughSpaceInPool):
             self.array.create_volume("fake_name", 1, 'thin', "fake_pool")
 

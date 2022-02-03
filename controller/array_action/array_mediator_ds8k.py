@@ -251,21 +251,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 'tp': array_space_efficiency,
 
             })
-            logger.debug(
-                "Start to create volume with parameters: {}".format(cli_kwargs)
-            )
-
-            # get the volume before creating again, to make sure it is not existing,
-            # because volume name is not unique in ds8k.
-            api_volume = self._get_api_object_by_name(
-                name,
-                pool_id=pool_id
-            )
-            logger.info("Found volume {}".format(name))
-            if api_volume is not None:
-                raise array_errors.VolumeAlreadyExists(name, self.identifier)
+            logger.debug("Start to create volume with parameters: {}".format(cli_kwargs))
             api_volume = self.client.create_volume(**cli_kwargs)
-
             logger.info("finished creating volume {}".format(name))
             return self.client.get_volume(api_volume.id)
         except exceptions.ClientException as ex:
@@ -382,17 +369,15 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         if cached_volume_id:
             logger.debug("Found object: {}".format(cached_volume_id))
             api_volume = self._get_api_volume_by_id(volume_id=cached_volume_id)
-        if not api_volume:
-            api_volume = self._get_api_volume_by_name(volume_name=name,
-                                                      pool_id=pool_id)
+        if not api_volume or api_volume.name != name:
+            api_volume = self._get_api_volume_by_name(volume_name=name, pool_id=pool_id)
         return api_volume
 
     def get_volume(self, name, pool=None):
         logger.debug("Getting volume {} in pool {}".format(name, pool))
         api_volume = self._get_api_object_by_name(name, pool)
         if api_volume:
-            with self._lock:
-                volume_cache.update({api_volume.name: api_volume.id})
+            self._update_or_delete_cache(api_volume.name, api_volume.id)
             return self._generate_volume_response(api_volume)
         raise array_errors.ObjectNotFoundError(name)
 
@@ -540,8 +525,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         api_snapshot = self._get_api_snapshot(snapshot_name, pool)
         if api_snapshot is None:
             return None
-        with self._lock:
-            volume_cache.update({api_snapshot.name: api_snapshot.id})
+        self._update_or_delete_cache(api_snapshot.name, api_snapshot.id)
         return self._generate_snapshot_response_with_verification(api_snapshot)
 
     def _create_similar_volume(self, target_volume_name, source_api_volume, space_efficiency, pool):
@@ -699,6 +683,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def get_flashcopy_state(self, flashcopy_id):
         flashcopy_process = self._get_flashcopy_process(flashcopy_id)
         return flashcopy_process.state
+
+    def _update_or_delete_cache(self, object_name, object_id):
+        with self._lock:
+            if not volume_cache.pop(object_name, None):
+                volume_cache.update({object_name: object_id})
 
     def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
         raise NotImplementedError
