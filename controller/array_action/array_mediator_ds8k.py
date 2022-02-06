@@ -366,7 +366,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         self._delete_object(volume_id)
         logger.info("finished deleting volume {}".format(volume_id))
 
-    def _get_api_object_by_name(self, name, pool_id):
+    def _get_api_volume_with_cache(self, name, pool_id):
         logger.debug("looking in cache {} for object {}".format(volume_cache, name))
         with volume_cache_lock:
             cached_volume_id = volume_cache.get(name, None)
@@ -380,7 +380,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def get_volume(self, name, pool=None):
         logger.debug("getting volume {} in pool {}".format(name, pool))
-        api_volume = self._get_api_object_by_name(name, pool)
+        api_volume = self._get_api_volume_with_cache(name, pool)
         if api_volume:
             _update_or_delete_cache(api_volume.name, api_volume.id)
             return self._generate_volume_response(api_volume)
@@ -512,7 +512,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def _get_api_snapshot(self, snapshot_name, pool_id=None):
         logger.debug("get snapshot : {} in pool: {}".format(snapshot_name, pool_id))
-        api_snapshot = self._get_api_object_by_name(snapshot_name, pool_id)
+        api_snapshot = self._get_api_volume_with_cache(snapshot_name, pool_id)
         if not api_snapshot:
             return None
         if not is_snapshot(api_snapshot):

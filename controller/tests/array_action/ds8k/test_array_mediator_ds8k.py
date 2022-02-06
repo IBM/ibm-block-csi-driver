@@ -14,6 +14,7 @@ from controller.array_action.array_mediator_ds8k import LOGIN_PORT_WWPN, LOGIN_P
 from controller.common.node_info import Initiators
 
 
+@patch.dict('controller.array_action.array_mediator_ds8k.volume_cache')
 class TestArrayMediatorDS8K(unittest.TestCase):
 
     def setUp(self):
@@ -70,7 +71,6 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         )
 
         self.array = DS8KArrayMediator("user", "password", self.endpoint)
-        volume_cache.clear()
 
     def test_connect_with_incorrect_credentials(self):
         self.client_mock.get_system.side_effect = \
@@ -125,8 +125,6 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self._test_get_volume()
 
     def test_get_volume_with_empty_cache(self):
-        self.assertDictEqual(volume_cache, {})
-
         self._test_get_volume()
 
         cache_entry = {self.volume_response.name: self.volume_response.id}
@@ -134,9 +132,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.get_volumes_by_pool.assert_called_once_with(self.volume_response.pool)
 
     def test_get_volume_with_volume_in_cache(self):
-        cache_entry = {self.volume_response.name: self.volume_response.id}
-        volume_cache.update(cache_entry)
-        self.assertDictEqual(volume_cache, cache_entry)
+        volume_cache[self.volume_response.name] = self.volume_response.id
 
         self._test_get_volume()
 
@@ -174,7 +170,6 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self._test_create_volume_success(space_efficiency='')
 
     def test_create_volume_with_empty_cache(self):
-        self.assertDictEqual(volume_cache, {})
         self._test_create_volume_success()
         self.assertDictEqual(volume_cache, {self.volume_response.name: self.volume_response.id})
 
@@ -227,7 +222,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_delete_volume_with_volumes_in_cache(self):
         self.client_mock.get_volume.return_value = self.volume_response
         scsi_id = "volume_scsi_id_{}".format(self.volume_response.id)
-        volume_cache.update({self.volume_response.name: self.volume_response.id, "test_name_fake": "test_id_fake"})
+        volume_cache[self.volume_response.name] = self.volume_response.id
+        volume_cache["test_name_fake"] = "test_id_fake"
         self.array.delete_volume(scsi_id)
         self.assertDictEqual(volume_cache, {"test_name_fake": "test_id_fake"})
 
@@ -516,8 +512,6 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self._test_get_snapshot_success()
 
     def test_get_snapshot_with_empty_cache(self):
-        self.assertDictEqual(volume_cache, {})
-
         self._test_get_snapshot_success()
 
         cache_entry = {self.snapshot_response.name: self.snapshot_response.id}
@@ -525,9 +519,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.get_volumes_by_pool.assert_called_once_with(self.snapshot_response.pool)
 
     def test_get_snapshot_with_volume_in_cache(self):
-        cache_entry = {self.snapshot_response.name: self.snapshot_response.id}
-        volume_cache.update(cache_entry)
-        self.assertDictEqual(volume_cache, cache_entry)
+        volume_cache[self.snapshot_response.name] = self.snapshot_response.id
 
         self._test_get_snapshot_success()
 
@@ -613,7 +605,6 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_create_snapshot_with_empty_cache(self):
         self._prepare_mocks_for_create_snapshot()
 
-        self.assertDictEqual(volume_cache, {})
         self.array.create_snapshot("volume_id", "target_volume", space_efficiency=None, pool=None)
 
         self.assertDictEqual(volume_cache, {self.snapshot_response.name: self.snapshot_response.id})
@@ -684,7 +675,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_delete_snapshot_with_volumes_in_cache(self):
         self._prepare_mocks_for_snapshot()
-        volume_cache.update({self.snapshot_response.name: self.snapshot_response.id, "test_name_fake": "test_id_fake"})
+        volume_cache[self.snapshot_response.name] = self.snapshot_response.id
+        volume_cache["test_name_fake"] = "test_id_fake"
         self.array.delete_snapshot(self.snapshot_response.id)
         self.assertDictEqual(volume_cache, {"test_name_fake": "test_id_fake"})
 
