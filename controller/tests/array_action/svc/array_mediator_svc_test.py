@@ -576,7 +576,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool=None)
         self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
-                                                                 pool='pool1', thin=True, iogrp='iogrp0')
+                                                                 pool='pool1', iogrp='iogrp0', thin=True)
         self.svc.client.svctask.mkfcmap.assert_called_once_with(source="source_volume", target="test_snapshot",
                                                                 copyrate=0)
 
@@ -585,7 +585,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="pool1:pool2")
         self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
-                                                                 pool='pool1:pool2', thin=True, iogrp='iogrp0')
+                                                                 pool='pool1:pool2', iogrp='iogrp0', thin=True)
         self.svc.client.svctask.mkfcmap.assert_called_once_with(source="source_volume", target="test_snapshot",
                                                                 copyrate=0)
 
