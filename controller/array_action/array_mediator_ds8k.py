@@ -47,6 +47,7 @@ ARRAY_SPACE_EFFICIENCY_THIN = ds8k_types.DS8K_TP_ESE
 ARRAY_SPACE_EFFICIENCY_NONE = ds8k_types.DS8K_TP_NONE
 
 volume_cache = dict()
+volume_cache_lock = RLock()
 
 
 def parse_version(bundle):
@@ -118,6 +119,12 @@ def _get_parameter_space_efficiency(array_space_efficiency):
     raise array_errors.SpaceEfficiencyNotSupported(array_space_efficiency)
 
 
+def _update_or_delete_cache(object_name, object_id):
+    with volume_cache_lock:
+        if volume_cache.pop(object_name, None) is None:
+            volume_cache.update({object_name: object_id})
+
+
 class DS8KArrayMediator(ArrayMediatorAbstract):
     SUPPORTED_FROM_VERSION = '7.5.1'
 
@@ -164,7 +171,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             self.endpoint[0] if isinstance(self.endpoint, list) else self.endpoint
 
         self._connect()
-        self._lock = RLock()
 
     def _connect(self):
         try:
@@ -273,7 +279,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         array_space_efficiency = get_array_space_efficiency(space_efficiency)
         api_volume = self._create_api_volume(name, size_in_bytes, array_space_efficiency, pool)
         logger.debug("Updating volume {} in cache".format(api_volume.name))
-        with self._lock:
+        with volume_cache_lock:
             volume_cache.update({api_volume.name: api_volume.id})
         return self._generate_volume_response(api_volume)
 
@@ -351,7 +357,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             self._delete_flashcopy(flashcopy_id=flashcopy_as_target.id)
         self._delete_volume(object_id)
         logger.debug("Removing object {} from cache".format(api_volume.name))
-        with self._lock:
+        with volume_cache_lock:
             volume_cache.pop(api_volume.name, None)
 
     @convert_scsi_ids_to_array_ids()
@@ -362,7 +368,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def _get_api_object_by_name(self, name, pool_id):
         logger.debug("Looking in cache {} for object {}".format(volume_cache, name))
-        with self._lock:
+        with volume_cache_lock:
             cached_volume_id = volume_cache.get(name, None)
         api_volume = None
         if cached_volume_id:
@@ -376,7 +382,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.debug("Getting volume {} in pool {}".format(name, pool))
         api_volume = self._get_api_object_by_name(name, pool)
         if api_volume:
-            self._update_or_delete_cache(api_volume.name, api_volume.id)
+            _update_or_delete_cache(api_volume.name, api_volume.id)
             return self._generate_volume_response(api_volume)
         raise array_errors.ObjectNotFoundError(name)
 
@@ -524,7 +530,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         api_snapshot = self._get_api_snapshot(snapshot_name, pool)
         if api_snapshot is None:
             return None
-        self._update_or_delete_cache(api_snapshot.name, api_snapshot.id)
+        _update_or_delete_cache(api_snapshot.name, api_snapshot.id)
         return self._generate_snapshot_response_with_verification(api_snapshot)
 
     def _create_similar_volume(self, target_volume_name, source_api_volume, space_efficiency, pool):
@@ -600,7 +606,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         target_api_volume = self._create_snapshot(snapshot_name, source_api_volume, space_efficiency, pool)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         logger.debug("Updating snapshot {} in cache".format(target_api_volume.name))
-        with self._lock:
+        with volume_cache_lock:
             volume_cache.update({target_api_volume.name: target_api_volume.id})
         return self._generate_snapshot_response(target_api_volume, volume_id)
 
@@ -682,11 +688,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def get_flashcopy_state(self, flashcopy_id):
         flashcopy_process = self._get_flashcopy_process(flashcopy_id)
         return flashcopy_process.state
-
-    def _update_or_delete_cache(self, object_name, object_id):
-        with self._lock:
-            if not volume_cache.pop(object_name, None):
-                volume_cache.update({object_name: object_id})
 
     def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
         raise NotImplementedError
