@@ -46,9 +46,6 @@ FLASHCOPY_STATE_VALID = 'valid'
 ARRAY_SPACE_EFFICIENCY_THIN = ds8k_types.DS8K_TP_ESE
 ARRAY_SPACE_EFFICIENCY_NONE = ds8k_types.DS8K_TP_NONE
 
-volume_cache = dict()
-volume_cache_lock = RLock()
-
 
 def parse_version(bundle):
     """
@@ -119,12 +116,6 @@ def _get_parameter_space_efficiency(array_space_efficiency):
     raise array_errors.SpaceEfficiencyNotSupported(array_space_efficiency)
 
 
-def _update_or_delete_cache(object_name, object_id):
-    with volume_cache_lock:
-        if volume_cache.pop(object_name, None) is None:
-            volume_cache[object_name] = object_id
-
-
 class DS8KArrayMediator(ArrayMediatorAbstract):
     SUPPORTED_FROM_VERSION = '7.5.1'
 
@@ -171,6 +162,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             self.endpoint[0] if isinstance(self.endpoint, list) else self.endpoint
 
         self._connect()
+        self.volume_cache = dict()
+        self.volume_cache_lock = RLock()
 
     def _connect(self):
         try:
@@ -229,6 +222,11 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             copy_source_id = self._generate_volume_scsi_identifier(volume_id=source_volume_id)
         return copy_source_id
 
+    def _update_or_delete_cache(self, object_name, object_id):
+        with self.volume_cache_lock:
+            if self.volume_cache.pop(object_name, None) is None:
+                self.volume_cache[object_name] = object_id
+
     def _generate_volume_response(self, api_volume):
         space_efficiency = _get_parameter_space_efficiency(api_volume.tp)
         return Volume(
@@ -279,8 +277,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         array_space_efficiency = get_array_space_efficiency(space_efficiency)
         api_volume = self._create_api_volume(name, size_in_bytes, array_space_efficiency, pool)
         logger.debug("updating volume {} in cache".format(api_volume.name))
-        with volume_cache_lock:
-            volume_cache[api_volume.name] = api_volume.id
+        with self.volume_cache_lock:
+            self.volume_cache[api_volume.name] = api_volume.id
         return self._generate_volume_response(api_volume)
 
     def _extend_volume(self, api_volume, new_size_in_bytes):
@@ -357,8 +355,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             self._delete_flashcopy(flashcopy_id=flashcopy_as_target.id)
         self._delete_volume(object_id)
         logger.debug("removing object {} from cache".format(api_volume.name))
-        with volume_cache_lock:
-            volume_cache.pop(api_volume.name, None)
+        with self.volume_cache_lock:
+            self.volume_cache.pop(api_volume.name, None)
 
     @convert_scsi_ids_to_array_ids()
     def delete_volume(self, volume_id):
@@ -367,9 +365,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.info("finished deleting volume {}".format(volume_id))
 
     def _get_api_volume_with_cache(self, name, pool_id):
-        logger.debug("looking in cache {} for object {}".format(volume_cache, name))
-        with volume_cache_lock:
-            cached_volume_id = volume_cache.get(name, None)
+        logger.debug("looking in cache {} for object {}".format(self.volume_cache, name))
+        with self.volume_cache_lock:
+            cached_volume_id = self.volume_cache.get(name, None)
         api_volume = None
         if cached_volume_id:
             logger.debug("found object: {}".format(cached_volume_id))
@@ -382,7 +380,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.debug("getting volume {} in pool {}".format(name, pool))
         api_volume = self._get_api_volume_with_cache(name, pool)
         if api_volume:
-            _update_or_delete_cache(api_volume.name, api_volume.id)
+            self._update_or_delete_cache(api_volume.name, api_volume.id)
             return self._generate_volume_response(api_volume)
         raise array_errors.ObjectNotFoundError(name)
 
@@ -530,7 +528,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         api_snapshot = self._get_api_snapshot(snapshot_name, pool)
         if api_snapshot is None:
             return None
-        _update_or_delete_cache(api_snapshot.name, api_snapshot.id)
+        self._update_or_delete_cache(api_snapshot.name, api_snapshot.id)
         return self._generate_snapshot_response_with_verification(api_snapshot)
 
     def _create_similar_volume(self, target_volume_name, source_api_volume, space_efficiency, pool):
@@ -606,8 +604,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         target_api_volume = self._create_snapshot(snapshot_name, source_api_volume, space_efficiency, pool)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         logger.debug("updating snapshot {} in cache".format(target_api_volume.name))
-        with volume_cache_lock:
-            volume_cache[target_api_volume.name] = target_api_volume.id
+        with self.volume_cache_lock:
+            self.volume_cache[target_api_volume.name] = target_api_volume.id
         return self._generate_snapshot_response(target_api_volume, volume_id)
 
     def _delete_flashcopy(self, flashcopy_id):
