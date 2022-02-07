@@ -1,5 +1,3 @@
-from threading import RLock
-
 from decorator import decorator
 from packaging.version import parse
 from pyds8k import exceptions
