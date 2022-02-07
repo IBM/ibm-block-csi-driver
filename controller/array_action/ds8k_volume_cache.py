@@ -37,9 +37,6 @@ class volumeCacheByManagement:
                 logger.debug("removing {} from cache".format(key))
                 del self.volume_cache_by_address[address][key]
 
-    def __str__(self):
-        return "volume cache: {}".format(self.volume_cache_by_address)
-
 
 volume_cache = volumeCacheByManagement()
 
@@ -61,3 +58,6 @@ class volumeCache:
 
     def add_or_delete(self, key, value):
         volume_cache.add_or_delete(self.service_address, key, value)
+
+    def __str__(self):
+        return "volume cache: {}".format(volume_cache.volume_cache_by_address)
