@@ -347,6 +347,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             self._delete_flashcopy(flashcopy_id=flashcopy_as_target.id)
         self._delete_volume(object_id)
         self.volume_cache.remove(api_volume.name)
+        logger.debug("updated cache: {}".format(self.volume_cache))
 
     @convert_scsi_ids_to_array_ids()
     def delete_volume(self, volume_id):
