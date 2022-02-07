@@ -11,6 +11,7 @@ from controller.array_action.array_mediator_ds8k import DS8KArrayMediator, FLASH
     FLASHCOPY_PERMIT_SPACE_EFFICIENT_TARGET_OPTION
 from controller.array_action.array_mediator_ds8k import LOGIN_PORT_WWPN, LOGIN_PORT_STATE, \
     LOGIN_PORT_STATE_ONLINE
+from controller.array_action.ds8k_volume_cahce import volumeCache
 from controller.common.node_info import Initiators
 
 
@@ -70,8 +71,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         )
 
         self.array = DS8KArrayMediator("user", "password", self.endpoint)
-        self.array.volume_cache = dict()
-        self.volume_cache = self.array.volume_cache
+        self.array.volume_cache = volumeCache()
+        self.volume_cache = self.array.volume_cache.cache
 
     def test_connect_with_incorrect_credentials(self):
         self.client_mock.get_system.side_effect = \
