@@ -114,7 +114,7 @@ class TestStorageAgent(unittest.TestCase):
         with self.assertRaises(FailedToFindStorageSystemType):
             detect_array_type(["unknown_host", ])
 
-    def test_init_StorageAgent_prepopulates_one_mediator(self):
+    def test_init_storage_agent_prepopulates_one_mediator(self):
         # one mediator client is already initialized.
         self.client_mock.get_system.assert_called_once_with()
 
@@ -216,17 +216,17 @@ class TestStorageAgent(unittest.TestCase):
 
         # max_size for ds8k is 10
         for _ in range(10):
-            t = Thread(target=blocking_action)
-            t.start()
+            thread = Thread(target=blocking_action)
+            thread.start()
 
         # all the clients are in use, the new action waits for an available one.
-        q = Queue()
-        new_thread = Thread(target=new_action, args=(q,))
+        queue = Queue()
+        new_thread = Thread(target=new_action, args=(queue,))
         new_thread.start()
         new_thread.join()
 
         if is_timeout:
-            self.assertTrue(q.empty())
+            self.assertTrue(queue.empty())
         else:
-            self.assertFalse(q.empty())
-            self.assertTrue(q.get() is True)
+            self.assertFalse(queue.empty())
+            self.assertTrue(queue.get() is True)

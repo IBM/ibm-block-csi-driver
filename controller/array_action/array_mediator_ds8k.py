@@ -11,7 +11,7 @@ from controller.array_action import config
 from controller.array_action.array_action_types import Volume, Snapshot
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.ds8k_rest_client import RESTClient, scsilun_to_int
-from controller.array_action.utils import classproperty
+from controller.array_action.utils import ClassProperty
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 
@@ -117,40 +117,40 @@ def _get_parameter_space_efficiency(array_space_efficiency):
 class DS8KArrayMediator(ArrayMediatorAbstract):
     SUPPORTED_FROM_VERSION = '7.5.1'
 
-    @classproperty
+    @ClassProperty
     def array_type(self):
         return settings.ARRAY_TYPE_DS8K
 
-    @classproperty
+    @ClassProperty
     def port(self):
         return 8452
 
-    @classproperty
+    @ClassProperty
     def max_object_name_length(self):
         return 16
 
-    @classproperty
+    @ClassProperty
     def max_object_prefix_length(self):
         return 5
 
-    @classproperty
+    @ClassProperty
     def max_connections(self):
         # max for rest api is 128.
         return 50
 
-    @classproperty
+    @ClassProperty
     def minimal_volume_size_in_bytes(self):
         return 512  # 1 block, 512 bytes
 
-    @classproperty
+    @ClassProperty
     def maximal_volume_size_in_bytes(self):
         return 16 * 1024 * 1024 * 1024 * 1024
 
-    @classproperty
+    @ClassProperty
     def max_lun_retries(self):
         return 10
 
-    @classproperty
+    @ClassProperty
     def default_object_prefix(self):
         return None
 
