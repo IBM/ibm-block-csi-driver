@@ -242,7 +242,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 'name': name,
                 'capacity_in_bytes': size_in_bytes,
                 'pool_id': pool_id,
-                'tp': array_space_efficiency,
+                'thin_provisioning': array_space_efficiency,
 
             })
             logger.debug(

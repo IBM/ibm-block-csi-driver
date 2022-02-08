@@ -156,7 +156,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.create_volume.assert_called_once_with(
             pool_id=pool_id,
             capacity_in_bytes=self.volume_response.cap,
-            tp=space_efficiency,
+            thin_provisioning=space_efficiency,
             name='test_name',
         )
         self.assertEqual(volume.name, self.volume_response.name)
@@ -549,7 +549,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.assertEqual(snapshot.name, snapshot_response.name)
         self.assertEqual(snapshot.id, self.array._generate_volume_scsi_identifier(snapshot_response.id))
         self.client_mock.create_volume.assert_called_once_with(name='target_volume', capacity_in_bytes=1073741824,
-                                                               pool_id='fake_pool', tp='none')
+                                                               pool_id='fake_pool', thin_provisioning='none')
 
     def test_create_snapshot_with_different_pool_success(self):
         self._prepare_mocks_for_create_snapshot()
@@ -557,7 +557,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.array.create_snapshot("volume_id", "target_volume", space_efficiency=None, pool="different_pool")
 
         self.client_mock.create_volume.assert_called_once_with(name='target_volume', capacity_in_bytes=1073741824,
-                                                               pool_id='different_pool', tp='none')
+                                                               pool_id='different_pool', thin_provisioning='none')
 
     def _test_create_snapshot_with_space_efficiency_success(self, source_volume_space_efficiency,
                                                             space_efficiency_called, space_efficiency_parameter=None):
@@ -570,7 +570,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                                        pool=None)
 
         self.client_mock.create_volume.assert_called_with(name='target_volume', capacity_in_bytes=1073741824,
-                                                          pool_id='fake_pool', tp=space_efficiency_called)
+                                                          pool_id='fake_pool',
+                                                          thin_provisioning=space_efficiency_called)
 
     def test_create_snapshot_with_specified_source_volume_space_efficiency_success(self):
         self._test_create_snapshot_with_space_efficiency_success(source_volume_space_efficiency="none",
