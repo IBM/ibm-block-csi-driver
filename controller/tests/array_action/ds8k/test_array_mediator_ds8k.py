@@ -14,7 +14,7 @@ from controller.array_action.array_mediator_ds8k import LOGIN_PORT_WWPN, LOGIN_P
 from controller.common.node_info import Initiators
 
 
-@patch.dict("controller.array_action.ds8k_volume_cache.volume_cache_by_management.volume_cache_by_address")
+@patch.dict("controller.array_action.ds8k_volume_cache.volume_cache_by_address.volume_cache_by_address")
 class TestArrayMediatorDS8K(unittest.TestCase):
 
     def setUp(self):
