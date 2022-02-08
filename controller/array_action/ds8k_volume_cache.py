@@ -26,8 +26,11 @@ class volumeCacheByAddress:
     def get(self, address, key):
         logger.debug("getting {} from cache".format(key))
         with self.cache_lock:
-            if key:
-                return self.volume_cache_by_address[address].get(key)
+            return self.volume_cache_by_address[address].get(key)
+
+    def get_all(self, address):
+        logger.debug("getting cache for address {}".format(address))
+        with self.cache_lock:
             return self.volume_cache_by_address.get(address)
 
     def add_or_delete(self, address, key, value):
@@ -53,8 +56,11 @@ class volumeCache:
     def remove(self, key):
         volume_cache_by_address.remove(self.service_address, key)
 
-    def get(self, key=None):
+    def get(self, key):
         return volume_cache_by_address.get(self.service_address, key)
+
+    def get_all(self):
+        return volume_cache_by_address.get_all(self.service_address)
 
     def add_or_delete(self, key, value):
         volume_cache_by_address.add_or_delete(self.service_address, key, value)
