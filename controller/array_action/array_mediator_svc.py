@@ -238,6 +238,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return self.client.transport.transport.get_transport().is_active()
 
     def _generate_volume_response(self, cli_volume):
+        pool = self._get_volume_pool(cli_volume)
         source_volume_wwn = self._get_source_volume_wwn_if_exists(cli_volume)
         space_efficiency = _get_cli_volume_space_efficiency(cli_volume)
         return Volume(
@@ -246,7 +247,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             internal_id=cli_volume.id,
             name=cli_volume.name,
             array_address=self.endpoint,
-            pool=cli_volume.mdisk_grp_name,
+            pool=pool,
             copy_source_id=source_volume_wwn,
             array_type=self.array_type,
             space_efficiency=space_efficiency,
@@ -316,6 +317,18 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return None
         source_volume_name = fcmap.source_vdisk_name
         return self._get_wwn_by_volume_name_if_exists(source_volume_name)
+
+    def _get_volume_pools(self, cli_volume):
+        pool = cli_volume.mdisk_grp_name
+        if isinstance(pool, list):
+            pool_names = pool[:]
+            pool_names.remove('many')
+            return pool_names
+        return [pool]
+
+    def _get_volume_pool(self, cli_volume):
+        pools = self._get_volume_pools(cli_volume)
+        return ':'.join(pools)
 
     def get_volume(self, name, pool=None):
         cli_volume = self._get_cli_volume(name)
@@ -531,7 +544,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             space_efficiency = _get_cli_volume_space_efficiency(source_cli_volume)
         size_in_bytes = int(source_cli_volume.capacity)
         if not pool:
-            pool = source_cli_volume.mdisk_grp_name
+            pool = self._get_volume_pools(source_cli_volume)[0]
         self._create_cli_volume(target_volume_name, size_in_bytes, space_efficiency, pool)
 
     def _create_fcmap(self, source_volume_name, target_volume_name, is_copy):
@@ -669,8 +682,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         raise array_errors.PoolDoesNotExist(pool, self.endpoint)
 
     def _is_cli_volume_in_site(self, cli_volume, site_name):
-        volume_site_name = self._get_pool_site(cli_volume.mdisk_grp_name)
-        return volume_site_name == site_name
+        volume_pools = self._get_volume_pools(cli_volume)
+        for pool in volume_pools:
+            volume_site_name = self._get_pool_site(pool)
+            if volume_site_name == site_name:
+                return True
+        return False
 
     def _get_rcrelationships_as_master_in_cluster(self, volume_name):
         filter_value = 'master_vdisk_name={}:aux_cluster_id={}'.format(volume_name, self.identifier)
@@ -678,7 +695,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _get_cli_volume_in_pool_site(self, volume_name, pool_name):
         cli_volume = self._get_cli_volume(volume_name)
-        if not pool_name:
+        if not pool_name or ':' in pool_name:
             return cli_volume
         pool_site_name = self._get_pool_site(pool_name)
         if self._is_cli_volume_in_site(cli_volume, pool_site_name):
