@@ -357,7 +357,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         cached_volume_id = self.volume_cache.get(name)
         api_volume = None
         if cached_volume_id:
-            logger.debug("found object: {} in cache".format(cached_volume_id))
+            logger.debug("found object id: {} in cache".format(cached_volume_id))
             api_volume = self._get_api_volume_by_id(volume_id=cached_volume_id)
         if not api_volume or api_volume.name != name:
             api_volume = self._get_api_volume_by_name(volume_name=name, pool_id=pool_id)
