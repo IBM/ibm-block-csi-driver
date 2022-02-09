@@ -1,6 +1,6 @@
 import unittest
 from queue import Queue
-from threading import Thread
+from threading import Lock, Thread
 from time import sleep
 
 from mock import patch, NonCallableMagicMock, Mock
@@ -161,6 +161,7 @@ class TestStorageAgent(unittest.TestCase):
         self.assertEqual(self.agent.conn_pool.current_size, 1)
 
     def test_get_multiple_mediators_parallelly_in_different_threads(self):
+        lock = Lock()
 
         def verify_mediator(current_size):
             agent = get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test", password="test"))
@@ -169,15 +170,18 @@ class TestStorageAgent(unittest.TestCase):
                 self.assertEqual(agent.conn_pool.current_size, current_size)
                 # get_system is called in setUp() too.
                 self.assertEqual(self.client_mock.get_system.call_count, current_size + 1)
-                sleep(0.2)
+                lock.acquire()
+                lock.release()
 
         t1 = Thread(target=verify_mediator, args=(1,))
         t2 = Thread(target=verify_mediator, args=(2,))
         t3 = Thread(target=verify_mediator, args=(3,))
 
+        lock.acquire()
         t1.start()
         t2.start()
         t3.start()
+        lock.release()
         t1.join()
         t2.join()
         t3.join()
