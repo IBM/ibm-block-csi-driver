@@ -11,8 +11,8 @@ from controller.array_action import config
 from controller.array_action.array_action_types import Volume, Snapshot
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.ds8k_rest_client import RESTClient, scsilun_to_int
-from controller.array_action.utils import classproperty
 from controller.array_action.ds8k_volume_cache import volumeCache
+from controller.array_action.utils import ClassProperty
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 
