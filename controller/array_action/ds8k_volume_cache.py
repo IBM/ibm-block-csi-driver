@@ -6,7 +6,7 @@ from controller.common.csi_logger import get_stdout_logger
 logger = get_stdout_logger()
 
 
-class volumeCacheByAddress:
+class VolumeCacheByAddress:
     def __init__(self):
         logger.debug("creating a new cache")
         self._volume_cache_by_address = defaultdict(dict)
@@ -28,11 +28,6 @@ class volumeCacheByAddress:
         with self._cache_lock:
             return self._volume_cache_by_address[address].get(key)
 
-    def get_all(self, address):
-        logger.debug("getting cache for address {}".format(address))
-        with self._cache_lock:
-            return self._volume_cache_by_address.get(address)
-
     def add_or_delete(self, address, key, value):
         with self._cache_lock:
             if self._volume_cache_by_address[address].get(key) is None:
@@ -43,10 +38,10 @@ class volumeCacheByAddress:
                 del self._volume_cache_by_address[address][key]
 
 
-volume_cache_by_address = volumeCacheByAddress()
+volume_cache_by_address = VolumeCacheByAddress()
 
 
-class volumeCache:
+class VolumeCache:
     def __init__(self, service_address):
         self._service_address = service_address
 
@@ -58,9 +53,6 @@ class volumeCache:
 
     def get(self, key):
         return volume_cache_by_address.get(self._service_address, key)
-
-    def get_all(self):
-        return volume_cache_by_address.get_all(self._service_address)
 
     def add_or_delete(self, key, value):
         volume_cache_by_address.add_or_delete(self._service_address, key, value)
