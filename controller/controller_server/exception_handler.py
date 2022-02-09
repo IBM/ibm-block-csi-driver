@@ -31,14 +31,14 @@ def build_error_response(message, context, status_code, response_type):
     return _build_non_ok_response(message, context, status_code, response_type)
 
 
-def handle_exception(ex, context, status_code, response_type):
-    logger.exception(ex)
-    return _build_non_ok_response(str(ex), context, status_code, response_type)
+def handle_exception(exception, context, status_code, response_type):
+    logger.exception(exception)
+    return _build_non_ok_response(str(exception), context, status_code, response_type)
 
 
 def handle_common_exceptions(controller_method, servicer, request, context, response_type):
     try:
         return controller_method(servicer, request, context)
-    except Exception as ex:
-        status_code = status_codes_by_exception.get(type(ex), grpc.StatusCode.INTERNAL)
-        return handle_exception(ex, context, status_code, response_type)
+    except Exception as exception:
+        status_code = status_codes_by_exception.get(type(exception), grpc.StatusCode.INTERNAL)
+        return handle_exception(exception, context, status_code, response_type)
