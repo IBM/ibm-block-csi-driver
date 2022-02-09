@@ -160,8 +160,15 @@ class TestStorageAgent(unittest.TestCase):
         # After some iteration, the inactive client is disconnected and removed.
         self.assertEqual(self.agent.conn_pool.current_size, 1)
 
-    def test_get_multiple_mediators_parallelly_in_different_threads(self):
-        lock = Lock()
+    @staticmethod
+    def _wait_until_equal(first_by_ref, second):
+        while first_by_ref[0] != second:
+            sleep(0.1)
+
+    def test_get_multiple_mediators_parallely_in_different_threads(self):
+        keep_alive_lock = Lock()
+        count_lock = Lock()
+        count = 0
 
         def verify_mediator(current_size):
             agent = get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test", password="test"))
@@ -170,18 +177,26 @@ class TestStorageAgent(unittest.TestCase):
                 self.assertEqual(agent.conn_pool.current_size, current_size)
                 # get_system is called in setUp() too.
                 self.assertEqual(self.client_mock.get_system.call_count, current_size + 1)
-                lock.acquire()
-                lock.release()
+
+                nonlocal count
+                with count_lock:
+                    # https://github.com/PyCQA/pylint/issues/5785
+                    count += 1  # pylint: disable=undefined-variable
+                with keep_alive_lock:
+                    pass
 
         t1 = Thread(target=verify_mediator, args=(1,))
         t2 = Thread(target=verify_mediator, args=(2,))
         t3 = Thread(target=verify_mediator, args=(3,))
 
-        lock.acquire()
-        t1.start()
-        t2.start()
-        t3.start()
-        lock.release()
+        with keep_alive_lock:
+            t1.start()
+            self._wait_until_equal([count], 1)
+            t2.start()
+            self._wait_until_equal([count], 2)
+            t3.start()
+            self._wait_until_equal([count], 3)
+
         t1.join()
         t2.join()
         t3.join()
