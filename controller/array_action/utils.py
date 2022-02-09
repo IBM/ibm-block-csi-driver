@@ -18,7 +18,7 @@ def convert_scsi_id_to_nguid(volume_id):
     return final_nguid
 
 
-class classproperty:
+class ClassProperty:
 
     def __init__(self, function):
         self._function = function

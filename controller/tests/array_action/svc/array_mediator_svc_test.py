@@ -54,7 +54,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.UnsupportedStorageVersionError):
             SVCArrayMediator("user", "password", self.endpoint)
 
-    def test_raise_ManagementIPsNotSupportError_in_init(self):
+    def test_raise_management_ips_not_support_error_in_init(self):
         self.endpoint = ["IP_1", "IP_2"]
         with self.assertRaises(
                 array_errors.StorageManagementIPsNotSupportError):
@@ -869,8 +869,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
             {config.NVME_OVER_FC_CONNECTIVITY_TYPE, config.FC_CONNECTIVITY_TYPE, config.ISCSI_CONNECTIVITY_TYPE},
             set(connectivity_types))
 
-    def _get_host_as_munch(self, id, name, nqn_list=None, wwpns_list=None, iscsi_names_list=None, portset_id=None):
-        host = Munch(id=id, name=name)
+    def _get_host_as_munch(self, host_id, host_name, nqn_list=None, wwpns_list=None, iscsi_names_list=None,
+                           portset_id=None):
+        host = Munch(id=host_id, name=host_name)
         if nqn_list:
             host.nqn = nqn_list
         if wwpns_list:

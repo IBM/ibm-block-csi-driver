@@ -61,7 +61,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                             system_id=system_id)
             pool = volume_parameters.pool
             if not pool:
-                raise ValidationException(controller_messages.pool_should_not_be_empty_message)
+                raise ValidationException(controller_messages.POOL_SHOULD_NOT_BE_EMPTY_MESSAGE)
             space_efficiency = volume_parameters.space_efficiency
             # TODO : pass multiple array addresses
             array_type = detect_array_type(array_connection_info.array_addresses)
@@ -74,7 +74,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 min_size = array_mediator.minimal_volume_size_in_bytes
 
                 if required_bytes > max_size:
-                    message = messages.SizeOutOfRangeError_message.format(required_bytes, max_size)
+                    message = messages.SIZE_OUT_OF_RANGE_ERROR_MESSAGE.format(required_bytes, max_size)
                     return build_error_response(message, context, grpc.StatusCode.OUT_OF_RANGE,
                                                 csi_pb2.CreateVolumeResponse)
 
@@ -360,9 +360,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 if snapshot:
                     if snapshot.source_volume_id != volume_id:
-                        message = messages.SnapshotWrongVolumeError_message.format(snapshot_final_name,
-                                                                                   snapshot.source_volume_id,
-                                                                                   volume_id)
+                        message = messages.SNAPSHOT_WRONG_VOLUME_ERROR_MESSAGE.format(snapshot_final_name,
+                                                                                      snapshot.source_volume_id,
+                                                                                      volume_id)
                         return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
                                                     csi_pb2.CreateSnapshotResponse)
                 else:
@@ -449,7 +449,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                                      node_expansion_required=False)
 
                 if required_bytes > max_size:
-                    message = messages.SizeOutOfRangeError_message.format(required_bytes, max_size)
+                    message = messages.SIZE_OUT_OF_RANGE_ERROR_MESSAGE.format(required_bytes, max_size)
                     return build_error_response(message, context, grpc.StatusCode.OUT_OF_RANGE,
                                                 csi_pb2.ControllerExpandVolumeResponse)
 
@@ -495,7 +495,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         return self.cfg['identity'][attribute_name]
 
     @csi_method(error_response_type=csi_pb2.GetPluginInfoResponse)
-    def GetPluginInfo(self, _, context):
+    def GetPluginInfo(self, _, context):  # pylint: disable=invalid-name
         name = self.get_identity_config("name")
         version = self.get_identity_config("version")
 
@@ -539,7 +539,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             return settings.NAME_PREFIX_SEPARATOR.join((prefix, name))
         return name
 
-    def GetPluginCapabilities(self, _, __):
+    def GetPluginCapabilities(self, _, __):  # pylint: disable=invalid-name
         logger.info("GetPluginCapabilities")
         service_type = csi_pb2.PluginCapability.Service.Type
         volume_expansion_type = csi_pb2.PluginCapability.VolumeExpansion.Type
@@ -562,7 +562,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             capabilities=capability_list
         )
 
-    def Probe(self, _, context):
+    def Probe(self, _, context):  # pylint: disable=invalid-name
         context.set_code(grpc.StatusCode.OK)
         return csi_pb2.ProbeResponse()
 

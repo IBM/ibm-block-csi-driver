@@ -11,7 +11,7 @@ from controller.common.node_info import NodeIdInfo
 from controller.controller_server import config as controller_config
 from controller.controller_server.csi_controller_server import CSIControllerServicer
 from controller.controller_server.errors import ObjectIdError, ValidationException, InvalidNodeId
-from controller.controller_server.test_settings import pool, user, password, array
+from controller.controller_server.test_settings import POOL, USER, PASSWORD, ARRAY
 from controller.tests import utils as test_utils
 from controller.tests.controller_server.csi_controller_server_test import ProtoBufMock
 from controller.tests.utils import get_fake_secret_config
@@ -53,22 +53,22 @@ class TestUtils(unittest.TestCase):
         self._test_validation_exception(utils.validate_secrets, secrets)
 
     def test_validate_secrets_success(self):
-        secrets = {"username": user, "password": password, "management_address": array}
+        secrets = {"username": USER, "password": PASSWORD, "management_address": ARRAY}
         utils.validate_secrets(secrets)
 
     def test_validate_secrets_with_no_secret(self):
         self._test_validate_secrets_validation_exception(None)
 
     def test_validate_secrets_with_no_management_address(self):
-        secrets = {"username": user, "password": password}
+        secrets = {"username": USER, "password": PASSWORD}
         self._test_validate_secrets_validation_exception(secrets)
 
     def test_validate_secrets_with_no_password(self):
-        secrets = {"username": user, "management_address": array}
+        secrets = {"username": USER, "management_address": ARRAY}
         self._test_validate_secrets_validation_exception(secrets)
 
     def test_validate_secrets_with_no_username(self):
-        secrets = {"password": password, "management_address": array}
+        secrets = {"password": PASSWORD, "management_address": ARRAY}
         self._test_validate_secrets_validation_exception(secrets)
 
     def test_validate_secrets_with_empty_dict(self):
@@ -114,9 +114,9 @@ class TestUtils(unittest.TestCase):
             secrets=secrets,
             topologies=topologies,
             system_id=system_id)
-        self.assertEqual(array_connection_info.user, user)
-        self.assertEqual(array_connection_info.password, password)
-        self.assertEqual(array_connection_info.array_addresses[0], array)
+        self.assertEqual(array_connection_info.user, USER)
+        self.assertEqual(array_connection_info.password, PASSWORD)
+        self.assertEqual(array_connection_info.array_addresses[0], ARRAY)
         if topologies or system_id:
             self.assertIsNotNone(array_connection_info.system_id)
         else:
@@ -125,23 +125,23 @@ class TestUtils(unittest.TestCase):
     def test_get_array_connection_info_from_secrets(self):
         secrets = get_fake_secret_config()
         self._test_get_array_connection_info_from_secrets(secrets, system_id="u1")
-        secrets = {"username": user, "password": password, "management_address": array}
+        secrets = {"username": USER, "password": PASSWORD, "management_address": ARRAY}
         self._test_get_array_connection_info_from_secrets(secrets)
         secrets = get_fake_secret_config(supported_topologies=[{"topology.block.csi.ibm.com/test1": "zone1"}])
         self._test_get_array_connection_info_from_secrets(secrets,
                                                           topologies={"topology.block.csi.ibm.com/test1": "zone1",
                                                                       "topology.block.csi.ibm.com/test2": "dev1"})
 
-    def _test_get_pool_from_parameters(self, parameters, expected_pool=pool, system_id=None):
+    def _test_get_pool_from_parameters(self, parameters, expected_pool=POOL, system_id=None):
         volume_parameters = utils.get_volume_parameters(parameters, system_id)
         self.assertEqual(volume_parameters.pool, expected_pool)
 
     def test_get_pool_from_parameters(self):
-        parameters = {controller_config.PARAMETERS_POOL: pool}
+        parameters = {controller_config.PARAMETERS_POOL: POOL}
         self._test_get_pool_from_parameters(parameters)
         self._test_get_pool_from_parameters(parameters, system_id="u1")
         parameters = {controller_config.PARAMETERS_BY_SYSTEM: json.dumps(
-            {"u1": {controller_config.PARAMETERS_POOL: pool}, "u2": {controller_config.PARAMETERS_POOL: "other_pool"}})}
+            {"u1": {controller_config.PARAMETERS_POOL: POOL}, "u2": {controller_config.PARAMETERS_POOL: "other_pool"}})}
         self._test_get_pool_from_parameters(parameters, system_id="u1")
         self._test_get_pool_from_parameters(parameters, expected_pool="other_pool", system_id="u2")
         self._test_get_pool_from_parameters(parameters, expected_pool=None)
@@ -236,13 +236,13 @@ class TestUtils(unittest.TestCase):
 
         self._test_validate_create_volume_request_validation_exception(request, "parameter")
 
-        request.parameters = {controller_config.PARAMETERS_POOL: pool,
+        request.parameters = {controller_config.PARAMETERS_POOL: POOL,
                               controller_config.PARAMETERS_SPACE_EFFICIENCY: "thin "}
         request.volume_content_source = None
 
         utils.validate_create_volume_request(request)
 
-        request.parameters = {controller_config.PARAMETERS_POOL: pool}
+        request.parameters = {controller_config.PARAMETERS_POOL: POOL}
         utils.validate_create_volume_request(request)
 
         request.capacity_range.required_bytes = 0
@@ -261,7 +261,7 @@ class TestUtils(unittest.TestCase):
         new_volume.name = "name"
         new_volume.array_address = ["fqdn1", "fqdn2"]
 
-        new_volume.pool = pool
+        new_volume.pool = POOL
         new_volume.array_type = "a9k"
         new_volume.capacity_bytes = 10
         new_volume.copy_source_id = None
@@ -277,12 +277,12 @@ class TestUtils(unittest.TestCase):
             utils.generate_csi_create_volume_response(new_volume)
 
     @patch("controller.controller_server.utils.get_volume_id")
-    def test_get_create_volume_response_with_single_IP(self, get_volume_id):
+    def test_get_create_volume_response_with_single_ip(self, get_volume_id):
         new_volume = Mock()
         new_volume.name = "name"
         new_volume.array_address = "9.1.1.1"
 
-        new_volume.pool = pool
+        new_volume.pool = POOL
         new_volume.array_type = "svc"
         new_volume.capacity_bytes = 10
         new_volume.copy_source_id = None
@@ -294,12 +294,12 @@ class TestUtils(unittest.TestCase):
         self.assertEqual("9.1.1.1", response.volume.volume_context['array_address'])
 
     @patch("controller.controller_server.utils.get_volume_id")
-    def test_get_create_volume_response_with_Multiple_IP(self, get_volume_id):
+    def test_get_create_volume_response_with_multiple_ip(self, get_volume_id):
         new_volume = Mock()
         new_volume.name = "name"
         new_volume.array_address = ["9.1.1.1", "9.1.1.2"]
 
-        new_volume.pool = pool
+        new_volume.pool = POOL
         new_volume.array_type = "svc"
         new_volume.capacity_bytes = 10
         new_volume.copy_source_id = None

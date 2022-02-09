@@ -13,7 +13,7 @@ import controller.array_action.errors as array_errors
 import controller.controller_server.config as controller_config
 from controller.array_action.array_action_types import Volume, Snapshot, Replication
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
-from controller.array_action.utils import classproperty, convert_scsi_id_to_nguid
+from controller.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 
@@ -62,9 +62,9 @@ ENDPOINT_TYPE_MASTER = 'master'
 ENDPOINT_TYPE_AUX = 'aux'
 
 
-def is_warning_message(ex):
+def is_warning_message(exception):
     """ Return True if the exception message is warning """
-    info_seperated_by_quotation = str(ex).split('"')
+    info_seperated_by_quotation = str(exception).split('"')
     message = info_seperated_by_quotation[1]
     word_in_message = message.split()
     message_tag = word_in_message[0]
@@ -153,39 +153,39 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     MIN_LUN_NUMBER = 0
     MIN_SUPPORTED_VERSION = '7.8'
 
-    @classproperty
+    @ClassProperty
     def array_type(self):
         return settings.ARRAY_TYPE_SVC
 
-    @classproperty
+    @ClassProperty
     def port(self):
         return 22
 
-    @classproperty
+    @ClassProperty
     def max_object_name_length(self):
         return 63
 
-    @classproperty
+    @ClassProperty
     def max_object_prefix_length(self):
         return 20
 
-    @classproperty
+    @ClassProperty
     def max_connections(self):
         return 2
 
-    @classproperty
+    @ClassProperty
     def minimal_volume_size_in_bytes(self):
         return 512  # 512 Bytes
 
-    @classproperty
+    @ClassProperty
     def maximal_volume_size_in_bytes(self):
         return 256 * 1024 * 1024 * 1024 * 1024
 
-    @classproperty
+    @ClassProperty
     def max_lun_retries(self):
         return 10
 
-    @classproperty
+    @ClassProperty
     def default_object_prefix(self):
         return "CSI"
 
