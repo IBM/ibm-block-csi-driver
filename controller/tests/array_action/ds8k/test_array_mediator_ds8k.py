@@ -70,9 +70,9 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         )
 
         self.array = DS8KArrayMediator("user", "password", self.endpoint)
-        cheche_patcher = patch.dict(
+        volume_cache_by_address_patcher = patch.dict(
             "controller.array_action.ds8k_volume_cache.volume_cache_by_address._volume_cache_by_address", clear=True)
-        volume_cache_by_address = cheche_patcher.start()
+        volume_cache_by_address = volume_cache_by_address_patcher.start()
         self.volume_cache = volume_cache_by_address[self.endpoint[0]]
 
     def test_connect_with_incorrect_credentials(self):
