@@ -70,10 +70,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         )
 
         self.array = DS8KArrayMediator("user", "password", self.endpoint)
-        volume_cache_by_address_patcher = patch.dict(
-            "controller.array_action.ds8k_volume_cache.volume_cache_by_address._volume_cache_by_address", clear=True)
-        volume_cache_by_address = volume_cache_by_address_patcher.start()
-        self.volume_cache = volume_cache_by_address[self.endpoint[0]]
+        self.array.volume_cache = Mock()
 
     def test_connect_with_incorrect_credentials(self):
         self.client_mock.get_system.side_effect = \
@@ -115,14 +112,21 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.PoolParameterIsMissing):
             self.array.get_volume("fake_name")
 
-    def _test_get_volume(self):
-        self.client_mock.get_volumes_by_pool.return_value = [self.volume_response]
-        self.client_mock.get_volume.return_value = self.volume_response
+    def _test_get_volume(self, with_cache=False):
+        if with_cache:
+            self.array.volume_cache.get.return_value = self.volume_response.id
+            self.client_mock.get_volume.return_value = self.volume_response
+        else:
+            self.array.volume_cache.get.return_value = None
+            self.client_mock.get_volumes_by_pool.return_value = [self.volume_response]
         volume = self.array.get_volume(
             self.volume_response.name,
             pool=self.volume_response.pool
         )
+
         self.assertEqual(volume.name, self.volume_response.name)
+        self.array.volume_cache.add_or_delete.assert_called_once_with(self.volume_response.name,
+                                                                      self.volume_response.id)
 
     def test_get_volume_success(self):
         self._test_get_volume()
@@ -130,16 +134,12 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_get_volume_with_empty_cache(self, ):
         self._test_get_volume()
 
-        cache_entry = {self.volume_response.name: self.volume_response.id}
-        self.assertDictEqual(self.volume_cache, cache_entry)
         self.client_mock.get_volumes_by_pool.assert_called_once_with(self.volume_response.pool)
 
     def test_get_volume_with_volume_in_cache(self):
-        self.volume_cache[self.volume_response.name] = self.volume_response.id
+        self._test_get_volume(with_cache=True)
 
-        self._test_get_volume()
-
-        self.assertDictEqual(self.volume_cache, {})
+        self.client_mock.get_volume.assert_called_once_with(self.volume_response.id)
         self.client_mock.get_volumes_by_pool.assert_not_called()
 
     def test_get_volume_with_pool_context(self):
@@ -174,7 +174,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_create_volume_with_empty_cache(self):
         self._test_create_volume_success()
-        self.assertDictEqual(self.volume_cache, {self.volume_response.name: self.volume_response.id})
+        self.array.volume_cache.add.assert_called_once_with(self.volume_response.name, self.volume_response.id)
 
     def _test_create_volume_success(self, space_efficiency=''):
         self.client_mock.create_volume.return_value = self.volume_response
@@ -222,13 +222,11 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.array.delete_volume(scsi_id)
         self.client_mock.delete_volume.assert_called_once_with(volume_id=self.volume_response.id)
 
-    def test_delete_volume_with_volumes_in_cache(self):
+    def test_delete_volume_with_remove_from_cache(self):
         self.client_mock.get_volume.return_value = self.volume_response
         scsi_id = "volume_scsi_id_{}".format(self.volume_response.id)
-        self.volume_cache[self.volume_response.name] = self.volume_response.id
-        self.volume_cache["test_name_fake"] = "test_id_fake"
         self.array.delete_volume(scsi_id)
-        self.assertDictEqual(self.volume_cache, {"test_name_fake": "test_id_fake"})
+        self.array.volume_cache.remove.assert_called_once_with(self.volume_response.name)
 
     def test_delete_volume_fail_with_client_exception(self):
         self.client_mock.delete_volume.side_effect = ClientException("500")
@@ -506,10 +504,16 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(array_errors.IllegalObjectID):
             self.array.get_snapshot("volume_id", "test_name", pool=None)
 
-    def _test_get_snapshot_success(self):
+    def _test_get_snapshot_success(self, with_cache=False):
+        if with_cache:
+            self.array.volume_cache.get.return_value = self.snapshot_response.id
+        else:
+            self.array.volume_cache.get.return_value = None
         target_volume = self._prepare_mocks_for_snapshot()
         volume = self.array.get_snapshot("volume_id", "test_name", pool=self.volume_response.pool)
         self.assertEqual(volume.name, target_volume.name)
+        self.array.volume_cache.add_or_delete.assert_called_once_with(target_volume.name,
+                                                                      target_volume.id)
 
     def test_get_snapshot_success(self):
         self._test_get_snapshot_success()
@@ -517,16 +521,12 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_get_snapshot_with_empty_cache(self):
         self._test_get_snapshot_success()
 
-        cache_entry = {self.snapshot_response.name: self.snapshot_response.id}
-        self.assertDictEqual(self.volume_cache, cache_entry)
         self.client_mock.get_volumes_by_pool.assert_called_once_with(self.snapshot_response.pool)
 
     def test_get_snapshot_with_volume_in_cache(self):
-        self.volume_cache[self.snapshot_response.name] = self.snapshot_response.id
+        self._test_get_snapshot_success(with_cache=True)
 
-        self._test_get_snapshot_success()
-
-        self.assertDictEqual(self.volume_cache, {})
+        self.client_mock.get_volume.assert_called_once_with(self.snapshot_response.id)
         self.client_mock.get_volumes_by_pool.assert_not_called()
 
     def test_get_snapshot_no_pool_success(self):
@@ -610,7 +610,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
         self.array.create_snapshot("volume_id", "target_volume", space_efficiency=None, pool=None)
 
-        self.assertDictEqual(self.volume_cache, {self.snapshot_response.name: self.snapshot_response.id})
+        self.array.volume_cache.add.assert_called_once_with(self.snapshot_response.name, self.snapshot_response.id)
 
     def test_create_snapshot_with_different_pool_success(self):
         self._prepare_mocks_for_create_snapshot()
@@ -677,12 +677,11 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.delete_volume.assert_called_once()
         self.client_mock.delete_flashcopy.assert_called_once_with(self.flashcopy_response.id)
 
-    def test_delete_snapshot_with_volumes_in_cache(self):
+    def test_delete_snapshot_with_remove_from_cache(self):
         self._prepare_mocks_for_snapshot()
-        self.volume_cache[self.snapshot_response.name] = self.snapshot_response.id
-        self.volume_cache["test_name_fake"] = "test_id_fake"
         self.array.delete_snapshot(self.snapshot_response.id)
-        self.assertDictEqual(self.volume_cache, {"test_name_fake": "test_id_fake"})
+
+        self.array.volume_cache.remove.assert_called_once_with(self.snapshot_response.name)
 
     def test_delete_snapshot_flashcopy_fail_with_client_exception(self):
         self._prepare_mocks_for_snapshot()
