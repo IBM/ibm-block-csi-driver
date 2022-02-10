@@ -128,17 +128,12 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.array.volume_cache.add_or_delete.assert_called_once_with(self.volume_response.name,
                                                                       self.volume_response.id)
 
-    def test_get_volume_success(self):
-        self._test_get_volume()
-
     def test_get_volume_with_empty_cache(self, ):
         self._test_get_volume()
-
         self.client_mock.get_volumes_by_pool.assert_called_once_with(self.volume_response.pool)
 
     def test_get_volume_with_volume_in_cache(self):
         self._test_get_volume(with_cache=True)
-
         self.client_mock.get_volume.assert_called_once_with(self.volume_response.id)
         self.client_mock.get_volumes_by_pool.assert_not_called()
 
@@ -515,17 +510,12 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.array.volume_cache.add_or_delete.assert_called_once_with(target_volume.name,
                                                                       target_volume.id)
 
-    def test_get_snapshot_success(self):
-        self._test_get_snapshot_success()
-
     def test_get_snapshot_with_empty_cache(self):
         self._test_get_snapshot_success()
-
         self.client_mock.get_volumes_by_pool.assert_called_once_with(self.snapshot_response.pool)
 
     def test_get_snapshot_with_volume_in_cache(self):
         self._test_get_snapshot_success(with_cache=True)
-
         self.client_mock.get_volume.assert_called_once_with(self.snapshot_response.id)
         self.client_mock.get_volumes_by_pool.assert_not_called()
 
