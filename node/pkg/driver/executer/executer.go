@@ -39,6 +39,7 @@ type ExecuterInterface interface { // basic host dependent functions
 	IoutilReadFile(filename string) ([]byte, error)
 	FileWriteString(f *os.File, s string) (n int, err error)
 	IsExecutable(path string) error
+	GetExitCode(err error) (int, bool)
 }
 
 type Executer struct {
@@ -113,4 +114,12 @@ func (e *Executer) FileWriteString(f *os.File, s string) (n int, err error) {
 func (e *Executer) IsExecutable(path string) error {
 	_, err := exec.LookPath(path)
 	return err
+}
+
+func (e *Executer) GetExitCode(err error) (int, bool) {
+	if exitError, isExitError := err.(*exec.ExitError); isExitError {
+		logger.Debug("No active iSCSI sessions")
+		return exitError.ExitCode(), true
+	}
+	return 0, false
 }
