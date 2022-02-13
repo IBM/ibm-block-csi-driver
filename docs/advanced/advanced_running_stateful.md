@@ -41,7 +41,8 @@ Use this for advanced information on running a stateful container for raw block 
         <pre>
         $> ssh root@k8s-node1
             
-        $>[k8s-node1] df | egrep pvc
+        $>kubectl get pvc -o jsonpath='{.items[*].metadata.annotations.volume\.beta\.kubernetes\.io\/storage-provisioner}' block.csi.ibm.com
+
         $>[k8s-node1] multipath -ll
 
     4. Recreate the StatefulSet and verify that the data still exists.
