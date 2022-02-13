@@ -4,11 +4,11 @@ import grpc
 from mock import Mock, MagicMock
 
 from controller.controller_server.controller_types import ArrayConnectionInfo
-from controller.controller_server.test_settings import user as test_user, password as test_password, array as test_array
+from controller.controller_server.test_settings import USER as test_user, PASSWORD as test_password, ARRAY as test_array
 
 
 class ProtoBufMock(MagicMock):
-    def HasField(self, field):
+    def HasField(self, field):  # pylint: disable=invalid-name
         return hasattr(self, field)
 
 

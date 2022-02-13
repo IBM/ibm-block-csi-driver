@@ -2,18 +2,18 @@ from collections import defaultdict
 from io import StringIO
 from random import choice
 
+from packaging.version import Version
 from pysvc import errors as svc_errors
 from pysvc.unified.client import connect
-from pysvc.unified.response import CLIFailureError
+from pysvc.unified.response import CLIFailureError, SVCResponse
 from retry import retry
 
 import controller.array_action.config as config
 import controller.array_action.errors as array_errors
 import controller.controller_server.config as controller_config
-from controller.array_action.array_action_types import Volume, Snapshot, Host, Replication
+from controller.array_action.array_action_types import Volume, Snapshot, Replication
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
-from controller.array_action.svc_cli_result_reader import SVCListResultsReader
-from controller.array_action.utils import classproperty, bytes_to_string, convert_scsi_id_to_nguid
+from controller.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 
@@ -40,13 +40,11 @@ NOT_REDUCTION_POOL = 'CMMVC9301E'
 NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND = 'CMMVC5860E'
 NOT_ENOUGH_EXTENTS_IN_POOL_CREATE = 'CMMVC8710E'
 
-LIST_HOSTS_CMD_FORMAT = 'lshost {HOST_ID};'
-HOST_ID_PARAM = 'id'
-HOST_NAME_PARAM = 'name'
-HOST_NQN_PARAM = 'nqn'
-HOST_WWPNS_PARAM = 'WWPN'
-HOST_ISCSI_NAMES_PARAM = 'iscsi_name'
+HOST_NQN = 'nqn'
+HOST_WWPN = 'WWPN'
+HOST_ISCSI_NAME = 'iscsi_name'
 HOST_PORTSET_ID = 'portset_id'
+LIST_HOSTS_CMD_FORMAT = 'lshost {HOST_ID};echo;'
 HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
 
 LUN_INTERVAL = 128
@@ -64,9 +62,9 @@ ENDPOINT_TYPE_MASTER = 'master'
 ENDPOINT_TYPE_AUX = 'aux'
 
 
-def is_warning_message(ex):
+def is_warning_message(exception):
     """ Return True if the exception message is warning """
-    info_seperated_by_quotation = str(ex).split('"')
+    info_seperated_by_quotation = str(exception).split('"')
     message = info_seperated_by_quotation[1]
     word_in_message = message.split()
     message_tag = word_in_message[0]
@@ -151,54 +149,54 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     BLOCK_SIZE_IN_BYTES = 512
     MAX_LUN_NUMBER = 511
     MIN_LUN_NUMBER = 0
+    MIN_SUPPORTED_VERSION = '7.8'
 
-    @classproperty
+    @ClassProperty
     def array_type(self):
         return settings.ARRAY_TYPE_SVC
 
-    @classproperty
+    @ClassProperty
     def port(self):
         return 22
 
-    @classproperty
+    @ClassProperty
     def max_object_name_length(self):
         return 63
 
-    @classproperty
+    @ClassProperty
     def max_object_prefix_length(self):
         return 20
 
-    @classproperty
+    @ClassProperty
     def max_connections(self):
         return 2
 
-    @classproperty
+    @ClassProperty
     def minimal_volume_size_in_bytes(self):
         return 512  # 512 Bytes
 
-    @classproperty
+    @ClassProperty
     def maximal_volume_size_in_bytes(self):
         return 256 * 1024 * 1024 * 1024 * 1024
 
-    @classproperty
+    @ClassProperty
     def max_lun_retries(self):
         return 10
 
-    @classproperty
+    @ClassProperty
     def default_object_prefix(self):
         return "CSI"
 
     def __init__(self, user, password, endpoint):
-        self.user = user
-        self.password = password
+        super().__init__(user, password, endpoint)
         self.client = None
         # SVC only accept one IP address
         if len(endpoint) == 0 or len(endpoint) > 1:
             logger.error("SVC only support one cluster IP")
             raise array_errors.StorageManagementIPsNotSupportError(
                 endpoint)
-        self.endpoint = endpoint[0]
-        self._identifier = None
+        self.endpoint = self.endpoint[0]
+        self._cluster = None
 
         logger.debug("in init")
         self._connect()
@@ -208,6 +206,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             self.client = connect(self.endpoint, username=self.user,
                                   password=self.password)
+            if Version(self._code_level) < Version(self.MIN_SUPPORTED_VERSION):
+                raise array_errors.UnsupportedStorageVersionError(
+                    self._code_level, self.MIN_SUPPORTED_VERSION
+                )
         except (svc_errors.IncorrectCredentials,
                 svc_errors.StorageArrayClientException):
             raise array_errors.CredentialsError(self.endpoint)
@@ -216,23 +218,27 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if self.client:
             self.client.close()
 
-    def get_system_info(self):
-        for cluster in self.client.svcinfo.lssystem():
-            if cluster['location'] == 'local':
-                return cluster
-        return None
+    @property
+    def _system_info(self):
+        if self._cluster is None:
+            for cluster in self.client.svcinfo.lssystem():
+                if cluster.location == 'local':
+                    self._cluster = cluster
+        return self._cluster
+
+    @property
+    def _code_level(self):
+        return self._system_info.code_level.split(None, 1)[0]
 
     @property
     def identifier(self):
-        if self._identifier is None:
-            cluster = self.get_system_info()
-            self._identifier = cluster['id_alias']
-        return self._identifier
+        return self._system_info.id_alias
 
     def is_active(self):
         return self.client.transport.transport.get_transport().is_active()
 
     def _generate_volume_response(self, cli_volume):
+        pool = self._get_volume_pool(cli_volume)
         source_volume_wwn = self._get_source_volume_wwn_if_exists(cli_volume)
         space_efficiency = _get_cli_volume_space_efficiency(cli_volume)
         return Volume(
@@ -241,7 +247,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             internal_id=cli_volume.id,
             name=cli_volume.name,
             array_address=self.endpoint,
-            pool=cli_volume.mdisk_grp_name,
+            pool=pool,
             copy_source_id=source_volume_wwn,
             array_type=self.array_type,
             space_efficiency=space_efficiency,
@@ -268,24 +274,26 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         source_volume_id = self._get_wwn_by_volume_name_if_exists(fcmap.source_vdisk_name)
         return self._generate_snapshot_response(cli_object, source_volume_id)
 
-    def _get_cli_volume(self, volume_name, not_exist_err=True):
+    def _lsvdisk(self, volume_name, not_exist_err):
         try:
-            cli_volume = self.client.svcinfo.lsvdisk(bytes=True, object_id=volume_name).as_single_element
-            if not cli_volume and not_exist_err:
-                raise array_errors.ObjectNotFoundError(volume_name)
-            return cli_volume
+            return self.client.svcinfo.lsvdisk(bytes=True, object_id=volume_name).as_single_element
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if not is_warning_message(ex.my_message):
-                if (OBJ_NOT_FOUND in ex.my_message or
-                        NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message):
-                    logger.info("volume not found")
-                    if not_exist_err:
-                        raise array_errors.ObjectNotFoundError(volume_name)
-                elif any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
-                    raise array_errors.IllegalObjectName(ex.my_message)
-                else:
-                    raise ex
+            if (OBJ_NOT_FOUND in ex.my_message or
+                    NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message):
+                logger.info("volume not found")
+                if not_exist_err:
+                    raise array_errors.ObjectNotFoundError(volume_name)
+            elif any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
+                raise array_errors.IllegalObjectName(ex.my_message)
+            else:
+                raise ex
         return None
+
+    def _get_cli_volume(self, volume_name, not_exist_err=True):
+        cli_volume = self._lsvdisk(volume_name, not_exist_err)
+        if not cli_volume and not_exist_err:
+            raise array_errors.ObjectNotFoundError(volume_name)
+        return cli_volume
 
     def _get_cli_volume_if_exists(self, volume_name):
         cli_volume = self._get_cli_volume(volume_name, not_exist_err=False)
@@ -310,8 +318,20 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         source_volume_name = fcmap.source_vdisk_name
         return self._get_wwn_by_volume_name_if_exists(source_volume_name)
 
-    def get_volume(self, volume_name, pool=None):
-        cli_volume = self._get_cli_volume(volume_name)
+    def _get_volume_pools(self, cli_volume):
+        pool = cli_volume.mdisk_grp_name
+        if isinstance(pool, list):
+            pool_names = pool[:]
+            pool_names.remove('many')
+            return pool_names
+        return [pool]
+
+    def _get_volume_pool(self, cli_volume):
+        pools = self._get_volume_pools(cli_volume)
+        return ':'.join(pools)
+
+    def get_volume(self, name, pool=None):
+        cli_volume = self._get_cli_volume(name)
         return self._generate_volume_response(cli_volume)
 
     def _get_object_fcmaps(self, object_name):
@@ -330,8 +350,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             else:
                 self.client.svctask.expandvdisksize(vdisk_id=volume_name, unit='b', size=increase_in_bytes)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if not is_warning_message(ex.my_message):
-                logger.warning("Failed to expand volume {}".format(volume_name))
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during volume expansion of {}: {}".format(volume_name,
+                                                                                                ex.my_message))
+            else:
+                logger.error("Failed to expand volume {}".format(volume_name))
                 if OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message:
                     raise array_errors.ObjectNotFoundError(volume_name)
                 if NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND in ex.my_message:
@@ -398,11 +421,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             return self.client.svcinfo.lsvdisk(bytes=True, filtervalue=filter_value).as_single_element
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if not is_warning_message(ex.my_message):
-                if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, INVALID_FILTER_VALUE)):
-                    raise array_errors.IllegalObjectID(ex.my_message)
-                raise ex
-        return None
+            if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, INVALID_FILTER_VALUE)):
+                raise array_errors.IllegalObjectID(ex.my_message)
+            raise ex
 
     def _get_cli_volume_by_wwn(self, volume_id, not_exist_err=False):
         cli_volume = self._lsvdisk_by_uid(volume_id)
@@ -435,12 +456,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             cli_kwargs = build_kwargs_from_parameters(space_efficiency, pool,
                                                       name, size)
             self.client.svctask.mkvolume(**cli_kwargs)
-            cli_volume = self._get_cli_volume(name)
-            logger.info("finished creating cli volume : {}".format(cli_volume.name))
-            return cli_volume
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if not is_warning_message(ex.my_message):
-                logger.error(msg="Cannot create volume {0}, Reason is: {1}".format(name, ex))
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during creation of volume {0}: {1}".format(name,
+                                                                                                 ex.my_message))
+            else:
+                logger.error("Cannot create volume {0}, Reason is: {1}".format(name, ex))
                 if OBJ_ALREADY_EXIST in ex.my_message:
                     raise array_errors.VolumeAlreadyExists(name, self.endpoint)
                 if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
@@ -452,7 +473,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, INVALID_NAME, TOO_MANY_CHARS)):
                     raise array_errors.IllegalObjectName(ex.my_message)
                 raise ex
-        return None
+        logger.info("finished creating cli volume : {}".format(name))
 
     @retry(svc_errors.StorageArrayClientException, tries=5, delay=1)
     def _rollback_copy_to_target_volume(self, target_volume_name):
@@ -476,8 +497,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._copy_to_target_volume(target_volume_name, source_name)
 
     def create_volume(self, name, size_in_bytes, space_efficiency, pool):
-        cli_volume = self._create_cli_volume(name, size_in_bytes, space_efficiency, pool)
-
+        self._create_cli_volume(name, size_in_bytes, space_efficiency, pool)
+        cli_volume = self._get_cli_volume(name)
         return self._generate_volume_response(cli_volume)
 
     def _delete_volume_by_name(self, volume_name, not_exist_err=True):
@@ -485,8 +506,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             self.client.svctask.rmvolume(vdisk_id=volume_name)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if not is_warning_message(ex.my_message):
-                logger.warning("Failed to delete volume {}".format(volume_name))
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during deletion of volume {}: {}".format(volume_name,
+                                                                                               ex.my_message))
+            else:
+                logger.error("Failed to delete volume {}".format(volume_name))
                 if (OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message) and not_exist_err:
                     raise array_errors.ObjectNotFoundError(volume_name)
                 raise ex
@@ -520,7 +544,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             space_efficiency = _get_cli_volume_space_efficiency(source_cli_volume)
         size_in_bytes = int(source_cli_volume.capacity)
         if not pool:
-            pool = source_cli_volume.mdisk_grp_name
+            pool = self._get_volume_pools(source_cli_volume)[0]
         self._create_cli_volume(target_volume_name, size_in_bytes, space_efficiency, pool)
 
     def _create_fcmap(self, source_volume_name, target_volume_name, is_copy):
@@ -529,11 +553,16 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             self.client.svctask.mkfcmap(source=source_volume_name, target=target_volume_name, **mkfcmap_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if not is_warning_message(ex.my_message):
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during FlashCopy Mapping creation"
+                               " for source '{0}' and target '{1}': {2}".format(source_volume_name,
+                                                                                target_volume_name,
+                                                                                ex.my_message))
+            else:
                 if FCMAP_ALREADY_EXIST in ex.my_message:
-                    logger.info(("FlashCopy Mapping already exists"
-                                 " for source '{0}' and target '{1}'").format(source_volume_name,
-                                                                              target_volume_name))
+                    logger.info("FlashCopy Mapping already exists"
+                                " for source '{0}' and target '{1}'".format(source_volume_name,
+                                                                            target_volume_name))
                 else:
                     raise ex
 
@@ -542,7 +571,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             self.client.svctask.startfcmap(prep=True, object_id=fcmap_id)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if not is_warning_message(ex.my_message):
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered while starting"
+                               " FlashCopy Mapping '{}': {}".format(fcmap_id,
+                                                                    ex.my_message))
+            else:
                 if FCMAP_ALREADY_COPYING in ex.my_message:
                     logger.info("FlashCopy Mapping '{0}' already copying".format(fcmap_id))
                 else:
@@ -559,7 +592,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             self.client.svctask.rmfcmap(object_id=fcmap_id, force=force)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if not is_warning_message(ex.my_message):
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during fcmap '{}' deletion: {}".format(fcmap_id,
+                                                                                             ex.my_message))
+            else:
                 logger.error("Failed to delete fcmap '{0}': {1}".format(fcmap_id, ex))
                 raise ex
 
@@ -568,7 +604,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             self.client.svctask.stopfcmap(object_id=fcmap_id)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if not is_warning_message(ex.my_message):
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered while stopping fcmap '{}': {}".format(fcmap_id,
+                                                                                            ex.my_message))
+            else:
                 if FCMAP_ALREADY_IN_THE_STOPPED_STATE in ex.my_message:
                     logger.info("fcmap '{0}' is already in the stopped state".format(fcmap_id))
                 else:
@@ -643,8 +682,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         raise array_errors.PoolDoesNotExist(pool, self.endpoint)
 
     def _is_cli_volume_in_site(self, cli_volume, site_name):
-        volume_site_name = self._get_pool_site(cli_volume.mdisk_grp_name)
-        return volume_site_name == site_name
+        volume_pools = self._get_volume_pools(cli_volume)
+        for pool in volume_pools:
+            volume_site_name = self._get_pool_site(pool)
+            if volume_site_name == site_name:
+                return True
+        return False
 
     def _get_rcrelationships_as_master_in_cluster(self, volume_name):
         filter_value = 'master_vdisk_name={}:aux_cluster_id={}'.format(volume_name, self.identifier)
@@ -652,7 +695,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _get_cli_volume_in_pool_site(self, volume_name, pool_name):
         cli_volume = self._get_cli_volume(volume_name)
-        if not pool_name:
+        if not pool_name or ':' in pool_name:
             return cli_volume
         pool_site_name = self._get_pool_site(pool_name)
         if self._is_cli_volume_in_site(cli_volume, pool_site_name):
@@ -680,23 +723,30 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._delete_object(cli_volume, is_snapshot=True)
         logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
 
+    def _get_host_ports(self, host, attribute_name):
+        ports = host.get(attribute_name, [])
+        return ports if isinstance(ports, list) else [ports]
+
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host name for initiators : {0}".format(initiators))
         detailed_hosts_list = self._get_detailed_hosts_list()
         nvme_host, fc_host, iscsi_host = None, None, None
         connectivity_types = set()
         for host in detailed_hosts_list:
-            if initiators.is_array_nvme_nqn_match(host.nqn):
+            host_nqns = self._get_host_ports(host, HOST_NQN)
+            if initiators.is_array_nvme_nqn_match(host_nqns):
                 nvme_host = host.name
                 connectivity_types.add(config.NVME_OVER_FC_CONNECTIVITY_TYPE)
                 logger.debug("found nvme nqn in list : {0} for host : "
                              "{1}".format(initiators.nvme_nqn, nvme_host))
-            if initiators.is_array_wwns_match(host.wwns):
+            host_wwns = self._get_host_ports(host, HOST_WWPN)
+            if initiators.is_array_wwns_match(host_wwns):
                 fc_host = host.name
                 connectivity_types.add(config.FC_CONNECTIVITY_TYPE)
                 logger.debug("found fc wwns in list : {0} for host : "
                              "{1}".format(initiators.fc_wwns, fc_host))
-            if initiators.is_array_iscsi_iqns_match(host.iscsi_names):
+            host_iqns = self._get_host_ports(host, HOST_ISCSI_NAME)
+            if initiators.is_array_iscsi_iqns_match(host_iqns):
                 iscsi_host = host.name
                 connectivity_types.add(config.ISCSI_CONNECTIVITY_TYPE)
                 logger.debug("found iscsi iqn in list : {0} for host : "
@@ -718,61 +768,34 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         # get all hosts details by sending a single batch of commands, in which each command is per host
         detailed_hosts_list_cmd = self._get_detailed_hosts_list_cmd(hosts_list)
         logger.debug("Sending getting detailed hosts list commands batch")
-        detailed_hosts_list_output, detailed_hosts_list_errors = self._send_raw_cli_command(detailed_hosts_list_cmd)
-        if detailed_hosts_list_errors:
-            logger.error("Errors returned from getting detailed hosts list: {0}".format(detailed_hosts_list_errors))
-
-        return self._get_detailed_hosts_by_raw_output(detailed_hosts_list_output)
-
-    def _get_detailed_hosts_by_raw_output(self, detailed_hosts_list_raw_output):
-        logger.debug("Reading detailed hosts list commands batch response")
-        hosts_reader = SVCListResultsReader(detailed_hosts_list_raw_output)
-        res = []
-        for host_details in hosts_reader:
-            host_id = host_details.get(HOST_ID_PARAM)
-            host_name = host_details.get(HOST_NAME_PARAM)
-            nqn = host_details.get_as_list(HOST_NQN_PARAM)
-            wwns = host_details.get_as_list(HOST_WWPNS_PARAM)
-            iscsi_names = host_details.get_as_list(HOST_ISCSI_NAMES_PARAM)
-            host = Host(host_id, host_name, nqn, wwns, iscsi_names)
-            res.append(host)
-        return res
+        raw_response = self.client.send_raw_command(detailed_hosts_list_cmd)
+        response = SVCResponse(raw_response, {'delim': ' '})
+        return response.as_list
 
     def _get_detailed_hosts_list_cmd(self, host_list):
         writer = StringIO()
         for host in host_list:
-            host_id = host.get(HOST_ID_PARAM)
-            writer.write(LIST_HOSTS_CMD_FORMAT.format(HOST_ID=host_id))
+            writer.write(LIST_HOSTS_CMD_FORMAT.format(HOST_ID=host.id))
         return writer.getvalue()
 
-    def _send_raw_cli_command(self, cmd):
-        output_as_bytes, errors_as_bytes = self.client.send_raw_command(cmd)
-        output_as_str = bytes_to_string(output_as_bytes)
-        errors_as_str = bytes_to_string(errors_as_bytes)
-        formatted_errors_as_str = self._truncate_error_msg(errors_as_str)
-        return output_as_str, formatted_errors_as_str
-
-    def _truncate_error_msg(self, detailed_host_list_errors):
-        if len(detailed_host_list_errors) <= HOSTS_LIST_ERR_MSG_MAX_LENGTH:
-            return detailed_host_list_errors
-        return "{0} ...".format(detailed_host_list_errors[HOSTS_LIST_ERR_MSG_MAX_LENGTH])
+    def _lsvdiskhostmap(self, volume_name):
+        try:
+            return self.client.svcinfo.lsvdiskhostmap(vdisk_name=volume_name)
+        except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            logger.error(ex)
+            raise array_errors.ObjectNotFoundError(volume_name)
 
     def get_volume_mappings(self, volume_id):
         logger.debug("Getting volume mappings for volume id : "
                      "{0}".format(volume_id))
-        vol_name = self._get_volume_name_by_wwn(volume_id)
-        logger.debug("volume name : {0}".format(vol_name))
-        try:
-            mapping_list = self.client.svcinfo.lsvdiskhostmap(vdisk_name=vol_name)
-            res = {}
-            for mapping in mapping_list:
-                logger.debug("mapping for volume is :{0}".format(mapping))
-                res[mapping.get('host_name', '')] = mapping.get('SCSI_id', '')
-        except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.error(ex)
-            raise array_errors.ObjectNotFoundError(volume_id)
-
-        return res
+        volume_name = self._get_volume_name_by_wwn(volume_id)
+        logger.debug("volume name : {0}".format(volume_name))
+        mapping_list = self._lsvdiskhostmap(volume_name)
+        luns_by_host = {}
+        for mapping in mapping_list:
+            logger.debug("mapping for volume is :{0}".format(mapping))
+            luns_by_host[mapping.get('host_name', '')] = mapping.get('SCSI_id', '')
+        return luns_by_host
 
     def _get_used_lun_ids_from_host(self, host_name):
         logger.debug("getting used lun ids for host :{0}".format(host_name))
@@ -813,10 +836,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def map_volume(self, volume_id, host_name, connectivity_type):
         logger.debug("mapping volume : {0} to host : "
                      "{1}".format(volume_id, host_name))
-        vol_name = self._get_volume_name_by_wwn(volume_id)
+        volume_name = self._get_volume_name_by_wwn(volume_id)
         cli_kwargs = {
             'host': host_name,
-            'object_id': vol_name,
+            'object_id': volume_name,
             'force': True
         }
         lun = ""
@@ -826,22 +849,26 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 cli_kwargs.update({'scsi': lun})
             self.client.svctask.mkvdiskhostmap(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if not is_warning_message(ex.my_message):
-                logger.error(msg="Map volume {0} to host {1} failed. Reason "
-                                 "is: {2}".format(vol_name, host_name, ex))
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during volume {0} mapping to host {1}: {2}".format(volume_name,
+                                                                                                         host_name,
+                                                                                                         ex.my_message))
+            else:
+                logger.error("Map volume {0} to host {1} failed. Reason "
+                             "is: {2}".format(volume_name, host_name, ex))
                 if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
                     raise array_errors.HostNotFoundError(host_name)
                 if SPECIFIED_OBJ_NOT_EXIST in ex.my_message:
-                    raise array_errors.ObjectNotFoundError(vol_name)
+                    raise array_errors.ObjectNotFoundError(volume_name)
                 if LUN_ALREADY_IN_USE in ex.my_message:
                     raise array_errors.LunAlreadyInUseError(lun,
                                                             host_name)
-                raise array_errors.MappingError(vol_name, host_name, ex)
+                raise array_errors.MappingError(volume_name, host_name, ex)
 
         return str(lun)
 
     def unmap_volume(self, volume_id, host_name):
-        logger.debug("un-mapping volume : {0} from host : "
+        logger.debug("unmapping volume : {0} from host : "
                      "{1}".format(volume_id, host_name))
         volume_name = self._get_volume_name_by_wwn(volume_id)
 
@@ -853,9 +880,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             self.client.svctask.rmvdiskhostmap(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if not is_warning_message(ex.my_message):
-                logger.error(msg="Map volume {0} to host {1} failed. Reason "
-                                 "is: {2}".format(volume_name, host_name, ex))
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during volume {0}"
+                               " unmapping from host {1}: {2}".format(volume_name,
+                                                                      host_name,
+                                                                      ex.my_message))
+            else:
+                logger.error("unmapping volume {0} from host {1} failed. Reason "
+                             "is: {2}".format(volume_name, host_name, ex))
                 if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
                     raise array_errors.HostNotFoundError(host_name)
                 if OBJ_NOT_FOUND in ex.my_message:
@@ -868,14 +900,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _get_array_iqns_by_node_id(self):
         logger.debug("Getting array nodes id and iscsi name")
-        try:
-            nodes_list = self.client.svcinfo.lsnode()
-            array_iqns_by_id = {node.id: node.iscsi_name for node in nodes_list
-                                if node.status.lower() == "online"}
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if not is_warning_message(ex.my_message):
-                logger.error(ex)
-                raise ex
+        nodes_list = self.client.svcinfo.lsnode()
+        array_iqns_by_id = {node.id: node.iscsi_name for node in nodes_list
+                            if node.status.lower() == "online"}
         logger.debug("Found iqns by node id: {}".format(array_iqns_by_id))
         return array_iqns_by_id
 
@@ -924,22 +951,25 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return ips_by_iqn
         raise array_errors.NoIscsiTargetsFoundError(self.endpoint)
 
+    def _lsfabric(self, host_name):
+        try:
+            return self.client.svcinfo.lsfabric(host=host_name)
+        except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            logger.error("Failed to get array fc wwn. Reason "
+                         "is: {0}".format(ex))
+            raise ex
+
     def get_array_fc_wwns(self, host_name):
         logger.debug("Getting the connected fc port wwn value from array "
                      "related to host : {}.".format(host_name))
         fc_port_wwns = []
-        try:
-            fc_wwns = self.client.svcinfo.lsfabric(host=host_name)
-            for wwn in fc_wwns:
-                state = wwn.get('state', '')
-                if state in ('active', 'inactive'):
-                    fc_port_wwns.append(wwn.get('local_wwpn', ''))
-            logger.debug("Getting fc wwns : {}".format(fc_port_wwns))
-            return fc_port_wwns
-        except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.error(msg="Failed to get array fc wwn. Reason "
-                             "is: {0}".format(ex))
-            raise ex
+        fc_wwns = self._lsfabric(host_name)
+        for wwn in fc_wwns:
+            state = wwn.get('state', '')
+            if state in ('active', 'inactive'):
+                fc_port_wwns.append(wwn.get('local_wwpn', ''))
+        logger.debug("Getting fc wwns : {}".format(fc_port_wwns))
+        return fc_port_wwns
 
     def _get_cli_host_by_name(self, host_name):
         filter_value = 'name={}'.format(host_name)
@@ -1064,7 +1094,13 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raw_id = message[id_start:id_end]
             return int(raw_id)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if not is_warning_message(ex.my_message):
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during creation of rcrelationship for volume id {0} "
+                               "with volume id {1} of system {2}: {3}".format(master_cli_volume_id,
+                                                                              aux_cli_volume_id,
+                                                                              other_system_id,
+                                                                              ex))
+            else:
                 logger.error("failed to create rcrelationship for volume id {0} "
                              "with volume id {1} of system {2}: {3}".format(master_cli_volume_id,
                                                                             aux_cli_volume_id,
@@ -1081,7 +1117,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             kwargs = build_start_replication_kwargs(rcrelationship_id, primary_endpoint_type, force)
             self.client.svctask.startrcrelationship(**kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if not is_warning_message(ex.my_message):
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered while starting rcrelationship '{}': {}".format(rcrelationship_id,
+                                                                                                     ex.my_message))
+            else:
                 logger.warning("failed to start rcrelationship '{}': {}".format(rcrelationship_id, ex))
 
     def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
@@ -1095,7 +1134,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             self.client.svctask.stoprcrelationship(**kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if not is_warning_message(ex.my_message):
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered while stopping"
+                               " rcrelationship '{0}': {1}".format(rcrelationship_id,
+                                                                   ex.my_message))
+            else:
                 logger.warning("failed to stop rcrelationship '{0}': {1}".format(rcrelationship_id, ex))
 
     def _delete_rcrelationship(self, rcrelationship_id):
@@ -1103,7 +1146,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             self.client.svctask.rmrcrelationship(object_id=rcrelationship_id)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if not is_warning_message(ex.my_message):
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during rcrelationship"
+                               " '{0}' deletion: {1}".format(rcrelationship_id,
+                                                             ex.my_message))
+            else:
                 logger.warning("failed to delete rcrelationship '{0}': {1}".format(rcrelationship_id, ex))
 
     def delete_replication(self, replication_name):
@@ -1119,7 +1166,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             self.client.svctask.switchrcrelationship(primary=endpoint_type, object_id=replication_name)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if not is_warning_message(ex.my_message):
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered while making '{}' primary"
+                               " for rcrelationship {}: {}".format(endpoint_type,
+                                                                   replication_name,
+                                                                   ex.my_message))
+            else:
                 logger.error("failed to make '{}' primary for rcrelationship {}: {}".format(endpoint_type,
                                                                                             replication_name,
                                                                                             ex.my_message))

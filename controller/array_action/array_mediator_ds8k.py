@@ -11,7 +11,7 @@ from controller.array_action import config
 from controller.array_action.array_action_types import Volume, Snapshot
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.ds8k_rest_client import RESTClient, scsilun_to_int
-from controller.array_action.utils import classproperty
+from controller.array_action.utils import ClassProperty
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 
@@ -117,48 +117,47 @@ def _get_parameter_space_efficiency(array_space_efficiency):
 class DS8KArrayMediator(ArrayMediatorAbstract):
     SUPPORTED_FROM_VERSION = '7.5.1'
 
-    @classproperty
+    @ClassProperty
     def array_type(self):
         return settings.ARRAY_TYPE_DS8K
 
-    @classproperty
+    @ClassProperty
     def port(self):
         return 8452
 
-    @classproperty
+    @ClassProperty
     def max_object_name_length(self):
         return 16
 
-    @classproperty
+    @ClassProperty
     def max_object_prefix_length(self):
         return 5
 
-    @classproperty
+    @ClassProperty
     def max_connections(self):
         # max for rest api is 128.
         return 50
 
-    @classproperty
+    @ClassProperty
     def minimal_volume_size_in_bytes(self):
         return 512  # 1 block, 512 bytes
 
-    @classproperty
+    @ClassProperty
     def maximal_volume_size_in_bytes(self):
         return 16 * 1024 * 1024 * 1024 * 1024
 
-    @classproperty
+    @ClassProperty
     def max_lun_retries(self):
         return 10
 
-    @classproperty
+    @ClassProperty
     def default_object_prefix(self):
         return None
 
     def __init__(self, user, password, endpoint):
-        self.user = user
+        super().__init__(user, password, endpoint)
         self.service_address = \
-            endpoint[0] if isinstance(endpoint, list) else endpoint
-        self.password = password
+            self.endpoint[0] if isinstance(self.endpoint, list) else self.endpoint
 
         self._connect()
 
@@ -243,7 +242,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 'name': name,
                 'capacity_in_bytes': size_in_bytes,
                 'pool_id': pool_id,
-                'tp': array_space_efficiency,
+                'thin_provisioning': array_space_efficiency,
 
             })
             logger.debug(
@@ -278,9 +277,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             )
             raise array_errors.VolumeCreationError(name)
 
-    def create_volume(self, volume_name, size_in_bytes, space_efficiency, pool):
+    def create_volume(self, name, size_in_bytes, space_efficiency, pool):
         array_space_efficiency = get_array_space_efficiency(space_efficiency)
-        api_volume = self._create_api_volume(volume_name, size_in_bytes, array_space_efficiency, pool)
+        api_volume = self._create_api_volume(name, size_in_bytes, array_space_efficiency, pool)
         return self._generate_volume_response(api_volume)
 
     def _extend_volume(self, api_volume, new_size_in_bytes):
@@ -444,9 +443,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def _get_api_volume_from_volumes(self, volume_candidates, volume_name):
         for volume in volume_candidates:
-            logger.info("Checking volume: {}".format(volume.name))
             if volume.name == volume_name:
-                logger.debug("Found volume: {}".format(volume))
+                logger.debug("Found volume: {} with id: {}".format(volume.name, volume.id))
                 volume.flashcopy = self.client.get_flashcopies_by_volume(volume.id)
                 return volume
         return None
@@ -615,7 +613,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def get_iscsi_targets_by_iqn(self, host_name):
         return {}
 
-    def get_array_fc_wwns(self, host_name=None):
+    def get_array_fc_wwns(self, host_name):
         logger.debug("Getting the connected fc port wwpns for host {} from array".format(host_name))
 
         try:

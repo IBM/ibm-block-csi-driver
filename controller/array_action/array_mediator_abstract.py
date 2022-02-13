@@ -13,6 +13,11 @@ logger = get_stdout_logger()
 
 
 class ArrayMediatorAbstract(ArrayMediator, ABC):
+    # https://github.com/PyCQA/pylint/issues/3975
+    def __init__(self, user, password, endpoint):  # pylint: disable=super-init-not-called
+        self.user = user
+        self.password = password
+        self.endpoint = endpoint
 
     @retry(NoConnectionAvailableException, tries=11, delay=1)
     def map_volume_by_initiators(self, vol_id, initiators):
