@@ -168,3 +168,7 @@ func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(mpathDevice string) erro
 func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(sysDevices []string) error {
 	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
 }
+
+func (r OsDeviceConnectivityIscsi) ValidateLun(lun int, sysDevices []string) error {
+	return r.HelperScsiGeneric.ValidateLun(lun, sysDevices)
+}

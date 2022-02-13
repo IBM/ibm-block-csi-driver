@@ -159,6 +159,17 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		logger.Debugf("NodeStageVolume Finished: multipath device [%s] is ready to be mounted by NodePublishVolume API", mpathDevice)
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
+	baseDevice := path.Base(mpathDevice)
+	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+	if err != nil {
+		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	err = osDeviceConnectivity.ValidateLun(lun, sysDevices)
+	if err != nil {
+		logger.Errorf("Error while trying to validate lun : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
 
 	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
 	if err != nil {
@@ -351,13 +362,11 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 	baseDevice := path.Base(mpathDevice)
 
-	rawSysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
 	if err != nil {
 		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-
-	sysDevices := strings.Split(rawSysDevices, ",")
 
 	err = d.OsDeviceConnectivityHelper.FlushMultipathDevice(baseDevice)
 	if err != nil {
@@ -636,13 +645,12 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 
 	baseDevice := path.Base(device)
 
-	rawSysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
 	if err != nil {
 		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	sysDevices := strings.Split(rawSysDevices, ",")
 	devicesAreNvme, err := d.NodeUtils.DevicesAreNvme(sysDevices)
 	if err != nil {
 		logger.Errorf("Error while trying to check if sys devices are nvme devices : {%v}", err.Error())

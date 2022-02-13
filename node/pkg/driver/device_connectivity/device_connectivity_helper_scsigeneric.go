@@ -43,6 +43,7 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	GetMpathDevice(volumeId string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
 	RemovePhysicalDevice(sysDevices []string) error
+	ValidateLun(lun int, sysDevices []string) error
 }
 
 type OsDeviceConnectivityHelperScsiGeneric struct {
@@ -72,7 +73,8 @@ const (
 	WaitForMpathWaitIntervalSec = 1
 	FcHostSysfsPath             = "/sys/class/fc_remote_ports/rport-*/port_name"
 	IscsiHostRexExPath          = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
-	deviceDeletePathFormat      = "/sys/block/%s/device/delete"
+	sysDeviceSymLinkFormat      = "/sys/block/%s/device"
+	sysDeviceDeletePathFormat   = sysDeviceSymLinkFormat + "/delete"
 	blockDevCmd                 = "blockdev"
 	flushBufsFlag               = "--flushbufs"
 	mpathdSeparator             = ","
@@ -257,7 +259,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 	}
 
 	// sysDevices  = sdb, sda,...
-	logger.Debugf(`Removing scsi device : {%v} by writing "1" to the delete file of each device: {%v}`, sysDevices, fmt.Sprintf(deviceDeletePathFormat, "<deviceName>"))
+	logger.Debugf(`Removing scsi device : {%v} by writing "1" to the delete file of each device: {%v}`, sysDevices, fmt.Sprintf(sysDeviceDeletePathFormat, "<deviceName>"))
 	// NOTE: this func could be also relevant for SCSI (not only for iSCSI)
 	var (
 		f   *os.File
@@ -269,7 +271,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 			continue
 		}
 
-		filename := fmt.Sprintf(deviceDeletePathFormat, deviceName)
+		filename := fmt.Sprintf(sysDeviceDeletePathFormat, deviceName)
 
 		if f, err = os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200); err != nil {
 			if os.IsNotExist(err) {
@@ -290,6 +292,27 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 	}
 	logger.Debugf("Finished removing SCSI devices : {%v}", sysDevices)
 	return nil
+}
+
+func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(lun int, sysDevices []string) error {
+	logger.Debugf("Validating lun {%v} on devices: {%v}", lun, sysDevices)
+	for _, sysDevice := range sysDevices {
+		sysDeviceParts := strings.Split(sysDevice, "/")
+		device := sysDeviceParts[len(sysDeviceParts)-1]
+
+		symLinkPath := fmt.Sprintf(sysDeviceSymLinkFormat, device)
+		destinationPath, err := filepath.EvalSymlinks(symLinkPath)
+		if err != nil {
+			return err
+		}
+
+		if !strings.HasSuffix(destinationPath, strconv.Itoa(lun)) {
+			return fmt.Errorf("lun not valid, storage lun: %v, linkedPath: %v to device: %v", lun, destinationPath, device)
+		}
+	}
+	logger.Debugf("Finished lun validation")
+	return nil
+
 }
 
 // ============== OsDeviceConnectivityHelperInterface ==========================
