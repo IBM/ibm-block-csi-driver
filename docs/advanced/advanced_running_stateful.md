@@ -7,9 +7,9 @@ Use this for advanced information on running a stateful container for raw block 
 
     Display the newly created pod (make sure the pod status is _Running_).
     
-        $> kubectl get pod <stateful-name>-0
+        $> kubectl get pod <statefulset-name>-0
         NAME                READY   STATUS    RESTARTS   AGE
-        <stateful-name>-0   1/1     Running   0          43s  
+        <statefulset-name>-0   1/1     Running   0          43s  
 3. Write data to the persistent volume of the pod.
 
     - For raw block configurations, the PV should be mounted inside the pod at `/dev/block`.
@@ -21,8 +21,8 @@ Use this for advanced information on running a stateful container for raw block 
 
     - For file system configurations, the PV should be mounted inside the pod at `/data`.
 
-            $> kubectl exec <stateful-name>-0 -- touch /data/FILE
-            $> kubectl exec <stateful-name>-0 -- ls /data/FILE
+            $> kubectl exec <statefulset-name>-0 -- touch /data/FILE
+            $> kubectl exec <statefulset-name>-0 -- ls /data/FILE
             /data/FILE
 4. Delete the StatefulSet and then recreate, in order to validate that the data remains in the persistent volume.
     
@@ -52,7 +52,7 @@ Use this for advanced information on running a stateful container for raw block 
                 $> kubectl create -f demo-statefulset-raw-block.yaml
                 statefulset/statefulset-name created
                     
-                $> kubectl exec <stateful-name>-0 -- bash -c "od -An -c -N 10 /dev/block"
+                $> kubectl exec <statefulset-name>-0 -- bash -c "od -An -c -N 10 /dev/block"
                 t   e   s   t   _   b   l   o   c   k
     
         - For file system configurations, verify that `/data/FILE` exists.
@@ -60,7 +60,7 @@ Use this for advanced information on running a stateful container for raw block 
                 $> kubectl create -f demo-statefulset-file-system.yaml
                 statefulset/statefulset-name created
                     
-                $> kubectl exec <stateful-name>-0 -- ls /data/FILE
+                $> kubectl exec <statefulset-name>-0 -- ls /data/FILE
                 /data/FILE
       
 5. Delete the StatefulSet and the PVC.
