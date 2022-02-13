@@ -73,8 +73,8 @@ const (
 	WaitForMpathWaitIntervalSec = 1
 	FcHostSysfsPath             = "/sys/class/fc_remote_ports/rport-*/port_name"
 	IscsiHostRexExPath          = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
-	sysDeviceSymLinkToLun       = "/sys/block/%s/device"
-	deviceDeletePathFormat      = "/sys/block/%s/device/delete"
+	sysDeviceSymLinkFormat      = "/sys/block/%s/device"
+	sysDeviceDeletePathFormat   = sysDeviceSymLinkFormat + "/delete"
 	blockDevCmd                 = "blockdev"
 	flushBufsFlag               = "--flushbufs"
 	mpathdSeparator             = ","
@@ -259,7 +259,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 	}
 
 	// sysDevices  = sdb, sda,...
-	logger.Debugf(`Removing scsi device : {%v} by writing "1" to the delete file of each device: {%v}`, sysDevices, fmt.Sprintf(deviceDeletePathFormat, "<deviceName>"))
+	logger.Debugf(`Removing scsi device : {%v} by writing "1" to the delete file of each device: {%v}`, sysDevices, fmt.Sprintf(sysDeviceDeletePathFormat, "<deviceName>"))
 	// NOTE: this func could be also relevant for SCSI (not only for iSCSI)
 	var (
 		f   *os.File
@@ -271,7 +271,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 			continue
 		}
 
-		filename := fmt.Sprintf(deviceDeletePathFormat, deviceName)
+		filename := fmt.Sprintf(sysDeviceDeletePathFormat, deviceName)
 
 		if f, err = os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200); err != nil {
 			if os.IsNotExist(err) {
@@ -300,7 +300,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(lun int, sysDevices [
 		sysDeviceParts := strings.Split(sysDevice, "/")
 		device := sysDeviceParts[len(sysDeviceParts)-1]
 
-		symLinkPath := fmt.Sprintf(sysDeviceSymLinkToLun, device)
+		symLinkPath := fmt.Sprintf(sysDeviceSymLinkFormat, device)
 		destinationPath, err := filepath.EvalSymlinks(symLinkPath)
 		if err != nil {
 			return err
