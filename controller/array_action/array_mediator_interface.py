@@ -45,7 +45,7 @@ class ArrayMediator(ABC):
             volume_id : the volume WWN.
 
         Raises:
-            VolumeAlreadyExists
+            VolumeAlreadyExists : optional
             PoolDoesNotExist
             PoolDoesNotMatchSpaceEfficiency
             IllegalObjectName
