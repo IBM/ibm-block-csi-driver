@@ -29,6 +29,20 @@ def _fake_socket_connect_test(host, port):
     return 1
 
 
+class Counter:
+    def __init__(self):
+        self._value = 0
+        self._lock = Lock()
+
+    def increment(self):
+        with self._lock:
+            self._value += 1
+
+    def get_value(self):
+        with self._lock:
+            return self._value
+
+
 class TestStorageAgent(unittest.TestCase):
 
     def setUp(self):
@@ -161,14 +175,13 @@ class TestStorageAgent(unittest.TestCase):
         self.assertEqual(self.agent.conn_pool.current_size, 1)
 
     @staticmethod
-    def _wait_until_equal(first_by_ref, second):
-        while first_by_ref[0] != second:
+    def _wait_for_count(count, target_count):
+        while count.get_value() != target_count:
             sleep(0.1)
 
     def test_get_multiple_mediators_parallely_in_different_threads(self):
         keep_alive_lock = Lock()
-        count_lock = Lock()
-        count = 0
+        count = Counter()
 
         def verify_mediator(current_size):
             agent = get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test", password="test"))
@@ -178,10 +191,7 @@ class TestStorageAgent(unittest.TestCase):
                 # get_system is called in setUp() too.
                 self.assertEqual(self.client_mock.get_system.call_count, current_size + 1)
 
-                nonlocal count
-                with count_lock:
-                    # https://github.com/PyCQA/pylint/issues/5785
-                    count += 1  # pylint: disable=undefined-variable
+                count.increment()
                 with keep_alive_lock:
                     pass
 
@@ -191,11 +201,11 @@ class TestStorageAgent(unittest.TestCase):
 
         with keep_alive_lock:
             t1.start()
-            self._wait_until_equal([count], 1)
+            self._wait_for_count(count, 1)
             t2.start()
-            self._wait_until_equal([count], 2)
+            self._wait_for_count(count, 2)
             t3.start()
-            self._wait_until_equal([count], 3)
+            self._wait_for_count(count, 3)
 
         t1.join()
         t2.join()
@@ -212,40 +222,30 @@ class TestStorageAgent(unittest.TestCase):
         self._test_get_mediator_timeout(False)
 
     def _test_get_mediator_timeout(self, is_timeout=True):
-
+        keep_alive_lock = Lock()
         timeout = 0.3
-        if is_timeout:
-            timeout = 0.1
 
         def blocking_action():
             with get_agent(
                     ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test", password="test")).get_mediator():
-                sleep(0.2)
+                with keep_alive_lock:
+                    pass
 
-        def new_action(in_q):
-            if is_timeout:
-                with self.assertRaises(array_errors.NoConnectionAvailableException):
-                    with get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test",
-                                                       password="test")).get_mediator(timeout=timeout):
-                        in_q.put(True)
-            else:
-                with get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test",
-                                                   password="test")).get_mediator(timeout=timeout):
-                    in_q.put(True)
+        keep_alive_lock.acquire()
 
         # max_size for ds8k is 10
         for _ in range(10):
             thread = Thread(target=blocking_action)
             thread.start()
 
-        # all the clients are in use, the new action waits for an available one.
-        queue = Queue()
-        new_thread = Thread(target=new_action, args=(queue,))
-        new_thread.start()
-        new_thread.join()
-
+        # all the clients are in use, the next section waits for an available one.
         if is_timeout:
-            self.assertTrue(queue.empty())
+            with self.assertRaises(array_errors.NoConnectionAvailableException):
+                with get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test",
+                                                   password="test")).get_mediator(timeout=timeout):
+                    pass
         else:
-            self.assertFalse(queue.empty())
-            self.assertTrue(queue.get() is True)
+            keep_alive_lock.release()
+            with get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test",
+                                               password="test")).get_mediator():
+                pass
