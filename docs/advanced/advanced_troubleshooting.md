@@ -26,8 +26,8 @@ Use this information to help pinpoint potential causes for multipath failures.
     | `- 3:0:0:0 sda 8:0  active ready running
     `-+- policy='service-time 0' prio=10 status=enabled
     `- 2:0:0:0 sdb 8:16 active ready running
-
--   **Display device attachment**
+    
+    **Display device attachment**
 
     Display device attachment information, using the `sudo lsblk` command.
 
