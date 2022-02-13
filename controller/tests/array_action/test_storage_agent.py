@@ -1,5 +1,4 @@
 import unittest
-from queue import Queue
 from threading import Lock, Thread
 from time import sleep
 
@@ -244,8 +243,9 @@ class TestStorageAgent(unittest.TestCase):
                 with get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test",
                                                    password="test")).get_mediator(timeout=timeout):
                     pass
-        else:
-            keep_alive_lock.release()
+
+        keep_alive_lock.release()
+        if not is_timeout:
             with get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test",
                                                password="test")).get_mediator():
                 pass
