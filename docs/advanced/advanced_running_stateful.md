@@ -24,7 +24,7 @@ Use this for advanced information on running a stateful container for raw block 
             $> kubectl exec <stateful-name>-0 -- touch /data/FILE
             $> kubectl exec <stateful-name>-0 -- ls /data/FILE
             /data/FILE
-4. Delete StatefulSet and then recreate, in order to validate that the data remains in the persistent volume.
+4. Delete the StatefulSet and then recreate, in order to validate that the data remains in the persistent volume.
     
     For raw block configurations, the data is `test_block` in `/dev/block`. For file system configurations, the data is `/data/FILE`.
     1. Delete the StatefulSet.
@@ -63,7 +63,7 @@ Use this for advanced information on running a stateful container for raw block 
                 $> kubectl exec <stateful-name>-0 -- ls /data/FILE
                 /data/FILE
       
-5. Delete StatefulSet and the PVC.
+5. Delete the StatefulSet and the PVC.
     
         $> kubectl delete statefulset/statefulset-name
         statefulset/statefulset-name deleted
