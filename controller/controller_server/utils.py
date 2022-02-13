@@ -99,10 +99,12 @@ def get_object_parameters(parameters, prefix_param_name, system_id):
     default_pool = parameters.get(config.PARAMETERS_POOL)
     default_space_efficiency = parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
     default_prefix = parameters.get(prefix_param_name)
+    default_io_group = parameters.get(config.PARAMETERS_IO_GROUP)
     return ObjectParameters(
         pool=system_parameters.get(config.PARAMETERS_POOL, default_pool),
         space_efficiency=system_parameters.get(config.PARAMETERS_SPACE_EFFICIENCY, default_space_efficiency),
-        prefix=system_parameters.get(prefix_param_name, default_prefix))
+        prefix=system_parameters.get(prefix_param_name, default_prefix),
+        io_group=system_parameters.get(config.PARAMETERS_IO_GROUP, default_io_group))
 
 
 def get_volume_id(new_volume, system_id):
