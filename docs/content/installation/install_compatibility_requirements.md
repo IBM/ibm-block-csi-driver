@@ -17,7 +17,7 @@ The CSI driver requires the following ports to be opened on the worker nodes OS 
 
         Port 7778
 
- -   **IBM Spectrum® Virtualize family includes IBM® SAN Volume Controller and IBM FlashSystem® family members that are built with IBM Spectrum® Virtualize (including FlashSystem 5xxx, 7200, 9100, 9200, 9200R)**
+ -   **IBM Spectrum® Virtualize family includes IBM® SAN Volume Controller and IBM FlashSystem® family members that are built with IBM Spectrum® Virtualize (including FlashSystem 5xxx, 7xxx, 9xxx)**
 
         Port 22
 
