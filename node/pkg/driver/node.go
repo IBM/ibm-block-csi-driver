@@ -27,6 +27,7 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"golang.org/x/sys/unix"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/utils/mount"
@@ -36,6 +37,7 @@ var (
 	nodeCaps = []csi.NodeServiceCapability_RPC_Type{
 		csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
 		csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
+		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
 	}
 
 	// volumeCaps represents how the volume could be accessed.
@@ -502,6 +504,14 @@ func (d *NodeService) publishRawBlockVolume(mpathDevice string, targetPath strin
 // Returns: is <target mounted, error if occured>
 func (d *NodeService) isTargetMounted(targetPathWithHostPrefix string, isFSVolume bool) (bool, error) {
 	logger.Debugf("Check if target {%s} is mounted", targetPathWithHostPrefix)
+	isMounted, err := d.IsMounted(targetPathWithHostPrefix, isFSVolume)
+	if isMounted && err == nil {
+		logger.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume", targetPathWithHostPrefix)
+	}
+	return isMounted, err
+}
+
+func (d *NodeService) IsMounted(targetPathWithHostPrefix string, isFSVolume bool) (bool, error) {
 	isNotMounted, err := d.NodeUtils.IsNotMountPoint(targetPathWithHostPrefix)
 	if err != nil {
 		logger.Warningf("Failed to check if (%s), is mounted", targetPathWithHostPrefix)
@@ -516,7 +526,6 @@ func (d *NodeService) isTargetMounted(targetPathWithHostPrefix string, isFSVolum
 		} else if !isFSVolume && targetIsDir {
 			return true, status.Errorf(codes.AlreadyExists, "Required raw block volume but target {%s} is mounted and it is a directory.", targetPathWithHostPrefix)
 		}
-		logger.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume", targetPathWithHostPrefix)
 		return true, nil
 	}
 }
@@ -613,9 +622,106 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 }
 
 func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	goid_info.SetAdditionalIDInfo(req.VolumeId)
+	volumeId := req.VolumeId
+	volumePath := req.VolumePath
+	goid_info.SetAdditionalIDInfo(volumeId)
 	defer goid_info.DeleteAdditionalIDInfo()
-	return nil, status.Error(codes.Unimplemented, "NodeGetVolumeStats is not implemented yet")
+
+	if volumeId == "" {
+		return nil, status.Error(codes.InvalidArgument, "NodeGetVolumeStats Volume ID must be provided")
+	}
+	if volumePath == "" {
+		return nil, status.Error(codes.InvalidArgument, "NodeGetVolumeStats Volume Path must be provided")
+	}
+
+	isTargetPathExists := d.NodeUtils.IsPathExists(volumePath)
+	if isTargetPathExists {
+		isMounted, err := d.IsMounted(volumePath, true)
+		if err != nil {
+			return nil, err
+		}
+		if !isMounted {
+			return nil, status.Errorf(codes.NotFound, "volume path %q is not mounted", volumePath)
+		}
+	} else {
+		return nil, status.Error(codes.NotFound, "Path does not exists")
+	}
+
+	isBlock, err := d.isBlock(volumePath)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to determine if %q is block device: %s", volumePath, err)
+	}
+	if isBlock {
+		return &csi.NodeGetVolumeStatsResponse{}, nil
+	} else {
+		available, capacity, usage, inodes, inodesFree, inodesUsed, err := d.getFilesystemStats(volumePath)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Failed to get capacity statistics for volume path %q: %s", volumePath, err)
+		}
+		return &csi.NodeGetVolumeStatsResponse{
+			Usage: []*csi.VolumeUsage{
+				{
+					Unit:      csi.VolumeUsage_BYTES,
+					Available: available,
+					Total:     capacity,
+					Used:      usage,
+				},
+				{
+					Unit:      csi.VolumeUsage_INODES,
+					Available: inodesFree,
+					Total:     inodes,
+					Used:      inodesUsed,
+				},
+			},
+		}, nil
+	}
+
+}
+
+func (d *NodeService) isBlock(devicePath string) (bool, error) {
+	//StagingTargetPath := req.StagingTargetPath
+	//if StagingTargetPath != "" {
+	//	publishInfo, err := p.readStagedDeviceInfo(ctx, StagingTargetPath)
+	//	if err != nil {
+	//		if utils.IsNotFoundError(err) {
+	//			return false, status.Error(codes.FailedPrecondition, err.Error())
+	//		} else {
+	//			return false, status.Error(codes.Internal, err.Error())
+	//		}
+	//	}
+	//	return publishInfo.FilesystemType == fsRaw, nil
+	//}
+	//return false, nil
+	var stat unix.Stat_t
+	err := unix.Stat(devicePath, &stat)
+	if err != nil {
+		return false, err
+	}
+
+	return (stat.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
+}
+
+func (d *NodeService) getFilesystemStats(path string) (int64, int64, int64, int64, int64, int64, error) {
+	statfs := &unix.Statfs_t{}
+	err := unix.Statfs(path, statfs)
+	if err != nil {
+		return 0, 0, 0, 0, 0, 0, err
+	}
+
+	// Available is blocks available * fragment size
+	available := int64(statfs.Bavail) * int64(statfs.Bsize)
+
+	// Capacity is total block count * fragment size
+	capacity := int64(statfs.Blocks) * int64(statfs.Bsize)
+
+	// Usage is block being used * fragment size (aka block size).
+	usage := (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize)
+
+	inodes := int64(statfs.Files)
+	inodesFree := int64(statfs.Ffree)
+	inodesUsed := inodes - inodesFree
+
+	return available, capacity, usage, inodes, inodesFree, inodesUsed, nil
 }
 
 func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {

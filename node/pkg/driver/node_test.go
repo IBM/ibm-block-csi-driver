@@ -895,23 +895,23 @@ func TestNodeUnpublishVolume(t *testing.T) {
 }
 
 func TestNodeGetVolumeStats(t *testing.T) {
-
-	req := &csi.NodeGetVolumeStatsRequest{}
-
 	d := newTestNodeService(nil, nil, nil)
-
-	expErrCode := codes.Unimplemented
+	volId := "someStorageType:vol-test"
+	volumePath := "/test/path"
+	stagingTargetPath := "/staging/test/path"
+	req := &csi.NodeGetVolumeStatsRequest{
+		VolumeId:          volId,
+		VolumePath:        volumePath,
+		StagingTargetPath: stagingTargetPath,
+	}
 
 	_, err := d.NodeGetVolumeStats(context.TODO(), req)
-	if err == nil {
-		t.Fatalf("Expected error code %d, got nil", expErrCode)
-	}
-	srvErr, ok := status.FromError(err)
-	if !ok {
-		t.Fatalf("Could not get error status code from error: %v", srvErr)
-	}
-	if srvErr.Code() != expErrCode {
-		t.Fatalf("Expected error code %d, got %d message %s", expErrCode, srvErr.Code(), srvErr.Message())
+	if err != nil {
+		srvErr, ok := status.FromError(err)
+		if !ok {
+			t.Fatalf("Could not get error status code from error: %v", srvErr)
+		}
+		t.Fatalf("Expected nil error, got %d message %s", srvErr.Code(), srvErr.Message())
 	}
 }
 
