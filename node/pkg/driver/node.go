@@ -19,6 +19,7 @@ package driver
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"strings"
@@ -653,7 +654,18 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		return nil, status.Errorf(codes.Internal, "failed to determine if %q is block device: %s", volumePath, err)
 	}
 	if isBlock {
-		return &csi.NodeGetVolumeStatsResponse{}, nil
+		blockSize, err := d.getBlockSize(volumePath)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to retrieve capacity statistics for block volume %q: %s", volumePath, err)
+		}
+		return &csi.NodeGetVolumeStatsResponse{
+			Usage: []*csi.VolumeUsage{
+				{
+					Unit:  csi.VolumeUsage_BYTES,
+					Total: blockSize,
+				},
+			},
+		}, nil
 	} else {
 		available, capacity, usage, inodes, inodesFree, inodesUsed, err := d.getFilesystemStats(volumePath)
 		if err != nil {
@@ -692,19 +704,6 @@ func (d *NodeService) matanPath(path string) bool {
 }
 
 func (d *NodeService) isBlock(devicePath string) (bool, error) {
-	//StagingTargetPath := req.StagingTargetPath
-	//if StagingTargetPath != "" {
-	//	publishInfo, err := p.readStagedDeviceInfo(ctx, StagingTargetPath)
-	//	if err != nil {
-	//		if utils.IsNotFoundError(err) {
-	//			return false, status.Error(codes.FailedPrecondition, err.Error())
-	//		} else {
-	//			return false, status.Error(codes.Internal, err.Error())
-	//		}
-	//	}
-	//	return publishInfo.FilesystemType == fsRaw, nil
-	//}
-	//return false, nil
 	var stat unix.Stat_t
 	err := unix.Stat(devicePath, &stat)
 	if err != nil {
@@ -714,6 +713,19 @@ func (d *NodeService) isBlock(devicePath string) (bool, error) {
 	return (stat.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
 }
 
+func (d *NodeService) getBlockSize(devicePath string) (int64, error) {
+    file, err := os.Open(devicePath)
+    if err != nil {
+        fmt.Printf("error opening %s: %s\n", devicePath, err)
+        os.Exit(1)
+    }
+    size, err := file.Seek(0, io.SeekEnd)
+    if err != nil {
+        return 0, err
+    }
+    return size, nil
+}
+
 func (d *NodeService) getFilesystemStats(path string) (int64, int64, int64, int64, int64, int64, error) {
 	statfs := &unix.Statfs_t{}
 	err := unix.Statfs(path, statfs)
@@ -721,13 +733,8 @@ func (d *NodeService) getFilesystemStats(path string) (int64, int64, int64, int6
 		return 0, 0, 0, 0, 0, 0, err
 	}
 
-	// Available is blocks available * fragment size
 	available := int64(statfs.Bavail) * int64(statfs.Bsize)
-
-	// Capacity is total block count * fragment size
 	capacity := int64(statfs.Blocks) * int64(statfs.Bsize)
-
-	// Usage is block being used * fragment size (aka block size).
 	usage := (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize)
 
 	inodes := int64(statfs.Files)
