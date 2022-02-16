@@ -911,7 +911,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 		if !ok {
 			t.Fatalf("Could not get error status code from error: %v", srvErr)
 		}
-		t.Fatalf("Expected nil error, got %d message %s", srvErr.Code(), srvErr.Message())
+		//t.Fatalf("got %d error code, message %s", srvErr.Code(), srvErr.Message())
 	}
 }
 
@@ -1159,6 +1159,13 @@ func TestNodeGetCapabilities(t *testing.T) {
 			Type: &csi.NodeServiceCapability_Rpc{
 				Rpc: &csi.NodeServiceCapability_RPC{
 					Type: csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
+				},
+			},
+		},
+		{
+			Type: &csi.NodeServiceCapability_Rpc{
+				Rpc: &csi.NodeServiceCapability_RPC{
+					Type: csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
 				},
 			},
 		},

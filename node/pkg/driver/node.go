@@ -19,6 +19,7 @@ package driver
 import (
 	"context"
 	"fmt"
+	"os"
 	"path"
 	"strings"
 
@@ -634,7 +635,7 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		return nil, status.Error(codes.InvalidArgument, "NodeGetVolumeStats Volume Path must be provided")
 	}
 
-	isTargetPathExists := d.NodeUtils.IsPathExists(volumePath)
+	isTargetPathExists := d.matanPath(volumePath)
 	if isTargetPathExists {
 		isMounted, err := d.IsMounted(volumePath, true)
 		if err != nil {
@@ -676,6 +677,18 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		}, nil
 	}
 
+}
+
+func (d *NodeService) matanPath(path string) bool {
+	_, err := os.Stat(path)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			logger.Warningf("Check is file %s exists returned error %s", path, err.Error())
+		}
+		return false
+	}
+
+	return true
 }
 
 func (d *NodeService) isBlock(devicePath string) (bool, error) {
