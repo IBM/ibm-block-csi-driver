@@ -645,7 +645,7 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 			return nil, status.Errorf(codes.NotFound, "volume path %q is not mounted", volumePath)
 		}
 	} else {
-		return nil, status.Error(codes.NotFound, "Path does not exists")
+		return nil, status.Errorf(codes.NotFound, "volume path %q does not exists", volumePath)
 	}
 
 	isBlock, err := d.isBlock(volumePath)
