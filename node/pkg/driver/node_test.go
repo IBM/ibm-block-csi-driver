@@ -897,12 +897,14 @@ func TestNodeUnpublishVolume(t *testing.T) {
 func TestNodeGetVolumeStats(t *testing.T) {
 	mockCtl := gomock.NewController(t)
 	defer mockCtl.Finish()
-	//mockMounter := mocks.NewMockNodeMounter(mockCtl)
 	mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
 	d := newTestNodeService(mockNodeUtils, nil, nil)
 	volId := "someStorageType:vol-test"
 	volumePath := "/test/path"
 	stagingTargetPath := "/staging/test/path"
+
+	mockNodeUtils.EXPECT().IsPathExists("/host" + volumePath).Return(false)
+	mockNodeUtils.EXPECT().IsPathExists(volumePath).Return(false)
 	req := &csi.NodeGetVolumeStatsRequest{
 		VolumeId:          volId,
 		VolumePath:        volumePath,
