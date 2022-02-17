@@ -696,18 +696,6 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 
 }
 
-//func (d *NodeService) matanPath(path string) bool {
-//	_, err := os.Stat(path)
-//	if err != nil {
-//		if !os.IsNotExist(err) {
-//			logger.Warningf("Check is file %s exists returned error %s", path, err.Error())
-//		}
-//		return false
-//	}
-//
-//	return true
-//}
-
 func (d *NodeService) isBlock(devicePath string) (bool, error) {
 	var stat unix.Stat_t
 	err := unix.Stat(devicePath, &stat)

@@ -902,6 +902,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 	volId := "someStorageType:vol-test"
 	volumePath := "/test/path"
 	stagingTargetPath := "/staging/test/path"
+	expErrCode := codes.NotFound
 
 	mockNodeUtils.EXPECT().IsPathExists("/host" + volumePath).Return(false)
 	mockNodeUtils.EXPECT().IsPathExists(volumePath).Return(false)
@@ -917,7 +918,9 @@ func TestNodeGetVolumeStats(t *testing.T) {
 		if !ok {
 			t.Fatalf("Could not get error status code from error: %v", srvErr)
 		}
-		t.Fatalf("got %d error code, message %s", srvErr.Code(), srvErr.Message())
+		if srvErr.Code() != expErrCode {
+			t.Fatalf("Expected error code %d, got %d error code, message %s", expErrCode, srvErr.Code(), srvErr.Message())
+		}
 	}
 }
 
