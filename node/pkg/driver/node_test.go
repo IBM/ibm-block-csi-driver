@@ -895,7 +895,11 @@ func TestNodeUnpublishVolume(t *testing.T) {
 }
 
 func TestNodeGetVolumeStats(t *testing.T) {
-	d := newTestNodeService(nil, nil, nil)
+	mockCtl := gomock.NewController(t)
+	defer mockCtl.Finish()
+	//mockMounter := mocks.NewMockNodeMounter(mockCtl)
+	mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+	d := newTestNodeService(mockNodeUtils, nil, nil)
 	volId := "someStorageType:vol-test"
 	volumePath := "/test/path"
 	stagingTargetPath := "/staging/test/path"
@@ -911,7 +915,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 		if !ok {
 			t.Fatalf("Could not get error status code from error: %v", srvErr)
 		}
-		//t.Fatalf("got %d error code, message %s", srvErr.Code(), srvErr.Message())
+		t.Fatalf("got %d error code, message %s", srvErr.Code(), srvErr.Message())
 	}
 }
 

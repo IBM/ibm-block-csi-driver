@@ -627,6 +627,7 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	volumeId := req.VolumeId
 	volumePath := req.VolumePath
 	blockPath := "/host" + volumePath
+	isBlock := false
 	goid_info.SetAdditionalIDInfo(volumeId)
 	defer goid_info.DeleteAdditionalIDInfo()
 
@@ -637,9 +638,13 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		return nil, status.Error(codes.InvalidArgument, "NodeGetVolumeStats Volume Path must be provided")
 	}
 
-	isBlock, err := d.isBlock(blockPath)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to determine if %q is block device: %s", volumePath, err)
+	isBlockPathExists := d.NodeUtils.IsPathExists(blockPath)
+	if isBlockPathExists {
+		var err error
+		isBlock, err = d.isBlock(blockPath)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to determine if %q is block device: %s", volumePath, err)
+		}
 	}
 	if isBlock {
 		blockSize, err := d.getBlockSize(blockPath)
