@@ -72,3 +72,8 @@ The following IBM block storage CSI driver features are not supported on volumes
 
 - Red Hat Bug [2022328](https://bugzilla.redhat.com/show_bug.cgi?id=2022328)
 - Kubernetes Issue [106710](https://github.com/kubernetes/kubernetes/issues/106710)
+
+## Stretched volume and snapshot limitations
+
+When conducting volume cloning while using stretched topology, the volume type (regular or stretched) is determined by the pool parameter (single or multiple pools) defined in the storageclass. For example, a regular volume will stay regular during cloning, and cannot be changed to be a stretched volume.
+- 
