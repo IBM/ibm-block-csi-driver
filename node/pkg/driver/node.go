@@ -714,16 +714,15 @@ func (d *NodeService) isBlock(devicePath string) (bool, error) {
 }
 
 func (d *NodeService) getBlockSize(devicePath string) (int64, error) {
-    file, err := os.Open(devicePath)
-    if err != nil {
-        fmt.Printf("error opening %s: %s\n", devicePath, err)
-        os.Exit(1)
-    }
-    size, err := file.Seek(0, io.SeekEnd)
-    if err != nil {
-        return 0, err
-    }
-    return size, nil
+	file, err := os.Open(devicePath)
+	if err != nil {
+		return 0, status.Errorf(codes.Internal, "Failed to open %q: %s", devicePath, err)
+	}
+	size, err := file.Seek(0, io.SeekEnd)
+	if err != nil {
+		return 0, status.Errorf(codes.Internal, "Failed to get size of %q: %s", devicePath, err)
+	}
+	return size, nil
 }
 
 func (d *NodeService) getFilesystemStats(path string) (int64, int64, int64, int64, int64, int64, error) {
