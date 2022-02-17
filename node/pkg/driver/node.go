@@ -714,6 +714,7 @@ func (d *NodeService) isBlock(devicePath string) (bool, error) {
 }
 
 func (d *NodeService) getBlockSize(devicePath string) (int64, error) {
+	devicePath = "/host" + devicePath
 	file, err := os.Open(devicePath)
 	if err != nil {
 		return 0, status.Errorf(codes.Internal, "Failed to open %q: %s", devicePath, err)
