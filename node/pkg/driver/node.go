@@ -628,11 +628,11 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 
 func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 	volumeId := req.VolumeId
+	goid_info.SetAdditionalIDInfo(volumeId)
+	defer goid_info.DeleteAdditionalIDInfo()
 	volumePath := req.VolumePath
 	volumePathWithHostPrefix := d.NodeUtils.GetPodPath(req.VolumePath)
 	isFSVolume := true
-	goid_info.SetAdditionalIDInfo(volumeId)
-	defer goid_info.DeleteAdditionalIDInfo()
 
 	err := d.nodeGetVolumeStatsRequestValidation(volumeId, volumePath)
 	if err != nil {

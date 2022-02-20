@@ -921,6 +921,8 @@ func TestNodeGetVolumeStats(t *testing.T) {
 		if srvErr.Code() != expErrCode {
 			t.Fatalf("Expected error code %d, got %d error code, message %s", expErrCode, srvErr.Code(), srvErr.Message())
 		}
+	} else {
+		t.Fatalf("Expected to get an error, got nil")
 	}
 }
 
