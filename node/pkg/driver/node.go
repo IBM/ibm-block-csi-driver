@@ -627,6 +627,7 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	volumeId := req.VolumeId
 	volumePath := req.VolumePath
 	volumePathWithHostPrefix := d.NodeUtils.GetPodPath(req.VolumePath)
+	isFSVolume := true
 	goid_info.SetAdditionalIDInfo(volumeId)
 	defer goid_info.DeleteAdditionalIDInfo()
 
@@ -646,48 +647,47 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		return nil, status.Errorf(codes.Internal, "failed to determine if %q is block device: %s", volumePath, err)
 	}
 	if isBlock {
-		blockSize, err := d.getBlockSize(volumePathWithHostPrefix)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to retrieve capacity statistics for block volume %q: %s", volumePath, err)
-		}
-		return &csi.NodeGetVolumeStatsResponse{
-			Usage: []*csi.VolumeUsage{
-				{
-					Unit:  csi.VolumeUsage_BYTES,
-					Total: blockSize,
-				},
-			},
-		}, nil
-	} else {
-		isMounted, err := d.IsMounted(volumePath, true)
-		if err != nil {
-			return nil, err
-		}
-		if !isMounted {
-			return nil, status.Errorf(codes.NotFound, "volume path %q is not mounted", volumePath)
-		}
-		available, capacity, usage, inodes, inodesFree, inodesUsed, err := d.getFilesystemStats(volumePath)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Failed to get capacity statistics for volume path %q: %s", volumePath, err)
-		}
-		return &csi.NodeGetVolumeStatsResponse{
-			Usage: []*csi.VolumeUsage{
-				{
-					Unit:      csi.VolumeUsage_BYTES,
-					Available: available,
-					Total:     capacity,
-					Used:      usage,
-				},
-				{
-					Unit:      csi.VolumeUsage_INODES,
-					Available: inodesFree,
-					Total:     inodes,
-					Used:      inodesUsed,
-				},
-			},
-		}, nil
+		isFSVolume = false
+		//blockSize, err := d.getBlockSize(volumePathWithHostPrefix)
+		//if err != nil {
+		//	return nil, status.Errorf(codes.Internal, "failed to retrieve capacity statistics for block volume %q: %s", volumePath, err)
+		//}
+		//return &csi.NodeGetVolumeStatsResponse{
+		//	Usage: []*csi.VolumeUsage{
+		//		{
+		//			Unit:  csi.VolumeUsage_BYTES,
+		//			Total: blockSize,
+		//		},
+		//	},
+		//}, nil
 	}
-
+	isMounted, err := d.IsMounted(volumePath, isFSVolume)
+	if err != nil {
+		return nil, err
+	}
+	if !isMounted {
+		return nil, status.Errorf(codes.NotFound, "volume path %q is not mounted", volumePath)
+	}
+	available, capacity, usage, inodes, inodesFree, inodesUsed, err := d.getFilesystemStats(volumePath)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Failed to get capacity statistics for volume path %q: %s", volumePath, err)
+	}
+	return &csi.NodeGetVolumeStatsResponse{
+		Usage: []*csi.VolumeUsage{
+			{
+				Unit:      csi.VolumeUsage_BYTES,
+				Available: available,
+				Total:     capacity,
+				Used:      usage,
+			},
+			{
+				Unit:      csi.VolumeUsage_INODES,
+				Available: inodesFree,
+				Total:     inodes,
+				Used:      inodesUsed,
+			},
+		},
+	}, nil
 }
 
 func (d *NodeService) isBlock(devicePath string) (bool, error) {
