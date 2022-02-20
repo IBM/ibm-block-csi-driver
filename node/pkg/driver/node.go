@@ -39,7 +39,7 @@ var (
 	nodeCaps = []csi.NodeServiceCapability_RPC_Type{
 		csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
 		csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
-		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
+//		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
 	}
 
 	// volumeCaps represents how the volume could be accessed.
