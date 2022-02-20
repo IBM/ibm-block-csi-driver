@@ -905,7 +905,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 	expErrCode := codes.NotFound
 
 	mockNodeUtils.EXPECT().IsPathExists("/host" + volumePath).Return(false)
-	mockNodeUtils.EXPECT().IsPathExists(volumePath).Return(false)
+	mockNodeUtils.EXPECT().GetPodPath(volumePath).Return("/host" + volumePath)
 	req := &csi.NodeGetVolumeStatsRequest{
 		VolumeId:          volId,
 		VolumePath:        volumePath,

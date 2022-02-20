@@ -626,8 +626,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
 	volumeId := req.VolumeId
 	volumePath := req.VolumePath
-	blockPath := "/host" + volumePath
-	isBlock := false
+	volumePathWithHostPrefix := d.NodeUtils.GetPodPath(req.VolumePath)
 	goid_info.SetAdditionalIDInfo(volumeId)
 	defer goid_info.DeleteAdditionalIDInfo()
 
@@ -638,16 +637,16 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		return nil, status.Error(codes.InvalidArgument, "NodeGetVolumeStats Volume Path must be provided")
 	}
 
-	isBlockPathExists := d.NodeUtils.IsPathExists(blockPath)
-	if isBlockPathExists {
-		var err error
-		isBlock, err = d.isBlock(blockPath)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "failed to determine if %q is block device: %s", volumePath, err)
-		}
+	isPathExists := d.NodeUtils.IsPathExists(volumePathWithHostPrefix)
+	if !isPathExists {
+		return nil, status.Errorf(codes.NotFound, "volume path %q does not exists", volumePath)
+	}
+	isBlock, err := d.isBlock(volumePathWithHostPrefix)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to determine if %q is block device: %s", volumePath, err)
 	}
 	if isBlock {
-		blockSize, err := d.getBlockSize(blockPath)
+		blockSize, err := d.getBlockSize(volumePathWithHostPrefix)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "failed to retrieve capacity statistics for block volume %q: %s", volumePath, err)
 		}
@@ -660,17 +659,12 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 			},
 		}, nil
 	} else {
-		isTargetPathExists := d.NodeUtils.IsPathExists(volumePath)
-		if isTargetPathExists {
-			isMounted, err := d.IsMounted(volumePath, true)
-			if err != nil {
-				return nil, err
-			}
-			if !isMounted {
-				return nil, status.Errorf(codes.NotFound, "volume path %q is not mounted", volumePath)
-			}
-		} else {
-			return nil, status.Errorf(codes.NotFound, "volume path %q does not exists", volumePath)
+		isMounted, err := d.IsMounted(volumePath, true)
+		if err != nil {
+			return nil, err
+		}
+		if !isMounted {
+			return nil, status.Errorf(codes.NotFound, "volume path %q is not mounted", volumePath)
 		}
 		available, capacity, usage, inodes, inodesFree, inodesUsed, err := d.getFilesystemStats(volumePath)
 		if err != nil {
