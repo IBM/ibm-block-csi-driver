@@ -668,7 +668,7 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	if !isMounted {
 		return nil, status.Errorf(codes.NotFound, "volume path %q is not mounted", volumePath)
 	}
-	available, capacity, usage, inodes, inodesFree, inodesUsed, err := d.getFilesystemStats(volumePath)
+	available, capacity, usage, inodes, inodesFree, inodesUsed, err := d.getFilesystemStats(volumePathWithHostPrefix)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to get capacity statistics for volume path %q: %s", volumePath, err)
 	}
