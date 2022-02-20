@@ -634,11 +634,9 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	goid_info.SetAdditionalIDInfo(volumeId)
 	defer goid_info.DeleteAdditionalIDInfo()
 
-	if volumeId == "" {
-		return nil, status.Error(codes.InvalidArgument, "NodeGetVolumeStats Volume ID must be provided")
-	}
-	if volumePath == "" {
-		return nil, status.Error(codes.InvalidArgument, "NodeGetVolumeStats Volume Path must be provided")
+	err := d.nodeGetVolumeStatsRequestValidation(volumeId, volumePath)
+	if err != nil {
+		return nil, err
 	}
 
 	isPathExists := d.NodeUtils.IsPathExists(volumePathWithHostPrefix)
@@ -679,6 +677,17 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 			},
 		},
 	}, nil
+}
+
+func (d *NodeService) nodeGetVolumeStatsRequestValidation(volumeId string, volumePath string) error {
+	if volumeId == "" {
+		return status.Error(codes.InvalidArgument, "NodeGetVolumeStats Volume ID must be provided")
+	}
+	if volumePath == "" {
+		return status.Error(codes.InvalidArgument, "NodeGetVolumeStats Volume Path must be provided")
+	}
+
+	return nil
 }
 
 func (d *NodeService) isBlock(devicePath string) (bool, error) {
