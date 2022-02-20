@@ -661,9 +661,9 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		//	},
 		//}, nil
 	}
-	isMounted, err := d.IsMounted(volumePath, isFSVolume)
+	isMounted, err := d.IsMounted(volumePathWithHostPrefix, isFSVolume)
 	if err != nil {
-		return nil, err
+		return nil, status.Errorf(codes.Internal, "failed to check if volume path %q is mounted", volumePath)
 	}
 	if !isMounted {
 		return nil, status.Errorf(codes.NotFound, "volume path %q is not mounted", volumePath)
