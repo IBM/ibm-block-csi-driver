@@ -19,8 +19,6 @@ package driver
 import (
 	"context"
 	"fmt"
-	"io"
-	"os"
 	"path"
 	"strings"
 
@@ -87,6 +85,11 @@ type NodeService struct {
 	VolumeIdLocksMap            SyncLockInterface
 	OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface
 	OsDeviceConnectivityHelper  device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface
+}
+
+type volumeStatistics struct {
+	availableBytes, totalBytes, usedBytes    int64
+	availableInodes, totalInodes, usedInodes int64
 }
 
 // newNodeService creates a new node service
@@ -648,18 +651,6 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	}
 	if isBlock {
 		isFSVolume = false
-		//blockSize, err := d.getBlockSize(volumePathWithHostPrefix)
-		//if err != nil {
-		//	return nil, status.Errorf(codes.Internal, "failed to retrieve capacity statistics for block volume %q: %s", volumePath, err)
-		//}
-		//return &csi.NodeGetVolumeStatsResponse{
-		//	Usage: []*csi.VolumeUsage{
-		//		{
-		//			Unit:  csi.VolumeUsage_BYTES,
-		//			Total: blockSize,
-		//		},
-		//	},
-		//}, nil
 	}
 	isMounted, err := d.IsMounted(volumePathWithHostPrefix, isFSVolume)
 	if err != nil {
@@ -668,7 +659,7 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	if !isMounted {
 		return nil, status.Errorf(codes.NotFound, "volume path %q is not mounted", volumePath)
 	}
-	available, capacity, usage, inodes, inodesFree, inodesUsed, err := d.getFilesystemStats(volumePathWithHostPrefix)
+	volumeStats, err := d.getVolumeStats(volumePathWithHostPrefix)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to get capacity statistics for volume path %q: %s", volumePath, err)
 	}
@@ -676,15 +667,15 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		Usage: []*csi.VolumeUsage{
 			{
 				Unit:      csi.VolumeUsage_BYTES,
-				Available: available,
-				Total:     capacity,
-				Used:      usage,
+				Available: volumeStats.availableBytes,
+				Total:     volumeStats.totalBytes,
+				Used:      volumeStats.usedBytes,
 			},
 			{
 				Unit:      csi.VolumeUsage_INODES,
-				Available: inodesFree,
-				Total:     inodes,
-				Used:      inodesUsed,
+				Available: volumeStats.availableInodes,
+				Total:     volumeStats.totalInodes,
+				Used:      volumeStats.usedInodes,
 			},
 		},
 	}, nil
@@ -699,34 +690,32 @@ func (d *NodeService) isBlock(devicePath string) (bool, error) {
 	return (stat.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
 }
 
-func (d *NodeService) getBlockSize(devicePath string) (int64, error) {
-	file, err := os.Open(devicePath)
-	if err != nil {
-		return 0, status.Errorf(codes.Internal, "Failed to open %q: %s", devicePath, err)
-	}
-	size, err := file.Seek(0, io.SeekEnd)
-	if err != nil {
-		return 0, status.Errorf(codes.Internal, "Failed to get size of %q: %s", devicePath, err)
-	}
-	return size, nil
-}
-
-func (d *NodeService) getFilesystemStats(path string) (int64, int64, int64, int64, int64, int64, error) {
+func (d *NodeService) getVolumeStats(path string) (volumeStatistics, error) {
 	statfs := &unix.Statfs_t{}
 	err := unix.Statfs(path, statfs)
 	if err != nil {
-		return 0, 0, 0, 0, 0, 0, err
+		return volumeStatistics{}, err
 	}
 
-	available := int64(statfs.Bavail) * int64(statfs.Bsize)
-	capacity := int64(statfs.Blocks) * int64(statfs.Bsize)
-	usage := (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize)
+	availableBytes := int64(statfs.Bavail) * int64(statfs.Bsize)
+	totalBytes := int64(statfs.Blocks) * int64(statfs.Bsize)
+	usedBytes := (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize)
 
-	inodes := int64(statfs.Files)
-	inodesFree := int64(statfs.Ffree)
-	inodesUsed := inodes - inodesFree
+	totalInodes := int64(statfs.Files)
+	availableInodes := int64(statfs.Ffree)
+	usedInodes := totalInodes - availableInodes
 
-	return available, capacity, usage, inodes, inodesFree, inodesUsed, nil
+	volumeStats := volumeStatistics{
+		availableBytes: availableBytes,
+		totalBytes:     totalBytes,
+		usedBytes:      usedBytes,
+
+		availableInodes: availableInodes,
+		totalInodes:     totalInodes,
+		usedInodes:      usedInodes,
+	}
+
+	return volumeStats, nil
 }
 
 func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
