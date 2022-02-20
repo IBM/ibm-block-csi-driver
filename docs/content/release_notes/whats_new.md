@@ -4,9 +4,9 @@ IBM® block storage CSI driver 1.9.0 introduces the enhancements that are detail
 
 **General availability date:** 18 March 2022
 
-## New stretched volume and snapshot support
+## Additional high availability (HA) feature
 
-Stretched volume and snapshot support is now supported for Spectrum Virtualize family systems. Stretched topology enables disaster recovery and high availability between nodes in I/O groups at different locations. For more information, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Product overview** > **Technical overview** > **Volumes** > **Stretched volumes**.
+Stretched volume and (FlashCopy) snapshot support is now supported on SAN Volume Controller storage systems. Stretched storage topology enables disaster recovery and high availability between nodes in I/O groups at different locations. For more information, see **Product overview** > **Technical overview** > **Systems** > **Stretched systems** within the [SAN Volume Controller documentation](https://www.ibm.com/docs/en/sanvolumecontroller).
 
 ## Additional orchestration support for OpenShift 4.7 and 4.9 for deployment
 

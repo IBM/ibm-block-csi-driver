@@ -13,7 +13,7 @@ The following limitations apply when using volume snapshots with the IBM block s
 -   When deleting a PersistentVolumeClaim (PVC), the persistent volume (PV) remains until all snapshots of the specific PV are deleted.
 -   When using the CSI (Container Storage Interface) driver with IBM Spectrum® Virtualize family products, a snapshot can only be used to provision a new volume of equal size.
 
-**Note:** For volume snapshot limitations pertaining specifically to HyperSwap usage, see [HyperSwap usage limitations](#hyperSwap-usage-limitations).
+**Note:** For volume snapshot limitations pertaining specifically to HyperSwap usage, see [High availability (HA) limitations](#high-availability-ha-limitations).
 
 ## Volume clone limitations
 
@@ -25,7 +25,7 @@ The following limitations apply when using volume clones with the IBM block stor
 
 -   A PVC and its clone need to both have the same volume mode (**Filesystem** or **Block**).
 
-**Note:** For volume clone limitations pertaining specifically to HyperSwap usage, see [HyperSwap usage limitations](#hyperSwap-usage-limitations).
+**Note:** For volume clone limitations pertaining specifically to HyperSwap usage, see [High availability (HA) limitations](#high-availability-ha-limitations).
 
 ## Volume expansion limitations
 
@@ -47,16 +47,21 @@ When a role switch is conducted, this is not reflected within the other orchestr
       
     For more information, see the [Change the Reclaim Policy of a PersistentVolume](https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy/) information in the Kubernetes documentation.
 
-## HyperSwap usage limitations
+## High availability (HA) limitations
+**Important:**
+- HyperSwap topology is only supported for use with IBM Spectrum Virtualize family storage systems.
+- Stretched topology is only supported with SAN Volume Controller storage systems.
 
-**Important:** The HyperSwap feature is only supported for use with IBM Spectrum Virtualize family storage systems.
-
+### HyperSwap volumes
 The following IBM block storage CSI driver features are not supported on volumes where HyperSwap is used:
 
 - A HyperSwap volume cannot be created from a snapshot.
 
     **Note:** A snapshot can be created from a HyperSwap volume.
  - Volume cloning.
+
+### Stretched volumes
+ When conducting volume cloning both volumes must use stretched topology.
 
 ## NVMe®/FC usage limitations
 
@@ -72,8 +77,3 @@ The following IBM block storage CSI driver features are not supported on volumes
 
 - Red Hat Bug [2022328](https://bugzilla.redhat.com/show_bug.cgi?id=2022328)
 - Kubernetes Issue [106710](https://github.com/kubernetes/kubernetes/issues/106710)
-
-## Stretched volume and snapshot limitations
-
-When conducting volume cloning while using stretched topology, the volume type (regular or stretched) is determined by the pool parameter (single or multiple pools) defined in the storageclass. For example, a regular volume will stay regular during cloning, and cannot be changed to be a stretched volume.
-- 

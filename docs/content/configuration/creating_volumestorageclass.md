@@ -24,14 +24,16 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in [the
 
 - The IBM DS8000 family `pool` value is the pool ID and not the pool name as is used in other storage systems.
 - Be sure that the `pool` value is the name of an existing pool on the storage system.
-- To create a volume with HyperSwap on IBM Spectrum Virtualize storage systems, put a colon (:) between the two pools within the `pool` value. For example:
+- To create a volume with high availability (HA) (HyperSwap or stretched topology) on IBM Spectrum Virtualize storage systems, put a colon (:) between the two pools within the `pool` value. For example:
   
   ```
   pool: demo-pool1:demo-pool2 
   ```
    **Important:** The two pools must be from different sites.
    
-  For more information about the HyperSwap limitations and requirements, see [Limitations](../release_notes/limitations.md) within the release notes and [Compatibility and requirements](../installation/install_compatibility_requirements.md) within this guide.
+  For more information about HyperSwap limitations, see [Limitations](../release_notes/limitations.md).
+  
+  For more information about high availability requirements, see [Compatibility and requirements](../installation/install_compatibility_requirements.md).
 
 - The `allowVolumeExpansion` parameter is optional but is necessary for using volume expansion. The default value is _false_.
 
