@@ -23,6 +23,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -919,7 +920,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 					VolumePath:        volumePath,
 					StagingTargetPath: stagingTargetPath,
 				}
-			
+
 				_, err := d.NodeGetVolumeStats(context.TODO(), req)
 				if err != nil {
 					srvErr, ok := status.FromError(err)
@@ -935,6 +936,39 @@ func TestNodeGetVolumeStats(t *testing.T) {
 			},
 		},
 		{
+			name: "fail to get stats",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				d := newTestNodeService(mockNodeUtils, nil, nil)
+				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
+				mockNodeUtils.EXPECT().IsPathExists(volumePathWithHostPrefix).Return(true)
+				mockNodeUtils.EXPECT().IsBlock(volumePathWithHostPrefix).Return(false, nil)
+				mockNodeUtils.EXPECT().IsNotMountPoint(volumePathWithHostPrefix).Return(false, nil)
+				mockNodeUtils.EXPECT().IsDirectory(volumePathWithHostPrefix).Return(true)
+				mockNodeUtils.EXPECT().GetVolumeStats(volumePathWithHostPrefix).Return(driver.VolumeStatistics{}, status.Errorf(codes.Internal, "fail to get stats"))
+				req := &csi.NodeGetVolumeStatsRequest{
+					VolumeId:          volId,
+					VolumePath:        volumePath,
+					StagingTargetPath: stagingTargetPath,
+				}
+
+				_, err := d.NodeGetVolumeStats(context.TODO(), req)
+				if err != nil {
+					srvErr, ok := status.FromError(err)
+					if !ok {
+						t.Fatalf("Could not get error status code from error: %v", srvErr)
+					}
+					if !strings.Contains(err.Error(), "Failed to get capacity statistics") {
+						t.Fatalf("Expected to get error from GetVolumeStats function, got error message: %s", err.Error())
+					}
+				} else {
+					t.Fatalf("Expected to get an error, got nil")
+				}
+			},
+		},
+		{
 			name: "success get stats",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)
@@ -942,17 +976,44 @@ func TestNodeGetVolumeStats(t *testing.T) {
 				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
 				d := newTestNodeService(mockNodeUtils, nil, nil)
 				expErrCode := codes.NotFound
+				volumeStats := driver.VolumeStatistics{
+					AvailableBytes: 1,
+					TotalBytes:     1,
+					UsedBytes:      1,
+
+					AvailableInodes: 1,
+					TotalInodes:     1,
+					UsedInodes:      1,
+				}
 				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(volumePathWithHostPrefix).Return(true)
-				mockNodeUtils.EXPECT().isBlock(volumePathWithHostPrefix).Return(false, nil)
-				mockNodeUtils.EXPECT().IsNotMountPoint(volumePathWithHostPrefix).Return(true, nil)
+				mockNodeUtils.EXPECT().IsBlock(volumePathWithHostPrefix).Return(false, nil)
+				mockNodeUtils.EXPECT().IsNotMountPoint(volumePathWithHostPrefix).Return(false, nil)
+				mockNodeUtils.EXPECT().IsDirectory(volumePathWithHostPrefix).Return(true)
+				mockNodeUtils.EXPECT().GetVolumeStats(volumePathWithHostPrefix).Return(volumeStats, nil)
+				expResp := &csi.NodeGetVolumeStatsResponse{
+					Usage: []*csi.VolumeUsage{
+						{
+							Unit:      csi.VolumeUsage_BYTES,
+							Available: volumeStats.AvailableBytes,
+							Total:     volumeStats.TotalBytes,
+							Used:      volumeStats.UsedBytes,
+						},
+						{
+							Unit:      csi.VolumeUsage_INODES,
+							Available: volumeStats.AvailableInodes,
+							Total:     volumeStats.TotalInodes,
+							Used:      volumeStats.UsedInodes,
+						},
+					},
+				}
 				req := &csi.NodeGetVolumeStatsRequest{
 					VolumeId:          volId,
 					VolumePath:        volumePath,
 					StagingTargetPath: stagingTargetPath,
 				}
-			
-				_, err := d.NodeGetVolumeStats(context.TODO(), req)
+
+				resp, err := d.NodeGetVolumeStats(context.TODO(), req)
 				if err != nil {
 					srvErr, ok := status.FromError(err)
 					if !ok {
@@ -961,13 +1022,13 @@ func TestNodeGetVolumeStats(t *testing.T) {
 					if srvErr.Code() != expErrCode {
 						t.Fatalf("Expected error code %d, got %d error code, message %s", expErrCode, srvErr.Code(), srvErr.Message())
 					}
-				} else {
-					t.Fatalf("Expected to get an error, got nil")
+				}
+				if !reflect.DeepEqual(expResp, resp) {
+					t.Fatalf("Expected response {%+v}, got {%+v}", expResp, resp)
 				}
 			},
 		},
 	}
-
 	for _, tc := range testCases {
 		t.Run(tc.name, tc.testFunc)
 	}

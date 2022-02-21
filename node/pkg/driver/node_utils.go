@@ -90,8 +90,8 @@ type NodeUtilsInterface interface {
 	GetPodPath(filepath string) string
 	GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []string, iscsiIQN string) (string, error)
 	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
-	isBlock(devicePath string) (bool, error)
-	//getVolumeStats(path string) (volumeStatistics, error)
+	IsBlock(devicePath string) (bool, error)
+	GetVolumeStats(path string) (VolumeStatistics, error)
 }
 
 type NodeUtils struct {
@@ -519,7 +519,7 @@ func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[
 	return topologyLabels, nil
 }
 
-func (n NodeUtils) isBlock(devicePath string) (bool, error) {
+func (n NodeUtils) IsBlock(devicePath string) (bool, error) {
 	var stat unix.Stat_t
 	err := unix.Stat(devicePath, &stat)
 	if err != nil {
@@ -528,30 +528,30 @@ func (n NodeUtils) isBlock(devicePath string) (bool, error) {
 	return (stat.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
 }
 
-//func (d NodeUtils) getVolumeStats(path string) (volumeStatistics, error) {
-//	statfs := &unix.Statfs_t{}
-//	err := unix.Statfs(path, statfs)
-//	if err != nil {
-//		return volumeStatistics{}, err
-//	}
-//
-//	availableBytes := int64(statfs.Bavail) * int64(statfs.Bsize)
-//	totalBytes := int64(statfs.Blocks) * int64(statfs.Bsize)
-//	usedBytes := (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize)
-//
-//	totalInodes := int64(statfs.Files)
-//	availableInodes := int64(statfs.Ffree)
-//	usedInodes := totalInodes - availableInodes
-//
-//	volumeStats := volumeStatistics{
-//		availableBytes: availableBytes,
-//		totalBytes:     totalBytes,
-//		usedBytes:      usedBytes,
-//
-//		availableInodes: availableInodes,
-//		totalInodes:     totalInodes,
-//		usedInodes:      usedInodes,
-//	}
-//
-//	return volumeStats, nil
-//}
+func (d NodeUtils) GetVolumeStats(path string) (VolumeStatistics, error) {
+	statfs := &unix.Statfs_t{}
+	err := unix.Statfs(path, statfs)
+	if err != nil {
+		return VolumeStatistics{}, err
+	}
+
+	availableBytes := int64(statfs.Bavail) * int64(statfs.Bsize)
+	TotalBytes := int64(statfs.Blocks) * int64(statfs.Bsize)
+	UsedBytes := (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize)
+
+	TotalInodes := int64(statfs.Files)
+	AvailableInodes := int64(statfs.Ffree)
+	UsedInodes := TotalInodes - AvailableInodes
+
+	volumeStats := VolumeStatistics{
+		AvailableBytes: availableBytes,
+		TotalBytes:     TotalBytes,
+		UsedBytes:      UsedBytes,
+
+		AvailableInodes: AvailableInodes,
+		TotalInodes:     TotalInodes,
+		UsedInodes:      UsedInodes,
+	}
+
+	return volumeStats, nil
+}
