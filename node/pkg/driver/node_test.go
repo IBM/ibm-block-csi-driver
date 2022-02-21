@@ -895,34 +895,81 @@ func TestNodeUnpublishVolume(t *testing.T) {
 }
 
 func TestNodeGetVolumeStats(t *testing.T) {
-	mockCtl := gomock.NewController(t)
-	defer mockCtl.Finish()
-	mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-	d := newTestNodeService(mockNodeUtils, nil, nil)
 	volId := "someStorageType:vol-test"
 	volumePath := "/test/path"
 	stagingTargetPath := "/staging/test/path"
-	expErrCode := codes.NotFound
+	volumePathWithHostPrefix := GetPodPath(volumePath)
 
-	mockNodeUtils.EXPECT().IsPathExists("/host" + volumePath).Return(false)
-	mockNodeUtils.EXPECT().GetPodPath(volumePath).Return("/host" + volumePath)
-	req := &csi.NodeGetVolumeStatsRequest{
-		VolumeId:          volId,
-		VolumePath:        volumePath,
-		StagingTargetPath: stagingTargetPath,
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "fail volumePath does not exists",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				d := newTestNodeService(mockNodeUtils, nil, nil)
+				expErrCode := codes.NotFound
+				mockNodeUtils.EXPECT().IsPathExists(volumePathWithHostPrefix).Return(false)
+				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
+				req := &csi.NodeGetVolumeStatsRequest{
+					VolumeId:          volId,
+					VolumePath:        volumePath,
+					StagingTargetPath: stagingTargetPath,
+				}
+			
+				_, err := d.NodeGetVolumeStats(context.TODO(), req)
+				if err != nil {
+					srvErr, ok := status.FromError(err)
+					if !ok {
+						t.Fatalf("Could not get error status code from error: %v", srvErr)
+					}
+					if srvErr.Code() != expErrCode {
+						t.Fatalf("Expected error code %d, got %d error code, message %s", expErrCode, srvErr.Code(), srvErr.Message())
+					}
+				} else {
+					t.Fatalf("Expected to get an error, got nil")
+				}
+			},
+		},
+		{
+			name: "success get stats",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				d := newTestNodeService(mockNodeUtils, nil, nil)
+				expErrCode := codes.NotFound
+				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
+				mockNodeUtils.EXPECT().IsPathExists(volumePathWithHostPrefix).Return(true)
+				mockNodeUtils.EXPECT().isBlock(volumePathWithHostPrefix).Return(false, nil)
+				mockNodeUtils.EXPECT().IsNotMountPoint(volumePathWithHostPrefix).Return(true, nil)
+				req := &csi.NodeGetVolumeStatsRequest{
+					VolumeId:          volId,
+					VolumePath:        volumePath,
+					StagingTargetPath: stagingTargetPath,
+				}
+			
+				_, err := d.NodeGetVolumeStats(context.TODO(), req)
+				if err != nil {
+					srvErr, ok := status.FromError(err)
+					if !ok {
+						t.Fatalf("Could not get error status code from error: %v", srvErr)
+					}
+					if srvErr.Code() != expErrCode {
+						t.Fatalf("Expected error code %d, got %d error code, message %s", expErrCode, srvErr.Code(), srvErr.Message())
+					}
+				} else {
+					t.Fatalf("Expected to get an error, got nil")
+				}
+			},
+		},
 	}
 
-	_, err := d.NodeGetVolumeStats(context.TODO(), req)
-	if err != nil {
-		srvErr, ok := status.FromError(err)
-		if !ok {
-			t.Fatalf("Could not get error status code from error: %v", srvErr)
-		}
-		if srvErr.Code() != expErrCode {
-			t.Fatalf("Expected error code %d, got %d error code, message %s", expErrCode, srvErr.Code(), srvErr.Message())
-		}
-	} else {
-		t.Fatalf("Expected to get an error, got nil")
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
 	}
 }
 

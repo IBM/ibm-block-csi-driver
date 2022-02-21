@@ -643,7 +643,7 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	if !isPathExists {
 		return nil, status.Errorf(codes.NotFound, "volume path %q does not exists", volumePath)
 	}
-	isBlock, err := d.isBlock(volumePathWithHostPrefix)
+	isBlock, err := d.NodeUtils.isBlock(volumePathWithHostPrefix)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to determine if %q is block device: %s", volumePath, err)
 	}
@@ -690,14 +690,14 @@ func (d *NodeService) nodeGetVolumeStatsRequestValidation(volumeId string, volum
 	return nil
 }
 
-func (d *NodeService) isBlock(devicePath string) (bool, error) {
-	var stat unix.Stat_t
-	err := unix.Stat(devicePath, &stat)
-	if err != nil {
-		return false, err
-	}
-	return (stat.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
-}
+//func (d *NodeService) isBlock(devicePath string) (bool, error) {
+//	var stat unix.Stat_t
+//	err := unix.Stat(devicePath, &stat)
+//	if err != nil {
+//		return false, err
+//	}
+//	return (stat.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
+//}
 
 func (d *NodeService) getVolumeStats(path string) (volumeStatistics, error) {
 	statfs := &unix.Statfs_t{}

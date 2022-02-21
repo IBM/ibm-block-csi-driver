@@ -57,7 +57,7 @@ test-xunit:
 	mkdir -p ./build/reports
 	if [ -d ./node/mocks ]; then rm -rf ./node/mocks; fi
 	go generate ./...
-	$(gofmt-test)
+#	$(gofmt-test)
 	go vet -c=1 ./node/...
 	go test ${GO_TEST_FLAGS} ./node/... | go2xunit -output build/reports/csi-node-unitests.xml
 	go test ${GO_TEST_FLAGS} ./node/...	# run again so the makefile will fail in case tests failing
