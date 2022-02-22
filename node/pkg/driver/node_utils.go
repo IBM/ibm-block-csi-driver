@@ -91,7 +91,7 @@ type NodeUtilsInterface interface {
 	GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []string, iscsiIQN string) (string, error)
 	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
 	IsBlock(devicePath string) (bool, error)
-	GetVolumeStats(path string) (VolumeStatistics, error)
+	GetVolumeStats(path string, isFSVolume bool) (VolumeStatistics, error)
 }
 
 type NodeUtils struct {
@@ -528,7 +528,15 @@ func (n NodeUtils) IsBlock(devicePath string) (bool, error) {
 	return (stat.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
 }
 
-func (d NodeUtils) GetVolumeStats(path string) (VolumeStatistics, error) {
+func (d NodeUtils) GetVolumeStats(path string, isFSVolume bool) (VolumeStatistics, error) {
+	if isFSVolume{
+		return d.getFileSystemVolumeStats(path)
+	} else {
+		return d.getBlockVolumeStats(path)
+	}
+}
+
+func (d NodeUtils) getFileSystemVolumeStats(path string) (VolumeStatistics, error) {
 	statfs := &unix.Statfs_t{}
 	err := unix.Statfs(path, statfs)
 	if err != nil {
@@ -536,21 +544,38 @@ func (d NodeUtils) GetVolumeStats(path string) (VolumeStatistics, error) {
 	}
 
 	availableBytes := int64(statfs.Bavail) * int64(statfs.Bsize)
-	TotalBytes := int64(statfs.Blocks) * int64(statfs.Bsize)
-	UsedBytes := (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize)
+	totalBytes := int64(statfs.Blocks) * int64(statfs.Bsize)
+	usedBytes := (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize)
 
-	TotalInodes := int64(statfs.Files)
-	AvailableInodes := int64(statfs.Ffree)
-	UsedInodes := TotalInodes - AvailableInodes
+	totalInodes := int64(statfs.Files)
+	availableInodes := int64(statfs.Ffree)
+	usedInodes := totalInodes - availableInodes
 
 	volumeStats := VolumeStatistics{
 		AvailableBytes: availableBytes,
-		TotalBytes:     TotalBytes,
-		UsedBytes:      UsedBytes,
+		TotalBytes:     totalBytes,
+		UsedBytes:      usedBytes,
 
-		AvailableInodes: AvailableInodes,
-		TotalInodes:     TotalInodes,
-		UsedInodes:      UsedInodes,
+		AvailableInodes: availableInodes,
+		TotalInodes:     totalInodes,
+		UsedInodes:      usedInodes,
+	}
+
+	return volumeStats, nil
+}
+
+func (d NodeUtils) getBlockVolumeStats(path string) (VolumeStatistics, error) {
+	blockDevice, err := os.Open(path)
+    if err != nil {
+        return VolumeStatistics{}, err
+    }
+	totalSize, err := blockDevice.Seek(0, io.SeekEnd)
+    if err != nil {
+        return VolumeStatistics{}, err
+    }
+
+	volumeStats := VolumeStatistics{
+		TotalBytes:     totalSize,
 	}
 
 	return volumeStats, nil
