@@ -529,7 +529,7 @@ func (n NodeUtils) IsBlock(devicePath string) (bool, error) {
 }
 
 func (d NodeUtils) GetVolumeStats(path string, isFSVolume bool) (VolumeStatistics, error) {
-	if isFSVolume{
+	if isFSVolume {
 		return d.getFileSystemVolumeStats(path)
 	} else {
 		return d.getBlockVolumeStats(path)
@@ -566,16 +566,16 @@ func (d NodeUtils) getFileSystemVolumeStats(path string) (VolumeStatistics, erro
 
 func (d NodeUtils) getBlockVolumeStats(path string) (VolumeStatistics, error) {
 	blockDevice, err := os.Open(path)
-    if err != nil {
-        return VolumeStatistics{}, err
-    }
+	if err != nil {
+		return VolumeStatistics{}, err
+	}
 	totalSize, err := blockDevice.Seek(0, io.SeekEnd)
-    if err != nil {
-        return VolumeStatistics{}, err
-    }
+	if err != nil {
+		return VolumeStatistics{}, err
+	}
 
 	volumeStats := VolumeStatistics{
-		TotalBytes:     totalSize,
+		TotalBytes: totalSize,
 	}
 
 	return volumeStats, nil

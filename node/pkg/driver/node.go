@@ -640,7 +640,7 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 
 	isPathExists := d.NodeUtils.IsPathExists(volumePathWithHostPrefix)
 	if !isPathExists {
-		return nil, status.Errorf(codes.NotFound, "volume path %q does not exists", volumePath)
+		return nil, status.Errorf(codes.NotFound, "volume path %q does not exist", volumePath)
 	}
 	isBlock, err := d.NodeUtils.IsBlock(volumePathWithHostPrefix)
 	if err != nil {
@@ -658,7 +658,7 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	}
 	volumeStats, err := d.NodeUtils.GetVolumeStats(volumePathWithHostPrefix, isFSVolume)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Failed to get capacity statistics for volume path %q: %s", volumePath, err)
+		return nil, status.Errorf(codes.Internal, "Failed to get statistics for volume path %q: %s", volumePath, err)
 	}
 	return &csi.NodeGetVolumeStatsResponse{
 		Usage: []*csi.VolumeUsage{
