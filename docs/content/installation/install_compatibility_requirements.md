@@ -105,6 +105,6 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
     - HyperSwap topology planning and configuration
         - **Planning** > **Planning for high availability** > **Planning for a HyperSwap topology system**
         - **Configuring** > **Configuration details** > **HyperSwap system configuration details**
-    - Stretched topology planning and configuration ([SAN Volume Controller](https://www.ibm.com/docs/en/sanvolumecontroller)) only):
+    - Stretched topology planning and configuration ([SAN Volume Controller](https://www.ibm.com/docs/en/sanvolumecontroller) only):
         - **Planning** > **Planning for high availability** > **Planning for a stretched topology system**
         - **Configuring** > **Configuration details** > **Stretched system configuration details**
