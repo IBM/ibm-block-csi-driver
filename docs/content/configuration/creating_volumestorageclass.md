@@ -31,7 +31,7 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in [the
   ```
    **Important:** The two pools must be from different sites.
    
-  For more information about HyperSwap limitations, see [Limitations](../release_notes/limitations.md).
+  For more information about high availability limitations, see [Limitations](../release_notes/limitations.md).
   
   For more information about high availability requirements, see [Compatibility and requirements](../installation/install_compatibility_requirements.md).
 

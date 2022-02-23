@@ -25,7 +25,7 @@ The following limitations apply when using volume clones with the IBM block stor
 
 -   A PVC and its clone need to both have the same volume mode (**Filesystem** or **Block**).
 
-**Note:** For volume clone limitations pertaining specifically to HyperSwap usage, see [High availability (HA) limitations](#high-availability-ha-limitations).
+**Note:** For high availability volume clone limitations, see [High availability (HA) limitations](#high-availability-ha-limitations).
 
 ## Volume expansion limitations
 
@@ -50,7 +50,7 @@ When a role switch is conducted, this is not reflected within the other orchestr
 ## High availability (HA) limitations
 **Important:**
 - HyperSwap topology is only supported for use with IBM Spectrum Virtualize family storage systems.
-- Stretched topology is only supported with SAN Volume Controller storage systems.
+- Stretched topology is only supported by SAN Volume Controller storage systems.
 
 ### HyperSwap volumes
 The following IBM block storage CSI driver features are not supported on volumes where HyperSwap is used:
@@ -61,7 +61,7 @@ The following IBM block storage CSI driver features are not supported on volumes
  - Volume cloning.
 
 ### Stretched volumes
- When conducting volume cloning both volumes must use stretched topology.
+ When conducting volume cloning, both volumes must use stretched topology.
 
 ## NVMe®/FC usage limitations
 
