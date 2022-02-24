@@ -623,7 +623,7 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	goid_info.SetAdditionalIDInfo(volumeId)
 	defer goid_info.DeleteAdditionalIDInfo()
 	volumePath := req.VolumePath
-	volumePathWithHostPrefix := d.NodeUtils.GetPodPath(req.VolumePath)
+	volumePathWithHostPrefix := d.NodeUtils.GetPodPath(volumePath)
 
 	err := d.nodeGetVolumeStatsRequestValidation(volumeId, volumePath)
 	if err != nil {
@@ -635,7 +635,7 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		return nil, status.Errorf(codes.NotFound, "volume path %q does not exist", volumePath)
 	}
 
-	volumeStats, err := d.GetVolumeStats(volumePathWithHostPrefix, volumeId)
+	volumeStats, err := d.getVolumeStats(volumePathWithHostPrefix, volumeId)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to get statistics for volume path %q: %s", volumePath, err)
 	}
@@ -668,12 +668,12 @@ func (d *NodeService) nodeGetVolumeStatsRequestValidation(volumeId string, volum
 	return nil
 }
 
-func (d *NodeService) GetVolumeStats(path string, volumeId string) (VolumeStatistics, error) {
+func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatistics, error) {
 	isBlock, err := d.NodeUtils.IsBlock(path)
 	if err != nil {
 		return VolumeStatistics{}, status.Errorf(codes.Internal, "failed to determine if %q is block device: %s", path, err)
 	}
-	
+
 	if isBlock {
 		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeId)
 		if err != nil {

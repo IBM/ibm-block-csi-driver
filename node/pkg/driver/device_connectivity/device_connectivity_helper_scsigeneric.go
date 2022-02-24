@@ -75,7 +75,7 @@ const (
 	IscsiHostRexExPath          = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
 	sysDeviceSymLinkFormat      = "/sys/block/%s/device"
 	sysDeviceDeletePathFormat   = sysDeviceSymLinkFormat + "/delete"
-	BlockDevCmd                 = "blockdev"
+	blockDevCmd                 = "blockdev"
 	flushBufsFlag               = "--flushbufs"
 	mpathdSeparator             = ","
 	multipathdCmd               = "multipathd"
@@ -201,9 +201,9 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 
 func (r OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(deviceName string) error {
 	devicePath := filepath.Join(DevPath, deviceName)
-	_, err := r.Executer.ExecuteWithTimeoutSilently(TimeOutBlockDevCmd, BlockDevCmd, []string{flushBufsFlag, devicePath})
+	_, err := r.Executer.ExecuteWithTimeoutSilently(TimeOutBlockDevCmd, blockDevCmd, []string{flushBufsFlag, devicePath})
 	if err != nil {
-		logger.Errorf("%v %v {%v} did not succeed to flush the device buffers. err={%v}", BlockDevCmd, flushBufsFlag, devicePath,
+		logger.Errorf("%v %v {%v} did not succeed to flush the device buffers. err={%v}", blockDevCmd, flushBufsFlag, devicePath,
 			err.Error())
 		return err
 	}
@@ -211,14 +211,14 @@ func (r OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(deviceName str
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) flushDevicesBuffers(deviceNames []string) error {
-	logger.Debugf("executing commands : {%v %v} on devices : {%v} and timeout : {%v} mseconds", BlockDevCmd, flushBufsFlag, deviceNames, TimeOutBlockDevCmd)
+	logger.Debugf("executing commands : {%v %v} on devices : {%v} and timeout : {%v} mseconds", blockDevCmd, flushBufsFlag, deviceNames, TimeOutBlockDevCmd)
 	for _, deviceName := range deviceNames {
 		err := r.flushDeviceBuffers(deviceName)
 		if err != nil {
 			return err
 		}
 	}
-	logger.Debugf("Finished executing commands: {%v %v}", BlockDevCmd, flushBufsFlag)
+	logger.Debugf("Finished executing commands: {%v %v}", blockDevCmd, flushBufsFlag)
 	return nil
 }
 

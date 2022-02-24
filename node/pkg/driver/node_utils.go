@@ -57,6 +57,7 @@ const (
 	TimeOutMultipathdCmd              = TimeOutGeneralCmd
 	TimeOutNvmeCmd                    = TimeOutGeneralCmd
 	multipathdCmd                     = "multipathd"
+	blockDevCmd                       = "blockdev"
 	nvmeCmd                           = "nvme"
 	minFilesInNonEmptyDir             = 1
 	noSuchFileOrDirectoryErrorMessage = "No such file or directory"
@@ -559,11 +560,11 @@ func (d NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, erro
 
 func (d NodeUtils) GetBlockVolumeStats(mpathDevice string) (VolumeStatistics, error) {
 	args := []string{"--getsize64", mpathDevice}
-	out, err := d.Executer.ExecuteWithTimeoutSilently(device_connectivity.TimeOutBlockDevCmd, device_connectivity.BlockDevCmd, args)
+	out, err := d.Executer.ExecuteWithTimeoutSilently(device_connectivity.TimeOutBlockDevCmd, blockDevCmd, args)
 	if err != nil {
 		return VolumeStatistics{}, err
 	}
-	
+
 	strOut := strings.TrimSpace(string(out))
 	sizeInBytes, err := strconv.ParseInt(strOut, 10, 64)
 	if err != nil {
