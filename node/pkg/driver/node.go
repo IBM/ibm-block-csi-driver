@@ -637,7 +637,7 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 
 	volumeStats, err := d.getVolumeStats(volumePathWithHostPrefix, volumeId)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Failed to get statistics for volume path %q: %s", volumePath, err)
+		return nil, err
 	}
 	return &csi.NodeGetVolumeStatsResponse{
 		Usage: []*csi.VolumeUsage{
@@ -669,9 +669,11 @@ func (d *NodeService) nodeGetVolumeStatsRequestValidation(volumeId string, volum
 }
 
 func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatistics, error) {
+	var volumeStats VolumeStatistics
+	errorMsg := "Failed to get statistics:"
 	isBlock, err := d.NodeUtils.IsBlock(path)
 	if err != nil {
-		return VolumeStatistics{}, status.Errorf(codes.Internal, "failed to determine if %q is block device: %s", path, err)
+		return VolumeStatistics{}, status.Errorf(codes.Internal, "%q failed to determine if %q is block device: %s", errorMsg, path, err)
 	}
 
 	if isBlock {
@@ -679,15 +681,20 @@ func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatis
 		if err != nil {
 			switch err.(type) {
 			case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
-				return VolumeStatistics{}, status.Errorf(codes.NotFound, "Multipath Device of volume id %q does not exist", volumeId)
+				return VolumeStatistics{}, status.Errorf(codes.NotFound, "%q multipath Device of volume id %q does not exist", errorMsg, volumeId)
 			default:
-				return VolumeStatistics{}, status.Errorf(codes.Internal, "Error while discovering the device : %s", err)
+				return VolumeStatistics{}, status.Errorf(codes.Internal, "%q error while discovering the device : %s", errorMsg, err)
 			}
 		}
-		return d.NodeUtils.GetBlockVolumeStats(mpathDevice)
+		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(mpathDevice)
 	} else {
-		return d.NodeUtils.GetFileSystemVolumeStats(path)
+		volumeStats, err = d.NodeUtils.GetFileSystemVolumeStats(path)
 	}
+
+	if err != nil {
+		return VolumeStatistics{}, status.Errorf(codes.Internal, "%q failed to determine if %q is block device: %s", errorMsg, path, err)
+	}
+	return volumeStats, nil
 }
 
 func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
