@@ -508,7 +508,6 @@ func (d *NodeService) publishRawBlockVolume(mpathDevice string, targetPath strin
 // Returns: is <target mounted, error if occured>
 func (d *NodeService) isTargetMounted(targetPathWithHostPrefix string, isFSVolume bool) (bool, error) {
 	logger.Debugf("Check if target {%s} is mounted", targetPathWithHostPrefix)
-	logger.Debugf("Check if target {%s} is mounted", targetPathWithHostPrefix)
 	isNotMounted, err := d.NodeUtils.IsNotMountPoint(targetPathWithHostPrefix)
 	if err != nil {
 		logger.Warningf("Failed to check if (%s), is mounted", targetPathWithHostPrefix)
