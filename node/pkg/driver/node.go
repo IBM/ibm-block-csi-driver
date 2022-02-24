@@ -631,7 +631,6 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	defer goid_info.DeleteAdditionalIDInfo()
 	volumePath := req.VolumePath
 	volumePathWithHostPrefix := d.NodeUtils.GetPodPath(req.VolumePath)
-	isFSVolume := true
 
 	err := d.nodeGetVolumeStatsRequestValidation(volumeId, volumePath)
 	if err != nil {
@@ -642,21 +641,8 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	if !isPathExists {
 		return nil, status.Errorf(codes.NotFound, "volume path %q does not exist", volumePath)
 	}
-	isBlock, err := d.NodeUtils.IsBlock(volumePathWithHostPrefix)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to determine if %q is block device: %s", volumePath, err)
-	}
-	if isBlock {
-		isFSVolume = false
-	}
-	isMounted, err := d.IsMounted(volumePathWithHostPrefix, isFSVolume)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to check if volume path %q is mounted", volumePath)
-	}
-	if !isMounted {
-		return nil, status.Errorf(codes.NotFound, "volume path %q is not mounted", volumePath)
-	}
-	volumeStats, err := d.NodeUtils.GetVolumeStats(volumePathWithHostPrefix, isFSVolume)
+
+	volumeStats, err := d.GetVolumeStats(volumePathWithHostPrefix, volumeId)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to get statistics for volume path %q: %s", volumePath, err)
 	}
@@ -687,6 +673,23 @@ func (d *NodeService) nodeGetVolumeStatsRequestValidation(volumeId string, volum
 	}
 
 	return nil
+}
+
+func (d *NodeService) GetVolumeStats(path string, volumeId string) (VolumeStatistics, error) {
+	isBlock, err := d.NodeUtils.IsBlock(path)
+	if err != nil {
+		return VolumeStatistics{}, status.Errorf(codes.Internal, "failed to determine if %q is block device: %s", path, err)
+	}
+	
+	if isBlock {
+		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeId)
+		if err != nil {
+			return VolumeStatistics{}, status.Errorf(codes.Internal, "Error while discovering the device : %s", err)
+		}
+		return d.NodeUtils.GetBlockVolumeStats(mpathDevice)
+	} else {
+		return d.NodeUtils.GetFileSystemVolumeStats(path)
+	}
 }
 
 func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {

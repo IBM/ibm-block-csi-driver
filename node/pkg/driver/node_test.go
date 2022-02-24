@@ -899,11 +899,13 @@ func TestNodeGetVolumeStats(t *testing.T) {
 	volId := "someStorageType:vol-test"
 	volumePath := "/test/path"
 	stagingTargetPath := "/staging/test/path"
+	mpathDevice := "/dev/dm-4"
 	volumePathWithHostPrefix := GetPodPath(volumePath)
 	mockCtl := gomock.NewController(t)
 	defer mockCtl.Finish()
 	mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
-	d := newTestNodeService(mockNodeUtils, nil, nil)
+	mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtl)
+	d := newTestNodeServiceExpand(mockNodeUtils, mockOsDeviceConHelper, nil)
 	req := &csi.NodeGetVolumeStatsRequest{
 		VolumeId:          volId,
 		VolumePath:        volumePath,
@@ -933,9 +935,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(volumePathWithHostPrefix).Return(true)
 				mockNodeUtils.EXPECT().IsBlock(volumePathWithHostPrefix).Return(false, nil)
-				mockNodeUtils.EXPECT().IsNotMountPoint(volumePathWithHostPrefix).Return(false, nil)
-				mockNodeUtils.EXPECT().IsDirectory(volumePathWithHostPrefix).Return(true)
-				mockNodeUtils.EXPECT().GetVolumeStats(volumePathWithHostPrefix, true).Return(driver.VolumeStatistics{}, status.Errorf(codes.Internal, "fail to get stats"))
+				mockNodeUtils.EXPECT().GetFileSystemVolumeStats(volumePathWithHostPrefix).Return(driver.VolumeStatistics{}, status.Errorf(codes.Internal, "fail to get stats"))
 
 				_, err := d.NodeGetVolumeStats(context.TODO(), req)
 				assertError(t, err, expErrCode)
@@ -975,9 +975,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(volumePathWithHostPrefix).Return(true)
 				mockNodeUtils.EXPECT().IsBlock(volumePathWithHostPrefix).Return(false, nil)
-				mockNodeUtils.EXPECT().IsNotMountPoint(volumePathWithHostPrefix).Return(false, nil)
-				mockNodeUtils.EXPECT().IsDirectory(volumePathWithHostPrefix).Return(true)
-				mockNodeUtils.EXPECT().GetVolumeStats(volumePathWithHostPrefix, true).Return(volumeStats, nil)
+				mockNodeUtils.EXPECT().GetFileSystemVolumeStats(volumePathWithHostPrefix).Return(volumeStats, nil)
 
 				assertExpectedStats(t, expResp, req, d)
 			},
@@ -1002,9 +1000,8 @@ func TestNodeGetVolumeStats(t *testing.T) {
 				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(volumePathWithHostPrefix).Return(true)
 				mockNodeUtils.EXPECT().IsBlock(volumePathWithHostPrefix).Return(true, nil)
-				mockNodeUtils.EXPECT().IsNotMountPoint(volumePathWithHostPrefix).Return(false, nil)
-				mockNodeUtils.EXPECT().IsDirectory(volumePathWithHostPrefix).Return(false)
-				mockNodeUtils.EXPECT().GetVolumeStats(volumePathWithHostPrefix, false).Return(volumeStats, nil)
+				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetBlockVolumeStats(mpathDevice).Return(volumeStats, nil)
 
 				assertExpectedStats(t, expResp, req, d)
 			},

@@ -91,7 +91,8 @@ type NodeUtilsInterface interface {
 	GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []string, iscsiIQN string) (string, error)
 	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
 	IsBlock(devicePath string) (bool, error)
-	GetVolumeStats(path string, isFSVolume bool) (VolumeStatistics, error)
+	GetFileSystemVolumeStats(path string) (VolumeStatistics, error)
+	GetBlockVolumeStats(mpathDevice string) (VolumeStatistics, error)
 }
 
 type NodeUtils struct {
@@ -528,15 +529,7 @@ func (n NodeUtils) IsBlock(devicePath string) (bool, error) {
 	return (stat.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
 }
 
-func (d NodeUtils) GetVolumeStats(path string, isFSVolume bool) (VolumeStatistics, error) {
-	if isFSVolume {
-		return d.getFileSystemVolumeStats(path)
-	} else {
-		return d.getBlockVolumeStats(path)
-	}
-}
-
-func (d NodeUtils) getFileSystemVolumeStats(path string) (VolumeStatistics, error) {
+func (d NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, error) {
 	statfs := &unix.Statfs_t{}
 	err := unix.Statfs(path, statfs)
 	if err != nil {
@@ -564,18 +557,21 @@ func (d NodeUtils) getFileSystemVolumeStats(path string) (VolumeStatistics, erro
 	return volumeStats, nil
 }
 
-func (d NodeUtils) getBlockVolumeStats(path string) (VolumeStatistics, error) {
-	blockDevice, err := os.Open(path)
+func (d NodeUtils) GetBlockVolumeStats(mpathDevice string) (VolumeStatistics, error) {
+	args := []string{"--getsize64", mpathDevice}
+	out, err := d.Executer.ExecuteWithTimeoutSilently(device_connectivity.TimeOutBlockDevCmd, device_connectivity.BlockDevCmd, args)
 	if err != nil {
 		return VolumeStatistics{}, err
 	}
-	totalSize, err := blockDevice.Seek(0, io.SeekEnd)
+	
+	strOut := strings.TrimSpace(string(out))
+	gotSizeBytes, err := strconv.ParseInt(strOut, 10, 64)
 	if err != nil {
 		return VolumeStatistics{}, err
 	}
 
 	volumeStats := VolumeStatistics{
-		TotalBytes: totalSize,
+		TotalBytes: gotSizeBytes,
 	}
 
 	return volumeStats, nil
