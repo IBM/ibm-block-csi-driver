@@ -896,7 +896,7 @@ func TestNodeUnpublishVolume(t *testing.T) {
 }
 
 func TestNodeGetVolumeStats(t *testing.T) {
-	volId := "someStorageType:vol-test"
+	volumeId := "someStorageType:vol-test"
 	volumePath := "/test/path"
 	stagingTargetPath := "/staging/test/path"
 	mpathDevice := "/dev/dm-4"
@@ -907,7 +907,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 	mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtl)
 	d := newTestNodeServiceExpand(mockNodeUtils, mockOsDeviceConHelper, nil)
 	req := &csi.NodeGetVolumeStatsRequest{
-		VolumeId:          volId,
+		VolumeId:          volumeId,
 		VolumePath:        volumePath,
 		StagingTargetPath: stagingTargetPath,
 	}
@@ -1000,7 +1000,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(volumePathWithHostPrefix).Return(true)
 				mockNodeUtils.EXPECT().IsBlock(volumePathWithHostPrefix).Return(true, nil)
-				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return(mpathDevice, nil)
+				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volumeId).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().GetBlockVolumeStats(mpathDevice).Return(volumeStats, nil)
 
 				assertExpectedStats(t, expResp, req, d)
