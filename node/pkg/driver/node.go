@@ -508,14 +508,7 @@ func (d *NodeService) publishRawBlockVolume(mpathDevice string, targetPath strin
 // Returns: is <target mounted, error if occured>
 func (d *NodeService) isTargetMounted(targetPathWithHostPrefix string, isFSVolume bool) (bool, error) {
 	logger.Debugf("Check if target {%s} is mounted", targetPathWithHostPrefix)
-	isMounted, err := d.IsMounted(targetPathWithHostPrefix, isFSVolume)
-	if isMounted && err == nil {
-		logger.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume", targetPathWithHostPrefix)
-	}
-	return isMounted, err
-}
-
-func (d *NodeService) IsMounted(targetPathWithHostPrefix string, isFSVolume bool) (bool, error) {
+	logger.Debugf("Check if target {%s} is mounted", targetPathWithHostPrefix)
 	isNotMounted, err := d.NodeUtils.IsNotMountPoint(targetPathWithHostPrefix)
 	if err != nil {
 		logger.Warningf("Failed to check if (%s), is mounted", targetPathWithHostPrefix)
@@ -530,6 +523,7 @@ func (d *NodeService) IsMounted(targetPathWithHostPrefix string, isFSVolume bool
 		} else if !isFSVolume && targetIsDir {
 			return true, status.Errorf(codes.AlreadyExists, "Required raw block volume but target {%s} is mounted and it is a directory.", targetPathWithHostPrefix)
 		}
+		logger.Warningf("Idempotent case : targetPath already mounted (%s), so no need to mount again. Finish NodePublishVolume", targetPathWithHostPrefix)
 		return true, nil
 	}
 }
@@ -684,7 +678,12 @@ func (d *NodeService) GetVolumeStats(path string, volumeId string) (VolumeStatis
 	if isBlock {
 		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeId)
 		if err != nil {
-			return VolumeStatistics{}, status.Errorf(codes.Internal, "Error while discovering the device : %s", err)
+			switch err.(type) {
+			case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
+				return VolumeStatistics{}, status.Errorf(codes.NotFound, "Multipath Device of volume id %q does not exist", volumeId)
+			default:
+				return VolumeStatistics{}, status.Errorf(codes.Internal, "Error while discovering the device : %s", err)
+			}
 		}
 		return d.NodeUtils.GetBlockVolumeStats(mpathDevice)
 	} else {

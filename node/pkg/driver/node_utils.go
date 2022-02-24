@@ -565,13 +565,13 @@ func (d NodeUtils) GetBlockVolumeStats(mpathDevice string) (VolumeStatistics, er
 	}
 	
 	strOut := strings.TrimSpace(string(out))
-	gotSizeBytes, err := strconv.ParseInt(strOut, 10, 64)
+	sizeInBytes, err := strconv.ParseInt(strOut, 10, 64)
 	if err != nil {
 		return VolumeStatistics{}, err
 	}
 
 	volumeStats := VolumeStatistics{
-		TotalBytes: gotSizeBytes,
+		TotalBytes: sizeInBytes,
 	}
 
 	return volumeStats, nil

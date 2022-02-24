@@ -1015,7 +1015,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 func assertExpectedStats(t *testing.T, expResp *csi.NodeGetVolumeStatsResponse, req *csi.NodeGetVolumeStatsRequest, node driver.NodeService) {
 	resp, err := node.NodeGetVolumeStats(context.TODO(), req)
 	if err != nil {
-		t.Fatalf("Expect no error but got: %v", err)
+		t.Fatalf("Expected no error but got: %v", err)
 	}
 	if !reflect.DeepEqual(expResp, resp) {
 		t.Fatalf("Expected response {%+v}, got {%+v}", expResp, resp)
