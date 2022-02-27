@@ -670,10 +670,9 @@ func (d *NodeService) nodeGetVolumeStatsRequestValidation(volumeId string, volum
 
 func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatistics, error) {
 	var volumeStats VolumeStatistics
-	errorMsg := "Failed to get statistics:"
 	isBlock, err := d.NodeUtils.IsBlock(path)
 	if err != nil {
-		return VolumeStatistics{}, status.Errorf(codes.Internal, "%q failed to determine if %q is block device: %s", errorMsg, path, err)
+		return VolumeStatistics{}, status.Errorf(codes.Internal, "Failed to determine if %q is block device: %s", path, err)
 	}
 
 	if isBlock {
@@ -681,9 +680,9 @@ func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatis
 		if err != nil {
 			switch err.(type) {
 			case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
-				return VolumeStatistics{}, status.Errorf(codes.NotFound, "%q multipath Device of volume id %q does not exist", errorMsg, volumeId)
+				return VolumeStatistics{}, status.Errorf(codes.NotFound, "Multipath device of volume id %q does not exist", volumeId)
 			default:
-				return VolumeStatistics{}, status.Errorf(codes.Internal, "%q error while discovering the device : %s", errorMsg, err)
+				return VolumeStatistics{}, status.Errorf(codes.Internal, "Error while discovering the device : %s", err)
 			}
 		}
 		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(mpathDevice)
@@ -692,7 +691,7 @@ func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatis
 	}
 
 	if err != nil {
-		return VolumeStatistics{}, status.Errorf(codes.Internal, "%q failed to determine if %q is block device: %s", errorMsg, path, err)
+		return VolumeStatistics{}, status.Errorf(codes.Internal, "Failed to get statistics: %s", err)
 	}
 	return volumeStats, nil
 }
