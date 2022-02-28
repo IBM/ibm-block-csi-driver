@@ -23,6 +23,7 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -895,23 +896,129 @@ func TestNodeUnpublishVolume(t *testing.T) {
 }
 
 func TestNodeGetVolumeStats(t *testing.T) {
-
-	req := &csi.NodeGetVolumeStatsRequest{}
-
-	d := newTestNodeService(nil, nil, nil)
-
-	expErrCode := codes.Unimplemented
-
-	_, err := d.NodeGetVolumeStats(context.TODO(), req)
-	if err == nil {
-		t.Fatalf("Expected error code %d, got nil", expErrCode)
+	volumeId := "someStorageType:vol-test"
+	volumePath := "/test/path"
+	stagingTargetPath := "/staging/test/path"
+	mpathDevice := "/dev/dm-4"
+	volumePathWithHostPrefix := GetPodPath(volumePath)
+	mockCtl := gomock.NewController(t)
+	defer mockCtl.Finish()
+	mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+	mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtl)
+	d := newTestNodeServiceExpand(mockNodeUtils, mockOsDeviceConHelper, nil)
+	req := &csi.NodeGetVolumeStatsRequest{
+		VolumeId:          volumeId,
+		VolumePath:        volumePath,
+		StagingTargetPath: stagingTargetPath,
 	}
-	srvErr, ok := status.FromError(err)
-	if !ok {
-		t.Fatalf("Could not get error status code from error: %v", srvErr)
+
+	testCases := []struct {
+		name     string
+		testFunc func(t *testing.T)
+	}{
+		{
+			name: "fail volumePath does not exists",
+			testFunc: func(t *testing.T) {
+				expErrCode := codes.NotFound
+				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
+				mockNodeUtils.EXPECT().IsPathExists(volumePathWithHostPrefix).Return(false)
+
+				_, err := d.NodeGetVolumeStats(context.TODO(), req)
+				assertError(t, err, expErrCode)
+			},
+		},
+		{
+			name: "fail to get stats",
+			testFunc: func(t *testing.T) {
+				expErrCode := codes.Internal
+				expSubString := "Failed to get statistics"
+				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
+				mockNodeUtils.EXPECT().IsPathExists(volumePathWithHostPrefix).Return(true)
+				mockNodeUtils.EXPECT().IsBlock(volumePathWithHostPrefix).Return(false, nil)
+				mockNodeUtils.EXPECT().GetFileSystemVolumeStats(volumePathWithHostPrefix).Return(driver.VolumeStatistics{}, errors.New("fail to get stats"))
+
+				_, err := d.NodeGetVolumeStats(context.TODO(), req)
+				assertError(t, err, expErrCode)
+				if err != nil && !strings.Contains(err.Error(), expSubString) {
+					t.Fatalf("Expected substring: %s in error message from NodeGetVolumeStats, got error message: %s", expSubString, err.Error())
+				}
+			},
+		},
+		{
+			name: "success get stats on file system volume",
+			testFunc: func(t *testing.T) {
+				volumeStats := driver.VolumeStatistics{
+					AvailableBytes: 1,
+					TotalBytes:     1,
+					UsedBytes:      1,
+
+					AvailableInodes: 1,
+					TotalInodes:     1,
+					UsedInodes:      1,
+				}
+				expResp := &csi.NodeGetVolumeStatsResponse{
+					Usage: []*csi.VolumeUsage{
+						{
+							Unit:      csi.VolumeUsage_BYTES,
+							Available: volumeStats.AvailableBytes,
+							Total:     volumeStats.TotalBytes,
+							Used:      volumeStats.UsedBytes,
+						},
+						{
+							Unit:      csi.VolumeUsage_INODES,
+							Available: volumeStats.AvailableInodes,
+							Total:     volumeStats.TotalInodes,
+							Used:      volumeStats.UsedInodes,
+						},
+					},
+				}
+				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
+				mockNodeUtils.EXPECT().IsPathExists(volumePathWithHostPrefix).Return(true)
+				mockNodeUtils.EXPECT().IsBlock(volumePathWithHostPrefix).Return(false, nil)
+				mockNodeUtils.EXPECT().GetFileSystemVolumeStats(volumePathWithHostPrefix).Return(volumeStats, nil)
+
+				assertExpectedStats(t, expResp, req, d)
+			},
+		},
+		{
+			name: "success get stats on block device volume",
+			testFunc: func(t *testing.T) {
+				volumeStats := driver.VolumeStatistics{
+					TotalBytes: 1,
+				}
+				expResp := &csi.NodeGetVolumeStatsResponse{
+					Usage: []*csi.VolumeUsage{
+						{
+							Unit:  csi.VolumeUsage_BYTES,
+							Total: volumeStats.TotalBytes,
+						},
+						{
+							Unit: csi.VolumeUsage_INODES,
+						},
+					},
+				}
+				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
+				mockNodeUtils.EXPECT().IsPathExists(volumePathWithHostPrefix).Return(true)
+				mockNodeUtils.EXPECT().IsBlock(volumePathWithHostPrefix).Return(true, nil)
+				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volumeId).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetBlockVolumeStats(mpathDevice).Return(volumeStats, nil)
+
+				assertExpectedStats(t, expResp, req, d)
+			},
+		},
 	}
-	if srvErr.Code() != expErrCode {
-		t.Fatalf("Expected error code %d, got %d message %s", expErrCode, srvErr.Code(), srvErr.Message())
+	for _, tc := range testCases {
+		t.Run(tc.name, tc.testFunc)
+	}
+}
+
+func assertExpectedStats(t *testing.T, expResp *csi.NodeGetVolumeStatsResponse, req *csi.NodeGetVolumeStatsRequest, node driver.NodeService) {
+	resp, err := node.NodeGetVolumeStats(context.TODO(), req)
+	if err != nil {
+		t.Fatalf("Expected no error but got: %v", err)
+	}
+	if !reflect.DeepEqual(expResp, resp) {
+		t.Fatalf("Expected response {%+v}, got {%+v}", expResp, resp)
 	}
 }
 
@@ -1159,6 +1266,13 @@ func TestNodeGetCapabilities(t *testing.T) {
 			Type: &csi.NodeServiceCapability_Rpc{
 				Rpc: &csi.NodeServiceCapability_RPC{
 					Type: csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
+				},
+			},
+		},
+		{
+			Type: &csi.NodeServiceCapability_Rpc{
+				Rpc: &csi.NodeServiceCapability_RPC{
+					Type: csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
 				},
 			},
 		},
