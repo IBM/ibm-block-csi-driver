@@ -1,0 +1,7 @@
+FROM registry.access.redhat.com/ubi8/python-38:1-75.1638364053
+
+COPY call_home/scripts/ .
+
+RUN pip install kubernetes==22.6.0
+
+ENTRYPOINT [ "python", "./create_send_event.py" ]

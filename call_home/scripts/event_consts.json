@@ -1,0 +1,33 @@
+{
+    "api_key": "IBM_SFW_CSI_Block_call_home_connect_28aG*712b_kba9wIUks*_9Jlsio#142_1645041190",
+    "private_key": "IBM_SFW_CSI_Block_call_home_connect__1645#$^190nsj*&^Y^sUwksmj(92827%^U_282219-+ISJKSIUS",
+    "target_space": "production",
+    "asset": "STOR-CSI",
+    "asset_type": "IBM_Software",
+    "asset_vendor": "IBM",
+    "country_code": "US",
+    "software_level": {
+        "vrmf": "8.3.0.1"
+    },
+    "type": "eccnext_apisv1s",
+    "version": "1.0.0.1",
+    "analytics_event_source_type": "asset_event",
+    "analytics_type": "STOR-CSI",
+    "analytics_group": "IBM",
+    "analytics_category": "Software",
+    "events": [
+        {
+            "body": {
+                "component": "last_contact_agent",
+                "context": {
+                    "origin": 2,
+                    "transid": 1582410799354
+                },
+                "description": "last contact event"
+            },
+            "header": {
+                "event_type": "last_contact"
+            }
+        }
+    ]
+}
