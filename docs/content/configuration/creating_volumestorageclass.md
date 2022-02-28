@@ -12,7 +12,7 @@ Create a storage class YAML file, similar to the following `demo-storageclass.ya
 
 When configuring the file, be sure to use the same array secret and array secret namespace as defined in [Creating a Secret](creating_secret.md).
 
-Use the `SpaceEfficiency` parameters for each storage system, as defined in [the following table](#spaceefficiency). These values are not case-sensitive.
+Use the `SpaceEfficiency` parameters for each storage system, as defined in the following table. These values are not case-sensitive.
 
 #### `SpaceEfficiency` parameter definitions per storage system type
 
