@@ -25,7 +25,7 @@ The following limitations apply when using volume clones with the IBM block stor
 
 -   A PVC and its clone need to both have the same volume mode (**Filesystem** or **Block**).
 
-**Note:** For high availability volume clone limitations, see [High availability limitations](#high-availability-limitations).
+**Note:** For high availability volume clone limitations, see [High availability (HA) limitations](#high-availability-ha-limitations).
 
 ## Volume expansion limitations
 

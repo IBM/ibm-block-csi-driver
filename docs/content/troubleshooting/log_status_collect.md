@@ -53,7 +53,7 @@ Be sure to run the following steps and copy the output to an external file, when
 
     `PVC NAME: demo-pvc-file-system PVC STATUS: Bound`
 
-    **Note:** If the PVCs are not in the _Bound_ state collect the events of all unbound PVCs. (See [Details collection for unbound PVCs](#Details-collection-for-unbound-pvcs).)
+    **Note:** If the PVCs are not in the _Bound_ state, collect the events of all unbound PVCs. (See [Details collection for unbound PVCs](#Details-collection-for-unbound-pvcs).)
 
 #### Log collection for all CSI driver node pods and their containers
 
