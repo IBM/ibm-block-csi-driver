@@ -101,4 +101,10 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
 
       For more information, see [Configuring for CSI Topology](../configuration/configuring_topology.md).
 
-7. (Optional) If planning on using HyperSwap on your storage system, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Planning** > **Planning for high availability** > **Planning for a HyperSwap topology system**.
+7. (Optional) If planning on using an HA feature (either HyperSwap or stretched topology) on your storage system, see the appropriate sections within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/):
+    - HyperSwap topology planning and configuration
+        - **Planning** > **Planning for high availability** > **Planning for a HyperSwap topology system**
+        - **Configuring** > **Configuration details** > **HyperSwap system configuration details**
+    - Stretched topology planning and configuration ([SAN Volume Controller](https://www.ibm.com/docs/en/sanvolumecontroller) only):
+        - **Planning** > **Planning for high availability** > **Planning for a stretched topology system**
+        - **Configuring** > **Configuration details** > **Stretched system configuration details**

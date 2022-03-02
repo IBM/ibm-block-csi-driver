@@ -12,7 +12,7 @@ Create a storage class YAML file, similar to the following `demo-storageclass.ya
 
 When configuring the file, be sure to use the same array secret and array secret namespace as defined in [Creating a Secret](creating_secret.md).
 
-Use the `SpaceEfficiency` parameters for each storage system, as defined in [the following table](#spaceefficiency). These values are not case-sensitive.
+Use the `SpaceEfficiency` parameters for each storage system, as defined in the following table. These values are not case-sensitive.
 
 #### `SpaceEfficiency` parameter definitions per storage system type
 
@@ -24,14 +24,16 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in [the
 
 - The IBM DS8000 family `pool` value is the pool ID and not the pool name as is used in other storage systems.
 - Be sure that the `pool` value is the name of an existing pool on the storage system.
-- To create a volume with HyperSwap on IBM Spectrum Virtualize storage systems, put a colon (:) between the two pools within the `pool` value. For example:
+- To create a volume with high availability (HA) (HyperSwap or stretched topology) on IBM Spectrum Virtualize storage systems, put a colon (:) between the two pools within the `pool` value. For example:
   
   ```
   pool: demo-pool1:demo-pool2 
   ```
    **Important:** The two pools must be from different sites.
    
-  For more information about the HyperSwap limitations and requirements, see [Limitations](../release_notes/limitations.md) within the release notes and [Compatibility and requirements](../installation/install_compatibility_requirements.md) within this guide.
+  For more information about high availability limitations, see [Limitations](../release_notes/limitations.md).
+  
+  For more information about high availability requirements, see [Compatibility and requirements](../installation/install_compatibility_requirements.md).
 
 - The `allowVolumeExpansion` parameter is optional but is necessary for using volume expansion. The default value is _false_.
 
