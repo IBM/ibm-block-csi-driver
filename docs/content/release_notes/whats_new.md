@@ -10,7 +10,7 @@ Stretched volumes and stretched snapshots (FlashCopy) are now supported on SAN V
 
 ## New metrics support
 
-IBM® block storage CSI driver 1.9.0 introduces new kubelet volume metric support. Use 
+IBM® block storage CSI driver 1.9.0 introduces new kubelet volume metrics support. Use 
 `NodeGetVolumeStats` to retrieve volume metrics. The following metrics are currently supported:
 - kubelet_volume_stats_available_bytes
 - kubelet_volume_stats_capacity_bytes
