@@ -80,4 +80,4 @@ The following IBM block storage CSI driver features are not supported on volumes
 
 ## Volume metrics limitations
 
-Raw block volume modes only support the metrics for the total capacity of the volume (`kubelet_volume_stats_capacity_bytes`).
+Raw block volume mode only supports the metrics for the total capacity of the volume (`kubelet_volume_stats_capacity_bytes`).
