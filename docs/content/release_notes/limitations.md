@@ -77,3 +77,7 @@ The following IBM block storage CSI driver features are not supported on volumes
 
 - Red Hat Bug [2022328](https://bugzilla.redhat.com/show_bug.cgi?id=2022328)
 - Kubernetes Issue [106710](https://github.com/kubernetes/kubernetes/issues/106710)
+
+## Volume metrics limitations
+
+Raw block volume modes only support the metrics for the total capacity of the volume (`kubelet_volume_stats_capacity_bytes`).
