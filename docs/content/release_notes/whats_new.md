@@ -19,7 +19,7 @@ IBM® block storage CSI driver 1.9.0 introduces new kubelet volume metrics suppo
 - kubelet_volume_stats_inodes_used
 - kubelet_volume_stats_used_bytes
 
-For more information on using kubelet volume metrics, see the [Container Storage Interface (CSI) spec documentation for `NodeGetVolumeStats`](https://github.com/container-storage-interface/spec/blob/v1.5.0/spec.md#nodegetvolumestats).
+For more information about the supported metrics, see `VolumeUsage` within the [Container Storage Interface (CSI) spec documentation for `NodeGetVolumeStats`](https://github.com/container-storage-interface/spec/blob/v1.5.0/spec.md#nodegetvolumestats).
 
 
 ## Additional orchestration support for OpenShift 4.7 and 4.9 for deployment
