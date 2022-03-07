@@ -8,7 +8,7 @@ In order to enable volume replication for your storage system, create a VolumeRe
 
 When configuring the file, be sure to use the same array secret and array secret namespace as defined in [Creating a Secret](creating_secret.md).
 
-For information on obtaining your storage system `system_id`, see [Finding a `system_id`](finding_systemid.md).
+Use the `system_id` of the storage system containing the `replicationHandle` volumes. For information on obtaining your storage system `system_id`, see [Finding a `system_id`](finding_systemid.md).
 
 ```
 apiVersion: replication.storage.openshift.io/v1alpha1

@@ -140,6 +140,6 @@ Use this procedure to help build a PV YAML file for your volumes.
       resources:
         requests:
           storage: 1Gi
-      storageClassName: ibmc-block-gold
+      storageClassName: demo-storageclass
       volumeName: demo-pv
     ```
