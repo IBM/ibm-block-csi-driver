@@ -1,6 +1,6 @@
 # What's new
 
-This topic lists the dates and nature of updates to the published information of IBM® block storage CSI driver 1.8.0.
+This topic lists the dates and nature of updates to the published information of IBM® block storage CSI driver 1.9.0.
 
 |Date|Nature of updates to the published information|
 |----|----------------------------------------------|
