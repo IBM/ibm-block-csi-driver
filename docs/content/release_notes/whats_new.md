@@ -10,6 +10,13 @@ Stretched volumes and stretched snapshots (FlashCopy) are now supported on SAN V
 
 ## New Call Home support
 
+IBM® block storage CSI driver 1.9.0 now supports using the storage system's built-in Call Home feature. The CSI driver volume identifier is the `_pvc-` tag.
+
+For more information about Call Home, see your product documentation on [IBM Documentation](https://www.ibm.com/docs).
+
+**Note:** Call Home is compliant with General Data Protection Regulation (GDPR) EU 2016/679. For more information, see http://ibm.biz/gdpr-storage-paper.
+
+
 ## Additional supported orchestration platforms for deployment
 
 This version adds support for orchestration platforms Kubernetes 1.23 and Red Hat® OpenShift 4.10, suitable for deployment of the CSI (Container Storage Interface) driver.
