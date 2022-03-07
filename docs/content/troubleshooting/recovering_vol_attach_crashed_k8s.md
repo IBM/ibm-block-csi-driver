@@ -1,4 +1,4 @@
-# Recovering a pod volume attachment from a crashed Kubernetes node
+# Recovering from a crashed Kubernetes node
 
 This section details a manual operation required to revive Kubernetes pods that reside on a crashed node due to an existing Kubernetes limitation.
 
