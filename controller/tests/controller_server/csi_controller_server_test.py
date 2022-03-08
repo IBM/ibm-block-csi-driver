@@ -14,7 +14,8 @@ from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.controller_server.csi_controller_server import CSIControllerServicer
 from controller.controller_server.sync_lock import SyncLock
 from controller.controller_server.test_settings import VOLUME_NAME, SNAPSHOT_NAME, SNAPSHOT_VOLUME_NAME, \
-    CLONE_VOLUME_NAME, SNAPSHOT_VOLUME_WWN, POOL, SPACE_EFFICIENCY, OBJECT_INTERNAL_ID
+    CLONE_VOLUME_NAME, SNAPSHOT_VOLUME_WWN, POOL, SPACE_EFFICIENCY, OBJECT_INTERNAL_ID, PLUGIN_VERSION, VOLUME_PREFIX, \
+    DEFAULT_VOLUME_PREFIX
 from controller.tests import utils
 from controller.tests.utils import ProtoBufMock
 
@@ -35,6 +36,8 @@ class BaseControllerSetUp(unittest.TestCase):
         self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
 
         self.servicer = CSIControllerServicer()
+
+        self.servicer.cfg["identity"]["version"] = PLUGIN_VERSION
 
         self.request = ProtoBufMock()
         self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
@@ -323,18 +326,28 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_with_name_prefix(self, storage_agent):
-        storage_agent.return_value = self.storage_agent
-        self.request.name = "some_name"
-        self.request.parameters[config.PARAMETERS_SNAPSHOT_NAME_PREFIX] = "prefix"
-        self.mediator.create_snapshot = Mock()
-        self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, SNAPSHOT_NAME, "wwn",
-                                                                                               SNAPSHOT_VOLUME_NAME,
-                                                                                               "xiv")
+        self._prepare_create_snapshot_mocks(storage_agent)
+        self.request.parameters[config.PARAMETERS_SNAPSHOT_NAME_PREFIX] = VOLUME_PREFIX
 
         self.servicer.CreateSnapshot(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.create_snapshot.assert_called_once_with(SNAPSHOT_VOLUME_WWN, "prefix_some_name", None, None)
+        snapshot_final_name = utils.get_object_final_name(VOLUME_PREFIX, self.request.name)
+        self.mediator.create_snapshot.assert_called_once_with(SNAPSHOT_VOLUME_WWN, snapshot_final_name, None, None)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_snapshot_with_snapshot_name_at_limit_success(self, storage_agent):
+        self._prepare_create_snapshot_mocks(storage_agent)
+        self.mediator.max_object_name_length = 63
+
+        snapshot_name = "a" * 40
+        snapshot_name_prefix = "a" * 20
+        snapshot_final_name = utils.get_object_final_name(snapshot_name_prefix, snapshot_name)
+        self.request.name = snapshot_name
+        self.request.parameters[config.PARAMETERS_SNAPSHOT_NAME_PREFIX] = snapshot_name_prefix
+        self.servicer.CreateSnapshot(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+        self.mediator.create_snapshot.assert_called_once_with(SNAPSHOT_VOLUME_WWN, snapshot_final_name, None, None)
 
 
 class TestDeleteSnapshot(BaseControllerSetUp, CommonControllerTest):
@@ -560,7 +573,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_prefix_too_long_exception(self, storage_agent):
         storage_agent.return_value = self.storage_agent
-        self.request.parameters.update({"volume_name_prefix": "a" * 128})
+        self.request.parameters[config.PARAMETERS_VOLUME_NAME_PREFIX] = "a" * 128
         self.servicer.CreateVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
@@ -573,6 +586,20 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.request.name = "a" * 128
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_with_volume_name_at_limit_success(self, storage_agent):
+        self._prepare_create_volume_mocks(storage_agent)
+        self.mediator.max_object_name_length = 63
+
+        volume_name = "a" * 40
+        volume_name_prefix = "a" * 20
+        volume_final_name = utils.get_object_final_name(volume_name_prefix, volume_name)
+        self.request.name = volume_name
+        self.request.parameters[config.PARAMETERS_VOLUME_NAME_PREFIX] = volume_name_prefix
+        self.servicer.CreateVolume(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+        self.mediator.create_volume.assert_called_once_with(volume_final_name, self.capacity_bytes, None, POOL, None)
 
     @patch("controller.array_action.array_mediator_xiv.XIVArrayMediator.create_volume")
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -612,21 +639,25 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INTERNAL,
                                          err=Exception("error"))
 
-    def _test_create_volume_parameters(self, final_name="default_some_name", space_efficiency=None):
-        self.mediator.default_object_prefix = "default"
-        self.request.name = "some_name"
+    def _test_create_volume_parameters(self, prefix="", space_efficiency=None):
+        self.mediator.default_object_prefix = DEFAULT_VOLUME_PREFIX
+        self.request.name = VOLUME_NAME
         self.mediator.create_volume = Mock()
         self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, "volume", "wwn", "xiv")
         self.mediator.validate_supported_space_efficiency = Mock()
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
+        if not prefix:
+            prefix = DEFAULT_VOLUME_PREFIX
+        final_name = utils.get_object_final_name(prefix, self.request.name)
         self.mediator.create_volume.assert_called_once_with(final_name, 10, space_efficiency, POOL, None)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_name_prefix(self, storage_agent):
         storage_agent.return_value = self.storage_agent
-        self.request.parameters[config.PARAMETERS_VOLUME_NAME_PREFIX] = "prefix"
-        self._test_create_volume_parameters("prefix_some_name")
+        self.request.parameters[config.PARAMETERS_VOLUME_NAME_PREFIX] = VOLUME_PREFIX
+
+        self._test_create_volume_parameters(VOLUME_PREFIX)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_no_name_prefix(self, storage_agent):
@@ -634,14 +665,14 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.request.parameters[config.PARAMETERS_VOLUME_NAME_PREFIX] = ""
         self._test_create_volume_parameters()
 
-    def _test_create_volume_with_parameters_by_system_prefix(self, get_array_connection_info_from_secrets, prefix,
-                                                             final_name="default_some_name",
+    def _test_create_volume_with_parameters_by_system_prefix(self, get_array_connection_info_from_secrets,
+                                                             prefix,
                                                              space_efficiency=None):
         get_array_connection_info_from_secrets.side_effect = [utils.get_fake_array_connection_info()]
         self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
             {"u1": {config.PARAMETERS_VOLUME_NAME_PREFIX: prefix, config.PARAMETERS_POOL: POOL,
                     config.PARAMETERS_SPACE_EFFICIENCY: space_efficiency}})}
-        self._test_create_volume_parameters(final_name, space_efficiency)
+        self._test_create_volume_parameters(prefix, space_efficiency)
 
     @patch("controller.controller_server.utils.get_array_connection_info_from_secrets")
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -655,8 +686,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
     def test_create_volume_with_parameters_by_system_name_prefix(self, storage_agent,
                                                                  get_array_connection_info_from_secrets):
         storage_agent.return_value = self.storage_agent
-        self._test_create_volume_with_parameters_by_system_prefix(get_array_connection_info_from_secrets, "prefix",
-                                                                  "prefix_some_name")
+        self._test_create_volume_with_parameters_by_system_prefix(get_array_connection_info_from_secrets, VOLUME_PREFIX)
 
     @patch("controller.controller_server.utils.get_array_connection_info_from_secrets")
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -1752,16 +1782,16 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_capabilities_with_prefix_not_match(self, storage_agent):
         storage_agent.return_value = self.storage_agent
-        self.request.parameters.update({config.PARAMETERS_VOLUME_NAME_PREFIX: "prefix"})
+        self.request.parameters.update({config.PARAMETERS_VOLUME_NAME_PREFIX: VOLUME_PREFIX})
 
         self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
-        self._assert_response(grpc.StatusCode.INVALID_ARGUMENT, "prefix")
+        self._assert_response(grpc.StatusCode.INVALID_ARGUMENT, VOLUME_PREFIX)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_capabilities_parameters_success(self, storage_agent):
         storage_agent.return_value = self.storage_agent
-        self.request.parameters = {config.PARAMETERS_VOLUME_NAME_PREFIX: "prefix",
+        self.request.parameters = {config.PARAMETERS_VOLUME_NAME_PREFIX: VOLUME_PREFIX,
                                    config.PARAMETERS_POOL: "pool2",
                                    config.PARAMETERS_SPACE_EFFICIENCY: "not_none"}
         volume_response = utils.get_mock_mediator_response_volume(10, "prefix_vol", "wwn2", "a9k",

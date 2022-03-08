@@ -3,8 +3,10 @@ import json
 import grpc
 from mock import Mock, MagicMock
 
+from controller.common.settings import NAME_PREFIX_SEPARATOR
 from controller.controller_server.controller_types import ArrayConnectionInfo
-from controller.controller_server.test_settings import USER as test_user, PASSWORD as test_password, ARRAY as test_array
+from controller.controller_server.test_settings import USER as test_user, PASSWORD as test_password, \
+    ARRAY as test_array, MINOR_VERSION_AS_CHAR as test_version_minor_last_digit
 
 
 class ProtoBufMock(MagicMock):
@@ -88,6 +90,10 @@ def get_fake_secret_config(system_id="u1", username=test_user, password=test_pas
         system_info.update({"supported_topologies": supported_topologies})
     config = {system_id: system_info}
     return {"config": json.dumps(config)}
+
+
+def get_object_final_name(prefix, name):
+    return NAME_PREFIX_SEPARATOR.join((prefix, test_version_minor_last_digit, name))
 
 
 class FakeContext:
