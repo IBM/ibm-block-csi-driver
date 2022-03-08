@@ -514,13 +514,13 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                                            config.SNAPSHOT_TYPE_NAME)
         return name
 
-    def _get_minor_version_as_char(self):
+    def _get_minor_version_as_letter(self):
         version = self.get_identity_config("version")
-        _, minor_version, _ = version.split('.')
-        minor_version_in_char_range = int(minor_version) % 26
-        base_value = ord('a')
-        minor_version_as_char = chr(base_value + minor_version_in_char_range)
-        return minor_version_as_char
+        _, minor_version, _ = version.split(config.VERSION_DELIMITER)
+        minor_version_in_letters_range = int(minor_version) % config.NUMBER_OF_LETTERS
+        base_value = ord(config.FIRST_LETTER)
+        minor_version_as_letter = chr(base_value + minor_version_in_letters_range)
+        return minor_version_as_letter
 
     def _get_object_final_name(self, volume_parameters, name, array_mediator, object_type):
         prefix = ""
@@ -536,17 +536,15 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 )
         if not prefix:
             prefix = array_mediator.default_object_prefix
-        version_digit = self._get_minor_version_as_char()
-        full_name = self._join_object_prefix_with_name(prefix, name, version_digit)
+        minor_version_as_letter = self._get_minor_version_as_letter()
+        full_name = self._join_object_name_parts(prefix, name, minor_version_as_letter)
         if len(full_name) > array_mediator.max_object_name_length:
             hashed_name = utils.hash_string(name)
-            full_name = self._join_object_prefix_with_name(prefix, hashed_name)
+            full_name = self._join_object_name_parts(prefix, hashed_name)
         return full_name[:array_mediator.max_object_name_length]
 
-    def _join_object_prefix_with_name(self, prefix, name, version=''):
-        if prefix:
-            return settings.NAME_PREFIX_SEPARATOR.join(filter(None, (prefix, version, name)))
-        return name
+    def _join_object_name_parts(self, prefix, name, version=''):
+        return settings.NAME_PREFIX_SEPARATOR.join(filter(None, (prefix, version, name)))
 
     def GetPluginCapabilities(self, _, __):  # pylint: disable=invalid-name
         logger.info("GetPluginCapabilities")

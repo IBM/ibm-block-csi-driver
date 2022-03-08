@@ -1,7 +1,7 @@
 from csi_general import csi_pb2
 
 from controller.common.settings import ALL_ARRAY_TYPES
-
+VERSION_DELIMITER = "."
 SUPPORTED_FS_TYPES = ["ext4", "xfs"]
 
 access_mode = csi_pb2.VolumeCapability.AccessMode
@@ -15,6 +15,8 @@ MAX_RESPONSE_STRING_LENGTH = 128
 VOLUME_WWN_LENGTH = 32
 MAX_ARRAY_TYPE_LENGTH = max(map(len, ALL_ARRAY_TYPES))
 NUMBER_OF_DELIMITERS_IN_VOLUME_ID = 2
+NUMBER_OF_LETTERS = 26
+FIRST_LETTER = 'a'
 
 SECRET_USERNAME_PARAMETER = "username"
 SECRET_PASSWORD_PARAMETER = "password"
