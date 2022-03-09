@@ -52,7 +52,7 @@
 		* [Creating a VolumeSnapshotClass with topology awareness](content/configuration/creating_volumesnapshotclass_topology_aware.md)
 	* [Advanced configuration](content/configuration/advanced_configuration.md)
 		* [Importing an existing volume](content/configuration/importing_existing_volume.md)
-* [Using IBM block storage CSI driver](content/using/using.md)
+* [Using](content/using/using.md)
 	* [Sample configurations for running a stateful container](content/using/sample_stateful_container.md)
 * [Troubleshooting](content/troubleshooting/troubleshooting.md)
 	* [Log and status collection](content/troubleshooting/log_status_collect.md)
