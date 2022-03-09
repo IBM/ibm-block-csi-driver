@@ -10,7 +10,7 @@ Stretched volumes and stretched snapshots (FlashCopy) are now supported on SAN V
 
 ## New Call Home support
 
-IBM® block storage CSI driver 1.9.0 now supports using the storage system's built-in Call Home feature. The CSI driver volumes contain the `_pvc-` identifier in their name.
+IBM® block storage CSI driver 1.9.0 now supports using the storage system's built-in Call Home feature. The CSI driver volumes are identfied by containing `_pvc-` in their name.
 
 For more information about Call Home, see your product documentation on [IBM Documentation](https://www.ibm.com/docs).
 
