@@ -4,6 +4,7 @@ import grpc
 import yaml
 from csi_general import csi_pb2
 from csi_general import csi_pb2_grpc
+from packaging.version import Version
 from retry import retry
 
 import controller.array_action.errors as array_errors
@@ -515,8 +516,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         return name
 
     def _get_version_letter(self):
-        version = self.get_identity_config("version")
-        _, minor_version, _ = version.split(config.VERSION_DELIMITER)
+        raw_version = self.get_identity_config("version")
+        version = Version(raw_version)
+        minor_version = version.minor
         minor_version_in_letters_range = int(minor_version) % config.NUMBER_OF_LETTERS
         base_value = ord(config.FIRST_LETTER)
         version_letter = chr(base_value + minor_version_in_letters_range)
