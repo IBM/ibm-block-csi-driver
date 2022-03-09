@@ -3,10 +3,8 @@ import json
 import grpc
 from mock import Mock, MagicMock
 
-from controller.common.settings import NAME_PREFIX_SEPARATOR
 from controller.controller_server.controller_types import ArrayConnectionInfo
-from controller.controller_server.test_settings import USER as test_user, PASSWORD as test_password, \
-    ARRAY as test_array, MINOR_VERSION_AS_CHAR as test_version_minor_last_digit
+from controller.controller_server.test_settings import USER as test_user, PASSWORD as test_password, ARRAY as test_array
 
 
 class ProtoBufMock(MagicMock):
