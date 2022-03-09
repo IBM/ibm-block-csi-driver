@@ -519,9 +519,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         raw_version = self.get_identity_config("version")
         version = Version(raw_version)
         minor_version = version.minor
-        minor_version_in_letters_range = int(minor_version) % config.NUMBER_OF_LETTERS
-        base_value = ord(config.FIRST_LETTER)
-        version_letter = chr(base_value + minor_version_in_letters_range)
+        minor_version_offset_in_letters_range = int(minor_version) % config.NUMBER_OF_LETTERS
+        letters_range_start = ord(config.FIRST_LETTER)
+        version_letter = chr(letters_range_start + minor_version_offset_in_letters_range)
         return version_letter
 
     def _get_object_final_name(self, volume_parameters, name, array_mediator, object_type):
