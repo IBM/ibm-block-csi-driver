@@ -1,3 +1,5 @@
+from string import ascii_lowercase
+
 from csi_general import csi_pb2
 
 from controller.common.settings import ALL_ARRAY_TYPES
@@ -16,8 +18,8 @@ MAX_RESPONSE_STRING_LENGTH = 128
 VOLUME_WWN_LENGTH = 32
 MAX_ARRAY_TYPE_LENGTH = max(map(len, ALL_ARRAY_TYPES))
 NUMBER_OF_DELIMITERS_IN_VOLUME_ID = 2
-NUMBER_OF_LETTERS = 26
-FIRST_LETTER = 'a'
+NUMBER_OF_LETTERS = len(ascii_lowercase)
+FIRST_LETTER = ascii_lowercase[0]
 
 SECRET_USERNAME_PARAMETER = "username"
 SECRET_PASSWORD_PARAMETER = "password"
