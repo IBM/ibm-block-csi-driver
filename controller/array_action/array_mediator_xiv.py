@@ -62,7 +62,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     @ClassProperty
     def default_object_prefix(self):
-        return None
+        return "CSI"
 
     def __init__(self, user, password, endpoint):
         super().__init__(user, password, endpoint)

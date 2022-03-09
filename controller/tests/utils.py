@@ -92,10 +92,6 @@ def get_fake_secret_config(system_id="u1", username=test_user, password=test_pas
     return {"config": json.dumps(config)}
 
 
-def get_object_final_name(prefix, name):
-    return NAME_PREFIX_SEPARATOR.join((prefix, test_version_minor_last_digit, name))
-
-
 class FakeContext:
 
     def __init__(self):
