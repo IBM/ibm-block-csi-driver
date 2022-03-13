@@ -53,6 +53,7 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in the 
       provisioner: block.csi.ibm.com
       parameters:
         pool: demo-pool
+        io_group: demo-iogrp             # Optional.
         SpaceEfficiency: thin            # Optional.
         volume_name_prefix: demo-prefix  # Optional.
 
