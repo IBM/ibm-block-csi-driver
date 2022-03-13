@@ -14,7 +14,7 @@ Call Home is now supported on Spectrum Virtualize family storage systems. For mo
 
 ## New Red Hat® Enterprise Linux® (RHEL) 8.x support
 
-IBM® block storage CSI driver 1.9.0 now supports RHEL 8.x systems for x86 architectures.
+IBM® block storage CSI driver 1.9.0 now supports RHEL 8.x systems for x86 architecture.
 
 ## Additional supported orchestration platforms for deployment
 
