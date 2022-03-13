@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 class ArrayMediator(ABC):
 
     @abstractmethod
-    def __init__(self, user, password, address):
+    def __init__(self, user, password, endpoint):
         """
         This is the init function for the class.
         it should establish the connection to the storage system.
@@ -30,21 +30,22 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_volume(self, volume_name, size_in_bytes, space_efficiency, pool):
+    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group):
         """
         This function should create a volume in the storage system.
 
         Args:
-            volume_name      : name of the volume to be created in the storage system
-            size_in_bytes : size in bytes of the volume
-            space_efficiency  : space efficiency (None for default)
-            pool          : pool name to create the volume in
+            name             : name of the volume to be created in the storage system
+            size_in_bytes    : size in bytes of the volume
+            space_efficiency : space efficiency (None for default)
+            pool             : pool name to create the volume in
+            io_group         : i/o group to create the volume in
 
         Returns:
             volume_id : the volume WWN.
 
         Raises:
-            VolumeAlreadyExists
+            VolumeAlreadyExists : optional
             PoolDoesNotExist
             PoolDoesNotMatchSpaceEfficiency
             IllegalObjectName
@@ -96,12 +97,12 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_volume(self, volume_name, pool=None):
+    def get_volume(self, name, pool=None):
         """
         This function return volume info about the volume.
 
         Args:
-            volume_name: name of the volume on storage system.
+            name: name of the volume on storage system.
             pool: pool of the volume to find the volume more efficiently.
 
 
@@ -285,13 +286,13 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_array_fc_wwns(self, host_name=None):
+    def get_array_fc_wwns(self, host_name):
         """
         This function will return the wwn of the connected
         FC port of the storage array
 
         Args:
-            None
+            host_name : used to filter relevant hosts
 
         Returns:
             wwn : the wwn of the storage

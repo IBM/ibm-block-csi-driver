@@ -22,6 +22,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
@@ -30,6 +31,7 @@ import (
 //go:generate mockgen -destination=../../../mocks/mock_executer.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer ExecuterInterface
 type ExecuterInterface interface { // basic host dependent functions
 	ExecuteWithTimeout(mSeconds int, command string, args []string) ([]byte, error)
+	ExecuteWithTimeoutSilently(mSeconds int, command string, args []string) ([]byte, error)
 	OsOpenFile(name string, flag int, perm os.FileMode) (*os.File, error)
 	OsReadlink(name string) (string, error)
 	FilepathGlob(pattern string) (matches []string, err error)
@@ -37,14 +39,13 @@ type ExecuterInterface interface { // basic host dependent functions
 	IoutilReadFile(filename string) ([]byte, error)
 	FileWriteString(f *os.File, s string) (n int, err error)
 	IsExecutable(path string) error
+	GetExitCode(err error) (int, bool)
 }
 
 type Executer struct {
 }
 
-func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []string) ([]byte, error) {
-	logger.Debugf("Executing command : {%v} with args : {%v}. and timeout : {%v} mseconds", command, args, mSeconds)
-
+func (e *Executer) ExecuteWithTimeoutSilently(mSeconds int, command string, args []string) ([]byte, error) {
 	// Create a new context and add a timeout to it
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(mSeconds)*time.Millisecond)
 	defer cancel() // The cancel should be deferred so resources are cleaned up
@@ -64,12 +65,25 @@ func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []strin
 	}
 
 	// If there's no context error, we know the command completed (or errored).
-	logger.Debugf("Output from command: %s", string(out))
 	if err != nil {
 		logger.Debugf("Non-zero exit code: %s", err)
 	}
+	return out, err
+}
 
-	logger.Debugf("Finished executing command")
+func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []string) ([]byte, error) {
+	logger.Debugf("Executing command : {%v} with args : {%v}. and timeout : {%v} mseconds", command, args, mSeconds)
+
+	out, err := e.ExecuteWithTimeoutSilently(mSeconds, command, args)
+
+	outAsStr := string(out)
+	noOutputMessage := ""
+	if strings.TrimSpace(outAsStr) != "" {
+		logger.Debugf("Output from command: %s", outAsStr)
+	} else {
+		noOutputMessage = " (no output)"
+	}
+	logger.Debugf("Finished executing command" + noOutputMessage)
 	return out, err
 }
 
@@ -100,4 +114,12 @@ func (e *Executer) FileWriteString(f *os.File, s string) (n int, err error) {
 func (e *Executer) IsExecutable(path string) error {
 	_, err := exec.LookPath(path)
 	return err
+}
+
+func (e *Executer) GetExitCode(err error) (int, bool) {
+	if exitError, isExitError := err.(*exec.ExitError); isExitError {
+		logger.Debug("No active iSCSI sessions")
+		return exitError.ExitCode(), true
+	}
+	return 0, false
 }

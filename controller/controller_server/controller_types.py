@@ -22,3 +22,4 @@ class ObjectParameters:
     pool: str
     space_efficiency: str
     prefix: str
+    io_group: str

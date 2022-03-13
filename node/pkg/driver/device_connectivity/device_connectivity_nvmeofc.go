@@ -50,3 +50,7 @@ func (r OsDeviceConnectivityNvmeOFc) FlushMultipathDevice(mpathDevice string) er
 func (r OsDeviceConnectivityNvmeOFc) RemovePhysicalDevice(sysDevices []string) error {
 	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
 }
+
+func (r OsDeviceConnectivityNvmeOFc) ValidateLun(_ int, _ []string) error {
+	return nil
+}

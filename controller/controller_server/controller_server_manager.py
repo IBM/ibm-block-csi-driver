@@ -2,14 +2,13 @@ import time
 from concurrent import futures
 
 import grpc
+from csi_general import csi_pb2_grpc
+from csi_general import replication_pb2_grpc
 
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
-from controller.controller_server.csi_controller_server import CSIControllerServicer
 from controller.controller_server.addons_server import ReplicationControllerServicer
-from controller.csi_general import csi_pb2_grpc
-from controller.csi_general import replication_pb2_grpc
-
+from controller.controller_server.csi_controller_server import CSIControllerServicer
 
 logger = get_stdout_logger()
 

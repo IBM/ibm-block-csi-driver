@@ -8,7 +8,7 @@ import controller.controller_server.config as controller_config
 from controller.array_action.array_action_types import Volume, Snapshot
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
-from controller.array_action.utils import classproperty
+from controller.array_action.utils import ClassProperty
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.utils import string_to_array
@@ -28,46 +28,44 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     MAX_LUN_NUMBER = 250
     MIN_LUN_NUMBER = 1
 
-    @classproperty
+    @ClassProperty
     def array_type(self):
         return settings.ARRAY_TYPE_XIV
 
-    @classproperty
+    @ClassProperty
     def port(self):
         return 7778
 
-    @classproperty
+    @ClassProperty
     def max_object_name_length(self):
         return 63
 
-    @classproperty
+    @ClassProperty
     def max_object_prefix_length(self):
         return 20
 
-    @classproperty
+    @ClassProperty
     def max_connections(self):
         return 2
 
-    @classproperty
+    @ClassProperty
     def minimal_volume_size_in_bytes(self):
         return 1 * 1024 * 1024 * 1024  # 1 GiB
 
-    @classproperty
+    @ClassProperty
     def maximal_volume_size_in_bytes(self):
         return 1 * 1024 * 1024 * 1024 * 1024 * 1024
 
-    @classproperty
+    @ClassProperty
     def max_lun_retries(self):
         return 10
 
-    @classproperty
+    @ClassProperty
     def default_object_prefix(self):
         return None
 
     def __init__(self, user, password, endpoint):
-        self.user = user
-        self.password = password
-        self.endpoint = endpoint
+        super().__init__(user, password, endpoint)
         self.client = None
         self._identifier = None
 
@@ -159,16 +157,16 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise array_errors.IllegalObjectName(ex.status)
 
-    def get_volume(self, volume_name, pool=None):
-        logger.debug("Get volume : {}".format(volume_name))
-        cli_volume = self._get_cli_object_by_name(volume_name)
+    def get_volume(self, name, pool=None):
+        logger.debug("Get volume : {}".format(name))
+        cli_volume = self._get_cli_object_by_name(name)
 
         logger.debug("cli volume returned : {}".format(cli_volume))
         if not cli_volume:
-            raise array_errors.ObjectNotFoundError(volume_name)
+            raise array_errors.ObjectNotFoundError(name)
 
         if cli_volume.master_name:
-            raise array_errors.VolumeNameBelongsToSnapshotError(volume_name, self.endpoint)
+            raise array_errors.VolumeNameBelongsToSnapshotError(name, self.endpoint)
 
         array_volume = self._generate_volume_response(cli_volume)
         return array_volume
@@ -205,7 +203,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def _convert_size_bytes_to_blocks(self, size_in_bytes):
         return int(size_in_bytes / self.BLOCK_SIZE_IN_BYTES)
 
-    def create_volume(self, name, size_in_bytes, space_efficiency, pool):
+    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with parameters : {}".format(
             name, size_in_bytes, pool, space_efficiency))
 
@@ -394,12 +392,12 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         vol_name = self._get_object_name_by_wwn(volume_id)
         logger.debug("volume name : {0}".format(vol_name))
         mapping_list = self.client.cmd.vol_mapping_list(vol=vol_name).as_list
-        res = {}
+        luns_by_host = {}
         for mapping in mapping_list:
             logger.debug("mapping for volume is :{0}".format(mapping))
-            res[mapping.host] = mapping.lun
+            luns_by_host[mapping.host] = mapping.lun
 
-        return res
+        return luns_by_host
 
     def _get_next_available_lun(self, host_name):
         logger.debug("getting host mapping list for host :{0}".format(host_name))

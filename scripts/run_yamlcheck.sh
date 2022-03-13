@@ -1,4 +1,5 @@
-#!/bin/bash -xe
+#!/bin/bash -e
+set -x
 
 arch=$(uname -m)
 if [[ "$arch" == "x86"* ]];
