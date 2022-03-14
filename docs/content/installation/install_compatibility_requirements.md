@@ -2,7 +2,7 @@
 
 For the complete and up-to-date information about the compatibility and requirements for using the IBM® block storage CSI driver, refer to its latest release notes. The release notes detail supported operating system and container platform versions, and microcode versions of the supported storage systems.
 
-Before beginning the installation of the CSI (Container Storage Interface) driver, be sure to verify that you comply with the following prerequisites.
+Be sure to verify that you comply with all of the following prerequisites before beginning the installation of the CSI (Container Storage Interface) driver.
 
 For IBM Cloud® Satellite users, see [cloud.ibm.com/docs/satellite](https://cloud.ibm.com/docs/satellite) for full system requirements.
 
@@ -25,13 +25,13 @@ The CSI driver requires the following ports to be opened on the worker nodes OS 
 
       Port 8452
 
-Complete these steps prepare your environment for installing the CSI (Container Storage Interface) driver.
+Complete these steps to prepare your environment for installing the CSI (Container Storage Interface) driver.
 
-1. Configure Linux® multipath devices on the host.
+1. Configure Linux® multipath devices, per worker node.
 
    **Important:** Be sure to configure each worker with storage connectivity according to your storage system instructions. For more information, find your storage system documentation in [IBM Documentation](http://www.ibm.com/docs/).
 
-   **Additional configuration steps for OpenShift® Container Platform users (RHEL and RHCOS).** Other users can skip these additional configuration steps.
+   **Additional configuration steps for Red Hat OpenShift Container Platform users (RHEL and RHCOS).** Other users can skip these additional configuration steps.
 
    Download and save the following YAML file:
 
@@ -49,7 +49,7 @@ Complete these steps prepare your environment for installing the CSI (Container 
 
    `oc apply -f 99-ibm-attach.yaml`
 
-2. Configure your storage system host attachment.
+2. Configure your storage system host attachment, per worker node.
 
     **Important:** The CSI driver does not define hosts on your storage system.
     
@@ -64,9 +64,9 @@ Complete these steps prepare your environment for installing the CSI (Container 
        
     For more information, find your storage system documentation in [IBM Documentation](http://www.ibm.com/docs/).
 
-3. **For RHEL OS users:** Ensure that the following packages are installed.
+3. **For RHEL OS users:** Ensure that the following packages are installed per worker node.
 
-    If using RHCOS or if the packages are already installed, this step may be skipped.
+    If using RHCOS or if the packages are already installed, this step can be skipped.
 
     - sg3_utils
     - iscsi-initiator-utils
