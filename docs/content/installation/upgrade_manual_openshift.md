@@ -16,7 +16,7 @@ When using the Red Hat® OpenShift® Container Platform, the CSI (Container Stor
 
 5.  From the **Subscription** tab, check the upgrade status and the installed version.
 
-6.  From **Operators** > **Installed Operators** > **Operator for IBM block storage CSI driver**, click **Create Instance**.
+6.  From **Operators** > **Installed Operators** > **IBM block storage CSI driver operator**, click **Create Instance**.
 
 7.  Check the **Subscriptions** > **Subscription Overview** tab see the Operator status.
 
