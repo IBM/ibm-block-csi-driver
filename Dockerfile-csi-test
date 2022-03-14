@@ -16,7 +16,7 @@ FROM golang:1.16
 
 ARG CSI_PARAMS=csi_params
 
-RUN git clone -b testing_unpublish https://github.com/ArbelNathan/csi-test /usr/local/go/src/github.com/ArbelNathan/csi-test
+RUN git clone -b add_controller_publish_support_to_controller_resources https://github.com/ArbelNathan/csi-test /usr/local/go/src/github.com/ArbelNathan/csi-test
 RUN make -C /usr/local/go/src/github.com/ArbelNathan/csi-test
 
 COPY ./scripts/csi_test /usr/local/go/src/github.com/ArbelNathan/csi-test/ibm-driver
