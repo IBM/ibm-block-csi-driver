@@ -27,7 +27,7 @@ The CSI driver requires the following ports to be opened on the worker nodes OS 
 
 Complete these steps to prepare your environment for installing the CSI (Container Storage Interface) driver.
 
-1. Configure Linux® multipath devices on the host, per worker node.
+1. Configure Linux® multipath devices, per worker node.
 
    **Important:** Be sure to configure each worker with storage connectivity according to your storage system instructions. For more information, find your storage system documentation in [IBM Documentation](http://www.ibm.com/docs/).
 
