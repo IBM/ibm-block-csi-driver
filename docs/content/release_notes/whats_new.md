@@ -12,6 +12,10 @@ Stretched volumes and stretched snapshots (FlashCopy) are now supported on SAN V
 
 Call Home is now supported on Spectrum Virtualize family storage systems. For more information about Call Home on your storage system, see **Product overview** > **Technical overview** > **Call Home** within your product documentation on [IBM Documentation](https://www.ibm.com/docs).
 
+## New I/O groups configuration enablement
+
+The CSI driver now enables I/O group configuration when creating a new volume for Spectrum Virtualize family systems.
+
 ## New Red Hat® Enterprise Linux® (RHEL) 8.x support
 
 IBM® block storage CSI driver 1.9.0 now supports RHEL 8.x systems for x86 architecture.
