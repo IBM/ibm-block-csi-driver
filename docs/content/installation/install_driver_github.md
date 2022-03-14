@@ -2,7 +2,7 @@
 
 The operator for IBM® block storage CSI driver can be installed directly with GitHub. Installing the CSI (Container Storage Interface) driver is part of the operator installation process.
 
-Use the following steps to install the operator and driver, with [GitHub](https://github.com/IBM/ibm-block-csi-operator) (github.com/IBM/ibm-block-csi-operator).
+Use the following steps to install the operator and driver, with [GitHub](https://github.com/IBM/ibm-block-csi-operator).
 
 **Note:** Before you begin, it is best practice to create a user-defined namespace. Create the project namespace, using the `kubectl create ns <namespace>` command.
 
