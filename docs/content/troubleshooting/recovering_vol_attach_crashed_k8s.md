@@ -26,7 +26,7 @@ default sanity-statefulset-0 1/1 Terminating 0 19m 10.244.2.37 k8s-node2
 
 Follow the following procedure to recover from a crashed node (see a [full example](#for-example) at the end of the procedure):
 
-1.  Find for the `volumeattachment` of the created pod:
+1.  Find the `volumeattachment` of the created pod:
 
     ```
     kubectl get volumeattachment
