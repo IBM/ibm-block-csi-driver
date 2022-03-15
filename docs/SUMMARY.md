@@ -26,7 +26,7 @@
 * [Installing](content/installation/installation.md)
 	* [Compatibility and requirements](content/installation/install_compatibility_requirements.md)
 	* [Installing the operator and driver](content/installation/install_operator_driver.md)
-		* [Installing the driver with OpenShift web console](content/installation/install_driver_openshift_web.md)
+		* [Installing the driver with the OpenShift web console](content/installation/install_driver_openshift_web.md)
 		* [Installing the driver with GitHub](content/installation/install_driver_github.md)
 		* [Installing the driver with OperatorHub.io](content/installation/install_driver_operatorhub.md)
 	* [Uninstalling the operator and driver](content/installation/uninstalling.md)
