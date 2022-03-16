@@ -41,6 +41,7 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in the 
 
 - The `csi.storage.k8s.io/fstype` parameter is optional. The values that are allowed are _ext4_ or _xfs_. The default value is _ext4_.
 - The `volume_name_prefix` parameter is optional.
+- The `io_group` parameter is only available on Spectrum Virtualize storage systems. For more information about I/O groups, see **Product overview** > **Technical overview** > **I/O group** within your product documentation on [IBM Documentation](https://www.ibm.com/docs).
 
     **Note:**
     For IBM DS8000 family, the maximum prefix length is five characters. The maximum prefix length for other systems is 20 characters. <br /><br />For storage systems that use Spectrum Virtualize, the `CSI` prefix is added as default if not specified by the user.

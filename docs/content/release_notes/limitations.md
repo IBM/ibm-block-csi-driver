@@ -48,7 +48,7 @@ When a role switch is conducted, this is not reflected within the other orchestr
     For more information, see the [Change the Reclaim Policy of a PersistentVolume](https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy/) information in the Kubernetes documentation.
 
 ## High availability (HA) limitations
-**Important:**
+**Note:**
 - HyperSwap topology is only supported for use with IBM Spectrum Virtualize family storage systems.
 - Stretched topology is only supported by SAN Volume Controller storage systems.
 
@@ -77,3 +77,7 @@ The following IBM block storage CSI driver features are not supported on volumes
 
 - Red Hat Bug [2022328](https://bugzilla.redhat.com/show_bug.cgi?id=2022328)
 - Kubernetes Issue [106710](https://github.com/kubernetes/kubernetes/issues/106710)
+
+## I/O group limitations
+
+**Note:** I/O group configuration is only supported for use with IBM Spectrum Virtualize family storage systems.
