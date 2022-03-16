@@ -12,6 +12,15 @@ When configuring the file, be sure to use the same array secret and array secret
 
     **Note:** For IBM DS8000® family, the maximum prefix length is five characters.<br/>The maximum prefix length for other systems is 20 characters.<br/>For storage systems that use Spectrum Virtualize, the `CSI` prefix is added as default if not specified by the user.
     
+- To create a stretched snapshot on SAN Volume Controller storage systems, put a colon (:) between the two pools within the `pool` value. For example:
+  
+  ```
+  pool: demo-pool1:demo-pool2 
+  ```
+   **Important:** The two pools must be from different sites.
+
+   For more information about stretched snapshot limitations and requirements, see [Limitations](../release_notes/limitations.md) and [Compatibility and requirements](../installation/install_compatibility_requirements.md).
+
 -   The `pool` parameter is not available on IBM FlashSystem A9000 and A9000R storage systems. For these storage systems, the snapshot must be created on the same pool as the source.
 
 ```

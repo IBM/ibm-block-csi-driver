@@ -12,26 +12,28 @@ Create a storage class YAML file, similar to the following `demo-storageclass.ya
 
 When configuring the file, be sure to use the same array secret and array secret namespace as defined in [Creating a Secret](creating_secret.md).
 
-Use the `SpaceEfficiency` parameters for each storage system, as defined in [the following table](#spaceefficiency). These values are not case-sensitive.
+Use the `SpaceEfficiency` parameters for each storage system, as defined in the following table. These values are not case-sensitive.
 
 #### `SpaceEfficiency` parameter definitions per storage system type
 
 |Storage system type|SpaceEfficiency parameter options|
 |-------------------|---------------------------------|
 |IBM FlashSystem® A9000 and A9000R|Always includes deduplication and compression. No need to specify during configuration.|
-|IBM Spectrum® Virtualize family|- `thick` (default value)<br />- `thin`<br />- `compressed`<br />- `dedup_thin` (creates volumes that are deduplicated with thin-provisioning)<br />- `dedup_compressed` (creates deduplicated and compressed volumes)<br /><br /> **Note:** <br />- The `deduplicated` value is deprecated. Use `dedup_compressed`, if possible. When used, `deduplicated` provide the same results as `dedup_compressed`.<br />- If not specified, the default value is `thick`.|
+|IBM Spectrum® Virtualize family|- `thick` (default value)<br />- `thin`<br />- `compressed`<br />- `dedup_thin` (creates volumes that are deduplicated with thin-provisioning)<br />- `dedup_compressed` (creates deduplicated and compressed volumes)<br /><br /> **Note:** <br />- The `deduplicated` value is deprecated. Use `dedup_compressed`, if possible. When used, `deduplicated` provides the same results as `dedup_compressed`.<br />- If not specified, the default value is `thick`.|
 |IBM® DS8000® family| - `none` (default value) <br />- `thin`<br /><br /> **Note:** If not specified, the default value is `none`.|
 
 - The IBM DS8000 family `pool` value is the pool ID and not the pool name as is used in other storage systems.
 - Be sure that the `pool` value is the name of an existing pool on the storage system.
-- To create a volume with HyperSwap on IBM Spectrum Virtualize storage systems, put a colon (:) between the two pools within the `pool` value. For example:
+- To create a volume with high availability (HA) (HyperSwap or stretched topology) on IBM Spectrum Virtualize storage systems, put a colon (:) between the two pools within the `pool` value. For example:
   
   ```
   pool: demo-pool1:demo-pool2 
   ```
    **Important:** The two pools must be from different sites.
    
-  For more information about the HyperSwap limitations and requirements, see [Limitations](../release_notes/limitations.md) within the release notes and [Compatibility and requirements](../installation/install_compatibility_requirements.md) within this guide.
+  For more information about high availability limitations, see [Limitations](../release_notes/limitations.md).
+  
+  For more information about high availability requirements, see [Compatibility and requirements](../installation/install_compatibility_requirements.md).
 
 - The `allowVolumeExpansion` parameter is optional but is necessary for using volume expansion. The default value is _false_.
 
@@ -39,6 +41,7 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in [the
 
 - The `csi.storage.k8s.io/fstype` parameter is optional. The values that are allowed are _ext4_ or _xfs_. The default value is _ext4_.
 - The `volume_name_prefix` parameter is optional.
+- The `io_group` parameter is only available on Spectrum Virtualize storage systems. For more information about I/O groups, see **Product overview** > **Technical overview** > **I/O group** within your product documentation on [IBM Documentation](https://www.ibm.com/docs).
 
     **Note:**
     For IBM DS8000 family, the maximum prefix length is five characters. The maximum prefix length for other systems is 20 characters. <br /><br />For storage systems that use Spectrum Virtualize, the `CSI` prefix is added as default if not specified by the user.
@@ -51,6 +54,7 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in [the
       provisioner: block.csi.ibm.com
       parameters:
         pool: demo-pool
+        io_group: demo-iogrp             # Optional.
         SpaceEfficiency: thin            # Optional.
         volume_name_prefix: demo-prefix  # Optional.
 

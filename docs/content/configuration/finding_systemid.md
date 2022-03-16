@@ -4,5 +4,5 @@ Find the remote storage system `system_id` parameter on your storage system in o
 
 For finding the `system_id` parameter on your Spectrum Virtualize storage system, use the `lspartnership` command.
 
-For more information, see **Command-line interface** > **Copy Service commands** > **lspartnership** within your specific product documentation on [IBM Docs](https://www.ibm.com/docs/en).
+For more information, see **Command-line interface** > **Copy Service commands** > **lspartnership** within your specific product documentation on [IBM Docs](https://www.ibm.com/docs/).
 
