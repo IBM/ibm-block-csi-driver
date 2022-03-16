@@ -1,70 +1,71 @@
-NoConnectionAvailableException_message = "Currently no connection is available to endpoint: {0}"
+NO_CONNECTION_AVAILABLE_EXCEPTION_MESSAGE = "Currently no connection is available to endpoint: {0}"
 
-CredentialsError_message = "Credential error has occurred while connecting to endpoint : {0} "
+CREDENTIALS_ERROR_MESSAGE = "Credential error has occurred while connecting to endpoint : {0} "
 
-StorageManagementIPsNotSupportError_message = "Invalid Management IP for SVC : {0} "
+STORAGE_MANAGEMENT_IPS_NOT_SUPPORT_ERROR_MESSAGE = "Invalid Management IP for SVC : {0} "
 
-ObjectNotFoundError_message = "Object was not found : {0} "
+OBJECT_NOT_FOUND_ERROR_MESSAGE = "Object was not found : {0} "
 
-VolumeNameBelongsToSnapshotError_message = "Volume not found. Snapshot with the same id exists. \
+VOLUME_NAME_BELONGS_TO_SNAPSHOT_ERROR_MESSAGE = "Volume not found. Snapshot with the same id exists. \
                                                          Name : {0} , array : {1}"
 
-PoolDoesNotMatchSpaceEfficiency_message = "Pool : {0} does not match the following space efficiency : {1} . error : {2}"
+POOL_DOES_NOT_MATCH_SPACE_EFFICIENCY_MESSAGE = "Pool : {0} does not match the following space efficiency : {1} . " \
+                                               "error : {2}"
 
-SpaceEfficiencyNotSupported_message = "space efficiency is not supported : {0} "
+SPACE_EFFICIENCY_NOT_SUPPORTED_MESSAGE = "space efficiency is not supported : {0} "
 
-VolumeAlreadyExists_message = "Volume already exists : {0} , array : {1}"
+VOLUME_ALREADY_EXISTS_MESSAGE = "Volume already exists : {0} , array : {1}"
 
-PoolDoesNotExist_message = "Pool does not exist: {0} , array : {1}"
+POOL_DOES_NOT_EXIST_MESSAGE = "Pool does not exist: {0} , array : {1}"
 
-PoolParameterIsMissing = "Pool parameter is mandatory in {0}"
+POOL_PARAMETER_IS_MISSING = "Pool parameter is mandatory in {0}"
 
-FailedToFindStorageSystemType_message = "Could not identify the type for endpoint: {0} "
+FAILED_TO_FIND_STORAGE_SYSTEM_TYPE_MESSAGE = "Could not identify the type for endpoint: {0} "
 
-PermissionDeniedError_message = "Permission was denied to operation : {0}"
+PERMISSION_DENIED_ERROR_MESSAGE = "Permission was denied to operation : {0}"
 
-MultipleHostsFoundError_message = "Multiple hosts found for port(s): {0}. hosts are : {1}"
+MULTIPLE_HOSTS_FOUND_ERROR_MESSAGE = "Multiple hosts found for port(s): {0}. hosts are : {1}"
 
-HostNotFoundError_message = "Host for node: {0} was not found, ensure all host ports are configured on storage"
+HOST_NOT_FOUND_ERROR_MESSAGE = "Host for node: {0} was not found, ensure all host ports are configured on storage"
 
-NoAvailableLunError_message = "No available lun was found for host : {0}"
+NO_AVAILABLE_LUN_ERROR_MESSAGE = "No available lun was found for host : {0}"
 
-LunAlreadyInUse_message = "Lun : {0} is already mapped for host : {1}"
+LUN_ALREADY_IN_USE_MESSAGE = "Lun : {0} is already mapped for host : {1}"
 
-MappingError_message = "Mapping error has occurred while mapping volume : {0} to host : {1}. error : {2}"
+MAPPING_ERROR_MESSAGE = "Mapping error has occurred while mapping volume : {0} to host : {1}. error : {2}"
 
-VolumeAlreadyUnmapped_message = "Volume: {0} is already unmapped."
+VOLUME_ALREADY_UNMAPPED_MESSAGE = "Volume: {0} is already unmapped."
 
-UnMappingError_message = "Unmapping error has occurred for volume : {0} and host : {1}. error : {2}"
+UNMAPPING_ERROR_MESSAGE = "Unmapping error has occurred for volume : {0} and host : {1}. error : {2}"
 
-VolumeMappedToMultipleHostsError_message = "Volume is already mapped to different hosts {0}"
+VOLUME_MAPPED_TO_MULTIPLE_HOSTS_ERROR_MESSAGE = "Volume is already mapped to different hosts {0}"
 
-UnsupportedStorageVersionError_message = ('Unsupported storage system microcode version {}, '
-                                          'the version should not be lower than {}')
+UNSUPPORTED_STORAGE_VERSION_ERROR_MESSAGE = ('Unsupported storage system microcode version {}, '
+                                             'the version should not be lower than {}')
 
-VolumeCreationError_message = 'Failed to create volume {}'
+VOLUME_CREATION_ERROR_MESSAGE = 'Failed to create volume {}'
 
-VolumeDeletionError_message = 'Failed to delete volume {}'
+VOLUME_DELETION_ERROR_MESSAGE = 'Failed to delete volume {}'
 
-NoIscsiTargetsFoundError_message = "Could not find iSCSI targets for endpoint: {0}"
+NO_ISCSI_TARGETS_FOUND_ERROR_MESSAGE = "Could not find iSCSI targets for endpoint: {0}"
 
-UnsupportedConnectivityTypeError_message = "Unsupported connectivity type: {0}"
+UNSUPPORTED_CONNECTIVITY_TYPE_ERROR_MESSAGE = "Unsupported connectivity type: {0}"
 
-SnapshotNotFoundError_message = "Snapshot was not found : {0} "
+SNAPSHOT_NOT_FOUND_ERROR_MESSAGE = "Snapshot was not found : {0} "
 
-SnapshotAlreadyExistsError_message = "Snapshot already exists : {0} , array : {1}"
+SNAPSHOT_ALREADY_EXISTS_ERROR_MESSAGE = "Snapshot already exists : {0} , array : {1}"
 
-ExpectedSnapshotButFoundVolumeError_message = "Could not find info about the source of: {0}, array: {1}"
+EXPECTED_SNAPSHOT_BUT_FOUND_VOLUME_ERROR_MESSAGE = "Could not find info about the source of: {0}, array: {1}"
 
-SnapshotWrongVolumeError_message = "Snapshot {0} exists but it is of Volume {1} and not {2}"
+SNAPSHOT_WRONG_VOLUME_ERROR_MESSAGE = "Snapshot {0} exists but it is of Volume {1} and not {2}"
 
-ObjectIsStillInUseError_message = "Object {0} is still in use by {1}"
+OBJECT_IS_STILL_IN_USE_ERROR_MESSAGE = "Object {0} is still in use by {1}"
 
-InvalidCliResponseError_message = "Invalid CLI response. Details : {0}"
+INVALID_CLI_RESPONSE_ERROR_MESSAGE = "Invalid CLI response. Details : {0}"
 
-NotEnoughSpaceInPoolError_message = "Not enough space in pool {0}"
+NOT_ENOUGH_SPACE_IN_POOL_ERROR_MESSAGE = "Not enough space in pool {0}"
 
-SizeOutOfRangeError_message = "requested size is out of limits. requested: {0}," \
-                              " max_in_byte: {1}"
+SIZE_OUT_OF_RANGE_ERROR_MESSAGE = "requested size is out of limits. requested: {0}," \
+                                  " max_in_byte: {1}"
 
-SnapshotSourcePoolMismatchError_message = "Snapshot pool : {0} does not match the source volume pool : {1}"
+SNAPSHOT_SOURCE_POOL_MISMATCH_ERROR_MESSAGE = "Snapshot pool : {0} does not match the source volume pool : {1}"

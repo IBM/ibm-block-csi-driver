@@ -36,6 +36,7 @@ var (
 	nodeCaps = []csi.NodeServiceCapability_RPC_Type{
 		csi.NodeServiceCapability_RPC_STAGE_UNSTAGE_VOLUME,
 		csi.NodeServiceCapability_RPC_EXPAND_VOLUME,
+		csi.NodeServiceCapability_RPC_GET_VOLUME_STATS,
 	}
 
 	// volumeCaps represents how the volume could be accessed.
@@ -83,6 +84,11 @@ type NodeService struct {
 	VolumeIdLocksMap            SyncLockInterface
 	OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface
 	OsDeviceConnectivityHelper  device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface
+}
+
+type VolumeStatistics struct {
+	AvailableBytes, TotalBytes, UsedBytes    int64
+	AvailableInodes, TotalInodes, UsedInodes int64
 }
 
 // newNodeService creates a new node service
@@ -158,6 +164,17 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	case *csi.VolumeCapability_Block:
 		logger.Debugf("NodeStageVolume Finished: multipath device [%s] is ready to be mounted by NodePublishVolume API", mpathDevice)
 		return &csi.NodeStageVolumeResponse{}, nil
+	}
+	baseDevice := path.Base(mpathDevice)
+	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+	if err != nil {
+		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	err = osDeviceConnectivity.ValidateLun(lun, sysDevices)
+	if err != nil {
+		logger.Errorf("Error while trying to validate lun : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
@@ -351,13 +368,11 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 	baseDevice := path.Base(mpathDevice)
 
-	rawSysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
 	if err != nil {
 		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-
-	sysDevices := strings.Split(rawSysDevices, ",")
 
 	err = d.OsDeviceConnectivityHelper.FlushMultipathDevice(baseDevice)
 	if err != nil {
@@ -604,9 +619,81 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 }
 
 func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	goid_info.SetAdditionalIDInfo(req.VolumeId)
+	volumeId := req.VolumeId
+	goid_info.SetAdditionalIDInfo(volumeId)
 	defer goid_info.DeleteAdditionalIDInfo()
-	return nil, status.Error(codes.Unimplemented, "NodeGetVolumeStats is not implemented yet")
+	volumePath := req.VolumePath
+	volumePathWithHostPrefix := d.NodeUtils.GetPodPath(volumePath)
+
+	err := d.nodeGetVolumeStatsRequestValidation(volumeId, volumePath)
+	if err != nil {
+		return nil, err
+	}
+
+	isPathExists := d.NodeUtils.IsPathExists(volumePathWithHostPrefix)
+	if !isPathExists {
+		return nil, status.Errorf(codes.NotFound, "volume path %q does not exist", volumePath)
+	}
+
+	volumeStats, err := d.getVolumeStats(volumePathWithHostPrefix, volumeId)
+	if err != nil {
+		return nil, err
+	}
+	return &csi.NodeGetVolumeStatsResponse{
+		Usage: []*csi.VolumeUsage{
+			{
+				Unit:      csi.VolumeUsage_BYTES,
+				Available: volumeStats.AvailableBytes,
+				Total:     volumeStats.TotalBytes,
+				Used:      volumeStats.UsedBytes,
+			},
+			{
+				Unit:      csi.VolumeUsage_INODES,
+				Available: volumeStats.AvailableInodes,
+				Total:     volumeStats.TotalInodes,
+				Used:      volumeStats.UsedInodes,
+			},
+		},
+	}, nil
+}
+
+func (d *NodeService) nodeGetVolumeStatsRequestValidation(volumeId string, volumePath string) error {
+	if volumeId == "" {
+		return status.Error(codes.InvalidArgument, "NodeGetVolumeStats Volume ID must be provided")
+	}
+	if volumePath == "" {
+		return status.Error(codes.InvalidArgument, "NodeGetVolumeStats Volume Path must be provided")
+	}
+
+	return nil
+}
+
+func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatistics, error) {
+	var volumeStats VolumeStatistics
+	isBlock, err := d.NodeUtils.IsBlock(path)
+	if err != nil {
+		return VolumeStatistics{}, status.Errorf(codes.Internal, "Failed to determine if %q is block device: %s", path, err)
+	}
+
+	if isBlock {
+		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeId)
+		if err != nil {
+			switch err.(type) {
+			case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
+				return VolumeStatistics{}, status.Errorf(codes.NotFound, "Multipath device of volume id %q does not exist", volumeId)
+			default:
+				return VolumeStatistics{}, status.Errorf(codes.Internal, "Error while discovering the device : %s", err)
+			}
+		}
+		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(mpathDevice)
+	} else {
+		volumeStats, err = d.NodeUtils.GetFileSystemVolumeStats(path)
+	}
+
+	if err != nil {
+		return VolumeStatistics{}, status.Errorf(codes.Internal, "Failed to get statistics: %s", err)
+	}
+	return volumeStats, nil
 }
 
 func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
@@ -636,13 +723,12 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 
 	baseDevice := path.Base(device)
 
-	rawSysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
 	if err != nil {
 		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	sysDevices := strings.Split(rawSysDevices, ",")
 	devicesAreNvme, err := d.NodeUtils.DevicesAreNvme(sysDevices)
 	if err != nil {
 		logger.Errorf("Error while trying to check if sys devices are nvme devices : {%v}", err.Error())

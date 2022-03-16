@@ -1,5 +1,6 @@
+from csi_general import csi_pb2
+
 from controller.common.settings import ALL_ARRAY_TYPES
-from controller.csi_general import csi_pb2
 
 SUPPORTED_FS_TYPES = ["ext4", "xfs"]
 
@@ -32,6 +33,7 @@ VOLUME_CONTEXT_STORAGE_TYPE = "storage_type"
 PARAMETERS_POOL = "pool"
 PARAMETERS_BY_SYSTEM = "by_management_id"
 PARAMETERS_SPACE_EFFICIENCY = "SpaceEfficiency"
+PARAMETERS_IO_GROUP = "io_group"
 PARAMETERS_VOLUME_NAME_PREFIX = "volume_name_prefix"
 PARAMETERS_SNAPSHOT_NAME_PREFIX = "snapshot_name_prefix"
 PARAMETERS_SYSTEM_ID = "system_id"

@@ -8,7 +8,7 @@ import controller.controller_server.config as controller_config
 from controller.array_action.array_action_types import Volume, Snapshot
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
-from controller.array_action.utils import classproperty
+from controller.array_action.utils import ClassProperty
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.utils import string_to_array
@@ -28,46 +28,44 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     MAX_LUN_NUMBER = 250
     MIN_LUN_NUMBER = 1
 
-    @classproperty
+    @ClassProperty
     def array_type(self):
         return settings.ARRAY_TYPE_XIV
 
-    @classproperty
+    @ClassProperty
     def port(self):
         return 7778
 
-    @classproperty
+    @ClassProperty
     def max_object_name_length(self):
         return 63
 
-    @classproperty
+    @ClassProperty
     def max_object_prefix_length(self):
         return 20
 
-    @classproperty
+    @ClassProperty
     def max_connections(self):
         return 2
 
-    @classproperty
+    @ClassProperty
     def minimal_volume_size_in_bytes(self):
         return 1 * 1024 * 1024 * 1024  # 1 GiB
 
-    @classproperty
+    @ClassProperty
     def maximal_volume_size_in_bytes(self):
         return 1 * 1024 * 1024 * 1024 * 1024 * 1024
 
-    @classproperty
+    @ClassProperty
     def max_lun_retries(self):
         return 10
 
-    @classproperty
+    @ClassProperty
     def default_object_prefix(self):
         return None
 
     def __init__(self, user, password, endpoint):
-        self.user = user
-        self.password = password
-        self.endpoint = endpoint
+        super().__init__(user, password, endpoint)
         self.client = None
         self._identifier = None
 
@@ -205,7 +203,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def _convert_size_bytes_to_blocks(self, size_in_bytes):
         return int(size_in_bytes / self.BLOCK_SIZE_IN_BYTES)
 
-    def create_volume(self, name, size_in_bytes, space_efficiency, pool):
+    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with parameters : {}".format(
             name, size_in_bytes, pool, space_efficiency))
 

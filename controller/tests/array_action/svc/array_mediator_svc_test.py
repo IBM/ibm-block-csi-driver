@@ -54,7 +54,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.UnsupportedStorageVersionError):
             SVCArrayMediator("user", "password", self.endpoint)
 
-    def test_raise_ManagementIPsNotSupportError_in_init(self):
+    def test_raise_management_ips_not_support_error_in_init(self):
         self.endpoint = ["IP_1", "IP_2"]
         with self.assertRaises(
                 array_errors.StorageManagementIPsNotSupportError):
@@ -122,6 +122,17 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.assertIsNone(volume.copy_source_id)
 
+    def _prepare_stretched_volume_mock(self):
+        cli_volume = self._get_cli_volume(pool_name=['many', 'pool1', 'pool2'])
+        self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=cli_volume)
+
+    def test_get_volume_stretched_return_correct_pools(self):
+        self._prepare_stretched_volume_mock()
+
+        volume = self.svc.get_volume("volume_name")
+
+        self.assertEqual(volume.pool, 'pool1:pool2')
+
     def test_get_volume_raise_exception(self):
         self._test_mediator_method_client_error(self.svc.get_volume, ("volume",),
                                                 self.svc.client.svcinfo.lsvdisk, Exception, Exception)
@@ -133,12 +144,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.get_volume("volume")
 
     def _test_create_volume_mkvolume_cli_failure_error(self, error_message_id, expected_error, volume_name="volume"):
-        self._test_mediator_method_client_cli_failure_error(self.svc.create_volume, (volume_name, 10, "thin", "pool"),
+        self._test_mediator_method_client_cli_failure_error(self.svc.create_volume,
+                                                            (volume_name, 10, "thin", "pool", None),
                                                             self.svc.client.svctask.mkvolume, error_message_id,
                                                             expected_error)
 
     def test_create_volume_raise_exceptions(self):
-        self._test_mediator_method_client_error(self.svc.create_volume, ("volume", 10, "thin", "pool"),
+        self._test_mediator_method_client_error(self.svc.create_volume, ("volume", 10, "thin", "pool", None),
                                                 self.svc.client.svctask.mkvolume, Exception, Exception)
         self._test_create_volume_mkvolume_cli_failure_error("Failed", CLIFailureError)
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC8710E", array_errors.NotEnoughSpaceInPool)
@@ -154,7 +166,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         vol_ret = Mock(as_single_element=self._get_cli_volume())
         self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
-        volume = self.svc.create_volume("test_volume", 1024, space_efficiency, "pool_name")
+        volume = self.svc.create_volume("test_volume", 1024, space_efficiency, "pool_name", None)
 
         self.assertEqual(volume.capacity_bytes, 1024)
         self.assertEqual(volume.array_type, 'SVC')
@@ -309,6 +321,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                       'name': name,
                       'capacity': '1024',
                       'mdisk_grp_name': pool_name,
+                      'IO_group_name': 'iogrp0',
                       'FC_id': '',
                       'se_copy': se_copy,
                       'deduplicated_copy': deduplicated_copy,
@@ -428,38 +441,46 @@ class TestArrayMediatorSVC(unittest.TestCase):
         volume = self.svc.get_object_by_id("volume_id", "volume")
         self.assertEqual(volume.name, "volume_id")
 
-    def _get_custom_dedup_cli_volume(self, support_deduplicated_copy, with_deduplicated_copy, name='source_volume',
-                                     pool_name='pool_name'):
+    def _get_custom_cli_volume(self, support_deduplicated_copy, with_deduplicated_copy, name='source_volume',
+                               pool_name='pool_name'):
         volume = self._get_cli_volume(with_deduplicated_copy, name=name, pool_name=pool_name)
         if not support_deduplicated_copy:
             del volume.deduplicated_copy
         return volume
 
     def _prepare_mocks_for_create_snapshot(self, support_deduplicated_copy=True, source_has_deduplicated_copy=False,
-                                           different_pool_site=False):
+                                           different_pool_site=False, is_source_stretched=False):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         self.svc.client.svctask.mkfcmap.return_value = Mock()
-        source_volume_to_copy_from = self._get_custom_dedup_cli_volume(support_deduplicated_copy,
-                                                                       source_has_deduplicated_copy)
+        pool = ['many', 'pool1', 'pool2'] if is_source_stretched else 'pool_name'
+        source_volume_to_copy_from = self._get_custom_cli_volume(support_deduplicated_copy,
+                                                                 source_has_deduplicated_copy,
+                                                                 pool_name=pool)
         volumes_to_return = [source_volume_to_copy_from, source_volume_to_copy_from]
 
         if different_pool_site:
-            pools_to_return = [Munch({'site_name': 'pool_site'}),
-                               Munch({'site_name': 'source_volume_site'}),
-                               Munch({'site_name': 'other_volume_site'}),
-                               Munch({'site_name': 'pool_site'})]
-            self.svc.client.svcinfo.lsmdiskgrp.side_effect = self._mock_cli_objects(pools_to_return)
+            if is_source_stretched:
+                pools_to_return = [Munch({'site_name': 'pool_site'}),
+                                   Munch({'site_name': 'source_volume_site'}),
+                                   Munch({'site_name': 'pool_site'})]
+                self.svc.client.svcinfo.lsmdiskgrp.side_effect = self._mock_cli_objects(pools_to_return)
+            else:
+                pools_to_return = [Munch({'site_name': 'pool_site'}),
+                                   Munch({'site_name': 'source_volume_site'}),
+                                   Munch({'site_name': 'other_volume_site'}),
+                                   Munch({'site_name': 'pool_site'})]
+                self.svc.client.svcinfo.lsmdiskgrp.side_effect = self._mock_cli_objects(pools_to_return)
 
-            auxiliary_volumes = [self._get_cli_volume(name='other_volume', pool_name='other_volume_pool'),
-                                 self._get_custom_dedup_cli_volume(support_deduplicated_copy,
-                                                                   source_has_deduplicated_copy,
-                                                                   name='relevant_volume',
-                                                                   pool_name='relevant_volume_pool')]
-            volumes_to_return.extend(auxiliary_volumes)
+                auxiliary_volumes = [self._get_cli_volume(name='other_volume', pool_name='other_volume_pool'),
+                                     self._get_custom_cli_volume(support_deduplicated_copy,
+                                                                 source_has_deduplicated_copy,
+                                                                 name='relevant_volume',
+                                                                 pool_name='relevant_volume_pool')]
+                volumes_to_return.extend(auxiliary_volumes)
 
-            rcrelationships_to_return = [Munch({'aux_vdisk_name': 'other_volume'}),
-                                         Munch({'aux_vdisk_name': 'relevant_volume'})]
-            self.svc.client.svcinfo.lsrcrelationship.return_value = Mock(as_list=rcrelationships_to_return)
+                rcrelationships_to_return = [Munch({'aux_vdisk_name': 'other_volume'}),
+                                             Munch({'aux_vdisk_name': 'relevant_volume'})]
+                self.svc.client.svcinfo.lsrcrelationship.return_value = Mock(as_list=rcrelationships_to_return)
 
         target_volume_after_creation = self._get_mapless_target_cli_volume()
         target_volume_after_mapping = self._get_mapped_target_cli_volume()
@@ -533,13 +554,39 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="different_pool")
         self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
-                                                                 pool='different_pool', thin=True)
+                                                                 pool='different_pool', iogrp='iogrp0',
+                                                                 thin=True)
 
-    def test_create_snapshot_with_different_site_success(self):
+    def test_create_snapshot_for_hyperswap_volume_with_different_site_success(self):
         self._prepare_mocks_for_create_snapshot(different_pool_site=True)
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="different_pool")
         self.svc.client.svctask.mkfcmap.assert_called_once_with(source="relevant_volume", target="test_snapshot",
+                                                                copyrate=0)
+
+    def test_create_snapshot_for_stretched_volume_with_different_site_success(self):
+        self._prepare_mocks_for_create_snapshot(different_pool_site=True, is_source_stretched=True)
+
+        self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="different_pool")
+        self.svc.client.svctask.mkfcmap.assert_called_once_with(source="source_volume", target="test_snapshot",
+                                                                copyrate=0)
+
+    def test_create_snapshot_for_stretched_volume_implicit_pool_success(self):
+        self._prepare_mocks_for_create_snapshot(is_source_stretched=True)
+
+        self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool=None)
+        self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
+                                                                 pool='pool1', iogrp='iogrp0', thin=True)
+        self.svc.client.svctask.mkfcmap.assert_called_once_with(source="source_volume", target="test_snapshot",
+                                                                copyrate=0)
+
+    def test_create_snapshot_as_stretched_success(self):
+        self._prepare_mocks_for_create_snapshot()
+
+        self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="pool1:pool2")
+        self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
+                                                                 pool='pool1:pool2', iogrp='iogrp0', thin=True)
+        self.svc.client.svctask.mkfcmap.assert_called_once_with(source="source_volume", target="test_snapshot",
                                                                 copyrate=0)
 
     def test_create_snapshot_with_specified_source_volume_space_efficiency_success(self):
@@ -547,14 +594,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool=None)
         self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
-                                                                 pool='pool_name', compressed=True, deduplicated=True)
+                                                                 pool='pool_name', iogrp='iogrp0',
+                                                                 compressed=True, deduplicated=True)
 
     def test_create_snapshot_with_different_space_efficiency_success(self):
         self._prepare_mocks_for_create_snapshot(source_has_deduplicated_copy=True)
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency="thin", pool=None)
         self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
-                                                                 pool='pool_name', thin=True)
+                                                                 pool='pool_name', iogrp='iogrp0', thin=True)
 
     def test_create_snapshot_no_deduplicated_copy_success(self):
         self._prepare_mocks_for_create_snapshot(support_deduplicated_copy=False)
@@ -657,22 +705,25 @@ class TestArrayMediatorSVC(unittest.TestCase):
         deduplicated_compressed_space_efficiency = config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED
         self.svc.validate_supported_space_efficiency(deduplicated_compressed_space_efficiency)
 
-    def _test_build_kwargs_from_parameters(self, space_efficiency, pool, name, size, expected_space_efficiency_kwargs):
+    def _test_build_kwargs_from_parameters(self, space_efficiency, pool, io_group, name, size,
+                                           expected_space_efficiency_kwargs):
         expected_kwargs = {'name': name, 'unit': 'b', 'size': size, 'pool': pool}
         expected_kwargs.update(expected_space_efficiency_kwargs)
-        actual_kwargs = build_kwargs_from_parameters(space_efficiency, pool, name, size)
+        if io_group:
+            expected_kwargs['iogrp'] = io_group
+        actual_kwargs = build_kwargs_from_parameters(space_efficiency, pool, io_group, name, size)
         self.assertDictEqual(actual_kwargs, expected_kwargs)
 
     def test_build_kwargs_from_parameters(self):
         size = self.svc._convert_size_bytes(1000)
-
-        self._test_build_kwargs_from_parameters('Thin', 'P1', 'V1', size, {'thin': True})
-        self._test_build_kwargs_from_parameters('compressed', 'P2', 'V2', size, {'compressed': True})
-        self._test_build_kwargs_from_parameters('dedup_thin', 'P3', 'V3', self.svc._convert_size_bytes(2048),
-                                                {'thin': True, 'deduplicated': True})
-        self._test_build_kwargs_from_parameters('dedup_compressed', 'P3', 'V3', self.svc._convert_size_bytes(2048),
+        second_size = self.svc._convert_size_bytes(2048)
+        self._test_build_kwargs_from_parameters('Thin', 'P1', None, 'V1', size, {'thin': True})
+        self._test_build_kwargs_from_parameters('compressed', 'P2', None, 'V2', size, {'compressed': True})
+        self._test_build_kwargs_from_parameters('dedup_thin', 'P3', 'IOGRP1', 'V3', second_size,
+                                                {'iogrp': 'IOGRP1', 'thin': True, 'deduplicated': True})
+        self._test_build_kwargs_from_parameters('dedup_compressed', 'P3', None, 'V3', second_size,
                                                 {'compressed': True, 'deduplicated': True})
-        self._test_build_kwargs_from_parameters('Deduplicated', 'P3', 'V3', self.svc._convert_size_bytes(2048),
+        self._test_build_kwargs_from_parameters('Deduplicated', 'P3', None, 'V3', second_size,
                                                 {'compressed': True, 'deduplicated': True})
 
     def test_properties(self):
@@ -818,8 +869,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
             {config.NVME_OVER_FC_CONNECTIVITY_TYPE, config.FC_CONNECTIVITY_TYPE, config.ISCSI_CONNECTIVITY_TYPE},
             set(connectivity_types))
 
-    def _get_host_as_munch(self, id, name, nqn_list=None, wwpns_list=None, iscsi_names_list=None, portset_id=None):
-        host = Munch(id=id, name=name)
+    def _get_host_as_munch(self, host_id, host_name, nqn_list=None, wwpns_list=None, iscsi_names_list=None,
+                           portset_id=None):
+        host = Munch(id=host_id, name=host_name)
         if nqn_list:
             host.nqn = nqn_list
         if wwpns_list:
