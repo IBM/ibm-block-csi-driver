@@ -2,7 +2,7 @@
 
 For the complete and up-to-date information about the compatibility and requirements for using the IBM® block storage CSI driver, refer to its latest release notes. The release notes detail supported operating system and container platform versions, and microcode versions of the supported storage systems.
 
-Before beginning the installation of the CSI (Container Storage Interface) driver, be sure to verify that you comply with the following prerequisites.
+Be sure to verify that you comply with all of the following prerequisites before beginning the installation of the CSI (Container Storage Interface) driver.
 
 For IBM Cloud® Satellite users, see [cloud.ibm.com/docs/satellite](https://cloud.ibm.com/docs/satellite) for full system requirements.
 
@@ -17,7 +17,7 @@ The CSI driver requires the following ports to be opened on the worker nodes OS 
 
         Port 7778
 
- -   **IBM Spectrum® Virtualize family includes IBM® SAN Volume Controller and IBM FlashSystem® family members that are built with IBM Spectrum® Virtualize (including FlashSystem 5xxx, 7200, 9100, 9200, 9200R)**
+ -   **IBM Spectrum® Virtualize family includes IBM® SAN Volume Controller and IBM FlashSystem® family members that are built with IBM Spectrum® Virtualize (including FlashSystem 5xxx, 7xxx, 9xxx)**
 
         Port 22
 
@@ -25,13 +25,13 @@ The CSI driver requires the following ports to be opened on the worker nodes OS 
 
       Port 8452
 
-Complete these steps for each worker node in Kubernetes cluster to prepare your environment for installing the CSI (Container Storage Interface) driver.
+Complete these steps to prepare your environment for installing the CSI (Container Storage Interface) driver.
 
-1. Configure Linux® multipath devices on the host.
+1. Configure Linux® multipath devices, per worker node.
 
    **Important:** Be sure to configure each worker with storage connectivity according to your storage system instructions. For more information, find your storage system documentation in [IBM Documentation](http://www.ibm.com/docs/).
 
-   **Additional configuration steps for OpenShift® Container Platform users (RHEL and RHCOS).** Other users can skip these additional configuration steps.
+   **Additional configuration steps for Red Hat OpenShift Container Platform users (RHEL and RHCOS).** Other users can skip these additional configuration steps.
 
    Download and save the following YAML file:
 
@@ -49,7 +49,7 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
 
    `oc apply -f 99-ibm-attach.yaml`
 
-2. Configure your storage system host attachment.
+2. Configure your storage system host attachment, per worker node.
 
     **Important:** The CSI driver does not define hosts on your storage system.
     
@@ -64,9 +64,9 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
        
     For more information, find your storage system documentation in [IBM Documentation](http://www.ibm.com/docs/).
 
-3. **For RHEL OS users:** Ensure that the following packages are installed.
+3. **For RHEL OS users:** Ensure that the following packages are installed per worker node.
 
-    If using RHCOS or if the packages are already installed, this step may be skipped.
+    If using RHCOS or if the packages are already installed, this step can be skipped.
 
     - sg3_utils
     - iscsi-initiator-utils
@@ -95,10 +95,16 @@ Complete these steps for each worker node in Kubernetes cluster to prepare your 
     
     2. To enable support on your storage system, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Administering** > **Managing Copy Services** > **Managing remote-copy partnerships**.
 
-6. (Optional) To use CSI Topology, at least one node in the cluster must have the label-prefix of `topology.block.csi.ibm.com` to introduce topology awareness:
+6. (Optional) To use CSI Topology, at least one node in the cluster must have the label-prefix of `topology.block.csi.ibm.com` to introduce topology awareness.
       
       **Important:** This label-prefix must be found on the nodes in the cluster **before** installing the IBM® block storage CSI driver. If the nodes do not have the proper label-prefix before installation, CSI Topology cannot be used with the CSI driver.
 
       For more information, see [Configuring for CSI Topology](../configuration/configuring_topology.md).
 
-7. (Optional) If planning on using HyperSwap on your storage system, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Planning** > **Planning for high availability** > **Planning for a HyperSwap topology system**.
+7. (Optional) If planning on using an HA feature (either HyperSwap or stretched topology) on your storage system, see the appropriate sections within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/):
+    - HyperSwap topology planning and configuration
+        - **Planning** > **Planning for high availability** > **Planning for a HyperSwap topology system**
+        - **Configuring** > **Configuration details** > **HyperSwap system configuration details**
+    - Stretched topology planning and configuration ([SAN Volume Controller](https://www.ibm.com/docs/en/sanvolumecontroller) only):
+        - **Planning** > **Planning for high availability** > **Planning for a stretched topology system**
+        - **Configuring** > **Configuration details** > **Stretched system configuration details**

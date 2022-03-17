@@ -1,23 +1,22 @@
 import grpc
+from csi_general import replication_pb2 as pb2
+from csi_general import replication_pb2_grpc as pb2_grpc
 
 from controller.array_action import errors as array_errors
 from controller.array_action.config import REPLICATION_DEFAULT_COPY_TYPE
 from controller.array_action.storage_agent import get_agent
 from controller.common.csi_logger import get_stdout_logger
-from controller.common.utils import set_current_thread_name
 from controller.controller_server import config, utils
-from controller.controller_server.exception_handler import handle_common_exceptions, build_error_response
-from controller.csi_general import replication_pb2 as pb2
-from controller.csi_general import replication_pb2_grpc as pb2_grpc
+from controller.controller_server.decorators import csi_method
+from controller.controller_server.exception_handler import build_error_response
 
 logger = get_stdout_logger()
 
 
 class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
-    @handle_common_exceptions(pb2.EnableVolumeReplicationResponse)
+
+    @csi_method(error_response_type=pb2.EnableVolumeReplicationResponse, lock_request_attribute="volume_id")
     def EnableVolumeReplication(self, request, context):
-        set_current_thread_name(request.volume_id)
-        logger.info("EnableVolumeReplication")
         utils.validate_addons_request(request)
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
@@ -53,10 +52,8 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         return pb2.EnableVolumeReplicationResponse()
 
-    @handle_common_exceptions(pb2.DisableVolumeReplicationResponse)
+    @csi_method(error_response_type=pb2.DisableVolumeReplicationResponse, lock_request_attribute="volume_id")
     def DisableVolumeReplication(self, request, context):
-        set_current_thread_name(request.volume_id)
-        logger.info("DisableVolumeReplication")
         utils.validate_addons_request(request)
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
@@ -95,7 +92,6 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
                 logger.info("idempotent case. volume is already secondary")
 
     def _ensure_volume_role(self, request, context, is_to_promote, response_type):
-        set_current_thread_name(request.volume_id)
         method_name = "PromoteVolume" if is_to_promote else "DemoteVolume"
         logger.info(method_name)
         utils.validate_addons_request(request)
@@ -124,18 +120,16 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         logger.info("finished {}".format(method_name))
         return response_type()
 
-    @handle_common_exceptions(pb2.PromoteVolumeResponse)
+    @csi_method(error_response_type=pb2.PromoteVolumeResponse, lock_request_attribute="volume_id")
     def PromoteVolume(self, request, context):
         return self._ensure_volume_role(request, context, is_to_promote=True, response_type=pb2.PromoteVolumeResponse)
 
-    @handle_common_exceptions(pb2.DemoteVolumeResponse)
+    @csi_method(error_response_type=pb2.DemoteVolumeResponse, lock_request_attribute="volume_id")
     def DemoteVolume(self, request, context):
         return self._ensure_volume_role(request, context, is_to_promote=False, response_type=pb2.DemoteVolumeResponse)
 
-    @handle_common_exceptions(pb2.ResyncVolumeResponse)
+    @csi_method(error_response_type=pb2.ResyncVolumeResponse, lock_request_attribute="volume_id")
     def ResyncVolume(self, request, context):
-        set_current_thread_name(request.volume_id)
-        logger.info("ResyncVolume")
         utils.validate_addons_request(request)
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)

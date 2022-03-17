@@ -1,25 +1,27 @@
-# What's new in 1.8.0
+# What's new in 1.9.0
 
-IBM® block storage CSI driver 1.8.0 introduces the enhancements that are detailed in the following section.
+IBM® block storage CSI driver 1.9.0 introduces the enhancements that are detailed in the following section.
 
-**General availability date:** 17 December 2021
+**General availability date:** 18 March 2022
 
-## New HyperSwap support for IBM Spectrum Virtualize family storage systems
+## Additional high availability (HA) feature
 
-IBM® block storage CSI driver 1.8.0 now supports HyperSwap implementation, when using IBM Spectrum Virtualize family storage systems.
+Stretched volumes and stretched snapshots (FlashCopy) are now supported on SAN Volume Controller storage systems. Stretched storage topology enables disaster recovery and high availability between nodes in I/O groups at different locations. For more information, see **Product overview** > **Technical overview** > **Systems** > **Stretched systems** within the [SAN Volume Controller documentation](https://www.ibm.com/docs/en/sanvolumecontroller).
 
-## New NVMe® over Fibre Channel protocol for IBM Spectrum Virtualize family storage systems
+## New Call Home support
 
-This version adds NVMe®/FC support for supported IBM Spectrum Virtualize family storage systems using Red Hat® Enterprise Linux® (RHEL) operating systems. 
+Call Home is now supported on Spectrum Virtualize family storage systems. For more information about Call Home on your storage system, see **Product overview** > **Technical overview** > **Call Home** within your product documentation on [IBM Documentation](https://www.ibm.com/docs).
 
-## Increased StorageClass `SpaceEfficiency` parameter capabilities
+## Now enables I/O group configuration
 
-Version 1.8.0 increases the `SpaceEfficiency` deduplication parameter options for IBM Spectrum Virtualize family storage systems. For more information, see [Creating a StorageClass](../configuration/creating_volumestorageclass.md).
+The CSI driver now enables I/O group configuration when creating a new volume for Spectrum Virtualize family systems.
 
-## Added custom resource configurability for the CSI driver health port
+For more information about I/O groups, see **Product overview** > **Technical overview** > **I/O group** within your product documentation on [IBM Documentation](https://www.ibm.com/docs).
 
-This version allows you to configure the health port (9808) for the CSI driver through the custom resource. Configure using the `healthPort` parameter.
+## New Red Hat® Enterprise Linux® (RHEL) 8.x support
 
-## Additional orchestration support for OpenShift 4.7 and 4.9 for deployment
+IBM® block storage CSI driver 1.9.0 now supports RHEL 8.x systems for x86 architecture.
 
-This version reintroduces Red Hat® OpenShift 4.7 and adds new support for orchestration platform Red Hat OpenShift 4.9, suitable for deployment of the CSI (Container Storage Interface) driver.
+## Additional supported orchestration platforms for deployment
+
+This version adds support for orchestration platforms Kubernetes 1.23 and Red Hat® OpenShift 4.10, suitable for deployment of the CSI (Container Storage Interface) driver.

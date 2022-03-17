@@ -13,20 +13,26 @@
 # limitations under the License.
 
 FROM registry.access.redhat.com/ubi8/python-38:1-75.1638364053 as builder
-COPY controller/requirements.txt /tmp/
 USER root
 RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
 USER default
 RUN pip3 install --ignore-installed --default-timeout=100 --upgrade pip==21.2.4
+WORKDIR /tmp
+COPY controller/requirements.txt .
 # avoid default boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
-RUN pip3 install -r /tmp/requirements.txt
+RUN pip3 install -r ./requirements.txt
+
+USER root
+COPY controller/scripts/csi_general .
+RUN ./csi_pb2.sh
+RUN pip3 install .
 
 
-FROM registry.access.redhat.com/ubi8/python-38:1-68
+FROM registry.access.redhat.com/ubi8/python-38:1-80.1645821300
 MAINTAINER IBM Storage
 
-ARG VERSION=1.8.0
+ARG VERSION=1.9.0
 ARG BUILD_NUMBER=0
 
 ###Required Labels

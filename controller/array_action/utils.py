@@ -8,10 +8,6 @@ UTF_8 = encodings.utf_8.getregentry().name
 logger = get_stdout_logger()
 
 
-def bytes_to_string(input_as_bytes):
-    return input_as_bytes.decode(UTF_8) if input_as_bytes else ""
-
-
 def convert_scsi_id_to_nguid(volume_id):
     logger.debug("Converting scsi uuid : {} to nguid".format(volume_id))
     oui = volume_id[1:WWN_OUI_END]
@@ -22,7 +18,7 @@ def convert_scsi_id_to_nguid(volume_id):
     return final_nguid
 
 
-class classproperty:
+class ClassProperty:
 
     def __init__(self, function):
         self._function = function

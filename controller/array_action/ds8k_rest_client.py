@@ -143,13 +143,13 @@ class RESTClient:
         mappings = self._client.get_mappings_by_host(host_name)
         return [mapping.id for mapping in mappings]
 
-    def create_volume(self, name, capacity_in_bytes, pool_id, tp):
+    def create_volume(self, name, capacity_in_bytes, pool_id, thin_provisioning):
         return self._client.create_volume_fb(
             name=name,
             cap=capacity_in_bytes,
             captype='bytes',
             pool=pool_id,
-            tp=tp
+            tp=thin_provisioning
         )[0]
 
     def rename_volume(self, volume_id, new_name):

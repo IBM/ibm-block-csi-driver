@@ -20,16 +20,15 @@ import (
 	"errors"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
 )
 
 const (
-	iscsiCmdTimeout     = 30 * time.Second
+	IscsiCmdTimeout     = 30 * time.Second
 	iscsiPort           = 3260
-	iSCSIErrNoObjsFound = 21
+	ISCSIErrNoObjsFound = 21
 )
 
 type OsDeviceConnectivityIscsi struct {
@@ -45,7 +44,7 @@ func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface) OsDeviceC
 }
 
 func (r OsDeviceConnectivityIscsi) iscsiCmd(args ...string) (string, error) {
-	out, err := r.Executer.ExecuteWithTimeout(int(iscsiCmdTimeout.Seconds()*1000), "iscsiadm", args)
+	out, err := r.Executer.ExecuteWithTimeout(int(IscsiCmdTimeout.Seconds()*1000), "iscsiadm", args)
 	return string(out), err
 }
 
@@ -69,11 +68,11 @@ func (r OsDeviceConnectivityIscsi) iscsiLogin(targetName, portal string) {
 func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions() ([]string, error) {
 	output, err := r.iscsiCmd("-m", "session")
 	if err != nil {
-		if exitError, isExitError := err.(*exec.ExitError); isExitError && exitError.ExitCode() == iSCSIErrNoObjsFound {
-			logger.Debug("No active iSCSI sessions.")
+		if exitCode, isExitError := r.Executer.GetExitCode(err); isExitError && exitCode == ISCSIErrNoObjsFound {
+			logger.Debug("No active iSCSI sessions")
 			return []string{}, nil
 		}
-		logger.Error("Failed to check iSCSI sessions.")
+		logger.Error("Failed to check iSCSI sessions")
 		return nil, err
 	}
 	lines := strings.Split(strings.TrimSpace(output), "\n")
@@ -168,4 +167,8 @@ func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(mpathDevice string) erro
 
 func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(sysDevices []string) error {
 	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
+}
+
+func (r OsDeviceConnectivityIscsi) ValidateLun(lun int, sysDevices []string) error {
+	return r.HelperScsiGeneric.ValidateLun(lun, sysDevices)
 }

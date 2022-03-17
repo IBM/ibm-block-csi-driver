@@ -32,7 +32,7 @@ mkdir logs
 ```
 Save logs and status reports directly to the created directory by adding in the following string at the end of the collection command: `> logs/<log_filename>.log`.
 
-**Important:** Be sure that the logs cover any relevant time frames for the specific issues that you are trying to debug when gathering logs from the storage system.
+**Important:** Be sure that the logs cover any relevant timeframes for the specific issues that you are trying to debug when gathering logs from the storage system.
 
 **Note:** All commands here are listed with the collection command with the `logs` folder name example. Change the folder name according as needed.
 
@@ -53,7 +53,7 @@ Be sure to run the following steps and copy the output to an external file, when
 
     `PVC NAME: demo-pvc-file-system PVC STATUS: Bound`
 
-    **Note:** If the PVCs are not in the _Bound_ state collect the events of all unbound PVCs. (See [Log collection for unbound PVCs](#log-collection-for-unbound-pvcs).)
+    **Note:** If the PVCs are not in the _Bound_ state, collect the events of all unbound PVCs. (See [Details collection for unbound PVCs](#Details-collection-for-unbound-pvcs).)
 
 #### Log collection for all CSI driver node pods and their containers
 

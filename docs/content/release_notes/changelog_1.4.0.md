@@ -4,7 +4,7 @@ IBM® block storage CSI driver 1.4.0 provided a range of enhancements and resolv
 
 -   New IBM Power Systems™ architecture support for Red Hat® OpenShift® 4.4 and 4.5
 -   Additional support for Kubernetes 1.19 and Red Hat OpenShift 4.4 and 4.5 with x86 architecture
--   Supports for IBM Z® for Red Hat OpenShift 4.5
+-   Added support for IBM Z® for Red Hat OpenShift 4.5
 -   Enhanced volume functionality
 
 |Ticket ID|Severity|Description|

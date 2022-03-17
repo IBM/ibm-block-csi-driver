@@ -27,6 +27,7 @@ import (
 	"strings"
 
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
+	"golang.org/x/sys/unix"
 	"k8s.io/apimachinery/pkg/util/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,6 +57,7 @@ const (
 	TimeOutMultipathdCmd              = TimeOutGeneralCmd
 	TimeOutNvmeCmd                    = TimeOutGeneralCmd
 	multipathdCmd                     = "multipathd"
+	blockDevCmd                       = "blockdev"
 	nvmeCmd                           = "nvme"
 	minFilesInNonEmptyDir             = 1
 	noSuchFileOrDirectoryErrorMessage = "No such file or directory"
@@ -70,7 +72,7 @@ type NodeUtilsInterface interface {
 	ParseIscsiInitiators() (string, error)
 	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, map[string][]string, error)
 	GetArrayInitiators(ipsByArrayInitiator map[string][]string) []string
-	GetSysDevicesFromMpath(baseDevice string) (string, error)
+	GetSysDevicesFromMpath(baseDevice string) ([]string, error)
 
 	// TODO refactor and move all staging methods to dedicate interface.
 	ClearStageInfoFile(filePath string) error
@@ -89,6 +91,9 @@ type NodeUtilsInterface interface {
 	GetPodPath(filepath string) string
 	GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []string, iscsiIQN string) (string, error)
 	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
+	IsBlock(devicePath string) (bool, error)
+	GetFileSystemVolumeStats(path string) (VolumeStatistics, error)
+	GetBlockVolumeStats(mpathDevice string) (VolumeStatistics, error)
 }
 
 type NodeUtils struct {
@@ -154,15 +159,15 @@ func (n NodeUtils) ClearStageInfoFile(filePath string) error {
 	return os.Remove(filePath)
 }
 
-func (n NodeUtils) GetSysDevicesFromMpath(device string) (string, error) {
+func (n NodeUtils) GetSysDevicesFromMpath(baseDevice string) ([]string, error) {
 	// this will return the 	/sys/block/dm-3/slaves/
-	logger.Debugf("GetSysDevicesFromMpath with param : {%v}", device)
-	deviceSlavePath := path.Join("/sys", "block", device, "slaves")
+	logger.Debugf("GetSysDevicesFromMpath with param : {%v}", baseDevice)
+	deviceSlavePath := path.Join("/sys", "block", baseDevice, "slaves")
 	logger.Debugf("looking in path : {%v}", deviceSlavePath)
 	slaves, err := ioutil.ReadDir(deviceSlavePath)
 	if err != nil {
 		logger.Errorf("an error occured while looking for device slaves : {%v}", err.Error())
-		return "", err
+		return nil, err
 	}
 
 	logger.Debugf("found slaves : {%v}", slaves)
@@ -171,9 +176,8 @@ func (n NodeUtils) GetSysDevicesFromMpath(device string) (string, error) {
 	for _, slave := range slaves {
 		slavesNames = append(slavesNames, slave.Name())
 	}
-	slavesString := strings.Join(slavesNames, ",")
 
-	return slavesString, nil
+	return slavesNames, nil
 }
 
 func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
@@ -515,4 +519,61 @@ func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[
 		}
 	}
 	return topologyLabels, nil
+}
+
+func (n NodeUtils) IsBlock(devicePath string) (bool, error) {
+	var stat unix.Stat_t
+	err := unix.Stat(devicePath, &stat)
+	if err != nil {
+		return false, err
+	}
+	return (stat.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
+}
+
+func (d NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, error) {
+	statfs := &unix.Statfs_t{}
+	err := unix.Statfs(path, statfs)
+	if err != nil {
+		return VolumeStatistics{}, err
+	}
+
+	availableBytes := int64(statfs.Bavail) * int64(statfs.Bsize)
+	totalBytes := int64(statfs.Blocks) * int64(statfs.Bsize)
+	usedBytes := (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize)
+
+	totalInodes := int64(statfs.Files)
+	availableInodes := int64(statfs.Ffree)
+	usedInodes := totalInodes - availableInodes
+
+	volumeStats := VolumeStatistics{
+		AvailableBytes: availableBytes,
+		TotalBytes:     totalBytes,
+		UsedBytes:      usedBytes,
+
+		AvailableInodes: availableInodes,
+		TotalInodes:     totalInodes,
+		UsedInodes:      usedInodes,
+	}
+
+	return volumeStats, nil
+}
+
+func (d NodeUtils) GetBlockVolumeStats(mpathDevice string) (VolumeStatistics, error) {
+	args := []string{"--getsize64", mpathDevice}
+	out, err := d.Executer.ExecuteWithTimeoutSilently(device_connectivity.TimeOutBlockDevCmd, blockDevCmd, args)
+	if err != nil {
+		return VolumeStatistics{}, err
+	}
+
+	strOut := strings.TrimSpace(string(out))
+	sizeInBytes, err := strconv.ParseInt(strOut, 10, 64)
+	if err != nil {
+		return VolumeStatistics{}, err
+	}
+
+	volumeStats := VolumeStatistics{
+		TotalBytes: sizeInBytes,
+	}
+
+	return volumeStats, nil
 }

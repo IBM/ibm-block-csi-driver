@@ -1,4 +1,5 @@
-#!/bin/bash -x
+#!/bin/bash
+set -x
 
 docker build -f Dockerfile-csi-controller.test -t csi-controller-tests . || exit 1
 
