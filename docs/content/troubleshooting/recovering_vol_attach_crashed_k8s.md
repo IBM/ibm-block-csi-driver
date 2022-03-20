@@ -1,4 +1,4 @@
-# Recovering a pod volume attachment from a crashed Kubernetes node
+# Recovering from a crashed Kubernetes node
 
 This section details a manual operation required to revive Kubernetes pods that reside on a crashed node due to an existing Kubernetes limitation.
 
@@ -24,9 +24,9 @@ default sanity-statefulset-0 1/1 Terminating 0 19m 10.244.2.37 k8s-node2
 
 **Attention:** In order to avoid data loss, before continuing, verify that there are no pods connected to this volume.
 
-Follow the following procedure to recover from a crashed node (see a [full example](#full_example) at the end of the procedure):
+Follow the following procedure to recover from a crashed node (see a [full example](#for-example) at the end of the procedure):
 
-1.  Find for the `volumeattachment` of the created pod:
+1.  Find the `volumeattachment` of the created pod:
 
     ```
     kubectl get volumeattachment
@@ -47,7 +47,7 @@ Follow the following procedure to recover from a crashed node (see a [full examp
 
 5.  Verify that the pod is now in a _Running_ state and that the pod has moved to a _Ready_ node.
 
-<a name="full_example">For example:</a>
+### For example:
 
     $> kubectl get nodes
     NAME        STATUS   ROLES  AGE VERSION
