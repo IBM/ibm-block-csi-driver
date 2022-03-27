@@ -33,7 +33,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         path = os.path.join(my_path, "../../common/config.yaml")
 
         with open(path, 'r') as yamlfile:
-            self.cfg = yaml.safe_load(yamlfile)  # TODO: add the following when possible : Loader=yaml.FullLoader)
+            cfg = yaml.safe_load(yamlfile)  # TODO: add the following when possible : Loader=yaml.FullLoader)
+        self.plugin_identity = cfg['identity']
+        self.controller_config = cfg['controller']
 
     @csi_method(error_response_type=csi_pb2.CreateVolumeResponse, lock_request_attribute="name")
     def CreateVolume(self, request, context):
@@ -246,7 +248,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                                                                    initiators)
             response = utils.generate_csi_publish_volume_response(lun,
                                                                   connectivity_type,
-                                                                  self.cfg,
+                                                                  self.controller_config,
                                                                   array_initiators)
             return response
 
@@ -495,7 +497,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         return response
 
     def get_identity_config(self, attribute_name):
-        return self.cfg['identity'][attribute_name]
+        return self.plugin_identity[attribute_name]
 
     @csi_method(error_response_type=csi_pb2.GetPluginInfoResponse)
     def GetPluginInfo(self, _, context):  # pylint: disable=invalid-name
