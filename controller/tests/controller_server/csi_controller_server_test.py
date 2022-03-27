@@ -749,7 +749,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
     def test_create_volume_idempotent_with_size_not_matched(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         self.mediator.get_volume = Mock()
-        self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(100, VOLUME_NAME, "wwn2", "a9k")
+        self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(9, VOLUME_NAME, "wwn2", "a9k")
 
         self.servicer.CreateVolume(self.request, self.context)
 
