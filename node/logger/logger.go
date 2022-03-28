@@ -207,3 +207,39 @@ func Panicf(format string, args ...interface{}) {
 func GetLevel() string {
 	return getInstance().GetLevel().String()
 }
+
+func setLoggerVolumeId(request interface{}) {
+	if requestWithId, ok := request.(interface{ GetVolumeId() string }); ok {
+		volumeId := requestWithId.GetVolumeId()
+		goid_info.SetAdditionalIDInfo(volumeId)
+	}
+}
+
+func getFuncName() string {
+	var funcName string
+	pc, _, _, ok := runtime.Caller(2)
+	details := runtime.FuncForPC(pc)
+	if ok && details != nil {
+		funcPath := details.Name()
+		lastDot := strings.LastIndexByte(funcPath, '.')
+		funcName = funcPath[lastDot+1:]
+	}
+	return funcName
+}
+
+func Enter(request interface{}) string {
+	setLoggerVolumeId(request)
+
+	funcName := getFuncName()
+	if funcName != "" {
+		Debugf(">>>> %v: called with args %+v", funcName, request)
+	}
+	return funcName
+}
+
+func Exit(funcName string) {
+	if funcName != "" {
+		Debugf("<<<< %v", funcName)
+	}
+	goid_info.DeleteAdditionalIDInfo()
+}
