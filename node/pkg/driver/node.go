@@ -110,7 +110,7 @@ func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsI
 }
 
 func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	defer logger.Exit(logger.Enter(*req))
+	defer logger.Exit(logger.Enter(req))
 
 	err := d.nodeStageVolumeRequestValidation(req)
 	if err != nil {

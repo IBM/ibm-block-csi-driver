@@ -31,6 +31,7 @@ import (
 	"flag"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -209,8 +210,10 @@ func GetLevel() string {
 }
 
 func setLoggerVolumeId(request interface{}) {
-	if requestWithId, ok := request.(interface{ GetVolumeId() string }); ok {
-		volumeId := requestWithId.GetVolumeId()
+	method := reflect.ValueOf(request).MethodByName("GetVolumeId")
+	if method.IsValid() {
+		volumeIdValue := method.Call([]reflect.Value{})[0]
+		volumeId, _ := volumeIdValue.Interface().(string)
 		goid_info.SetAdditionalIDInfo(volumeId)
 	}
 }
