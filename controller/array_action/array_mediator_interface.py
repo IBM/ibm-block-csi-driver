@@ -55,8 +55,8 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def copy_to_existing_volume_from_source(self, volume_id, source_id, source_capacity_in_bytes,
-                                            minimum_volume_size_in_bytes):
+    def copy_to_existing_volume(self, volume_id, source_id, source_capacity_in_bytes,
+                                minimum_volume_size_in_bytes):
         """
         This function should create a volume from source volume or snapshot in the storage system.
 

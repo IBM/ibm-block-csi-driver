@@ -494,8 +494,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self._rollback_copy_to_target_volume(target_volume_name)
             raise ex
 
-    def copy_to_existing_volume_from_source(self, volume_id, source_id, source_capacity_in_bytes,
-                                            minimum_volume_size_in_bytes):
+    def copy_to_existing_volume(self, volume_id, source_id, source_capacity_in_bytes,
+                                minimum_volume_size_in_bytes):
         source_name = self._get_volume_name_by_wwn(source_id)
         target_volume_name = self._get_volume_name_by_wwn(volume_id)
         self._copy_to_target_volume(target_volume_name, source_name)

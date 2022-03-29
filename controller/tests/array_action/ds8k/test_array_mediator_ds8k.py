@@ -711,7 +711,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_copy_to_existing_volume_success(self):
         volume = self._prepare_mocks_for_copy_to_existing_volume()
-        self.array.copy_to_existing_volume_from_source(volume.id, "0002", 3, 2)
+        self.array.copy_to_existing_volume(volume.id, "0002", 3, 2)
         self.client_mock.extend_volume.assert_called_once_with(volume_id=volume.id,
                                                                new_size_in_bytes=3)
         self.client_mock.create_flashcopy.assert_called_once_with(
@@ -725,7 +725,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self._prepare_mocks_for_copy_to_existing_volume()
         client_method.side_effect = client_error
         with self.assertRaises(expected_error):
-            self.array.copy_to_existing_volume_from_source("test_name", "source_name", 3, 2)
+            self.array.copy_to_existing_volume("test_name", "source_name", 3, 2)
 
     def test_copy_to_existing_volume_raise_not_found(self):
         self._test_copy_to_existing_volume_raise_errors(client_method=self.client_mock.extend_volume,
