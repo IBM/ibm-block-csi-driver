@@ -146,8 +146,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
         source_volume = self._get_cli_volume(name=source_snapshot_name)
         self.mediator.client.cmd.vol_list.side_effect = [Mock(as_single_element=target_volume),
                                                          Mock(as_single_element=source_volume)]
-        self.mediator.copy_to_existing_volume_from_source(volume_id, source_id,
-                                                          source_snapshot_capacity_in_bytes, min_volume_size_in_bytes)
+        self.mediator.copy_to_existing_volume(volume_id, source_id,
+                                              source_snapshot_capacity_in_bytes, min_volume_size_in_bytes)
         calls = [call(wwn=volume_id), call(wwn=source_id)]
         self.mediator.client.cmd.vol_list.assert_has_calls(calls, any_order=False)
         self.mediator.client.cmd.vol_format.assert_called_once_with(vol=volume_name)
@@ -171,7 +171,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
                                                           expected_array_exception):
         client_method.side_effect = [xcli_exception]
         with self.assertRaises(expected_array_exception):
-            self.mediator.copy_to_existing_volume_from_source("volume", "snapshot", 0, 0)
+            self.mediator.copy_to_existing_volume("volume", "snapshot", 0, 0)
 
     def test_copy_to_existing_volume_from_snapshot_failed_illegal_id(self):
         self._test_copy_to_existing_volume_from_snapshot_error(self.mediator.client.cmd.vol_list,

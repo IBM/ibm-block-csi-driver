@@ -72,3 +72,30 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
         if connectivity_type == NVME_OVER_FC_CONNECTIVITY_TYPE:
             vol_id = convert_scsi_id_to_nguid(vol_id)
         self.unmap_volume(vol_id, host_name)
+
+    def copy_to_existing_volume_from_source(self, volume, source_id, source_type, minimum_volume_size):
+        volume_id = volume.id
+        try:
+            source_object = self.get_object_by_id(source_id, source_type)
+            if not source_object:
+                self._rollback_create_volume_from_source(volume.id)
+                raise array_errors.ObjectNotFoundError(source_id)
+            source_capacity = source_object.capacity_bytes
+            logger.debug("Copy {0} {1} data to volume {2}.".format(source_type, source_id, volume_id))
+            self.copy_to_existing_volume(volume_id, source_id,
+                                         source_capacity, minimum_volume_size)
+            logger.debug("Copy volume from {0} finished".format(source_type))
+        except array_errors.ObjectNotFoundError as ex:
+            logger.error("Volume not found while copying {0} data to volume".format(source_type))
+            logger.exception(ex)
+            self._rollback_create_volume_from_source(volume.id)
+            raise ex
+        except Exception as ex:
+            logger.error("Exception raised while copying {0} data to volume".format(source_type))
+            self._rollback_create_volume_from_source(volume.id)
+            raise ex
+
+    @retry(Exception, tries=5, delay=1)
+    def _rollback_create_volume_from_source(self, volume_id):
+        logger.debug("Rollback copy volume from source. Deleting volume {0}".format(volume_id))
+        self.delete_volume(volume_id)
