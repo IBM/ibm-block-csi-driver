@@ -80,8 +80,6 @@ const (
 	mpathdSeparator             = ","
 	multipathdCmd               = "multipathd"
 	multipathCmd                = "multipath"
-	VolumeIdDelimiter           = ":"
-	VolumeStorageIdsDelimiter   = ";"
 	WwnOuiEnd                   = 7
 	WwnVendorIdentifierEnd      = 16
 )

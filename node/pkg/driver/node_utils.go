@@ -66,11 +66,12 @@ const (
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
 
 type NodeUtilsInterface interface {
+	getVolumeUuid(volumeId string) string
 	ReadNvmeNqn() (string, error)
 	DevicesAreNvme(sysDevices []string) (bool, error)
 	ParseFCPorts() ([]string, error)
 	ParseIscsiInitiators() (string, error)
-	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, map[string][]string, error)
+	GetInfoFromPublishContext(publishContext map[string]string) (string, int, map[string][]string, error)
 	GetArrayInitiators(ipsByArrayInitiator map[string][]string) []string
 	GetSysDevicesFromMpath(baseDevice string) ([]string, error)
 
@@ -97,25 +98,27 @@ type NodeUtilsInterface interface {
 }
 
 type NodeUtils struct {
-	Executer executer.ExecuterInterface
-	mounter  mount.Interface
+	Executer   executer.ExecuterInterface
+	mounter    mount.Interface
+	ConfigYaml ConfigFile
 }
 
-func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface) *NodeUtils {
+func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface, configYaml ConfigFile) *NodeUtils {
 	return &NodeUtils{
-		Executer: executer,
-		mounter:  mounter,
+		Executer:   executer,
+		mounter:    mounter,
+		ConfigYaml: configYaml,
 	}
 }
 
-func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, map[string][]string, error) {
+func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string) (string, int, map[string][]string, error) {
 	// this will return :  connectivityType, lun, ipsByArrayInitiator, error
 	ipsByArrayInitiator := make(map[string][]string)
-	strLun := publishContext[configYaml.Controller.Publish_context_lun_parameter]
+	strLun := publishContext[n.ConfigYaml.Controller.Publish_context_lun_parameter]
 
 	var lun int
 	var err error
-	connectivityType := publishContext[configYaml.Controller.Publish_context_connectivity_parameter]
+	connectivityType := publishContext[n.ConfigYaml.Controller.Publish_context_connectivity_parameter]
 	if connectivityType != device_connectivity.ConnectionTypeNVMEoFC {
 		lun, err = strconv.Atoi(strLun)
 		if err != nil {
@@ -123,13 +126,13 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, c
 		}
 	}
 	if connectivityType == device_connectivity.ConnectionTypeFC {
-		wwns := strings.Split(publishContext[configYaml.Controller.Publish_context_fc_initiators], PublishContextSeparator)
+		wwns := strings.Split(publishContext[n.ConfigYaml.Controller.Publish_context_fc_initiators], PublishContextSeparator)
 		for _, wwn := range wwns {
 			ipsByArrayInitiator[wwn] = nil
 		}
 	}
 	if connectivityType == device_connectivity.ConnectionTypeISCSI {
-		iqns := strings.Split(publishContext[configYaml.Controller.Publish_context_array_iqn], PublishContextSeparator)
+		iqns := strings.Split(publishContext[n.ConfigYaml.Controller.Publish_context_array_iqn], PublishContextSeparator)
 		for _, iqn := range iqns {
 			if ips, iqnExists := publishContext[iqn]; iqnExists {
 				ipsByArrayInitiator[iqn] = strings.Split(ips, PublishContextSeparator)
@@ -576,4 +579,15 @@ func (d NodeUtils) GetBlockVolumeStats(mpathDevice string) (VolumeStatistics, er
 	}
 
 	return volumeStats, nil
+}
+
+func (d NodeUtils) getVolumeUuid(volumeId string) string {
+	volumeIdParts := strings.Split(volumeId, d.ConfigYaml.Controller.parameters_object_id_info_delimiter)
+	idsPart := volumeIdParts[len(volumeIdParts)-1]
+	splittedIdsPart := strings.Split(idsPart, d.ConfigYaml.Controller.parameters_object_ids_delimiter)
+	if len(splittedIdsPart) == 2 {
+		return splittedIdsPart[1]
+	} else {
+		return splittedIdsPart[0]
+	}
 }
