@@ -312,7 +312,7 @@ func (d *NodeService) formatAndMount(mpathDevice string, stagingPath string, fsT
 }
 
 func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	defer logger.Exit(logger.Enter(*req))
+	defer logger.Exit(logger.Enter(req))
 	volumeID := req.GetVolumeId()
 
 	if len(volumeID) == 0 {
@@ -390,7 +390,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 }
 
 func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
-	defer logger.Exit(logger.Enter(*req))
+	defer logger.Exit(logger.Enter(req))
 
 	err := d.nodePublishVolumeRequestValidation(req)
 	if err != nil {
@@ -555,7 +555,7 @@ func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVol
 }
 
 func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
-	defer logger.Exit(logger.Enter(*req))
+	defer logger.Exit(logger.Enter(req))
 	volumeID := req.GetVolumeId()
 
 	if len(volumeID) == 0 {
@@ -685,7 +685,7 @@ func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatis
 }
 
 func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-	defer logger.Exit(logger.Enter(*req))
+	defer logger.Exit(logger.Enter(req))
 
 	err := d.nodeExpandVolumeRequestValidation(req)
 	if err != nil {
@@ -775,7 +775,7 @@ func (d *NodeService) nodeExpandVolumeRequestValidation(req *csi.NodeExpandVolum
 }
 
 func (d *NodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetCapabilitiesRequest) (*csi.NodeGetCapabilitiesResponse, error) {
-	defer logger.Exit(logger.Enter(*req))
+	defer logger.Exit(logger.Enter(req))
 
 	var caps []*csi.NodeServiceCapability
 	for _, cap := range nodeCaps {
@@ -792,7 +792,7 @@ func (d *NodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 }
 
 func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
-	defer logger.Exit(logger.Enter(*req))
+	defer logger.Exit(logger.Enter(req))
 
 	var nvmeNQN string
 	var fcWWNs []string
