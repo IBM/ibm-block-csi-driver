@@ -98,7 +98,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
             as_single_element=self._get_cli_volume(wwn="Not Available"))
         volume = self.mediator.create_volume("mock_volume", 512, None, "fake_pool", None)
 
-        self.assertIsNone(volume.copy_source_id)
+        self.assertIsNone(volume.source_id)
 
     def test_create_volume_raise_illegal_name_for_object(self):
         self.mediator.client.cmd.vol_create.side_effect = [xcli_errors.IllegalNameForObjectError("", "volume", "")]
@@ -241,7 +241,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_list.return_value = xcli_snapshot
         snapshot = self.mediator.get_snapshot(snapshot_volume_wwn, snapshot_name)
         self.assertEqual(snapshot.name, snapshot_name)
-        self.assertEqual(snapshot.source_volume_id, snapshot_volume_wwn)
+        self.assertEqual(snapshot.source_id, snapshot_volume_wwn)
 
     def test_get_snapshot_same_name_volume_exists_error(self):
         snapshot_name = "snapshot"
@@ -270,7 +270,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.snapshot_create.return_value = xcli_snapshot
         snapshot = self.mediator.create_snapshot(snapshot_volume_wwn, snapshot_name, space_efficiency=None, pool=None)
         self.assertEqual(snapshot.name, snapshot_name)
-        self.assertEqual(snapshot.source_volume_id, snapshot_volume_wwn)
+        self.assertEqual(snapshot.source_id, snapshot_volume_wwn)
         self.assertEqual(snapshot.capacity_bytes, size_in_bytes)
         self.assertEqual(snapshot.capacity_bytes, size_in_bytes)
 
@@ -354,7 +354,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_list.return_value = xcli_snapshot
         snapshot = self.mediator.get_object_by_id("1235678", "snapshot")
         self.assertEqual(snapshot.name, snapshot_name)
-        self.assertEqual(snapshot.source_volume_id, snapshot_volume_wwn)
+        self.assertEqual(snapshot.source_id, snapshot_volume_wwn)
 
     def test_get_object_by_id_return_correct_volume(self):
         volume_name = "volume_name"

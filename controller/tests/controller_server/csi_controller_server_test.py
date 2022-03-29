@@ -700,7 +700,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         storage_agent.return_value = self.storage_agent
         snapshot_id = "wwn1"
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, VOLUME_NAME, "wwn2", "a9k",
-                                                                                        copy_source_id=snapshot_id)
+                                                                                        source_id=snapshot_id)
 
         response = self.servicer.CreateVolume(self.request, self.context)
 
@@ -727,7 +727,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         snapshot_id = "wwn1"
         self.request.volume_content_source = None
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, VOLUME_NAME, "wwn2", "a9k",
-                                                                                        copy_source_id=snapshot_id)
+                                                                                        source_id=snapshot_id)
         response = self.servicer.CreateVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
@@ -740,7 +740,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         storage_agent.return_value = self.storage_agent
         volume_source_id = "wwn3"
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, "volume", "wwn2", "a9k",
-                                                                                        copy_source_id=volume_source_id)
+                                                                                        source_id=volume_source_id)
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
         self.mediator.copy_to_existing_volume_from_source.assert_not_called()

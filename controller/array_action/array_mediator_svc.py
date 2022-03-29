@@ -250,21 +250,23 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             name=cli_volume.name,
             array_address=self.endpoint,
             pool=pool,
-            copy_source_id=source_volume_wwn,
+            source_id=source_volume_wwn,
             array_type=self.array_type,
             space_efficiency=space_efficiency,
             default_space_efficiency=config.SPACE_EFFICIENCY_THICK
         )
 
-    def _generate_snapshot_response(self, cli_snapshot, source_volume_id):
-        return Snapshot(int(cli_snapshot.capacity),
-                        cli_snapshot.vdisk_UID,
-                        cli_snapshot.id,
-                        cli_snapshot.name,
-                        self.endpoint,
-                        source_volume_id=source_volume_id,
-                        is_ready=True,
-                        array_type=self.array_type)
+    def _generate_snapshot_response(self, cli_snapshot, source_id):
+        return Snapshot(
+            capacity_bytes=int(cli_snapshot.capacity),
+            id=cli_snapshot.vdisk_UID,
+            internal_id=cli_snapshot.id,
+            name=cli_snapshot.name,
+            array_address=self.endpoint,
+            source_id=source_id,
+            is_ready=True,
+            array_type=self.array_type
+        )
 
     def _generate_snapshot_response_with_verification(self, cli_object):
         if not cli_object.FC_id:
@@ -273,8 +275,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         fcmap = self._get_fcmap_as_target_if_exists(cli_object.name)
         if fcmap is None or fcmap.copy_rate != '0':
             raise array_errors.ExpectedSnapshotButFoundVolumeError(cli_object.name, self.endpoint)
-        source_volume_id = self._get_wwn_by_volume_name_if_exists(fcmap.source_vdisk_name)
-        return self._generate_snapshot_response(cli_object, source_volume_id)
+        source_id = self._get_wwn_by_volume_name_if_exists(fcmap.source_vdisk_name)
+        return self._generate_snapshot_response(cli_object, source_id)
 
     def _lsvdisk(self, volume_name, not_exist_err):
         try:
