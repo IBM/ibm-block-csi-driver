@@ -11,6 +11,8 @@ controller:
    publish_context_separator : ","
    publish_context_array_iqn : "PUBLISH_CONTEXT_ARRAY_IQN"
    publish_context_fc_initiators : "PUBLISH_CONTEXT_ARRAY_FC_INITIATORS"
+   parameters_object_id_info_delimiter: ":"
+   parameters_object_ids_delimiter: ";"
 #  <array_iqn_1> : comma-separated list of iqn_1 iscsi target ips
 #  <array_iqn_2> : comma-separated list of iqn_2 iscsi target ips
 #  ...

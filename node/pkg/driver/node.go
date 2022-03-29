@@ -125,14 +125,14 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		}
 	}
 
-	volId := req.VolumeId
-	err = d.VolumeIdLocksMap.AddVolumeLock(volId, "NodeStageVolume")
+	volumeID := req.VolumeId
+	err = d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeStageVolume")
 	if err != nil {
-		logger.Errorf("Another operation is being performed on volume : {%s}", volId)
+		logger.Errorf("Another operation is being performed on volume : {%s}", volumeID)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
 
-	defer d.VolumeIdLocksMap.RemoveVolumeLock(volId, "NodeStageVolume")
+	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeStageVolume")
 
 	connectivityType, lun, ipsByArrayInitiator, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
 	if err != nil {
@@ -152,7 +152,8 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(volId)
+	volumeUuid := d.getVolumeUuid(volumeID)
+	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(volumeUuid)
 	logger.Debugf("Discovered device : {%v}", mpathDevice)
 	if err != nil {
 		logger.Errorf("Error while discovering the device : {%v}", err.Error())
@@ -354,7 +355,8 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		}
 	}
 
-	mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeID)
+	volumeUuid := d.getVolumeUuid(volumeID)
+	mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
 	if err != nil {
 		switch err.(type) {
 		case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
@@ -676,7 +678,8 @@ func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatis
 	}
 
 	if isBlock {
-		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeId)
+		volumeUuid := d.getVolumeUuid(volumeId)
+		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
 		if err != nil {
 			switch err.(type) {
 			case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
@@ -714,7 +717,8 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	}
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeExpandVolume")
 
-	device, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeID)
+	volumeUuid := d.getVolumeUuid(volumeID)
+	device, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
 	if err != nil {
 		logger.Errorf("Error while discovering the device : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
@@ -881,4 +885,15 @@ func isValidVolumeCapabilitiesAccessMode(volCaps []*csi.VolumeCapability) bool {
 	}
 
 	return foundAll
+}
+
+func (d *NodeService) getVolumeUuid(volumeId string) string {
+	volumeIdParts := strings.Split(volumeId, d.ConfigYaml.parameters_object_id_info_delimiter)
+	idsPart := volumeIdParts[len(volumeIdParts)-1]
+	splittedIdsPart := strings.Split(idsPart, d.ConfigYaml.parameters_object_ids_delimiter)
+	if len(splittedIdsPart) == 2 {
+		return splittedIdsPart[1]
+	} else {
+		return splittedIdsPart[0]
+	}
 }
