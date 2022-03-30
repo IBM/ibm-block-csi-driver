@@ -387,3 +387,39 @@ func TestGenerateNodeID(t *testing.T) {
 		})
 	}
 }
+
+func TestGetVolumeUuid(t *testing.T) {
+	testCases := []struct {
+		name     string
+		volumeId string
+	}{
+		{name: "success",
+			volumeId: "fakeArray:volumeUuid",
+		},
+		{name: "success with internal volumeId",
+			volumeId: "fakeArray:internalVolumeId;volumeUuid",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
+			var configFile driver.ConfigFile
+			configFile.Controller.Parameters_object_id_info_delimiter = ":"
+			configFile.Controller.Parameters_object_ids_delimiter = ";"
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, configFile)
+
+			volumeUuid := nodeUtils.GetVolumeUuid(tc.volumeId)
+
+			expectedVolumeUuid := "volumeUuid"
+			if volumeUuid != expectedVolumeUuid {
+				t.Fatalf("wrong volumeUuid: expected %v, got %v", expectedVolumeUuid, volumeUuid)
+			}
+
+		})
+	}
+
+}
