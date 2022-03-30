@@ -236,18 +236,22 @@ func getFuncName() string {
 	return funcName
 }
 
+func logEnter(funcName string, request interface{}) {
+	var message = ">>>> %v"
+	if getStringFromCall(request, "String") != "" {
+		message += ": called with args %+v"
+		Debugf(message, funcName, request)
+	} else {
+		Debugf(message, funcName)
+	}
+}
+
 func Enter(request interface{}) string {
 	setLoggerVolumeId(request)
 
 	funcName := getFuncName()
 	if funcName != "" {
-		var message = ">>>> %v"
-		if getStringFromCall(request, "String") != "" {
-			message += ": called with args %+v"
-			Debugf(message, funcName, request)
-		} else {
-			Debugf(message, funcName)
-		}
+		logEnter(funcName, request)
 	}
 	return funcName
 }
