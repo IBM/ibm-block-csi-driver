@@ -209,13 +209,19 @@ func GetLevel() string {
 	return getInstance().GetLevel().String()
 }
 
-func setLoggerVolumeId(request interface{}) {
-	method := reflect.ValueOf(request).MethodByName("GetVolumeId")
+func getStringFromCall(request interface{}, methodName string) string {
+	var returnString string
+	method := reflect.ValueOf(request).MethodByName(methodName)
 	if method.IsValid() {
-		volumeIdValue := method.Call([]reflect.Value{})[0]
-		volumeId, _ := volumeIdValue.Interface().(string)
-		goid_info.SetAdditionalIDInfo(volumeId)
+		returnValue := method.Call([]reflect.Value{})[0]
+		returnString, _ = returnValue.Interface().(string)
 	}
+	return returnString
+}
+
+func setLoggerVolumeId(request interface{}) {
+	volumeId := getStringFromCall(request, "GetVolumeId")
+	goid_info.SetAdditionalIDInfo(volumeId)
 }
 
 func getFuncName() string {
@@ -235,7 +241,13 @@ func Enter(request interface{}) string {
 
 	funcName := getFuncName()
 	if funcName != "" {
-		Debugf(">>>> %v: called with args %+v", funcName, request)
+		var message = ">>>> %v"
+		if getStringFromCall(request, "String") != "" {
+			message += ": called with args %+v"
+			Debugf(message, funcName, request)
+		} else {
+			Debugf(message, funcName)
+		}
 	}
 	return funcName
 }
