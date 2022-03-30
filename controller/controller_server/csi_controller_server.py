@@ -4,7 +4,6 @@ import grpc
 import yaml
 from csi_general import csi_pb2
 from csi_general import csi_pb2_grpc
-from retry import retry
 
 import controller.array_action.errors as array_errors
 import controller.controller_server.config as config
@@ -114,9 +113,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return response
 
                 if source_id:
-                    self._copy_to_existing_volume_from_source(volume, source_id,
-                                                              source_type, required_bytes,
-                                                              array_mediator)
+                    array_mediator.copy_to_existing_volume_from_source(volume, source_id,
+                                                                       source_type, required_bytes)
                     volume.copy_source_id = source_id
 
                 response = utils.generate_csi_create_volume_response(volume, array_connection_info.system_id,
@@ -126,34 +124,6 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT, csi_pb2.CreateVolumeResponse)
         except array_errors.VolumeAlreadyExists as ex:
             return handle_exception(ex, context, grpc.StatusCode.ALREADY_EXISTS, csi_pb2.CreateVolumeResponse)
-
-    def _copy_to_existing_volume_from_source(self, volume, source_id, source_type,
-                                             minimum_volume_size, array_mediator):
-        volume_id = volume.id
-        try:
-            source_object = array_mediator.get_object_by_id(source_id, source_type)
-            if not source_object:
-                self._rollback_create_volume_from_source(array_mediator, volume.id)
-                raise array_errors.ObjectNotFoundError(source_id)
-            source_capacity = source_object.capacity_bytes
-            logger.debug("Copy {0} {1} data to volume {2}.".format(source_type, source_id, volume_id))
-            array_mediator.copy_to_existing_volume_from_source(volume_id, source_id,
-                                                               source_capacity, minimum_volume_size)
-            logger.debug("Copy volume from {0} finished".format(source_type))
-        except array_errors.ObjectNotFoundError as ex:
-            logger.error("Volume not found while copying {0} data to volume".format(source_type))
-            logger.exception(ex)
-            self._rollback_create_volume_from_source(array_mediator, volume.id)
-            raise ex
-        except Exception as ex:
-            logger.error("Exception raised while copying {0} data to volume".format(source_type))
-            self._rollback_create_volume_from_source(array_mediator, volume.id)
-            raise ex
-
-    @retry(Exception, tries=5, delay=1)
-    def _rollback_create_volume_from_source(self, array_mediator, volume_id):
-        logger.debug("Rollback copy volume from source. Deleting volume {0}".format(volume_id))
-        array_mediator.delete_volume(volume_id)
 
     def _get_create_volume_response_for_existing_volume_source(self, volume, source_id, source_type, system_id,
                                                                context):

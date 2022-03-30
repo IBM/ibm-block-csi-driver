@@ -284,8 +284,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     @convert_scsi_ids_to_array_ids(args_amount=2)
-    def copy_to_existing_volume_from_source(self, volume_id, source_id, source_capacity_in_bytes,
-                                            minimum_volume_size_in_bytes):
+    def copy_to_existing_volume(self, volume_id, source_id, source_capacity_in_bytes,
+                                minimum_volume_size_in_bytes):
         logger.debug(
             "copy source {0} data to volume {1}. source capacity {2}. Minimal requested volume capacity {3}".format(
                 source_id, volume_id, source_capacity_in_bytes,
