@@ -226,8 +226,8 @@ func setLoggerVolumeId(request interface{}) {
 
 func getFuncName() string {
 	var funcName string
-	pc, _, _, ok := runtime.Caller(2)
-	details := runtime.FuncForPC(pc)
+	programCounter, _, _, ok := runtime.Caller(2)
+	details := runtime.FuncForPC(programCounter)
 	if ok && details != nil {
 		funcPath := details.Name()
 		lastDot := strings.LastIndexByte(funcPath, '.')
