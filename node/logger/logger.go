@@ -31,6 +31,7 @@ import (
 	"flag"
 	"fmt"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strconv"
 	"strings"
@@ -206,4 +207,58 @@ func Panicf(format string, args ...interface{}) {
 
 func GetLevel() string {
 	return getInstance().GetLevel().String()
+}
+
+func getStringFromCall(request interface{}, methodName string) string {
+	var returnString string
+	method := reflect.ValueOf(request).MethodByName(methodName)
+	if method.IsValid() {
+		returnValue := method.Call([]reflect.Value{})[0]
+		returnString, _ = returnValue.Interface().(string)
+	}
+	return returnString
+}
+
+func setLoggerVolumeId(request interface{}) {
+	volumeId := getStringFromCall(request, "GetVolumeId")
+	goid_info.SetAdditionalIDInfo(volumeId)
+}
+
+func getFuncName() string {
+	var funcName string
+	programCounter, _, _, ok := runtime.Caller(2)
+	details := runtime.FuncForPC(programCounter)
+	if ok && details != nil {
+		funcPath := details.Name()
+		lastDot := strings.LastIndexByte(funcPath, '.')
+		funcName = funcPath[lastDot+1:]
+	}
+	return funcName
+}
+
+func logEnter(funcName string, request interface{}) {
+	var message = ">>>> %v"
+	if getStringFromCall(request, "String") != "" {
+		message += ": called with args %+v"
+		Debugf(message, funcName, request)
+	} else {
+		Debugf(message, funcName)
+	}
+}
+
+func Enter(request interface{}) string {
+	setLoggerVolumeId(request)
+
+	funcName := getFuncName()
+	if funcName != "" {
+		logEnter(funcName, request)
+	}
+	return funcName
+}
+
+func Exit(funcName string) {
+	if funcName != "" {
+		Debugf("<<<< %v", funcName)
+	}
+	goid_info.DeleteAdditionalIDInfo()
 }
