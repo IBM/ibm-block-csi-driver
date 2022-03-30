@@ -66,7 +66,7 @@ const (
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
 
 type NodeUtilsInterface interface {
-	getVolumeUuid(volumeId string) string
+	GetVolumeUuid(volumeId string) string
 	ReadNvmeNqn() (string, error)
 	DevicesAreNvme(sysDevices []string) (bool, error)
 	ParseFCPorts() ([]string, error)
@@ -581,7 +581,7 @@ func (d NodeUtils) GetBlockVolumeStats(mpathDevice string) (VolumeStatistics, er
 	return volumeStats, nil
 }
 
-func (d NodeUtils) getVolumeUuid(volumeId string) string {
+func (d NodeUtils) GetVolumeUuid(volumeId string) string {
 	volumeIdParts := strings.Split(volumeId, d.ConfigYaml.Controller.parameters_object_id_info_delimiter)
 	idsPart := volumeIdParts[len(volumeIdParts)-1]
 	splittedIdsPart := strings.Split(idsPart, d.ConfigYaml.Controller.parameters_object_ids_delimiter)

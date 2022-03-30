@@ -152,7 +152,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	volumeUuid := d.NodeUtils.getVolumeUuid(volumeID)
+	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
 	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(volumeUuid)
 	logger.Debugf("Discovered device : {%v}", mpathDevice)
 	if err != nil {
@@ -355,7 +355,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		}
 	}
 
-	volumeUuid := d.NodeUtils.getVolumeUuid(volumeID)
+	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
 	mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
 	if err != nil {
 		switch err.(type) {
@@ -475,7 +475,8 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		fsType := volumeCap.GetMount().FsType
 		err = d.publishFileSystemVolume(stagingPath, targetPath, fsType)
 	} else {
-		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeID)
+		volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
+		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
 		if err != nil {
 			logger.Errorf("Error while discovering the device : {%v}", err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
@@ -678,7 +679,7 @@ func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatis
 	}
 
 	if isBlock {
-		volumeUuid := d.NodeUtils.getVolumeUuid(volumeId)
+		volumeUuid := d.NodeUtils.GetVolumeUuid(volumeId)
 		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
 		if err != nil {
 			switch err.(type) {
@@ -717,7 +718,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	}
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeExpandVolume")
 
-	volumeUuid := d.NodeUtils.getVolumeUuid(volumeID)
+	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
 	device, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
 	if err != nil {
 		logger.Errorf("Error while discovering the device : {%v}", err.Error())
