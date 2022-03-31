@@ -13,8 +13,13 @@ import controller.controller_server.errors as controller_errors
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.controller_server.csi_controller_server import CSIControllerServicer
 from controller.controller_server.sync_lock import SyncLock
-from controller.controller_server.test_settings import VOLUME_NAME, SNAPSHOT_NAME, SNAPSHOT_VOLUME_NAME, \
-    CLONE_VOLUME_NAME, SNAPSHOT_VOLUME_WWN, POOL, SPACE_EFFICIENCY, OBJECT_INTERNAL_ID
+from controller.controller_server.test_settings import (CLONE_VOLUME_NAME,
+                                                        OBJECT_INTERNAL_ID,
+                                                        POOL, SNAPSHOT_NAME,
+                                                        SNAPSHOT_VOLUME_NAME,
+                                                        SNAPSHOT_VOLUME_WWN,
+                                                        SPACE_EFFICIENCY,
+                                                        VOLUME_NAME)
 from controller.tests import utils
 from controller.tests.utils import ProtoBufMock
 
@@ -52,28 +57,30 @@ class BaseControllerSetUp(unittest.TestCase):
 
 class CommonControllerTest:
 
+    @property
     @abc.abstractmethod
-    def get_tested_method(self):
+    def tested_method(self):
         raise NotImplementedError
 
+    @property
     @abc.abstractmethod
-    def get_tested_method_response_class(self):
+    def tested_method_response_class(self):
         raise NotImplementedError
 
     def _test_create_object_with_empty_name(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         self.request.name = ""
         context = utils.FakeContext()
-        response = self.get_tested_method()(self.request, context)
+        response = self.tested_method(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertIn("name", context.details)
-        self.assertEqual(response, self.get_tested_method_response_class()())
+        self.assertEqual(response, self.tested_method_response_class())
 
     def _test_request_with_wrong_secrets_parameters(self, secrets, message="secret"):
         context = utils.FakeContext()
 
         self.request.secrets = secrets
-        self.get_tested_method()(self.request, context)
+        self.tested_method(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertIn(message, context.details)
 
@@ -97,14 +104,14 @@ class CommonControllerTest:
     def _test_request_already_processing(self, storage_agent, request_attribute, object_id):
         storage_agent.side_effect = self.storage_agent
         with SyncLock(request_attribute, object_id, "test_request_already_processing"):
-            response = self.get_tested_method()(self.request, self.context)
+            response = self.tested_method(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.ABORTED)
-        self.assertEqual(type(response), self.get_tested_method_response_class())
+        self.assertEqual(type(response), self.tested_method_response_class)
 
     def _test_request_with_array_connection_exception(self, storage_agent):
         storage_agent.side_effect = [Exception("error")]
         context = utils.FakeContext()
-        self.get_tested_method()(self.request, context)
+        self.tested_method(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
         self.assertIn("error", context.details)
 
@@ -112,7 +119,7 @@ class CommonControllerTest:
         storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
         self.detect_array_type.side_effect = [array_errors.FailedToFindStorageSystemType("endpoint")]
-        self.get_tested_method()(self.request, context)
+        self.tested_method(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
         msg = array_errors.FailedToFindStorageSystemType("endpoint").message
         self.assertIn(msg, context.details)
@@ -124,16 +131,18 @@ class CommonControllerTest:
 
         for request_parameters in parameters:
             self.request.parameters = request_parameters
-            self.get_tested_method()(self.request, context)
+            self.tested_method(self.request, context)
             self.assertEqual(grpc.StatusCode.INVALID_ARGUMENT, context.code)
 
 
 class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
 
-    def get_tested_method(self):
+    @property
+    def tested_method(self):
         return self.servicer.CreateSnapshot
 
-    def get_tested_method_response_class(self):
+    @property
+    def tested_method_response_class(self):
         return csi_pb2.CreateSnapshotResponse
 
     def setUp(self):
@@ -338,10 +347,12 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
 
 
 class TestDeleteSnapshot(BaseControllerSetUp, CommonControllerTest):
-    def get_tested_method(self):
+    @property
+    def tested_method(self):
         return self.servicer.DeleteSnapshot
 
-    def get_tested_method_response_class(self):
+    @property
+    def tested_method_response_class(self):
         return csi_pb2.DeleteSnapshotResponse
 
     def setUp(self):
@@ -404,10 +415,12 @@ class TestDeleteSnapshot(BaseControllerSetUp, CommonControllerTest):
 
 class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
-    def get_tested_method(self):
+    @property
+    def tested_method(self):
         return self.servicer.CreateVolume
 
-    def get_tested_method_response_class(self):
+    @property
+    def tested_method_response_class(self):
         return csi_pb2.CreateVolumeResponse
 
     def setUp(self):
@@ -900,10 +913,12 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
 class TestDeleteVolume(BaseControllerSetUp, CommonControllerTest):
 
-    def get_tested_method(self):
+    @property
+    def tested_method(self):
         return self.servicer.DeleteVolume
 
-    def get_tested_method_response_class(self):
+    @property
+    def tested_method_response_class(self):
         return csi_pb2.DeleteVolumeResponse
 
     def get_create_object_method(self):
@@ -996,10 +1011,12 @@ class TestDeleteVolume(BaseControllerSetUp, CommonControllerTest):
 
 class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
 
-    def get_tested_method(self):
+    @property
+    def tested_method(self):
         return self.servicer.ControllerPublishVolume
 
-    def get_tested_method_response_class(self):
+    @property
+    def tested_method_response_class(self):
         return csi_pb2.ControllerPublishVolumeResponse
 
     def setUp(self):
@@ -1297,10 +1314,12 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
 
 class TestUnpublishVolume(BaseControllerSetUp, CommonControllerTest):
 
-    def get_tested_method(self):
+    @property
+    def tested_method(self):
         return self.servicer.ControllerUnpublishVolume
 
-    def get_tested_method_response_class(self):
+    @property
+    def tested_method_response_class(self):
         return csi_pb2.ControllerUnpublishVolumeResponse
 
     def setUp(self):
@@ -1415,10 +1434,12 @@ class TestGetCapabilities(BaseControllerSetUp):
 
 class TestExpandVolume(BaseControllerSetUp, CommonControllerTest):
 
-    def get_tested_method(self):
+    @property
+    def tested_method(self):
         return self.servicer.ControllerExpandVolume
 
-    def get_tested_method_response_class(self):
+    @property
+    def tested_method_response_class(self):
         return csi_pb2.ControllerExpandVolumeResponse
 
     def setUp(self):
@@ -1628,10 +1649,12 @@ class TestIdentityServer(BaseControllerSetUp):
 
 class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
 
-    def get_tested_method(self):
+    @property
+    def tested_method(self):
         return self.servicer.ValidateVolumeCapabilities
 
-    def get_tested_method_response_class(self):
+    @property
+    def tested_method_response_class(self):
         return csi_pb2.ValidateVolumeCapabilitiesResponse
 
     def setUp(self):
