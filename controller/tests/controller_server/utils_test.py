@@ -9,6 +9,7 @@ from controller.array_action import config as array_config
 from controller.array_action.config import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.common.node_info import NodeIdInfo
 from controller.controller_server import config as controller_config
+from controller.controller_server.common_config import CommonConfig
 from controller.controller_server.csi_controller_server import CSIControllerServicer
 from controller.controller_server.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controller.controller_server.test_settings import POOL, USER, PASSWORD, ARRAY
@@ -443,9 +444,15 @@ class TestUtils(unittest.TestCase):
             actual_chosen = utils.choose_connectivity_type(list(connectivities_found))
             self.assertEqual(actual_chosen, expected_chosen_connectivity)
 
-    def _check_publish_volume_response_parameters(self, lun, connectivity_type, array_initiators):
+    @patch.object(CommonConfig, "get_controller_config")
+    def _check_publish_volume_response_parameters(self, lun, connectivity_type, array_initiators,
+                                                  get_controller_config):
+        def mock_get_controller_config(attribute_name):
+            return self.controller_config[attribute_name]
+
+        get_controller_config.side_effect = mock_get_controller_config
+
         publish_volume_response = utils.generate_csi_publish_volume_response(lun, connectivity_type,
-                                                                             self.controller_config,
                                                                              array_initiators)
         self.assertEqual(publish_volume_response.publish_context["lun"], lun)
         self.assertEqual(publish_volume_response.publish_context["connectivity_type"], connectivity_type)

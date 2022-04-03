@@ -11,6 +11,7 @@ import controller.array_action.errors as array_errors
 import controller.controller_server.config as config
 import controller.controller_server.errors as controller_errors
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
+from controller.controller_server.common_config import CommonConfig
 from controller.controller_server.csi_controller_server import CSIControllerServicer
 from controller.controller_server.sync_lock import SyncLock
 from controller.controller_server.test_settings import (CLONE_VOLUME_NAME,
@@ -1594,7 +1595,7 @@ class TestExpandVolume(BaseControllerSetUp, CommonControllerTest):
 
 class TestIdentityServer(BaseControllerSetUp):
 
-    @patch.object(CSIControllerServicer, "get_identity_config")
+    @patch.object(CommonConfig, "get_identity_config")
     def test_identity_plugin_get_info_succeeds(self, identity_config):
         plugin_name = "plugin-name"
         version = "1.1.0"
@@ -1605,7 +1606,7 @@ class TestIdentityServer(BaseControllerSetUp):
         response = self.servicer.GetPluginInfo(request, context)
         self.assertEqual(response, csi_pb2.GetPluginInfoResponse(name=plugin_name, vendor_version=version))
 
-    @patch.object(CSIControllerServicer, "get_identity_config")
+    @patch.object(CommonConfig, "get_identity_config")
     def test_identity_plugin_get_info_fails_when_attributes_from_config_are_missing(self, identity_config):
         request = Mock()
         context = Mock()
@@ -1620,7 +1621,7 @@ class TestIdentityServer(BaseControllerSetUp):
         self.assertEqual(response, csi_pb2.GetPluginInfoResponse())
         context.set_code.assert_called_with(grpc.StatusCode.INTERNAL)
 
-    @patch.object(CSIControllerServicer, "get_identity_config")
+    @patch.object(CommonConfig, "get_identity_config")
     def test_identity_plugin_get_info_fails_when_name_or_value_are_empty(self, identity_config):
         request = Mock()
         context = Mock()

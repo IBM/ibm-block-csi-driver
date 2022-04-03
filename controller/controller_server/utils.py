@@ -13,6 +13,7 @@ from controller.array_action.config import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CO
     ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.settings import NAME_PREFIX_SEPARATOR
+from controller.controller_server.common_config import common_config
 from controller.controller_server.controller_types import ArrayConnectionInfo, ObjectIdInfo, ObjectParameters
 from controller.controller_server.errors import ObjectIdError, ValidationException, InvalidNodeId
 
@@ -116,10 +117,13 @@ def get_snapshot_id(new_snapshot, system_id):
 
 
 def _get_object_id(obj, system_id):
-    object_ids_value = config.PARAMETERS_OBJECT_IDS_DELIMITER.join((obj.internal_id, obj.id))
+    object_ids_value = common_config.get_controller_config(config.PARAMETERS_OBJECT_IDS_DELIMITER).join(
+        (obj.internal_id, obj.id))
     if system_id:
-        return config.PARAMETERS_OBJECT_ID_INFO_DELIMITER.join((obj.array_type, system_id, object_ids_value))
-    return config.PARAMETERS_OBJECT_ID_INFO_DELIMITER.join((obj.array_type, object_ids_value))
+        return common_config.get_controller_config(config.PARAMETERS_OBJECT_ID_INFO_DELIMITER).join(
+            (obj.array_type, system_id, object_ids_value))
+    return common_config.get_controller_config(config.PARAMETERS_OBJECT_ID_INFO_DELIMITER).join(
+        (obj.array_type, object_ids_value))
 
 
 def _is_system_id_valid(system_id):
@@ -237,10 +241,11 @@ def _validate_object_id(object_id, object_type=config.VOLUME_TYPE_NAME,
     logger.debug("validating volume id")
     if not object_id:
         raise ValidationException(message)
-    if config.PARAMETERS_OBJECT_ID_INFO_DELIMITER not in object_id:
+    if common_config.get_controller_config(config.PARAMETERS_OBJECT_ID_INFO_DELIMITER) not in object_id:
         raise ObjectIdError(object_type, object_id)
-    if len(object_id.split(config.PARAMETERS_OBJECT_ID_INFO_DELIMITER)) not in {config.MINIMUM_VOLUME_ID_PARTS,
-                                                                                config.MAXIMUM_VOLUME_ID_PARTS}:
+    if len(object_id.split(common_config.get_controller_config(config.PARAMETERS_OBJECT_ID_INFO_DELIMITER))) not in {
+        config.MINIMUM_VOLUME_ID_PARTS,
+        config.MAXIMUM_VOLUME_ID_PARTS}:
         raise ValidationException(messages.WRONG_FORMAT_MESSAGE.format("volume id"))
 
 
@@ -476,7 +481,8 @@ def _get_context_from_volume(volume):
 
 def get_object_id_info(full_object_id, object_type):
     logger.debug("getting {0} info for id : {1}".format(object_type, full_object_id))
-    splitted_object_id = full_object_id.split(config.PARAMETERS_OBJECT_ID_INFO_DELIMITER)
+    splitted_object_id = full_object_id.split(
+        common_config.get_controller_config(config.PARAMETERS_OBJECT_ID_INFO_DELIMITER))
     system_id, wwn, internal_id = None, None, None
     if len(splitted_object_id) == 2:
         array_type, object_id = splitted_object_id
@@ -484,7 +490,7 @@ def get_object_id_info(full_object_id, object_type):
         array_type, system_id, object_id = splitted_object_id
     else:
         raise ObjectIdError(object_type, full_object_id)
-    splitted_id = object_id.split(config.PARAMETERS_OBJECT_IDS_DELIMITER)
+    splitted_id = object_id.split(common_config.get_controller_config(config.PARAMETERS_OBJECT_IDS_DELIMITER))
     if len(splitted_id) == 1:
         wwn = splitted_id[0]
     elif len(splitted_id) == 2:
@@ -526,12 +532,12 @@ def choose_connectivity_type(connectivity_types):
     return None
 
 
-def generate_csi_publish_volume_response(lun, connectivity_type, controller_config, array_initiators):
+def generate_csi_publish_volume_response(lun, connectivity_type, array_initiators):
     logger.debug("generating publish volume response for lun :{0}, connectivity : {1}".format(lun, connectivity_type))
 
-    lun_param = controller_config["publish_context_lun_parameter"]
-    connectivity_param = controller_config["publish_context_connectivity_parameter"]
-    separator = controller_config["publish_context_separator"]
+    lun_param = common_config.get_controller_config("publish_context_lun_parameter")
+    connectivity_param = common_config.get_controller_config("publish_context_connectivity_parameter")
+    separator = common_config.get_controller_config("publish_context_separator")
 
     publish_context = {
         lun_param: str(lun),
@@ -539,13 +545,13 @@ def generate_csi_publish_volume_response(lun, connectivity_type, controller_conf
     }
 
     if connectivity_type == FC_CONNECTIVITY_TYPE:
-        array_initiators_param = controller_config["publish_context_fc_initiators"]
+        array_initiators_param = common_config.get_controller_config("publish_context_fc_initiators")
         publish_context[array_initiators_param] = separator.join(array_initiators)
     elif connectivity_type == ISCSI_CONNECTIVITY_TYPE:
         for iqn, ips in array_initiators.items():
             publish_context[iqn] = separator.join(ips)
 
-        array_initiators_param = controller_config["publish_context_array_iqn"]
+        array_initiators_param = common_config.get_controller_config("publish_context_array_iqn")
         publish_context[array_initiators_param] = separator.join(array_initiators.keys())
 
     response = csi_pb2.ControllerPublishVolumeResponse(publish_context=publish_context)
