@@ -345,12 +345,12 @@ def generate_csi_create_volume_response(new_volume, system_id=None, source_type=
     volume_context = _get_context_from_volume(new_volume)
 
     content_source = None
-    if new_volume.copy_source_id:
+    if new_volume.source_id:
         if source_type == config.SNAPSHOT_TYPE_NAME:
-            snapshot_source = csi_pb2.VolumeContentSource.SnapshotSource(snapshot_id=new_volume.copy_source_id)
+            snapshot_source = csi_pb2.VolumeContentSource.SnapshotSource(snapshot_id=new_volume.source_id)
             content_source = csi_pb2.VolumeContentSource(snapshot=snapshot_source)
         else:
-            volume_source = csi_pb2.VolumeContentSource.VolumeSource(volume_id=new_volume.copy_source_id)
+            volume_source = csi_pb2.VolumeContentSource.VolumeSource(volume_id=new_volume.source_id)
             content_source = csi_pb2.VolumeContentSource(volume=volume_source)
 
     response = csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(
@@ -526,12 +526,12 @@ def choose_connectivity_type(connectivity_types):
     return None
 
 
-def generate_csi_publish_volume_response(lun, connectivity_type, config, array_initiators):
+def generate_csi_publish_volume_response(lun, connectivity_type, controller_config, array_initiators):
     logger.debug("generating publish volume response for lun :{0}, connectivity : {1}".format(lun, connectivity_type))
 
-    lun_param = config["controller"]["publish_context_lun_parameter"]
-    connectivity_param = config["controller"]["publish_context_connectivity_parameter"]
-    separator = config["controller"]["publish_context_separator"]
+    lun_param = controller_config["publish_context_lun_parameter"]
+    connectivity_param = controller_config["publish_context_connectivity_parameter"]
+    separator = controller_config["publish_context_separator"]
 
     publish_context = {
         lun_param: str(lun),
@@ -539,13 +539,13 @@ def generate_csi_publish_volume_response(lun, connectivity_type, config, array_i
     }
 
     if connectivity_type == FC_CONNECTIVITY_TYPE:
-        array_initiators_param = config["controller"]["publish_context_fc_initiators"]
+        array_initiators_param = controller_config["publish_context_fc_initiators"]
         publish_context[array_initiators_param] = separator.join(array_initiators)
     elif connectivity_type == ISCSI_CONNECTIVITY_TYPE:
         for iqn, ips in array_initiators.items():
             publish_context[iqn] = separator.join(ips)
 
-        array_initiators_param = config["controller"]["publish_context_array_iqn"]
+        array_initiators_param = controller_config["publish_context_array_iqn"]
         publish_context[array_initiators_param] = separator.join(array_initiators.keys())
 
     response = csi_pb2.ControllerPublishVolumeResponse(publish_context=publish_context)

@@ -21,12 +21,11 @@ class TestUtils(unittest.TestCase):
 
     def setUp(self):
         self.servicer = CSIControllerServicer()
-        self.config = {"controller": {"publish_context_lun_parameter": "lun",
-                                      "publish_context_connectivity_parameter": "connectivity_type",
-                                      "publish_context_separator": ",",
-                                      "publish_context_array_iqn": "array_iqn",
-                                      "publish_context_fc_initiators": "fc_wwns"}
-                       }
+        self.controller_config = {"publish_context_lun_parameter": "lun",
+                                  "publish_context_connectivity_parameter": "connectivity_type",
+                                  "publish_context_separator": ",",
+                                  "publish_context_array_iqn": "array_iqn",
+                                  "publish_context_fc_initiators": "fc_wwns"}
 
     def _test_validation_exception(self, util_function, function_arg, str_in_msg="", raised_error=ValidationException):
         with self.assertRaises(raised_error) as context:
@@ -264,7 +263,7 @@ class TestUtils(unittest.TestCase):
         new_volume.pool = POOL
         new_volume.array_type = "a9k"
         new_volume.capacity_bytes = 10
-        new_volume.copy_source_id = None
+        new_volume.source_id = None
 
         get_volume_id.return_value = "a9k:name"
         response = utils.generate_csi_create_volume_response(new_volume)
@@ -285,7 +284,7 @@ class TestUtils(unittest.TestCase):
         new_volume.pool = POOL
         new_volume.array_type = "svc"
         new_volume.capacity_bytes = 10
-        new_volume.copy_source_id = None
+        new_volume.source_id = None
 
         get_volume_id.return_value = "svc:name"
         response = utils.generate_csi_create_volume_response(new_volume)
@@ -302,7 +301,7 @@ class TestUtils(unittest.TestCase):
         new_volume.pool = POOL
         new_volume.array_type = "svc"
         new_volume.capacity_bytes = 10
-        new_volume.copy_source_id = None
+        new_volume.source_id = None
 
         get_volume_id.return_value = "svc:name"
         response = utils.generate_csi_create_volume_response(new_volume)
@@ -445,7 +444,8 @@ class TestUtils(unittest.TestCase):
             self.assertEqual(actual_chosen, expected_chosen_connectivity)
 
     def _check_publish_volume_response_parameters(self, lun, connectivity_type, array_initiators):
-        publish_volume_response = utils.generate_csi_publish_volume_response(lun, connectivity_type, self.config,
+        publish_volume_response = utils.generate_csi_publish_volume_response(lun, connectivity_type,
+                                                                             self.controller_config,
                                                                              array_initiators)
         self.assertEqual(publish_volume_response.publish_context["lun"], lun)
         self.assertEqual(publish_volume_response.publish_context["connectivity_type"], connectivity_type)
