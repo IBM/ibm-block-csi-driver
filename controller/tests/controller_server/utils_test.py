@@ -263,7 +263,7 @@ class TestUtils(unittest.TestCase):
         new_volume.pool = POOL
         new_volume.array_type = "a9k"
         new_volume.capacity_bytes = 10
-        new_volume.copy_source_id = None
+        new_volume.source_id = None
 
         get_volume_id.return_value = "a9k:name"
         response = utils.generate_csi_create_volume_response(new_volume)
@@ -284,7 +284,7 @@ class TestUtils(unittest.TestCase):
         new_volume.pool = POOL
         new_volume.array_type = "svc"
         new_volume.capacity_bytes = 10
-        new_volume.copy_source_id = None
+        new_volume.source_id = None
 
         get_volume_id.return_value = "svc:name"
         response = utils.generate_csi_create_volume_response(new_volume)
@@ -301,7 +301,7 @@ class TestUtils(unittest.TestCase):
         new_volume.pool = POOL
         new_volume.array_type = "svc"
         new_volume.capacity_bytes = 10
-        new_volume.copy_source_id = None
+        new_volume.source_id = None
 
         get_volume_id.return_value = "svc:name"
         response = utils.generate_csi_create_volume_response(new_volume)
