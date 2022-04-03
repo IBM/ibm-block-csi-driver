@@ -47,6 +47,9 @@ const (
 	additionalGoIDInfoField = "addId"
 	unknownValue            = "unknown"
 	noAdditionalIDValue     = "-"
+	defaultCallerDepth      = 3
+	logEnterCallerDepth     = 5
+	logExitCallerDepth      = 4
 )
 
 type LogFormat struct {
@@ -107,10 +110,10 @@ func getInstance() *logrus.Logger {
 // Create log entry with additional data
 // 1) goroutine id
 // 2) caller: file and line log was called from
-func logEntry() *logrus.Entry {
+func logEntryCustomDepth(callerDepth int) *logrus.Entry {
 	goid := util.GetGoID()
 	additionalId, _ := goid_info.GetAdditionalIDInfo()
-	_, file, no, ok := runtime.Caller(2)
+	_, file, no, ok := runtime.Caller(callerDepth)
 	caller := unknownValue
 	if ok {
 		caller = filepath.Base(file) + ":" + strconv.Itoa(no)
@@ -119,6 +122,10 @@ func logEntry() *logrus.Entry {
 		additionalGoIDInfoField: additionalId,
 		callerField:             caller})
 	return logEntry
+}
+
+func logEntry() *logrus.Entry {
+	return logEntryCustomDepth(defaultCallerDepth)
 }
 
 func Trace(args ...interface{}) {
@@ -143,6 +150,10 @@ func Debugln(args ...interface{}) {
 
 func Debugf(format string, args ...interface{}) {
 	logEntry().Debugf(format, args...)
+}
+
+func DebugfCustomDepth(callerDepth int, format string, args ...interface{}) {
+	logEntryCustomDepth(callerDepth).Debugf(format, args...)
 }
 
 func Info(args ...interface{}) {
@@ -236,13 +247,21 @@ func getFuncName() string {
 	return funcName
 }
 
+func DebugfLogEnter(format string, args ...interface{}) {
+	DebugfCustomDepth(logEnterCallerDepth, format, args...)
+}
+
+func DebugfLogExit(format string, args ...interface{}) {
+	DebugfCustomDepth(logExitCallerDepth, format, args...)
+}
+
 func logEnter(funcName string, request interface{}) {
 	var message = ">>>> %v"
 	if getStringFromCall(request, "String") != "" {
 		message += ": called with args %+v"
-		Debugf(message, funcName, request)
+		DebugfLogEnter(message, funcName, request)
 	} else {
-		Debugf(message, funcName)
+		DebugfLogEnter(message, funcName)
 	}
 }
 
@@ -258,7 +277,7 @@ func Enter(request interface{}) string {
 
 func Exit(funcName string) {
 	if funcName != "" {
-		Debugf("<<<< %v", funcName)
+		DebugfLogExit("<<<< %v", funcName)
 	}
 	goid_info.DeleteAdditionalIDInfo()
 }
