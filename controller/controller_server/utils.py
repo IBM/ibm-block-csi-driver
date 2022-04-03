@@ -119,11 +119,10 @@ def get_snapshot_id(new_snapshot, system_id):
 def _get_object_id(obj, system_id):
     object_ids_value = common_config.get_controller_config(config.PARAMETERS_OBJECT_IDS_DELIMITER).join(
         (obj.internal_id, obj.id))
+    object_id_info_delimiter = common_config.get_controller_config(config.PARAMETERS_OBJECT_ID_INFO_DELIMITER)
     if system_id:
-        return common_config.get_controller_config(config.PARAMETERS_OBJECT_ID_INFO_DELIMITER).join(
-            (obj.array_type, system_id, object_ids_value))
-    return common_config.get_controller_config(config.PARAMETERS_OBJECT_ID_INFO_DELIMITER).join(
-        (obj.array_type, object_ids_value))
+        return object_id_info_delimiter.join((obj.array_type, system_id, object_ids_value))
+    return object_id_info_delimiter.join((obj.array_type, object_ids_value))
 
 
 def _is_system_id_valid(system_id):
@@ -239,13 +238,13 @@ def _validate_pool_parameter(parameters):
 def _validate_object_id(object_id, object_type=config.VOLUME_TYPE_NAME,
                         message=messages.VOLUME_ID_SHOULD_NOT_BE_EMPTY_MESSAGE):
     logger.debug("validating volume id")
+    object_id_info_delimiter = common_config.get_controller_config(config.PARAMETERS_OBJECT_ID_INFO_DELIMITER)
     if not object_id:
         raise ValidationException(message)
-    if common_config.get_controller_config(config.PARAMETERS_OBJECT_ID_INFO_DELIMITER) not in object_id:
+    if object_id_info_delimiter not in object_id:
         raise ObjectIdError(object_type, object_id)
-    if len(object_id.split(common_config.get_controller_config(config.PARAMETERS_OBJECT_ID_INFO_DELIMITER))) not in {
-        config.MINIMUM_VOLUME_ID_PARTS,
-        config.MAXIMUM_VOLUME_ID_PARTS}:
+    if len(object_id.split(object_id_info_delimiter)) not in {config.MINIMUM_VOLUME_ID_PARTS,
+                                                              config.MAXIMUM_VOLUME_ID_PARTS}:
         raise ValidationException(messages.WRONG_FORMAT_MESSAGE.format("volume id"))
 
 

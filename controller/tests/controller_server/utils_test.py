@@ -444,13 +444,14 @@ class TestUtils(unittest.TestCase):
             actual_chosen = utils.choose_connectivity_type(list(connectivities_found))
             self.assertEqual(actual_chosen, expected_chosen_connectivity)
 
+    def _mock_get_controller_config(self, attribute_name):
+        return self.controller_config[attribute_name]
+
     @patch.object(CommonConfig, "get_controller_config")
     def _check_publish_volume_response_parameters(self, lun, connectivity_type, array_initiators,
                                                   get_controller_config):
-        def mock_get_controller_config(attribute_name):
-            return self.controller_config[attribute_name]
 
-        get_controller_config.side_effect = mock_get_controller_config
+        get_controller_config.side_effect = self._mock_get_controller_config
 
         publish_volume_response = utils.generate_csi_publish_volume_response(lun, connectivity_type,
                                                                              array_initiators)
