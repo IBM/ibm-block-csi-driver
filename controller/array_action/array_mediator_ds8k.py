@@ -212,13 +212,13 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def _generate_volume_scsi_identifier(self, volume_id):
         return '6{}000000000000{}'.format(self.wwnn[1:], volume_id)
 
-    def _get_copy_source_id(self, api_volume):
-        copy_source_id = None
+    def _get_source_id(self, api_volume):
+        source_id = None
         flashcopy_as_target = get_flashcopy_as_target_if_exists(api_volume=api_volume)
         if flashcopy_as_target:
             source_volume_id = flashcopy_as_target.sourcevolume
-            copy_source_id = self._generate_volume_scsi_identifier(volume_id=source_volume_id)
-        return copy_source_id
+            source_id = self._generate_volume_scsi_identifier(volume_id=source_volume_id)
+        return source_id
 
     def _generate_volume_response(self, api_volume):
         space_efficiency = _get_parameter_space_efficiency(api_volume.tp)
@@ -228,7 +228,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             internal_id=api_volume.id,
             name=api_volume.name,
             array_address=self.service_address,
-            copy_source_id=self._get_copy_source_id(api_volume=api_volume),
+            source_id=self._get_source_id(api_volume=api_volume),
             pool=api_volume.pool,
             array_type=self.array_type,
             space_efficiency=space_efficiency,
@@ -284,8 +284,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     @convert_scsi_ids_to_array_ids(args_amount=2)
-    def copy_to_existing_volume_from_source(self, volume_id, source_id, source_capacity_in_bytes,
-                                            minimum_volume_size_in_bytes):
+    def copy_to_existing_volume(self, volume_id, source_id, source_capacity_in_bytes,
+                                minimum_volume_size_in_bytes):
         logger.debug(
             "copy source {0} data to volume {1}. source capacity {2}. Minimal requested volume capacity {3}".format(
                 source_id, volume_id, source_capacity_in_bytes,
@@ -658,13 +658,13 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
         logger.debug("finished validate_supported_space_efficiency.")
 
-    def _generate_snapshot_response(self, api_snapshot, source_volume_id):
+    def _generate_snapshot_response(self, api_snapshot, source_id):
         return Snapshot(capacity_bytes=int(api_snapshot.cap),
                         id=self._generate_volume_scsi_identifier(api_snapshot.id),
                         internal_id=api_snapshot.id,
                         name=api_snapshot.name,
                         array_address=self.service_address,
-                        source_volume_id=self._generate_volume_scsi_identifier(source_volume_id),
+                        source_id=self._generate_volume_scsi_identifier(source_id),
                         is_ready=True,
                         array_type=self.array_type)
 

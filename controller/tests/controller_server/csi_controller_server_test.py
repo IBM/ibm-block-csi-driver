@@ -13,8 +13,13 @@ import controller.controller_server.errors as controller_errors
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.controller_server.csi_controller_server import CSIControllerServicer
 from controller.controller_server.sync_lock import SyncLock
-from controller.controller_server.test_settings import VOLUME_NAME, SNAPSHOT_NAME, SNAPSHOT_VOLUME_NAME, \
-    CLONE_VOLUME_NAME, SNAPSHOT_VOLUME_WWN, POOL, SPACE_EFFICIENCY, OBJECT_INTERNAL_ID
+from controller.controller_server.test_settings import (CLONE_VOLUME_NAME,
+                                                        OBJECT_INTERNAL_ID,
+                                                        POOL, SNAPSHOT_NAME,
+                                                        SNAPSHOT_VOLUME_NAME,
+                                                        SNAPSHOT_VOLUME_WWN,
+                                                        SPACE_EFFICIENCY,
+                                                        VOLUME_NAME)
 from controller.tests import utils
 from controller.tests.utils import ProtoBufMock
 
@@ -52,28 +57,30 @@ class BaseControllerSetUp(unittest.TestCase):
 
 class CommonControllerTest:
 
+    @property
     @abc.abstractmethod
-    def get_tested_method(self):
+    def tested_method(self):
         raise NotImplementedError
 
+    @property
     @abc.abstractmethod
-    def get_tested_method_response_class(self):
+    def tested_method_response_class(self):
         raise NotImplementedError
 
     def _test_create_object_with_empty_name(self, storage_agent):
         storage_agent.return_value = self.storage_agent
         self.request.name = ""
         context = utils.FakeContext()
-        response = self.get_tested_method()(self.request, context)
+        response = self.tested_method(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertIn("name", context.details)
-        self.assertEqual(response, self.get_tested_method_response_class()())
+        self.assertEqual(response, self.tested_method_response_class())
 
     def _test_request_with_wrong_secrets_parameters(self, secrets, message="secret"):
         context = utils.FakeContext()
 
         self.request.secrets = secrets
-        self.get_tested_method()(self.request, context)
+        self.tested_method(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertIn(message, context.details)
 
@@ -97,14 +104,14 @@ class CommonControllerTest:
     def _test_request_already_processing(self, storage_agent, request_attribute, object_id):
         storage_agent.side_effect = self.storage_agent
         with SyncLock(request_attribute, object_id, "test_request_already_processing"):
-            response = self.get_tested_method()(self.request, self.context)
+            response = self.tested_method(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.ABORTED)
-        self.assertEqual(type(response), self.get_tested_method_response_class())
+        self.assertEqual(type(response), self.tested_method_response_class)
 
     def _test_request_with_array_connection_exception(self, storage_agent):
         storage_agent.side_effect = [Exception("error")]
         context = utils.FakeContext()
-        self.get_tested_method()(self.request, context)
+        self.tested_method(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
         self.assertIn("error", context.details)
 
@@ -112,7 +119,7 @@ class CommonControllerTest:
         storage_agent.return_value = self.storage_agent
         context = utils.FakeContext()
         self.detect_array_type.side_effect = [array_errors.FailedToFindStorageSystemType("endpoint")]
-        self.get_tested_method()(self.request, context)
+        self.tested_method(self.request, context)
         self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
         msg = array_errors.FailedToFindStorageSystemType("endpoint").message
         self.assertIn(msg, context.details)
@@ -124,16 +131,18 @@ class CommonControllerTest:
 
         for request_parameters in parameters:
             self.request.parameters = request_parameters
-            self.get_tested_method()(self.request, context)
+            self.tested_method(self.request, context)
             self.assertEqual(grpc.StatusCode.INVALID_ARGUMENT, context.code)
 
 
 class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
 
-    def get_tested_method(self):
+    @property
+    def tested_method(self):
         return self.servicer.CreateSnapshot
 
-    def get_tested_method_response_class(self):
+    @property
+    def tested_method_response_class(self):
         return csi_pb2.CreateSnapshotResponse
 
     def setUp(self):
@@ -338,10 +347,12 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
 
 
 class TestDeleteSnapshot(BaseControllerSetUp, CommonControllerTest):
-    def get_tested_method(self):
+    @property
+    def tested_method(self):
         return self.servicer.DeleteSnapshot
 
-    def get_tested_method_response_class(self):
+    @property
+    def tested_method_response_class(self):
         return csi_pb2.DeleteSnapshotResponse
 
     def setUp(self):
@@ -404,10 +415,12 @@ class TestDeleteSnapshot(BaseControllerSetUp, CommonControllerTest):
 
 class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
-    def get_tested_method(self):
+    @property
+    def tested_method(self):
         return self.servicer.CreateVolume
 
-    def get_tested_method_response_class(self):
+    @property
+    def tested_method_response_class(self):
         return csi_pb2.CreateVolumeResponse
 
     def setUp(self):
@@ -691,7 +704,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
     def _prepare_idempotent_tests(self):
         self.mediator.get_volume = Mock()
-        self.mediator.copy_to_existing_volume_from_source = Mock()
+        self.mediator.copy_to_existing_volume = Mock()
         self.request.volume_content_source = self._get_source_snapshot("wwn1")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -700,13 +713,13 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         storage_agent.return_value = self.storage_agent
         snapshot_id = "wwn1"
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, VOLUME_NAME, "wwn2", "a9k",
-                                                                                        copy_source_id=snapshot_id)
+                                                                                        source_id=snapshot_id)
 
         response = self.servicer.CreateVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
         self.assertEqual(response.volume.content_source.snapshot.snapshot_id, snapshot_id)
-        self.mediator.copy_to_existing_volume_from_source.assert_not_called()
+        self.mediator.copy_to_existing_volume.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_idempotent_with_source_volume_have_no_source(self, storage_agent):
@@ -718,7 +731,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
         self.assertFalse(response.HasField("volume"))
-        self.mediator.copy_to_existing_volume_from_source.assert_not_called()
+        self.mediator.copy_to_existing_volume.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_idempotent_source_not_requested_but_found_in_volume(self, storage_agent):
@@ -727,12 +740,12 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         snapshot_id = "wwn1"
         self.request.volume_content_source = None
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, VOLUME_NAME, "wwn2", "a9k",
-                                                                                        copy_source_id=snapshot_id)
+                                                                                        source_id=snapshot_id)
         response = self.servicer.CreateVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
         self.assertFalse(response.HasField("volume"))
-        self.mediator.copy_to_existing_volume_from_source.assert_not_called()
+        self.mediator.copy_to_existing_volume.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_idempotent_with_source_volume_got_other_source(self, storage_agent):
@@ -740,10 +753,10 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         storage_agent.return_value = self.storage_agent
         volume_source_id = "wwn3"
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, "volume", "wwn2", "a9k",
-                                                                                        copy_source_id=volume_source_id)
+                                                                                        source_id=volume_source_id)
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
-        self.mediator.copy_to_existing_volume_from_source.assert_not_called()
+        self.mediator.copy_to_existing_volume.assert_not_called()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_idempotent_with_size_not_matched(self, storage_agent):
@@ -760,7 +773,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, VOLUME_NAME, "wwn2",
                                                                                            "a9k")
         self.mediator.get_object_by_id = Mock()
-        self.mediator.copy_to_existing_volume_from_source = Mock()
+        self.mediator.copy_to_existing_volume = Mock()
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_from_snapshot_success(self, storage_agent):
@@ -776,9 +789,9 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
                                                                                                 "a9k")
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.copy_to_existing_volume_from_source.assert_called_once_with('wwn2', snapshot_id,
-                                                                                  snapshot_capacity_bytes,
-                                                                                  self.capacity_bytes)
+        self.mediator.copy_to_existing_volume.assert_called_once_with('wwn2', snapshot_id,
+                                                                      snapshot_capacity_bytes,
+                                                                      self.capacity_bytes)
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, snapshot_id)
 
@@ -853,7 +866,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
             self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_snapshot(1000, SNAPSHOT_NAME,
                                                                                                     target_volume_id,
                                                                                                     VOLUME_NAME, "a9k")
-            self.mediator.copy_to_existing_volume_from_source.side_effect = [copy_exception]
+            self.mediator.copy_to_existing_volume.side_effect = [copy_exception]
 
             self.storage_agent.get_mediator.return_value.__exit__.side_effect = [copy_exception]
         self.mediator.delete_volume = Mock()
@@ -876,9 +889,9 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
                                                                                               "a9k")
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.copy_to_existing_volume_from_source.assert_called_once_with('wwn2', volume_id,
-                                                                                  volume_capacity_bytes,
-                                                                                  self.capacity_bytes)
+        self.mediator.copy_to_existing_volume.assert_called_once_with('wwn2', volume_id,
+                                                                      volume_capacity_bytes,
+                                                                      self.capacity_bytes)
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, volume_id)
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
 
@@ -900,10 +913,12 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
 class TestDeleteVolume(BaseControllerSetUp, CommonControllerTest):
 
-    def get_tested_method(self):
+    @property
+    def tested_method(self):
         return self.servicer.DeleteVolume
 
-    def get_tested_method_response_class(self):
+    @property
+    def tested_method_response_class(self):
         return csi_pb2.DeleteVolumeResponse
 
     def get_create_object_method(self):
@@ -996,10 +1011,12 @@ class TestDeleteVolume(BaseControllerSetUp, CommonControllerTest):
 
 class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
 
-    def get_tested_method(self):
+    @property
+    def tested_method(self):
         return self.servicer.ControllerPublishVolume
 
-    def get_tested_method_response_class(self):
+    @property
+    def tested_method_response_class(self):
         return csi_pb2.ControllerPublishVolumeResponse
 
     def setUp(self):
@@ -1297,10 +1314,12 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
 
 class TestUnpublishVolume(BaseControllerSetUp, CommonControllerTest):
 
-    def get_tested_method(self):
+    @property
+    def tested_method(self):
         return self.servicer.ControllerUnpublishVolume
 
-    def get_tested_method_response_class(self):
+    @property
+    def tested_method_response_class(self):
         return csi_pb2.ControllerUnpublishVolumeResponse
 
     def setUp(self):
@@ -1415,10 +1434,12 @@ class TestGetCapabilities(BaseControllerSetUp):
 
 class TestExpandVolume(BaseControllerSetUp, CommonControllerTest):
 
-    def get_tested_method(self):
+    @property
+    def tested_method(self):
         return self.servicer.ControllerExpandVolume
 
-    def get_tested_method_response_class(self):
+    @property
+    def tested_method_response_class(self):
         return csi_pb2.ControllerExpandVolumeResponse
 
     def setUp(self):
@@ -1628,10 +1649,12 @@ class TestIdentityServer(BaseControllerSetUp):
 
 class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
 
-    def get_tested_method(self):
+    @property
+    def tested_method(self):
         return self.servicer.ValidateVolumeCapabilities
 
-    def get_tested_method_response_class(self):
+    @property
+    def tested_method_response_class(self):
         return csi_pb2.ValidateVolumeCapabilitiesResponse
 
     def setUp(self):

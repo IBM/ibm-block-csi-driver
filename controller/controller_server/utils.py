@@ -345,12 +345,12 @@ def generate_csi_create_volume_response(new_volume, system_id=None, source_type=
     volume_context = _get_context_from_volume(new_volume)
 
     content_source = None
-    if new_volume.copy_source_id:
+    if new_volume.source_id:
         if source_type == config.SNAPSHOT_TYPE_NAME:
-            snapshot_source = csi_pb2.VolumeContentSource.SnapshotSource(snapshot_id=new_volume.copy_source_id)
+            snapshot_source = csi_pb2.VolumeContentSource.SnapshotSource(snapshot_id=new_volume.source_id)
             content_source = csi_pb2.VolumeContentSource(snapshot=snapshot_source)
         else:
-            volume_source = csi_pb2.VolumeContentSource.VolumeSource(volume_id=new_volume.copy_source_id)
+            volume_source = csi_pb2.VolumeContentSource.VolumeSource(volume_id=new_volume.source_id)
             content_source = csi_pb2.VolumeContentSource(volume=volume_source)
 
     response = csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(

@@ -4,7 +4,6 @@ import grpc
 import yaml
 from csi_general import csi_pb2
 from csi_general import csi_pb2_grpc
-from retry import retry
 
 import controller.array_action.errors as array_errors
 import controller.controller_server.config as config
@@ -114,10 +113,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return response
 
                 if source_id:
-                    self._copy_to_existing_volume_from_source(volume, source_id,
-                                                              source_type, required_bytes,
-                                                              array_mediator)
-                    volume.copy_source_id = source_id
+                    array_mediator.copy_to_existing_volume_from_source(volume, source_id,
+                                                                       source_type, required_bytes)
+                    volume.source_id = source_id
 
                 response = utils.generate_csi_create_volume_response(volume, array_connection_info.system_id,
                                                                      source_type)
@@ -126,34 +124,6 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT, csi_pb2.CreateVolumeResponse)
         except array_errors.VolumeAlreadyExists as ex:
             return handle_exception(ex, context, grpc.StatusCode.ALREADY_EXISTS, csi_pb2.CreateVolumeResponse)
-
-    def _copy_to_existing_volume_from_source(self, volume, source_id, source_type,
-                                             minimum_volume_size, array_mediator):
-        volume_id = volume.id
-        try:
-            source_object = array_mediator.get_object_by_id(source_id, source_type)
-            if not source_object:
-                self._rollback_create_volume_from_source(array_mediator, volume.id)
-                raise array_errors.ObjectNotFoundError(source_id)
-            source_capacity = source_object.capacity_bytes
-            logger.debug("Copy {0} {1} data to volume {2}.".format(source_type, source_id, volume_id))
-            array_mediator.copy_to_existing_volume_from_source(volume_id, source_id,
-                                                               source_capacity, minimum_volume_size)
-            logger.debug("Copy volume from {0} finished".format(source_type))
-        except array_errors.ObjectNotFoundError as ex:
-            logger.error("Volume not found while copying {0} data to volume".format(source_type))
-            logger.exception(ex)
-            self._rollback_create_volume_from_source(array_mediator, volume.id)
-            raise ex
-        except Exception as ex:
-            logger.error("Exception raised while copying {0} data to volume".format(source_type))
-            self._rollback_create_volume_from_source(array_mediator, volume.id)
-            raise ex
-
-    @retry(Exception, tries=5, delay=1)
-    def _rollback_create_volume_from_source(self, array_mediator, volume_id):
-        logger.debug("Rollback copy volume from source. Deleting volume {0}".format(volume_id))
-        array_mediator.delete_volume(volume_id)
 
     def _get_create_volume_response_for_existing_volume_source(self, volume, source_id, source_type, system_id,
                                                                context):
@@ -169,10 +139,10 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             If volume is a copy of another source - set context status to INTERNAL and return CreateVolumeResponse.
             In any other case return None.
         """
-        volume_copy_source_id = volume.copy_source_id
-        if not source_id and not volume_copy_source_id:
+        volume_source_id = volume.source_id
+        if not source_id and not volume_source_id:
             return None
-        if volume_copy_source_id == source_id:
+        if volume_source_id == source_id:
             return self._handle_volume_exists_with_same_source(context, source_id, source_type, volume,
                                                                system_id)
         return self._handle_volume_exists_with_different_source(context, source_id, source_type, volume)
@@ -189,10 +159,10 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                        "requested source {1} {2}. actual source: {3}".format(volume.name,
                                                                              source_type,
                                                                              source_id,
-                                                                             volume.copy_source_id))
+                                                                             volume.source_id))
         else:
             message = "Volume {0} already exists but was created from a source: {1}".format(volume.name,
-                                                                                            volume.copy_source_id)
+                                                                                            volume.source_id)
         logger.debug(message)
         return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS, csi_pb2.CreateVolumeResponse)
 
@@ -339,11 +309,11 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
     @csi_method(error_response_type=csi_pb2.CreateSnapshotResponse, lock_request_attribute="name")
     def CreateSnapshot(self, request, context):
         utils.validate_create_snapshot_request(request)
-        source_volume_id = request.source_volume_id
-        logger.info("Snapshot base name : {}. Source volume id : {}".format(request.name, source_volume_id))
+        source_id = request.source_volume_id
+        logger.info("Snapshot base name : {}. Source volume id : {}".format(request.name, source_id))
         secrets = request.secrets
         try:
-            volume_id_info = utils.get_volume_id_info(source_volume_id)
+            volume_id_info = utils.get_volume_id_info(source_id)
             system_id = volume_id_info.system_id
             array_type = volume_id_info.array_type
             volume_id = volume_id_info.object_id
@@ -364,9 +334,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 )
 
                 if snapshot:
-                    if snapshot.source_volume_id != volume_id:
+                    if snapshot.source_id != volume_id:
                         message = messages.SNAPSHOT_WRONG_VOLUME_ERROR_MESSAGE.format(snapshot_final_name,
-                                                                                      snapshot.source_volume_id,
+                                                                                      snapshot.source_id,
                                                                                       volume_id)
                         return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
                                                     csi_pb2.CreateSnapshotResponse)
@@ -379,7 +349,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     snapshot = array_mediator.create_snapshot(volume_id, snapshot_final_name, space_efficiency, pool)
 
                 logger.debug("generating create snapshot response")
-                response = utils.generate_csi_create_snapshot_response(snapshot, system_id, source_volume_id)
+                response = utils.generate_csi_create_snapshot_response(snapshot, system_id, source_id)
                 return response
         except (ObjectIdError, array_errors.SnapshotSourcePoolMismatch, array_errors.SpaceEfficiencyNotSupported) as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,

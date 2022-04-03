@@ -120,7 +120,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         volume = self.svc.get_volume("volume_name")
 
-        self.assertIsNone(volume.copy_source_id)
+        self.assertIsNone(volume.source_id)
 
     def _prepare_stretched_volume_mock(self):
         cli_volume = self._get_cli_volume(pool_name=['many', 'pool1', 'pool2'])
@@ -278,7 +278,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.delete_volume("volume")
 
     def test_copy_to_existing_volume_from_source_success(self):
-        self.svc.copy_to_existing_volume_from_source("a", "b", 1, 1)
+        self.svc.copy_to_existing_volume("a", "b", 1, 1)
         self.svc.client.svctask.mkfcmap.assert_called_once()
         self.svc.client.svctask.startfcmap.assert_called_once()
 
@@ -287,7 +287,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         mock_warning.return_value = False
         self.svc.client.svcinfo.lsvdisk.side_effect = [client_return_value, client_return_value]
         with self.assertRaises(expected_error):
-            self.svc.copy_to_existing_volume_from_source("a", "b", 1, 1)
+            self.svc.copy_to_existing_volume("a", "b", 1, 1)
 
     def test_copy_to_existing_volume_raise_not_found(self):
         self._test_copy_to_existing_volume_raise_errors(client_return_value=Mock(as_single_element=None),

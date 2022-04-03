@@ -98,7 +98,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
             as_single_element=self._get_cli_volume(wwn="Not Available"))
         volume = self.mediator.create_volume("mock_volume", 512, None, "fake_pool", None)
 
-        self.assertIsNone(volume.copy_source_id)
+        self.assertIsNone(volume.source_id)
 
     def test_create_volume_raise_illegal_name_for_object(self):
         self.mediator.client.cmd.vol_create.side_effect = [xcli_errors.IllegalNameForObjectError("", "volume", "")]
@@ -146,8 +146,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
         source_volume = self._get_cli_volume(name=source_snapshot_name)
         self.mediator.client.cmd.vol_list.side_effect = [Mock(as_single_element=target_volume),
                                                          Mock(as_single_element=source_volume)]
-        self.mediator.copy_to_existing_volume_from_source(volume_id, source_id,
-                                                          source_snapshot_capacity_in_bytes, min_volume_size_in_bytes)
+        self.mediator.copy_to_existing_volume(volume_id, source_id,
+                                              source_snapshot_capacity_in_bytes, min_volume_size_in_bytes)
         calls = [call(wwn=volume_id), call(wwn=source_id)]
         self.mediator.client.cmd.vol_list.assert_has_calls(calls, any_order=False)
         self.mediator.client.cmd.vol_format.assert_called_once_with(vol=volume_name)
@@ -171,7 +171,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
                                                           expected_array_exception):
         client_method.side_effect = [xcli_exception]
         with self.assertRaises(expected_array_exception):
-            self.mediator.copy_to_existing_volume_from_source("volume", "snapshot", 0, 0)
+            self.mediator.copy_to_existing_volume("volume", "snapshot", 0, 0)
 
     def test_copy_to_existing_volume_from_snapshot_failed_illegal_id(self):
         self._test_copy_to_existing_volume_from_snapshot_error(self.mediator.client.cmd.vol_list,
@@ -241,7 +241,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_list.return_value = xcli_snapshot
         snapshot = self.mediator.get_snapshot(snapshot_volume_wwn, snapshot_name)
         self.assertEqual(snapshot.name, snapshot_name)
-        self.assertEqual(snapshot.source_volume_id, snapshot_volume_wwn)
+        self.assertEqual(snapshot.source_id, snapshot_volume_wwn)
 
     def test_get_snapshot_same_name_volume_exists_error(self):
         snapshot_name = "snapshot"
@@ -270,7 +270,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.snapshot_create.return_value = xcli_snapshot
         snapshot = self.mediator.create_snapshot(snapshot_volume_wwn, snapshot_name, space_efficiency=None, pool=None)
         self.assertEqual(snapshot.name, snapshot_name)
-        self.assertEqual(snapshot.source_volume_id, snapshot_volume_wwn)
+        self.assertEqual(snapshot.source_id, snapshot_volume_wwn)
         self.assertEqual(snapshot.capacity_bytes, size_in_bytes)
         self.assertEqual(snapshot.capacity_bytes, size_in_bytes)
 
@@ -354,7 +354,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_list.return_value = xcli_snapshot
         snapshot = self.mediator.get_object_by_id("1235678", "snapshot")
         self.assertEqual(snapshot.name, snapshot_name)
-        self.assertEqual(snapshot.source_volume_id, snapshot_volume_wwn)
+        self.assertEqual(snapshot.source_id, snapshot_volume_wwn)
 
     def test_get_object_by_id_return_correct_volume(self):
         volume_name = "volume_name"
