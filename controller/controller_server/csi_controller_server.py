@@ -11,7 +11,7 @@ from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.node_info import NodeIdInfo
 from controller.controller_server import messages as controller_messages
-from controller.controller_server.common_config import common_config
+from controller.controller_server.common_config import config as common_config
 from controller.controller_server.decorators import csi_method
 from controller.controller_server.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controller.controller_server.exception_handler import handle_exception, \
@@ -456,8 +456,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     @csi_method(error_response_type=csi_pb2.GetPluginInfoResponse)
     def GetPluginInfo(self, _, context):  # pylint: disable=invalid-name
-        name = common_config.get_identity_config("name")
-        version = common_config.get_identity_config("version")
+        name = common_config.identity.name
+        version = common_config.identity.version
 
         if not name or not version:
             message = "plugin name or version cannot be empty"
@@ -503,10 +503,10 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.info("GetPluginCapabilities")
         service_type = csi_pb2.PluginCapability.Service.Type
         volume_expansion_type = csi_pb2.PluginCapability.VolumeExpansion.Type
-        capabilities = common_config.get_identity_config("capabilities")
+        capabilities = common_config.identity.capabilities
         capability_list = []
-        service_capabilities = capabilities.get('Service')
-        volume_expansion_capability = capabilities.get('VolumeExpansion')
+        service_capabilities = capabilities.Service
+        volume_expansion_capability = capabilities.VolumeExpansion
         if service_capabilities:
             for service_capability in service_capabilities:
                 capability_list.append(
