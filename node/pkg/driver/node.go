@@ -764,8 +764,8 @@ func (d *NodeService) nodeExpandVolumeRequestValidation(req *csi.NodeExpandVolum
 		return status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	if !strings.Contains(volumeID, d.ConfigYaml.Controller.Parameters_object_id_info_delimiter) {
-		errMsg := fmt.Sprintf("invalid Volume ID - no {%v} found", d.ConfigYaml.Controller.Parameters_object_id_info_delimiter)
+	if !strings.Contains(volumeID, d.ConfigYaml.Parameters.Object_id_info.Delimiter) {
+		errMsg := fmt.Sprintf("invalid Volume ID - no {%v} found", d.ConfigYaml.Parameters.Object_id_info.Delimiter)
 		err := &RequestValidationError{errMsg}
 		return status.Error(codes.NotFound, err.Error())
 	}
