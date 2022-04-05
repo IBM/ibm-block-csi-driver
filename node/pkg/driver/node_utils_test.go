@@ -366,7 +366,10 @@ func TestGenerateNodeID(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
-			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, driver.ConfigFile{})
+			var configYaml driver.ConfigFile
+			configYaml.Parameters.Node_id_info.Delimiter = ";"
+			configYaml.Parameters.Node_id_info.Fcs_delimiter = ":"
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, configYaml)
 
 			nodeId, err := nodeUtils.GenerateNodeID(tc.hostName, tc.nvmeNQN, tc.fcWWNs, tc.iscsiIQN)
 

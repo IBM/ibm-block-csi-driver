@@ -124,6 +124,10 @@ type ConfigFile struct {
 			Delimiter     string
 			Ids_delimiter string
 		}
+		Node_id_info struct {
+			Delimiter     string
+			Fcs_delimiter string
+		}
 	}
 }
 

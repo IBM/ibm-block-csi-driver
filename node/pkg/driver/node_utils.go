@@ -49,8 +49,6 @@ const (
 	// Command lines inside the container will show /host prefix.
 	PrefixChrootOfHostRoot            = "/host"
 	PublishContextSeparator           = ","
-	NodeIdDelimiter                   = ";"
-	NodeIdFcDelimiter                 = ":"
 	mkfsTimeoutMilliseconds           = 15 * 60 * 1000
 	resizeFsTimeoutMilliseconds       = 30 * 1000
 	TimeOutGeneralCmd                 = 10 * 1000
@@ -456,18 +454,20 @@ func (n NodeUtils) GetPodPath(origPath string) string {
 
 func (n NodeUtils) GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []string, iscsiIQN string) (string, error) {
 	var nodeId strings.Builder
+	nodeIdDelimiter := n.ConfigYaml.Parameters.Node_id_info.Delimiter
+	nodeIdFcDelimiter := n.ConfigYaml.Parameters.Node_id_info.Fcs_delimiter
 	nodeId.Grow(MaxNodeIdLength)
 	nodeId.WriteString(hostName)
-	nodeId.WriteString(NodeIdDelimiter)
+	nodeId.WriteString(nodeIdDelimiter)
 
 	if len(nvmeNQN) > 0 {
-		if nodeId.Len()+len(nvmeNQN)+len(NodeIdDelimiter) <= MaxNodeIdLength {
+		if nodeId.Len()+len(nvmeNQN)+len(nodeIdDelimiter) <= MaxNodeIdLength {
 			nodeId.WriteString(nvmeNQN)
 		} else {
 			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
 		}
 	}
-	nodeId.WriteString(NodeIdDelimiter)
+	nodeId.WriteString(nodeIdDelimiter)
 	if len(fcWWNs) > 0 {
 		if nodeId.Len()+len(fcWWNs[0]) <= MaxNodeIdLength {
 			nodeId.WriteString(fcWWNs[0])
@@ -476,15 +476,15 @@ func (n NodeUtils) GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []stri
 		}
 
 		for _, fcPort := range fcWWNs[1:] {
-			if nodeId.Len()+len(NodeIdFcDelimiter)+len(fcPort) <= MaxNodeIdLength {
-				nodeId.WriteString(NodeIdFcDelimiter)
+			if nodeId.Len()+len(nodeIdFcDelimiter)+len(fcPort) <= MaxNodeIdLength {
+				nodeId.WriteString(nodeIdFcDelimiter)
 				nodeId.WriteString(fcPort)
 			}
 		}
 	}
 	if len(iscsiIQN) > 0 {
-		if nodeId.Len()+len(NodeIdDelimiter)+len(iscsiIQN) <= MaxNodeIdLength {
-			nodeId.WriteString(NodeIdDelimiter)
+		if nodeId.Len()+len(nodeIdDelimiter)+len(iscsiIQN) <= MaxNodeIdLength {
+			nodeId.WriteString(nodeIdDelimiter)
 			nodeId.WriteString(iscsiIQN)
 		} else if len(fcWWNs) == 0 && nvmeNQN == "" {
 			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
