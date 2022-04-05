@@ -117,9 +117,9 @@ def get_snapshot_id(new_snapshot, system_id):
 
 
 def _get_object_id(obj, system_id):
-    object_ids_delimiter = common_config.parameters.object_id_info.ids_delimiter
+    object_ids_delimiter = config.PARAMETERS_OBJECT_IDS_DELIMITER
     object_ids_value = object_ids_delimiter.join((obj.internal_id, obj.id))
-    object_id_info_delimiter = common_config.parameters.object_id_info.delimiter
+    object_id_info_delimiter = config.PARAMETERS_OBJECT_ID_INFO_DELIMITER
     if system_id:
         return object_id_info_delimiter.join((obj.array_type, system_id, object_ids_value))
     return object_id_info_delimiter.join((obj.array_type, object_ids_value))
@@ -238,7 +238,7 @@ def _validate_pool_parameter(parameters):
 def _validate_object_id(object_id, object_type=config.VOLUME_TYPE_NAME,
                         message=messages.VOLUME_ID_SHOULD_NOT_BE_EMPTY_MESSAGE):
     logger.debug("validating volume id")
-    object_id_info_delimiter = common_config.parameters.object_id_info.delimiter
+    object_id_info_delimiter = config.PARAMETERS_OBJECT_ID_INFO_DELIMITER
     if not object_id:
         raise ValidationException(message)
     if object_id_info_delimiter not in object_id:
@@ -437,7 +437,7 @@ def validate_delete_volume_request(request):
 def _validate_node_id(node_id):
     logger.debug("validating node id")
 
-    delimiter_count = node_id.count(common_config.parameters.node_id_info.delimiter)
+    delimiter_count = node_id.count(config.PARAMETERS_NODE_ID_DELIMITER)
 
     if not 1 <= delimiter_count <= 3:
         raise InvalidNodeId(node_id)
@@ -480,8 +480,7 @@ def _get_context_from_volume(volume):
 
 def get_object_id_info(full_object_id, object_type):
     logger.debug("getting {0} info for id : {1}".format(object_type, full_object_id))
-    splitted_object_id = full_object_id.split(
-        common_config.parameters.object_id_info.delimiter)
+    splitted_object_id = full_object_id.split(config.PARAMETERS_OBJECT_ID_INFO_DELIMITER)
     system_id, wwn, internal_id = None, None, None
     if len(splitted_object_id) == 2:
         array_type, object_id = splitted_object_id
@@ -489,7 +488,7 @@ def get_object_id_info(full_object_id, object_type):
         array_type, system_id, object_id = splitted_object_id
     else:
         raise ObjectIdError(object_type, full_object_id)
-    splitted_id = object_id.split(common_config.parameters.object_id_info.ids_delimiter)
+    splitted_id = object_id.split(config.PARAMETERS_OBJECT_IDS_DELIMITER)
     if len(splitted_id) == 1:
         wwn = splitted_id[0]
     elif len(splitted_id) == 2:
@@ -502,7 +501,7 @@ def get_object_id_info(full_object_id, object_type):
 
 def get_node_id_info(node_id):
     logger.debug("getting node info for node id : {0}".format(node_id))
-    split_node = node_id.split(common_config.parameters.node_id_info.delimiter)
+    split_node = node_id.split(config.PARAMETERS_NODE_ID_DELIMITER)
     hostname, nvme_nqn, fc_wwns, iscsi_iqn = "", "", "", ""
     if len(split_node) == 4:
         hostname, nvme_nqn, fc_wwns, iscsi_iqn = split_node

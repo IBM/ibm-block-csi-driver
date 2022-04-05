@@ -445,7 +445,7 @@ class TestUtils(unittest.TestCase):
             self.assertEqual(actual_chosen, expected_chosen_connectivity)
 
     def _check_publish_volume_response_parameters(self, lun, connectivity_type, array_initiators):
-        with patch("controller.controller_server.common_config.Config.controller",
+        with patch("controller.controller_server.common_config.config.controller",
                    new=Munch(self.controller_config)):
 
             publish_volume_response = utils.generate_csi_publish_volume_response(lun, connectivity_type,

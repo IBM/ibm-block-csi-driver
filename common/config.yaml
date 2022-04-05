@@ -23,3 +23,8 @@ parameters:
   node_id_info:
     delimiter: ";"
     fcs_delimiter: ":"
+
+connectivity_type:
+  nvme_over_fc: "nvmeofc"
+  fc: "fc"
+  iscsi: "iscsi"
