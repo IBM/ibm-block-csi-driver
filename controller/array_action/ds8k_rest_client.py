@@ -63,6 +63,7 @@ class RESTClient:
         client_kwargs = {'service_address': service_address,
                          'user': user,
                          'password': password,
+                         'verify': False,
                          }
         if port:
             client_kwargs.update({'port': port})
