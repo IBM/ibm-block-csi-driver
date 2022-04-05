@@ -20,3 +20,6 @@ parameters:
   object_id_info:
     delimiter: ":"
     ids_delimiter: ";"
+  node_id_info:
+    delimiter: ";"
+    fcs_delimiter: ":"

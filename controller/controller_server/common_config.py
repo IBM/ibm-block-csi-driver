@@ -10,19 +10,20 @@ class Config:
         path = os.path.join(my_path, "../../common/config.yaml")
 
         with open(path, 'r') as yamlfile:
-            self.cfg = yaml.safe_load(yamlfile)  # TODO: add the following when possible : Loader=yaml.FullLoader)
+            cfg = yaml.safe_load(yamlfile)  # TODO: add the following when possible : Loader=yaml.FullLoader)
+        self.config = DefaultMunch.fromDict(cfg)
 
     @property
     def identity(self):
-        return DefaultMunch.fromDict(self.cfg['identity'])
+        return self.config.identity
 
     @property
     def controller(self):
-        return DefaultMunch.fromDict(self.cfg['controller'])
+        return self.config.controller
 
     @property
     def parameters(self):
-        return DefaultMunch.fromDict(self.cfg['parameters'])
+        return self.config.parameters
 
 
 config = Config()

@@ -1,5 +1,5 @@
 import controller.controller_server.utils as utils
-import controller.controller_server.config as config
+from controller.controller_server.common_config import config
 
 
 class NodeIdInfo:
@@ -9,7 +9,7 @@ class NodeIdInfo:
             node_id: <node_name>,<iqn>,<wwns>
         """
         node_name, nvme_nqn, fc_wwns_str, iscsi_iqn = utils.get_node_id_info(node_id)
-        fc_wwns = fc_wwns_str.split(config.PARAMETERS_FC_WWN_DELIMITER)
+        fc_wwns = fc_wwns_str.split(config.parameters.node_id_info.fcs_delimiter)
         self.node_name = node_name
         self.initiators = Initiators(nvme_nqn.strip(), fc_wwns, iscsi_iqn.strip())
 

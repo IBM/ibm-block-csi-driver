@@ -437,7 +437,7 @@ def validate_delete_volume_request(request):
 def _validate_node_id(node_id):
     logger.debug("validating node id")
 
-    delimiter_count = node_id.count(config.PARAMETERS_NODE_ID_DELIMITER)
+    delimiter_count = node_id.count(common_config.parameters.node_id_info.delimiter)
 
     if not 1 <= delimiter_count <= 3:
         raise InvalidNodeId(node_id)
@@ -502,7 +502,7 @@ def get_object_id_info(full_object_id, object_type):
 
 def get_node_id_info(node_id):
     logger.debug("getting node info for node id : {0}".format(node_id))
-    split_node = node_id.split(config.PARAMETERS_NODE_ID_DELIMITER)
+    split_node = node_id.split(common_config.parameters.node_id_info.delimiter)
     hostname, nvme_nqn, fc_wwns, iscsi_iqn = "", "", "", ""
     if len(split_node) == 4:
         hostname, nvme_nqn, fc_wwns, iscsi_iqn = split_node
