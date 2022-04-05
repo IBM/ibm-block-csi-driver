@@ -582,9 +582,9 @@ func (d NodeUtils) GetBlockVolumeStats(mpathDevice string) (VolumeStatistics, er
 }
 
 func (d NodeUtils) GetVolumeUuid(volumeId string) string {
-	volumeIdParts := strings.Split(volumeId, d.ConfigYaml.Controller.Parameters_object_id_info_delimiter)
+	volumeIdParts := strings.Split(volumeId, d.ConfigYaml.Parameters.Object_id_info.Delimiter)
 	idsPart := volumeIdParts[len(volumeIdParts)-1]
-	splittedIdsPart := strings.Split(idsPart, d.ConfigYaml.Controller.Parameters_object_ids_delimiter)
+	splittedIdsPart := strings.Split(idsPart, d.ConfigYaml.Parameters.Object_id_info.Ids_delimiter)
 	if len(splittedIdsPart) == 2 {
 		return splittedIdsPart[1]
 	} else {
