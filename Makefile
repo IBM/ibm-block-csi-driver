@@ -59,7 +59,7 @@ test-xunit:
 	go generate ./...
 	$(gofmt-test)
 	go vet -c=1 ./node/...
-	#go test ${GO_TEST_FLAGS} ./node/... | go2xunit -output build/reports/csi-node-unitests.xml
+	go test ${GO_TEST_FLAGS} ./node/... | go2xunit -output build/reports/csi-node-unitests.xml
 	go test ${GO_TEST_FLAGS} ./node/...	# run again so the makefile will fail in case tests failing
 
 .PHONY: test-xunit-in-container
