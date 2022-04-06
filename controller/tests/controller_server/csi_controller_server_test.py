@@ -1611,14 +1611,12 @@ class TestIdentityServer(BaseControllerSetUp):
         request = Mock()
         context = Mock()
 
-        identity_config.name = "name"
-        identity_config.version = Exception()
+        identity_config.mock_add_spec(spec=["name"])
         response = self.servicer.GetPluginInfo(request, context)
         context.set_code.assert_called_once_with(grpc.StatusCode.INTERNAL)
         self.assertEqual(response, csi_pb2.GetPluginInfoResponse())
 
-        identity_config.name = Exception()
-        identity_config.version = "1.1.0"
+        identity_config.mock_add_spec(spec=["version"])
         response = self.servicer.GetPluginInfo(request, context)
         self.assertEqual(response, csi_pb2.GetPluginInfoResponse())
         context.set_code.assert_called_with(grpc.StatusCode.INTERNAL)
