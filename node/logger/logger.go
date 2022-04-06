@@ -122,24 +122,12 @@ func logEntry(callerDepth int) *logrus.Entry {
 	return logEntry
 }
 
-func Trace(args ...interface{}) {
-	logEntry(startCallerDepth).Trace(args...)
-}
-
-func Traceln(args ...interface{}) {
-	logEntry(startCallerDepth).Traceln(args...)
-}
-
 func Tracef(format string, args ...interface{}) {
 	logEntry(startCallerDepth).Tracef(format, args...)
 }
 
 func Debug(args ...interface{}) {
 	logEntry(startCallerDepth).Debug(args...)
-}
-
-func Debugln(args ...interface{}) {
-	logEntry(startCallerDepth).Debugln(args...)
 }
 
 func Debugf(format string, args ...interface{}) {
@@ -154,20 +142,12 @@ func Info(args ...interface{}) {
 	logEntry(startCallerDepth).Info(args...)
 }
 
-func Infoln(args ...interface{}) {
-	logEntry(startCallerDepth).Infoln(args...)
-}
-
 func Infof(format string, args ...interface{}) {
 	logEntry(startCallerDepth).Infof(format, args...)
 }
 
 func Warning(args ...interface{}) {
 	logEntry(startCallerDepth).Warn(args...)
-}
-
-func Warningln(args ...interface{}) {
-	logEntry(startCallerDepth).Warnln(args...)
 }
 
 func Warningf(format string, args ...interface{}) {
