@@ -12,7 +12,7 @@ class ProtoBufMock(MagicMock):
         return hasattr(self, field)
 
 
-def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_source_id=None, space_efficiency=None,
+def get_mock_mediator_response_volume(size, name, wwn, array_type, source_id=None, space_efficiency=None,
                                       default_space_efficiency=None):
     volume = Mock()
     volume.capacity_bytes = size
@@ -22,7 +22,7 @@ def get_mock_mediator_response_volume(size, name, wwn, array_type, copy_source_i
     volume.array_address = "arr1"
     volume.pool = "pool1"
     volume.array_type = array_type
-    volume.copy_source_id = copy_source_id
+    volume.source_id = source_id
     volume.space_efficiency = space_efficiency
     volume.default_space_efficiency = default_space_efficiency
     return volume

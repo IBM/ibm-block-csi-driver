@@ -120,7 +120,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         volume = self.svc.get_volume("volume_name")
 
-        self.assertIsNone(volume.copy_source_id)
+        self.assertIsNone(volume.source_id)
 
     def _prepare_stretched_volume_mock(self):
         cli_volume = self._get_cli_volume(pool_name=['many', 'pool1', 'pool2'])
