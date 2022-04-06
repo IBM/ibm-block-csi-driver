@@ -48,7 +48,6 @@ const (
 	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
 	// Command lines inside the container will show /host prefix.
 	PrefixChrootOfHostRoot            = "/host"
-	PublishContextSeparator           = ","
 	mkfsTimeoutMilliseconds           = 15 * 60 * 1000
 	resizeFsTimeoutMilliseconds       = 30 * 1000
 	TimeOutGeneralCmd                 = 10 * 1000
@@ -113,27 +112,27 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string) (
 	// this will return :  connectivityType, lun, ipsByArrayInitiator, error
 	ipsByArrayInitiator := make(map[string][]string)
 	strLun := publishContext[n.ConfigYaml.Controller.Publish_context_lun_parameter]
-
+	publishContextSeparator := n.ConfigYaml.Controller.Publish_context_separator
 	var lun int
 	var err error
 	connectivityType := publishContext[n.ConfigYaml.Controller.Publish_context_connectivity_parameter]
-	if connectivityType != device_connectivity.ConnectionTypeNVMEoFC {
+	if connectivityType != n.ConfigYaml.Connectivity_type.Nvme_over_fc {
 		lun, err = strconv.Atoi(strLun)
 		if err != nil {
 			return "", -1, nil, err
 		}
 	}
-	if connectivityType == device_connectivity.ConnectionTypeFC {
-		wwns := strings.Split(publishContext[n.ConfigYaml.Controller.Publish_context_fc_initiators], PublishContextSeparator)
+	if connectivityType == n.ConfigYaml.Connectivity_type.Fc {
+		wwns := strings.Split(publishContext[n.ConfigYaml.Controller.Publish_context_fc_initiators], publishContextSeparator)
 		for _, wwn := range wwns {
 			ipsByArrayInitiator[wwn] = nil
 		}
 	}
-	if connectivityType == device_connectivity.ConnectionTypeISCSI {
-		iqns := strings.Split(publishContext[n.ConfigYaml.Controller.Publish_context_array_iqn], PublishContextSeparator)
+	if connectivityType == n.ConfigYaml.Connectivity_type.Iscsi {
+		iqns := strings.Split(publishContext[n.ConfigYaml.Controller.Publish_context_array_iqn], publishContextSeparator)
 		for _, iqn := range iqns {
 			if ips, iqnExists := publishContext[iqn]; iqnExists {
-				ipsByArrayInitiator[iqn] = strings.Split(ips, PublishContextSeparator)
+				ipsByArrayInitiator[iqn] = strings.Split(ips, publishContextSeparator)
 			} else {
 				logger.Errorf("Publish context does not contain any iscsi target IP for {%v}", iqn)
 			}
@@ -251,14 +250,14 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 
 	fpaths, err := n.Executer.FilepathGlob(FCPortPath)
 	if fpaths == nil {
-		err = fmt.Errorf(ErrorUnsupportedConnectivityType, device_connectivity.ConnectionTypeFC)
+		err = fmt.Errorf(ErrorUnsupportedConnectivityType, n.ConfigYaml.Connectivity_type.Fc)
 	}
 	if err != nil {
 		return nil, err
 	}
 
 	for _, fpath := range fpaths {
-		fcPort, err := readAfterPrefix(fpath, "0x", device_connectivity.ConnectionTypeFC)
+		fcPort, err := readAfterPrefix(fpath, "0x", n.ConfigYaml.Connectivity_type.Fc)
 		if err != nil {
 			errs = append(errs, err)
 		} else {
@@ -278,7 +277,7 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 }
 
 func (n NodeUtils) ParseIscsiInitiators() (string, error) {
-	return readAfterPrefix(IscsiFullPath, "InitiatorName=", device_connectivity.ConnectionTypeISCSI)
+	return readAfterPrefix(IscsiFullPath, "InitiatorName=", n.ConfigYaml.Connectivity_type.Iscsi)
 }
 
 func (n NodeUtils) IsFCExists() bool {

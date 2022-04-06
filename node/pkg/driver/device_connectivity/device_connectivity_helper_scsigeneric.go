@@ -66,9 +66,6 @@ var (
 
 const (
 	DevPath                     = "/dev"
-	ConnectionTypeNVMEoFC       = "nvmeofc"
-	ConnectionTypeFC            = "fc"
-	ConnectionTypeISCSI         = "iscsi"
 	WaitForMpathRetries         = 5
 	WaitForMpathWaitIntervalSec = 1
 	FcHostSysfsPath             = "/sys/class/fc_remote_ports/rport-*/port_name"

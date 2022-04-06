@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"reflect"
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -48,13 +49,8 @@ var (
 		},
 	}
 
-	defaultFSType              = "ext4"
-	StageInfoFilename          = ".stageInfo.json"
-	supportedConnectivityTypes = map[string]bool{
-		device_connectivity.ConnectionTypeNVMEoFC: true,
-		device_connectivity.ConnectionTypeFC:      true,
-		device_connectivity.ConnectionTypeISCSI:   true,
-	}
+	defaultFSType     = "ext4"
+	StageInfoFilename = ".stageInfo.json"
 
 	NvmeFullPath  = "/host/etc/nvme/hostnqn"
 	IscsiFullPath = "/host/etc/iscsi/initiatorname.iscsi"
@@ -210,6 +206,16 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
+func isValidConnectivity(connectivityTypes Connectivity_type, connectivityType string) bool {
+	connectivityReflect := reflect.ValueOf(&connectivityTypes).Elem()
+	for i := 0; i < connectivityReflect.NumField(); i++ {
+		if connectivityReflect.Field(i).Interface() == connectivityType {
+			return true
+		}
+	}
+	return false
+}
+
 func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeRequest) error {
 
 	volumeID := req.GetVolumeId()
@@ -249,8 +255,8 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 	if err != nil {
 		return &RequestValidationError{fmt.Sprintf("Fail to parse PublishContext %v with err = %v", req.PublishContext, err)}
 	}
-
-	if _, ok := supportedConnectivityTypes[connectivityType]; !ok {
+	supportedConnectivityTypes := d.ConfigYaml.Connectivity_type
+	if !isValidConnectivity(supportedConnectivityTypes, connectivityType) {
 		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong connectivity type %s. Supported connectivities %v", connectivityType, supportedConnectivityTypes)}
 	}
 
@@ -258,14 +264,14 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong lun id %d.", lun)}
 	}
 
-	if connectivityType != device_connectivity.ConnectionTypeNVMEoFC {
+	if connectivityType != d.ConfigYaml.Connectivity_type.Nvme_over_fc {
 		if len(ipsByArrayInitiator) == 0 {
 			return &RequestValidationError{fmt.Sprintf("PublishContext with wrong arrayInitiators %v.",
 				ipsByArrayInitiator)}
 		}
 	}
 
-	if connectivityType == device_connectivity.ConnectionTypeISCSI {
+	if connectivityType == d.ConfigYaml.Connectivity_type.Iscsi {
 		isAnyIpFound := false
 		for arrayInitiator := range ipsByArrayInitiator {
 			if _, ok := req.PublishContext[arrayInitiator]; ok {

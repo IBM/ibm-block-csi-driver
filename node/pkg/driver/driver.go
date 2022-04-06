@@ -56,9 +56,9 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 	syncLock := NewSyncLock()
 	executer := &executer.Executer{}
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
-		device_connectivity.ConnectionTypeNVMEoFC: device_connectivity.NewOsDeviceConnectivityNvmeOFc(executer),
-		device_connectivity.ConnectionTypeFC:      device_connectivity.NewOsDeviceConnectivityFc(executer),
-		device_connectivity.ConnectionTypeISCSI:   device_connectivity.NewOsDeviceConnectivityIscsi(executer),
+		configFile.Connectivity_type.Nvme_over_fc: device_connectivity.NewOsDeviceConnectivityNvmeOFc(executer),
+		configFile.Connectivity_type.Fc:           device_connectivity.NewOsDeviceConnectivityFc(executer),
+		configFile.Connectivity_type.Iscsi:        device_connectivity.NewOsDeviceConnectivityIscsi(executer),
 	}
 	osDeviceConnectivityHelper := device_connectivity.NewOsDeviceConnectivityHelperScsiGeneric(executer)
 	return &Driver{
@@ -103,32 +103,50 @@ func (d *Driver) Stop() {
 	d.srv.Stop()
 }
 
+type Identity struct {
+	Name    string
+	Version string
+	// TODO missing capabilities - currently the csi node is setting driver capability hardcoded. fix it low priority.
+}
+
+type Controller struct {
+	Publish_context_lun_parameter          string
+	Publish_context_connectivity_parameter string
+	Publish_context_separator              string
+	Publish_context_array_iqn              string
+	Publish_context_fc_initiators          string
+	//<array_iqn_1> : comma-separated list of iqn_1 iscsi target ips
+	//<array_iqn_2> : comma-separated list of iqn_2 iscsi target ips
+	//...
+	//<array_iqn_k> : comma-separated list of iqn_k iscsi target ips
+}
+
+type Object_id_info struct {
+	Delimiter     string
+	Ids_delimiter string
+}
+
+type Node_id_info struct {
+	Delimiter     string
+	Fcs_delimiter string
+}
+
+type Parameters struct {
+	Object_id_info Object_id_info
+	Node_id_info   Node_id_info
+}
+
+type Connectivity_type struct {
+	Nvme_over_fc string
+	Fc           string
+	Iscsi        string
+}
+
 type ConfigFile struct {
-	Identity struct {
-		Name    string
-		Version string
-		// TODO missing capabilities - currently the csi node is setting driver capability hardcoded. fix it low priority.
-	}
-	Controller struct {
-		Publish_context_lun_parameter          string
-		Publish_context_connectivity_parameter string
-		Publish_context_array_iqn              string
-		Publish_context_fc_initiators          string
-		//<array_iqn_1> : comma-separated list of iqn_1 iscsi target ips
-		//<array_iqn_2> : comma-separated list of iqn_2 iscsi target ips
-		//...
-		//<array_iqn_k> : comma-separated list of iqn_k iscsi target ips
-	}
-	Parameters struct {
-		Object_id_info struct {
-			Delimiter     string
-			Ids_delimiter string
-		}
-		Node_id_info struct {
-			Delimiter     string
-			Fcs_delimiter string
-		}
-	}
+	Identity          Identity
+	Controller        Controller
+	Parameters        Parameters
+	Connectivity_type Connectivity_type
 }
 
 const (

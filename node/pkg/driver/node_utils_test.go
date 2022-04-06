@@ -29,12 +29,11 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
 	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
-	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
 var (
-	nodeUtils       = driver.NewNodeUtils(&executer.Executer{}, nil, driver.ConfigFile{})
+	nodeUtils       = driver.NewNodeUtils(&executer.Executer{}, nil, ConfigYaml)
 	maxNodeIdLength = driver.MaxNodeIdLength
 	hostName        = "test-hostname"
 	longHostName    = strings.Repeat(hostName, 15)
@@ -127,11 +126,11 @@ func TestParseFCPortsName(t *testing.T) {
 		{
 			name:          "fc port file with wrong content",
 			file_contents: []string{"wrong content"},
-			expErr:        fmt.Errorf(driver.ErrorWhileTryingToReadPort, device_connectivity.ConnectionTypeFC, "wrong content"),
+			expErr:        fmt.Errorf(driver.ErrorWhileTryingToReadPort, ConfigYaml.Connectivity_type.Fc, "wrong content"),
 		},
 		{
 			name:   "fc unsupported",
-			expErr: fmt.Errorf(driver.ErrorUnsupportedConnectivityType, device_connectivity.ConnectionTypeFC),
+			expErr: fmt.Errorf(driver.ErrorUnsupportedConnectivityType, ConfigYaml.Connectivity_type.Fc),
 		},
 		{
 			name:          "one fc port",
@@ -192,7 +191,7 @@ func TestParseFCPortsName(t *testing.T) {
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 			devicePath := "/sys/class/fc_host/host*/port_name"
 			fakeExecuter.EXPECT().FilepathGlob(devicePath).Return(fpaths, tc.err)
-			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, driver.ConfigFile{})
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml)
 
 			fcs, err := nodeUtils.ParseFCPorts()
 
@@ -224,7 +223,7 @@ func TestParseIscsiInitiators(t *testing.T) {
 		{
 			name:         "wrong iqn file",
 			file_content: "wrong-content",
-			expErr:       fmt.Errorf(driver.ErrorWhileTryingToReadPort, device_connectivity.ConnectionTypeISCSI, "wrong-content"),
+			expErr:       fmt.Errorf(driver.ErrorWhileTryingToReadPort, ConfigYaml.Connectivity_type.Iscsi, "wrong-content"),
 		},
 		{
 			name:   "non existing file",
@@ -366,10 +365,7 @@ func TestGenerateNodeID(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
-			var configYaml driver.ConfigFile
-			configYaml.Parameters.Node_id_info.Delimiter = ";"
-			configYaml.Parameters.Node_id_info.Fcs_delimiter = ":"
-			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, configYaml)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml)
 
 			nodeId, err := nodeUtils.GenerateNodeID(tc.hostName, tc.nvmeNQN, tc.fcWWNs, tc.iscsiIQN)
 
@@ -410,10 +406,7 @@ func TestGetVolumeUuid(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
-			var configYaml driver.ConfigFile
-			configYaml.Parameters.Object_id_info.Delimiter = ":"
-			configYaml.Parameters.Object_id_info.Ids_delimiter = ";"
-			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, configYaml)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml)
 
 			volumeUuid := nodeUtils.GetVolumeUuid(tc.volumeId)
 
