@@ -134,7 +134,7 @@ func TestNodeStageVolume(t *testing.T) {
 				}
 				node := newTestNodeService(nil, nil, nil)
 				_, err := node.NodeStageVolume(context.TODO(), req)
-				assertError(t, err, codes.InvalidArgument)
+				assertError(t, err, codes.FailedPrecondition)
 			},
 		},
 		{

@@ -112,11 +112,11 @@ func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsI
 func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
 	defer logger.Exit(logger.Enter(req))
 
-	err := d.nodeStageVolumeRequestValidation(req)
+	code, err := d.nodeStageVolumeRequestValidation(req)
 	if err != nil {
 		switch err.(type) {
 		case *RequestValidationError:
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, status.Error(code, err.Error())
 		default:
 			return nil, status.Error(codes.Internal, err.Error())
 		}
@@ -209,31 +209,32 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
-func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeRequest) error {
+func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeRequest) (codes.Code, error) {
 
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
-		return &RequestValidationError{"Volume ID not provided"}
+		return codes.InvalidArgument, &RequestValidationError{"Volume ID not provided"}
 	}
 
 	stagingPath := req.GetStagingTargetPath()
 	if len(stagingPath) == 0 {
-		return &RequestValidationError{"Staging path not provided"}
+		return codes.FailedPrecondition, &RequestValidationError{"Staging path not provided"}
 	}
 
 	stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingPath)
 	isStagingPathExists := d.NodeUtils.IsPathExists(stagingPathWithHostPrefix)
 	if !isStagingPathExists {
-		return &RequestValidationError{fmt.Sprintf("Staging path [%s] does not exist", stagingPathWithHostPrefix)}
+		return codes.InvalidArgument, &RequestValidationError{fmt.Sprintf("Staging path [%s] does not exist",
+			stagingPathWithHostPrefix)}
 	}
 
 	volCap := req.GetVolumeCapability()
 	if volCap == nil {
-		return &RequestValidationError{"Volume capability not provided"}
+		return codes.InvalidArgument, &RequestValidationError{"Volume capability not provided"}
 	}
 
 	if !isValidVolumeCapabilitiesAccessMode([]*csi.VolumeCapability{volCap}) {
-		return &RequestValidationError{"Volume capability AccessMode not supported"}
+		return codes.InvalidArgument, &RequestValidationError{"Volume capability AccessMode not supported"}
 	}
 
 	// If the access type is not mount and not block, should never happen
@@ -241,26 +242,31 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 	case *csi.VolumeCapability_Mount:
 	case *csi.VolumeCapability_Block:
 	default:
-		return &RequestValidationError{"Volume Access Type is not supported"}
+		return codes.InvalidArgument, &RequestValidationError{"Volume Access Type is not supported"}
 	}
 
 	connectivityType, lun, ipsByArrayInitiator, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
 	if err != nil {
-		return &RequestValidationError{fmt.Sprintf("Fail to parse PublishContext %v with err = %v", req.PublishContext, err)}
+		return codes.InvalidArgument, &RequestValidationError{
+			fmt.Sprintf("Fail to parse PublishContext %v with err = %v", req.PublishContext, err)}
 	}
 
 	if _, ok := supportedConnectivityTypes[connectivityType]; !ok {
-		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong connectivity type %s. Supported connectivities %v", connectivityType, supportedConnectivityTypes)}
+		return codes.InvalidArgument, &RequestValidationError{
+			fmt.Sprintf("PublishContext with wrong connectivity type %s. Supported connectivities %v",
+				connectivityType, supportedConnectivityTypes)}
 	}
 
 	if lun < 0 {
-		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong lun id %d.", lun)}
+		return codes.InvalidArgument, &RequestValidationError{fmt.Sprintf("PublishContext with wrong lun id %d.",
+			lun)}
 	}
 
 	if connectivityType != device_connectivity.ConnectionTypeNVMEoFC {
 		if len(ipsByArrayInitiator) == 0 {
-			return &RequestValidationError{fmt.Sprintf("PublishContext with wrong arrayInitiators %v.",
-				ipsByArrayInitiator)}
+			return codes.InvalidArgument, &RequestValidationError{
+				fmt.Sprintf("PublishContext with wrong arrayInitiators %v.",
+					ipsByArrayInitiator)}
 		}
 	}
 
@@ -273,12 +279,13 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 			}
 		}
 		if !isAnyIpFound {
-			return &RequestValidationError{fmt.Sprintf("PublishContext with no iscsi target IP %v.",
-				req.PublishContext)}
+			return codes.InvalidArgument, &RequestValidationError{
+				fmt.Sprintf("PublishContext with no iscsi target IP %v.",
+					req.PublishContext)}
 		}
 	}
 
-	return nil
+	return codes.Internal, nil
 }
 
 func (d *NodeService) resolveFsTypeForMount(requestedFsType string, existingFormat string) (string, error) {
