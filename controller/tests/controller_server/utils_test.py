@@ -22,11 +22,11 @@ class TestUtils(unittest.TestCase):
 
     def setUp(self):
         self.servicer = CSIControllerServicer()
-        self.controller_config = {"publish_context_lun_parameter": "lun",
-                                  "publish_context_connectivity_parameter": "connectivity_type",
-                                  "publish_context_separator": ",",
-                                  "publish_context_array_iqn": "array_iqn",
-                                  "publish_context_fc_initiators": "fc_wwns"}
+        self.controller_config = Munch({"publish_context_lun_parameter": "lun",
+                                        "publish_context_connectivity_parameter": "connectivity_type",
+                                        "publish_context_separator": ",",
+                                        "publish_context_array_iqn": "array_iqn",
+                                        "publish_context_fc_initiators": "fc_wwns"})
 
     def _test_validation_exception(self, util_function, function_arg, str_in_msg="", raised_error=ValidationException):
         with self.assertRaises(raised_error) as context:
@@ -445,9 +445,7 @@ class TestUtils(unittest.TestCase):
             self.assertEqual(actual_chosen, expected_chosen_connectivity)
 
     def _check_publish_volume_response_parameters(self, lun, connectivity_type, array_initiators):
-        with patch("controller.controller_server.common_config.config.controller",
-                   new=Munch(self.controller_config)):
-
+        with patch("controller.controller_server.common_config.config.controller", new=self.controller_config):
             publish_volume_response = utils.generate_csi_publish_volume_response(lun, connectivity_type,
                                                                                  array_initiators)
             self.assertEqual(publish_volume_response.publish_context["lun"], lun)
