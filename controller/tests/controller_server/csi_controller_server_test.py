@@ -1622,7 +1622,8 @@ class TestIdentityServer(BaseControllerSetUp):
         context.set_code.assert_called_with(grpc.StatusCode.INTERNAL)
 
     @patch("controller.controller_server.common_config.config.identity")
-    def test_identity_plugin_get_info_fails_when_name_or_value_are_empty(self, identity_config):
+    def test_identity_plugin_get_info_fails_when_name_or_version_are_empty(self, identity_config):
+
         request = Mock()
         context = Mock()
 
