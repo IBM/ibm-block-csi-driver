@@ -28,6 +28,8 @@ import (
 
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"golang.org/x/sys/unix"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"k8s.io/apimachinery/pkg/util/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -97,14 +99,20 @@ type NodeUtilsInterface interface {
 }
 
 type NodeUtils struct {
-	Executer executer.ExecuterInterface
-	mounter  mount.Interface
+	Executer                   executer.ExecuterInterface
+	mounter                    mount.Interface
+	osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface
+	//	getDmsPathHelperInterface  device_connectivity.GetDmsPathHelperInterface
 }
 
-func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface) *NodeUtils {
+func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface,
+	osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface) *NodeUtils {
+	//	getDmsPathHelperInterface device_connectivity.GetDmsPathHelperInterface) *NodeUtils {
 	return &NodeUtils{
-		Executer: executer,
-		mounter:  mounter,
+		Executer:                   executer,
+		mounter:                    mounter,
+		osDeviceConnectivityHelper: osDeviceConnectivityHelper,
+		//		getDmsPathHelperInterface:  getDmsPathHelperInterface,
 	}
 }
 
@@ -558,7 +566,17 @@ func (d NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, erro
 	return volumeStats, nil
 }
 
-func (d NodeUtils) GetBlockVolumeStats(mpathDevice string) (VolumeStatistics, error) {
+func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error) {
+	mpathDevice, err := d.osDeviceConnectivityHelper.GetMpathDevice(volumeId)
+	if err != nil {
+		switch err.(type) {
+		case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
+			return VolumeStatistics{}, status.Errorf(codes.NotFound, "Multipath device of volume id %q does not exist", volumeId)
+		default:
+			return VolumeStatistics{}, status.Errorf(codes.Internal, "Error while discovering the device : %s", err)
+		}
+	}
+
 	args := []string{"--getsize64", mpathDevice}
 	out, err := d.Executer.ExecuteWithTimeoutSilently(device_connectivity.TimeOutBlockDevCmd, blockDevCmd, args)
 	if err != nil {
@@ -576,4 +594,13 @@ func (d NodeUtils) GetBlockVolumeStats(mpathDevice string) (VolumeStatistics, er
 	}
 
 	return volumeStats, nil
+}
+
+func (d NodeUtils) IsVolumePathMatchesVolumeId(volumeId string, volumePath string) (string, error) {
+	mpathdOutput, err := d.osDeviceConnectivityHelper.GetMpathOutputByVolumeId(volumeId)
+	if err != nil {
+		return "", err
+	}
+	return mpathdOutput, err
+
 }

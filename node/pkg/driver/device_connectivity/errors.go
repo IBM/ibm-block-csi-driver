@@ -13,12 +13,29 @@ func (e *MultipleDmDevicesError) Error() string {
 	return fmt.Sprintf("Detected more than one multipath device (%v) for single volume (%s)", e.MultipathDevices, e.VolumeId)
 }
 
+type MultipleVolumeIdsError struct {
+	VolumeIds           map[string]bool
+	MultipathDeviceName string
+}
+
+func (e *MultipleVolumeIdsError) Error() string {
+	return fmt.Sprintf("Detected more than one volume uuids (%v) for single multipath device name (%s)", e.VolumeIds, e.MultipathDeviceName)
+}
+
 type MultipathDeviceNotFoundForVolumeError struct {
 	VolumeId string
 }
 
 func (e *MultipathDeviceNotFoundForVolumeError) Error() string {
 	return fmt.Sprintf("Couldn't find multipath device for volumeID [%s]. Please check the host connectivity to the storage.", e.VolumeId)
+}
+
+type MultipathDeviceNotFoundForVolumePathError struct {
+	VolumePath string
+}
+
+func (e *MultipathDeviceNotFoundForVolumePathError) Error() string {
+	return fmt.Sprintf("Couldn't find multipath device for VolumePath [%s]. Please check the host connectivity to the storage.", e.VolumePath)
 }
 
 type ConnectivityIdentifierStorageTargetNotFoundError struct {

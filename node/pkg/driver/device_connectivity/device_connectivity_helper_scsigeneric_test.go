@@ -18,14 +18,15 @@ package device_connectivity_test
 
 import (
 	"fmt"
-	"github.com/golang/mock/gomock"
-	"github.com/ibm/ibm-block-csi-driver/node/mocks"
-	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
-	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"reflect"
 	"strings"
 	"sync"
 	"testing"
+
+	"github.com/golang/mock/gomock"
+	"github.com/ibm/ibm-block-csi-driver/node/mocks"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
 var (
@@ -217,7 +218,7 @@ func TestGetMpathDevice(t *testing.T) {
 			fake_mutex := &sync.Mutex{}
 
 			for _, r := range tc.getDmsPathReturn {
-				fake_helper.EXPECT().GetDmsPath(volumeUuid, volumeNguid).Return(
+				fake_helper.EXPECT().GetDmsPath(volumeUuid, volumeNguid, device_connectivity.MultipathdFilterMpathAndVolumeId).Return(
 					r.dmPath,
 					r.err)
 			}
@@ -335,11 +336,13 @@ func TestGetDmsPath(t *testing.T) {
 			fake_helper := mocks.NewMockGetDmsPathHelperInterface(mockCtrl)
 
 			for _, r := range tc.waitForDmToExistReturn {
-				fake_helper.EXPECT().WaitForDmToExist(volumeUuid, volumeNguid, 5, 1).Return(r.out, r.err)
+				fake_helper.EXPECT().WaitForDmToExist(volumeUuid, volumeNguid, 5, 1,
+					device_connectivity.MultipathdFilterMpathAndVolumeId).Return(r.out, r.err)
 			}
 
 			helperGeneric := NewOsDeviceConnectivityHelperGenericForTest(fakeExecuter, fake_helper)
-			dmPath, err := helperGeneric.GetDmsPath(volumeUuid, volumeNguid)
+			dmPath, err := helperGeneric.GetDmsPath(volumeUuid, volumeNguid,
+				device_connectivity.MultipathdFilterMpathAndVolumeId)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")
@@ -398,10 +401,10 @@ func TestHelperWaitForDmToExist(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
-			args := []string{"show", "maps", "raw", "format", "\"", "%d,%w", "\""}
+			args := []string{"show", "maps", "raw", "format", "\"", "%w,%d", "\""}
 			fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathdCmd, "multipathd", args).Return([]byte(tc.devices), tc.cmdReturnErr)
 			helperGeneric := device_connectivity.NewGetDmsPathHelperGeneric(fakeExecuter)
-			devices, err := helperGeneric.WaitForDmToExist(volumeUuid, volumeNguid, 1, 1)
+			devices, err := helperGeneric.WaitForDmToExist(volumeUuid, volumeNguid, 1, 1, device_connectivity.MultipathdFilterMpathAndVolumeId)
 			if err != nil {
 				if err.Error() != tc.expErr.Error() {
 					t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())
