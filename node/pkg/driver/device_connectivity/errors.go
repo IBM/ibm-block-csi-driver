@@ -38,6 +38,14 @@ func (e *MultipathDeviceNotFoundForVolumePathError) Error() string {
 	return fmt.Sprintf("Couldn't find multipath device for VolumePath [%s]. Please check the host connectivity to the storage.", e.VolumePath)
 }
 
+type VolumeIdNotFoundForMultipathDeviceNameError struct {
+	mpathDeviceName string
+}
+
+func (e *VolumeIdNotFoundForMultipathDeviceNameError) Error() string {
+	return fmt.Sprintf("Couldn't find Volume Id for Multipath device name [%s]. Please check the host connectivity to the storage.", e.mpathDeviceName)
+}
+
 type ConnectivityIdentifierStorageTargetNotFoundError struct {
 	StorageTargetName string
 	DirectoryPath     string

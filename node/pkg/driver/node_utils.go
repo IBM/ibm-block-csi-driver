@@ -96,6 +96,7 @@ type NodeUtilsInterface interface {
 	IsBlock(devicePath string) (bool, error)
 	GetFileSystemVolumeStats(path string) (VolumeStatistics, error)
 	GetBlockVolumeStats(mpathDevice string) (VolumeStatistics, error)
+	IsVolumePathMatchesVolumeId(volumeId string, volumePath string) (bool, error)
 }
 
 type NodeUtils struct {
@@ -596,11 +597,23 @@ func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error
 	return volumeStats, nil
 }
 
-func (d NodeUtils) IsVolumePathMatchesVolumeId(volumeId string, volumePath string) (string, error) {
-	mpathdOutput, err := d.osDeviceConnectivityHelper.GetMpathOutputByVolumeId(volumeId)
+func (d NodeUtils) IsVolumePathMatchesVolumeId(volumeId string, volumePath string) (bool, error) {
+	volumeIdByVolumePath, err := d.osDeviceConnectivityHelper.GetVolumeIdByVolumePath(volumePath, volumeId)
 	if err != nil {
-		return "", err
+		return false, err
 	}
-	return mpathdOutput, err
+	logger.Infof("IsVolumePathMatchesVolumeId: found volume id [%s] for volume path [%s] ", volumeId, volumePath)
 
+	return d.isVolumeIdFromPathIsWanted(volumeIdByVolumePath, volumeId), nil
+}
+
+func (d NodeUtils) isVolumeIdFromPathIsWanted(volumeIdByVolumePath string, volumeId string) bool {
+	volumeUuidLower, volumeNguid := d.osDeviceConnectivityHelper.GetNguidFromVolumeId(volumeId)
+	wantedVolumIds := []string{volumeUuidLower, volumeNguid}
+	for _, wnatedVolumeId := range wantedVolumIds {
+		if strings.Contains(wnatedVolumeId, volumeIdByVolumePath) || strings.Contains(volumeIdByVolumePath, wnatedVolumeId) {
+			return true
+		}
+	}
+	return false
 }

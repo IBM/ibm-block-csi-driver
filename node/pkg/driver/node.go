@@ -613,8 +613,6 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	defer goid_info.DeleteAdditionalIDInfo()
 	volumePath := req.VolumePath
 	volumePathWithHostPrefix := d.NodeUtils.GetPodPath(volumePath)
-	logger.Debugf("matan1_volume_path: {%v}", volumePathWithHostPrefix)
-	logger.Debugf("matan2_volumeid : {%v}", volumeId)
 
 	err := d.nodeGetVolumeStatsRequestValidation(volumeId, volumePath)
 	if err != nil {
@@ -634,6 +632,15 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	if isBlock {
 		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(volumeId)
 	} else {
+		isVolumePathMatchesVolumeId, err := d.NodeUtils.IsVolumePathMatchesVolumeId(volumeId, volumePathWithHostPrefix)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal,
+				"Failed to determine if the volume id [%q], is accessible on volume path [%q]", volumeId, volumePathWithHostPrefix)
+		}
+		if !isVolumePathMatchesVolumeId {
+			return nil, status.Errorf(codes.NotFound,
+				"volume id [%q] is not accessible on volume path [%q]", volumeId, volumePathWithHostPrefix)
+		}
 		volumeStats, err = d.NodeUtils.GetFileSystemVolumeStats(volumePathWithHostPrefix)
 	}
 	if err != nil {
