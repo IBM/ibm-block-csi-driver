@@ -58,3 +58,15 @@ func (r OsDeviceConnectivityFc) RemovePhysicalDevice(sysDevices []string) error 
 func (r OsDeviceConnectivityFc) ValidateLun(lun int, sysDevices []string) error {
 	return r.HelperScsiGeneric.ValidateLun(lun, sysDevices)
 }
+
+func (r OsDeviceConnectivityFc) GetNguidFromVolumeId(volumeId string) (string, string) {
+	return r.HelperScsiGeneric.GetNguidFromVolumeId(volumeId)
+}
+
+func (r OsDeviceConnectivityFc) GetMpathOutputByVolumeId(volumeUuidLower string, volumeNguid string) (string, error) {
+	return r.HelperScsiGeneric.GetMpathOutputByVolumeId(volumeUuidLower, volumeNguid)
+}
+
+func (r OsDeviceConnectivityFc) GetVolumeIdByVolumePath(volumePath string, volumeId string) (string, error) {
+	return r.HelperScsiGeneric.GetVolumeIdByVolumePath(volumePath, volumeId)
+}

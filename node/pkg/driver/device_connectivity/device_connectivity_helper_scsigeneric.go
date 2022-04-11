@@ -119,7 +119,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetVolumeIdByVolumePath(volumePat
 
 	volumeId, _ = r.getVolumeIdByMpathName(mpathDeviceName, mpathdOutput)
 	if volumeId != "" {
-		if r.Helper.isMpathHasRightVolumeIdWithoutErrors(dmPath, wantedVolumIds) {
+		if r.Helper.IsMpathHasRightVolumeIdWithoutErrors(dmPath, wantedVolumIds) {
 			return volumeId, nil
 		}
 	}
@@ -137,7 +137,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetVolumeIdByVolumePath(volumePat
 		return "", &VolumeIdNotFoundForMultipathDeviceNameError{mpathDeviceName}
 	}
 
-	if _, err = r.Helper.isMpathHasRightVolumeId(dmPath, volumeUuidLower, volumeNguid); err != nil {
+	if _, err = r.Helper.IsMpathHasRightVolumeId(dmPath, volumeUuidLower, volumeNguid); err != nil {
 		return "", err
 	}
 	return volumeId, nil
@@ -261,7 +261,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 
 	if dmPath != "" {
 		wantedVolumIds := []string{volumeUuidLower, volumeNguid}
-		if r.Helper.isMpathHasRightVolumeIdWithoutErrors(dmPath, wantedVolumIds) {
+		if r.Helper.IsMpathHasRightVolumeIdWithoutErrors(dmPath, wantedVolumIds) {
 			return dmPath, nil
 		}
 	}
@@ -279,7 +279,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	if dmPath == "" {
 		return "", &MultipathDeviceNotFoundForVolumeError{volumeId}
 	}
-	_, err = r.Helper.isMpathHasRightVolumeId(dmPath, volumeUuidLower, volumeNguid)
+	_, err = r.Helper.IsMpathHasRightVolumeId(dmPath, volumeUuidLower, volumeNguid)
 	if err != nil {
 		return "", err
 	}
@@ -424,8 +424,8 @@ type OsDeviceConnectivityHelperInterface interface {
 	GetMpathOutput(volumeUuidLower string, volumeNguid string, multipathdCommandFormatArgs []string) (string, error)
 	GetDmObjectsByIdentifier(wantedDmObjects []string, outputToCheckIn string) map[string]bool
 	GetWwnByScsiInq(dev string) (string, error)
-	isMpathHasRightVolumeId(dmPath string, volumeUuidLower string, volumeNguid string) (bool, error)
-	isMpathHasRightVolumeIdWithoutErrors(dmPath string, wnatedVolumeIds []string) bool
+	IsMpathHasRightVolumeId(dmPath string, volumeUuidLower string, volumeNguid string) (bool, error)
+	IsMpathHasRightVolumeIdWithoutErrors(dmPath string, wnatedVolumeIds []string) bool
 	ReloadMultipath() error
 }
 
@@ -514,7 +514,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 
 }
 
-func (o OsDeviceConnectivityHelperGeneric) isMpathHasRightVolumeId(dmPath string,
+func (o OsDeviceConnectivityHelperGeneric) IsMpathHasRightVolumeId(dmPath string,
 	volumeUuidLower string, volumeNguid string) (bool, error) {
 	SgInqWwn, err := o.GetWwnByScsiInq(dmPath)
 	if err != nil {
@@ -527,7 +527,7 @@ func (o OsDeviceConnectivityHelperGeneric) isMpathHasRightVolumeId(dmPath string
 	return false, &ErrorWrongDeviceFound{dmPath, volumeUuidLower, SgInqWwn}
 }
 
-func (o OsDeviceConnectivityHelperGeneric) isMpathHasRightVolumeIdWithoutErrors(dmPath string, wnatedVolumeIds []string) bool {
+func (o OsDeviceConnectivityHelperGeneric) IsMpathHasRightVolumeIdWithoutErrors(dmPath string, wnatedVolumeIds []string) bool {
 	SgInqWwn, _ := o.GetWwnByScsiInq(dmPath)
 	SgInqWwnLower := strings.ToLower(SgInqWwn)
 	for _, wnatedVolumeId := range wnatedVolumeIds {

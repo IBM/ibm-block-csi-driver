@@ -34,7 +34,7 @@ import (
 )
 
 var (
-	nodeUtils       = driver.NewNodeUtils(&executer.Executer{}, nil)
+	nodeUtils       = driver.NewNodeUtils(&executer.Executer{}, nil, device_connectivity.OsDeviceConnectivityHelperScsiGeneric{})
 	maxNodeIdLength = driver.MaxNodeIdLength
 	hostName        = "test-hostname"
 	longHostName    = strings.Repeat(hostName, 15)
@@ -192,7 +192,7 @@ func TestParseFCPortsName(t *testing.T) {
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 			devicePath := "/sys/class/fc_host/host*/port_name"
 			fakeExecuter.EXPECT().FilepathGlob(devicePath).Return(fpaths, tc.err)
-			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, nil)
 
 			fcs, err := nodeUtils.ParseFCPorts()
 
@@ -366,7 +366,7 @@ func TestGenerateNodeID(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
-			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, nil)
 
 			nodeId, err := nodeUtils.GenerateNodeID(tc.hostName, tc.nvmeNQN, tc.fcWWNs, tc.iscsiIQN)
 

@@ -54,3 +54,15 @@ func (r OsDeviceConnectivityNvmeOFc) RemovePhysicalDevice(sysDevices []string) e
 func (r OsDeviceConnectivityNvmeOFc) ValidateLun(_ int, _ []string) error {
 	return nil
 }
+
+func (r OsDeviceConnectivityNvmeOFc) GetNguidFromVolumeId(volumeId string) (string, string) {
+	return r.HelperScsiGeneric.GetNguidFromVolumeId(volumeId)
+}
+
+func (r OsDeviceConnectivityNvmeOFc) GetMpathOutputByVolumeId(volumeUuidLower string, volumeNguid string) (string, error) {
+	return r.HelperScsiGeneric.GetMpathOutputByVolumeId(volumeUuidLower, volumeNguid)
+}
+
+func (r OsDeviceConnectivityNvmeOFc) GetVolumeIdByVolumePath(volumePath string, volumeId string) (string, error) {
+	return r.HelperScsiGeneric.GetVolumeIdByVolumePath(volumePath, volumeId)
+}

@@ -18,11 +18,12 @@ package device_connectivity
 
 import (
 	"errors"
-	"github.com/ibm/ibm-block-csi-driver/node/logger"
-	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ibm/ibm-block-csi-driver/node/logger"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
 const (
@@ -171,4 +172,16 @@ func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(sysDevices []string) err
 
 func (r OsDeviceConnectivityIscsi) ValidateLun(lun int, sysDevices []string) error {
 	return r.HelperScsiGeneric.ValidateLun(lun, sysDevices)
+}
+
+func (r OsDeviceConnectivityIscsi) GetNguidFromVolumeId(volumeId string) (string, string) {
+	return r.HelperScsiGeneric.GetNguidFromVolumeId(volumeId)
+}
+
+func (r OsDeviceConnectivityIscsi) GetMpathOutputByVolumeId(volumeUuidLower string, volumeNguid string) (string, error) {
+	return r.HelperScsiGeneric.GetMpathOutputByVolumeId(volumeUuidLower, volumeNguid)
+}
+
+func (r OsDeviceConnectivityIscsi) GetVolumeIdByVolumePath(volumePath string, volumeId string) (string, error) {
+	return r.HelperScsiGeneric.GetVolumeIdByVolumePath(volumePath, volumeId)
 }
