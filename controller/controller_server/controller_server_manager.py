@@ -8,7 +8,7 @@ from csi_general import replication_pb2_grpc
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 from controller.controller_server.addons_server import ReplicationControllerServicer
-from controller.controller_server.common_config import config
+from controller.common.config import config
 from controller.controller_server.csi_controller_server import CSIControllerServicer
 
 logger = get_stdout_logger()

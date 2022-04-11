@@ -11,7 +11,7 @@ from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.node_info import NodeIdInfo
 from controller.controller_server import messages as controller_messages
-from controller.controller_server.common_config import config as common_config
+from controller.common.config import config as common_config
 from controller.controller_server.decorators import csi_method
 from controller.controller_server.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controller.controller_server.exception_handler import handle_exception, \

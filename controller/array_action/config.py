@@ -1,4 +1,4 @@
-from controller.controller_server.common_config import config
+from controller.common.config import config
 
 NVME_OVER_FC_CONNECTIVITY_TYPE = config.connectivity_type.nvme_over_fc
 FC_CONNECTIVITY_TYPE = config.connectivity_type.fc

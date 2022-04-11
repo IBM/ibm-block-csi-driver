@@ -13,7 +13,7 @@ from controller.array_action.config import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CO
     ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.settings import NAME_PREFIX_SEPARATOR
-from controller.controller_server.common_config import config as common_config
+from controller.common.config import config as common_config
 from controller.controller_server.controller_types import ArrayConnectionInfo, ObjectIdInfo, ObjectParameters
 from controller.controller_server.errors import ObjectIdError, ValidationException, InvalidNodeId
 
