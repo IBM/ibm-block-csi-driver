@@ -607,7 +607,6 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 }
 
 func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
-	var volumeStats VolumeStatistics
 	volumeId := req.VolumeId
 	goid_info.SetAdditionalIDInfo(volumeId)
 	defer goid_info.DeleteAdditionalIDInfo()
@@ -624,27 +623,9 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		return nil, status.Errorf(codes.NotFound, "volume path %q does not exist", volumePath)
 	}
 
-	isBlock, err := d.NodeUtils.IsBlock(volumePathWithHostPrefix)
+	volumeStats, err := d.getVolumeStats(volumePathWithHostPrefix, volumeId)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Failed to determine if %q is block device: %s", volumePathWithHostPrefix, err)
-	}
-
-	if isBlock {
-		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(volumeId)
-	} else {
-		isVolumePathMatchesVolumeId, err := d.NodeUtils.IsVolumePathMatchesVolumeId(volumeId, volumePathWithHostPrefix)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal,
-				"Failed to determine if the volume id [%q], is accessible on volume path [%q]", volumeId, volumePathWithHostPrefix)
-		}
-		if !isVolumePathMatchesVolumeId {
-			return nil, status.Errorf(codes.NotFound,
-				"volume id [%q] is not accessible on volume path [%q]", volumeId, volumePathWithHostPrefix)
-		}
-		volumeStats, err = d.NodeUtils.GetFileSystemVolumeStats(volumePathWithHostPrefix)
-	}
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Failed to get statistics: %s", err)
+		return nil, err
 	}
 
 	return &csi.NodeGetVolumeStatsResponse{
@@ -674,6 +655,36 @@ func (d *NodeService) nodeGetVolumeStatsRequestValidation(volumeId string, volum
 	}
 
 	return nil
+}
+
+func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatistics, error) {
+	var volumeStats VolumeStatistics
+	isBlock, err := d.NodeUtils.IsBlock(path)
+	if err != nil {
+		return VolumeStatistics{}, status.Errorf(codes.Internal, "Failed to determine if %q is block device: %s", path, err)
+	}
+
+	if isBlock {
+		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(volumeId)
+		if err != nil {
+			return VolumeStatistics{}, status.Errorf(codes.Internal, "Failed to get statistics: %s", err)
+		}
+	} else {
+		isVolumePathMatchesVolumeId, err := d.NodeUtils.IsVolumePathMatchesVolumeId(volumeId, path)
+		if err != nil {
+			return VolumeStatistics{}, status.Errorf(codes.Internal,
+				"Failed to determine if the volume id [%q], is accessible on volume path [%q]", volumeId, path)
+		}
+		if !isVolumePathMatchesVolumeId {
+			return VolumeStatistics{}, status.Errorf(codes.NotFound,
+				"volume id [%q] is not accessible on volume path [%q]", volumeId, path)
+		}
+		volumeStats, err = d.NodeUtils.GetFileSystemVolumeStats(path)
+		if err != nil {
+			return VolumeStatistics{}, status.Errorf(codes.Internal, "Failed to get statistics: %s", err)
+		}
+	}
+	return volumeStats, nil
 }
 
 func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {

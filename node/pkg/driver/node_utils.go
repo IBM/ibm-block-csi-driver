@@ -95,7 +95,7 @@ type NodeUtilsInterface interface {
 	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
 	IsBlock(devicePath string) (bool, error)
 	GetFileSystemVolumeStats(path string) (VolumeStatistics, error)
-	GetBlockVolumeStats(mpathDevice string) (VolumeStatistics, error)
+	GetBlockVolumeStats(volumeId string) (VolumeStatistics, error)
 	IsVolumePathMatchesVolumeId(volumeId string, volumePath string) (bool, error)
 }
 

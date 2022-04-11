@@ -899,7 +899,6 @@ func TestNodeGetVolumeStats(t *testing.T) {
 	volumeId := "someStorageType:vol-test"
 	volumePath := "/test/path"
 	stagingTargetPath := "/staging/test/path"
-	mpathDevice := "/dev/dm-4"
 	volumePathWithHostPrefix := GetPodPath(volumePath)
 	mockCtl := gomock.NewController(t)
 	defer mockCtl.Finish()
@@ -935,6 +934,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(volumePathWithHostPrefix).Return(true)
 				mockNodeUtils.EXPECT().IsBlock(volumePathWithHostPrefix).Return(false, nil)
+				mockNodeUtils.EXPECT().IsVolumePathMatchesVolumeId(volumeId, volumePathWithHostPrefix).Return(true, nil)
 				mockNodeUtils.EXPECT().GetFileSystemVolumeStats(volumePathWithHostPrefix).Return(driver.VolumeStatistics{}, errors.New("fail to get stats"))
 
 				_, err := d.NodeGetVolumeStats(context.TODO(), req)
@@ -975,6 +975,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(volumePathWithHostPrefix).Return(true)
 				mockNodeUtils.EXPECT().IsBlock(volumePathWithHostPrefix).Return(false, nil)
+				mockNodeUtils.EXPECT().IsVolumePathMatchesVolumeId(volumeId, volumePathWithHostPrefix).Return(true, nil)
 				mockNodeUtils.EXPECT().GetFileSystemVolumeStats(volumePathWithHostPrefix).Return(volumeStats, nil)
 
 				assertExpectedStats(t, expResp, req, d)
@@ -1000,8 +1001,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(volumePathWithHostPrefix).Return(true)
 				mockNodeUtils.EXPECT().IsBlock(volumePathWithHostPrefix).Return(true, nil)
-				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volumeId).Return(mpathDevice, nil)
-				mockNodeUtils.EXPECT().GetBlockVolumeStats(mpathDevice).Return(volumeStats, nil)
+				mockNodeUtils.EXPECT().GetBlockVolumeStats(volumeId).Return(volumeStats, nil)
 
 				assertExpectedStats(t, expResp, req, d)
 			},
