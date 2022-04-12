@@ -59,10 +59,6 @@ func (r OsDeviceConnectivityNvmeOFc) GetNguidFromVolumeId(volumeId string) (stri
 	return r.HelperScsiGeneric.GetNguidFromVolumeId(volumeId)
 }
 
-func (r OsDeviceConnectivityNvmeOFc) GetMpathOutputByVolumeId(volumeUuidLower string, volumeNguid string) (string, error) {
-	return r.HelperScsiGeneric.GetMpathOutputByVolumeId(volumeUuidLower, volumeNguid)
-}
-
 func (r OsDeviceConnectivityNvmeOFc) GetVolumeIdByVolumePath(volumePath string, volumeId string) (string, error) {
 	return r.HelperScsiGeneric.GetVolumeIdByVolumePath(volumePath, volumeId)
 }

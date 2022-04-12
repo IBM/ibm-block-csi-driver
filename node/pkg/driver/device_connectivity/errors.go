@@ -91,13 +91,13 @@ func (e *ErrorNoRegexWwnMatchInScsiInq) Error() string {
 }
 
 type ErrorWrongDeviceFound struct {
-	devPath    string
-	reqVolName string
-	volName    string
+	DevPath    string
+	ReqVolName string
+	VolName    string
 }
 
 func (e *ErrorWrongDeviceFound) Error() string {
 	return fmt.Sprintf("Multipath device [%s] was found as WWN [%s] via multipath -ll command, "+
-		"BUT sg_inq identify this device as a different WWN: [%s]. Check your multipathd.", e.devPath,
-		e.reqVolName, e.volName)
+		"BUT sg_inq identify this device as a different WWN: [%s]. Check your multipathd.", e.DevPath,
+		e.ReqVolName, e.VolName)
 }

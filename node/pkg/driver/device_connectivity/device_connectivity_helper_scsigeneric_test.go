@@ -62,24 +62,29 @@ type GetDmsPathReturn struct {
 	err    error
 }
 
-type GetWwnByScsiInqReturn struct {
-	wwn string
-	err error
-}
-
 type ReloadMultipathReturn struct {
 	err error
 }
 
+type IsMpathHasRightVolumeIdWithoutErrorsReturn struct {
+	isMpathGood bool
+}
+
+type IsMpathHasRightVolumeIdReturn struct {
+	isMpathGood bool
+	err         error
+}
+
 func TestGetMpathDevice(t *testing.T) {
 	testCases := []struct {
-		name                  string
-		expErrType            reflect.Type
-		expErr                error
-		expDMPath             string
-		getDmsPathReturn      []GetDmsPathReturn
-		getWwnByScsiInqReturn []GetWwnByScsiInqReturn
-		reloadMultipathReturn []ReloadMultipathReturn
+		name                                       string
+		expErrType                                 reflect.Type
+		expErr                                     error
+		expDMPath                                  string
+		getDmsPathReturn                           []GetDmsPathReturn
+		reloadMultipathReturn                      []ReloadMultipathReturn
+		isMpathHasRightVolumeIdWithoutErrorsReturn []IsMpathHasRightVolumeIdWithoutErrorsReturn
+		isMpathHasRightVolumeIdReturn              []IsMpathHasRightVolumeIdReturn
 	}{
 		{
 			name: "Should fail when WaitForDmToExist did not find any dm device",
@@ -139,17 +144,15 @@ func TestGetMpathDevice(t *testing.T) {
 					err:    nil,
 				},
 			},
-
 			reloadMultipathReturn: []ReloadMultipathReturn{
 				ReloadMultipathReturn{
 					err: nil,
 				},
 			},
-
-			getWwnByScsiInqReturn: []GetWwnByScsiInqReturn{
-				GetWwnByScsiInqReturn{
-					wwn: "otheruuid",
-					err: nil,
+			isMpathHasRightVolumeIdReturn: []IsMpathHasRightVolumeIdReturn{
+				IsMpathHasRightVolumeIdReturn{
+					isMpathGood: false,
+					err:         &device_connectivity.ErrorWrongDeviceFound{"", "", ""},
 				},
 			},
 
@@ -165,10 +168,9 @@ func TestGetMpathDevice(t *testing.T) {
 					err:    nil,
 				},
 			},
-			getWwnByScsiInqReturn: []GetWwnByScsiInqReturn{
-				GetWwnByScsiInqReturn{
-					wwn: volumeUuid,
-					err: nil,
+			isMpathHasRightVolumeIdWithoutErrorsReturn: []IsMpathHasRightVolumeIdWithoutErrorsReturn{
+				IsMpathHasRightVolumeIdWithoutErrorsReturn{
+					isMpathGood: true,
 				},
 			},
 
@@ -195,10 +197,10 @@ func TestGetMpathDevice(t *testing.T) {
 				},
 			},
 
-			getWwnByScsiInqReturn: []GetWwnByScsiInqReturn{
-				GetWwnByScsiInqReturn{
-					wwn: volumeUuid,
-					err: nil,
+			isMpathHasRightVolumeIdReturn: []IsMpathHasRightVolumeIdReturn{
+				IsMpathHasRightVolumeIdReturn{
+					isMpathGood: true,
+					err:         nil,
 				},
 			},
 
@@ -216,6 +218,7 @@ func TestGetMpathDevice(t *testing.T) {
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 			fake_helper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
 			fake_mutex := &sync.Mutex{}
+			wantedVolumIds := []string{volumeUuid, volumeNguid}
 
 			for _, r := range tc.getDmsPathReturn {
 				fake_helper.EXPECT().GetDmsPath(volumeUuid, volumeNguid, device_connectivity.MultipathdFilterMpathAndVolumeId).Return(
@@ -223,14 +226,20 @@ func TestGetMpathDevice(t *testing.T) {
 					r.err)
 			}
 
+			for _, r := range tc.isMpathHasRightVolumeIdWithoutErrorsReturn {
+				fmt.Println("hi1")
+				fake_helper.EXPECT().IsMpathHasRightVolumeIdWithoutErrors("/dev/dm-1", wantedVolumIds).Return(
+					r.isMpathGood)
+			}
+
 			for _, r := range tc.reloadMultipathReturn {
 				fake_helper.EXPECT().ReloadMultipath().Return(
 					r.err)
 			}
 
-			for _, r := range tc.getWwnByScsiInqReturn {
-				fake_helper.EXPECT().GetWwnByScsiInq("/dev/dm-1").Return(
-					r.wwn,
+			for _, r := range tc.isMpathHasRightVolumeIdReturn {
+				fake_helper.EXPECT().IsMpathHasRightVolumeId("/dev/dm-1", volumeUuid, volumeNguid).Return(
+					r.isMpathGood,
 					r.err)
 			}
 
@@ -265,20 +274,39 @@ type WaitForDmToExistReturn struct {
 	err error
 }
 
+type GetMpathOutputReturn struct {
+	out string
+	err error
+}
+
+type GetDmObjectsByIdentifierReturn struct {
+	mpathdOutput string
+	dmObjects    map[string]bool
+}
+
+type GetFullDmPathReturn struct {
+	dmObjects map[string]bool
+	dmPath    string
+	err       error
+}
+
 func TestGetDmsPath(t *testing.T) {
 	testCases := []struct {
-		name                   string
-		expErrType             reflect.Type
-		expErr                 error
-		expDMPath              string
-		waitForDmToExistReturn []WaitForDmToExistReturn
+		name                           string
+		expErrType                     reflect.Type
+		expErr                         error
+		expDMPath                      string
+		waitForDmToExistReturn         []WaitForDmToExistReturn
+		getMpathOutputReturn           []GetMpathOutputReturn
+		getDmObjectsByIdentifierReturn []GetDmObjectsByIdentifierReturn
+		getFullDmPathReturn            []GetFullDmPathReturn
 	}{
 		{
 			name: "Should fail when WaitForDmToExist did not find any dm device",
-			waitForDmToExistReturn: []WaitForDmToExistReturn{
-				WaitForDmToExistReturn{
+			getMpathOutputReturn: []GetMpathOutputReturn{
+				GetMpathOutputReturn{
 					out: "",
-					err: nil,
+					err: &device_connectivity.MultipathDeviceNotFoundForVolumeError{""},
 				},
 			},
 
@@ -288,10 +316,33 @@ func TestGetDmsPath(t *testing.T) {
 
 		{
 			name: "Should fail when WaitForDmToExist found more than 1 dm for volume",
-			waitForDmToExistReturn: []WaitForDmToExistReturn{
-				WaitForDmToExistReturn{
+			getMpathOutputReturn: []GetMpathOutputReturn{
+				GetMpathOutputReturn{
 					out: fmt.Sprintf("dm-1,%s\ndm-2,%s\ndm-3,%s", volumeUuid, "otheruuid", volumeUuid),
 					err: nil,
+				},
+			},
+
+			getDmObjectsByIdentifierReturn: []GetDmObjectsByIdentifierReturn{
+				GetDmObjectsByIdentifierReturn{
+					mpathdOutput: fmt.Sprintf("dm-1,%s\ndm-2,%s\ndm-3,%s", volumeUuid, "otheruuid", volumeUuid),
+					dmObjects: map[string]bool{
+						"dm-1": true,
+						"dm-2": true,
+						"dm-3": true,
+					},
+				},
+			},
+
+			getFullDmPathReturn: []GetFullDmPathReturn{
+				GetFullDmPathReturn{
+					dmObjects: map[string]bool{
+						"dm-1": true,
+						"dm-2": true,
+						"dm-3": true,
+					},
+					dmPath: "",
+					err:    &device_connectivity.MultipleDmDevicesError{"", map[string]bool{}},
 				},
 			},
 
@@ -301,10 +352,29 @@ func TestGetDmsPath(t *testing.T) {
 
 		{
 			name: "Should succeed to GetDmPath with space in start of input",
-			waitForDmToExistReturn: []WaitForDmToExistReturn{
-				WaitForDmToExistReturn{
+			getMpathOutputReturn: []GetMpathOutputReturn{
+				GetMpathOutputReturn{
 					out: fmt.Sprintf(" dm-1,%s", volumeUuid),
 					err: nil,
+				},
+			},
+
+			getDmObjectsByIdentifierReturn: []GetDmObjectsByIdentifierReturn{
+				GetDmObjectsByIdentifierReturn{
+					mpathdOutput: fmt.Sprintf(" dm-1,%s", volumeUuid),
+					dmObjects: map[string]bool{
+						"dm-1": true,
+					},
+				},
+			},
+
+			getFullDmPathReturn: []GetFullDmPathReturn{
+				GetFullDmPathReturn{
+					dmObjects: map[string]bool{
+						"dm-1": true,
+					},
+					dmPath: "/dev/dm-1",
+					err:    nil,
 				},
 			},
 
@@ -314,10 +384,29 @@ func TestGetDmsPath(t *testing.T) {
 
 		{
 			name: "Should succeed to GetDmPath",
-			waitForDmToExistReturn: []WaitForDmToExistReturn{
-				WaitForDmToExistReturn{
-					out: fmt.Sprintf("dm-1,%s\ndm-2,%s\ndm-3,%s", volumeUuid, "otheruuid", "otheruuid2"),
+			getMpathOutputReturn: []GetMpathOutputReturn{
+				GetMpathOutputReturn{
+					out: fmt.Sprintf("dm-1,%s", volumeUuid),
 					err: nil,
+				},
+			},
+
+			getDmObjectsByIdentifierReturn: []GetDmObjectsByIdentifierReturn{
+				GetDmObjectsByIdentifierReturn{
+					mpathdOutput: fmt.Sprintf("dm-1,%s", volumeUuid),
+					dmObjects: map[string]bool{
+						"dm-1": true,
+					},
+				},
+			},
+
+			getFullDmPathReturn: []GetFullDmPathReturn{
+				GetFullDmPathReturn{
+					dmObjects: map[string]bool{
+						"dm-1": true,
+					},
+					dmPath: "/dev/dm-1",
+					err:    nil,
 				},
 			},
 
@@ -331,13 +420,22 @@ func TestGetDmsPath(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
+			wantedVolumIds := []string{volumeUuid, volumeNguid}
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 			fake_helper := mocks.NewMockGetDmsPathHelperInterface(mockCtrl)
 
-			for _, r := range tc.waitForDmToExistReturn {
-				fake_helper.EXPECT().WaitForDmToExist(volumeUuid, volumeNguid, 5, 1,
+			for _, r := range tc.getMpathOutputReturn {
+				fake_helper.EXPECT().GetMpathOutput(volumeUuid, volumeNguid,
 					device_connectivity.MultipathdFilterMpathAndVolumeId).Return(r.out, r.err)
+			}
+
+			for _, r := range tc.getDmObjectsByIdentifierReturn {
+				fake_helper.EXPECT().GetDmObjectsByIdentifier(wantedVolumIds, r.mpathdOutput).Return(r.dmObjects)
+			}
+
+			for _, r := range tc.getFullDmPathReturn {
+				fake_helper.EXPECT().GetFullDmPath(r.dmObjects, volumeUuid).Return(r.dmPath, r.err)
 			}
 
 			helperGeneric := NewOsDeviceConnectivityHelperGenericForTest(fakeExecuter, fake_helper)

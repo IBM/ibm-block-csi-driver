@@ -26,6 +26,5 @@ type OsDeviceConnectivityInterface interface {
 	RemovePhysicalDevice(sysDevices []string) error
 	ValidateLun(lun int, sysDevices []string) error
 	GetNguidFromVolumeId(volumeId string) (string, string)
-	GetMpathOutputByVolumeId(volumeUuidLower string, volumeNguid string) (string, error)
 	GetVolumeIdByVolumePath(volumePath string, volumeId string) (string, error)
 }

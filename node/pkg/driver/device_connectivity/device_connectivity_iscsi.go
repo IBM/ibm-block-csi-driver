@@ -178,10 +178,6 @@ func (r OsDeviceConnectivityIscsi) GetNguidFromVolumeId(volumeId string) (string
 	return r.HelperScsiGeneric.GetNguidFromVolumeId(volumeId)
 }
 
-func (r OsDeviceConnectivityIscsi) GetMpathOutputByVolumeId(volumeUuidLower string, volumeNguid string) (string, error) {
-	return r.HelperScsiGeneric.GetMpathOutputByVolumeId(volumeUuidLower, volumeNguid)
-}
-
 func (r OsDeviceConnectivityIscsi) GetVolumeIdByVolumePath(volumePath string, volumeId string) (string, error) {
 	return r.HelperScsiGeneric.GetVolumeIdByVolumePath(volumePath, volumeId)
 }
