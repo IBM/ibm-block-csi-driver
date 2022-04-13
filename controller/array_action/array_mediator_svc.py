@@ -11,11 +11,12 @@ from retry import retry
 import controller.array_action.config as config
 import controller.array_action.errors as array_errors
 import controller.controller_server.config as controller_config
-from controller.array_action.array_action_types import Volume, Snapshot, Replication
+from controller.array_action.array_action_types import Volume, Snapshot, Replication, Host
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
+from controller.common.node_info import Initiators
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -783,6 +784,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             writer.write(LIST_HOSTS_CMD_FORMAT.format(HOST_ID=host.id))
         return writer.getvalue()
 
+    def get_host_by_name(self, host_name):
+        cli_host_by_name = self._get_cli_host_by_name(host_name)
+        cli_host_by_id = self._get_cli_host_by_id(cli_host_by_name.id)
+        initiators = Initiators(nvme_nqn=self._get_host_ports(cli_host_by_id, HOST_NQN),
+                                iscsi_iqn=self._get_host_ports(cli_host_by_id, HOST_ISCSI_NAME),
+                                fc_wwns=self._get_host_ports(cli_host_by_id, HOST_WWPN))
+        return Host(host_id=cli_host_by_id.id, host_name=cli_host_by_id.name, initiators=initiators)
+
     def _lsvdiskhostmap(self, volume_name):
         try:
             return self.client.svcinfo.lsvdiskhostmap(vdisk_name=volume_name)
@@ -981,6 +990,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         cli_host = self.client.svcinfo.lshost(filtervalue=filter_value).as_single_element
         if not cli_host:
             raise array_errors.HostNotFoundError(host_name)
+        return cli_host
+
+    def _get_cli_host_by_id(self, host_id):
+        cli_host = self.client.svcinfo.lshost(object_id=host_id).as_single_element
+        if not cli_host:
+            raise array_errors.HostNotFoundError(host_id)
         return cli_host
 
     def _get_host_portset_id(self, host_name):

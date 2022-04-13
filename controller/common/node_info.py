@@ -68,3 +68,14 @@ class Initiators:
 
     def __str__(self):
         return "nvme_nqn: {}, fc_wwns : {}, iscsi_iqn : {} ".format(self.nvme_nqn, self.fc_wwns, self.iscsi_iqn)
+
+    def __eq__(self, another):
+        return self.nvme_nqn == another.nvme_nqn and \
+               self.fc_wwns == another.fc_wwns and \
+               self.iscsi_iqn == another.iscsi_iqn
+
+    def __hash__(self):
+        fcs_str = ""
+        for fc in self.fc_wwns:
+            fcs_str.join(fc)
+        return hash(self.nvme_nqn + fcs_str + self.iscsi_iqn)

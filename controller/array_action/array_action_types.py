@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from controller.common.node_info import Initiators
+
 
 @dataclass()
 class Volume:
@@ -29,3 +31,9 @@ class Replication:
         self.copy_type = copy_type
         self.is_ready = is_ready
         self.is_primary = is_primary
+
+
+@dataclass()
+class Host:
+    host_name: str
+    initiators: Initiators = None

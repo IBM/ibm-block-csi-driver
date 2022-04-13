@@ -615,22 +615,24 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def get_iscsi_targets_by_iqn(self, host_name):
         return {}
 
-    def get_array_fc_wwns(self, host_name):
-        logger.debug("getting the connected fc port wwpns for host {} from array".format(host_name))
-
+    def _get_api_host_by_name(self, host_name):
         try:
-            host = self.client.get_host(host_name)
-            wwpns = [port[LOGIN_PORT_WWPN] for port in host.login_ports if
-                     port[LOGIN_PORT_STATE] == LOGIN_PORT_STATE_ONLINE]
-            logger.debug("found wwpns: {}".format(wwpns))
-            return wwpns
+            api_host = self.client.get_host(host_name)
+            return api_host
         except exceptions.NotFound:
             raise array_errors.HostNotFoundError(host_name)
         except exceptions.ClientException as ex:
-            logger.error(
-                "failed to get array fc wwpn. Reason is: {}".format(ex.details)
-            )
+            logger.error(ex.details)
             raise ex
+
+    def get_array_fc_wwns(self, host_name):
+        logger.debug("getting the connected fc port wwpns for host {} from array".format(host_name))
+        api_host = self._get_api_host_by_name(host_name)
+        wwpns = [port[LOGIN_PORT_WWPN] for port in api_host.login_ports if
+                 port[LOGIN_PORT_STATE] == LOGIN_PORT_STATE_ONLINE]
+        logger.debug("found wwpns: {}".format(wwpns))
+        return wwpns
+
 
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("getting host by initiators: {}".format(initiators))
@@ -646,6 +648,14 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             return found, [config.FC_CONNECTIVITY_TYPE]
         logger.debug("can not found host by initiators: {0} ".format(initiators))
         raise array_errors.HostNotFoundError(initiators)
+
+    def get_host_by_name(self, host_name):
+        cli_host_by_name = self._get_cli_host_by_name(host_name)
+        cli_host_by_id = self._get_cli_host_by_id(cli_host_by_name.id)
+        initiators = Initiators(nvme_nqn=self._get_host_ports(cli_host_by_id, HOST_NQN),
+                                iscsi_iqn=self._get_host_ports(cli_host_by_id, HOST_ISCSI_NAME),
+                                fc_wwns=self._get_host_ports(cli_host_by_id, HOST_WWPN))
+        return Host(host_id=cli_host_by_id.id, host_name=cli_host_by_id.name, initiators=initiators)
 
     def validate_supported_space_efficiency(self, space_efficiency):
         logger.debug("validate_supported_space_efficiency for space efficiency : {0}".format(space_efficiency))

@@ -322,6 +322,24 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def get_host_by_name(self, host_name):
+        """
+        This function will find the host name by iscsi iqn or fc wwns.
+
+        Args:
+           host_name : name of the host in the storage system
+
+        Returns:
+           Host
+
+        Raises:
+            HostNotFound
+            multipleHostsFoundError
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def is_active(self):
         """
         This function will return True if the storage connection is still active.

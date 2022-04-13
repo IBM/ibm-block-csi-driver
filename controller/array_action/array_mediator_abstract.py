@@ -2,11 +2,14 @@ from abc import ABC
 from retry import retry
 
 import controller.array_action.errors as array_errors
+from controller.array_action.array_action_types import Host
 from controller.array_action.array_mediator_interface import ArrayMediator
 from controller.array_action.config import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.errors import NoConnectionAvailableException, UnsupportedConnectivityTypeError
+from controller.array_action.host_connectivity_cache import host_connectivity_cache, HostConnectivityInfo
 from controller.array_action.utils import convert_scsi_id_to_nguid
 from controller.common.csi_logger import get_stdout_logger
+from controller.common.node_info import Initiators
 from controller.controller_server import utils
 
 logger = get_stdout_logger()
@@ -20,20 +23,29 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
         self.endpoint = endpoint
 
     @retry(NoConnectionAvailableException, tries=11, delay=1)
-    def map_volume_by_initiators(self, vol_id, initiators):
-        host_name, connectivity_types = self.get_host_by_host_identifiers(initiators)
+    def map_volume_by_initiators(self, vol_id, initiators: Initiators):
+        host = None
+        host_connectivity_info = host_connectivity_cache.get(self.endpoint, initiators)
+        if host_connectivity_info:
+            host = self.get_host_by_name(host_connectivity_info.host_name)
+        if not self._is_host_match_initiators(host, initiators):
+            host_name, connectivity_types = self.get_host_by_host_identifiers(initiators)
 
-        logger.debug("hostname : {}, connectivity_types  : {}".format(host_name, connectivity_types))
+            logger.debug("hostname : {}, connectivity_types  : {}".format(host_name, connectivity_types))
 
-        connectivity_type = utils.choose_connectivity_type(connectivity_types)
-        if NVME_OVER_FC_CONNECTIVITY_TYPE == connectivity_type:
-            array_initiators = []
-        elif FC_CONNECTIVITY_TYPE == connectivity_type:
-            array_initiators = self.get_array_fc_wwns(host_name)
-        elif ISCSI_CONNECTIVITY_TYPE == connectivity_type:
-            array_initiators = self.get_iscsi_targets_by_iqn(host_name)
-        else:
-            raise UnsupportedConnectivityTypeError(connectivity_type)
+            connectivity_type = utils.choose_connectivity_type(connectivity_types)
+            if NVME_OVER_FC_CONNECTIVITY_TYPE == connectivity_type:
+                array_initiators = []
+            elif FC_CONNECTIVITY_TYPE == connectivity_type:
+                array_initiators = self.get_array_fc_wwns(host_name)
+            elif ISCSI_CONNECTIVITY_TYPE == connectivity_type:
+                array_initiators = self.get_iscsi_targets_by_iqn(host_name)
+            else:
+                raise UnsupportedConnectivityTypeError(connectivity_type)
+            host_connectivity_info = HostConnectivityInfo(host_name=host_name, connectivity_type=connectivity_type,
+                                                          array_initiators=array_initiators)
+            host_connectivity_cache.add(self.endpoint, initiators=initiators,
+                                        host_connectivity_info=host_connectivity_info)
 
         mappings = self.get_volume_mappings(vol_id)
         if len(mappings) >= 1:
@@ -41,21 +53,25 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
                 "{0} mappings have been found for volume. the mappings are: {1}".format(len(mappings), mappings))
             if len(mappings) == 1:
                 mapping = list(mappings)[0]
-                if mapping == host_name:
+                if mapping == host_connectivity_info.host_name:
                     logger.debug("idempotent case - volume is already mapped to host.")
-                    return mappings[mapping], connectivity_type, array_initiators
+                    return mappings[mapping], \
+                           host_connectivity_info.connectivity_type, host_connectivity_info.array_initiators
             raise array_errors.VolumeMappedToMultipleHostsError(mappings)
 
-        logger.debug("no mappings were found for volume. mapping volume : {0} to host : {1}".format(vol_id, host_name))
+        logger.debug("no mappings were found for volume. mapping volume : {0} to host : {1}".format(
+            vol_id,
+            host_connectivity_info.host_name))
 
         try:
-            lun = self.map_volume(vol_id, host_name, connectivity_type)
+            lun = self.map_volume(vol_id, host_connectivity_info.host_name, host_connectivity_info.connectivity_type)
             logger.debug("lun : {}".format(lun))
         except array_errors.LunAlreadyInUseError as ex:
             logger.warning("Lun was already in use. re-trying the operation. {0}".format(ex))
             for i in range(self.max_lun_retries - 1):
                 try:
-                    lun = self.map_volume(vol_id, host_name, connectivity_type)
+                    lun = self.map_volume(vol_id, host_connectivity_info.host_name,
+                                          host_connectivity_info.connectivity_type)
                     break
                 except array_errors.LunAlreadyInUseError as inner_ex:
                     logger.warning(
@@ -63,7 +79,7 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
             else:  # will get here only if the for statement is false.
                 raise ex
 
-        return lun, connectivity_type, array_initiators
+        return lun, host_connectivity_info.connectivity_type, host_connectivity_info.array_initiators
 
     @retry(NoConnectionAvailableException, tries=11, delay=1)
     def unmap_volume_by_initiators(self, vol_id, initiators):
@@ -99,3 +115,10 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
     def _rollback_create_volume_from_source(self, volume_id):
         logger.debug("Rollback copy volume from source. Deleting volume {0}".format(volume_id))
         self.delete_volume(volume_id)
+
+    def _is_host_match_initiators(self, host: Host, initiators: Initiators):
+        if host.initiators.is_array_wwns_match(initiators.fc_wwns) or \
+                host.initiators.is_array_nvme_nqn_match(initiators.nvme_nqn) or \
+                host.initiators.is_array_iscsi_iqns_match(initiators.iscsi_iqn):
+            return True
+        return False
