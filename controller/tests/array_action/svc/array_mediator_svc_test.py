@@ -734,6 +734,18 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(SVCArrayMediator.max_connections, 2)
         self.assertEqual(SVCArrayMediator.max_lun_retries, 10)
 
+    def test_get_host_by_name_success(self):
+        host = self._get_host_as_munch('host_id_1', 'test_host_1', nqn_list=['nqn.test.1'], wwpns_list=['wwn1'],
+                                       iscsi_names_list=['iqn.test.1'])
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = Mock(as_single_element=host)
+        host = self.svc.get_host_by_name('test_host_1')
+        self.assertEqual(host.host_name, "test_host_1")
+        self.assertEqual(host.connectivity_types, ['nvmeofc', 'fc', 'iscsi'])
+        self.assertEqual(host.initiators.nvme_nqn, "nqn.test.1")
+        self.assertEqual(host.initiators.iscsi_iqn, "iqn.test.1")
+        self.assertEqual(host.initiators.fc_wwns, ['wwn1'])
+
     def _prepare_mocks_for_get_host_by_identifiers(self, svc_response, custom_host=None):
         host_1 = self._get_host_as_munch('host_id_1', 'test_host_1', nqn_list=['nqn.test.1'], wwpns_list=['wwn1'],
                                          iscsi_names_list=['iqn.test.1'])
@@ -773,48 +785,48 @@ class TestArrayMediatorSVC(unittest.TestCase):
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_return_iscsi_host(self, svc_response):
         self._prepare_mocks_for_get_host_by_identifiers(svc_response)
-        hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
+        host = self.svc.get_host_by_host_identifiers(
             Initiators('Test_nqn', ['Test_wwn'], 'iqn.test.2'))
-        self.assertEqual('test_host_2', hostname)
-        self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_types)
+        self.assertEqual('test_host_2', host.host_name)
+        self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], host.connectivity_types)
 
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_no_other_ports_return_iscsi_host(self, svc_response):
         host_with_iqn = self._get_host_as_munch('costume_host_id', 'test_costume_host',
                                                 iscsi_names_list=['iqn.test.costume'])
         self._prepare_mocks_for_get_host_by_identifiers(svc_response, custom_host=host_with_iqn)
-        hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
+        host = self.svc.get_host_by_host_identifiers(
             Initiators('Test_nqn', ['Test_wwn'], 'iqn.test.costume'))
-        self.assertEqual('test_costume_host', hostname)
-        self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_types)
+        self.assertEqual('test_costume_host', host.host_name)
+        self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], host.connectivity_types)
 
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_return_iscsi_host_with_list_iqn(self, svc_response):
         host_with_iqn_list = self._get_host_as_munch('costume_host_id', 'test_costume_host', wwpns_list=['wwns'],
                                                      iscsi_names_list=['iqn.test.s1', 'iqn.test.s2'])
         self._prepare_mocks_for_get_host_by_identifiers(svc_response, custom_host=host_with_iqn_list)
-        hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
+        host = self.svc.get_host_by_host_identifiers(
             Initiators('Test_nqn', ['Test_wwn'], 'iqn.test.s1'))
-        self.assertEqual('test_costume_host', hostname)
-        self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_types)
+        self.assertEqual('test_costume_host', host.host_name)
+        self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], host.connectivity_types)
 
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_return_nvme_host(self, svc_response):
         self._prepare_mocks_for_get_host_by_identifiers(svc_response)
-        hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
+        host = self.svc.get_host_by_host_identifiers(
             Initiators('nqn.test.3', ['Test_wwn'], 'iqn.test.6'))
-        self.assertEqual('test_host_3', hostname)
-        self.assertEqual([config.NVME_OVER_FC_CONNECTIVITY_TYPE], connectivity_types)
+        self.assertEqual('test_host_3', host.host_name)
+        self.assertEqual([config.NVME_OVER_FC_CONNECTIVITY_TYPE], host.connectivity_types)
 
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_no_other_ports_return_nvme_host(self, svc_response):
         host_with_nqn = self._get_host_as_munch('costume_host_id', 'test_costume_host',
                                                 nqn_list=['nqn.test.costume'])
         self._prepare_mocks_for_get_host_by_identifiers(svc_response, custom_host=host_with_nqn)
-        hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
+        host = self.svc.get_host_by_host_identifiers(
             Initiators('nqn.test.costume', ['Test_wwn'], 'Test_iqn'))
-        self.assertEqual('test_costume_host', hostname)
-        self.assertEqual([config.NVME_OVER_FC_CONNECTIVITY_TYPE], connectivity_types)
+        self.assertEqual('test_costume_host', host.host_name)
+        self.assertEqual([config.NVME_OVER_FC_CONNECTIVITY_TYPE], host.connectivity_types)
 
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_return_fc_host(self, svc_response):
@@ -824,25 +836,25 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                          iscsi_names_list=['iqn.test.3'])
         hosts = [host_1, host_2, host_3]
         self._prepare_mocks_for_get_host_by_identifiers(svc_response)
-        hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
+        host = self.svc.get_host_by_host_identifiers(
             Initiators('Test_nqn', ['wwn4', 'WWN3'], 'iqn.test.6'))
-        self.assertEqual('test_host_3', hostname)
-        self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_types)
+        self.assertEqual('test_host_3', host.host_name)
+        self.assertEqual([config.FC_CONNECTIVITY_TYPE], host.connectivity_types)
 
         svc_response.return_value = hosts
-        hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
+        host = self.svc.get_host_by_host_identifiers(
             Initiators('Test_nqn', ['wwn3'], 'iqn.test.6'))
-        self.assertEqual('test_host_3', hostname)
-        self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_types)
+        self.assertEqual('test_host_3', host.host_name)
+        self.assertEqual([config.FC_CONNECTIVITY_TYPE], host.connectivity_types)
 
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_no_other_ports_return_fc_host(self, svc_response):
         host_with_wwpn = self._get_host_as_munch('costume_host_id', 'test_costume_host', wwpns_list=['WWNs'])
         self._prepare_mocks_for_get_host_by_identifiers(svc_response, custom_host=host_with_wwpn)
-        hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
+        host = self.svc.get_host_by_host_identifiers(
             Initiators('Test_nqn', ['Test_wwn', 'WWNs'], 'Test_iqn'))
-        self.assertEqual('test_costume_host', hostname)
-        self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_types)
+        self.assertEqual('test_costume_host', host.host_name)
+        self.assertEqual([config.FC_CONNECTIVITY_TYPE], host.connectivity_types)
 
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_with_wrong_fc_iscsi_raise_not_found(self, svc_response):
@@ -862,12 +874,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_return_nvme_fc_and_iscsi(self, svc_response):
         self._prepare_mocks_for_get_host_by_identifiers(svc_response)
-        hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
+        host = self.svc.get_host_by_host_identifiers(
             Initiators('nqn.test.2', ['WWN2'], 'iqn.test.2'))
-        self.assertEqual('test_host_2', hostname)
+        self.assertEqual('test_host_2', host.host_name)
         self.assertEqual(
             {config.NVME_OVER_FC_CONNECTIVITY_TYPE, config.FC_CONNECTIVITY_TYPE, config.ISCSI_CONNECTIVITY_TYPE},
-            set(connectivity_types))
+            set(host.connectivity_types))
 
     def _get_host_as_munch(self, host_id, host_name, nqn_list=None, wwpns_list=None, iscsi_names_list=None,
                            portset_id=None):

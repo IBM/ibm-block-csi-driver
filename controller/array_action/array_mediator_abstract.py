@@ -1,4 +1,5 @@
 from abc import ABC
+
 from retry import retry
 
 import controller.array_action.errors as array_errors
@@ -21,30 +22,30 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
 
     @retry(NoConnectionAvailableException, tries=11, delay=1)
     def map_volume_by_initiators(self, vol_id, initiators):
-        host_name, connectivity_types = self.get_host_by_host_identifiers(initiators)
-
-        logger.debug("hostname : {}, connectivity_types  : {}".format(host_name, connectivity_types))
-
-        connectivity_type = utils.choose_connectivity_type(connectivity_types)
-        if NVME_OVER_FC_CONNECTIVITY_TYPE == connectivity_type:
-            array_initiators = []
-        elif FC_CONNECTIVITY_TYPE == connectivity_type:
-            array_initiators = self.get_array_fc_wwns(host_name)
-        elif ISCSI_CONNECTIVITY_TYPE == connectivity_type:
-            array_initiators = self.get_iscsi_targets_by_iqn(host_name)
-        else:
-            raise UnsupportedConnectivityTypeError(connectivity_type)
-
         mappings = self.get_volume_mappings(vol_id)
         if len(mappings) >= 1:
             logger.debug(
                 "{0} mappings have been found for volume. the mappings are: {1}".format(len(mappings), mappings))
             if len(mappings) == 1:
-                mapping = list(mappings)[0]
-                if mapping == host_name:
+                mapping_host_name = list(mappings)[0]
+                host = self.get_host_by_name(mapping_host_name)
+                if self._is_host_match_initiators(host, initiators):
                     logger.debug("idempotent case - volume is already mapped to host.")
-                    return mappings[mapping], connectivity_type, array_initiators
+                    lun = mappings[mapping_host_name]
+                    logger.debug(
+                        "hostname : {}, connectivity_types  : {}".format(host.host_name, host.connectivity_types))
+                    connectivity_type = utils.choose_connectivity_type(host.connectivity_types)
+                    array_initiators = self._get_array_initiators(host.host_name, connectivity_type)
+                    return lun, connectivity_type, array_initiators
+                raise array_errors.VolumeMappedToMultipleHostsError(host.initiators)
             raise array_errors.VolumeMappedToMultipleHostsError(mappings)
+
+        host_name, connectivity_types = self.get_host_by_host_identifiers(initiators)
+
+        logger.debug("hostname : {}, connectivity_types  : {}".format(host_name, connectivity_types))
+
+        connectivity_type = utils.choose_connectivity_type(connectivity_types)
+        array_initiators = self._get_array_initiators(host_name, connectivity_type)
 
         logger.debug("no mappings were found for volume. mapping volume : {0} to host : {1}".format(vol_id, host_name))
 
@@ -99,3 +100,17 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
     def _rollback_create_volume_from_source(self, volume_id):
         logger.debug("Rollback copy volume from source. Deleting volume {0}".format(volume_id))
         self.delete_volume(volume_id)
+
+    def _is_host_match_initiators(self, host, initiators):
+        return host.initiators in initiators
+
+    def _get_array_initiators(self, host_name, connectivity_type):
+        if NVME_OVER_FC_CONNECTIVITY_TYPE == connectivity_type:
+            array_initiators = []
+        elif FC_CONNECTIVITY_TYPE == connectivity_type:
+            array_initiators = self.get_array_fc_wwns(host_name)
+        elif ISCSI_CONNECTIVITY_TYPE == connectivity_type:
+            array_initiators = self.get_iscsi_targets_by_iqn(host_name)
+        else:
+            raise UnsupportedConnectivityTypeError(connectivity_type)
+        return array_initiators

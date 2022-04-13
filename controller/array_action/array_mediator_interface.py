@@ -311,13 +311,29 @@ class ArrayMediator(ABC):
            initiators : initiators (e.g. fc wwns, iqn) of the wanted host.
 
         Returns:
-           connectivity_types : list of connectivity types ([iscis, fc] or just [iscsi],..)
-           hostname           : the name of the host
+           Host
 
         Raises:
             HostNotFound
             multipleHostsFoundError
             PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_host_by_name(self, host_name):
+        """
+        This function will find the host name by iscsi iqn or fc wwns.
+
+        Args:
+           host_name : name of the host in the storage system
+
+        Returns:
+           Host
+           None
+
+        Raises:
+            None
         """
         raise NotImplementedError
 

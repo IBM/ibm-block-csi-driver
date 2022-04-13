@@ -19,13 +19,15 @@ class Initiators:
     Object containing node initiators (e.g. iqn, fc_wwns)
     """
 
-    def __init__(self, nvme_nqn, fc_wwns, iscsi_iqn):
+    def __init__(self, nvme_nqn="", fc_wwns=None, iscsi_iqn=""):
         """
         Args:
             nvme_nqn: nqn
             fc_wwns : list of fc wwns
             iscsi_iqn : iqn
         """
+        if fc_wwns is None:
+            fc_wwns = ['']
         self.nvme_nqn = nvme_nqn
         self.fc_wwns = fc_wwns
         self.iscsi_iqn = iscsi_iqn
@@ -65,6 +67,13 @@ class Initiators:
         """
         host_nqns_lower = [nqn.lower() for nqn in host_nqns]
         return self._nvme_nqn_lowercase in host_nqns_lower
+
+    def __contains__(self, other_initiators):
+        if other_initiators.is_array_wwns_match(self.fc_wwns) or \
+                other_initiators.is_array_nvme_nqn_match(self.nvme_nqn) or \
+                other_initiators.is_array_iscsi_iqns_match([self.iscsi_iqn]):
+            return True
+        return False
 
     def __str__(self):
         return "nvme_nqn: {}, fc_wwns : {}, iscsi_iqn : {} ".format(self.nvme_nqn, self.fc_wwns, self.iscsi_iqn)

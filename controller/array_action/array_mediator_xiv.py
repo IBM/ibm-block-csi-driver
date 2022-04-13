@@ -5,12 +5,13 @@ from pyxcli.client import XCLIClient
 
 import controller.array_action.errors as array_errors
 import controller.controller_server.config as controller_config
-from controller.array_action.array_action_types import Volume, Snapshot
+from controller.array_action.array_action_types import Volume, Snapshot, Host
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.utils import ClassProperty
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
+from controller.common.node_info import Initiators
 from controller.common.utils import string_to_array
 
 array_connections_dict = {}
@@ -366,6 +367,21 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise array_errors.PermissionDeniedError("delete snapshot : {0}".format(snapshot_name))
 
         logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
+
+    def _get_cli_host_by_name(self, host_name):
+        return self.client.cmd.host_list(host=host_name).as_single_element
+
+    def get_host_by_name(self, host_name):
+        cli_host = self._get_cli_host_by_name(host_name)
+        fc_wwns = string_to_array(cli_host.fc_ports, ',')
+        iscsi_iqn = string_to_array(cli_host.iscsi_ports, ',')[0]
+        connectivity_types = []
+        if fc_wwns:
+            connectivity_types.append(FC_CONNECTIVITY_TYPE)
+        if iscsi_iqn:
+            connectivity_types.append(ISCSI_CONNECTIVITY_TYPE)
+        initiators = Initiators(fc_wwns=fc_wwns, iscsi_iqn=iscsi_iqn)
+        return Host(host_name=cli_host.name, connectivity_types=connectivity_types, initiators=initiators)
 
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host id for initiators : {0}".format(initiators))

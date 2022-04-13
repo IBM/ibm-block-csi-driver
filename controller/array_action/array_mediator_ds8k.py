@@ -8,13 +8,14 @@ from retry import retry
 import controller.array_action.errors as array_errors
 import controller.controller_server.config as controller_config
 from controller.array_action import config
-from controller.array_action.array_action_types import Volume, Snapshot
+from controller.array_action.array_action_types import Volume, Snapshot, Host
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.ds8k_rest_client import RESTClient, scsilun_to_int
 from controller.array_action.ds8k_volume_cache import VolumeCache
 from controller.array_action.utils import ClassProperty
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
+from controller.common.node_info import Initiators
 
 LOGIN_PORT_WWPN = attr_names.IOPORT_WWPN
 LOGIN_PORT_STATE = attr_names.IOPORT_STATUS
@@ -617,20 +618,28 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def get_array_fc_wwns(self, host_name):
         logger.debug("getting the connected fc port wwpns for host {} from array".format(host_name))
+        api_host = self._get_api_host_by_name(host_name)
+        wwpns = [port[LOGIN_PORT_WWPN] for port in api_host.login_ports if
+                 port[LOGIN_PORT_STATE] == LOGIN_PORT_STATE_ONLINE]
+        logger.debug("found wwpns: {}".format(wwpns))
+        return wwpns
 
+    def _get_api_host_by_name(self, host_name):
         try:
-            host = self.client.get_host(host_name)
-            wwpns = [port[LOGIN_PORT_WWPN] for port in host.login_ports if
-                     port[LOGIN_PORT_STATE] == LOGIN_PORT_STATE_ONLINE]
-            logger.debug("found wwpns: {}".format(wwpns))
-            return wwpns
+            return self.client.get_host(host_name)
         except exceptions.NotFound:
-            raise array_errors.HostNotFoundError(host_name)
+            return None
         except exceptions.ClientException as ex:
-            logger.error(
-                "failed to get array fc wwpn. Reason is: {}".format(ex.details)
-            )
             raise ex
+
+    def get_host_by_name(self, host_name):
+        api_host = self._get_api_host_by_name(host_name)
+        if api_host is None:
+            return None
+        host_ports = api_host.host_ports_briefs
+        fc_wwns = [p["wwpn"] for p in host_ports]
+        initiators = Initiators(fc_wwns=fc_wwns)
+        return Host(host_name=api_host.name, connectivity_types=[config.FC_CONNECTIVITY_TYPE], initiators=initiators)
 
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("getting host by initiators: {}".format(initiators))
