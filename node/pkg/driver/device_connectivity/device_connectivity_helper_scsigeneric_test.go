@@ -219,6 +219,7 @@ func TestGetMpathDevice(t *testing.T) {
 			fake_helper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
 			fake_mutex := &sync.Mutex{}
 			wantedVolumIds := []string{volumeUuid, volumeNguid}
+			dmPath := "/dev/dm-1"
 
 			for _, r := range tc.getDmsPathReturn {
 				fake_helper.EXPECT().GetDmsPath(volumeUuid, volumeNguid, device_connectivity.MultipathdFilterMpathAndVolumeId).Return(
@@ -227,8 +228,7 @@ func TestGetMpathDevice(t *testing.T) {
 			}
 
 			for _, r := range tc.isMpathHasRightVolumeIdWithoutErrorsReturn {
-				fmt.Println("hi1")
-				fake_helper.EXPECT().IsMpathHasRightVolumeIdWithoutErrors("/dev/dm-1", wantedVolumIds).Return(
+				fake_helper.EXPECT().IsMpathHasRightVolumeIdWithoutErrors(dmPath, wantedVolumIds).Return(
 					r.isMpathGood)
 			}
 
@@ -238,7 +238,7 @@ func TestGetMpathDevice(t *testing.T) {
 			}
 
 			for _, r := range tc.isMpathHasRightVolumeIdReturn {
-				fake_helper.EXPECT().IsMpathHasRightVolumeId("/dev/dm-1", volumeUuid, volumeNguid).Return(
+				fake_helper.EXPECT().IsMpathHasRightVolumeId(dmPath, volumeUuid, volumeNguid).Return(
 					r.isMpathGood,
 					r.err)
 			}

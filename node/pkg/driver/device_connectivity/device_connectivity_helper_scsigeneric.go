@@ -468,26 +468,33 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 
 func (o OsDeviceConnectivityHelperGeneric) IsMpathHasRightVolumeId(dmPath string,
 	volumeUuidLower string, volumeNguid string) (bool, error) {
-	SgInqWwn, err := o.GetWwnByScsiInq(dmPath)
+	sgInqWwn, err := o.getSgInqWwnFromDmPath(dmPath)
 	if err != nil {
 		return false, err
 	}
-	SgInqWwnLower := strings.ToLower(SgInqWwn)
-	if SgInqWwnLower == volumeUuidLower || SgInqWwnLower == volumeNguid {
+	if sgInqWwn == volumeUuidLower || sgInqWwn == volumeNguid {
 		return true, nil
 	}
-	return false, &ErrorWrongDeviceFound{dmPath, volumeUuidLower, SgInqWwn}
+	return false, &ErrorWrongDeviceFound{dmPath, volumeUuidLower, sgInqWwn}
 }
 
 func (o OsDeviceConnectivityHelperGeneric) IsMpathHasRightVolumeIdWithoutErrors(dmPath string, wnatedVolumeIds []string) bool {
-	SgInqWwn, _ := o.GetWwnByScsiInq(dmPath)
-	SgInqWwnLower := strings.ToLower(SgInqWwn)
+	sgInqWwn, _ := o.getSgInqWwnFromDmPath(dmPath)
 	for _, wnatedVolumeId := range wnatedVolumeIds {
-		if SgInqWwnLower == wnatedVolumeId {
+		if sgInqWwn == wnatedVolumeId {
 			return true
 		}
 	}
 	return false
+}
+
+func (o OsDeviceConnectivityHelperGeneric) getSgInqWwnFromDmPath(dmPath string) (string, error) {
+	SgInqWwn, err := o.GetWwnByScsiInq(dmPath)
+	if err != nil {
+		return "", err
+	}
+	SgInqWwnLower := strings.ToLower(SgInqWwn)
+	return SgInqWwnLower, nil
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, error) {
@@ -713,9 +720,7 @@ func (o GetDmsPathHelperGeneric) GetDmObjectsByIdentifier(wantedDmObjects []stri
 
 	scanner := bufio.NewScanner(strings.NewReader(outputToCheckIn))
 	for scanner.Scan() {
-		deviceLine := scanner.Text()
-		lineParts := strings.Split(deviceLine, mpathdSeparator)
-		identifier, dmObject := lineParts[0], lineParts[1]
+		identifier, dmObject := o.getLineParts(scanner)
 		if o.IsThisWantedDmObject(wantedDmObjects, identifier) {
 			dmObjects[dmObject] = true
 			logger.Infof("getDmObjectsByIdentifier: DM Object found: %s for DM Object %s", dmObject, identifier)
@@ -723,6 +728,12 @@ func (o GetDmsPathHelperGeneric) GetDmObjectsByIdentifier(wantedDmObjects []stri
 	}
 
 	return dmObjects
+}
+
+func (GetDmsPathHelperGeneric) getLineParts(scanner *bufio.Scanner) (string, string) {
+	deviceLine := scanner.Text()
+	lineParts := strings.Split(deviceLine, mpathdSeparator)
+	return lineParts[0], lineParts[1]
 }
 
 func (o GetDmsPathHelperGeneric) IsThisWantedDmObject(wantedDmObjects []string, dmObject string) bool {
@@ -752,13 +763,22 @@ func (GetDmsPathHelperGeneric) GetMpathDeviceNameFromProcMountsContent(procMount
 	volumePath string) (string, error) {
 	scanner := bufio.NewScanner(strings.NewReader(string(procMountsFileContent)))
 	for scanner.Scan() {
-		mountLine := scanner.Text()
-		lineParts := strings.Fields(mountLine)
+		mountLine, lineParts := getLinePartsBySpaces(scanner)
 		if strings.Contains(mountLine, volumePath) {
-			fullMpathDeviceName := lineParts[0]
-			splitedFullMpathDeviceName := strings.Split(fullMpathDeviceName, "/")
-			return splitedFullMpathDeviceName[len(splitedFullMpathDeviceName)-1], nil
+			return getMpathDeviceNameFromSplitedLine(lineParts), nil
 		}
 	}
 	return "", &MultipathDeviceNotFoundForVolumePathError{volumePath}
+}
+
+func getLinePartsBySpaces(scanner *bufio.Scanner) (string, []string) {
+	mountLine := scanner.Text()
+	lineParts := strings.Fields(mountLine)
+	return mountLine, lineParts
+}
+
+func getMpathDeviceNameFromSplitedLine(lineParts []string) string {
+	fullMpathDeviceName := lineParts[0]
+	splitedFullMpathDeviceName := strings.Split(fullMpathDeviceName, "/")
+	return splitedFullMpathDeviceName[len(splitedFullMpathDeviceName)-1]
 }
