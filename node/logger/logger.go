@@ -47,6 +47,7 @@ const (
 	additionalGoIDInfoField = "addId"
 	unknownValue            = "unknown"
 	noAdditionalIDValue     = "-"
+	startCallerDepth        = 1
 )
 
 type LogFormat struct {
@@ -85,7 +86,7 @@ func (f *LogFormat) Format(entry *logrus.Entry) ([]byte, error) {
 
 // Initialize logrus instance if it was not initialized yet
 // It panics if -loglevel is specified but as illegal value
-func getInstance() *logrus.Logger {
+func getInstance(callerDepth int) *logrus.Logger {
 	if instance == nil {
 		formatter := LogFormat{}
 		instance = logrus.New()
@@ -97,7 +98,7 @@ func getInstance() *logrus.Logger {
 		logLevel := flag.String("loglevel", "trace", "The level of logs (error, warning info, debug, trace etc...).")
 		level, err := logrus.ParseLevel(*logLevel)
 		if err != nil {
-			logEntry().Panic(err)
+			logEntry(callerDepth + 1).Panic(err)
 		}
 		instance.SetLevel(level)
 	}
@@ -107,106 +108,70 @@ func getInstance() *logrus.Logger {
 // Create log entry with additional data
 // 1) goroutine id
 // 2) caller: file and line log was called from
-func logEntry() *logrus.Entry {
+func logEntry(callerDepth int) *logrus.Entry {
 	goid := util.GetGoID()
 	additionalId, _ := goid_info.GetAdditionalIDInfo()
-	_, file, no, ok := runtime.Caller(2)
+	_, file, no, ok := runtime.Caller(callerDepth + 1)
 	caller := unknownValue
 	if ok {
 		caller = filepath.Base(file) + ":" + strconv.Itoa(no)
 	}
-	logEntry := getInstance().WithFields(logrus.Fields{goIDField: strconv.FormatUint(goid, 10),
+	logEntry := getInstance(callerDepth + 1).WithFields(logrus.Fields{goIDField: strconv.FormatUint(goid, 10),
 		additionalGoIDInfoField: additionalId,
 		callerField:             caller})
 	return logEntry
 }
 
-func Trace(args ...interface{}) {
-	logEntry().Trace(args...)
-}
-
-func Traceln(args ...interface{}) {
-	logEntry().Traceln(args...)
-}
-
 func Tracef(format string, args ...interface{}) {
-	logEntry().Tracef(format, args...)
+	logEntry(startCallerDepth).Tracef(format, args...)
 }
 
 func Debug(args ...interface{}) {
-	logEntry().Debug(args...)
-}
-
-func Debugln(args ...interface{}) {
-	logEntry().Debugln(args...)
+	logEntry(startCallerDepth).Debug(args...)
 }
 
 func Debugf(format string, args ...interface{}) {
-	logEntry().Debugf(format, args...)
+	logEntry(startCallerDepth).Debugf(format, args...)
+}
+
+func DebugfCustomDepth(callerDepth int, format string, args ...interface{}) {
+	logEntry(callerDepth+1).Debugf(format, args...)
 }
 
 func Info(args ...interface{}) {
-	logEntry().Info(args...)
-}
-
-func Infoln(args ...interface{}) {
-	logEntry().Infoln(args...)
+	logEntry(startCallerDepth).Info(args...)
 }
 
 func Infof(format string, args ...interface{}) {
-	logEntry().Infof(format, args...)
+	logEntry(startCallerDepth).Infof(format, args...)
 }
 
 func Warning(args ...interface{}) {
-	logEntry().Warn(args...)
-}
-
-func Warningln(args ...interface{}) {
-	logEntry().Warnln(args...)
+	logEntry(startCallerDepth).Warn(args...)
 }
 
 func Warningf(format string, args ...interface{}) {
-	logEntry().Warnf(format, args...)
+	logEntry(startCallerDepth).Warnf(format, args...)
 }
 
 func Error(args ...interface{}) {
-	logEntry().Error(args...)
+	logEntry(startCallerDepth).Error(args...)
 }
 
 func Errorln(args ...interface{}) {
-	logEntry().Errorln(args...)
+	logEntry(startCallerDepth).Errorln(args...)
 }
 
 func Errorf(format string, args ...interface{}) {
-	logEntry().Errorf(format, args...)
-}
-
-func Fatal(args ...interface{}) {
-	logEntry().Fatal(args...)
-}
-
-func Fatalln(args ...interface{}) {
-	logEntry().Fatalln(args...)
-}
-
-func Fatalf(format string, args ...interface{}) {
-	logEntry().Fatalf(format, args...)
-}
-
-func Panic(args ...interface{}) {
-	logEntry().Panic(args...)
+	logEntry(startCallerDepth).Errorf(format, args...)
 }
 
 func Panicln(args ...interface{}) {
-	logEntry().Panicln(args...)
-}
-
-func Panicf(format string, args ...interface{}) {
-	logEntry().Panicf(format, args...)
+	logEntry(startCallerDepth).Panicln(args...)
 }
 
 func GetLevel() string {
-	return getInstance().GetLevel().String()
+	return getInstance(startCallerDepth).GetLevel().String()
 }
 
 func getStringFromCall(request interface{}, methodName string) string {
@@ -236,13 +201,22 @@ func getFuncName() string {
 	return funcName
 }
 
-func logEnter(funcName string, request interface{}) {
+func DebugfLogEnter(callerDepth int, format string, args ...interface{}) {
+	DebugfCustomDepth(callerDepth+1, format, args...)
+}
+
+func DebugfLogExit(callerDepth int, format string, args ...interface{}) {
+	DebugfCustomDepth(callerDepth+1, format, args...)
+}
+
+func logEnter(callerDepth int, funcName string, request interface{}) {
+	callerDepth++
 	var message = ">>>> %v"
 	if getStringFromCall(request, "String") != "" {
 		message += ": called with args %+v"
-		Debugf(message, funcName, request)
+		DebugfLogEnter(callerDepth, message, funcName, request)
 	} else {
-		Debugf(message, funcName)
+		DebugfLogEnter(callerDepth, message, funcName)
 	}
 }
 
@@ -251,14 +225,14 @@ func Enter(request interface{}) string {
 
 	funcName := getFuncName()
 	if funcName != "" {
-		logEnter(funcName, request)
+		logEnter(startCallerDepth, funcName, request)
 	}
 	return funcName
 }
 
 func Exit(funcName string) {
 	if funcName != "" {
-		Debugf("<<<< %v", funcName)
+		DebugfLogExit(startCallerDepth, "<<<< %v", funcName)
 	}
 	goid_info.DeleteAdditionalIDInfo()
 }

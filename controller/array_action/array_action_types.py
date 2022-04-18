@@ -8,23 +8,17 @@ class Volume:
     internal_id: str
     name: str
     array_address: str
-    pool: str
-    copy_source_id: str
+    source_id: str
     array_type: str
+    pool: str
     space_efficiency: str = None
     default_space_efficiency: str = None
 
 
 @dataclass()
-class Snapshot:
-    capacity_bytes: int
-    id: str
-    internal_id: str
-    name: str
-    array_address: str
-    source_volume_id: str
-    is_ready: bool
-    array_type: str
+class Snapshot(Volume):
+    pool: str = None
+    is_ready: bool = False
 
 
 class Replication:
