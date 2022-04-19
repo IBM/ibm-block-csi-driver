@@ -388,6 +388,21 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_property(self):
         self.assertEqual(XIVArrayMediator.port, 7778)
 
+    def test_get_host_by_name_success(self):
+        host = utils.get_mock_xiv_host("test_host_1", "iqn.test.1", "")
+        self.mediator.client.cmd.host_list.return_value = Mock(as_single_element=host)
+        host = self.mediator.get_host_by_name('test_host_1')
+        self.assertEqual(host.host_name, "test_host_1")
+        self.assertEqual(host.connectivity_types, ['iscsi'])
+        self.assertEqual(host.initiators.nvme_nqn, '')
+        self.assertEqual(host.initiators.iscsi_iqn, "iqn.test.1")
+        self.assertEqual(host.initiators.fc_wwns, [])
+
+    def test_get_host_by_name_return_none(self):
+        self.mediator.client.cmd.host_list.return_value = Mock(as_single_element=None)
+        host = self.mediator.get_host_by_name('test_host_1')
+        self.assertIsNone(host)
+
     def test_get_host_by_identifiers_returns_host_not_found(self):
         nqn = ""
         wwns = ['wwn1', 'wwn2']

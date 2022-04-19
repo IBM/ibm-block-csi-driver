@@ -311,7 +311,8 @@ class ArrayMediator(ABC):
            initiators : initiators (e.g. fc wwns, iqn) of the wanted host.
 
         Returns:
-           Host
+           connectivity_types : list of connectivity types ([iscis, fc] or just [iscsi],..)
+           hostname           : the name of the host
 
         Raises:
             HostNotFound

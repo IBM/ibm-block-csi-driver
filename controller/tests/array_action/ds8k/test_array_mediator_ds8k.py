@@ -435,6 +435,21 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             ]})
         self.assertListEqual(self.array.get_array_fc_wwns(None), [wwpn])
 
+    def test_get_host_by_name_success(self):
+        self.client_mock.get_host.return_value = Munch(
+            {"name": "test_host_1", "host_ports_briefs": [{"wwpn": "wwpn1"}, {"wwpn": "wwpn2"}]})
+        host = self.array.get_host_by_name('test_host_1')
+        self.assertEqual(host.host_name, "test_host_1")
+        self.assertEqual(host.connectivity_types, ['fc'])
+        self.assertEqual(host.initiators.nvme_nqn, "")
+        self.assertEqual(host.initiators.iscsi_iqn, "")
+        self.assertEqual(host.initiators.fc_wwns, ['wwpn1', 'wwpn2'])
+
+    def test_get_host_by_name_return_none(self):
+        self.client_mock.get_host.return_value = None
+        host = self.array.get_host_by_name('test_host_1')
+        self.assertIsNone(host)
+
     def test_get_host_by_identifiers(self):
         host_name = "test_host"
         wwpn1 = "wwpn1"
