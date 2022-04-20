@@ -7,6 +7,7 @@ echo `pwd`
 sleep 2
 mkdir -p build/reports && chmod 777 build/reports
 set +e
+docker image rm csi-sanity-test
 ./scripts/ci/run_csi_test_client.sh csi-sanity-test `pwd`/build/reports/ $1
 
 docker logs csi-controller >& "csi_controller_run.log"
