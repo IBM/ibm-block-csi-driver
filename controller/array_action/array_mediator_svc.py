@@ -763,7 +763,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         host_name = self._get_host_name_if_equal(nvme_host, fc_host, iscsi_host)
         if not host_name:
             raise array_errors.MultipleHostsFoundError(initiators, fc_host)
-        return Host(host_name=host_name, connectivity_types=list(connectivity_types))
+        return host_name, list(connectivity_types)
 
     def _get_detailed_hosts_list(self):
         logger.debug("Getting detailed hosts list on array {0}".format(self.endpoint))

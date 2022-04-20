@@ -27,7 +27,7 @@ class Initiators:
             iscsi_iqn : iqn
         """
         if fc_wwns is None:
-            fc_wwns = ['']
+            fc_wwns = []
         self.nvme_nqn = nvme_nqn
         self.fc_wwns = fc_wwns
         self.iscsi_iqn = iscsi_iqn

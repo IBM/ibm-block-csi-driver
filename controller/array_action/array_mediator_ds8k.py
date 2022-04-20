@@ -632,21 +632,27 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         except exceptions.ClientException as ex:
             raise ex
 
+    def _get_fc_wwns_from_api_host(self, api_host):
+        host_ports = api_host.host_ports_briefs
+        return [p["wwpn"] for p in host_ports]
+
     def get_host_by_name(self, host_name):
         api_host = self._get_api_host_by_name(host_name)
         if api_host is None:
             return None
-        host_ports = api_host.host_ports_briefs
-        fc_wwns = [p["wwpn"] for p in host_ports]
-        initiators = Initiators(fc_wwns=fc_wwns)
-        return Host(host_name=api_host.name, connectivity_types=[config.FC_CONNECTIVITY_TYPE], initiators=initiators)
+        fc_wwns = self._get_fc_wwns_from_api_host(api_host)
+        initiators = Initiators()
+        connectivity_types = []
+        if fc_wwns:
+            initiators.fc_wwns = fc_wwns
+            connectivity_types.append(config.FC_CONNECTIVITY_TYPE)
+        return Host(host_name=api_host.name, connectivity_types=connectivity_types, initiators=initiators)
 
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("getting host by initiators: {}".format(initiators))
         found = ""
         for host in self.client.get_hosts():
-            host_ports = host.host_ports_briefs
-            wwpns = [p["wwpn"] for p in host_ports]
+            wwpns = self._get_fc_wwns_from_api_host(host)
             if initiators.is_array_wwns_match(wwpns):
                 found = host.name
                 break
