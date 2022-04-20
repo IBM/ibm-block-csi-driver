@@ -13,5 +13,7 @@ docker logs csi-controller >& "csi_controller_run.log"
 docker logs csi-node >& "csi_node_run.log"
 docker kill csi-controller
 docker kill csi-node
+docker kill csi-sanity-test
 docker rm csi-controller
 docker rm csi-node
+docker rm csi-sanity-test
