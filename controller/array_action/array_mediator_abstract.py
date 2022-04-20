@@ -29,7 +29,7 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
             if len(mappings) == 1:
                 mapping_host_name = list(mappings)[0]
                 host = self.get_host_by_name(mapping_host_name)
-                if self._is_host_match_initiators(host, initiators):
+                if host.initiators in initiators:
                     logger.debug("idempotent case - volume is already mapped to host.")
                     lun = mappings[mapping_host_name]
                     logger.debug(
@@ -37,8 +37,12 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
                     connectivity_type = utils.choose_connectivity_type(host.connectivity_types)
                     array_initiators = self._get_array_initiators(host.host_name, connectivity_type)
                     return lun, connectivity_type, array_initiators
+                logger.debug("idempotent case - volume is already mapped to host but dont match initiators."
+                             " host initiators: {} request initiators: {}.".format(host.initiators, initiators))
                 raise array_errors.VolumeMappedToMultipleHostsError(host.initiators)
             raise array_errors.VolumeMappedToMultipleHostsError(mappings)
+
+        logger.debug("no mappings were found for volume. mapping volume : {0}".format(vol_id))
 
         host_name, connectivity_types = self.get_host_by_host_identifiers(initiators)
 
@@ -46,8 +50,6 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
 
         connectivity_type = utils.choose_connectivity_type(connectivity_types)
         array_initiators = self._get_array_initiators(host_name, connectivity_type)
-
-        logger.debug("no mappings were found for volume. mapping volume : {0} to host : {1}".format(vol_id, host_name))
 
         try:
             lun = self.map_volume(vol_id, host_name, connectivity_type)
@@ -100,9 +102,6 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
     def _rollback_create_volume_from_source(self, volume_id):
         logger.debug("Rollback copy volume from source. Deleting volume {0}".format(volume_id))
         self.delete_volume(volume_id)
-
-    def _is_host_match_initiators(self, host, initiators):
-        return host.initiators in initiators
 
     def _get_array_initiators(self, host_name, connectivity_type):
         if NVME_OVER_FC_CONNECTIVITY_TYPE == connectivity_type:
