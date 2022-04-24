@@ -784,10 +784,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             return self.client.svcinfo.lshostiplogin(object_id=iqn).as_single_element
         except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.error("Failed to get iscsi host. Reason "
-                         "is: {0}".format(ex))
             if SPECIFIED_OBJ_NOT_EXIST in ex.my_message:
                 return None
+            logger.error("Failed to get iscsi host. Reason "
+                         "is: {0}".format(ex))
             raise ex
 
     def _get_host_name_by_iqn(self, iqn):
@@ -806,12 +806,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 if nvme_host_names:
                     host_names.update(nvme_host_names)
                     connectivity_types.add(config.NVME_OVER_FC_CONNECTIVITY_TYPE)
-            if connectivity_type == config.FC_CONNECTIVITY_TYPE:
+            elif connectivity_type == config.FC_CONNECTIVITY_TYPE:
                 fc_host_names = self._get_host_names_by_wwpn(initiator)
                 if fc_host_names:
                     host_names.update(fc_host_names)
                     connectivity_types.add(config.FC_CONNECTIVITY_TYPE)
-            if connectivity_type == config.ISCSI_CONNECTIVITY_TYPE:
+            elif connectivity_type == config.ISCSI_CONNECTIVITY_TYPE:
                 iscsi_host_name = self._get_host_name_by_iqn(initiator)
                 if iscsi_host_name:
                     host_names.add(iscsi_host_name)
