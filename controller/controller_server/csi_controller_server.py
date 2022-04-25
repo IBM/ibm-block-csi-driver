@@ -222,7 +222,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                                   array_initiators)
             return response
 
-        except array_errors.VolumeMappedToMultipleHostsError as ex:
+        except array_errors.VolumeAlreadyMappedError as ex:
             return handle_exception(ex, context, grpc.StatusCode.FAILED_PRECONDITION,
                                     csi_pb2.ControllerPublishVolumeResponse)
         except (array_errors.LunAlreadyInUseError, array_errors.NoAvailableLunError) as ex:

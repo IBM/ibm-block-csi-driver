@@ -187,11 +187,11 @@ class UnmappingError(BaseArrayActionException):
         self.message = messages.UNMAPPING_ERROR_MESSAGE.format(volume_id_or_name, host, err)
 
 
-class VolumeMappedToMultipleHostsError(BaseArrayActionException):
+class VolumeAlreadyMappedError(BaseArrayActionException):
 
     def __init__(self, hosts):
         super().__init__()
-        self.message = messages.VOLUME_MAPPED_TO_MULTIPLE_HOSTS_ERROR_MESSAGE.format(hosts)
+        self.message = messages.VOLUME_ALREADY_MAPPED_ERROR_MESSAGE.format(hosts)
 
 
 class NoIscsiTargetsFoundError(BaseArrayActionException):
