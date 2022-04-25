@@ -641,11 +641,10 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         if api_host is None:
             return None
         fc_wwns = self._get_fc_wwns_from_api_host(api_host)
-        initiators = Initiators()
         connectivity_types = []
         if fc_wwns:
-            initiators.fc_wwns = fc_wwns
             connectivity_types.append(config.FC_CONNECTIVITY_TYPE)
+        initiators = Initiators(nvme_nqn="", fc_wwns=fc_wwns, iscsi_iqn="")
         return Host(host_name=api_host.name, connectivity_types=connectivity_types, initiators=initiators)
 
     def get_host_by_host_identifiers(self, initiators):

@@ -378,13 +378,11 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         fc_wwns = string_to_array(cli_host.fc_ports, ',')
         iscsi_iqn = string_to_array(cli_host.iscsi_ports, ',')[0]
         connectivity_types = []
-        initiators = Initiators()
         if fc_wwns:
             connectivity_types.append(FC_CONNECTIVITY_TYPE)
-            initiators.fc_wwns = fc_wwns
         if iscsi_iqn:
             connectivity_types.append(ISCSI_CONNECTIVITY_TYPE)
-            initiators.iscsi_iqn = iscsi_iqn
+        initiators = Initiators(nvme_nqn="", fc_wwns=fc_wwns, iscsi_iqn=iscsi_iqn)
         return Host(host_name=cli_host.name, connectivity_types=connectivity_types, initiators=initiators)
 
     def get_host_by_host_identifiers(self, initiators):
