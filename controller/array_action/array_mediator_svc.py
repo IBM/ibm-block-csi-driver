@@ -733,7 +733,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return ports if isinstance(ports, list) else [ports]
 
     def _get_host_by_host_identifiers_slow(self, initiators):
-        logger.debug("Getting host name slowly for initiators : {0}".format(initiators))
+        logger.debug("Scanning all hosts for initiators : {0}".format(initiators))
         detailed_hosts_list = self._get_detailed_hosts_list()
         nvme_host, fc_host, iscsi_host = None, None, None
         connectivity_types = set()
