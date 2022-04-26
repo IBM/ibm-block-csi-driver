@@ -524,14 +524,14 @@ func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVol
 		return codes.InvalidArgument, &RequestValidationError{"Volume ID not provided"}
 	}
 
-	source := req.GetStagingTargetPath()
-	if len(source) == 0 {
-		return codes.FailedPrecondition, &RequestValidationError{"Staging target not provided"}
-	}
-
 	target := req.GetTargetPath()
 	if len(target) == 0 {
 		return codes.InvalidArgument, &RequestValidationError{"Target path not provided"}
+	}
+
+	source := req.GetStagingTargetPath()
+	if len(source) == 0 {
+		return codes.FailedPrecondition, &RequestValidationError{"Staging target not provided"}
 	}
 
 	volCap := req.GetVolumeCapability()
