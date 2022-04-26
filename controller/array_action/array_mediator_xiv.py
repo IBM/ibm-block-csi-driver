@@ -383,7 +383,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         if iscsi_iqn:
             connectivity_types.append(ISCSI_CONNECTIVITY_TYPE)
         initiators = Initiators(nvme_nqn="", fc_wwns=fc_wwns, iscsi_iqn=iscsi_iqn)
-        return Host(host_name=cli_host.name, connectivity_types=connectivity_types, initiators=initiators)
+        return Host(name=cli_host.name, connectivity_types=connectivity_types, initiators=initiators)
 
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host id for initiators : {0}".format(initiators))

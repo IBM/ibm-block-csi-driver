@@ -1109,7 +1109,7 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_volume_mappings = Mock()
         self.mediator.get_volume_mappings.return_value = {self.hostname: 2}
         self.mediator.get_host_by_name = Mock()
-        self.mediator.get_host_by_name.return_value = Host(host_name=self.hostname, connectivity_types=['iscsi'],
+        self.mediator.get_host_by_name.return_value = Host(name=self.hostname, connectivity_types=['iscsi'],
                                                            initiators=Initiators(nvme_nqn="", fc_wwns=[],
                                                                                  iscsi_iqn=self.iqn))
         storage_agent.return_value = self.storage_agent
@@ -1214,7 +1214,7 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_volume_mappings = Mock()
         self.mediator.get_volume_mappings.return_value = {self.hostname: 3}
         self.mediator.get_host_by_name = Mock()
-        self.mediator.get_host_by_name.return_value = Host(host_name=self.hostname, connectivity_types=['iscsi'],
+        self.mediator.get_host_by_name.return_value = Host(name=self.hostname, connectivity_types=['iscsi'],
                                                            initiators=Initiators(nvme_nqn="", fc_wwns=[],
                                                                                  iscsi_iqn="other_iqn"))
         storage_agent.return_value = self.storage_agent

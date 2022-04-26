@@ -392,7 +392,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         host = utils.get_mock_xiv_host("test_host_1", "iqn.test.1", "")
         self.mediator.client.cmd.host_list.return_value = Mock(as_single_element=host)
         host = self.mediator.get_host_by_name('test_host_1')
-        self.assertEqual(host.host_name, "test_host_1")
+        self.assertEqual(host.name, "test_host_1")
         self.assertEqual(host.connectivity_types, ['iscsi'])
         self.assertEqual(host.initiators.nvme_nqn, '')
         self.assertEqual(host.initiators.iscsi_iqn, "iqn.test.1")

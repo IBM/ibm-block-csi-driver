@@ -802,7 +802,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if iscsi_iqns:
             connectivity_types.append(config.ISCSI_CONNECTIVITY_TYPE)
         initiators = Initiators(nvme_nqn=nvme_nqns[0], iscsi_iqn=iscsi_iqns[0], fc_wwns=fc_wwns)
-        return Host(host_name=cli_host_by_id.name, connectivity_types=connectivity_types, initiators=initiators)
+        return Host(name=cli_host_by_id.name, connectivity_types=connectivity_types, initiators=initiators)
 
     def _lsvdiskhostmap(self, volume_name):
         try:

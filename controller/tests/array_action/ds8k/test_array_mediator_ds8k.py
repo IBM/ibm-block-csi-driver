@@ -439,7 +439,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.get_host.return_value = Munch(
             {"name": "test_host_1", "host_ports_briefs": [{"wwpn": "wwpn1"}, {"wwpn": "wwpn2"}]})
         host = self.array.get_host_by_name('test_host_1')
-        self.assertEqual(host.host_name, "test_host_1")
+        self.assertEqual(host.name, "test_host_1")
         self.assertEqual(host.connectivity_types, ['fc'])
         self.assertEqual(host.initiators.nvme_nqn, "")
         self.assertEqual(host.initiators.iscsi_iqn, "")

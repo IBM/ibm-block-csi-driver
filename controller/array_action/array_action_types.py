@@ -35,6 +35,6 @@ class Replication:
 
 @dataclass()
 class Host:
-    host_name: str
+    name: str
     connectivity_types: list
     initiators: Initiators = None

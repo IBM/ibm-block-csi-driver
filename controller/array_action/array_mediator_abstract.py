@@ -33,13 +33,13 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
                     logger.debug("idempotent case - volume is already mapped to host.")
                     lun = mappings[mapping_host_name]
                     logger.debug(
-                        "hostname : {}, connectivity_types  : {}".format(host.host_name, host.connectivity_types))
+                        "hostname : {}, connectivity_types  : {}".format(host.name, host.connectivity_types))
                     connectivity_type = utils.choose_connectivity_type(host.connectivity_types)
-                    array_initiators = self._get_array_initiators(host.host_name, connectivity_type)
+                    array_initiators = self._get_array_initiators(host.name, connectivity_type)
                     return lun, connectivity_type, array_initiators
                 logger.debug("idempotent case - volume is already mapped to host but dont match initiators."
                              " host initiators: {} request initiators: {}.".format(host.initiators, initiators))
-                raise array_errors.VolumeAlreadyMappedError(host.initiators)
+                raise array_errors.VolumeAlreadyMappedError(host.name)
             raise array_errors.VolumeAlreadyMappedError(mappings)
 
         logger.debug("no mappings were found for volume. mapping volume : {0}".format(vol_id))
