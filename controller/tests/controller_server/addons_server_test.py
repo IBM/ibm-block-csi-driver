@@ -11,10 +11,12 @@ from controller.tests.controller_server.csi_controller_server_test import BaseCo
 
 
 class TestControllerServicerEnableVolumeReplication(BaseControllerSetUp, CommonControllerTest):
-    def get_tested_method(self):
+    @property
+    def tested_method(self):
         return self.servicer.EnableVolumeReplication
 
-    def get_tested_method_response_class(self):
+    @property
+    def tested_method_response_class(self):
         return pb2.EnableVolumeReplicationResponse
 
     def setUp(self):

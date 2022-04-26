@@ -1,7 +1,4 @@
-import os.path
-
 import grpc
-import yaml
 from csi_general import csi_pb2
 from csi_general import csi_pb2_grpc
 
@@ -14,6 +11,7 @@ from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.node_info import NodeIdInfo
 from controller.controller_server import messages as controller_messages
+from controller.common.config import config as common_config
 from controller.controller_server.decorators import csi_method
 from controller.controller_server.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controller.controller_server.exception_handler import handle_exception, \
@@ -26,15 +24,6 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
     """
     gRPC server for Digestor Service
     """
-
-    def __init__(self):
-        my_path = os.path.abspath(os.path.dirname(__file__))
-        path = os.path.join(my_path, "../../common/config.yaml")
-
-        with open(path, 'r') as yamlfile:
-            cfg = yaml.safe_load(yamlfile)  # TODO: add the following when possible : Loader=yaml.FullLoader)
-        self.plugin_identity = cfg['identity']
-        self.controller_config = cfg['controller']
 
     @csi_method(error_response_type=csi_pb2.CreateVolumeResponse, lock_request_attribute="name")
     def CreateVolume(self, request, context):
@@ -115,7 +104,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 if source_id:
                     array_mediator.copy_to_existing_volume_from_source(volume, source_id,
                                                                        source_type, required_bytes)
-                    volume.copy_source_id = source_id
+                    volume.source_id = source_id
 
                 response = utils.generate_csi_create_volume_response(volume, array_connection_info.system_id,
                                                                      source_type)
@@ -139,10 +128,10 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             If volume is a copy of another source - set context status to INTERNAL and return CreateVolumeResponse.
             In any other case return None.
         """
-        volume_copy_source_id = volume.copy_source_id
-        if not source_id and not volume_copy_source_id:
+        volume_source_id = volume.source_id
+        if not source_id and not volume_source_id:
             return None
-        if volume_copy_source_id == source_id:
+        if volume_source_id == source_id:
             return self._handle_volume_exists_with_same_source(context, source_id, source_type, volume,
                                                                system_id)
         return self._handle_volume_exists_with_different_source(context, source_id, source_type, volume)
@@ -159,10 +148,10 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                        "requested source {1} {2}. actual source: {3}".format(volume.name,
                                                                              source_type,
                                                                              source_id,
-                                                                             volume.copy_source_id))
+                                                                             volume.source_id))
         else:
             message = "Volume {0} already exists but was created from a source: {1}".format(volume.name,
-                                                                                            volume.copy_source_id)
+                                                                                            volume.source_id)
         logger.debug(message)
         return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS, csi_pb2.CreateVolumeResponse)
 
@@ -218,7 +207,6 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                                                                    initiators)
             response = utils.generate_csi_publish_volume_response(lun,
                                                                   connectivity_type,
-                                                                  self.controller_config,
                                                                   array_initiators)
             return response
 
@@ -309,11 +297,11 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
     @csi_method(error_response_type=csi_pb2.CreateSnapshotResponse, lock_request_attribute="name")
     def CreateSnapshot(self, request, context):
         utils.validate_create_snapshot_request(request)
-        source_volume_id = request.source_volume_id
-        logger.info("Snapshot base name : {}. Source volume id : {}".format(request.name, source_volume_id))
+        source_id = request.source_volume_id
+        logger.info("Snapshot base name : {}. Source volume id : {}".format(request.name, source_id))
         secrets = request.secrets
         try:
-            volume_id_info = utils.get_volume_id_info(source_volume_id)
+            volume_id_info = utils.get_volume_id_info(source_id)
             system_id = volume_id_info.system_id
             array_type = volume_id_info.array_type
             volume_id = volume_id_info.object_id
@@ -334,9 +322,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 )
 
                 if snapshot:
-                    if snapshot.source_volume_id != volume_id:
+                    if snapshot.source_id != volume_id:
                         message = messages.SNAPSHOT_WRONG_VOLUME_ERROR_MESSAGE.format(snapshot_final_name,
-                                                                                      snapshot.source_volume_id,
+                                                                                      snapshot.source_id,
                                                                                       volume_id)
                         return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
                                                     csi_pb2.CreateSnapshotResponse)
@@ -349,7 +337,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     snapshot = array_mediator.create_snapshot(volume_id, snapshot_final_name, space_efficiency, pool)
 
                 logger.debug("generating create snapshot response")
-                response = utils.generate_csi_create_snapshot_response(snapshot, system_id, source_volume_id)
+                response = utils.generate_csi_create_snapshot_response(snapshot, system_id, source_id)
                 return response
         except (ObjectIdError, array_errors.SnapshotSourcePoolMismatch, array_errors.SpaceEfficiencyNotSupported) as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
@@ -466,13 +454,10 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.info("finished ControllerGetCapabilities")
         return response
 
-    def get_identity_config(self, attribute_name):
-        return self.plugin_identity[attribute_name]
-
     @csi_method(error_response_type=csi_pb2.GetPluginInfoResponse)
     def GetPluginInfo(self, _, context):  # pylint: disable=invalid-name
-        name = self.get_identity_config("name")
-        version = self.get_identity_config("version")
+        name = common_config.identity.name
+        version = common_config.identity.version
 
         if not name or not version:
             message = "plugin name or version cannot be empty"
@@ -518,10 +503,10 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.info("GetPluginCapabilities")
         service_type = csi_pb2.PluginCapability.Service.Type
         volume_expansion_type = csi_pb2.PluginCapability.VolumeExpansion.Type
-        capabilities = self.get_identity_config("capabilities")
+        capabilities = common_config.identity.capabilities
         capability_list = []
-        service_capabilities = capabilities.get('Service')
-        volume_expansion_capability = capabilities.get('VolumeExpansion')
+        service_capabilities = capabilities.Service
+        volume_expansion_capability = capabilities.VolumeExpansion
         if service_capabilities:
             for service_capability in service_capabilities:
                 capability_list.append(

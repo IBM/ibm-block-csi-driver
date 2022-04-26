@@ -749,7 +749,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         return_value = self.array.get_object_by_id(volume.id, "volume")
         self.assertEqual(type(return_value), Volume)
         self.assertEqual(return_value.id, self.array._generate_volume_scsi_identifier(volume.id))
-        self.assertEqual(return_value.copy_source_id, self.array._generate_volume_scsi_identifier(volume.id))
+        self.assertEqual(return_value.source_id, self.array._generate_volume_scsi_identifier(volume.id))
 
     def test_get_object_by_id_return_none(self):
         self.client_mock.get_volume.side_effect = NotFound("404")

@@ -1,5 +1,5 @@
-import controller.controller_server.utils as utils
 import controller.controller_server.config as config
+import controller.controller_server.utils as utils
 
 
 class NodeIdInfo:
