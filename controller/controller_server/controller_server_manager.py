@@ -8,6 +8,7 @@ from csi_general import replication_pb2_grpc
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
 from controller.controller_server.addons_server import ReplicationControllerServicer
+from controller.common.config import config
 from controller.controller_server.csi_controller_server import CSIControllerServicer
 
 logger = get_stdout_logger()
@@ -31,7 +32,7 @@ class ControllerServerManager:
         # controller_server.add_insecure_port('unix://{}'.format(self.server_port))
         controller_server.add_insecure_port(self.endpoint)
 
-        logger.info("Controller version: {}".format(self.csi_servicer.get_identity_config("version")))
+        logger.info("Controller version: {}".format(config.identity.version))
 
         # start the server
         logger.debug("Listening for connections on endpoint address: {}".format(self.endpoint))

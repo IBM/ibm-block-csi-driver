@@ -234,7 +234,7 @@ func TestGetMpathDevice(t *testing.T) {
 			}
 
 			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fakeExecuter, fake_helper, fake_mutex)
-			DMPath, err := o.GetMpathDevice(fmt.Sprintf("Test:%s", volumeUuid))
+			DMPath, err := o.GetMpathDevice(volumeUuid)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")
