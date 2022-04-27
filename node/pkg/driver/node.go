@@ -686,7 +686,7 @@ func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatis
 		}
 		if !isVolumePathMatchesVolumeId {
 			return VolumeStatistics{}, status.Errorf(codes.NotFound,
-				"volume id [%q] is not accessible on volume path [%q]", volumeId, path)
+				"Volume id [%q] is not accessible on volume path [%q]", volumeId, path)
 		}
 		volumeStats, err = d.NodeUtils.GetFileSystemVolumeStats(path)
 		if err != nil {
