@@ -37,7 +37,7 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
                     connectivity_type = utils.choose_connectivity_type(host.connectivity_types)
                     array_initiators = self._get_array_initiators(host.name, connectivity_type)
                     return lun, connectivity_type, array_initiators
-                logger.debug("idempotent case - volume is already mapped to host but dont match initiators."
+                logger.error("volume is already mapped to host but dont match initiators."
                              " host initiators: {} request initiators: {}.".format(host.initiators, initiators))
             raise array_errors.VolumeAlreadyMappedToDifferentHostsError(mappings)
 
