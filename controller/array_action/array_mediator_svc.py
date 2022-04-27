@@ -796,8 +796,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return iscsi_login.host_name
         return None
 
-    def get_host_by_host_identifiers(self, initiators):
-        logger.debug("Getting host name for initiators : {0}".format(initiators))
+    def _get_host_names_and_connectivity_types(self, initiators):
         host_names = set()
         connectivity_types = set()
         for connectivity_type, initiator in initiators:
@@ -816,6 +815,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 if iscsi_host_name:
                     host_names.add(iscsi_host_name)
                     connectivity_types.add(config.ISCSI_CONNECTIVITY_TYPE)
+        return host_names, connectivity_types
+
+    def get_host_by_host_identifiers(self, initiators):
+        logger.debug("Getting host name for initiators : {0}".format(initiators))
+        host_names, connectivity_types = self._get_host_names_and_connectivity_types(initiators)
         host_names = set(filter(None, host_names))
         if len(host_names) > 1:
             raise array_errors.MultipleHostsFoundError(initiators, host_names)

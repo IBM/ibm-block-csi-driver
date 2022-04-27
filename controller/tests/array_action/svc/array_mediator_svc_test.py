@@ -734,25 +734,18 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(SVCArrayMediator.max_connections, 2)
         self.assertEqual(SVCArrayMediator.max_lun_retries, 10)
 
-    def _prepare_mocks_for_get_host_by_identifiers(self, nvme_host_names=None, fc_host_names=None,
-                                                   iscsi_host_name=None, connectivity_types=None):
-        host_name = 'test_host_1'
-        host_names = [host_name]
+    def _prepare_lsnvmefabric_mock(self, host_names, nvme_host_names, connectivity_types):
         nvme_host_mocks = []
-        fc_host_mocks = []
-        if connectivity_types is None:
-            connectivity_types = {config.NVME_OVER_FC_CONNECTIVITY_TYPE,
-                                  config.FC_CONNECTIVITY_TYPE,
-                                  config.ISCSI_CONNECTIVITY_TYPE}
-
         self.svc.client.svcinfo.lsnvmefabric.return_value = Mock(as_list=nvme_host_mocks)
         if config.NVME_OVER_FC_CONNECTIVITY_TYPE in connectivity_types:
             nvme_host_names = host_names if nvme_host_names is None else nvme_host_names
             if nvme_host_names:
                 nvme_host_mocks = [Mock(object_name=host_name) for host_name in nvme_host_names]
-                lsnvmefabric_return_values = [Mock(as_list=[host_mock]*4) for host_mock in nvme_host_mocks]
+                lsnvmefabric_return_values = [Mock(as_list=[host_mock] * 4) for host_mock in nvme_host_mocks]
                 self.svc.client.svcinfo.lsnvmefabric.side_effect = lsnvmefabric_return_values
 
+    def _prepare_lsfabric_mock_for_get_host(self, host_names, fc_host_names, connectivity_types):
+        fc_host_mocks = []
         self.svc.client.svcinfo.lsfabric.return_value = Mock(as_list=fc_host_mocks)
         if config.FC_CONNECTIVITY_TYPE in connectivity_types:
             fc_host_names = host_names if fc_host_names is None else fc_host_names
@@ -761,15 +754,30 @@ class TestArrayMediatorSVC(unittest.TestCase):
                     mock = Mock()
                     mock.name = host_name
                     fc_host_mocks.append(mock)
-                lsfabric_return_values = [Mock(as_list=[host_mock]*4) for host_mock in fc_host_mocks]
+                lsfabric_return_values = [Mock(as_list=[host_mock] * 4) for host_mock in fc_host_mocks]
                 self.svc.client.svcinfo.lsfabric.side_effect = lsfabric_return_values
 
+    def _prepare_lshostiplogin_mock(self, host_name, iscsi_host_name, connectivity_types):
         iscsi_host_name = host_name if iscsi_host_name is None else iscsi_host_name
         if config.ISCSI_CONNECTIVITY_TYPE in connectivity_types and iscsi_host_name:
             iscsi_host_mock = Mock(host_name=iscsi_host_name)
             self.svc.client.svcinfo.lshostiplogin.return_value = Mock(as_single_element=iscsi_host_mock)
         else:
             self.svc.client.svcinfo.lshostiplogin.side_effect = CLIFailureError("CMMVC5804E")
+
+    def _prepare_mocks_for_get_host_by_identifiers(self, nvme_host_names=None, fc_host_names=None,
+                                                   iscsi_host_name=None, connectivity_types=None):
+        host_name = 'test_host_1'
+        host_names = [host_name]
+
+        if connectivity_types is None:
+            connectivity_types = {config.NVME_OVER_FC_CONNECTIVITY_TYPE,
+                                  config.FC_CONNECTIVITY_TYPE,
+                                  config.ISCSI_CONNECTIVITY_TYPE}
+
+        self._prepare_lsnvmefabric_mock(host_names, nvme_host_names, connectivity_types)
+        self._prepare_lsfabric_mock_for_get_host(host_names, fc_host_names, connectivity_types)
+        self._prepare_lshostiplogin_mock(host_name, iscsi_host_name, connectivity_types)
 
     def _prepare_mocks_for_get_host_by_identifiers_no_hosts(self):
         self._prepare_mocks_for_get_host_by_identifiers(nvme_host_names=[], fc_host_names=[], iscsi_host_name='')
