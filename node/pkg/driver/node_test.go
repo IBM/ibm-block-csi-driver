@@ -623,7 +623,7 @@ func TestNodePublishVolume(t *testing.T) {
 				}
 
 				_, err := node.NodePublishVolume(context.TODO(), req)
-				assertError(t, err, codes.InvalidArgument)
+				assertError(t, err, codes.FailedPrecondition)
 			},
 		},
 		{
