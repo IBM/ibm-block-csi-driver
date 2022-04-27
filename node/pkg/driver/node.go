@@ -400,11 +400,11 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	defer logger.Exit(logger.Enter(req))
 
-	err := d.nodePublishVolumeRequestValidation(req)
+	code, err := d.nodePublishVolumeRequestValidation(req)
 	if err != nil {
 		switch err.(type) {
 		case *RequestValidationError:
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, status.Error(code, err.Error())
 		default:
 			return nil, status.Error(codes.Internal, err.Error())
 		}
@@ -527,29 +527,29 @@ func (d *NodeService) isTargetMounted(targetPathWithHostPrefix string, isFSVolum
 	}
 }
 
-func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVolumeRequest) error {
+func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVolumeRequest) (codes.Code, error) {
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
-		return &RequestValidationError{"Volume ID not provided"}
-	}
-
-	source := req.GetStagingTargetPath()
-	if len(source) == 0 {
-		return &RequestValidationError{"Staging target not provided"}
+		return codes.InvalidArgument, &RequestValidationError{"Volume ID not provided"}
 	}
 
 	target := req.GetTargetPath()
 	if len(target) == 0 {
-		return &RequestValidationError{"Target path not provided"}
+		return codes.InvalidArgument, &RequestValidationError{"Target path not provided"}
 	}
 
 	volCap := req.GetVolumeCapability()
 	if volCap == nil {
-		return &RequestValidationError{"Volume capability not provided"}
+		return codes.InvalidArgument, &RequestValidationError{"Volume capability not provided"}
+	}
+
+	source := req.GetStagingTargetPath()
+	if len(source) == 0 {
+		return codes.FailedPrecondition, &RequestValidationError{"Staging target not provided"}
 	}
 
 	if !isValidVolumeCapabilitiesAccessMode([]*csi.VolumeCapability{volCap}) {
-		return &RequestValidationError{"Volume capability AccessMode not supported"}
+		return codes.InvalidArgument, &RequestValidationError{"Volume capability AccessMode not supported"}
 	}
 
 	// If the access type is not mount and not block, should never happen
@@ -557,10 +557,10 @@ func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVol
 	case *csi.VolumeCapability_Mount:
 	case *csi.VolumeCapability_Block:
 	default:
-		return &RequestValidationError{"Volume Access Type is not supported"}
+		return codes.InvalidArgument, &RequestValidationError{"Volume Access Type is not supported"}
 	}
 
-	return nil
+	return codes.Internal, nil
 }
 
 func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
