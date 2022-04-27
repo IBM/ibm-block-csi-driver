@@ -28,7 +28,7 @@ class Initiators:
             iscsi_iqn : iqn
         """
         self.nvme_nqn = nvme_nqn
-        self.fc_wwns = fc_wwns
+        self.fc_wwns = list(filter(None, fc_wwns))
         self.iscsi_iqn = iscsi_iqn
         self._nvme_nqn_lowercase = nvme_nqn.lower()
         self._fc_wwns_lowercase_set = set(wwn.lower() for wwn in fc_wwns)
