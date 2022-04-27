@@ -11,7 +11,7 @@ class NodeIdInfo:
         node_name, nvme_nqn, fc_wwns_str, iscsi_iqn = utils.get_node_id_info(node_id)
         fc_wwns = fc_wwns_str.split(config.PARAMETERS_FC_WWN_DELIMITER)
         self.node_name = node_name
-        self.initiators = Initiators(nvme_nqn.strip(), fc_wwns, iscsi_iqn.strip())
+        self.initiators = Initiators(nvme_nqn, fc_wwns, iscsi_iqn)
 
 
 class Initiators:
@@ -26,14 +26,12 @@ class Initiators:
             fc_wwns : list of fc wwns
             iscsi_iqn : iqn
         """
-        nvme_nqn = nvme_nqn.strip()
-        iscsi_iqn = iscsi_iqn.strip()
-        self.nvme_nqn = nvme_nqn
+        self.nvme_nqn = nvme_nqn.strip()
         self.fc_wwns = fc_wwns
-        self.iscsi_iqn = iscsi_iqn
-        self._nvme_nqn_lowercase = nvme_nqn.lower()
-        self._fc_wwns_lowercase_set = set(wwn.lower() for wwn in fc_wwns)
-        self._iscsi_iqn_lowercase = iscsi_iqn.lower()
+        self.iscsi_iqn = iscsi_iqn.strip()
+        self._nvme_nqn_lowercase = self.nvme_nqn.lower()
+        self._fc_wwns_lowercase_set = set(wwn.lower() for wwn in self.fc_wwns)
+        self._iscsi_iqn_lowercase = self.iscsi_iqn.lower()
 
     def is_array_wwns_match(self, host_wwns):
         """
@@ -69,8 +67,8 @@ class Initiators:
         return self._nvme_nqn_lowercase in host_nqns_lower
 
     def __contains__(self, other_initiators):
-        if other_initiators.is_array_wwns_match(self.fc_wwns) or \
-                other_initiators.is_array_nvme_nqn_match(self.nvme_nqn) or \
+        if other_initiators.is_array_nvme_nqn_match(self.nvme_nqn) or \
+                other_initiators.is_array_wwns_match(self.fc_wwns) or \
                 other_initiators.is_array_iscsi_iqns_match([self.iscsi_iqn]):
             return True
         return False
