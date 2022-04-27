@@ -50,9 +50,6 @@ const (
 	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
 	// Command lines inside the container will show /host prefix.
 	PrefixChrootOfHostRoot            = "/host"
-	PublishContextSeparator           = ","
-	NodeIdDelimiter                   = ";"
-	NodeIdFcDelimiter                 = ":"
 	mkfsTimeoutMilliseconds           = 15 * 60 * 1000
 	resizeFsTimeoutMilliseconds       = 30 * 1000
 	TimeOutGeneralCmd                 = 10 * 1000
@@ -68,11 +65,12 @@ const (
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
 
 type NodeUtilsInterface interface {
+	GetVolumeUuid(volumeId string) string
 	ReadNvmeNqn() (string, error)
 	DevicesAreNvme(sysDevices []string) (bool, error)
 	ParseFCPorts() ([]string, error)
 	ParseIscsiInitiators() (string, error)
-	GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, map[string][]string, error)
+	GetInfoFromPublishContext(publishContext map[string]string) (string, int, map[string][]string, error)
 	GetArrayInitiators(ipsByArrayInitiator map[string][]string) []string
 	GetSysDevicesFromMpath(baseDevice string) ([]string, error)
 
@@ -103,44 +101,44 @@ type NodeUtils struct {
 	Executer                   executer.ExecuterInterface
 	mounter                    mount.Interface
 	osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface
-	//	getDmsPathHelperInterface  device_connectivity.GetDmsPathHelperInterface
+	ConfigYaml ConfigFile
 }
 
-func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface,
+func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface, configYaml ConfigFile,
 	osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface) *NodeUtils {
-	//	getDmsPathHelperInterface device_connectivity.GetDmsPathHelperInterface) *NodeUtils {
 	return &NodeUtils{
 		Executer:                   executer,
 		mounter:                    mounter,
 		osDeviceConnectivityHelper: osDeviceConnectivityHelper,
+		ConfigYaml: configFile,
 	}
 }
 
-func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string, configYaml ConfigFile) (string, int, map[string][]string, error) {
+func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string) (string, int, map[string][]string, error) {
 	// this will return :  connectivityType, lun, ipsByArrayInitiator, error
 	ipsByArrayInitiator := make(map[string][]string)
-	strLun := publishContext[configYaml.Controller.Publish_context_lun_parameter]
-
+	strLun := publishContext[n.ConfigYaml.Controller.Publish_context_lun_parameter]
+	publishContextSeparator := n.ConfigYaml.Controller.Publish_context_separator
 	var lun int
 	var err error
-	connectivityType := publishContext[configYaml.Controller.Publish_context_connectivity_parameter]
-	if connectivityType != device_connectivity.ConnectionTypeNVMEoFC {
+	connectivityType := publishContext[n.ConfigYaml.Controller.Publish_context_connectivity_parameter]
+	if connectivityType != n.ConfigYaml.Connectivity_type.Nvme_over_fc {
 		lun, err = strconv.Atoi(strLun)
 		if err != nil {
 			return "", -1, nil, err
 		}
 	}
-	if connectivityType == device_connectivity.ConnectionTypeFC {
-		wwns := strings.Split(publishContext[configYaml.Controller.Publish_context_fc_initiators], PublishContextSeparator)
+	if connectivityType == n.ConfigYaml.Connectivity_type.Fc {
+		wwns := strings.Split(publishContext[n.ConfigYaml.Controller.Publish_context_fc_initiators], publishContextSeparator)
 		for _, wwn := range wwns {
 			ipsByArrayInitiator[wwn] = nil
 		}
 	}
-	if connectivityType == device_connectivity.ConnectionTypeISCSI {
-		iqns := strings.Split(publishContext[configYaml.Controller.Publish_context_array_iqn], PublishContextSeparator)
+	if connectivityType == n.ConfigYaml.Connectivity_type.Iscsi {
+		iqns := strings.Split(publishContext[n.ConfigYaml.Controller.Publish_context_array_iqn], publishContextSeparator)
 		for _, iqn := range iqns {
 			if ips, iqnExists := publishContext[iqn]; iqnExists {
-				ipsByArrayInitiator[iqn] = strings.Split(ips, PublishContextSeparator)
+				ipsByArrayInitiator[iqn] = strings.Split(ips, publishContextSeparator)
 			} else {
 				logger.Errorf("Publish context does not contain any iscsi target IP for {%v}", iqn)
 			}
@@ -258,14 +256,14 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 
 	fpaths, err := n.Executer.FilepathGlob(FCPortPath)
 	if fpaths == nil {
-		err = fmt.Errorf(ErrorUnsupportedConnectivityType, device_connectivity.ConnectionTypeFC)
+		err = fmt.Errorf(ErrorUnsupportedConnectivityType, n.ConfigYaml.Connectivity_type.Fc)
 	}
 	if err != nil {
 		return nil, err
 	}
 
 	for _, fpath := range fpaths {
-		fcPort, err := readAfterPrefix(fpath, "0x", device_connectivity.ConnectionTypeFC)
+		fcPort, err := readAfterPrefix(fpath, "0x", n.ConfigYaml.Connectivity_type.Fc)
 		if err != nil {
 			errs = append(errs, err)
 		} else {
@@ -285,7 +283,7 @@ func (n NodeUtils) ParseFCPorts() ([]string, error) {
 }
 
 func (n NodeUtils) ParseIscsiInitiators() (string, error) {
-	return readAfterPrefix(IscsiFullPath, "InitiatorName=", device_connectivity.ConnectionTypeISCSI)
+	return readAfterPrefix(IscsiFullPath, "InitiatorName=", n.ConfigYaml.Connectivity_type.Iscsi)
 }
 
 func (n NodeUtils) IsFCExists() bool {
@@ -461,18 +459,20 @@ func (n NodeUtils) GetPodPath(origPath string) string {
 
 func (n NodeUtils) GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []string, iscsiIQN string) (string, error) {
 	var nodeId strings.Builder
+	nodeIdDelimiter := n.ConfigYaml.Parameters.Node_id_info.Delimiter
+	nodeIdFcDelimiter := n.ConfigYaml.Parameters.Node_id_info.Fcs_delimiter
 	nodeId.Grow(MaxNodeIdLength)
 	nodeId.WriteString(hostName)
-	nodeId.WriteString(NodeIdDelimiter)
+	nodeId.WriteString(nodeIdDelimiter)
 
 	if len(nvmeNQN) > 0 {
-		if nodeId.Len()+len(nvmeNQN)+len(NodeIdDelimiter) <= MaxNodeIdLength {
+		if nodeId.Len()+len(nvmeNQN)+len(nodeIdDelimiter) <= MaxNodeIdLength {
 			nodeId.WriteString(nvmeNQN)
 		} else {
 			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
 		}
 	}
-	nodeId.WriteString(NodeIdDelimiter)
+	nodeId.WriteString(nodeIdDelimiter)
 	if len(fcWWNs) > 0 {
 		if nodeId.Len()+len(fcWWNs[0]) <= MaxNodeIdLength {
 			nodeId.WriteString(fcWWNs[0])
@@ -481,15 +481,15 @@ func (n NodeUtils) GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []stri
 		}
 
 		for _, fcPort := range fcWWNs[1:] {
-			if nodeId.Len()+len(NodeIdFcDelimiter)+len(fcPort) <= MaxNodeIdLength {
-				nodeId.WriteString(NodeIdFcDelimiter)
+			if nodeId.Len()+len(nodeIdFcDelimiter)+len(fcPort) <= MaxNodeIdLength {
+				nodeId.WriteString(nodeIdFcDelimiter)
 				nodeId.WriteString(fcPort)
 			}
 		}
 	}
 	if len(iscsiIQN) > 0 {
-		if nodeId.Len()+len(NodeIdDelimiter)+len(iscsiIQN) <= MaxNodeIdLength {
-			nodeId.WriteString(NodeIdDelimiter)
+		if nodeId.Len()+len(nodeIdDelimiter)+len(iscsiIQN) <= MaxNodeIdLength {
+			nodeId.WriteString(nodeIdDelimiter)
 			nodeId.WriteString(iscsiIQN)
 		} else if len(fcWWNs) == 0 && nvmeNQN == "" {
 			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
@@ -567,7 +567,8 @@ func (d NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, erro
 }
 
 func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error) {
-	mpathDevice, err := d.osDeviceConnectivityHelper.GetMpathDevice(volumeId)
+	volumeUuid := d.GetVolumeUuid(volumeId)
+	mpathDevice, err := d.osDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
 	if err != nil {
 		switch err.(type) {
 		case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
@@ -597,17 +598,18 @@ func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error
 }
 
 func (d NodeUtils) IsVolumePathMatchesVolumeId(volumeId string, volumePath string) (bool, error) {
-	volumeIdByVolumePath, err := d.osDeviceConnectivityHelper.GetVolumeIdByVolumePath(volumePath, volumeId)
+	volumeUuid := d.GetVolumeUuid(volumeId)
+	volumeIdByVolumePath, err := d.osDeviceConnectivityHelper.GetVolumeIdByVolumePath(volumePath, volumeUuid)
 	if err != nil {
 		return false, err
 	}
 	logger.Infof("IsVolumePathMatchesVolumeId: found volume id [%s] for volume path [%s] ", volumeId, volumePath)
 
-	return d.isVolumeIdFromPathIsWanted(volumeIdByVolumePath, volumeId), nil
+	return d.isVolumeIdFromPathIsWanted(volumeIdByVolumePath, volumeUuid), nil
 }
 
-func (d NodeUtils) isVolumeIdFromPathIsWanted(volumeIdByVolumePath string, volumeId string) bool {
-	volumeUuidLower, volumeNguid := d.osDeviceConnectivityHelper.GetNguidFromVolumeId(volumeId)
+func (d NodeUtils) isVolumeIdFromPathIsWanted(volumeIdByVolumePath string, volumeUuid string) bool {
+	volumeUuidLower, volumeNguid := d.osDeviceConnectivityHelper.GetNguidFromVolumeId(volumeUuid)
 	wantedVolumIds := []string{volumeUuidLower, volumeNguid}
 	for _, wnatedVolumeId := range wantedVolumIds {
 		if strings.Contains(wnatedVolumeId, volumeIdByVolumePath) || strings.Contains(volumeIdByVolumePath, wnatedVolumeId) {
@@ -615,4 +617,14 @@ func (d NodeUtils) isVolumeIdFromPathIsWanted(volumeIdByVolumePath string, volum
 		}
 	}
 	return false
+
+func (d NodeUtils) GetVolumeUuid(volumeId string) string {
+	volumeIdParts := strings.Split(volumeId, d.ConfigYaml.Parameters.Object_id_info.Delimiter)
+	idsPart := volumeIdParts[len(volumeIdParts)-1]
+	splittedIdsPart := strings.Split(idsPart, d.ConfigYaml.Parameters.Object_id_info.Ids_delimiter)
+	if len(splittedIdsPart) == 2 {
+		return splittedIdsPart[1]
+	} else {
+		return splittedIdsPart[0]
+	}
 }

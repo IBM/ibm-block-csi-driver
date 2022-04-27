@@ -45,7 +45,7 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	FlushMultipathDevice(mpathDevice string) error
 	RemovePhysicalDevice(sysDevices []string) error
 	ValidateLun(lun int, sysDevices []string) error
-	GetNguidFromVolumeId(volumeId string) (string, string)
+	GetNguidFromVolumeId(volumeUuid string) (string, string)
 	GetVolumeIdByVolumePath(volumePath string, volumeId string) (string, error)
 }
 
@@ -86,8 +86,6 @@ const (
 	mpathdSeparator             = ","
 	multipathdCmd               = "multipathd"
 	multipathCmd                = "multipath"
-	VolumeIdDelimiter           = ":"
-	VolumeStorageIdsDelimiter   = ";"
 	WwnOuiEnd                   = 7
 	WwnVendorIdentifierEnd      = 16
 	procMountsFilePath          = "/proc/mounts"
@@ -193,16 +191,6 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 	logger.Debugf("Rescan : finish rescan lun on lun id : {%v}, with array identifiers : {%v}", lunId, arrayIdentifiers)
 	return nil
 }
-func getVolumeUuid(volumeId string) string {
-	volumeIdParts := strings.Split(volumeId, VolumeIdDelimiter)
-	idsPart := volumeIdParts[len(volumeIdParts)-1]
-	splittedIdsPart := strings.Split(idsPart, VolumeStorageIdsDelimiter)
-	if len(splittedIdsPart) == 2 {
-		return splittedIdsPart[1]
-	} else {
-		return splittedIdsPart[0]
-	}
-}
 
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (string, error) {
 	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] ", volumeId)
@@ -237,9 +225,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	return dmPath, nil
 }
 
-func (OsDeviceConnectivityHelperScsiGeneric) GetNguidFromVolumeId(volumeId string) (string, string) {
-	volumeUuid := getVolumeUuid(volumeId)
-
+func (OsDeviceConnectivityHelperScsiGeneric) GetNguidFromVolumeId(volumeUuid string) (string, string) {
 	volumeUuidLower := strings.ToLower(volumeUuid)
 	volumeNguid := ConvertScsiIdToNguid(volumeUuidLower)
 	return volumeUuidLower, volumeNguid

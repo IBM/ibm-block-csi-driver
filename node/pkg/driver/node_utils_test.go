@@ -34,7 +34,7 @@ import (
 )
 
 var (
-	nodeUtils       = driver.NewNodeUtils(&executer.Executer{}, nil, device_connectivity.OsDeviceConnectivityHelperScsiGeneric{})
+	nodeUtils       = driver.NewNodeUtils(&executer.Executer{}, nil, ConfigYaml, device_connectivity.OsDeviceConnectivityHelperScsiGeneric{})
 	maxNodeIdLength = driver.MaxNodeIdLength
 	hostName        = "test-hostname"
 	longHostName    = strings.Repeat(hostName, 15)
@@ -127,11 +127,11 @@ func TestParseFCPortsName(t *testing.T) {
 		{
 			name:          "fc port file with wrong content",
 			file_contents: []string{"wrong content"},
-			expErr:        fmt.Errorf(driver.ErrorWhileTryingToReadPort, device_connectivity.ConnectionTypeFC, "wrong content"),
+			expErr:        fmt.Errorf(driver.ErrorWhileTryingToReadPort, ConfigYaml.Connectivity_type.Fc, "wrong content"),
 		},
 		{
 			name:   "fc unsupported",
-			expErr: fmt.Errorf(driver.ErrorUnsupportedConnectivityType, device_connectivity.ConnectionTypeFC),
+			expErr: fmt.Errorf(driver.ErrorUnsupportedConnectivityType, ConfigYaml.Connectivity_type.Fc),
 		},
 		{
 			name:          "one fc port",
@@ -192,7 +192,7 @@ func TestParseFCPortsName(t *testing.T) {
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 			devicePath := "/sys/class/fc_host/host*/port_name"
 			fakeExecuter.EXPECT().FilepathGlob(devicePath).Return(fpaths, tc.err)
-			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, nil)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml, nil)
 
 			fcs, err := nodeUtils.ParseFCPorts()
 
@@ -224,7 +224,7 @@ func TestParseIscsiInitiators(t *testing.T) {
 		{
 			name:         "wrong iqn file",
 			file_content: "wrong-content",
-			expErr:       fmt.Errorf(driver.ErrorWhileTryingToReadPort, device_connectivity.ConnectionTypeISCSI, "wrong-content"),
+			expErr:       fmt.Errorf(driver.ErrorWhileTryingToReadPort, ConfigYaml.Connectivity_type.Iscsi, "wrong-content"),
 		},
 		{
 			name:   "non existing file",
@@ -366,7 +366,7 @@ func TestGenerateNodeID(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
-			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, nil)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml, nil)
 
 			nodeId, err := nodeUtils.GenerateNodeID(tc.hostName, tc.nvmeNQN, tc.fcWWNs, tc.iscsiIQN)
 
@@ -386,4 +386,37 @@ func TestGenerateNodeID(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetVolumeUuid(t *testing.T) {
+	testCases := []struct {
+		name     string
+		volumeId string
+	}{
+		{name: "success",
+			volumeId: "fakeArray:volumeUuid",
+		},
+		{name: "success with internal volumeId",
+			volumeId: "fakeArray:internalVolumeId;volumeUuid",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml)
+
+			volumeUuid := nodeUtils.GetVolumeUuid(tc.volumeId)
+
+			expectedVolumeUuid := "volumeUuid"
+			if volumeUuid != expectedVolumeUuid {
+				t.Fatalf("wrong volumeUuid: expected %v, got %v", expectedVolumeUuid, volumeUuid)
+			}
+
+		})
+	}
+
 }

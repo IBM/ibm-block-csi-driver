@@ -131,24 +131,28 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def _generate_volume_response(self, cli_volume):
         source_object_wwn = self._get_volume_source_wwn(cli_volume)
-        return Volume(self._convert_size_blocks_to_bytes(cli_volume.capacity),
-                      cli_volume.wwn,
-                      cli_volume.id,
-                      cli_volume.name,
-                      self.endpoint,
-                      cli_volume.pool_name,
-                      source_object_wwn,
-                      self.array_type)
+        return Volume(
+            capacity_bytes=self._convert_size_blocks_to_bytes(cli_volume.capacity),
+            id=cli_volume.wwn,
+            internal_id=cli_volume.id,
+            name=cli_volume.name,
+            array_address=self.endpoint,
+            pool=cli_volume.pool_name,
+            source_id=source_object_wwn,
+            array_type=self.array_type
+        )
 
     def _generate_snapshot_response(self, cli_snapshot):
-        return Snapshot(self._convert_size_blocks_to_bytes(cli_snapshot.capacity),
-                        cli_snapshot.wwn,
-                        cli_snapshot.id,
-                        cli_snapshot.name,
-                        self.endpoint,
-                        source_volume_id=self._get_snapshot_source_wwn(cli_snapshot),
-                        is_ready=True,
-                        array_type=self.array_type)
+        return Snapshot(
+            capacity_bytes=self._convert_size_blocks_to_bytes(cli_snapshot.capacity),
+            id=cli_snapshot.wwn,
+            internal_id=cli_snapshot.id,
+            name=cli_snapshot.name,
+            array_address=self.endpoint,
+            source_id=self._get_snapshot_source_wwn(cli_snapshot),
+            is_ready=True,
+            array_type=self.array_type
+        )
 
     def _get_cli_object_by_name(self, volume_name):
         try:
