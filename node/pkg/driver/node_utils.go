@@ -101,7 +101,7 @@ type NodeUtils struct {
 	Executer                   executer.ExecuterInterface
 	mounter                    mount.Interface
 	osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface
-	ConfigYaml ConfigFile
+	ConfigYaml                 ConfigFile
 }
 
 func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface, configYaml ConfigFile,
@@ -110,7 +110,7 @@ func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface, 
 		Executer:                   executer,
 		mounter:                    mounter,
 		osDeviceConnectivityHelper: osDeviceConnectivityHelper,
-		ConfigYaml: configFile,
+		ConfigYaml:                 configFile,
 	}
 }
 
@@ -617,6 +617,7 @@ func (d NodeUtils) isVolumeIdFromPathIsWanted(volumeIdByVolumePath string, volum
 		}
 	}
 	return false
+}
 
 func (d NodeUtils) GetVolumeUuid(volumeId string) string {
 	volumeIdParts := strings.Split(volumeId, d.ConfigYaml.Parameters.Object_id_info.Delimiter)
