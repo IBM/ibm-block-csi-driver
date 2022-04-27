@@ -407,7 +407,7 @@ func TestGetVolumeUuid(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
-			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml, nil)
 
 			volumeUuid := nodeUtils.GetVolumeUuid(tc.volumeId)
 

@@ -110,7 +110,7 @@ func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface, 
 		Executer:                   executer,
 		mounter:                    mounter,
 		osDeviceConnectivityHelper: osDeviceConnectivityHelper,
-		ConfigYaml:                 configFile,
+		ConfigYaml:                 configYaml,
 	}
 }
 
