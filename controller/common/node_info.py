@@ -67,11 +67,9 @@ class Initiators:
         return self._nvme_nqn_lowercase in host_nqns_lower
 
     def __contains__(self, other_initiators):
-        if other_initiators.is_array_nvme_nqn_match(self.nvme_nqn) or \
-                other_initiators.is_array_wwns_match(self.fc_wwns) or \
-                other_initiators.is_array_iscsi_iqns_match([self.iscsi_iqn]):
-            return True
-        return False
+        return other_initiators.is_array_nvme_nqn_match([self.nvme_nqn] if self.nvme_nqn else []) or \
+               other_initiators.is_array_wwns_match(self.fc_wwns) or \
+               other_initiators.is_array_iscsi_iqns_match([self.iscsi_iqn] if self.iscsi_iqn else [])
 
     def __str__(self):
         return "nvme_nqn: {}, fc_wwns : {}, iscsi_iqn : {} ".format(self.nvme_nqn, self.fc_wwns, self.iscsi_iqn)

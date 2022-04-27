@@ -39,8 +39,7 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
                     return lun, connectivity_type, array_initiators
                 logger.debug("idempotent case - volume is already mapped to host but dont match initiators."
                              " host initiators: {} request initiators: {}.".format(host.initiators, initiators))
-                raise array_errors.VolumeAlreadyMappedError(host.name)
-            raise array_errors.VolumeAlreadyMappedError(mappings)
+            raise array_errors.VolumeAlreadyMappedToDifferentHostsError(mappings)
 
         logger.debug("no mappings were found for volume. mapping volume : {0}".format(vol_id))
 
@@ -63,7 +62,7 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
                 except array_errors.LunAlreadyInUseError as inner_ex:
                     logger.warning(
                         "re-trying map volume. try #{0}. {1}".format(i, inner_ex))
-            else:  # will get here only if the for statement is false.
+            else:
                 raise ex
 
         return lun, connectivity_type, array_initiators

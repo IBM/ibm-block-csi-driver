@@ -25,9 +25,6 @@ from controller.tests import utils
 from controller.tests.utils import ProtoBufMock
 
 
-# from unittest import mock as umock
-
-
 class BaseControllerSetUp(unittest.TestCase):
 
     def setUp(self):
