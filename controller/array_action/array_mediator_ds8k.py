@@ -619,6 +619,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def get_array_fc_wwns(self, host_name):
         logger.debug("getting the connected fc port wwpns for host {} from array".format(host_name))
         api_host = self._get_api_host_by_name(host_name)
+        if api_host is None:
+            return []
         wwpns = [port[LOGIN_PORT_WWPN] for port in api_host.login_ports if
                  port[LOGIN_PORT_STATE] == LOGIN_PORT_STATE_ONLINE]
         logger.debug("found wwpns: {}".format(wwpns))
