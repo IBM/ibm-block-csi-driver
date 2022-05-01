@@ -403,10 +403,13 @@ class TestUtils(unittest.TestCase):
                                                            raised_error=ObjectIdError)
 
     def _check_node_id_parameters(self, node_id_info, nvme_nqn, fc_wwns, iscsi_iqn):
+        nvme_nqn = [nvme_nqn] if nvme_nqn else []
+        fc_wwns = fc_wwns.split(":") if fc_wwns else []
+        iscsi_iqn = [iscsi_iqn] if iscsi_iqn else []
         self.assertEqual(node_id_info.node_name, "host-name")
-        self.assertEqual(node_id_info.initiators.nvme_nqn, nvme_nqn)
-        self.assertEqual(node_id_info.initiators.fc_wwns, fc_wwns.split(":"))
-        self.assertEqual(node_id_info.initiators.iscsi_iqn, iscsi_iqn)
+        self.assertEqual(node_id_info.initiators._nvme_nqns, nvme_nqn)
+        self.assertEqual(node_id_info.initiators._fc_wwns, fc_wwns)
+        self.assertEqual(node_id_info.initiators._iscsi_iqns, iscsi_iqn)
 
     def test_get_node_id_info(self):
         self._test_validation_exception(utils.get_node_id_info, "bad-node-format", str_in_msg="node",

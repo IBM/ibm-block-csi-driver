@@ -644,7 +644,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         connectivity_types = []
         if fc_wwns:
             connectivity_types.append(config.FC_CONNECTIVITY_TYPE)
-        initiators = Initiators(nvme_nqn="", fc_wwns=fc_wwns, iscsi_iqn="")
+        initiators = Initiators(nvme_nqns=[], fc_wwns=fc_wwns, iscsi_iqns=[])
         return Host(name=api_host.name, connectivity_types=connectivity_types, initiators=initiators)
 
     def get_host_by_host_identifiers(self, initiators):
@@ -656,7 +656,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 found = host.name
                 break
         if found:
-            logger.debug("found host {0} with fc wwpns: {1}".format(found, initiators.fc_wwns))
+            logger.debug("found host {0} with fc wwpns: {1}".format(found, initiators._fc_wwns))
             return found, [config.FC_CONNECTIVITY_TYPE]
         logger.debug("can not found host by initiators: {0} ".format(initiators))
         raise array_errors.HostNotFoundError(initiators)

@@ -441,9 +441,9 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         host = self.array.get_host_by_name('test_host_1')
         self.assertEqual(host.name, "test_host_1")
         self.assertEqual(host.connectivity_types, ['fc'])
-        self.assertEqual(host.initiators.nvme_nqn, "")
-        self.assertEqual(host.initiators.iscsi_iqn, "")
-        self.assertEqual(host.initiators.fc_wwns, ['wwpn1', 'wwpn2'])
+        self.assertFalse(host.initiators.is_array_nvme_nqn_match([]))
+        self.assertFalse(host.initiators.is_array_iscsi_iqns_match([]))
+        self.assertTrue(host.initiators.is_array_wwns_match(['wwpn1', 'wwpn2']))
 
     def test_get_host_by_name_return_none(self):
         self.client_mock.get_host.return_value = None
@@ -461,7 +461,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             })
         ]
         host, connectivity_type = self.array.get_host_by_host_identifiers(
-            Initiators('', [wwpn1, wwpn2], '')
+            Initiators([], [wwpn1, wwpn2], [])
         )
         self.assertEqual(host, host_name)
         self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_type)
@@ -477,7 +477,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             })
         ]
         host, connectivity_type = self.array.get_host_by_host_identifiers(
-            Initiators('', [wwpn1, "another_wwpn"], '')
+            Initiators([], [wwpn1, "another_wwpn"], [])
         )
         self.assertEqual(host, host_name)
         self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_type)
@@ -494,7 +494,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         ]
         with self.assertRaises(array_errors.HostNotFoundError):
             self.array.get_host_by_host_identifiers(
-                Initiators('', ["new_wwpn", "another_wwpn"], '')
+                Initiators([], ["new_wwpn", "another_wwpn"], [])
             )
 
     def test_get_snapshot_not_exist_return_none(self):

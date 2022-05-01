@@ -394,9 +394,9 @@ class TestArrayMediatorXIV(unittest.TestCase):
         host = self.mediator.get_host_by_name('test_host_1')
         self.assertEqual(host.name, "test_host_1")
         self.assertEqual(host.connectivity_types, ['iscsi'])
-        self.assertEqual(host.initiators.nvme_nqn, '')
-        self.assertEqual(host.initiators.iscsi_iqn, "iqn.test.1")
-        self.assertEqual(host.initiators.fc_wwns, [])
+        self.assertFalse(host.initiators.is_array_nvme_nqn_match([]))
+        self.assertTrue(host.initiators.is_array_iscsi_iqns_match(["iqn.test.1"]))
+        self.assertFalse(host.initiators.is_array_wwns_match([]))
 
     def test_get_host_by_name_return_none(self):
         self.mediator.client.cmd.host_list.return_value = Mock(as_single_element=None)
@@ -433,7 +433,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         host4 = utils.get_mock_xiv_host("host4", "iqn3", "")
 
         self.mediator.client.cmd.host_list.return_value = Mock(as_list=[host1, host2, host3, host4])
-        host, connectivity_type = self.mediator.get_host_by_host_identifiers(Initiators(nqn, wwns, iqn))
+        host, connectivity_type = self.mediator.get_host_by_host_identifiers(Initiators([nqn], [wwns], [iqn]))
         self.assertEqual(host, right_host)
         self.assertEqual(connectivity_type, [ISCSI_CONNECTIVITY_TYPE])
 
@@ -463,7 +463,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         host4 = utils.get_mock_xiv_host("host4", "iqn4", "wwn4")
 
         self.mediator.client.cmd.host_list.return_value = Mock(as_list=[host1, host2, host3, host4])
-        host, connectivity_type = self.mediator.get_host_by_host_identifiers(Initiators(nqn, wwns, iqn))
+        host, connectivity_type = self.mediator.get_host_by_host_identifiers(Initiators([nqn], wwns, [iqn]))
         self.assertEqual(host, right_host)
         self.assertEqual(connectivity_type, [FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE])
 
