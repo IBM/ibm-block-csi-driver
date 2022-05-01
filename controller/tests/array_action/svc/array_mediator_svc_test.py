@@ -816,7 +816,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_host_by_identifiers_slow_raise_multiplehostsfounderror(self, svc_response):
         self._prepare_mocks_for_get_host_by_identifiers_slow(svc_response)
         with self.assertRaises(array_errors.MultipleHostsFoundError):
-            self.svc.get_host_by_host_identifiers(Initiators('Test_nqn', ['wwn2'], 'iqn.test.3'))
+            self.svc.get_host_by_host_identifiers(Initiators(['Test_nqn'], ['wwn2'], ['iqn.test.3']))
 
     def test_get_host_by_identifiers_raise_multiplehostsfounderror(self):
         self._prepare_mocks_for_get_host_by_identifiers(nvme_host_names=['test_host_1'],
@@ -872,7 +872,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_mocks_for_get_host_by_identifiers(nvme_host_names=['test_host_3'],
                                                         connectivity_types=[config.NVME_OVER_FC_CONNECTIVITY_TYPE])
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('nqn.test.1', ['Test_wwn'], 'iqn.test.6'))
+            Initiators(['nqn.test.1'], ['Test_wwn'], ['iqn.test.6']))
         self.assertEqual('test_host_3', hostname)
         self.assertEqual({config.NVME_OVER_FC_CONNECTIVITY_TYPE}, connectivity_types)
 
@@ -958,7 +958,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_host_by_identifiers_return_nvme_fc_and_iscsi(self):
         self._prepare_mocks_for_get_host_by_identifiers()
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('nqn.test.1', ['WWN1'], 'iqn.test.1'))
+            Initiators(['nqn.test.1'], ['WWN1'], ['iqn.test.1']))
         self.assertEqual('test_host_1', hostname)
         self.assertEqual(
             {config.NVME_OVER_FC_CONNECTIVITY_TYPE, config.FC_CONNECTIVITY_TYPE, config.ISCSI_CONNECTIVITY_TYPE},

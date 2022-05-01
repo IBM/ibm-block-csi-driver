@@ -445,9 +445,9 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         host = self.array.get_host_by_name('test_host_1')
         self.assertEqual(host.name, "test_host_1")
         self.assertEqual(host.connectivity_types, ['fc'])
-        self.assertFalse(host.initiators.is_array_nvme_nqn_match([]))
-        self.assertFalse(host.initiators.is_array_iscsi_iqns_match([]))
-        self.assertTrue(host.initiators.is_array_wwns_match(['wwpn1', 'wwpn2']))
+        self.assertEqual(host.initiators.nvme_nqns, [])
+        self.assertEqual(host.initiators.iscsi_iqns, [])
+        self.assertEqual(host.initiators.fc_wwns, ['wwpn1', 'wwpn2'])
 
     def test_get_host_by_name_return_none(self):
         self.client_mock.get_host.return_value = None

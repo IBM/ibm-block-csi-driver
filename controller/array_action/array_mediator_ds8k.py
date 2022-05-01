@@ -15,7 +15,6 @@ from controller.array_action.ds8k_volume_cache import VolumeCache
 from controller.array_action.utils import ClassProperty
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
-from controller.common.node_info import Initiators
 
 LOGIN_PORT_WWPN = attr_names.IOPORT_WWPN
 LOGIN_PORT_STATE = attr_names.IOPORT_STATUS
@@ -646,19 +645,18 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         connectivity_types = []
         if fc_wwns:
             connectivity_types.append(config.FC_CONNECTIVITY_TYPE)
-        initiators = Initiators(nvme_nqns=[], fc_wwns=fc_wwns, iscsi_iqns=[])
-        return Host(name=api_host.name, connectivity_types=connectivity_types, initiators=initiators)
+        return Host(name=api_host.name, connectivity_types=connectivity_types, fc_wwns=fc_wwns)
 
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("getting host by initiators: {}".format(initiators))
         found = ""
         for host in self.client.get_hosts():
             wwpns = self._get_fc_wwns_from_api_host(host)
-            if initiators.is_array_wwns_match(wwpns):
+            if initiators.is_match(initiators.fc_wwns, wwpns):
                 found = host.name
                 break
         if found:
-            logger.debug("found host {0} with fc wwpns: {1}".format(found, initiators._fc_wwns))
+            logger.debug("found host {0} with fc wwpns: {1}".format(found, initiators.fc_wwns))
             return found, [config.FC_CONNECTIVITY_TYPE]
         logger.debug("can not found host by initiators: {0} ".format(initiators))
         raise array_errors.HostNotFoundError(initiators)

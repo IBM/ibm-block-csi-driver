@@ -16,7 +16,6 @@ from controller.array_action.array_mediator_abstract import ArrayMediatorAbstrac
 from controller.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
-from controller.common.node_info import Initiators
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -740,23 +739,23 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         connectivity_types = set()
         for host in detailed_hosts_list:
             host_nqns = self._get_host_ports(host, HOST_NQN)
-            if initiators.is_array_nvme_nqn_match(host_nqns):
+            if initiators.is_match(initiators.nvme_nqns, host_nqns):
                 nvme_host = host.name
                 connectivity_types.add(config.NVME_OVER_FC_CONNECTIVITY_TYPE)
                 logger.debug("found nvme nqn in list : {0} for host : "
-                             "{1}".format(initiators._nvme_nqns, nvme_host))
+                             "{1}".format(initiators.nvme_nqns, nvme_host))
             host_wwns = self._get_host_ports(host, HOST_WWPN)
-            if initiators.is_array_wwns_match(host_wwns):
+            if initiators.is_match(initiators.fc_wwns, host_wwns):
                 fc_host = host.name
                 connectivity_types.add(config.FC_CONNECTIVITY_TYPE)
                 logger.debug("found fc wwns in list : {0} for host : "
-                             "{1}".format(initiators._fc_wwns, fc_host))
+                             "{1}".format(initiators.fc_wwns, fc_host))
             host_iqns = self._get_host_ports(host, HOST_ISCSI_NAME)
-            if initiators.is_array_iscsi_iqns_match(host_iqns):
+            if initiators.is_match(initiators.iscsi_iqns, host_iqns):
                 iscsi_host = host.name
                 connectivity_types.add(config.ISCSI_CONNECTIVITY_TYPE)
                 logger.debug("found iscsi iqn in list : {0} for host : "
-                             "{1}".format(initiators._iscsi_iqns, iscsi_host))
+                             "{1}".format(initiators.iscsi_iqns, iscsi_host))
         if not connectivity_types:
             logger.debug("could not find host by using initiators: {0} ".format(initiators))
             raise array_errors.HostNotFoundError(initiators)
@@ -864,8 +863,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             connectivity_types.append(config.FC_CONNECTIVITY_TYPE)
         if iscsi_iqns:
             connectivity_types.append(config.ISCSI_CONNECTIVITY_TYPE)
-        initiators = Initiators(nvme_nqns=nvme_nqns, fc_wwns=fc_wwns, iscsi_iqns=iscsi_iqns)
-        return Host(name=cli_host_by_id.name, connectivity_types=connectivity_types, initiators=initiators)
+        return Host(name=cli_host_by_id.name, connectivity_types=connectivity_types, nvme_nqns=nvme_nqns,
+                    fc_wwns=fc_wwns, iscsi_iqns=iscsi_iqns)
 
     def _lsvdiskhostmap(self, volume_name):
         try:

@@ -408,9 +408,9 @@ class TestUtils(unittest.TestCase):
         fc_wwns = fc_wwns.split(":") if fc_wwns else []
         iscsi_iqn = [iscsi_iqn] if iscsi_iqn else []
         self.assertEqual(node_id_info.node_name, "host-name")
-        self.assertEqual(node_id_info.initiators._nvme_nqn, nvme_nqn)
-        self.assertEqual(node_id_info.initiators._fc_wwns, list(filter(None, fc_wwns.split(":"))))
-        self.assertEqual(node_id_info.initiators._iscsi_iqn, iscsi_iqn)
+        self.assertEqual(node_id_info.initiators.nvme_nqns, nvme_nqn)
+        self.assertEqual(node_id_info.initiators.fc_wwns, list(filter(None, fc_wwns)))
+        self.assertEqual(node_id_info.initiators.iscsi_iqns, iscsi_iqn)
 
     def test_get_node_id_info(self):
         self._test_validation_exception(utils.get_node_id_info, "bad-node-format", str_in_msg="node",

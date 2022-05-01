@@ -11,7 +11,6 @@ from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIV
 from controller.array_action.utils import ClassProperty
 from controller.common import settings
 from controller.common.csi_logger import get_stdout_logger
-from controller.common.node_info import Initiators
 from controller.common.utils import string_to_array
 
 array_connections_dict = {}
@@ -382,8 +381,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             connectivity_types.append(FC_CONNECTIVITY_TYPE)
         if iscsi_iqn:
             connectivity_types.append(ISCSI_CONNECTIVITY_TYPE)
-        initiators = Initiators(nvme_nqns=[], fc_wwns=fc_wwns, iscsi_iqns=iscsi_iqn)
-        return Host(name=cli_host.name, connectivity_types=connectivity_types, initiators=initiators)
+        return Host(name=cli_host.name, connectivity_types=connectivity_types, fc_wwns=fc_wwns, iscsi_iqns=iscsi_iqn)
 
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host id for initiators : {0}".format(initiators))
@@ -394,11 +392,11 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         for host in host_list:
             host_iscsi_ports = string_to_array(host.iscsi_ports, ',')
             host_fc_ports = string_to_array(host.fc_ports, ',')
-            if initiators.is_array_wwns_match(host_fc_ports):
+            if initiators.is_match(initiators.fc_wwns, host_fc_ports):
                 matching_hosts_set.add(host.name)
                 logger.debug("found host : {0}, by fc port : {1}".format(host.name, host_fc_ports))
                 port_types.append(FC_CONNECTIVITY_TYPE)
-            if initiators.is_array_iscsi_iqns_match(host_iscsi_ports):
+            if initiators.is_match(initiators.iscsi_iqns, host_iscsi_ports):
                 matching_hosts_set.add(host.name)
                 logger.debug("found host : {0}, by iscsi port : {1}".format(host.name, host_iscsi_ports))
                 port_types.append(ISCSI_CONNECTIVITY_TYPE)

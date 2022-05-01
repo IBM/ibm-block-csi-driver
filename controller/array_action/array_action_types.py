@@ -1,9 +1,9 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from controller.common.node_info import Initiators
 
 
-@dataclass()
+@dataclass
 class Volume:
     capacity_bytes: int
     id: str
@@ -17,7 +17,7 @@ class Volume:
     default_space_efficiency: str = None
 
 
-@dataclass()
+@dataclass
 class Snapshot(Volume):
     pool: str = None
     is_ready: bool = False
@@ -33,8 +33,14 @@ class Replication:
         self.is_primary = is_primary
 
 
-@dataclass()
+@dataclass
 class Host:
     name: str
     connectivity_types: list
-    initiators: Initiators = None
+    nvme_nqns: list = field(default_factory=list, repr=False)
+    fc_wwns: list = field(default_factory=list, repr=False)
+    iscsi_iqns: list = field(default_factory=list, repr=False)
+    initiators: Initiators = field(init=False)
+
+    def __post_init__(self):
+        self.initiators = Initiators(nvme_nqns=self.nvme_nqns, fc_wwns=self.fc_wwns, iscsi_iqns=self.iscsi_iqns)

@@ -20,76 +20,51 @@ class Initiators:
     Object containing node initiators (e.g. iqn, fc_wwns)
     """
 
-    def __init__(self, nvme_nqns, fc_wwns, iscsi_iqns):
+    def __init__(self, nvme_nqns=None, fc_wwns=None, iscsi_iqns=None):
         """
         Args:
             nvme_nqns: list of nqns
             fc_wwns : list of fc wwns
             iscsi_iqns : list of iqns
         """
-        self._nvme_nqns = self._strip_and_filter(nvme_nqns)
-        self._fc_wwns = self._strip_and_filter(fc_wwns)
-        self._iscsi_iqns = self._strip_and_filter(iscsi_iqns)
-        self._nvme_nqns_lowercase = self._lower_and_parse(self._nvme_nqns)
-        self._fc_wwns_lowercase = self._lower_and_parse(self._fc_wwns)
-        self._iscsi_iqns_lowercase = self._lower_and_parse(self._iscsi_iqns)
+        if not nvme_nqns:
+            nvme_nqns = []
+        if not fc_wwns:
+            fc_wwns = []
+        if not iscsi_iqns:
+            iscsi_iqns = []
+        self.nvme_nqns = self._filter_empty_parts(nvme_nqns)
+        self.fc_wwns = self._filter_empty_parts(fc_wwns)
+        self.iscsi_iqns = self._filter_empty_parts(iscsi_iqns)
 
-    def _strip_and_filter(self, ports):
-        ports_strip = [port.strip() for port in ports if port]
+    def _filter_empty_parts(self, ports):
+        ports_strip = [port.strip() for port in ports]
         ports_filter = filter(None, ports_strip)
         return list(ports_filter)
 
-    def _lower_and_parse(self, ports):
+    def _lower(self, ports):
         return {port.lower() for port in ports if ports}
 
-    def is_array_wwns_match(self, host_wwns):
-        """
-        Args:
-           host_wwns : storage host wwns list
-
-        Returns:
-           Is current host wwns matches
-        """
-        host_wwns_lower = [wwn.lower() for wwn in host_wwns]
-        return not self._fc_wwns_lowercase.isdisjoint(host_wwns_lower)
-
-    def is_array_iscsi_iqns_match(self, host_iqns):
-        """
-        Args:
-           host_iqns: storage host iqns list
-
-        Returns:
-           Is current host iqns matches
-        """
-        host_iqns_lower = [iqn.lower() for iqn in host_iqns]
-        return not self._iscsi_iqns_lowercase.isdisjoint(host_iqns_lower)
-
-    def is_array_nvme_nqn_match(self, host_nqns):
-        """
-        Args:
-           host_nqns: storage host nqns list
-
-        Returns:
-           Is current host nqns matches
-        """
-        host_nqns_lower = [nqn.lower() for nqn in host_nqns]
-        return not self._nvme_nqns_lowercase.isdisjoint(host_nqns_lower)
-
     def __contains__(self, other_initiators):
-        return other_initiators.is_array_nvme_nqn_match(self._nvme_nqns) or \
-               other_initiators.is_array_wwns_match(self._fc_wwns) or \
-               other_initiators.is_array_iscsi_iqns_match(self._iscsi_iqns)
+        return other_initiators.is_match(other_initiators.nvme_nqns, self.nvme_nqns) or \
+               other_initiators.is_match(other_initiators.fc_wwns, self.fc_wwns) or \
+               other_initiators.is_match(other_initiators.iscsi_iqns, self.iscsi_iqns)
 
     def _get_iter(self):
-        if self.nvme_nqn:
-            yield array_config.NVME_OVER_FC_CONNECTIVITY_TYPE, self.nvme_nqn
+        for nvme_nqn in self.nvme_nqns:
+            yield array_config.NVME_OVER_FC_CONNECTIVITY_TYPE, nvme_nqn
         for fc_wwn in self.fc_wwns:
             yield array_config.FC_CONNECTIVITY_TYPE, fc_wwn
-        if self.iscsi_iqn:
-            yield array_config.ISCSI_CONNECTIVITY_TYPE, self.iscsi_iqn
+        for iscsi_iqn in self.nvme_nqns:
+            yield array_config.ISCSI_CONNECTIVITY_TYPE, iscsi_iqn
 
     def __iter__(self):
         return self._get_iter()
 
+    def is_match(self, ports, other_ports):
+        ports_lower = self._lower(ports)
+        other_ports_lower = self._lower(other_ports)
+        return not ports_lower.isdisjoint(other_ports_lower)
+
     def __str__(self):
-        return "nvme_nqn: {}, fc_wwns : {}, iscsi_iqn : {} ".format(self._nvme_nqns, self._fc_wwns, self._iscsi_iqns)
+        return "nvme_nqns : {}, fc_wwns : {}, iscsi_iqns : {} ".format(self.nvme_nqns, self.fc_wwns, self.iscsi_iqns)

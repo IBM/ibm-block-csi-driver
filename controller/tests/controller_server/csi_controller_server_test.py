@@ -11,7 +11,6 @@ import controller.controller_server.config as config
 import controller.controller_server.errors as controller_errors
 from controller.array_action.array_action_types import Host
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
-from controller.common.node_info import Initiators
 from controller.controller_server.csi_controller_server import CSIControllerServicer
 from controller.controller_server.sync_lock import SyncLock
 from controller.controller_server.test_settings import (CLONE_VOLUME_NAME,
@@ -1107,8 +1106,7 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_volume_mappings.return_value = {self.hostname: 2}
         self.mediator.get_host_by_name = Mock()
         self.mediator.get_host_by_name.return_value = Host(name=self.hostname, connectivity_types=['iscsi'],
-                                                           initiators=Initiators(nvme_nqns=[], fc_wwns=[],
-                                                                                 iscsi_iqns=[self.iqn]))
+                                                           iscsi_iqns=[self.iqn])
         storage_agent.return_value = self.storage_agent
 
         response = self.servicer.ControllerPublishVolume(self.request, self.context)
@@ -1212,8 +1210,7 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_volume_mappings.return_value = {self.hostname: 3}
         self.mediator.get_host_by_name = Mock()
         self.mediator.get_host_by_name.return_value = Host(name=self.hostname, connectivity_types=['iscsi'],
-                                                           initiators=Initiators(nvme_nqns=[], fc_wwns=[],
-                                                                                 iscsi_iqns="other_iqn"))
+                                                           iscsi_iqns="other_iqn")
         storage_agent.return_value = self.storage_agent
 
         self.servicer.ControllerPublishVolume(self.request, self.context)
@@ -1634,7 +1631,6 @@ class TestIdentityServer(BaseControllerSetUp):
 
     @patch("controller.common.config.config.identity")
     def test_identity_plugin_get_info_fails_when_name_or_version_are_empty(self, identity_config):
-
         request = Mock()
         context = Mock()
 
