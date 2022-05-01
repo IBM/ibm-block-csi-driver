@@ -406,7 +406,7 @@ class TestUtils(unittest.TestCase):
     def _check_node_id_parameters(self, node_id_info, nvme_nqn, fc_wwns, iscsi_iqn):
         self.assertEqual(node_id_info.node_name, "host-name")
         self.assertEqual(node_id_info.initiators.nvme_nqn, nvme_nqn)
-        self.assertEqual(node_id_info.initiators.fc_wwns, fc_wwns.split(":"))
+        self.assertEqual(node_id_info.initiators.fc_wwns, list(filter(None, fc_wwns.split(":"))))
         self.assertEqual(node_id_info.initiators.iscsi_iqn, iscsi_iqn)
 
     def test_get_node_id_info(self):
