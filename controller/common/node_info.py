@@ -1,5 +1,6 @@
-import controller.controller_server.utils as utils
-import controller.controller_server.config as config
+from controller.array_action import config as array_config
+from controller.controller_server import config
+from controller.controller_server import utils
 
 
 class NodeIdInfo:
@@ -78,6 +79,17 @@ class Initiators:
         return other_initiators.is_array_nvme_nqn_match(self._nvme_nqns) or \
                other_initiators.is_array_wwns_match(self._fc_wwns) or \
                other_initiators.is_array_iscsi_iqns_match(self._iscsi_iqns)
+
+    def _get_iter(self):
+        if self.nvme_nqn:
+            yield array_config.NVME_OVER_FC_CONNECTIVITY_TYPE, self.nvme_nqn
+        for fc_wwn in self.fc_wwns:
+            yield array_config.FC_CONNECTIVITY_TYPE, fc_wwn
+        if self.iscsi_iqn:
+            yield array_config.ISCSI_CONNECTIVITY_TYPE, self.iscsi_iqn
+
+    def __iter__(self):
+        return self._get_iter()
 
     def __str__(self):
         return "nvme_nqn: {}, fc_wwns : {}, iscsi_iqn : {} ".format(self._nvme_nqns, self._fc_wwns, self._iscsi_iqns)

@@ -1,6 +1,8 @@
-NVME_OVER_FC_CONNECTIVITY_TYPE = "nvmeofc"
-FC_CONNECTIVITY_TYPE = "fc"
-ISCSI_CONNECTIVITY_TYPE = "iscsi"
+from controller.common.config import config
+
+NVME_OVER_FC_CONNECTIVITY_TYPE = config.connectivity_type.nvme_over_fc
+FC_CONNECTIVITY_TYPE = config.connectivity_type.fc
+ISCSI_CONNECTIVITY_TYPE = config.connectivity_type.iscsi
 SPACE_EFFICIENCY_THIN = "thin"
 SPACE_EFFICIENCY_COMPRESSED = "compressed"
 SPACE_EFFICIENCY_DEDUPLICATED = "deduplicated"

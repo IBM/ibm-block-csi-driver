@@ -3,6 +3,7 @@ import unittest
 
 from csi_general import csi_pb2
 from mock import patch, Mock
+from munch import Munch
 
 import controller.controller_server.utils as utils
 from controller.array_action import config as array_config
@@ -21,11 +22,11 @@ class TestUtils(unittest.TestCase):
 
     def setUp(self):
         self.servicer = CSIControllerServicer()
-        self.controller_config = {"publish_context_lun_parameter": "lun",
-                                  "publish_context_connectivity_parameter": "connectivity_type",
-                                  "publish_context_separator": ",",
-                                  "publish_context_array_iqn": "array_iqn",
-                                  "publish_context_fc_initiators": "fc_wwns"}
+        self.controller_config = Munch({"publish_context_lun_parameter": "lun",
+                                        "publish_context_connectivity_parameter": "connectivity_type",
+                                        "publish_context_separator": ",",
+                                        "publish_context_array_iqn": "array_iqn",
+                                        "publish_context_fc_initiators": "fc_wwns"})
 
     def _test_validation_exception(self, util_function, function_arg, str_in_msg="", raised_error=ValidationException):
         with self.assertRaises(raised_error) as context:
@@ -407,9 +408,9 @@ class TestUtils(unittest.TestCase):
         fc_wwns = fc_wwns.split(":") if fc_wwns else []
         iscsi_iqn = [iscsi_iqn] if iscsi_iqn else []
         self.assertEqual(node_id_info.node_name, "host-name")
-        self.assertEqual(node_id_info.initiators._nvme_nqns, nvme_nqn)
-        self.assertEqual(node_id_info.initiators._fc_wwns, fc_wwns)
-        self.assertEqual(node_id_info.initiators._iscsi_iqns, iscsi_iqn)
+        self.assertEqual(node_id_info.initiators._nvme_nqn, nvme_nqn)
+        self.assertEqual(node_id_info.initiators._fc_wwns, list(filter(None, fc_wwns.split(":"))))
+        self.assertEqual(node_id_info.initiators._iscsi_iqn, iscsi_iqn)
 
     def test_get_node_id_info(self):
         self._test_validation_exception(utils.get_node_id_info, "bad-node-format", str_in_msg="node",
@@ -447,22 +448,23 @@ class TestUtils(unittest.TestCase):
             self.assertEqual(actual_chosen, expected_chosen_connectivity)
 
     def _check_publish_volume_response_parameters(self, lun, connectivity_type, array_initiators):
-        publish_volume_response = utils.generate_csi_publish_volume_response(lun, connectivity_type,
-                                                                             self.controller_config,
-                                                                             array_initiators)
-        self.assertEqual(publish_volume_response.publish_context["lun"], lun)
-        self.assertEqual(publish_volume_response.publish_context["connectivity_type"], connectivity_type)
-        if connectivity_type == NVME_OVER_FC_CONNECTIVITY_TYPE:
-            self.assertIsNone(publish_volume_response.publish_context.get("fc_wwns"))
-            self.assertIsNone(publish_volume_response.publish_context.get("array_iqn"))
-        elif connectivity_type == FC_CONNECTIVITY_TYPE:
-            self.assertEqual(publish_volume_response.publish_context["fc_wwns"], ",".join(array_initiators))
-            self.assertIsNone(publish_volume_response.publish_context.get("array_iqn"))
-        elif connectivity_type == ISCSI_CONNECTIVITY_TYPE:
-            self.assertEqual(publish_volume_response.publish_context["array_iqn"], ",".join(array_initiators.keys()))
-            for iqn, ips in array_initiators.items():
-                self.assertEqual(publish_volume_response.publish_context[iqn], ",".join(ips))
-            self.assertIsNone(publish_volume_response.publish_context.get("fc_wwns"))
+        with patch("controller.common.config.config.controller", new=self.controller_config):
+            publish_volume_response = utils.generate_csi_publish_volume_response(lun, connectivity_type,
+                                                                                 array_initiators)
+            self.assertEqual(publish_volume_response.publish_context["lun"], lun)
+            self.assertEqual(publish_volume_response.publish_context["connectivity_type"], connectivity_type)
+            if connectivity_type == NVME_OVER_FC_CONNECTIVITY_TYPE:
+                self.assertIsNone(publish_volume_response.publish_context.get("fc_wwns"))
+                self.assertIsNone(publish_volume_response.publish_context.get("array_iqn"))
+            elif connectivity_type == FC_CONNECTIVITY_TYPE:
+                self.assertEqual(publish_volume_response.publish_context["fc_wwns"], ",".join(array_initiators))
+                self.assertIsNone(publish_volume_response.publish_context.get("array_iqn"))
+            elif connectivity_type == ISCSI_CONNECTIVITY_TYPE:
+                self.assertEqual(publish_volume_response.publish_context["array_iqn"],
+                                 ",".join(array_initiators.keys()))
+                for iqn, ips in array_initiators.items():
+                    self.assertEqual(publish_volume_response.publish_context[iqn], ",".join(ips))
+                self.assertIsNone(publish_volume_response.publish_context.get("fc_wwns"))
 
     def test_generate_publish_volume_response_success(self):
         self._check_publish_volume_response_parameters("", NVME_OVER_FC_CONNECTIVITY_TYPE, [])
