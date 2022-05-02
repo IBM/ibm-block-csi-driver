@@ -53,6 +53,14 @@ class Initiators:
     def __iter__(self):
         return self._get_iter()
 
+    def _lower(self, ports):
+        return {port.lower() for port in ports if ports}
+
+    def _is_match(self, ports, other_ports):
+        ports_lower = self._lower(ports)
+        other_ports_lower = self._lower(other_ports)
+        return not ports_lower.isdisjoint(other_ports_lower)
+
     def is_array_wwns_match(self, host_wwns):
         return self._is_match(self.fc_wwns, host_wwns)
 
@@ -66,14 +74,6 @@ class Initiators:
         return other_initiators.is_array_nvme_nqn_match(self.nvme_nqns) or \
                other_initiators.is_array_wwns_match(self.fc_wwns) or \
                other_initiators.is_array_iscsi_iqns_match(self.iscsi_iqns)
-
-    def _lower(self, ports):
-        return {port.lower() for port in ports if ports}
-
-    def _is_match(self, ports, other_ports):
-        ports_lower = self._lower(ports)
-        other_ports_lower = self._lower(other_ports)
-        return not ports_lower.isdisjoint(other_ports_lower)
 
     def __str__(self):
         return "nvme_nqns : {}, fc_wwns : {}, iscsi_iqns : {} ".format(self.nvme_nqns, self.fc_wwns, self.iscsi_iqns)
