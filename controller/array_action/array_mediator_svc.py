@@ -733,8 +733,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         ports = host.get(attribute_name, [])
         return ports if isinstance(ports, list) else [ports]
 
-    def get_host_by_host_identifiers(self, initiators):
-        logger.debug("Getting host name for initiators : {0}".format(initiators))
+    def _get_host_by_host_identifiers_slow(self, initiators):
+        logger.debug("Scanning all hosts for initiators : {0}".format(initiators))
         detailed_hosts_list = self._get_detailed_hosts_list()
         nvme_host, fc_host, iscsi_host = None, None, None
         connectivity_types = set()
@@ -764,6 +764,69 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if not host_name:
             raise array_errors.MultipleHostsFoundError(initiators, fc_host)
         return host_name, list(connectivity_types)
+
+    def _get_host_names_by_wwpn(self, host_wwpn):
+        fabrics = self._lsfabric(wwpn=host_wwpn).as_list
+        return set(fabric.name for fabric in fabrics)
+
+    def _lsnvmefabric(self, host_nqn):
+        try:
+            return self.client.svcinfo.lsnvmefabric(remotenqn=host_nqn).as_list
+        except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            logger.error("Failed to get nvme fabrics. Reason "
+                         "is: {0}".format(ex))
+            raise ex
+
+    def _get_host_names_by_nqn(self, nqn):
+        nvme_fabrics = self._lsnvmefabric(nqn)
+        return set(nvme_fabric.object_name for nvme_fabric in nvme_fabrics)
+
+    def _lshostiplogin(self, iqn):
+        try:
+            return self.client.svcinfo.lshostiplogin(object_id=iqn).as_single_element
+        except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if SPECIFIED_OBJ_NOT_EXIST in ex.my_message:
+                return None
+            logger.error("Failed to get iscsi host. Reason "
+                         "is: {0}".format(ex))
+            raise ex
+
+    def _get_host_name_by_iqn(self, iqn):
+        iscsi_login = self._lshostiplogin(iqn)
+        if iscsi_login:
+            return iscsi_login.host_name
+        return None
+
+    def _get_host_names_and_connectivity_types(self, initiators):
+        host_names = set()
+        connectivity_types = set()
+        for connectivity_type, initiator in initiators:
+            if connectivity_type == config.NVME_OVER_FC_CONNECTIVITY_TYPE:
+                nvme_host_names = self._get_host_names_by_nqn(initiator)
+                if nvme_host_names:
+                    host_names.update(nvme_host_names)
+                    connectivity_types.add(config.NVME_OVER_FC_CONNECTIVITY_TYPE)
+            elif connectivity_type == config.FC_CONNECTIVITY_TYPE:
+                fc_host_names = self._get_host_names_by_wwpn(initiator)
+                if fc_host_names:
+                    host_names.update(fc_host_names)
+                    connectivity_types.add(config.FC_CONNECTIVITY_TYPE)
+            elif connectivity_type == config.ISCSI_CONNECTIVITY_TYPE:
+                iscsi_host_name = self._get_host_name_by_iqn(initiator)
+                if iscsi_host_name:
+                    host_names.add(iscsi_host_name)
+                    connectivity_types.add(config.ISCSI_CONNECTIVITY_TYPE)
+        return host_names, connectivity_types
+
+    def get_host_by_host_identifiers(self, initiators):
+        logger.debug("Getting host name for initiators : {0}".format(initiators))
+        host_names, connectivity_types = self._get_host_names_and_connectivity_types(initiators)
+        host_names = set(filter(None, host_names))
+        if len(host_names) > 1:
+            raise array_errors.MultipleHostsFoundError(initiators, host_names)
+        if len(host_names) == 1:
+            return host_names.pop(), connectivity_types
+        return self._get_host_by_host_identifiers_slow(initiators)
 
     def _get_detailed_hosts_list(self):
         logger.debug("Getting detailed hosts list on array {0}".format(self.endpoint))
@@ -965,19 +1028,19 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return ips_by_iqn
         raise array_errors.NoIscsiTargetsFoundError(self.endpoint)
 
-    def _lsfabric(self, host_name):
+    def _lsfabric(self, **kwargs):
         try:
-            return self.client.svcinfo.lsfabric(host=host_name)
+            return self.client.svcinfo.lsfabric(**kwargs)
         except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.error("Failed to get array fc wwn. Reason "
-                         "is: {0}".format(ex))
+            logger.error("Failed to get fabrics for {0}. Reason "
+                         "is: {1}".format(kwargs, ex))
             raise ex
 
     def get_array_fc_wwns(self, host_name):
         logger.debug("Getting the connected fc port wwn value from array "
                      "related to host : {}.".format(host_name))
         fc_port_wwns = []
-        fc_wwns = self._lsfabric(host_name)
+        fc_wwns = self._lsfabric(host=host_name)
         for wwn in fc_wwns:
             state = wwn.get('state', '')
             if state in ('active', 'inactive'):

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"reflect"
 	"strings"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
@@ -48,13 +49,8 @@ var (
 		},
 	}
 
-	defaultFSType              = "ext4"
-	StageInfoFilename          = ".stageInfo.json"
-	supportedConnectivityTypes = map[string]bool{
-		device_connectivity.ConnectionTypeNVMEoFC: true,
-		device_connectivity.ConnectionTypeFC:      true,
-		device_connectivity.ConnectionTypeISCSI:   true,
-	}
+	defaultFSType     = "ext4"
+	StageInfoFilename = ".stageInfo.json"
 
 	NvmeFullPath  = "/host/etc/nvme/hostnqn"
 	IscsiFullPath = "/host/etc/iscsi/initiatorname.iscsi"
@@ -122,16 +118,16 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		}
 	}
 
-	volId := req.VolumeId
-	err = d.VolumeIdLocksMap.AddVolumeLock(volId, "NodeStageVolume")
+	volumeID := req.VolumeId
+	err = d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeStageVolume")
 	if err != nil {
-		logger.Errorf("Another operation is being performed on volume : {%s}", volId)
+		logger.Errorf("Another operation is being performed on volume : {%s}", volumeID)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
 
-	defer d.VolumeIdLocksMap.RemoveVolumeLock(volId, "NodeStageVolume")
+	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeStageVolume")
 
-	connectivityType, lun, ipsByArrayInitiator, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
+	connectivityType, lun, ipsByArrayInitiator, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -149,7 +145,8 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(volId)
+	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
+	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(volumeUuid)
 	logger.Debugf("Discovered device : {%v}", mpathDevice)
 	if err != nil {
 		logger.Errorf("Error while discovering the device : {%v}", err.Error())
@@ -209,6 +206,16 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
+func isValidConnectivity(connectivityTypes Connectivity_type, connectivityType string) bool {
+	connectivityReflect := reflect.ValueOf(&connectivityTypes).Elem()
+	for i := 0; i < connectivityReflect.NumField(); i++ {
+		if connectivityReflect.Field(i).Interface() == connectivityType {
+			return true
+		}
+	}
+	return false
+}
+
 func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeRequest) error {
 
 	volumeID := req.GetVolumeId()
@@ -244,12 +251,12 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{"Volume Access Type is not supported"}
 	}
 
-	connectivityType, lun, ipsByArrayInitiator, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext, d.ConfigYaml)
+	connectivityType, lun, ipsByArrayInitiator, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext)
 	if err != nil {
 		return &RequestValidationError{fmt.Sprintf("Fail to parse PublishContext %v with err = %v", req.PublishContext, err)}
 	}
-
-	if _, ok := supportedConnectivityTypes[connectivityType]; !ok {
+	supportedConnectivityTypes := d.ConfigYaml.Connectivity_type
+	if !isValidConnectivity(supportedConnectivityTypes, connectivityType) {
 		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong connectivity type %s. Supported connectivities %v", connectivityType, supportedConnectivityTypes)}
 	}
 
@@ -257,14 +264,14 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong lun id %d.", lun)}
 	}
 
-	if connectivityType != device_connectivity.ConnectionTypeNVMEoFC {
+	if connectivityType != d.ConfigYaml.Connectivity_type.Nvme_over_fc {
 		if len(ipsByArrayInitiator) == 0 {
 			return &RequestValidationError{fmt.Sprintf("PublishContext with wrong arrayInitiators %v.",
 				ipsByArrayInitiator)}
 		}
 	}
 
-	if connectivityType == device_connectivity.ConnectionTypeISCSI {
+	if connectivityType == d.ConfigYaml.Connectivity_type.Iscsi {
 		isAnyIpFound := false
 		for arrayInitiator := range ipsByArrayInitiator {
 			if _, ok := req.PublishContext[arrayInitiator]; ok {
@@ -348,7 +355,8 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		}
 	}
 
-	mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeID)
+	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
+	mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
 	if err != nil {
 		switch err.(type) {
 		case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
@@ -392,11 +400,11 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
 	defer logger.Exit(logger.Enter(req))
 
-	err := d.nodePublishVolumeRequestValidation(req)
+	code, err := d.nodePublishVolumeRequestValidation(req)
 	if err != nil {
 		switch err.(type) {
 		case *RequestValidationError:
-			return nil, status.Error(codes.InvalidArgument, err.Error())
+			return nil, status.Error(code, err.Error())
 		default:
 			return nil, status.Error(codes.Internal, err.Error())
 		}
@@ -464,7 +472,8 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		fsType := volumeCap.GetMount().FsType
 		err = d.publishFileSystemVolume(stagingPath, targetPath, fsType)
 	} else {
-		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeID)
+		volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
+		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
 		if err != nil {
 			logger.Errorf("Error while discovering the device : {%v}", err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
@@ -518,29 +527,29 @@ func (d *NodeService) isTargetMounted(targetPathWithHostPrefix string, isFSVolum
 	}
 }
 
-func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVolumeRequest) error {
+func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVolumeRequest) (codes.Code, error) {
 	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
-		return &RequestValidationError{"Volume ID not provided"}
-	}
-
-	source := req.GetStagingTargetPath()
-	if len(source) == 0 {
-		return &RequestValidationError{"Staging target not provided"}
+		return codes.InvalidArgument, &RequestValidationError{"Volume ID not provided"}
 	}
 
 	target := req.GetTargetPath()
 	if len(target) == 0 {
-		return &RequestValidationError{"Target path not provided"}
+		return codes.InvalidArgument, &RequestValidationError{"Target path not provided"}
 	}
 
 	volCap := req.GetVolumeCapability()
 	if volCap == nil {
-		return &RequestValidationError{"Volume capability not provided"}
+		return codes.InvalidArgument, &RequestValidationError{"Volume capability not provided"}
+	}
+
+	source := req.GetStagingTargetPath()
+	if len(source) == 0 {
+		return codes.FailedPrecondition, &RequestValidationError{"Staging target not provided"}
 	}
 
 	if !isValidVolumeCapabilitiesAccessMode([]*csi.VolumeCapability{volCap}) {
-		return &RequestValidationError{"Volume capability AccessMode not supported"}
+		return codes.InvalidArgument, &RequestValidationError{"Volume capability AccessMode not supported"}
 	}
 
 	// If the access type is not mount and not block, should never happen
@@ -548,10 +557,10 @@ func (d *NodeService) nodePublishVolumeRequestValidation(req *csi.NodePublishVol
 	case *csi.VolumeCapability_Mount:
 	case *csi.VolumeCapability_Block:
 	default:
-		return &RequestValidationError{"Volume Access Type is not supported"}
+		return codes.InvalidArgument, &RequestValidationError{"Volume Access Type is not supported"}
 	}
 
-	return nil
+	return codes.Internal, nil
 }
 
 func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpublishVolumeRequest) (*csi.NodeUnpublishVolumeResponse, error) {
@@ -664,7 +673,8 @@ func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatis
 	}
 
 	if isBlock {
-		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeId)
+		volumeUuid := d.NodeUtils.GetVolumeUuid(volumeId)
+		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
 		if err != nil {
 			switch err.(type) {
 			case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
@@ -701,7 +711,8 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	}
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeExpandVolume")
 
-	device, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeID)
+	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
+	device, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
 	if err != nil {
 		logger.Errorf("Error while discovering the device : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
@@ -759,8 +770,8 @@ func (d *NodeService) nodeExpandVolumeRequestValidation(req *csi.NodeExpandVolum
 		return status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	if !strings.Contains(volumeID, device_connectivity.VolumeIdDelimiter) {
-		errMsg := fmt.Sprintf("invalid Volume ID - no {%v} found", device_connectivity.VolumeIdDelimiter)
+	if !strings.Contains(volumeID, d.ConfigYaml.Parameters.Object_id_info.Delimiter) {
+		errMsg := fmt.Sprintf("invalid Volume ID - no {%v} found", d.ConfigYaml.Parameters.Object_id_info.Delimiter)
 		err := &RequestValidationError{errMsg}
 		return status.Error(codes.NotFound, err.Error())
 	}
