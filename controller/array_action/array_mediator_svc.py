@@ -739,19 +739,19 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         connectivity_types = set()
         for host in detailed_hosts_list:
             host_nqns = self._get_host_ports(host, HOST_NQN)
-            if initiators.is_match(initiators.nvme_nqns, host_nqns):
+            if initiators.is_array_nvme_nqn_match(host_nqns):
                 nvme_host = host.name
                 connectivity_types.add(config.NVME_OVER_FC_CONNECTIVITY_TYPE)
                 logger.debug("found nvme nqn in list : {0} for host : "
                              "{1}".format(initiators.nvme_nqns, nvme_host))
             host_wwns = self._get_host_ports(host, HOST_WWPN)
-            if initiators.is_match(initiators.fc_wwns, host_wwns):
+            if initiators.is_array_wwns_match(host_wwns):
                 fc_host = host.name
                 connectivity_types.add(config.FC_CONNECTIVITY_TYPE)
                 logger.debug("found fc wwns in list : {0} for host : "
                              "{1}".format(initiators.fc_wwns, fc_host))
             host_iqns = self._get_host_ports(host, HOST_ISCSI_NAME)
-            if initiators.is_match(initiators.iscsi_iqns, host_iqns):
+            if initiators.is_array_iscsi_iqns_match(host_iqns):
                 iscsi_host = host.name
                 connectivity_types.add(config.ISCSI_CONNECTIVITY_TYPE)
                 logger.debug("found iscsi iqn in list : {0} for host : "

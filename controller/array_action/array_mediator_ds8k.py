@@ -652,7 +652,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         found = ""
         for host in self.client.get_hosts():
             wwpns = self._get_fc_wwns_from_api_host(host)
-            if initiators.is_match(initiators.fc_wwns, wwpns):
+            if initiators.is_array_wwns_match(wwpns):
                 found = host.name
                 break
         if found:

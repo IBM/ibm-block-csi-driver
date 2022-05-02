@@ -42,14 +42,6 @@ class Initiators:
         ports_filter = filter(None, ports_strip)
         return list(ports_filter)
 
-    def _lower(self, ports):
-        return {port.lower() for port in ports if ports}
-
-    def __contains__(self, other_initiators):
-        return other_initiators.is_match(other_initiators.nvme_nqns, self.nvme_nqns) or \
-               other_initiators.is_match(other_initiators.fc_wwns, self.fc_wwns) or \
-               other_initiators.is_match(other_initiators.iscsi_iqns, self.iscsi_iqns)
-
     def _get_iter(self):
         for nvme_nqn in self.nvme_nqns:
             yield array_config.NVME_OVER_FC_CONNECTIVITY_TYPE, nvme_nqn
@@ -61,7 +53,24 @@ class Initiators:
     def __iter__(self):
         return self._get_iter()
 
-    def is_match(self, ports, other_ports):
+    def is_array_wwns_match(self, host_wwns):
+        return self._is_match(self.fc_wwns, host_wwns)
+
+    def is_array_iscsi_iqns_match(self, host_iqns):
+        return self._is_match(self.iscsi_iqns, host_iqns)
+
+    def is_array_nvme_nqn_match(self, host_nqns):
+        return self._is_match(self.nvme_nqns, host_nqns)
+
+    def __contains__(self, other_initiators):
+        return other_initiators.is_array_nvme_nqn_match(self.nvme_nqns) or \
+               other_initiators.is_array_wwns_match(self.fc_wwns) or \
+               other_initiators.is_array_iscsi_iqns_match(self.iscsi_iqns)
+
+    def _lower(self, ports):
+        return {port.lower() for port in ports if ports}
+
+    def _is_match(self, ports, other_ports):
         ports_lower = self._lower(ports)
         other_ports_lower = self._lower(other_ports)
         return not ports_lower.isdisjoint(other_ports_lower)
