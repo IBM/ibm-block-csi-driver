@@ -72,9 +72,6 @@ var (
 const (
 	DevPath                     = "/dev"
 	DevMapperPath               = "/dev/mapper"
-	ConnectionTypeNVMEoFC       = "nvmeofc"
-	ConnectionTypeFC            = "fc"
-	ConnectionTypeISCSI         = "iscsi"
 	WaitForMpathRetries         = 5
 	WaitForMpathWaitIntervalSec = 1
 	FcHostSysfsPath             = "/sys/class/fc_remote_ports/rport-*/port_name"
@@ -102,7 +99,7 @@ func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterfac
 func (r OsDeviceConnectivityHelperScsiGeneric) GetVolumeIdByVolumePath(volumePath string, volumeId string) (string, error) {
 	logger.Infof("GetVolumeIdByVolumePath: Searching matching volume id for volume path: [%s] ", volumePath)
 	volumeUuidLower, volumeNguid := r.GetNguidFromVolumeId(volumeId)
-	wantedVolumIds := []string{volumeUuidLower, volumeNguid}
+	volumeUids := []string{volumeUuidLower, volumeNguid}
 	mpathdOutput, err := r.Helper.GetMpathOutputByVolumeId(volumeUuidLower, volumeNguid)
 	if err != nil {
 		return "", err
@@ -116,7 +113,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetVolumeIdByVolumePath(volumePat
 
 	volumeId, _ = r.Helper.GetVolumeIdByMpathName(mpathDeviceName, mpathdOutput)
 	if volumeId != "" {
-		if r.Helper.IsMpathHasRightVolumeIdWithoutErrors(dmPath, wantedVolumIds) {
+		if r.Helper.IsMpathMatchVolumeIdWithoutErrors(dmPath, volumeUids) {
 			return volumeId, nil
 		}
 	}
@@ -134,7 +131,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetVolumeIdByVolumePath(volumePat
 		return "", &VolumeIdNotFoundForMultipathDeviceNameError{mpathDeviceName}
 	}
 
-	if _, err = r.Helper.IsMpathHasRightVolumeId(dmPath, volumeUuidLower, volumeNguid); err != nil {
+	if _, err = r.Helper.IsMpathMatchVolumeId(dmPath, volumeUuidLower, volumeNguid); err != nil {
 		return "", err
 	}
 	return volumeId, nil
@@ -200,7 +197,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 
 	if dmPath != "" {
 		wantedVolumIds := []string{volumeUuidLower, volumeNguid}
-		if r.Helper.IsMpathHasRightVolumeIdWithoutErrors(dmPath, wantedVolumIds) {
+		if r.Helper.IsMpathMatchVolumeIdWithoutErrors(dmPath, wantedVolumIds) {
 			return dmPath, nil
 		}
 	}
@@ -218,7 +215,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	if dmPath == "" {
 		return "", &MultipathDeviceNotFoundForVolumeError{volumeId}
 	}
-	_, err = r.Helper.IsMpathHasRightVolumeId(dmPath, volumeUuidLower, volumeNguid)
+	_, err = r.Helper.IsMpathMatchVolumeId(dmPath, volumeUuidLower, volumeNguid)
 	if err != nil {
 		return "", err
 	}
@@ -227,7 +224,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 
 func (OsDeviceConnectivityHelperScsiGeneric) GetNguidFromVolumeId(volumeUuid string) (string, string) {
 	volumeUuidLower := strings.ToLower(volumeUuid)
-	volumeNguid := ConvertScsiIdToNguid(volumeUuidLower)
+	volumeNguid := convertScsiIdToNguid(volumeUuidLower)
 	return volumeUuidLower, volumeNguid
 }
 
@@ -359,8 +356,8 @@ type OsDeviceConnectivityHelperInterface interface {
 	GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error)
 	GetDmsPath(volumeId string, volumeNguid string, multipathdCommandFormatArgs []string) (string, error)
 	GetWwnByScsiInq(dev string) (string, error)
-	IsMpathHasRightVolumeId(dmPath string, volumeUuidLower string, volumeNguid string) (bool, error)
-	IsMpathHasRightVolumeIdWithoutErrors(dmPath string, wnatedVolumeIds []string) bool
+	IsMpathMatchVolumeId(dmPath string, volumeUuidLower string, volumeNguid string) (bool, error)
+	IsMpathMatchVolumeIdWithoutErrors(dmPath string, wnatedVolumeIds []string) bool
 	ReloadMultipath() error
 	GetMpathOutputByVolumeId(volumeUuidLower string, volumeNguid string) (string, error)
 	GetVolumeIdByMpathName(mpathDeviceName string, mpathdOutput string) (string, error)
@@ -452,7 +449,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 
 }
 
-func (o OsDeviceConnectivityHelperGeneric) IsMpathHasRightVolumeId(dmPath string,
+func (o OsDeviceConnectivityHelperGeneric) IsMpathMatchVolumeId(dmPath string,
 	volumeUuidLower string, volumeNguid string) (bool, error) {
 	sgInqWwn, err := o.getSgInqWwnFromDmPath(dmPath)
 	if err != nil {
@@ -464,7 +461,7 @@ func (o OsDeviceConnectivityHelperGeneric) IsMpathHasRightVolumeId(dmPath string
 	return false, &ErrorWrongDeviceFound{dmPath, volumeUuidLower, sgInqWwn}
 }
 
-func (o OsDeviceConnectivityHelperGeneric) IsMpathHasRightVolumeIdWithoutErrors(dmPath string, wnatedVolumeIds []string) bool {
+func (o OsDeviceConnectivityHelperGeneric) IsMpathMatchVolumeIdWithoutErrors(dmPath string, wnatedVolumeIds []string) bool {
 	sgInqWwn, _ := o.getSgInqWwnFromDmPath(dmPath)
 	for _, wnatedVolumeId := range wnatedVolumeIds {
 		if sgInqWwn == wnatedVolumeId {
@@ -475,12 +472,12 @@ func (o OsDeviceConnectivityHelperGeneric) IsMpathHasRightVolumeIdWithoutErrors(
 }
 
 func (o OsDeviceConnectivityHelperGeneric) getSgInqWwnFromDmPath(dmPath string) (string, error) {
-	SgInqWwn, err := o.GetWwnByScsiInq(dmPath)
+	sgInqWwn, err := o.GetWwnByScsiInq(dmPath)
 	if err != nil {
 		return "", err
 	}
-	SgInqWwnLower := strings.ToLower(SgInqWwn)
-	return SgInqWwnLower, nil
+	sgInqWwnLower := strings.ToLower(sgInqWwn)
+	return sgInqWwnLower, nil
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, error) {
@@ -652,7 +649,7 @@ func NewGetDmsPathHelperGeneric(executer executer.ExecuterInterface) GetDmsPathH
 	return &GetDmsPathHelperGeneric{executer: executer}
 }
 
-func ConvertScsiIdToNguid(scsiId string) string {
+func convertScsiIdToNguid(scsiId string) string {
 	logger.Infof("Converting scsi uuid : %s to nguid", scsiId)
 	oui := scsiId[1:WwnOuiEnd]
 	vendorIdentifier := scsiId[WwnOuiEnd:WwnVendorIdentifierEnd]
@@ -709,7 +706,7 @@ func (o GetDmsPathHelperGeneric) GetDmObjectsByIdentifier(wantedDmObjects []stri
 		identifier, dmObject := o.getLineParts(scanner)
 		if o.IsThisWantedDmObject(wantedDmObjects, identifier) {
 			dmObjects[dmObject] = true
-			logger.Infof("getDmObjectsByIdentifier: DM Object found: %s for DM Object %s", dmObject, identifier)
+			logger.Infof("GetDmObjectsByIdentifier: DM Object found: %s for DM Object %s", dmObject, identifier)
 		}
 	}
 
