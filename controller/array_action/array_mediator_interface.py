@@ -331,10 +331,9 @@ class ArrayMediator(ABC):
 
         Returns:
            Host
-           None
 
         Raises:
-            None
+            HostNotFoundError
         """
         raise NotImplementedError
 

@@ -451,8 +451,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_get_host_by_name_return_none(self):
         self.client_mock.get_host.return_value = None
-        host = self.array.get_host_by_name('test_host_1')
-        self.assertIsNone(host)
+        with self.assertRaises(array_errors.HostNotFoundError):
+            self.array.get_host_by_name('test_host_1')
 
     def test_get_host_by_identifiers(self):
         host_name = "test_host"

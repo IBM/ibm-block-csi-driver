@@ -36,7 +36,7 @@ class Replication:
 @dataclass
 class Host:
     name: str
-    connectivity_types: list
+    connectivity_types: list = field(repr=False)
     nvme_nqns: list = field(default_factory=list, repr=False)
     fc_wwns: list = field(default_factory=list, repr=False)
     iscsi_iqns: list = field(default_factory=list, repr=False)

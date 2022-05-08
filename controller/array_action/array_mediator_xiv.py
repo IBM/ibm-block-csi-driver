@@ -373,7 +373,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def get_host_by_name(self, host_name):
         cli_host = self._get_cli_host_by_name(host_name)
         if not cli_host:
-            return None
+            raise array_errors.HostNotFoundError(host_name)
         fc_wwns = string_to_array(cli_host.fc_ports, ',')
         iscsi_iqn = string_to_array(cli_host.iscsi_ports, ',')
         connectivity_types = []

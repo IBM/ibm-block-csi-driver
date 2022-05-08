@@ -147,9 +147,9 @@ class MultipleHostsFoundError(BaseArrayActionException):
 
 class HostNotFoundError(BaseArrayActionException):
 
-    def __init__(self, iscsi_iqn):
+    def __init__(self, host_identifier):
         super().__init__()
-        self.message = messages.HOST_NOT_FOUND_ERROR_MESSAGE.format(iscsi_iqn)
+        self.message = messages.HOST_NOT_FOUND_ERROR_MESSAGE.format(host_identifier)
 
 
 class NoAvailableLunError(BaseArrayActionException):

@@ -1,3 +1,5 @@
+from dataclasses import dataclass, field
+
 from controller.array_action import config as array_config
 from controller.controller_server import config
 from controller.controller_server import utils
@@ -15,27 +17,19 @@ class NodeIdInfo:
         self.initiators = Initiators([nvme_nqn], fc_wwns, [iscsi_iqn])
 
 
+@dataclass
 class Initiators:
     """
     Object containing node initiators (e.g. iqn, fc_wwns)
     """
+    nvme_nqns: list = field(default_factory=list)
+    fc_wwns: list = field(default_factory=list)
+    iscsi_iqns: list = field(default_factory=list)
 
-    def __init__(self, nvme_nqns=None, fc_wwns=None, iscsi_iqns=None):
-        """
-        Args:
-            nvme_nqns: list of nqns
-            fc_wwns : list of fc wwns
-            iscsi_iqns : list of iqns
-        """
-        if not nvme_nqns:
-            nvme_nqns = []
-        if not fc_wwns:
-            fc_wwns = []
-        if not iscsi_iqns:
-            iscsi_iqns = []
-        self.nvme_nqns = self._filter_empty_parts(nvme_nqns)
-        self.fc_wwns = self._filter_empty_parts(fc_wwns)
-        self.iscsi_iqns = self._filter_empty_parts(iscsi_iqns)
+    def __post_init__(self):
+        self.nvme_nqns = self._filter_empty_parts(self.nvme_nqns)
+        self.fc_wwns = self._filter_empty_parts(self.fc_wwns)
+        self.iscsi_iqns = self._filter_empty_parts(self.iscsi_iqns)
 
     def _filter_empty_parts(self, ports):
         ports_strip = [port.strip() for port in ports]
@@ -74,6 +68,3 @@ class Initiators:
         return other_initiators.is_array_nvme_nqn_match(self.nvme_nqns) or \
                other_initiators.is_array_wwns_match(self.fc_wwns) or \
                other_initiators.is_array_iscsi_iqns_match(self.iscsi_iqns)
-
-    def __str__(self):
-        return "nvme_nqns : {}, fc_wwns : {}, iscsi_iqns : {} ".format(self.nvme_nqns, self.fc_wwns, self.iscsi_iqns)

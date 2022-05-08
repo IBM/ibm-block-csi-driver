@@ -836,7 +836,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_mocks_for_get_host_by_identifiers(iscsi_host_name='test_host_1',
                                                         connectivity_types=[config.ISCSI_CONNECTIVITY_TYPE])
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('Test_nqn', ['Test_wwn'], 'iqn.test.2'))
+            Initiators(['Test_nqn'], ['Test_wwn'], ['iqn.test.2']))
         self.assertEqual('test_host_1', hostname)
         self.assertEqual({config.ISCSI_CONNECTIVITY_TYPE}, connectivity_types)
 
@@ -909,7 +909,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_mocks_for_get_host_by_identifiers(fc_host_names=['test_host_3'],
                                                         connectivity_types=[config.FC_CONNECTIVITY_TYPE])
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('nqn.test.1', ['Test_wwn'], 'iqn.test.6'))
+            Initiators(['nqn.test.1'], ['Test_wwn'], ['iqn.test.6']))
         self.assertEqual('test_host_3', hostname)
         self.assertEqual({config.FC_CONNECTIVITY_TYPE}, connectivity_types)
 
@@ -926,7 +926,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_mocks_for_get_host_by_identifiers(fc_host_names=['', 'test_host_2'],
                                                         connectivity_types=[config.FC_CONNECTIVITY_TYPE])
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('Test_nqn', ['Test_wwn', 'WWNs'], 'Test_iqn'))
+            Initiators(['Test_nqn'], ['Test_wwn', 'WWNs'], ['Test_iqn']))
         self.assertEqual('test_host_2', hostname)
         self.assertEqual({config.FC_CONNECTIVITY_TYPE}, connectivity_types)
 
