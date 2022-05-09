@@ -847,12 +847,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return writer.getvalue()
 
     def get_host_by_name(self, host_name):
-        cli_host_by_name = self._get_cli_host_by_name(host_name, not_found_error=False)
-        if cli_host_by_name is None:
-            raise array_errors.HostNotFoundError(host_name)
+        cli_host_by_name = self._get_cli_host_by_name(host_name)
         cli_host_by_id = self._get_cli_host_by_id(cli_host_by_name.id)
-        if cli_host_by_id is None:
-            raise array_errors.HostNotFoundError(host_name)
         nvme_nqns = self._get_host_ports(cli_host_by_id, HOST_NQN)
         fc_wwns = self._get_host_ports(cli_host_by_id, HOST_WWPN)
         iscsi_iqns = self._get_host_ports(cli_host_by_id, HOST_ISCSI_NAME)
@@ -1059,19 +1055,17 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.debug("Getting fc wwns : {}".format(fc_port_wwns))
         return fc_port_wwns
 
-    def _get_cli_host_by_name(self, host_name, not_found_error=True):
+    def _get_cli_host_by_name(self, host_name):
         filter_value = 'name={}'.format(host_name)
         cli_host = self.client.svcinfo.lshost(filtervalue=filter_value).as_single_element
         if not cli_host:
-            if not_found_error:
-                raise array_errors.HostNotFoundError(host_name)
-            return None
+            raise array_errors.HostNotFoundError(host_name)
         return cli_host
 
     def _get_cli_host_by_id(self, host_id):
         cli_host = self.client.svcinfo.lshost(object_id=host_id).as_single_element
         if not cli_host:
-            return None
+            raise array_errors.HostNotFoundError(host_id)
         return cli_host
 
     def _get_host_portset_id(self, host_name):
