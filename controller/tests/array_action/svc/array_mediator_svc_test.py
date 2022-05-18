@@ -34,6 +34,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.fcmaps_as_target = [self._create_dummy_fcmap('source_name', 'test_fc_as_target_id')]
         self.fcmaps_as_source = [self._create_dummy_fcmap('test_snapshot', 'test_fc_id')]
         self.svc.client.svcinfo.lsfcmap.return_value = Mock(as_list=self.fcmaps)
+        del self.svc.client.svctask.addsnapshot
 
     def _create_dummy_fcmap(self, source_name, id_value):
         return Munch(
@@ -328,6 +329,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
                       'compressed_copy': compressed_copy
                       })
 
+    @staticmethod
+    def _get_cli_snapshot():
+        return Munch({'snapshot_id': 'snapshot_id',
+                      'snapshot_name': 'snapshot_name',
+                      'volume_id': 'volume_id',
+                      'volume_name': 'volume_name',
+                      })
+
     @classmethod
     def _get_mapless_target_cli_volume(cls):
         target_cli_volume = cls._get_cli_volume()
@@ -612,6 +621,45 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(snapshot.capacity_bytes, 1024)
         self.assertEqual(snapshot.array_type, 'SVC')
         self.assertEqual(snapshot.id, 'snap_id')
+
+    def _prepare_mocks_for_create_snapshot_2_0(self):
+        self.svc.client.svctask.addsnapshot = Mock()
+        source_volume_to_copy_from = self._get_custom_cli_volume(False, False, pool_name='pool1')
+        volumes_to_return = [source_volume_to_copy_from, source_volume_to_copy_from]
+        self.svc.client.svcinfo.lsvdisk.side_effect = self._mock_cli_objects(volumes_to_return)
+        self.svc.client.svctask.addsnapshot.return_value = Mock(
+            response=(b'Snapshot, id [0], successfully created or triggered\n', b''))
+        self.svc.client.svcinfo.lsvolumesnapshot = Mock()
+        self.svc.client.svcinfo.lsvolumesnapshot.return_value = self._get_cli_snapshot()
+
+    def test_create_snapshot_2_0_success(self):
+        self._prepare_mocks_for_create_snapshot_2_0()
+        snapshot = self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="pool1")
+
+        self.assertEqual(snapshot.capacity_bytes, 1024)
+        self.svc.client.svctask.addsnapshot.assert_called_once_with(name='test_snapshot', volumes='test_id',
+                                                                    pool='pool1')
+        self.svc.client.svcinfo.lsvolumesnapshot.assert_called_once_with(snapshot_id=0)
+        self.assertEqual(snapshot.array_type, 'SVC')
+        self.assertEqual(snapshot.id, ' ')
+        self.assertEqual(snapshot.internal_id, 'snapshot_id')
+
+    def _test_create_snapshot_addsnapshot_cli_failure_error(self, error_message_id, expected_error):
+        self._test_mediator_method_client_cli_failure_error(self.svc.create_snapshot,
+                                                            ('source_volume_name', 'snapshot_name', '', 'pool'),
+                                                            self.svc.client.svctask.addsnapshot, error_message_id,
+                                                            expected_error)
+
+    def test_create_snapshot_2_0_raise_exceptions(self):
+        self.svc.client.svctask.addsnapshot = Mock()
+        self._test_mediator_method_client_error(self.svc.create_snapshot,
+                                                ('source_volume_name', 'snapshot_name', '', 'pool'),
+                                                self.svc.client.svctask.addsnapshot, Exception, Exception)
+        self._test_create_snapshot_addsnapshot_cli_failure_error("Failed", CLIFailureError)
+        self._test_create_snapshot_addsnapshot_cli_failure_error("CMMVC8710E", array_errors.NotEnoughSpaceInPool)
+        self._test_create_snapshot_addsnapshot_cli_failure_error("CMMVC6017E", array_errors.IllegalObjectName)
+        self._test_create_snapshot_addsnapshot_cli_failure_error("CMMVC6035E", array_errors.SnapshotAlreadyExists)
+        self._test_create_snapshot_addsnapshot_cli_failure_error("CMMVC5754E", array_errors.PoolDoesNotExist)
 
     def test_delete_snapshot_no_volume_raise_snapshot_not_found(self):
         self._prepare_lsvdisk_to_return_none()
