@@ -21,6 +21,7 @@ array_connections_dict = {}
 logger = get_stdout_logger()
 
 OBJ_NOT_FOUND = 'CMMVC5753E'
+SNAPSHOT_NOT_EXIST = 'CMMVC9755E'
 NAME_NOT_EXIST_OR_MEET_RULES = 'CMMVC5754E'
 NON_ASCII_CHARS = 'CMMVC6017E'
 INVALID_NAME = 'CMMVC6527E'
@@ -720,12 +721,26 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         return self._generate_snapshot_response(target_cli_volume, source_cli_volume.vdisk_UID)
 
-    def delete_snapshot(self, snapshot_id):
+    def _is_flashcopy_2_0_supported(self):
+        return hasattr(self.client.svctask, "addsnapshot")
+
+    def _rmsnapshot(self, internal_snapshot_id):
+        try:
+            self.client.svctask.rmsnapshot(snapshotid=internal_snapshot_id)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if SNAPSHOT_NOT_EXIST in ex.my_message:
+                raise array_errors.ObjectNotFoundError(internal_snapshot_id)
+            raise ex
+
+    def delete_snapshot(self, snapshot_id, internal_snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
-        cli_volume = self._get_cli_volume_by_wwn(snapshot_id)
-        if not cli_volume or not cli_volume.FC_id:
-            raise array_errors.ObjectNotFoundError(snapshot_id)
-        self._delete_object(cli_volume, is_snapshot=True)
+        if self._is_flashcopy_2_0_supported() and not snapshot_id:
+            self._rmsnapshot(internal_snapshot_id)
+        else:
+            cli_volume = self._get_cli_volume_by_wwn(snapshot_id)
+            if not cli_volume or not cli_volume.FC_id:
+                raise array_errors.ObjectNotFoundError(snapshot_id)
+            self._delete_object(cli_volume, is_snapshot=True)
         logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
 
     def _get_host_ports(self, host, attribute_name):
