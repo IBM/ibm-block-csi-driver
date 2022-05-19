@@ -452,7 +452,7 @@ func (o OsDeviceConnectivityHelperGeneric) IsMpathMatchVolumeId(dmPath string, i
 	if err != nil {
 		return false, err
 	}
-	if isSameId, _ := o.isSameId(sgInqWwn, identifiers); isSameId == true {
+	if o.isSameId(sgInqWwn, identifiers) {
 		return true, nil
 	}
 	return false, &ErrorWrongDeviceFound{dmPath, identifiers[0], sgInqWwn}
@@ -460,17 +460,16 @@ func (o OsDeviceConnectivityHelperGeneric) IsMpathMatchVolumeId(dmPath string, i
 
 func (o OsDeviceConnectivityHelperGeneric) IsMpathMatchVolumeIdWithoutErrors(dmPath string, identifiers []string) bool {
 	sgInqWwn, _ := o.GetWwnByScsiInq(dmPath)
-	isSameId, _ := o.isSameId(sgInqWwn, identifiers)
-	return isSameId
+	return o.isSameId(sgInqWwn, identifiers)
 }
 
-func (o OsDeviceConnectivityHelperGeneric) isSameId(wwn string, identifiers []string) (bool, error) {
+func (o OsDeviceConnectivityHelperGeneric) isSameId(wwn string, identifiers []string) bool {
 	for _, identifier := range identifiers {
 		if wwn == identifier {
-			return true, nil
+			return true
 		}
 	}
-	return false, nil
+	return false
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, error) {
