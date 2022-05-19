@@ -194,7 +194,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 
 	volumeUuidLower, volumeNguid := r.GetNguidFromVolumeId(volumeId)
 	volumeIds := []string{volumeUuidLower, volumeNguid}
-	dmPath, _ := r.Helper.GetDmsPath(volumeUuidLower, volumeNguid, MultipathdFilterMpathAndVolumeId)
+	dmPath, _ := r.Helper.GetDmsPath(volumeUuidLower, volumeNguid)
 
 	if dmPath != "" {
 		if r.Helper.IsMpathMatchVolumeIdWithoutErrors(dmPath, volumeIds) {
@@ -206,7 +206,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 		return "", err
 	}
 
-	dmPath, err := r.Helper.GetDmsPath(volumeUuidLower, volumeNguid, MultipathdFilterMpathAndVolumeId)
+	dmPath, err := r.Helper.GetDmsPath(volumeUuidLower, volumeNguid)
 
 	if err != nil {
 		return "", err
@@ -354,7 +354,7 @@ type OsDeviceConnectivityHelperInterface interface {
 		Mainly for writting clean unit testing, so we can Mock this interface in order to unit test OsDeviceConnectivityHelperGeneric logic.
 	*/
 	GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error)
-	GetDmsPath(volumeId string, volumeNguid string, multipathdCommandFormatArgs []string) (string, error)
+	GetDmsPath(volumeId string, volumeNguid string) (string, error)
 	GetWwnByScsiInq(dev string) (string, error)
 	IsMpathMatchVolumeId(dmPath string, identifiers []string) (bool, error)
 	IsMpathMatchVolumeIdWithoutErrors(dmPath string, identifiers []string) bool
@@ -593,7 +593,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(volumePath string)
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetMpathOutputByVolumeId(volumeUuidLower string, volumeNguid string) (string, error) {
-	mpathdOutput, err := o.Helper.GetMpathOutput(volumeUuidLower, volumeNguid, multipathdFilterMpathNameAndVolumeId)
+	mpathdOutput, err := o.Helper.GetMpathdOutput(volumeUuidLower, volumeNguid, multipathdFilterMpathNameAndVolumeId)
 	if err != nil {
 		return "", err
 	}
@@ -615,9 +615,9 @@ func (o OsDeviceConnectivityHelperGeneric) GetVolumeIdByMpathName(mpathDeviceNam
 	return volumeId, nil
 }
 
-func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeId string, volumeNguid string, multipathdCommandFormatArgs []string) (string, error) {
+func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeId string, volumeNguid string) (string, error) {
 	volumeUuidLower := strings.ToLower(volumeId)
-	mpathdOutput, err := o.Helper.GetMpathOutput(volumeUuidLower, volumeNguid, multipathdCommandFormatArgs)
+	mpathdOutput, err := o.Helper.GetMpathdOutput(volumeUuidLower, volumeNguid, MultipathdFilterMpathAndVolumeId)
 	if err != nil {
 		return "", err
 	}
@@ -630,7 +630,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeId string, volumeNgu
 
 type GetDmsPathHelperInterface interface {
 	WaitForDmToExist(volumeUuid string, volumeNguid string, maxRetries int, intervalSeconds int, multipathdCommandFormatArgs []string) (string, error)
-	GetMpathOutput(volumeUuidLower string, volumeNguid string, multipathdCommandFormatArgs []string) (string, error)
+	GetMpathdOutput(volumeUuidLower string, volumeNguid string, multipathdCommandFormatArgs []string) (string, error)
 	ParseFieldValuesOfIdentifiers(identifiers []string, mpathdOutput string) map[string]bool
 	GetFullDmPath(dms map[string]bool, volumeId string) (string, error)
 	IsThisMatchedDmObject(identifiers []string, dmObject string) bool
@@ -655,7 +655,7 @@ func convertScsiIdToNguid(scsiId string) string {
 	return finalNguid
 }
 
-func (o GetDmsPathHelperGeneric) GetMpathOutput(volumeUuidLower string, volumeNguid string,
+func (o GetDmsPathHelperGeneric) GetMpathdOutput(volumeUuidLower string, volumeNguid string,
 	multipathdCommandFormatArgs []string) (string, error) {
 	mpathdOutput, err := o.WaitForDmToExist(volumeUuidLower, volumeNguid,
 		WaitForMpathRetries, WaitForMpathWaitIntervalSec, multipathdCommandFormatArgs)
