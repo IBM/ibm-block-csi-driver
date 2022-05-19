@@ -222,7 +222,7 @@ func TestGetMpathDevice(t *testing.T) {
 			dmPath := "/dev/dm-1"
 
 			for _, r := range tc.getDmsPathReturn {
-				fake_helper.EXPECT().GetDmsPath(volumeUuid, volumeNguid).Return(
+				fake_helper.EXPECT().GetDmsPath(volumIds).Return(
 					r.dmPath,
 					r.err)
 			}
@@ -426,7 +426,7 @@ func TestGetDmsPath(t *testing.T) {
 			fake_helper := mocks.NewMockGetDmsPathHelperInterface(mockCtrl)
 
 			for _, r := range tc.getMpathdOutputReturn {
-				fake_helper.EXPECT().GetMpathdOutput(volumeUuid, volumeNguid,
+				fake_helper.EXPECT().GetMpathdOutput(volumIds,
 					device_connectivity.MultipathdWildcardsMpathAndVolumeId).Return(r.out, r.err)
 			}
 
@@ -439,7 +439,7 @@ func TestGetDmsPath(t *testing.T) {
 			}
 
 			helperGeneric := NewOsDeviceConnectivityHelperGenericForTest(fakeExecuter, fake_helper)
-			dmPath, err := helperGeneric.GetDmsPath(volumeUuid, volumeNguid)
+			dmPath, err := helperGeneric.GetDmsPath(volumIds)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")
@@ -496,12 +496,13 @@ func TestHelperWaitForDmToExist(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
+			volumIds := []string{volumeUuid, volumeNguid}
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 			args := []string{"show", "maps", "raw", "format", "\"", "%w,%d", "\""}
 			fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathdCmd, "multipathd", args).Return([]byte(tc.devices), tc.cmdReturnErr)
 			helperGeneric := device_connectivity.NewGetDmsPathHelperGeneric(fakeExecuter)
-			devices, err := helperGeneric.WaitForDmToExist(volumeUuid, volumeNguid, 1, 1, device_connectivity.MultipathdWildcardsMpathAndVolumeId)
+			devices, err := helperGeneric.WaitForDmToExist(volumIds, 1, 1, device_connectivity.MultipathdWildcardsMpathAndVolumeId)
 			if err != nil {
 				if err.Error() != tc.expErr.Error() {
 					t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())

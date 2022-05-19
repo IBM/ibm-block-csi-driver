@@ -609,8 +609,7 @@ func (d NodeUtils) IsVolumePathMatchesVolumeId(volumeId string, volumePath strin
 }
 
 func (d NodeUtils) isVolumeIdFromPathIsMatched(volumeIdByVolumePath string, volumeUuid string) bool {
-	volumeUuidLower, volumeNguid := d.osDeviceConnectivityHelper.GetNguidFromVolumeId(volumeUuid)
-	volumIds := []string{volumeUuidLower, volumeNguid}
+	volumIds := d.osDeviceConnectivityHelper.GetVolumeIdVariations(volumeUuid)
 	for _, volumeId := range volumIds {
 		if strings.Contains(volumeId, volumeIdByVolumePath) || strings.Contains(volumeIdByVolumePath, volumeId) {
 			return true

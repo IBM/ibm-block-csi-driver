@@ -59,8 +59,8 @@ func (r OsDeviceConnectivityFc) ValidateLun(lun int, sysDevices []string) error 
 	return r.HelperScsiGeneric.ValidateLun(lun, sysDevices)
 }
 
-func (r OsDeviceConnectivityFc) GetNguidFromVolumeId(volumeId string) (string, string) {
-	return r.HelperScsiGeneric.GetNguidFromVolumeId(volumeId)
+func (r OsDeviceConnectivityFc) GetVolumeIdVariations(volumeId string) []string {
+	return r.HelperScsiGeneric.GetVolumeIdVariations(volumeId)
 }
 
 func (r OsDeviceConnectivityFc) GetVolumeIdByVolumePath(volumePath string, volumeId string) (string, error) {
