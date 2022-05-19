@@ -238,7 +238,7 @@ func TestGetMpathDevice(t *testing.T) {
 			}
 
 			for _, r := range tc.isMpathMatchVolumeIdReturn {
-				fake_helper.EXPECT().IsMpathMatchVolumeId(dmPath, volumeUuid, volumeNguid).Return(
+				fake_helper.EXPECT().IsMpathMatchVolumeId(dmPath, volumIds).Return(
 					r.isMpathGood,
 					r.err)
 			}

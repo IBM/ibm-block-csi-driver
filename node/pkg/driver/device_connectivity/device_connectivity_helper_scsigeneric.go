@@ -131,7 +131,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetVolumeIdByVolumePath(volumePat
 		return "", &VolumeIdNotFoundForMultipathDeviceNameError{mpathDeviceName}
 	}
 
-	if _, err = r.Helper.IsMpathMatchVolumeId(dmPath, volumeUuidLower, volumeNguid); err != nil {
+	if _, err = r.Helper.IsMpathMatchVolumeId(dmPath, volumeUids); err != nil {
 		return "", err
 	}
 	return volumeId, nil
@@ -193,10 +193,10 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] ", volumeId)
 
 	volumeUuidLower, volumeNguid := r.GetNguidFromVolumeId(volumeId)
+	volumeIds := []string{volumeUuidLower, volumeNguid}
 	dmPath, _ := r.Helper.GetDmsPath(volumeUuidLower, volumeNguid, MultipathdFilterMpathAndVolumeId)
 
 	if dmPath != "" {
-		volumeIds := []string{volumeUuidLower, volumeNguid}
 		if r.Helper.IsMpathMatchVolumeIdWithoutErrors(dmPath, volumeIds) {
 			return dmPath, nil
 		}
@@ -215,7 +215,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	if dmPath == "" {
 		return "", &MultipathDeviceNotFoundForVolumeError{volumeId}
 	}
-	_, err = r.Helper.IsMpathMatchVolumeId(dmPath, volumeUuidLower, volumeNguid)
+	_, err = r.Helper.IsMpathMatchVolumeId(dmPath, volumeIds)
 	if err != nil {
 		return "", err
 	}
@@ -356,8 +356,8 @@ type OsDeviceConnectivityHelperInterface interface {
 	GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error)
 	GetDmsPath(volumeId string, volumeNguid string, multipathdCommandFormatArgs []string) (string, error)
 	GetWwnByScsiInq(dev string) (string, error)
-	IsMpathMatchVolumeId(dmPath string, volumeUuidLower string, volumeNguid string) (bool, error)
-	IsMpathMatchVolumeIdWithoutErrors(dmPath string, wnatedVolumeIds []string) bool
+	IsMpathMatchVolumeId(dmPath string, identifiers []string) (bool, error)
+	IsMpathMatchVolumeIdWithoutErrors(dmPath string, identifiers []string) bool
 	ReloadMultipath() error
 	GetMpathOutputByVolumeId(volumeUuidLower string, volumeNguid string) (string, error)
 	GetVolumeIdByMpathName(mpathDeviceName string, mpathdOutput string) (string, error)
@@ -449,35 +449,30 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 
 }
 
-func (o OsDeviceConnectivityHelperGeneric) IsMpathMatchVolumeId(dmPath string,
-	volumeUuidLower string, volumeNguid string) (bool, error) {
-	sgInqWwn, err := o.getSgInqWwnFromDmPath(dmPath)
+func (o OsDeviceConnectivityHelperGeneric) IsMpathMatchVolumeId(dmPath string, identifiers []string) (bool, error) {
+	sgInqWwn, err := o.GetWwnByScsiInq(dmPath)
 	if err != nil {
 		return false, err
 	}
-	if sgInqWwn == volumeUuidLower || sgInqWwn == volumeNguid {
+	if isSameId, _ := o.isSameId(sgInqWwn, identifiers); isSameId == true {
 		return true, nil
 	}
-	return false, &ErrorWrongDeviceFound{dmPath, volumeUuidLower, sgInqWwn}
+	return false, &ErrorWrongDeviceFound{dmPath, identifiers[0], sgInqWwn}
 }
 
-func (o OsDeviceConnectivityHelperGeneric) IsMpathMatchVolumeIdWithoutErrors(dmPath string, wnatedVolumeIds []string) bool {
-	sgInqWwn, _ := o.getSgInqWwnFromDmPath(dmPath)
-	for _, wnatedVolumeId := range wnatedVolumeIds {
-		if sgInqWwn == wnatedVolumeId {
-			return true
+func (o OsDeviceConnectivityHelperGeneric) IsMpathMatchVolumeIdWithoutErrors(dmPath string, identifiers []string) bool {
+	sgInqWwn, _ := o.GetWwnByScsiInq(dmPath)
+	isSameId, _ := o.isSameId(sgInqWwn, identifiers)
+	return isSameId
+}
+
+func (o OsDeviceConnectivityHelperGeneric) isSameId(wwn string, identifiers []string) (bool, error) {
+	for _, identifier := range identifiers {
+		if wwn == identifier {
+			return true, nil
 		}
 	}
-	return false
-}
-
-func (o OsDeviceConnectivityHelperGeneric) getSgInqWwnFromDmPath(dmPath string) (string, error) {
-	sgInqWwn, err := o.GetWwnByScsiInq(dmPath)
-	if err != nil {
-		return "", err
-	}
-	sgInqWwnLower := strings.ToLower(sgInqWwn)
-	return sgInqWwnLower, nil
+	return false, nil
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, error) {
@@ -554,7 +549,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 			}
 			wwn = matches[1]
 			logger.Debugf("Found the expected Wwn [%s] in sg_inq", wwn)
-			return wwn, nil
+			return strings.ToLower(wwn), nil
 		}
 		if regex.MatchString(line) {
 			found = true
