@@ -1357,6 +1357,16 @@ class TestUnpublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertIn("msg", self.context.details)
 
+    @patch("controller.controller_server.utils.get_volume_id_info")
+    def test_unpublish_volume_object_id_error(self, get_volume_id_info):
+        get_volume_id_info.side_effect = [controller_errors.ObjectIdError("object_type", "object_id")]
+
+        self.servicer.ControllerUnpublishVolume(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
+        self.assertIn("object_type", self.context.details)
+        self.assertIn("object_id", self.context.details)
+
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_unpublish_volume_with_wrong_secrets(self, storage_agent):
         self._test_request_with_wrong_secrets(storage_agent)
@@ -1687,6 +1697,16 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
         self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
+
+    @patch("controller.controller_server.utils.get_volume_id_info")
+    def test_validate_volume_capabilities_object_id_error(self, get_volume_id_info):
+        get_volume_id_info.side_effect = [controller_errors.ObjectIdError("object_type", "object_id")]
+
+        self.servicer.ValidateVolumeCapabilities(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
+        self.assertIn("object_type", self.context.details)
+        self.assertIn("object_id", self.context.details)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_validate_volume_capabilities_with_empty_id(self, storage_agent):
