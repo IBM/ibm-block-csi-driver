@@ -61,12 +61,12 @@ type WaitForMpathResult struct {
 }
 
 var (
-	TimeOutMultipathCmd                  = 60 * 1000
-	TimeOutMultipathdCmd                 = 10 * 1000
-	TimeOutBlockDevCmd                   = 10 * 1000
-	TimeOutSgInqCmd                      = 3 * 1000
-	MultipathdFilterMpathAndVolumeId     = []string{"%w", "%d"}
-	multipathdFilterMpathNameAndVolumeId = []string{"%n", "%w"}
+	TimeOutMultipathCmd                     = 60 * 1000
+	TimeOutMultipathdCmd                    = 10 * 1000
+	TimeOutBlockDevCmd                      = 10 * 1000
+	TimeOutSgInqCmd                         = 3 * 1000
+	MultipathdWildcardsMpathAndVolumeId     = []string{"%w", "%d"}
+	multipathdWildcardsMpathNameAndVolumeId = []string{"%n", "%w"}
 )
 
 const (
@@ -593,7 +593,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(volumePath string)
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetMpathOutputByVolumeId(volumeUuidLower string, volumeNguid string) (string, error) {
-	mpathdOutput, err := o.Helper.GetMpathdOutput(volumeUuidLower, volumeNguid, multipathdFilterMpathNameAndVolumeId)
+	mpathdOutput, err := o.Helper.GetMpathdOutput(volumeUuidLower, volumeNguid, multipathdWildcardsMpathNameAndVolumeId)
 	if err != nil {
 		return "", err
 	}
@@ -617,7 +617,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetVolumeIdByMpathName(mpathDeviceNam
 
 func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeId string, volumeNguid string) (string, error) {
 	volumeUuidLower := strings.ToLower(volumeId)
-	mpathdOutput, err := o.Helper.GetMpathdOutput(volumeUuidLower, volumeNguid, MultipathdFilterMpathAndVolumeId)
+	mpathdOutput, err := o.Helper.GetMpathdOutput(volumeUuidLower, volumeNguid, MultipathdWildcardsMpathAndVolumeId)
 	if err != nil {
 		return "", err
 	}

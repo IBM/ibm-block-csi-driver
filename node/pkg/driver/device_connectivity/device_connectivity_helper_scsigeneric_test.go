@@ -427,7 +427,7 @@ func TestGetDmsPath(t *testing.T) {
 
 			for _, r := range tc.getMpathdOutputReturn {
 				fake_helper.EXPECT().GetMpathdOutput(volumeUuid, volumeNguid,
-					device_connectivity.MultipathdFilterMpathAndVolumeId).Return(r.out, r.err)
+					device_connectivity.MultipathdWildcardsMpathAndVolumeId).Return(r.out, r.err)
 			}
 
 			for _, r := range tc.parseFieldValuesOfIdentifiersReturn {
@@ -501,7 +501,7 @@ func TestHelperWaitForDmToExist(t *testing.T) {
 			args := []string{"show", "maps", "raw", "format", "\"", "%w,%d", "\""}
 			fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathdCmd, "multipathd", args).Return([]byte(tc.devices), tc.cmdReturnErr)
 			helperGeneric := device_connectivity.NewGetDmsPathHelperGeneric(fakeExecuter)
-			devices, err := helperGeneric.WaitForDmToExist(volumeUuid, volumeNguid, 1, 1, device_connectivity.MultipathdFilterMpathAndVolumeId)
+			devices, err := helperGeneric.WaitForDmToExist(volumeUuid, volumeNguid, 1, 1, device_connectivity.MultipathdWildcardsMpathAndVolumeId)
 			if err != nil {
 				if err.Error() != tc.expErr.Error() {
 					t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())
