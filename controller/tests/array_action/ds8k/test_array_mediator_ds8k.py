@@ -449,7 +449,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.assertEqual(host.initiators.iscsi_iqns, [])
         self.assertEqual(host.initiators.fc_wwns, ['wwpn1', 'wwpn2'])
 
-    def test_get_host_by_name_return_none(self):
+    def test_get_host_by_name_raise_host_not_found(self):
         self.client_mock.get_host.return_value = None
         with self.assertRaises(array_errors.HostNotFoundError):
             self.array.get_host_by_name('test_host_1')

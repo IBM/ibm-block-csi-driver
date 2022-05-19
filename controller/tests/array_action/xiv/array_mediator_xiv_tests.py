@@ -398,7 +398,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.assertEqual(host.initiators.iscsi_iqns, ["iqn.test.1"])
         self.assertEqual(host.initiators.fc_wwns, [])
 
-    def test_get_host_by_name_return_none(self):
+    def test_get_host_by_name_raise_host_not_found(self):
         self.mediator.client.cmd.host_list.return_value = Mock(as_single_element=None)
         with self.assertRaises(array_errors.HostNotFoundError):
             self.mediator.get_host_by_name('test_host_1')

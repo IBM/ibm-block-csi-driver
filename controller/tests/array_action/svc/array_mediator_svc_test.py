@@ -801,6 +801,23 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
         svc_response.return_value = hosts
 
+    def test_get_host_by_name_success(self):
+        self.svc.client.svcinfo.lshost.return_value = Mock(
+            as_single_element=self._get_host_as_munch('host_id_1', 'test_host_1', nqn_list=['nqn.test.1'],
+                                                      wwpns_list=['wwn1'],
+                                                      iscsi_names_list=['iqn.test.1']))
+        host = self.svc.get_host_by_name('test_host_1')
+        self.assertEqual(host.name, "test_host_1")
+        self.assertEqual(host.connectivity_types, ['nvmeofc', 'fc', 'iscsi'])
+        self.assertEqual(host.initiators.nvme_nqns, ['nqn.test.1'])
+        self.assertEqual(host.initiators.iscsi_iqns, ['iqn.test.1'])
+        self.assertEqual(host.initiators.fc_wwns, ['wwn1'])
+
+    def test_get_host_by_name_raise_host_not_found(self):
+        self.svc.client.svcinfo.lshost.return_value = Mock(as_single_element=None)
+        with self.assertRaises(array_errors.HostNotFoundError):
+            self.svc.get_host_by_name('test_host_1')
+
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_returns_host_not_found(self, svc_response):
         self._prepare_mocks_for_get_host_by_identifiers_slow(svc_response)

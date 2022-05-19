@@ -846,6 +846,19 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             writer.write(LIST_HOSTS_CMD_FORMAT.format(HOST_ID=host.id))
         return writer.getvalue()
 
+    def _lshost(self, **kwargs):
+        cli_host = self.client.svcinfo.lshost(**kwargs).as_single_element
+        if not cli_host:
+            raise array_errors.HostNotFoundError(kwargs)
+        return cli_host
+
+    def _get_cli_host_by_id(self, host_id):
+        return self._lshost(object_id=host_id)
+
+    def _get_cli_host_by_name(self, host_name):
+        filter_value = 'name={}'.format(host_name)
+        return self._lshost(filtervalue=filter_value)
+
     def get_host_by_name(self, host_name):
         cli_host_by_name = self._get_cli_host_by_name(host_name)
         cli_host_by_id = self._get_cli_host_by_id(cli_host_by_name.id)
@@ -1054,19 +1067,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 fc_port_wwns.append(wwn.get('local_wwpn', ''))
         logger.debug("Getting fc wwns : {}".format(fc_port_wwns))
         return fc_port_wwns
-
-    def _get_cli_host_by_name(self, host_name):
-        filter_value = 'name={}'.format(host_name)
-        cli_host = self.client.svcinfo.lshost(filtervalue=filter_value).as_single_element
-        if not cli_host:
-            raise array_errors.HostNotFoundError(host_name)
-        return cli_host
-
-    def _get_cli_host_by_id(self, host_id):
-        cli_host = self.client.svcinfo.lshost(object_id=host_id).as_single_element
-        if not cli_host:
-            raise array_errors.HostNotFoundError(host_id)
-        return cli_host
 
     def _get_host_portset_id(self, host_name):
         cli_host = self._get_cli_host_by_name(host_name)
