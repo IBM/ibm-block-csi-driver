@@ -605,13 +605,13 @@ func (d NodeUtils) IsVolumePathMatchesVolumeId(volumeId string, volumePath strin
 	}
 	logger.Infof("IsVolumePathMatchesVolumeId: found volume id [%s] for volume path [%s] ", volumeId, volumePath)
 
-	return d.isVolumeIdFromPathIsWanted(volumeIdByVolumePath, volumeUuid), nil
+	return d.isVolumeIdFromPathIsMatched(volumeIdByVolumePath, volumeUuid), nil
 }
 
-func (d NodeUtils) isVolumeIdFromPathIsWanted(volumeIdByVolumePath string, volumeUuid string) bool {
+func (d NodeUtils) isVolumeIdFromPathIsMatched(volumeIdByVolumePath string, volumeUuid string) bool {
 	volumeUuidLower, volumeNguid := d.osDeviceConnectivityHelper.GetNguidFromVolumeId(volumeUuid)
-	wantedVolumIds := []string{volumeUuidLower, volumeNguid}
-	for _, wnatedVolumeId := range wantedVolumIds {
+	volumIds := []string{volumeUuidLower, volumeNguid}
+	for _, wnatedVolumeId := range volumIds {
 		if strings.Contains(wnatedVolumeId, volumeIdByVolumePath) || strings.Contains(volumeIdByVolumePath, wnatedVolumeId) {
 			return true
 		}
