@@ -71,7 +71,7 @@ var (
 
 const (
 	DevPath                     = "/dev"
-	DevMapperPath               = "/dev/mapper"
+	devMapperPath               = "/dev/mapper"
 	WaitForMpathRetries         = 5
 	WaitForMpathWaitIntervalSec = 1
 	FcHostSysfsPath             = "/sys/class/fc_remote_ports/rport-*/port_name"
@@ -109,7 +109,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetVolumeIdByVolumePath(volumePat
 	if err != nil {
 		return "", err
 	}
-	dmPath := filepath.Join(DevMapperPath, filepath.Base(strings.TrimSpace(mpathDeviceName)))
+	dmPath := filepath.Join(devMapperPath, filepath.Base(strings.TrimSpace(mpathDeviceName)))
 
 	volumeId, _ = r.Helper.GetVolumeIdByMpathName(mpathDeviceName, mpathdOutput)
 	if volumeId != "" {
@@ -196,8 +196,8 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	dmPath, _ := r.Helper.GetDmsPath(volumeUuidLower, volumeNguid, MultipathdFilterMpathAndVolumeId)
 
 	if dmPath != "" {
-		wantedVolumIds := []string{volumeUuidLower, volumeNguid}
-		if r.Helper.IsMpathMatchVolumeIdWithoutErrors(dmPath, wantedVolumIds) {
+		volumeIds := []string{volumeUuidLower, volumeNguid}
+		if r.Helper.IsMpathMatchVolumeIdWithoutErrors(dmPath, volumeIds) {
 			return dmPath, nil
 		}
 	}
@@ -592,8 +592,9 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(volumePath string)
 	if err != nil {
 		return "", err
 	}
+	procMounts := string(procMountsFileContent)
 
-	return o.Helper.GetMpathDeviceNameFromProcMountsContent(procMountsFileContent, volumePath)
+	return o.Helper.GetMpathDeviceNameFromProcMounts(procMounts, volumePath)
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetMpathOutputByVolumeId(volumeUuidLower string, volumeNguid string) (string, error) {
@@ -605,8 +606,8 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathOutputByVolumeId(volumeUuidLo
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetVolumeIdByMpathName(mpathDeviceName string, mpathdOutput string) (string, error) {
-	wantedDmObjects := []string{mpathDeviceName}
-	volumeIds := o.Helper.GetDmObjectsByIdentifier(wantedDmObjects, mpathdOutput)
+	identifiers := []string{mpathDeviceName}
+	volumeIds := o.Helper.ParseFieldValuesOfIdentifiers(identifiers, mpathdOutput)
 	if len(volumeIds) > 1 {
 		return "", &MultipleVolumeIdsError{volumeIds, mpathDeviceName}
 	}
@@ -625,8 +626,8 @@ func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeId string, volumeNgu
 	if err != nil {
 		return "", err
 	}
-	wantedDmObjects := []string{volumeUuidLower, volumeNguid}
-	dms := o.Helper.GetDmObjectsByIdentifier(wantedDmObjects, mpathdOutput)
+	identifiers := []string{volumeUuidLower, volumeNguid}
+	dms := o.Helper.ParseFieldValuesOfIdentifiers(identifiers, mpathdOutput)
 	return o.Helper.GetFullDmPath(dms, volumeId)
 }
 
@@ -635,10 +636,10 @@ func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeId string, volumeNgu
 type GetDmsPathHelperInterface interface {
 	WaitForDmToExist(volumeUuid string, volumeNguid string, maxRetries int, intervalSeconds int, multipathdCommandFormatArgs []string) (string, error)
 	GetMpathOutput(volumeUuidLower string, volumeNguid string, multipathdCommandFormatArgs []string) (string, error)
-	GetDmObjectsByIdentifier(wantedDmObjects []string, outputToCheckIn string) map[string]bool
+	ParseFieldValuesOfIdentifiers(identifiers []string, mpathdOutput string) map[string]bool
 	GetFullDmPath(dms map[string]bool, volumeId string) (string, error)
-	IsThisWantedDmObject(wantedDmObjects []string, dmObject string) bool
-	GetMpathDeviceNameFromProcMountsContent(procMountsFileContent []byte, volumePath string) (string, error)
+	IsThisMatchedDmObject(identifiers []string, dmObject string) bool
+	GetMpathDeviceNameFromProcMounts(procMounts string, volumePath string) (string, error)
 }
 
 type GetDmsPathHelperGeneric struct {
@@ -698,19 +699,19 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeUuid string, volumeNguid
 	return "", err
 }
 
-func (o GetDmsPathHelperGeneric) GetDmObjectsByIdentifier(wantedDmObjects []string, outputToCheckIn string) map[string]bool {
-	dmObjects := make(map[string]bool)
+func (o GetDmsPathHelperGeneric) ParseFieldValuesOfIdentifiers(identifiers []string, mpathdOutput string) map[string]bool {
+	dmFieldValues := make(map[string]bool)
 
-	scanner := bufio.NewScanner(strings.NewReader(outputToCheckIn))
+	scanner := bufio.NewScanner(strings.NewReader(mpathdOutput))
 	for scanner.Scan() {
 		identifier, dmObject := o.getLineParts(scanner)
-		if o.IsThisWantedDmObject(wantedDmObjects, identifier) {
-			dmObjects[dmObject] = true
-			logger.Infof("GetDmObjectsByIdentifier: DM Object found: %s for DM Object %s", dmObject, identifier)
+		if o.IsThisMatchedDmObject(identifiers, identifier) {
+			dmFieldValues[dmObject] = true
+			logger.Infof("ParseFieldValuesOfIdentifiers: DM Object found: %s for DM Object %s", dmObject, identifier)
 		}
 	}
 
-	return dmObjects
+	return dmFieldValues
 }
 
 func (GetDmsPathHelperGeneric) getLineParts(scanner *bufio.Scanner) (string, string) {
@@ -719,9 +720,9 @@ func (GetDmsPathHelperGeneric) getLineParts(scanner *bufio.Scanner) (string, str
 	return lineParts[0], lineParts[1]
 }
 
-func (o GetDmsPathHelperGeneric) IsThisWantedDmObject(wantedDmObjects []string, dmObject string) bool {
-	for _, wantedObject := range wantedDmObjects {
-		if strings.Contains(dmObject, wantedObject) {
+func (o GetDmsPathHelperGeneric) IsThisMatchedDmObject(identifiers []string, dmObject string) bool {
+	for _, identifier := range identifiers {
+		if strings.Contains(dmObject, identifier) {
 			return true
 		}
 	}
@@ -742,25 +743,19 @@ func (GetDmsPathHelperGeneric) GetFullDmPath(dms map[string]bool, volumeId strin
 	return dmPath, nil
 }
 
-func (GetDmsPathHelperGeneric) GetMpathDeviceNameFromProcMountsContent(procMountsFileContent []byte,
-	volumePath string) (string, error) {
-	scanner := bufio.NewScanner(strings.NewReader(string(procMountsFileContent)))
+func (GetDmsPathHelperGeneric) GetMpathDeviceNameFromProcMounts(procMounts string, volumePath string) (string, error) {
+	scanner := bufio.NewScanner(strings.NewReader(procMounts))
 	for scanner.Scan() {
-		mountLine, lineParts := getLinePartsBySpaces(scanner)
+		mountLine := scanner.Text()
 		if strings.Contains(mountLine, volumePath) {
-			return getMpathDeviceNameFromSplitedLine(lineParts), nil
+			return getMpathDeviceNameFromMountLine(mountLine), nil
 		}
 	}
 	return "", &MultipathDeviceNotFoundForVolumePathError{volumePath}
 }
 
-func getLinePartsBySpaces(scanner *bufio.Scanner) (string, []string) {
-	mountLine := scanner.Text()
+func getMpathDeviceNameFromMountLine(mountLine string) string {
 	lineParts := strings.Fields(mountLine)
-	return mountLine, lineParts
-}
-
-func getMpathDeviceNameFromSplitedLine(lineParts []string) string {
 	fullMpathDeviceName := lineParts[0]
 	splitedFullMpathDeviceName := strings.Split(fullMpathDeviceName, "/")
 	return splitedFullMpathDeviceName[len(splitedFullMpathDeviceName)-1]
