@@ -32,17 +32,16 @@ class Initiators:
         self.iscsi_iqns = self._filter_empty_parts(self.iscsi_iqns)
 
     def _filter_empty_parts(self, ports):
-        ports_strip = [port.strip() for port in ports]
-        ports_filter = filter(None, ports_strip)
-        return list(ports_filter)
+        stripped_ports = [port.strip() for port in ports]
+        filtered_ports = filter(None, stripped_ports)
+        return list(filtered_ports)
 
     def _get_iter(self):
-        for nvme_nqn in self.nvme_nqns:
-            yield array_config.NVME_OVER_FC_CONNECTIVITY_TYPE, nvme_nqn
-        for fc_wwn in self.fc_wwns:
-            yield array_config.FC_CONNECTIVITY_TYPE, fc_wwn
-        for iscsi_iqn in self.nvme_nqns:
-            yield array_config.ISCSI_CONNECTIVITY_TYPE, iscsi_iqn
+        for connectivity_type, initiators in ((array_config.NVME_OVER_FC_CONNECTIVITY_TYPE, self.nvme_nqns),
+                                              (array_config.FC_CONNECTIVITY_TYPE, self.fc_wwns),
+                                              (array_config.ISCSI_CONNECTIVITY_TYPE, self.iscsi_iqns)):
+            for initiator in initiators:
+                yield connectivity_type, initiator
 
     def __iter__(self):
         return self._get_iter()

@@ -410,7 +410,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_get_array_fc_wwns_returns_empty_list(self):
         self.client_mock.get_host.side_effect = NotFound("404")
-        self.assertListEqual(self.array.get_array_fc_wwns(None), [])
+        self.assertEqual(self.array.get_array_fc_wwns(None), [])
 
     def test_get_array_fc_wwns_skip_offline_port(self):
         wwpn1 = "fake_wwpn"

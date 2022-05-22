@@ -324,7 +324,7 @@ class ArrayMediator(ABC):
     @abstractmethod
     def get_host_by_name(self, host_name):
         """
-        This function will find the host name by iscsi iqn or fc wwns.
+        This function will find the host by name.
 
         Args:
            host_name : name of the host in the storage system

@@ -846,25 +846,17 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             writer.write(LIST_HOSTS_CMD_FORMAT.format(HOST_ID=host.id))
         return writer.getvalue()
 
-    def _lshost(self, **kwargs):
-        cli_host = self.client.svcinfo.lshost(**kwargs).as_single_element
+    def _get_cli_host(self, id_or_name):
+        cli_host = self.client.svcinfo.lshost(object_id=id_or_name).as_single_element
         if not cli_host:
-            raise array_errors.HostNotFoundError(kwargs)
+            raise array_errors.HostNotFoundError(id_or_name)
         return cli_host
 
-    def _get_cli_host_by_id(self, host_id):
-        return self._lshost(object_id=host_id)
-
-    def _get_cli_host_by_name(self, host_name):
-        filter_value = 'name={}'.format(host_name)
-        return self._lshost(filtervalue=filter_value)
-
     def get_host_by_name(self, host_name):
-        cli_host_by_name = self._get_cli_host_by_name(host_name)
-        cli_host_by_id = self._get_cli_host_by_id(cli_host_by_name.id)
-        nvme_nqns = self._get_host_ports(cli_host_by_id, HOST_NQN)
-        fc_wwns = self._get_host_ports(cli_host_by_id, HOST_WWPN)
-        iscsi_iqns = self._get_host_ports(cli_host_by_id, HOST_ISCSI_NAME)
+        cli_host = self._get_cli_host(host_name)
+        nvme_nqns = self._get_host_ports(cli_host, HOST_NQN)
+        fc_wwns = self._get_host_ports(cli_host, HOST_WWPN)
+        iscsi_iqns = self._get_host_ports(cli_host, HOST_ISCSI_NAME)
         connectivity_types = []
         if nvme_nqns:
             connectivity_types.append(config.NVME_OVER_FC_CONNECTIVITY_TYPE)
@@ -872,7 +864,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             connectivity_types.append(config.FC_CONNECTIVITY_TYPE)
         if iscsi_iqns:
             connectivity_types.append(config.ISCSI_CONNECTIVITY_TYPE)
-        return Host(name=cli_host_by_id.name, connectivity_types=connectivity_types, nvme_nqns=nvme_nqns,
+        return Host(name=cli_host.name, connectivity_types=connectivity_types, nvme_nqns=nvme_nqns,
                     fc_wwns=fc_wwns, iscsi_iqns=iscsi_iqns)
 
     def _lsvdiskhostmap(self, volume_name):
@@ -1069,7 +1061,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return fc_port_wwns
 
     def _get_host_portset_id(self, host_name):
-        cli_host = self._get_cli_host_by_name(host_name)
+        cli_host = self._get_cli_host(host_name)
         return cli_host.get(HOST_PORTSET_ID)
 
     def _get_replication_endpoint_type(self, rcrelationship):
