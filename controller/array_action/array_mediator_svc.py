@@ -1341,8 +1341,3 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if cli_snapshot is None:
             raise array_errors.ObjectNotFoundError(snapshot_id)
         return cli_snapshot
-
-# a = SVCArrayMediator(endpoint=["bfn-7-cluster.xiv.ibm.com"], user="superuser", password="passw0rd")
-# a._addsnapshot(snapshot_name='test_snapshot', pool='arbel_pool', volume_id='6005076801948048D000000000000000',
-#                   space_efficiency=None)
-# a.delete_snapshot(snapshot_id='0')
