@@ -856,6 +856,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             Initiators(['Test_nqn'], ['Test_wwn'], ['iqn.test.2']))
         self.assertEqual('test_host_1', hostname)
         self.assertEqual({config.ISCSI_CONNECTIVITY_TYPE}, connectivity_types)
+        self.svc.client.svcinfo.lshostiplogin.assert_called_once_with(object_id='iqn.test.2')
 
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_slow_no_other_ports_return_iscsi_host(self, svc_response):
@@ -892,6 +893,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             Initiators(['nqn.test.1'], ['Test_wwn'], ['iqn.test.6']))
         self.assertEqual('test_host_3', hostname)
         self.assertEqual({config.NVME_OVER_FC_CONNECTIVITY_TYPE}, connectivity_types)
+        self.svc.client.svcinfo.lsnvmefabric.assert_called_once_with(remotenqn='nqn.test.1')
 
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_slow_no_other_ports_return_nvme_host(self, svc_response):
@@ -929,6 +931,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             Initiators(['nqn.test.1'], ['Test_wwn'], ['iqn.test.6']))
         self.assertEqual('test_host_3', hostname)
         self.assertEqual({config.FC_CONNECTIVITY_TYPE}, connectivity_types)
+        self.svc.client.svcinfo.lsfabric.assert_called_once_with(wwpn='Test_wwn')
 
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_slow_no_other_ports_return_fc_host(self, svc_response):

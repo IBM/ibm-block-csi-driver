@@ -367,11 +367,11 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
         logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
 
-    def _get_cli_host_by_name(self, host_name):
+    def _get_cli_host(self, host_name):
         return self.client.cmd.host_list(host=host_name).as_single_element
 
     def get_host_by_name(self, host_name):
-        cli_host = self._get_cli_host_by_name(host_name)
+        cli_host = self._get_cli_host(host_name)
         if not cli_host:
             raise array_errors.HostNotFoundError(host_name)
         fc_wwns = string_to_array(cli_host.fc_ports, ',')

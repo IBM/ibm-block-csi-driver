@@ -617,7 +617,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def get_array_fc_wwns(self, host_name):
         logger.debug("getting the connected fc port wwpns for host {} from array".format(host_name))
-        api_host = self._get_api_host_by_name(host_name)
+        api_host = self._get_api_host(host_name)
         if api_host is None:
             return []
         wwpns = [port[LOGIN_PORT_WWPN] for port in api_host.login_ports if
@@ -625,7 +625,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.debug("found wwpns: {}".format(wwpns))
         return wwpns
 
-    def _get_api_host_by_name(self, host_name):
+    def _get_api_host(self, host_name):
         try:
             return self.client.get_host(host_name)
         except exceptions.NotFound:
@@ -638,7 +638,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return [p["wwpn"] for p in host_ports]
 
     def get_host_by_name(self, host_name):
-        api_host = self._get_api_host_by_name(host_name)
+        api_host = self._get_api_host(host_name)
         if api_host is None:
             raise array_errors.HostNotFoundError(host_name)
         fc_wwns = self._get_fc_wwns_from_api_host(api_host)
