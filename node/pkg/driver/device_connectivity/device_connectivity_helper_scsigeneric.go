@@ -628,7 +628,7 @@ type GetDmsPathHelperInterface interface {
 	GetMpathdOutput(identifiers []string, multipathdCommandFormatArgs []string) (string, error)
 	ParseFieldValuesOfIdentifiers(identifiers []string, mpathdOutput string) map[string]bool
 	GetFullDmPath(dms map[string]bool, volumeId string) (string, error)
-	IsThisMatchedDmObject(identifiers []string, dmObject string) bool
+	IsThisMatchedDmFieldValue(identifiers []string, dmFieldValue string) bool
 	GetMpathDeviceNameFromProcMounts(procMounts string, volumePath string) (string, error)
 }
 
@@ -669,10 +669,8 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(identifiers []string, maxRetri
 	multipathdCommandFormatArgs []string) (string, error) {
 	formatTemplate := strings.Join(multipathdCommandFormatArgs, mpathdSeparator)
 	args := []string{"show", "maps", "raw", "format", "\"", formatTemplate, "\""}
-	var err error
 	logger.Debugf("Waiting for dm to exist")
 	for i := 0; i < maxRetries; i++ {
-		err = nil
 		out, err := o.executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
 		if err != nil {
 			return "", err
@@ -683,11 +681,10 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(identifiers []string, maxRetri
 				return dms, nil
 			}
 		}
-		err = os.ErrNotExist
 
 		time.Sleep(time.Second * time.Duration(intervalSeconds))
 	}
-	return "", err
+	return "", os.ErrNotExist
 }
 
 func (o GetDmsPathHelperGeneric) ParseFieldValuesOfIdentifiers(identifiers []string, mpathdOutput string) map[string]bool {
@@ -695,10 +692,10 @@ func (o GetDmsPathHelperGeneric) ParseFieldValuesOfIdentifiers(identifiers []str
 
 	scanner := bufio.NewScanner(strings.NewReader(mpathdOutput))
 	for scanner.Scan() {
-		identifier, dmObject := o.getLineParts(scanner)
-		if o.IsThisMatchedDmObject(identifiers, identifier) {
-			dmFieldValues[dmObject] = true
-			logger.Infof("ParseFieldValuesOfIdentifiers: DM Object found: %s for DM Object %s", dmObject, identifier)
+		identifier, dmFieldValue := o.getLineParts(scanner)
+		if o.IsThisMatchedDmFieldValue(identifiers, identifier) {
+			dmFieldValues[dmFieldValue] = true
+			logger.Infof("ParseFieldValuesOfIdentifiers: DM Object found: %s for DM Object %s", dmFieldValue, identifier)
 		}
 	}
 
@@ -711,9 +708,9 @@ func (GetDmsPathHelperGeneric) getLineParts(scanner *bufio.Scanner) (string, str
 	return lineParts[0], lineParts[1]
 }
 
-func (o GetDmsPathHelperGeneric) IsThisMatchedDmObject(identifiers []string, dmObject string) bool {
+func (o GetDmsPathHelperGeneric) IsThisMatchedDmFieldValue(identifiers []string, dmFieldValue string) bool {
 	for _, identifier := range identifiers {
-		if strings.Contains(dmObject, identifier) {
+		if strings.Contains(dmFieldValue, identifier) {
 			return true
 		}
 	}

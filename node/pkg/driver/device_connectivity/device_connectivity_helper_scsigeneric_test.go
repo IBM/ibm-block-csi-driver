@@ -280,14 +280,14 @@ type GetMpathdOutputReturn struct {
 }
 
 type ParseFieldValuesOfIdentifiersReturn struct {
-	mpathdOutput string
-	dmObjects    map[string]bool
+	mpathdOutput  string
+	dmFieldValues map[string]bool
 }
 
 type GetFullDmPathReturn struct {
-	dmObjects map[string]bool
-	dmPath    string
-	err       error
+	dmFieldValues map[string]bool
+	dmPath        string
+	err           error
 }
 
 func TestGetDmsPath(t *testing.T) {
@@ -326,7 +326,7 @@ func TestGetDmsPath(t *testing.T) {
 			parseFieldValuesOfIdentifiersReturn: []ParseFieldValuesOfIdentifiersReturn{
 				ParseFieldValuesOfIdentifiersReturn{
 					mpathdOutput: fmt.Sprintf("dm-1,%s\ndm-2,%s\ndm-3,%s", volumeUuid, "otheruuid", volumeUuid),
-					dmObjects: map[string]bool{
+					dmFieldValues: map[string]bool{
 						"dm-1": true,
 						"dm-2": true,
 						"dm-3": true,
@@ -336,7 +336,7 @@ func TestGetDmsPath(t *testing.T) {
 
 			getFullDmPathReturn: []GetFullDmPathReturn{
 				GetFullDmPathReturn{
-					dmObjects: map[string]bool{
+					dmFieldValues: map[string]bool{
 						"dm-1": true,
 						"dm-2": true,
 						"dm-3": true,
@@ -362,7 +362,7 @@ func TestGetDmsPath(t *testing.T) {
 			parseFieldValuesOfIdentifiersReturn: []ParseFieldValuesOfIdentifiersReturn{
 				ParseFieldValuesOfIdentifiersReturn{
 					mpathdOutput: fmt.Sprintf(" dm-1,%s", volumeUuid),
-					dmObjects: map[string]bool{
+					dmFieldValues: map[string]bool{
 						"dm-1": true,
 					},
 				},
@@ -370,7 +370,7 @@ func TestGetDmsPath(t *testing.T) {
 
 			getFullDmPathReturn: []GetFullDmPathReturn{
 				GetFullDmPathReturn{
-					dmObjects: map[string]bool{
+					dmFieldValues: map[string]bool{
 						"dm-1": true,
 					},
 					dmPath: "/dev/dm-1",
@@ -394,7 +394,7 @@ func TestGetDmsPath(t *testing.T) {
 			parseFieldValuesOfIdentifiersReturn: []ParseFieldValuesOfIdentifiersReturn{
 				ParseFieldValuesOfIdentifiersReturn{
 					mpathdOutput: fmt.Sprintf("dm-1,%s", volumeUuid),
-					dmObjects: map[string]bool{
+					dmFieldValues: map[string]bool{
 						"dm-1": true,
 					},
 				},
@@ -402,7 +402,7 @@ func TestGetDmsPath(t *testing.T) {
 
 			getFullDmPathReturn: []GetFullDmPathReturn{
 				GetFullDmPathReturn{
-					dmObjects: map[string]bool{
+					dmFieldValues: map[string]bool{
 						"dm-1": true,
 					},
 					dmPath: "/dev/dm-1",
@@ -431,11 +431,11 @@ func TestGetDmsPath(t *testing.T) {
 			}
 
 			for _, r := range tc.parseFieldValuesOfIdentifiersReturn {
-				fake_helper.EXPECT().ParseFieldValuesOfIdentifiers(volumIds, r.mpathdOutput).Return(r.dmObjects)
+				fake_helper.EXPECT().ParseFieldValuesOfIdentifiers(volumIds, r.mpathdOutput).Return(r.dmFieldValues)
 			}
 
 			for _, r := range tc.getFullDmPathReturn {
-				fake_helper.EXPECT().GetFullDmPath(r.dmObjects, volumeUuid).Return(r.dmPath, r.err)
+				fake_helper.EXPECT().GetFullDmPath(r.dmFieldValues, volumeUuid).Return(r.dmPath, r.err)
 			}
 
 			helperGeneric := NewOsDeviceConnectivityHelperGenericForTest(fakeExecuter, fake_helper)
