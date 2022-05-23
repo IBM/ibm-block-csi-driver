@@ -263,7 +263,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                                                 cli_volume.name, source_id)
 
     def _generate_snapshot_response_from_cli_snapshot(self, cli_snapshot, source_cli_volume):
-        return self._generate_snapshot_response(source_cli_volume.capacity, " ", cli_snapshot.snapshot_id,
+        return self._generate_snapshot_response(source_cli_volume.capacity, "", cli_snapshot.snapshot_id,
                                                 cli_snapshot.snapshot_name, source_cli_volume.vdisk_UID)
 
     def _generate_snapshot_response(self, capacity, vdisk_uid, internal_id, name, source_id):
@@ -537,6 +537,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def get_snapshot(self, volume_id, snapshot_name, pool=None):
         logger.debug("Get snapshot : {}".format(snapshot_name))
+        if self._is_flashcopy_2_0_supported():
+            cli_snapshot = self._get_cli_snapshot_by_name(snapshot_name)
+            if not cli_snapshot:
+                return None
+            source_cli_volume = self._get_cli_volume_by_wwn(volume_id)
+            return self._generate_snapshot_response_from_cli_snapshot(cli_snapshot, source_cli_volume)
         target_cli_volume = self._get_cli_volume_if_exists(snapshot_name)
         if not target_cli_volume:
             return None
@@ -1321,12 +1327,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         raw_id = message[id_start:id_end]
         return int(raw_id)
 
-    def _lsvolumesnapshot(self, snapshot_id):
+    def _lsvolumesnapshot(self, **kwargs):
         try:
-            return self.client.svcinfo.lsvolumesnapshot(snapshot_id=snapshot_id)
+            return self.client.svcinfo.lsvolumesnapshot(**kwargs).as_single_element
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if (OBJ_NOT_FOUND in ex.my_message or
-                    NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message):
+            if OBJ_NOT_FOUND in ex.my_message or NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
                 logger.info("snapshot not found")
             elif any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
                 raise array_errors.IllegalObjectName(ex.my_message)
@@ -1334,10 +1339,17 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 raise ex
         return None
 
+    def _get_cli_snapshot_by_id(self, snapshot_id):
+        return self._lsvolumesnapshot(object_id=snapshot_id)
+
+    def _get_cli_snapshot_by_name(self, snapshot_name):
+        filter_value = 'snapshot_name={}'.format(snapshot_name)
+        return self._lsvolumesnapshot(filtervalue=filter_value)
+
     def _add_snapshot(self, snapshot_name, source_cli_volume, pool):
         svc_response = self._addsnapshot(name=snapshot_name, source_volume_id=source_cli_volume.id, pool=pool)
         snapshot_id = self._get_id_from_response(svc_response)
-        cli_snapshot = self._lsvolumesnapshot(snapshot_id)
+        cli_snapshot = self._get_cli_snapshot_by_id(snapshot_id)
         if cli_snapshot is None:
             raise array_errors.ObjectNotFoundError(snapshot_id)
         return cli_snapshot

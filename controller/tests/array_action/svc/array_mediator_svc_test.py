@@ -380,15 +380,19 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.assertIsNone(snapshot)
 
-    def _test_get_snapshot_lsvdisk_cli_failure_error(self, snapshot_name, error_message_id, expected_error):
+    def _test_get_snapshot_cli_failure_error(self, snapshot_name, client_method, error_message_id, expected_error):
         volume_id = "volume_id"
         self._test_mediator_method_client_cli_failure_error(self.svc.get_snapshot, (volume_id, snapshot_name),
-                                                            self.svc.client.svcinfo.lsvdisk, error_message_id,
-                                                            expected_error)
+                                                            client_method, error_message_id, expected_error)
+
+    def _test_get_snapshot_illegal_name_cli_failure_errors(self, client_method):
+        self._test_get_snapshot_cli_failure_error("\xff", client_method, 'CMMVC6017E', array_errors.IllegalObjectName)
+        self._test_get_snapshot_cli_failure_error("12345", client_method, 'CMMVC5703E', array_errors.IllegalObjectName)
 
     def test_get_snapshot_lsvdisk_cli_failure_errors(self):
-        self._test_get_snapshot_lsvdisk_cli_failure_error("\xff", 'CMMVC6017E', array_errors.IllegalObjectName)
-        self._test_get_snapshot_lsvdisk_cli_failure_error("12345", 'CMMVC5703E', array_errors.IllegalObjectName)
+        client_method = self.svc.client.svcinfo.lsvdisk
+        self._test_get_snapshot_illegal_name_cli_failure_errors(client_method)
+        self.svc.client.svcinfo.lsvdisk.assert_called()
 
     def test_get_snapshot_has_no_fc_id_raise_error(self):
         self._prepare_lsvdisk_to_return_mapless_target_volume()
@@ -423,6 +427,24 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_mocks_for_get_snapshot()
         snapshot = self.svc.get_snapshot("volume_id", "test_snapshot")
         self.assertEqual(snapshot.name, "test_snapshot")
+
+    def test_get_snapshot_lsvolumesnapshot_cli_failure_errors(self):
+        self.svc.client.svctask.addsnapshot = Mock()
+        client_method = self.svc.client.svcinfo.lsvolumesnapshot
+        self._test_get_snapshot_illegal_name_cli_failure_errors(client_method)
+        self.svc.client.svcinfo.lsvolumesnapshot.assert_called()
+
+    def _prepare_mocks_for_get_snapshot_2_0(self):
+        self.svc.client.svctask.addsnapshot = Mock()
+        self.svc.client.svcinfo.lsvolumesnapshot.return_value = self._mock_cli_object(self._get_cli_snapshot())
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(self._get_cli_volume())
+
+    def test_get_snapshot_2_0_success(self):
+        self._prepare_mocks_for_get_snapshot_2_0()
+        snapshot = self.svc.get_snapshot("volume_id", "snapshot_name")
+        self.assertEqual(snapshot.name, "snapshot_name")
+        self.svc.client.svcinfo.lsvolumesnapshot.assert_called_once_with(filtervalue='snapshot_name=snapshot_name')
+        self.svc.client.svcinfo.lsvdisk.assert_called_once_with(bytes=True, filtervalue='vdisk_UID=volume_id')
 
     def test_get_object_by_id_snapshot_has_no_fcmap_id_raise_error(self):
         self._prepare_lsvdisk_to_return_mapless_target_volume()
@@ -630,7 +652,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.addsnapshot.return_value = Mock(
             response=(b'Snapshot, id [0], successfully created or triggered\n', b''))
         self.svc.client.svcinfo.lsvolumesnapshot = Mock()
-        self.svc.client.svcinfo.lsvolumesnapshot.return_value = self._get_cli_snapshot()
+        self.svc.client.svcinfo.lsvolumesnapshot.return_value = self._mock_cli_object(self._get_cli_snapshot())
 
     def test_create_snapshot_2_0_success(self):
         self._prepare_mocks_for_create_snapshot_2_0()
@@ -639,9 +661,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(snapshot.capacity_bytes, 1024)
         self.svc.client.svctask.addsnapshot.assert_called_once_with(name='test_snapshot', volumes='test_id',
                                                                     pool='pool1')
-        self.svc.client.svcinfo.lsvolumesnapshot.assert_called_once_with(snapshot_id=0)
+        self.svc.client.svcinfo.lsvolumesnapshot.assert_called_once_with(object_id=0)
         self.assertEqual(snapshot.array_type, 'SVC')
-        self.assertEqual(snapshot.id, ' ')
+        self.assertEqual(snapshot.id, '')
         self.assertEqual(snapshot.internal_id, 'snapshot_id')
 
     def _test_create_snapshot_addsnapshot_cli_failure_error(self, error_message_id, expected_error):
