@@ -19,7 +19,7 @@ type MultipleVolumeIdsError struct {
 }
 
 func (e *MultipleVolumeIdsError) Error() string {
-	return fmt.Sprintf("Detected more than one volume uuids (%v) for single multipath device name (%s)", e.VolumeIds, e.MultipathDeviceName)
+	return fmt.Sprintf("Detected more than one volume uuid (%v) for a single multipath device name (%s)", e.VolumeIds, e.MultipathDeviceName)
 }
 
 type MultipathDeviceNotFoundForVolumeError struct {
@@ -35,7 +35,7 @@ type MultipathDeviceNotFoundForVolumePathError struct {
 }
 
 func (e *MultipathDeviceNotFoundForVolumePathError) Error() string {
-	return fmt.Sprintf("Couldn't find multipath device for VolumePath [%s]. Please check the host connectivity to the storage.", e.VolumePath)
+	return fmt.Sprintf("Couldn't find multipath device for VolumePath [%s]. Please verify the path is mounted", e.VolumePath)
 }
 
 type VolumeIdNotFoundForMultipathDeviceNameError struct {
@@ -91,13 +91,13 @@ func (e *ErrorNoRegexWwnMatchInScsiInq) Error() string {
 }
 
 type ErrorWrongDeviceFound struct {
-	DevPath    string
-	ReqVolName string
-	VolName    string
+	DevPath       string
+	DmVolumeId    string
+	SgInqVolumeId string
 }
 
 func (e *ErrorWrongDeviceFound) Error() string {
 	return fmt.Sprintf("Multipath device [%s] was found as WWN [%s] via multipath -ll command, "+
 		"BUT sg_inq identify this device as a different WWN: [%s]. Check your multipathd.", e.DevPath,
-		e.ReqVolName, e.VolName)
+		e.DmVolumeId, e.SgInqVolumeId)
 }

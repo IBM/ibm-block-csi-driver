@@ -67,12 +67,12 @@ type ReloadMultipathReturn struct {
 }
 
 type IsMpathMatchVolumeIdWithoutErrorsReturn struct {
-	isMpathGood bool
+	isMpathMatchVolumeId bool
 }
 
 type IsMpathMatchVolumeIdReturn struct {
-	isMpathGood bool
-	err         error
+	isMpathMatchVolumeId bool
+	err                  error
 }
 
 func TestGetMpathDevice(t *testing.T) {
@@ -151,8 +151,8 @@ func TestGetMpathDevice(t *testing.T) {
 			},
 			isMpathMatchVolumeIdReturn: []IsMpathMatchVolumeIdReturn{
 				IsMpathMatchVolumeIdReturn{
-					isMpathGood: false,
-					err:         &device_connectivity.ErrorWrongDeviceFound{"", "", ""},
+					isMpathMatchVolumeId: false,
+					err:                  &device_connectivity.ErrorWrongDeviceFound{"", "", ""},
 				},
 			},
 
@@ -170,7 +170,7 @@ func TestGetMpathDevice(t *testing.T) {
 			},
 			isMpathMatchVolumeIdWithoutErrorsReturn: []IsMpathMatchVolumeIdWithoutErrorsReturn{
 				IsMpathMatchVolumeIdWithoutErrorsReturn{
-					isMpathGood: true,
+					isMpathMatchVolumeId: true,
 				},
 			},
 
@@ -199,8 +199,8 @@ func TestGetMpathDevice(t *testing.T) {
 
 			isMpathMatchVolumeIdReturn: []IsMpathMatchVolumeIdReturn{
 				IsMpathMatchVolumeIdReturn{
-					isMpathGood: true,
-					err:         nil,
+					isMpathMatchVolumeId: true,
+					err:                  nil,
 				},
 			},
 
@@ -229,7 +229,7 @@ func TestGetMpathDevice(t *testing.T) {
 
 			for _, r := range tc.isMpathMatchVolumeIdWithoutErrorsReturn {
 				fake_helper.EXPECT().IsMpathMatchVolumeIdWithoutErrors(dmPath, volumIds).Return(
-					r.isMpathGood)
+					r.isMpathMatchVolumeId)
 			}
 
 			for _, r := range tc.reloadMultipathReturn {
@@ -239,7 +239,7 @@ func TestGetMpathDevice(t *testing.T) {
 
 			for _, r := range tc.isMpathMatchVolumeIdReturn {
 				fake_helper.EXPECT().IsMpathMatchVolumeId(dmPath, volumIds).Return(
-					r.isMpathGood,
+					r.isMpathMatchVolumeId,
 					r.err)
 			}
 
