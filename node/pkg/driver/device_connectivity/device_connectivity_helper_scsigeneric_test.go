@@ -599,7 +599,7 @@ func TestHelperGetWwnByScsiInq(t *testing.T) {
 					}
 				}
 			}
-			if strings.ToLower(tc.wwn) != wwn {
+			if strings.ToLower(tc.wwn) != strings.ToLower(wwn) {
 				t.Fatalf("Expected wwn  %v, got %v", wwn, tc.wwn)
 			}
 

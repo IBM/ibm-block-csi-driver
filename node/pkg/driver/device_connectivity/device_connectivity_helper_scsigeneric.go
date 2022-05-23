@@ -464,6 +464,7 @@ func (o OsDeviceConnectivityHelperGeneric) IsMpathMatchVolumeIdWithoutErrors(dmP
 }
 
 func (o OsDeviceConnectivityHelperGeneric) isSameId(wwn string, identifiers []string) bool {
+	wwn = strings.ToLower(wwn)
 	for _, identifier := range identifiers {
 		if wwn == identifier {
 			return true
@@ -546,7 +547,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 			}
 			wwn = matches[1]
 			logger.Debugf("Found the expected Wwn [%s] in sg_inq", wwn)
-			return strings.ToLower(wwn), nil
+			return wwn, nil
 		}
 		if regex.MatchString(line) {
 			found = true
