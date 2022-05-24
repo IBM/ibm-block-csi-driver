@@ -435,6 +435,21 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             ]})
         self.assertListEqual(self.array.get_array_fc_wwns(None), [wwpn])
 
+    def test_get_host_by_name_success(self):
+        self.client_mock.get_host.return_value = Munch(
+            {"name": "test_host_1", "host_ports_briefs": [{"wwpn": "wwpn1"}, {"wwpn": "wwpn2"}]})
+        host = self.array.get_host_by_name('test_host_1')
+        self.assertEqual(host.name, "test_host_1")
+        self.assertEqual(host.connectivity_types, ['fc'])
+        self.assertEqual(host.initiators.nvme_nqns, [])
+        self.assertEqual(host.initiators.fc_wwns, ['wwpn1', 'wwpn2'])
+        self.assertEqual(host.initiators.iscsi_iqns, [])
+
+    def test_get_host_by_name_raise_host_not_found(self):
+        self.client_mock.get_host.side_effect = NotFound("404", message='BE7A0001')
+        with self.assertRaises(array_errors.HostNotFoundError):
+            self.array.get_host_by_name('test_host_1')
+
     def test_get_host_by_identifiers(self):
         host_name = "test_host"
         wwpn1 = "wwpn1"
@@ -446,7 +461,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             })
         ]
         host, connectivity_type = self.array.get_host_by_host_identifiers(
-            Initiators('', [wwpn1, wwpn2], '')
+            Initiators([], [wwpn1, wwpn2], [])
         )
         self.assertEqual(host, host_name)
         self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_type)
@@ -462,7 +477,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             })
         ]
         host, connectivity_type = self.array.get_host_by_host_identifiers(
-            Initiators('', [wwpn1, "another_wwpn"], '')
+            Initiators([], [wwpn1, "another_wwpn"], [])
         )
         self.assertEqual(host, host_name)
         self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_type)
@@ -479,7 +494,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         ]
         with self.assertRaises(array_errors.HostNotFoundError):
             self.array.get_host_by_host_identifiers(
-                Initiators('', ["new_wwpn", "another_wwpn"], '')
+                Initiators([], ["new_wwpn", "another_wwpn"], [])
             )
 
     def test_get_snapshot_not_exist_return_none(self):
