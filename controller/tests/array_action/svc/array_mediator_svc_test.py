@@ -423,7 +423,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.svc.get_snapshot("volume_id", "test_snapshot")
 
-    def test_get_snapshot_success(self):
+    def test_get_snapshot_lsvdisk_success(self):
         self._prepare_mocks_for_get_snapshot()
         snapshot = self.svc.get_snapshot("volume_id", "test_snapshot")
         self.assertEqual(snapshot.name, "test_snapshot")
@@ -434,13 +434,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_get_snapshot_illegal_name_cli_failure_errors(client_method)
         self.svc.client.svcinfo.lsvolumesnapshot.assert_called()
 
-    def _prepare_mocks_for_get_snapshot_2_0(self):
+    def _prepare_mocks_for_get_snapshot_lsvolumesnapshot(self):
         self.svc.client.svctask.addsnapshot = Mock()
         self.svc.client.svcinfo.lsvolumesnapshot.return_value = self._mock_cli_object(self._get_cli_snapshot())
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(self._get_cli_volume())
 
-    def test_get_snapshot_2_0_success(self):
-        self._prepare_mocks_for_get_snapshot_2_0()
+    def test_get_snapshot_lsvolumesnapshot_success(self):
+        self._prepare_mocks_for_get_snapshot_lsvolumesnapshot()
         snapshot = self.svc.get_snapshot("volume_id", "snapshot_name")
         self.assertEqual(snapshot.name, "snapshot_name")
         self.svc.client.svcinfo.lsvolumesnapshot.assert_called_once_with(filtervalue='snapshot_name=snapshot_name')
@@ -479,8 +479,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
             del volume.deduplicated_copy
         return volume
 
-    def _prepare_mocks_for_create_snapshot(self, support_deduplicated_copy=True, source_has_deduplicated_copy=False,
-                                           different_pool_site=False, is_source_stretched=False):
+    def _prepare_mocks_for_create_snapshot_mkvolume(self, support_deduplicated_copy=True,
+                                                    source_has_deduplicated_copy=False, different_pool_site=False,
+                                                    is_source_stretched=False):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         self.svc.client.svctask.mkfcmap.return_value = Mock()
         pool = ['many', 'pool1', 'pool2'] if is_source_stretched else 'pool_name'
@@ -553,7 +554,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_create_snapshot_create_fcmap_error(self, mock_warning):
-        self._prepare_mocks_for_create_snapshot()
+        self._prepare_mocks_for_create_snapshot_mkvolume()
         mock_warning.return_value = False
         self.svc.client.svctask.mkfcmap.side_effect = [
             CLIFailureError("Failed")]
@@ -563,7 +564,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_create_snapshot_start_fcmap_error(self, mock_warning):
-        self._prepare_mocks_for_create_snapshot()
+        self._prepare_mocks_for_create_snapshot_mkvolume()
         mock_warning.return_value = False
         self.svc.client.svctask.startfcmap.side_effect = [
             CLIFailureError("Failed")]
@@ -571,8 +572,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(CLIFailureError):
             self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="pool1")
 
-    def test_create_snapshot_success(self):
-        self._prepare_mocks_for_create_snapshot()
+    def test_create_snapshot_mkvolume_success(self):
+        self._prepare_mocks_for_create_snapshot_mkvolume()
 
         snapshot = self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="pool1")
 
@@ -581,7 +582,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(snapshot.id, 'snap_id')
 
     def test_create_snapshot_with_different_pool_success(self):
-        self._prepare_mocks_for_create_snapshot()
+        self._prepare_mocks_for_create_snapshot_mkvolume()
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="different_pool")
         self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
@@ -589,21 +590,21 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                                  thin=True)
 
     def test_create_snapshot_for_hyperswap_volume_with_different_site_success(self):
-        self._prepare_mocks_for_create_snapshot(different_pool_site=True)
+        self._prepare_mocks_for_create_snapshot_mkvolume(different_pool_site=True)
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="different_pool")
         self.svc.client.svctask.mkfcmap.assert_called_once_with(source="relevant_volume", target="test_snapshot",
                                                                 copyrate=0)
 
     def test_create_snapshot_for_stretched_volume_with_different_site_success(self):
-        self._prepare_mocks_for_create_snapshot(different_pool_site=True, is_source_stretched=True)
+        self._prepare_mocks_for_create_snapshot_mkvolume(different_pool_site=True, is_source_stretched=True)
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="different_pool")
         self.svc.client.svctask.mkfcmap.assert_called_once_with(source="source_volume", target="test_snapshot",
                                                                 copyrate=0)
 
     def test_create_snapshot_for_stretched_volume_implicit_pool_success(self):
-        self._prepare_mocks_for_create_snapshot(is_source_stretched=True)
+        self._prepare_mocks_for_create_snapshot_mkvolume(is_source_stretched=True)
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool=None)
         self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
@@ -612,7 +613,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                                 copyrate=0)
 
     def test_create_snapshot_as_stretched_success(self):
-        self._prepare_mocks_for_create_snapshot()
+        self._prepare_mocks_for_create_snapshot_mkvolume()
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="pool1:pool2")
         self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
@@ -621,7 +622,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                                 copyrate=0)
 
     def test_create_snapshot_with_specified_source_volume_space_efficiency_success(self):
-        self._prepare_mocks_for_create_snapshot(source_has_deduplicated_copy=True)
+        self._prepare_mocks_for_create_snapshot_mkvolume(source_has_deduplicated_copy=True)
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool=None)
         self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
@@ -629,14 +630,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                                  compressed=True, deduplicated=True)
 
     def test_create_snapshot_with_different_space_efficiency_success(self):
-        self._prepare_mocks_for_create_snapshot(source_has_deduplicated_copy=True)
+        self._prepare_mocks_for_create_snapshot_mkvolume(source_has_deduplicated_copy=True)
 
         self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency="thin", pool=None)
         self.svc.client.svctask.mkvolume.assert_called_once_with(name='test_snapshot', unit='b', size=1024,
                                                                  pool='pool_name', iogrp='iogrp0', thin=True)
 
     def test_create_snapshot_no_deduplicated_copy_success(self):
-        self._prepare_mocks_for_create_snapshot(support_deduplicated_copy=False)
+        self._prepare_mocks_for_create_snapshot_mkvolume(support_deduplicated_copy=False)
 
         snapshot = self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="pool1")
 
@@ -644,7 +645,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(snapshot.array_type, 'SVC')
         self.assertEqual(snapshot.id, 'snap_id')
 
-    def _prepare_mocks_for_create_snapshot_2_0(self):
+    def _prepare_mocks_for_create_snapshot_addsnapshot(self):
         self.svc.client.svctask.addsnapshot = Mock()
         source_volume_to_copy_from = self._get_custom_cli_volume(False, False, pool_name='pool1')
         volumes_to_return = [source_volume_to_copy_from, source_volume_to_copy_from]
@@ -654,8 +655,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvolumesnapshot = Mock()
         self.svc.client.svcinfo.lsvolumesnapshot.return_value = self._mock_cli_object(self._get_cli_snapshot())
 
-    def test_create_snapshot_2_0_success(self):
-        self._prepare_mocks_for_create_snapshot_2_0()
+    def test_create_snapshot_addsnapshot_success(self):
+        self._prepare_mocks_for_create_snapshot_addsnapshot()
         snapshot = self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="pool1")
 
         self.assertEqual(snapshot.capacity_bytes, 1024)
@@ -672,7 +673,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                             self.svc.client.svctask.addsnapshot, error_message_id,
                                                             expected_error)
 
-    def test_create_snapshot_2_0_raise_exceptions(self):
+    def test_create_snapshot_addsnapshot_raise_exceptions(self):
         self.svc.client.svctask.addsnapshot = Mock()
         self._test_mediator_method_client_error(self.svc.create_snapshot,
                                                 ('source_volume_name', 'snapshot_name', '', 'pool'),

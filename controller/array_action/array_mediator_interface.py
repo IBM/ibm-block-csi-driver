@@ -241,7 +241,6 @@ class ArrayMediator(ABC):
         Returns:
             Snapshot
         Raises:
-            SnapshotAlreadyExists
             ObjectNotFound
             IllegalObjectName
             IllegalObjectID

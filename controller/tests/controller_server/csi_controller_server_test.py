@@ -310,10 +310,6 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
                                            err=array_errors.SnapshotSourcePoolMismatch("snapshot_pool", "source_pool"))
 
-    def test_create_snapshot_with_snapshot_exists_exception(self):
-        self.create_snapshot_returns_error(return_code=grpc.StatusCode.ALREADY_EXISTS,
-                                           err=array_errors.SnapshotAlreadyExists("snapshot", "endpoint"))
-
     def test_create_snapshot_with_same_volume_name_exists_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INTERNAL,
                                            err=array_errors.ExpectedSnapshotButFoundVolumeError("snapshot",
@@ -1633,7 +1629,6 @@ class TestIdentityServer(BaseControllerSetUp):
 
     @patch("controller.common.config.config.identity")
     def test_identity_plugin_get_info_fails_when_name_or_version_are_empty(self, identity_config):
-
         request = Mock()
         context = Mock()
 

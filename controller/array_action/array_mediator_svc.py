@@ -536,7 +536,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def get_snapshot(self, volume_id, snapshot_name, pool=None):
         logger.debug("Get snapshot : {}".format(snapshot_name))
-        if self._is_flashcopy_2_0_supported():
+        if self._is_addsnapshot_supported():
             cli_snapshot = self._get_cli_snapshot_by_name(snapshot_name)
             if not cli_snapshot:
                 return None
@@ -734,7 +734,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         source_volume_name = self._get_volume_name_by_wwn(volume_id)
         source_cli_volume = self._get_cli_volume_in_pool_site(source_volume_name, pool)
-        if self._is_flashcopy_2_0_supported():
+        if self._is_addsnapshot_supported():
             target_cli_snapshot = self._add_snapshot(snapshot_name, source_cli_volume, pool)
             snapshot = self._generate_snapshot_response_from_cli_snapshot(target_cli_snapshot, source_cli_volume)
         else:
