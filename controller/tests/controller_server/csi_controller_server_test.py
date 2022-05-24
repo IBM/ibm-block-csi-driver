@@ -2,7 +2,6 @@ import abc
 import json
 import unittest
 
-# from unittest import mock as umock
 import grpc
 from csi_general import csi_pb2
 from mock import patch, Mock, MagicMock, call
@@ -10,6 +9,7 @@ from mock import patch, Mock, MagicMock, call
 import controller.array_action.errors as array_errors
 import controller.controller_server.config as config
 import controller.controller_server.errors as controller_errors
+from controller.array_action.array_action_types import Host
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.controller_server.csi_controller_server import CSIControllerServicer
 from controller.controller_server.sync_lock import SyncLock
@@ -1033,7 +1033,9 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
 
         arr_type = XIVArrayMediator.array_type
         self.request.volume_id = "{}:wwn1".format(arr_type)
-        self.request.node_id = "hostname;iqn.1994-05.com.redhat:686358c930fe;500143802426baf4"
+        self.iqn = "iqn.1994-05.com.redhat:686358c930fe"
+        self.fc_port = "500143802426baf4"
+        self.request.node_id = "{};;{};{}".format(self.hostname, self.fc_port, self.iqn)
         self.request.readonly = False
         self.request.readonly = False
 
@@ -1098,6 +1100,9 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
     def test_publish_volume_get_volume_mappings_one_map_for_existing_host(self, storage_agent):
         self.mediator.get_volume_mappings = Mock()
         self.mediator.get_volume_mappings.return_value = {self.hostname: 2}
+        self.mediator.get_host_by_name = Mock()
+        self.mediator.get_host_by_name.return_value = Host(name=self.hostname, connectivity_types=['iscsi'],
+                                                           iscsi_iqns=[self.iqn])
         storage_agent.return_value = self.storage_agent
 
         response = self.servicer.ControllerPublishVolume(self.request, self.context)
@@ -1198,7 +1203,10 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_publish_volume_get_volume_mappings_one_map_for_other_host(self, storage_agent):
         self.mediator.get_volume_mappings = Mock()
-        self.mediator.get_volume_mappings.return_value = {"other-hostname": 3}
+        self.mediator.get_volume_mappings.return_value = {self.hostname: 3}
+        self.mediator.get_host_by_name = Mock()
+        self.mediator.get_host_by_name.return_value = Host(name=self.hostname, connectivity_types=['iscsi'],
+                                                           iscsi_iqns="other_iqn")
         storage_agent.return_value = self.storage_agent
 
         self.servicer.ControllerPublishVolume(self.request, self.context)
