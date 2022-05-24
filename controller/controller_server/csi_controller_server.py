@@ -244,7 +244,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         except ObjectIdError as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
-                                    array_errors.VolumeAlreadyUnmappedError)
+                                    csi_pb2.ControllerUnpublishVolumeResponse)
         except (array_errors.HostNotFoundError, InvalidNodeId) as ex:
             logger.debug("Idempotent case. {}.".format(str(ex)))
         except array_errors.VolumeAlreadyUnmappedError:
@@ -285,10 +285,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                                             request.parameters)
         except ObjectIdError as ex:
             return handle_exception(ex, context, grpc.StatusCode.NOT_FOUND,
-                                    csi_pb2.CreateSnapshotResponse)
-        except array_errors.SpaceEfficiencyNotSupported as ex:
-            return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
-                                    csi_pb2.CreateSnapshotResponse)
+                                    csi_pb2.ValidateVolumeCapabilitiesResponse)
 
     @csi_method(error_response_type=csi_pb2.ListVolumesResponse)
     def ListVolumes(self, request, context):
