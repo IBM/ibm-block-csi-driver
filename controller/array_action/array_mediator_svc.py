@@ -88,8 +88,8 @@ def _get_space_efficiency_kwargs(space_efficiency):
     return {}
 
 
-def build_kwargs_from_parameters(space_efficiency, pool_name, io_group, volume_name,
-                                 volume_size):
+def build_kwargs_from_parameters(space_efficiency, pool_name, io_group,
+                                 volume_group, volume_name, volume_size):
     cli_kwargs = {}
     cli_kwargs.update({
         'name': volume_name,
@@ -101,6 +101,8 @@ def build_kwargs_from_parameters(space_efficiency, pool_name, io_group, volume_n
     cli_kwargs.update(space_efficiency_kwargs)
     if io_group:
         cli_kwargs['iogrp'] = io_group
+    if volume_group:
+        cli_kwargs['volumegroup'] = volume_group
     return cli_kwargs
 
 
@@ -452,13 +454,13 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise array_errors.ObjectNotFoundError(volume_id)
         return vol_name
 
-    def _create_cli_volume(self, name, size_in_bytes, space_efficiency, pool, io_group):
+    def _create_cli_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group=None):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with parameters : {}".format(
             name, size_in_bytes, pool, space_efficiency))
         try:
             size = self._convert_size_bytes(size_in_bytes)
             cli_kwargs = build_kwargs_from_parameters(space_efficiency, pool, io_group,
-                                                      name, size)
+                                                      volume_group, name, size)
             self.client.svctask.mkvolume(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if is_warning_message(ex.my_message):
@@ -500,8 +502,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         target_volume_name = self._get_volume_name_by_wwn(volume_id)
         self._copy_to_target_volume(target_volume_name, source_name)
 
-    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group):
-        self._create_cli_volume(name, size_in_bytes, space_efficiency, pool, io_group)
+    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group):
+        self._create_cli_volume(name, size_in_bytes, space_efficiency, pool, io_group, volume_group)
         cli_volume = self._get_cli_volume(name)
         return self._generate_volume_response(cli_volume)
 

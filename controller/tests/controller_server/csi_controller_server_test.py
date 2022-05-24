@@ -450,7 +450,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
         self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, pool=expected_pool)
-        self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, 10, None, expected_pool, None)
+        self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, 10, None, expected_pool, None, None)
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
         self.assertEqual(response_volume.volume.volume_id, expected_volume_id)
@@ -484,7 +484,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
         self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, pool=POOL)
-        self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, 10, "not_none", POOL, None)
+        self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, 10, "not_none", POOL, None, None)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_idempotent_no_source_succeeds(self, storage_agent):
@@ -599,7 +599,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(self.context.code, return_code)
         self.assertIn(msg, self.context.details)
         self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, pool=POOL)
-        self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, self.capacity_bytes, None, POOL, None)
+        self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, self.capacity_bytes, None, POOL, None, None)
 
     def test_create_volume_with_illegal_object_name_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
@@ -633,7 +633,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.validate_supported_space_efficiency = Mock()
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.create_volume.assert_called_once_with(final_name, 10, space_efficiency, POOL, None)
+        self.mediator.create_volume.assert_called_once_with(final_name, 10, space_efficiency, POOL, None, None)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_name_prefix(self, storage_agent):
@@ -686,7 +686,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.create_volume.assert_called_once_with(self.request.name, 2, None, POOL, None)
+        self.mediator.create_volume.assert_called_once_with(self.request.name, 2, None, POOL, None, None)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_required_bytes_too_large_fail(self, storage_agent):
