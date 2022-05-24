@@ -252,11 +252,12 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def delete_snapshot(self, snapshot_id):
+    def delete_snapshot(self, snapshot_id, internal_snapshot_id):
         """
         This function should delete a snapshot in the storage system.
         Args:
             snapshot_id : wwn of the snapshot to delete
+            internal_snapshot_id : storage internal snapshot id
         Returns:
             None
         Raises:
