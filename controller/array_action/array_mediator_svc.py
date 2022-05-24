@@ -1310,9 +1310,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return unique_names.pop()
         return None
 
-    def _is_flashcopy_2_0_supported(self):
-        return hasattr(self.client.svctask, "addsnapshot")
-
     def _addsnapshot(self, name, source_volume_id, pool):
         try:
             return self.client.svctask.addsnapshot(name=name, volumes=source_volume_id, pool=pool)
