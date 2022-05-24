@@ -1320,12 +1320,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 logger.error("cannot create snapshot {0}, Reason is: {1}".format(name, ex))
                 if OBJ_ALREADY_EXIST in ex.my_message:
                     raise array_errors.SnapshotAlreadyExists(name, self.endpoint)
-                if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
+                if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message or NOT_CHILD_POOL in ex.my_message:
                     raise array_errors.PoolDoesNotExist(pool, self.endpoint)
                 if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in ex.my_message:
                     raise array_errors.NotEnoughSpaceInPool(id_or_name=pool)
-                if NOT_CHILD_POOL in ex.my_message:
-                    raise array_errors.PoolDoesNotExist(pool, self.endpoint)
                 if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, INVALID_NAME, TOO_MANY_CHARS)):
                     raise array_errors.IllegalObjectName(ex.my_message)
                 raise ex
