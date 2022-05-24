@@ -531,8 +531,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
-        cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
-        self._delete_object(cli_volume)
+        self._delete_volume(volume_id)
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
     def get_snapshot(self, volume_id, snapshot_name, pool=None):
@@ -658,8 +657,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def _is_in_remote_copy_relationship(self, fcmap):
         return fcmap.rc_controlled == YES
 
-    def _delete_object(self, cli_object, is_snapshot=False):
-        object_name = cli_object.name
+    def _delete_volume(self, volume_id, is_snapshot=False):
+        cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
+        object_name = cli_volume.name
+        if is_snapshot and not cli_volume.FC_id:
+            raise array_errors.ObjectNotFoundError(object_name)
         fcmap_as_target = self._get_fcmap_as_target_if_exists(object_name)
         if is_snapshot and not fcmap_as_target:
             raise array_errors.ObjectNotFoundError(object_name)
@@ -741,7 +743,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         return snapshot
 
-    def _is_flashcopy_2_0_supported(self):
+    def _is_addsnapshot_supported(self):
         return hasattr(self.client.svctask, "addsnapshot")
 
     def _rmsnapshot(self, internal_snapshot_id):
@@ -754,13 +756,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def delete_snapshot(self, snapshot_id, internal_snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
-        if self._is_flashcopy_2_0_supported() and not snapshot_id:
+        if self._is_addsnapshot_supported() and not snapshot_id:
             self._rmsnapshot(internal_snapshot_id)
         else:
-            cli_volume = self._get_cli_volume_by_wwn(snapshot_id)
-            if not cli_volume or not cli_volume.FC_id:
-                raise array_errors.ObjectNotFoundError(snapshot_id)
-            self._delete_object(cli_volume, is_snapshot=True)
+            self._delete_volume(snapshot_id, is_snapshot=True)
         logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
 
     def _get_host_ports(self, host, attribute_name):
