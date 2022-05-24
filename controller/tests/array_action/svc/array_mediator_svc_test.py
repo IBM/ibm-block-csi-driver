@@ -661,7 +661,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectIsStillInUseError):
             self.svc.delete_snapshot("test_snapshot", "internal_id")
 
-    def test_delete_snapshot_success(self):
+    def test_delete_snapshot_rmvolume_success(self):
         self._prepare_mocks_for_delete_snapshot()
         self.svc.delete_snapshot("test_snapshot", "internal_id")
         self.assertEqual(self.svc.client.svctask.rmfcmap.call_count, 2)
@@ -684,21 +684,21 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(CLIFailureError):
             self.svc.delete_snapshot("test_snapshot", "internal_id")
 
-    def _prepare_mocks_for_delete_snapshot_2_0(self):
+    def _prepare_mocks_for_delete_snapshot_addsnapshot(self):
         self.svc.client.svctask.addsnapshot = Mock()
 
-    def _test_delete_snapshot_2_0_rmsnapshot_cli_failure_error(self, error_message_id, expected_error):
+    def _test_delete_snapshot_rmsnapshot_cli_failure_error(self, error_message_id, expected_error):
         self._test_mediator_method_client_cli_failure_error(self.svc.delete_snapshot, ("", "internal_id"),
                                                             self.svc.client.svctask.rmsnapshot, error_message_id,
                                                             expected_error)
 
-    def test_delete_snapshot_2_0_rmsnapshot_errors(self):
-        self._prepare_mocks_for_delete_snapshot_2_0()
-        self._test_delete_snapshot_2_0_rmsnapshot_cli_failure_error("CMMVC9755E", array_errors.ObjectNotFoundError)
-        self._test_delete_snapshot_2_0_rmsnapshot_cli_failure_error("Failed", CLIFailureError)
+    def test_delete_snapshot_rmsnapshot_errors(self):
+        self._prepare_mocks_for_delete_snapshot_addsnapshot()
+        self._test_delete_snapshot_rmsnapshot_cli_failure_error("CMMVC9755E", array_errors.ObjectNotFoundError)
+        self._test_delete_snapshot_rmsnapshot_cli_failure_error("Failed", CLIFailureError)
 
-    def test_delete_snapshot_2_0_success(self):
-        self._prepare_mocks_for_delete_snapshot_2_0()
+    def test_delete_snapshot_rmsnapshot_success(self):
+        self._prepare_mocks_for_delete_snapshot_addsnapshot()
         self.svc.delete_snapshot("", "internal_id")
         self.svc.client.svctask.rmsnapshot.assert_called_once_with(snapshotid='internal_id')
 
