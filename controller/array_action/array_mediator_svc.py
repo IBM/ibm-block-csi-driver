@@ -11,7 +11,7 @@ from retry import retry
 import controller.array_action.config as config
 import controller.array_action.errors as array_errors
 import controller.controller_server.config as controller_config
-from controller.array_action.array_action_types import Volume, Snapshot, Replication
+from controller.array_action.array_action_types import Volume, Snapshot, Replication, Host
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controller.common import settings
@@ -757,7 +757,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 nvme_host = host.name
                 connectivity_types.add(config.NVME_OVER_FC_CONNECTIVITY_TYPE)
                 logger.debug("found nvme nqn in list : {0} for host : "
-                             "{1}".format(initiators.nvme_nqn, nvme_host))
+                             "{1}".format(initiators.nvme_nqns, nvme_host))
             host_wwns = self._get_host_ports(host, HOST_WWPN)
             if initiators.is_array_wwns_match(host_wwns):
                 fc_host = host.name
@@ -769,7 +769,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 iscsi_host = host.name
                 connectivity_types.add(config.ISCSI_CONNECTIVITY_TYPE)
                 logger.debug("found iscsi iqn in list : {0} for host : "
-                             "{1}".format(initiators.iscsi_iqn, iscsi_host))
+                             "{1}".format(initiators.iscsi_iqns, iscsi_host))
         if not connectivity_types:
             logger.debug("could not find host by using initiators: {0} ".format(initiators))
             raise array_errors.HostNotFoundError(initiators)
@@ -859,6 +859,27 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         for host in host_list:
             writer.write(LIST_HOSTS_CMD_FORMAT.format(HOST_ID=host.id))
         return writer.getvalue()
+
+    def _get_cli_host(self, id_or_name):
+        cli_host = self.client.svcinfo.lshost(object_id=id_or_name).as_single_element
+        if not cli_host:
+            raise array_errors.HostNotFoundError(id_or_name)
+        return cli_host
+
+    def get_host_by_name(self, host_name):
+        cli_host = self._get_cli_host(host_name)
+        nvme_nqns = self._get_host_ports(cli_host, HOST_NQN)
+        fc_wwns = self._get_host_ports(cli_host, HOST_WWPN)
+        iscsi_iqns = self._get_host_ports(cli_host, HOST_ISCSI_NAME)
+        connectivity_types = []
+        if nvme_nqns:
+            connectivity_types.append(config.NVME_OVER_FC_CONNECTIVITY_TYPE)
+        if fc_wwns:
+            connectivity_types.append(config.FC_CONNECTIVITY_TYPE)
+        if iscsi_iqns:
+            connectivity_types.append(config.ISCSI_CONNECTIVITY_TYPE)
+        return Host(name=cli_host.name, connectivity_types=connectivity_types, nvme_nqns=nvme_nqns,
+                    fc_wwns=fc_wwns, iscsi_iqns=iscsi_iqns)
 
     def _lsvdiskhostmap(self, volume_name):
         try:
@@ -1053,15 +1074,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.debug("Getting fc wwns : {}".format(fc_port_wwns))
         return fc_port_wwns
 
-    def _get_cli_host_by_name(self, host_name):
-        filter_value = 'name={}'.format(host_name)
-        cli_host = self.client.svcinfo.lshost(filtervalue=filter_value).as_single_element
-        if not cli_host:
-            raise array_errors.HostNotFoundError(host_name)
-        return cli_host
-
     def _get_host_portset_id(self, host_name):
-        cli_host = self._get_cli_host_by_name(host_name)
+        cli_host = self._get_cli_host(host_name)
         return cli_host.get(HOST_PORTSET_ID)
 
     def _get_replication_endpoint_type(self, rcrelationship):

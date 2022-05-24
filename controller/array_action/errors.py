@@ -147,9 +147,9 @@ class MultipleHostsFoundError(BaseArrayActionException):
 
 class HostNotFoundError(BaseArrayActionException):
 
-    def __init__(self, iscsi_iqn):
+    def __init__(self, host_identifier):
         super().__init__()
-        self.message = messages.HOST_NOT_FOUND_ERROR_MESSAGE.format(iscsi_iqn)
+        self.message = messages.HOST_NOT_FOUND_ERROR_MESSAGE.format(host_identifier)
 
 
 class NoAvailableLunError(BaseArrayActionException):
@@ -187,11 +187,11 @@ class UnmappingError(BaseArrayActionException):
         self.message = messages.UNMAPPING_ERROR_MESSAGE.format(volume_id_or_name, host, err)
 
 
-class VolumeMappedToMultipleHostsError(BaseArrayActionException):
+class VolumeAlreadyMappedToDifferentHostsError(BaseArrayActionException):
 
     def __init__(self, hosts):
         super().__init__()
-        self.message = messages.VOLUME_MAPPED_TO_MULTIPLE_HOSTS_ERROR_MESSAGE.format(hosts)
+        self.message = messages.VOLUME_ALREADY_MAPPED_TO_DIFFERENT_HOSTS_ERROR_MESSAGE.format(hosts)
 
 
 class NoIscsiTargetsFoundError(BaseArrayActionException):
