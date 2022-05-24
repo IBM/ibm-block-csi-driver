@@ -810,8 +810,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(host.name, "test_host_1")
         self.assertEqual(host.connectivity_types, ['nvmeofc', 'fc', 'iscsi'])
         self.assertEqual(host.initiators.nvme_nqns, ['nqn.test.1'])
-        self.assertEqual(host.initiators.iscsi_iqns, ['iqn.test.1'])
         self.assertEqual(host.initiators.fc_wwns, ['wwn1'])
+        self.assertEqual(host.initiators.iscsi_iqns, ['iqn.test.1'])
 
     def test_get_host_by_name_raise_host_not_found(self):
         self.svc.client.svcinfo.lshost.return_value = Mock(as_single_element=None)

@@ -395,8 +395,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.assertEqual(host.name, "test_host_1")
         self.assertEqual(host.connectivity_types, ['iscsi'])
         self.assertEqual(host.initiators.nvme_nqns, [])
-        self.assertEqual(host.initiators.iscsi_iqns, ["iqn.test.1"])
         self.assertEqual(host.initiators.fc_wwns, [])
+        self.assertEqual(host.initiators.iscsi_iqns, ["iqn.test.1"])
 
     def test_get_host_by_name_raise_host_not_found(self):
         self.mediator.client.cmd.host_list.return_value = Mock(as_single_element=None)
