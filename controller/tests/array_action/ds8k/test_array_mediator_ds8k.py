@@ -446,7 +446,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.assertEqual(host.initiators.fc_wwns, ['wwpn1', 'wwpn2'])
 
     def test_get_host_by_name_raise_host_not_found(self):
-        self.client_mock.get_host.return_value = None
+        self.client_mock.get_host.side_effect = NotFound("404", message='BE7A0001')
         with self.assertRaises(array_errors.HostNotFoundError):
             self.array.get_host_by_name('test_host_1')
 

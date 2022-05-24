@@ -32,9 +32,9 @@ class Initiators:
         self.iscsi_iqns = self._filter_empty_parts(self.iscsi_iqns)
 
     def _filter_empty_parts(self, ports):
-        stripped_ports = [port.strip() for port in ports]
-        filtered_ports = filter(None, stripped_ports)
-        return list(filtered_ports)
+        ports = [port.strip() for port in ports]
+        ports = filter(None, ports)
+        return list(ports)
 
     def _get_iter(self):
         for connectivity_type, initiators in ((array_config.NVME_OVER_FC_CONNECTIVITY_TYPE, self.nvme_nqns),
@@ -50,9 +50,10 @@ class Initiators:
         return {port.lower() for port in ports if ports}
 
     def _is_match(self, ports, other_ports):
-        ports_lower = self._lower(ports)
-        other_ports_lower = self._lower(other_ports)
-        return not ports_lower.isdisjoint(other_ports_lower)
+        other_ports = self._filter_empty_parts(other_ports)
+        ports = self._lower(ports)
+        other_ports = self._lower(other_ports)
+        return not ports.isdisjoint(other_ports)
 
     def is_array_wwns_match(self, host_wwns):
         return self._is_match(self.fc_wwns, host_wwns)

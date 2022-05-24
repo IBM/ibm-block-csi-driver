@@ -627,7 +627,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         try:
             return self.client.get_host(host_name)
         except exceptions.NotFound:
-            return None
+            raise array_errors.HostNotFoundError(host_name)
         except exceptions.ClientException as ex:
             raise ex
 
@@ -637,8 +637,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def get_host_by_name(self, host_name):
         api_host = self._get_api_host(host_name)
-        if api_host is None:
-            raise array_errors.HostNotFoundError(host_name)
         fc_wwns = self._get_fc_wwns_from_api_host(api_host)
         connectivity_types = []
         if fc_wwns:
