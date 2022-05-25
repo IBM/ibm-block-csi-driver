@@ -146,12 +146,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def _test_create_volume_mkvolume_cli_failure_error(self, error_message_id, expected_error, volume_name="volume"):
         self._test_mediator_method_client_cli_failure_error(self.svc.create_volume,
-                                                            (volume_name, 10, "thin", "pool", None),
+                                                            (volume_name, 10, "thin", "pool", None, "", ""),
                                                             self.svc.client.svctask.mkvolume, error_message_id,
                                                             expected_error)
 
     def test_create_volume_raise_exceptions(self):
-        self._test_mediator_method_client_error(self.svc.create_volume, ("volume", 10, "thin", "pool", None),
+        self._test_mediator_method_client_error(self.svc.create_volume, ("volume", 10, "thin", "pool", None, "", ""),
                                                 self.svc.client.svctask.mkvolume, Exception, Exception)
         self._test_create_volume_mkvolume_cli_failure_error("Failed", CLIFailureError)
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC8710E", array_errors.NotEnoughSpaceInPool)
@@ -167,7 +167,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         vol_ret = Mock(as_single_element=self._get_cli_volume())
         self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
-        volume = self.svc.create_volume("test_volume", 1024, space_efficiency, "pool_name", None)
+        volume = self.svc.create_volume("test_volume", 1024, space_efficiency, "pool_name", None, "", "")
 
         self.assertEqual(volume.capacity_bytes, 1024)
         self.assertEqual(volume.array_type, 'SVC')
