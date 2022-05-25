@@ -352,12 +352,12 @@ type OsDeviceConnectivityHelperInterface interface {
 		Mainly for writting clean unit testing, so we can Mock this interface in order to unit test OsDeviceConnectivityHelperGeneric logic.
 	*/
 	GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error)
-	GetDmsPath(identifiers []string) (string, error)
+	GetDmsPath(volumeIdVariations []string) (string, error)
 	GetWwnByScsiInq(dev string) (string, error)
-	IsMpathdMatchVolumeId(dmPath string, identifiers []string) (bool, error)
-	IsMpathdMatchVolumeIdWithoutErrors(dmPath string, identifiers []string) bool
+	IsMpathdMatchVolumeId(dmPath string, volumeIdVariations []string) (bool, error)
+	IsMpathdMatchVolumeIdWithoutErrors(dmPath string, volumeIdVariations []string) bool
 	ReloadMultipath() error
-	GetMpathdOutputByVolumeId(identifiers []string) (string, error)
+	GetMpathdOutputByVolumeId(volumeIdVariations []string) (string, error)
 	GetVolumeIdByMpathdName(mpathDeviceName string, mpathdOutput string) (string, error)
 	GetMpathDeviceName(volumePath string) (string, error)
 }
@@ -447,26 +447,26 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 
 }
 
-func (o OsDeviceConnectivityHelperGeneric) IsMpathdMatchVolumeId(dmPath string, identifiers []string) (bool, error) {
+func (o OsDeviceConnectivityHelperGeneric) IsMpathdMatchVolumeId(dmPath string, volumeIdVariations []string) (bool, error) {
 	sgInqWwn, err := o.GetWwnByScsiInq(dmPath)
 	if err != nil {
 		return false, err
 	}
-	if o.isSameId(sgInqWwn, identifiers) {
+	if o.isSameId(sgInqWwn, volumeIdVariations) {
 		return true, nil
 	}
-	return false, &ErrorWrongDeviceFound{dmPath, identifiers[0], sgInqWwn}
+	return false, &ErrorWrongDeviceFound{dmPath, volumeIdVariations[0], sgInqWwn}
 }
 
-func (o OsDeviceConnectivityHelperGeneric) IsMpathdMatchVolumeIdWithoutErrors(dmPath string, identifiers []string) bool {
+func (o OsDeviceConnectivityHelperGeneric) IsMpathdMatchVolumeIdWithoutErrors(dmPath string, volumeIdVariations []string) bool {
 	sgInqWwn, _ := o.GetWwnByScsiInq(dmPath)
-	return o.isSameId(sgInqWwn, identifiers)
+	return o.isSameId(sgInqWwn, volumeIdVariations)
 }
 
-func (o OsDeviceConnectivityHelperGeneric) isSameId(wwn string, identifiers []string) bool {
+func (o OsDeviceConnectivityHelperGeneric) isSameId(wwn string, volumeIdVariations []string) bool {
 	wwn = strings.ToLower(wwn)
-	for _, identifier := range identifiers {
-		if wwn == identifier {
+	for _, volumeIdVariation := range volumeIdVariations {
+		if wwn == volumeIdVariation {
 			return true
 		}
 	}
@@ -590,8 +590,8 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(volumePath string)
 	return o.Helper.GetMpathDeviceNameFromProcMounts(procMounts, volumePath)
 }
 
-func (o OsDeviceConnectivityHelperGeneric) GetMpathdOutputByVolumeId(identifiers []string) (string, error) {
-	mpathdOutput, err := o.Helper.GetMpathdOutput(identifiers, multipathdWildcardsMpathNameAndVolumeId)
+func (o OsDeviceConnectivityHelperGeneric) GetMpathdOutputByVolumeId(volumeIdVariations []string) (string, error) {
+	mpathdOutput, err := o.Helper.GetMpathdOutput(volumeIdVariations, multipathdWildcardsMpathNameAndVolumeId)
 	if err != nil {
 		return "", err
 	}
@@ -599,8 +599,8 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathdOutputByVolumeId(identifiers
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetVolumeIdByMpathdName(mpathDeviceName string, mpathdOutput string) (string, error) {
-	identifiers := []string{mpathDeviceName}
-	volumeIds := o.Helper.ParseFieldValuesOfIdentifiers(identifiers, mpathdOutput)
+	volumeIdVariations := []string{mpathDeviceName}
+	volumeIds := o.Helper.ParseFieldValuesOfVolume(volumeIdVariations, mpathdOutput)
 	if len(volumeIds) > 1 {
 		return "", &MultipleVolumeIdsError{volumeIds, mpathDeviceName}
 	}
@@ -613,23 +613,23 @@ func (o OsDeviceConnectivityHelperGeneric) GetVolumeIdByMpathdName(mpathDeviceNa
 	return volumeId, nil
 }
 
-func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(identifiers []string) (string, error) {
-	mpathdOutput, err := o.Helper.GetMpathdOutput(identifiers, MultipathdWildcardsMpathAndVolumeId)
+func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeIdVariations []string) (string, error) {
+	mpathdOutput, err := o.Helper.GetMpathdOutput(volumeIdVariations, MultipathdWildcardsMpathAndVolumeId)
 	if err != nil {
 		return "", err
 	}
-	dms := o.Helper.ParseFieldValuesOfIdentifiers(identifiers, mpathdOutput)
-	return o.Helper.GetFullDmPath(dms, identifiers[0])
+	dms := o.Helper.ParseFieldValuesOfVolume(volumeIdVariations, mpathdOutput)
+	return o.Helper.GetFullDmPath(dms, volumeIdVariations[0])
 }
 
 //go:generate mockgen -destination=../../../mocks/mock_GetDmsPathHelperInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity GetDmsPathHelperInterface
 
 type GetDmsPathHelperInterface interface {
-	WaitForDmToExist(identifiers []string, maxRetries int, intervalSeconds int, multipathdCommandFormatArgs []string) (string, error)
-	GetMpathdOutput(identifiers []string, multipathdCommandFormatArgs []string) (string, error)
-	ParseFieldValuesOfIdentifiers(identifiers []string, mpathdOutput string) map[string]bool
+	WaitForDmToExist(volumeIdVariations []string, maxRetries int, intervalSeconds int, multipathdCommandFormatArgs []string) (string, error)
+	GetMpathdOutput(volumeIdVariations []string, multipathdCommandFormatArgs []string) (string, error)
+	ParseFieldValuesOfVolume(volumeIdVariations []string, mpathdOutput string) map[string]bool
 	GetFullDmPath(dms map[string]bool, volumeId string) (string, error)
-	IsThisMatchedDmFieldValue(identifiers []string, dmFieldValue string) bool
+	IsThisMatchedDmFieldValue(volumeIdVariations []string, dmFieldValue string) bool
 	GetMpathDeviceNameFromProcMounts(procMounts string, volumePath string) (string, error)
 }
 
@@ -651,9 +651,9 @@ func convertScsiIdToNguid(scsiId string) string {
 	return finalNguid
 }
 
-func (o GetDmsPathHelperGeneric) GetMpathdOutput(identifiers []string,
+func (o GetDmsPathHelperGeneric) GetMpathdOutput(volumeIdVariations []string,
 	multipathdCommandFormatArgs []string) (string, error) {
-	mpathdOutput, err := o.WaitForDmToExist(identifiers, WaitForMpathRetries,
+	mpathdOutput, err := o.WaitForDmToExist(volumeIdVariations, WaitForMpathRetries,
 		WaitForMpathWaitIntervalSec, multipathdCommandFormatArgs)
 
 	if err != nil {
@@ -661,12 +661,12 @@ func (o GetDmsPathHelperGeneric) GetMpathdOutput(identifiers []string,
 	}
 
 	if mpathdOutput == "" {
-		return "", &MultipathDeviceNotFoundForVolumeError{identifiers[0]}
+		return "", &MultipathDeviceNotFoundForVolumeError{volumeIdVariations[0]}
 	}
 	return mpathdOutput, nil
 }
 
-func (o GetDmsPathHelperGeneric) WaitForDmToExist(identifiers []string, maxRetries int, intervalSeconds int,
+func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeIdVariations []string, maxRetries int, intervalSeconds int,
 	multipathdCommandFormatArgs []string) (string, error) {
 	formatTemplate := strings.Join(multipathdCommandFormatArgs, mpathdSeparator)
 	args := []string{"show", "maps", "raw", "format", "\"", formatTemplate, "\""}
@@ -679,8 +679,8 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(identifiers []string, maxRetri
 			return "", err
 		}
 		dms := string(out)
-		for _, identifier := range identifiers {
-			if strings.Contains(dms, identifier) {
+		for _, volumeIdVariation := range volumeIdVariations {
+			if strings.Contains(dms, volumeIdVariation) {
 				return dms, nil
 			}
 		}
@@ -691,15 +691,15 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(identifiers []string, maxRetri
 	return "", err
 }
 
-func (o GetDmsPathHelperGeneric) ParseFieldValuesOfIdentifiers(identifiers []string, mpathdOutput string) map[string]bool {
+func (o GetDmsPathHelperGeneric) ParseFieldValuesOfVolume(volumeIdVariations []string, mpathdOutput string) map[string]bool {
 	dmFieldValues := make(map[string]bool)
 
 	scanner := bufio.NewScanner(strings.NewReader(mpathdOutput))
 	for scanner.Scan() {
-		identifier, dmFieldValue := o.getLineParts(scanner)
-		if o.IsThisMatchedDmFieldValue(identifiers, identifier) {
+		volumeIdVariation, dmFieldValue := o.getLineParts(scanner)
+		if o.IsThisMatchedDmFieldValue(volumeIdVariations, volumeIdVariation) {
 			dmFieldValues[dmFieldValue] = true
-			logger.Infof("ParseFieldValuesOfIdentifiers: DM field value found: %s for DM field value %s", dmFieldValue, identifier)
+			logger.Infof("ParseFieldValuesOfVolume: DM field value found: %s for DM field value %s", dmFieldValue, volumeIdVariation)
 		}
 	}
 
@@ -712,9 +712,9 @@ func (GetDmsPathHelperGeneric) getLineParts(scanner *bufio.Scanner) (string, str
 	return lineParts[0], lineParts[1]
 }
 
-func (o GetDmsPathHelperGeneric) IsThisMatchedDmFieldValue(identifiers []string, dmFieldValue string) bool {
-	for _, identifier := range identifiers {
-		if strings.Contains(dmFieldValue, identifier) {
+func (o GetDmsPathHelperGeneric) IsThisMatchedDmFieldValue(volumeIdVariations []string, dmFieldValue string) bool {
+	for _, volumeIdVariation := range volumeIdVariations {
+		if strings.Contains(dmFieldValue, volumeIdVariation) {
 			return true
 		}
 	}
