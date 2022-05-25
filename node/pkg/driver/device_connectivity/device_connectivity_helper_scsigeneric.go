@@ -696,7 +696,7 @@ func (o GetDmsPathHelperGeneric) ParseFieldValuesOfIdentifiers(identifiers []str
 		identifier, dmFieldValue := o.getLineParts(scanner)
 		if o.IsThisMatchedDmFieldValue(identifiers, identifier) {
 			dmFieldValues[dmFieldValue] = true
-			logger.Infof("ParseFieldValuesOfIdentifiers: DM Object found: %s for DM Object %s", dmFieldValue, identifier)
+			logger.Infof("ParseFieldValuesOfIdentifiers: DM field value found: %s for DM field value %s", dmFieldValue, identifier)
 		}
 	}
 
