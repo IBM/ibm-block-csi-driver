@@ -34,6 +34,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.fcmaps_as_target = [self._create_dummy_fcmap('source_name', 'test_fc_as_target_id')]
         self.fcmaps_as_source = [self._create_dummy_fcmap('test_snapshot', 'test_fc_id')]
         self.svc.client.svcinfo.lsfcmap.return_value = Mock(as_list=self.fcmaps)
+        del self.svc.client.svctask.addsnapshot
 
     def _create_dummy_fcmap(self, source_name, id_value):
         return Munch(
@@ -617,31 +618,31 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_lsvdisk_to_return_none()
 
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.svc.delete_snapshot("test_snapshot")
+            self.svc.delete_snapshot("test_snapshot", "internal_id")
 
     def test_delete_snapshot_no_fcmap_id_raise_snapshot_not_found(self):
         self._prepare_lsvdisk_to_return_mapless_target_volume()
 
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.svc.delete_snapshot("test_snapshot")
+            self.svc.delete_snapshot("test_snapshot", "internal_id")
 
     def test_delete_snapshot_call_rmfcmap(self):
         self._prepare_mocks_for_delete_snapshot()
         fcmaps_as_target = self.fcmaps
         self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=fcmaps_as_target), Mock(as_list=[])]
-        self.svc.delete_snapshot("test_snapshot")
+        self.svc.delete_snapshot("test_snapshot", "internal_id")
 
         self.svc.client.svctask.rmfcmap.assert_called_once_with(object_id="test_fc_id", force=True)
 
     def test_delete_snapshot_does_not_remove_hyperswap_fcmap(self):
         self._prepare_mocks_for_delete_snapshot()
         self._prepare_fcmaps_for_hyperswap()
-        self.svc.delete_snapshot("test_snapshot")
+        self.svc.delete_snapshot("test_snapshot", "internal_id")
 
         self.svc.client.svctask.rmfcmap.assert_not_called()
 
     def _test_delete_snapshot_rmvolume_cli_failure_error(self, error_message_id, expected_error, snapshot_id="snap_id"):
-        self._test_mediator_method_client_cli_failure_error(self.svc.delete_snapshot, (snapshot_id,),
+        self._test_mediator_method_client_cli_failure_error(self.svc.delete_snapshot, (snapshot_id, "internal_id"),
                                                             self.svc.client.svctask.rmvolume, error_message_id,
                                                             expected_error)
 
@@ -658,11 +659,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
         fcmaps_as_source[0].status = "not good"
         self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=fcmaps_as_target), Mock(as_list=fcmaps_as_source)]
         with self.assertRaises(array_errors.ObjectIsStillInUseError):
-            self.svc.delete_snapshot("test_snapshot")
+            self.svc.delete_snapshot("test_snapshot", "internal_id")
 
-    def test_delete_snapshot_success(self):
+    def test_delete_snapshot_rmvolume_success(self):
         self._prepare_mocks_for_delete_snapshot()
-        self.svc.delete_snapshot("test_snapshot")
+        self.svc.delete_snapshot("test_snapshot", "internal_id")
         self.assertEqual(self.svc.client.svctask.rmfcmap.call_count, 2)
         self.svc.client.svctask.rmvolume.assert_called_once_with(vdisk_id="test_snapshot")
 
@@ -671,7 +672,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_mocks_for_delete_snapshot()
         mock_warning.return_value = False
         self.svc.client.svctask.stopfcmap.side_effect = [CLIFailureError('CMMVC5912E')]
-        self.svc.delete_snapshot("test_snapshot")
+        self.svc.delete_snapshot("test_snapshot", "internal_id")
         self.assertEqual(self.svc.client.svctask.rmfcmap.call_count, 2)
         self.svc.client.svctask.rmvolume.assert_called_once_with(vdisk_id="test_snapshot")
 
@@ -681,7 +682,25 @@ class TestArrayMediatorSVC(unittest.TestCase):
         mock_warning.return_value = False
         self.svc.client.svctask.stopfcmap.side_effect = [CLIFailureError('error')]
         with self.assertRaises(CLIFailureError):
-            self.svc.delete_snapshot("test_snapshot")
+            self.svc.delete_snapshot("test_snapshot", "internal_id")
+
+    def _prepare_mocks_for_delete_snapshot_addsnapshot(self):
+        self.svc.client.svctask.addsnapshot = Mock()
+
+    def _test_delete_snapshot_rmsnapshot_cli_failure_error(self, error_message_id, expected_error):
+        self._test_mediator_method_client_cli_failure_error(self.svc.delete_snapshot, ("", "internal_id"),
+                                                            self.svc.client.svctask.rmsnapshot, error_message_id,
+                                                            expected_error)
+
+    def test_delete_snapshot_rmsnapshot_errors(self):
+        self._prepare_mocks_for_delete_snapshot_addsnapshot()
+        self._test_delete_snapshot_rmsnapshot_cli_failure_error("CMMVC9755E", array_errors.ObjectNotFoundError)
+        self._test_delete_snapshot_rmsnapshot_cli_failure_error("Failed", CLIFailureError)
+
+    def test_delete_snapshot_rmsnapshot_success(self):
+        self._prepare_mocks_for_delete_snapshot_addsnapshot()
+        self.svc.delete_snapshot("", "internal_id")
+        self.svc.client.svctask.rmsnapshot.assert_called_once_with(snapshotid='internal_id')
 
     def test_validate_supported_space_efficiency_raise_error(self):
         space_efficiency = "Test"

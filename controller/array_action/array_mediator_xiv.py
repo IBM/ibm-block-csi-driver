@@ -352,7 +352,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise array_errors.PermissionDeniedError(
                 "create snapshot {0} from volume {1}".format(snapshot_name, volume_id))
 
-    def delete_snapshot(self, snapshot_id):
+    def delete_snapshot(self, snapshot_id, internal_snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
         snapshot_name = self._get_object_name_by_wwn(snapshot_id)
         try:

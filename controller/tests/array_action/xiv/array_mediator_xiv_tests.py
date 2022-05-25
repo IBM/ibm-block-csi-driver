@@ -323,28 +323,28 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_delete_snapshot_return_volume_not_found(self):
         self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=None)
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.mediator.delete_snapshot("snapshot-wwn")
+            self.mediator.delete_snapshot("snapshot-wwn", "internal_id")
 
     def test_delete_snapshot_raise_bad_name_error(self):
         self.mediator.client.cmd.snapshot_delete.side_effect = [xcli_errors.VolumeBadNameError("", "snapshot", "")]
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.mediator.delete_snapshot("snapshot-wwn")
+            self.mediator.delete_snapshot("snapshot-wwn", "internal_id")
 
     def test_delete_snapshot_raise_illegal_object_id(self):
         self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalValueForArgumentError("",
                                                                                                   "snapshot-wwn", "")]
         with self.assertRaises(array_errors.IllegalObjectID):
-            self.mediator.delete_snapshot("snapshot-wwn")
+            self.mediator.delete_snapshot("snapshot-wwn", "internal_id")
 
     def test_delete_snapshot_fails_on_permissions(self):
         self.mediator.client.cmd.snapshot_delete.side_effect = [
             xcli_errors.OperationForbiddenForUserCategoryError("", "snapshot", "")]
         with self.assertRaises(array_errors.PermissionDeniedError):
-            self.mediator.delete_snapshot("snapshot-wwn")
+            self.mediator.delete_snapshot("snapshot-wwn", "internal_id")
 
     def test_delete_snapshot_succeeds(self):
         self.mediator.client.cmd.snapshot_delete = Mock()
-        self.mediator.delete_snapshot("snapshot-wwn")
+        self.mediator.delete_snapshot("snapshot-wwn", "internal_id")
 
     def test_get_object_by_id_return_correct_snapshot(self):
         snapshot_name = "snapshot"
