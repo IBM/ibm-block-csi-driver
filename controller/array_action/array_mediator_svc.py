@@ -259,21 +259,21 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         )
 
     def _generate_snapshot_response_from_cli_volume(self, cli_volume, source_id):
-        return self._generate_snapshot_response(cli_volume.capacity, cli_volume.vdisk_UID, cli_volume.id,
-                                                cli_volume.name, source_id)
+        return self._generate_snapshot_response(cli_volume.capacity, cli_volume.name, source_id, cli_volume.id,
+                                                cli_volume.vdisk_UID)
 
     def _generate_snapshot_response_from_cli_snapshot(self, cli_snapshot, source_cli_volume):
-        return self._generate_snapshot_response(source_cli_volume.capacity, "", cli_snapshot.snapshot_id,
-                                                cli_snapshot.snapshot_name, source_cli_volume.vdisk_UID)
+        return self._generate_snapshot_response(source_cli_volume.capacity, cli_snapshot.snapshot_name,
+                                                source_cli_volume.vdisk_UID, cli_snapshot.snapshot_id)
 
-    def _generate_snapshot_response(self, capacity, vdisk_uid, internal_id, name, source_id):
+    def _generate_snapshot_response(self, capacity, name, source_id, internal_id, vdisk_uid=''):
         return Snapshot(
             capacity_bytes=int(capacity),
-            id=vdisk_uid,
-            internal_id=internal_id,
             name=name,
-            array_address=self.endpoint,
             source_id=source_id,
+            internal_id=internal_id,
+            id=vdisk_uid,
+            array_address=self.endpoint,
             is_ready=True,
             array_type=self.array_type
         )
