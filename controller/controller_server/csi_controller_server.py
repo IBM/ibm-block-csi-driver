@@ -536,5 +536,5 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             else:
                 return None, None
             object_id_info = utils.get_object_id_info(source_id, source_type)
-            object_id = object_id_info.object_id
+            object_id = object_id_info.object_id if object_id_info.object_id else object_id_info.internal_id
         return source_type, object_id

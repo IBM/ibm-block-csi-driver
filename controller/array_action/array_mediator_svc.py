@@ -510,8 +510,18 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         target_volume_name = self._get_volume_name_by_wwn(volume_id)
         self._copy_to_target_volume(target_volume_name, source_name)
 
-    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group):
-        self._create_cli_volume(name, size_in_bytes, space_efficiency, pool, io_group)
+    def _create_cli_volume_from_snapshot(self, name, pool, io_group, source_id):
+        response = self._mkvolumegroup(pool, io_group, source_id)
+        volume_group_id = self._get_id_from_response(response)
+        volume_id = self._get_volume_id_from_volume_group(volume_group_id)
+        self._chvdisk(name, volume_id)
+        self._rmvolumegroup(volume_group_id)
+
+    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, source_id, source_type):
+        if source_type == controller_config.SNAPSHOT_TYPE_NAME and self._is_addsnapshot_supported():
+            self._create_cli_volume_from_snapshot(name, pool, io_group, source_id)
+        else:
+            self._create_cli_volume(name, size_in_bytes, space_efficiency, pool, io_group)
         cli_volume = self._get_cli_volume(name)
         return self._generate_volume_response(cli_volume)
 
@@ -1375,3 +1385,17 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if cli_snapshot is None:
             raise array_errors.ObjectNotFoundError(snapshot_id)
         return cli_snapshot
+
+    def _mkvolumegroup(self, pool, io_group, source_id):
+        return self.client.svctask.mkvolumegroup(type='clone', fromsnapshotid=source_id, iogroup=io_group, pool=pool)
+
+    def _get_volume_id_from_volume_group(self, volume_group_id):
+        filter_value = 'volume_group_id={}'.format(volume_group_id)
+        cli_volume = self.client.svcinfo.lsvdisk(bytes=True, filtervalue=filter_value).as_single_element
+        return cli_volume.id
+
+    def _chvdisk(self, name, volume_id):
+        self.client.svctask.chvdisk(name=name, novolumegroup=True, vdisk_id=volume_id)
+
+    def _rmvolumegroup(self, volume_group_id):
+        self.client.svctask.rmvolumegroup(volumegroup_id=volume_group_id)
