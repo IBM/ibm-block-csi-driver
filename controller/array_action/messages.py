@@ -38,7 +38,7 @@ VOLUME_ALREADY_UNMAPPED_MESSAGE = "Volume: {0} is already unmapped."
 
 UNMAPPING_ERROR_MESSAGE = "Unmapping error has occurred for volume : {0} and host : {1}. error : {2}"
 
-VOLUME_MAPPED_TO_MULTIPLE_HOSTS_ERROR_MESSAGE = "Volume is already mapped to different hosts {0}"
+VOLUME_ALREADY_MAPPED_TO_DIFFERENT_HOSTS_ERROR_MESSAGE = "Volume is already mapped to different hosts {0}"
 
 UNSUPPORTED_STORAGE_VERSION_ERROR_MESSAGE = ('Unsupported storage system microcode version {}, '
                                              'the version should not be lower than {}')
