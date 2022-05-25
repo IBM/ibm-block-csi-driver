@@ -66,25 +66,25 @@ type ReloadMultipathReturn struct {
 	err error
 }
 
-type IsMpathMatchVolumeIdWithoutErrorsReturn struct {
-	isMpathMatchVolumeId bool
+type IsMpathdMatchVolumeIdWithoutErrorsReturn struct {
+	isMpathdMatchVolumeId bool
 }
 
-type IsMpathMatchVolumeIdReturn struct {
-	isMpathMatchVolumeId bool
-	err                  error
+type IsMpathdMatchVolumeIdReturn struct {
+	isMpathdMatchVolumeId bool
+	err                   error
 }
 
 func TestGetMpathDevice(t *testing.T) {
 	testCases := []struct {
-		name                                    string
-		expErrType                              reflect.Type
-		expErr                                  error
-		expDMPath                               string
-		getDmsPathReturn                        []GetDmsPathReturn
-		reloadMultipathReturn                   []ReloadMultipathReturn
-		isMpathMatchVolumeIdWithoutErrorsReturn []IsMpathMatchVolumeIdWithoutErrorsReturn
-		isMpathMatchVolumeIdReturn              []IsMpathMatchVolumeIdReturn
+		name                                     string
+		expErrType                               reflect.Type
+		expErr                                   error
+		expDMPath                                string
+		getDmsPathReturn                         []GetDmsPathReturn
+		reloadMultipathReturn                    []ReloadMultipathReturn
+		isMpathdMatchVolumeIdWithoutErrorsReturn []IsMpathdMatchVolumeIdWithoutErrorsReturn
+		isMpathdMatchVolumeIdReturn              []IsMpathdMatchVolumeIdReturn
 	}{
 		{
 			name: "Should fail when WaitForDmToExist did not find any dm device",
@@ -149,10 +149,10 @@ func TestGetMpathDevice(t *testing.T) {
 					err: nil,
 				},
 			},
-			isMpathMatchVolumeIdReturn: []IsMpathMatchVolumeIdReturn{
-				IsMpathMatchVolumeIdReturn{
-					isMpathMatchVolumeId: false,
-					err:                  &device_connectivity.ErrorWrongDeviceFound{"", "", ""},
+			isMpathdMatchVolumeIdReturn: []IsMpathdMatchVolumeIdReturn{
+				IsMpathdMatchVolumeIdReturn{
+					isMpathdMatchVolumeId: false,
+					err:                   &device_connectivity.ErrorWrongDeviceFound{"", "", ""},
 				},
 			},
 
@@ -168,9 +168,9 @@ func TestGetMpathDevice(t *testing.T) {
 					err:    nil,
 				},
 			},
-			isMpathMatchVolumeIdWithoutErrorsReturn: []IsMpathMatchVolumeIdWithoutErrorsReturn{
-				IsMpathMatchVolumeIdWithoutErrorsReturn{
-					isMpathMatchVolumeId: true,
+			isMpathdMatchVolumeIdWithoutErrorsReturn: []IsMpathdMatchVolumeIdWithoutErrorsReturn{
+				IsMpathdMatchVolumeIdWithoutErrorsReturn{
+					isMpathdMatchVolumeId: true,
 				},
 			},
 
@@ -197,10 +197,10 @@ func TestGetMpathDevice(t *testing.T) {
 				},
 			},
 
-			isMpathMatchVolumeIdReturn: []IsMpathMatchVolumeIdReturn{
-				IsMpathMatchVolumeIdReturn{
-					isMpathMatchVolumeId: true,
-					err:                  nil,
+			isMpathdMatchVolumeIdReturn: []IsMpathdMatchVolumeIdReturn{
+				IsMpathdMatchVolumeIdReturn{
+					isMpathdMatchVolumeId: true,
+					err:                   nil,
 				},
 			},
 
@@ -227,9 +227,9 @@ func TestGetMpathDevice(t *testing.T) {
 					r.err)
 			}
 
-			for _, r := range tc.isMpathMatchVolumeIdWithoutErrorsReturn {
-				fake_helper.EXPECT().IsMpathMatchVolumeIdWithoutErrors(dmPath, volumIds).Return(
-					r.isMpathMatchVolumeId)
+			for _, r := range tc.isMpathdMatchVolumeIdWithoutErrorsReturn {
+				fake_helper.EXPECT().IsMpathdMatchVolumeIdWithoutErrors(dmPath, volumIds).Return(
+					r.isMpathdMatchVolumeId)
 			}
 
 			for _, r := range tc.reloadMultipathReturn {
@@ -237,9 +237,9 @@ func TestGetMpathDevice(t *testing.T) {
 					r.err)
 			}
 
-			for _, r := range tc.isMpathMatchVolumeIdReturn {
-				fake_helper.EXPECT().IsMpathMatchVolumeId(dmPath, volumIds).Return(
-					r.isMpathMatchVolumeId,
+			for _, r := range tc.isMpathdMatchVolumeIdReturn {
+				fake_helper.EXPECT().IsMpathdMatchVolumeId(dmPath, volumIds).Return(
+					r.isMpathdMatchVolumeId,
 					r.err)
 			}
 
