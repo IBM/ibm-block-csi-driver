@@ -598,8 +598,20 @@ func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error
 }
 
 func (d NodeUtils) IsVolumePathMatchesVolumeId(volumeId string, volumePath string) (bool, error) {
+	logger.Infof("IsVolumePathMatchesVolumeId: Searching matching volume id for volume path: [%s] ", volumePath)
 	volumeUuid := d.GetVolumeUuid(volumeId)
-	volumeIdByVolumePath, err := d.osDeviceConnectivityHelper.GetVolumeIdByVolumePath(volumePath, volumeUuid)
+	volumeUids := d.osDeviceConnectivityHelper.GetVolumeIdVariations(volumeUuid)
+	mpathdOutput, err := d.osDeviceConnectivityHelper.GetMpathDeviceNameVolumeIds(volumeUids)
+	if err != nil {
+		return false, err
+	}
+
+	mpathDeviceName, err := d.osDeviceConnectivityHelper.GetMpathDeviceName(volumePath)
+	if err != nil {
+		return false, err
+	}
+
+	volumeIdByVolumePath, err := d.osDeviceConnectivityHelper.GetMatchingVolumeIdToMpathd(mpathdOutput, mpathDeviceName, volumeUids)
 	if err != nil {
 		return false, err
 	}

@@ -46,7 +46,9 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	RemovePhysicalDevice(sysDevices []string) error
 	ValidateLun(lun int, sysDevices []string) error
 	GetVolumeIdVariations(volumeUuid string) []string
-	GetVolumeIdByVolumePath(volumePath string, volumeId string) (string, error)
+	GetMatchingVolumeIdToMpathd(mpathDeviceName string, mpathdOutput string, volumeUids []string) (string, error)
+	GetMpathDeviceNameVolumeIds(volumeUids []string) (string, error)
+	GetMpathDeviceName(volumePath string) (string, error)
 }
 
 type OsDeviceConnectivityHelperScsiGeneric struct {
@@ -96,21 +98,26 @@ func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterfac
 	}
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) GetVolumeIdByVolumePath(volumePath string, volumeId string) (string, error) {
-	logger.Infof("GetVolumeIdByVolumePath: Searching matching volume id for volume path: [%s] ", volumePath)
-	volumeUids := r.GetVolumeIdVariations(volumeId)
-	mpathdOutput, err := r.Helper.GetMpathdOutputByVolumeId(volumeUids)
-	if err != nil {
-		return "", err
-	}
+func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDeviceNameVolumeIds(volumeUids []string) (string, error) {
+	return r.Helper.GetMpathdOutputByVolumeId(volumeUids)
+}
 
-	mpathDeviceName, err := r.Helper.GetMpathDeviceName(volumePath)
+func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDeviceName(volumePath string) (string, error) {
+	procMountsFileContent, err := ioutil.ReadFile(procMountsFilePath)
 	if err != nil {
 		return "", err
 	}
+	procMounts := string(procMountsFileContent)
+
+	return r.Helper.GetMpathDeviceNameFromProcMounts(procMounts, volumePath)
+}
+
+func (r OsDeviceConnectivityHelperScsiGeneric) GetMatchingVolumeIdToMpathd(mpathdOutput string,
+	mpathDeviceName string, volumeUids []string) (string, error) {
+
+	volumeId, _ := r.Helper.GetVolumeIdByMpathdName(mpathDeviceName, mpathdOutput)
+
 	dmPath := filepath.Join(devMapperPath, filepath.Base(strings.TrimSpace(mpathDeviceName)))
-
-	volumeId, _ = r.Helper.GetVolumeIdByMpathdName(mpathDeviceName, mpathdOutput)
 	if volumeId != "" {
 		if r.Helper.IsMpathdMatchVolumeIdWithoutErrors(dmPath, volumeUids) {
 			return volumeId, nil
@@ -121,7 +128,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetVolumeIdByVolumePath(volumePat
 		return "", err
 	}
 
-	volumeId, err = r.Helper.GetVolumeIdByMpathdName(mpathDeviceName, mpathdOutput)
+	volumeId, err := r.Helper.GetVolumeIdByMpathdName(mpathDeviceName, mpathdOutput)
 	if err != nil {
 		return "", err
 	}
@@ -359,7 +366,7 @@ type OsDeviceConnectivityHelperInterface interface {
 	ReloadMultipath() error
 	GetMpathdOutputByVolumeId(volumeIdVariations []string) (string, error)
 	GetVolumeIdByMpathdName(mpathDeviceName string, mpathdOutput string) (string, error)
-	GetMpathDeviceName(volumePath string) (string, error)
+	GetMpathDeviceNameFromProcMounts(procMounts string, volumePath string) (string, error)
 }
 
 type OsDeviceConnectivityHelperGeneric struct {
@@ -580,16 +587,6 @@ func (o OsDeviceConnectivityHelperGeneric) ReloadMultipath() error {
 	return nil
 }
 
-func (o OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(volumePath string) (string, error) {
-	procMountsFileContent, err := ioutil.ReadFile(procMountsFilePath)
-	if err != nil {
-		return "", err
-	}
-	procMounts := string(procMountsFileContent)
-
-	return o.Helper.GetMpathDeviceNameFromProcMounts(procMounts, volumePath)
-}
-
 func (o OsDeviceConnectivityHelperGeneric) GetMpathdOutputByVolumeId(volumeIdVariations []string) (string, error) {
 	mpathdOutput, err := o.Helper.GetMpathdOutput(volumeIdVariations, multipathdWildcardsMpathNameAndVolumeId)
 	if err != nil {
@@ -622,6 +619,24 @@ func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeIdVariations []strin
 	return o.Helper.GetFullDmPath(dms, volumeIdVariations[0])
 }
 
+func (OsDeviceConnectivityHelperGeneric) GetMpathDeviceNameFromProcMounts(procMounts string, volumePath string) (string, error) {
+	scanner := bufio.NewScanner(strings.NewReader(procMounts))
+	for scanner.Scan() {
+		mountLine := scanner.Text()
+		if strings.Contains(mountLine, volumePath) {
+			return getMpathDeviceNameFromMountLine(mountLine), nil
+		}
+	}
+	return "", &MultipathDeviceNotFoundForVolumePathError{volumePath}
+}
+
+func getMpathDeviceNameFromMountLine(mountLine string) string {
+	lineParts := strings.Fields(mountLine)
+	fullMpathDeviceName := lineParts[0]
+	splitedFullMpathDeviceName := strings.Split(fullMpathDeviceName, "/")
+	return splitedFullMpathDeviceName[len(splitedFullMpathDeviceName)-1]
+}
+
 //go:generate mockgen -destination=../../../mocks/mock_GetDmsPathHelperInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity GetDmsPathHelperInterface
 
 type GetDmsPathHelperInterface interface {
@@ -630,7 +645,6 @@ type GetDmsPathHelperInterface interface {
 	ParseFieldValuesOfVolume(volumeIdVariations []string, mpathdOutput string) map[string]bool
 	GetFullDmPath(dms map[string]bool, volumeId string) (string, error)
 	IsThisMatchedDmFieldValue(volumeIdVariations []string, dmFieldValue string) bool
-	GetMpathDeviceNameFromProcMounts(procMounts string, volumePath string) (string, error)
 }
 
 type GetDmsPathHelperGeneric struct {
@@ -733,22 +747,4 @@ func (GetDmsPathHelperGeneric) GetFullDmPath(dms map[string]bool, volumeId strin
 
 	dmPath := filepath.Join(DevPath, filepath.Base(strings.TrimSpace(dm)))
 	return dmPath, nil
-}
-
-func (GetDmsPathHelperGeneric) GetMpathDeviceNameFromProcMounts(procMounts string, volumePath string) (string, error) {
-	scanner := bufio.NewScanner(strings.NewReader(procMounts))
-	for scanner.Scan() {
-		mountLine := scanner.Text()
-		if strings.Contains(mountLine, volumePath) {
-			return getMpathDeviceNameFromMountLine(mountLine), nil
-		}
-	}
-	return "", &MultipathDeviceNotFoundForVolumePathError{volumePath}
-}
-
-func getMpathDeviceNameFromMountLine(mountLine string) string {
-	lineParts := strings.Fields(mountLine)
-	fullMpathDeviceName := lineParts[0]
-	splitedFullMpathDeviceName := strings.Split(fullMpathDeviceName, "/")
-	return splitedFullMpathDeviceName[len(splitedFullMpathDeviceName)-1]
 }

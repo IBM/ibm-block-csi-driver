@@ -177,7 +177,3 @@ func (r OsDeviceConnectivityIscsi) ValidateLun(lun int, sysDevices []string) err
 func (r OsDeviceConnectivityIscsi) GetVolumeIdVariations(volumeId string) []string {
 	return r.HelperScsiGeneric.GetVolumeIdVariations(volumeId)
 }
-
-func (r OsDeviceConnectivityIscsi) GetVolumeIdByVolumePath(volumePath string, volumeId string) (string, error) {
-	return r.HelperScsiGeneric.GetVolumeIdByVolumePath(volumePath, volumeId)
-}

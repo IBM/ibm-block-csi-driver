@@ -58,7 +58,3 @@ func (r OsDeviceConnectivityNvmeOFc) ValidateLun(_ int, _ []string) error {
 func (r OsDeviceConnectivityNvmeOFc) GetVolumeIdVariations(volumeId string) []string {
 	return r.HelperScsiGeneric.GetVolumeIdVariations(volumeId)
 }
-
-func (r OsDeviceConnectivityNvmeOFc) GetVolumeIdByVolumePath(volumePath string, volumeId string) (string, error) {
-	return r.HelperScsiGeneric.GetVolumeIdByVolumePath(volumePath, volumeId)
-}
