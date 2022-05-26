@@ -13,13 +13,13 @@ from controller.array_action.array_action_types import Host
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.controller_server.csi_controller_server import CSIControllerServicer
 from controller.controller_server.sync_lock import SyncLock
-from controller.controller_server.test_settings import (CLONE_VOLUME_NAME,
-                                                        OBJECT_INTERNAL_ID,
-                                                        POOL, SPACE_EFFICIENCY,
-                                                        IO_GROUP, VOLUME_GROUP,
-                                                        VOLUME_NAME, SNAPSHOT_NAME,
-                                                        SNAPSHOT_VOLUME_NAME,
-                                                        SNAPSHOT_VOLUME_WWN)
+from controller.tests.controller_server.test_settings import (CLONE_VOLUME_NAME,
+                                                              OBJECT_INTERNAL_ID,
+                                                              POOL, SPACE_EFFICIENCY,
+                                                              IO_GROUP, VOLUME_GROUP,
+                                                              VOLUME_NAME, SNAPSHOT_NAME,
+                                                              SNAPSHOT_VOLUME_NAME,
+                                                              SNAPSHOT_VOLUME_WWN)
 from controller.tests import utils
 from controller.tests.utils import ProtoBufMock
 
