@@ -607,7 +607,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     @convert_scsi_ids_to_array_ids()
-    def delete_snapshot(self, snapshot_id):
+    def delete_snapshot(self, snapshot_id, internal_snapshot_id):
         logger.info("deleting snapshot with id : {0}".format(snapshot_id))
         self._delete_object(snapshot_id, object_is_snapshot=True)
         logger.info("finished snapshot deletion. id : {0}".format(snapshot_id))

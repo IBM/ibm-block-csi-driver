@@ -678,13 +678,13 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_delete_snapshot(self):
         self._prepare_mocks_for_snapshot()
-        self.array.delete_snapshot("test_id")
+        self.array.delete_snapshot("test_id", "internal_id")
         self.client_mock.delete_volume.assert_called_once()
         self.client_mock.delete_flashcopy.assert_called_once_with(self.flashcopy_response.id)
 
     def test_delete_snapshot_with_remove_from_cache(self):
         self._prepare_mocks_for_snapshot()
-        self.array.delete_snapshot(self.snapshot_response.id)
+        self.array.delete_snapshot(self.snapshot_response.id, "internal_id")
 
         self.array.volume_cache.remove.assert_called_once_with(self.snapshot_response.name)
 
@@ -693,27 +693,27 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.delete_flashcopy.side_effect = ClientException("500")
         self.client_mock.get_volume.return_value = self.snapshot_response
         with self.assertRaises(ClientException):
-            self.array.delete_snapshot("fake_name")
+            self.array.delete_snapshot("fake_name", "internal_id")
 
     def test_delete_snapshot_fail_with_client_exception(self):
         self._prepare_mocks_for_snapshot()
         self.client_mock.delete_volume.side_effect = ClientException("500")
         with self.assertRaises(array_errors.VolumeDeletionError):
-            self.array.delete_snapshot("fake_id")
+            self.array.delete_snapshot("fake_id", "internal_id")
 
     def test_delete_snapshot_fail_with_not_found(self):
         self.client_mock.get_volume.side_effect = NotFound("404")
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.array.delete_snapshot("fake_id")
+            self.array.delete_snapshot("fake_id", "internal_id")
         self.client_mock.get_volume.side_effect = [self.snapshot_response]
         self.client_mock.get_flashcopies_by_volume.return_value = [self.flashcopy_response]
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.array.delete_snapshot("fake_id")
+            self.array.delete_snapshot("fake_id", "internal_id")
 
     def test_delete_snapshot_failed_with_illegal_object_id(self):
         self.client_mock.get_volume.side_effect = InternalServerError("500", message="BE7A0005")
         with self.assertRaises(array_errors.IllegalObjectID):
-            self.array.delete_snapshot("fake_id")
+            self.array.delete_snapshot("fake_id", "internal_id")
 
     def _prepare_mocks_for_copy_to_existing_volume(self):
         volume = self.volume_response
