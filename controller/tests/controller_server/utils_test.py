@@ -114,9 +114,9 @@ class TestUtils(unittest.TestCase):
             secrets=secrets,
             topologies=topologies,
             system_id=system_id)
-        self.assertEqual(array_connection_info.user, USER)
-        self.assertEqual(array_connection_info.password, PASSWORD)
-        self.assertEqual(array_connection_info.array_addresses[0], ARRAY)
+        self.assertEqual(USER, array_connection_info.user)
+        self.assertEqual(PASSWORD, array_connection_info.password)
+        self.assertEqual(ARRAY, array_connection_info.array_addresses[0])
         if topologies or system_id:
             self.assertIsNotNone(array_connection_info.system_id)
         else:
@@ -134,7 +134,7 @@ class TestUtils(unittest.TestCase):
 
     def _test_get_pool_from_parameters(self, parameters, expected_pool=POOL, system_id=None):
         volume_parameters = utils.get_volume_parameters(parameters, system_id)
-        self.assertEqual(volume_parameters.pool, expected_pool)
+        self.assertEqual(expected_pool, volume_parameters.pool)
 
     def test_get_pool_from_parameters(self):
         parameters = {controller_config.PARAMETERS_POOL: POOL}
@@ -374,10 +374,10 @@ class TestUtils(unittest.TestCase):
         ids_field = '{};{}'.format(internal_id, object_id) if internal_id else object_id
         volume_id = '{}{}:{}'.format('xiv', system_id_field, ids_field)
         volume_id_info = utils.get_volume_id_info(volume_id)
-        self.assertEqual(volume_id_info.array_type, "xiv")
-        self.assertEqual(volume_id_info.system_id, system_id)
-        self.assertEqual(volume_id_info.internal_id, internal_id)
-        self.assertEqual(volume_id_info.object_id, object_id)
+        self.assertEqual("xiv", volume_id_info.array_type)
+        self.assertEqual(system_id, volume_id_info.system_id)
+        self.assertEqual(internal_id, volume_id_info.internal_id)
+        self.assertEqual(object_id, volume_id_info.object_id)
 
     def test_get_volume_id_info(self):
         self._test_get_volume_id_info(object_id="volume-id")
@@ -407,10 +407,10 @@ class TestUtils(unittest.TestCase):
         nvme_nqn = [nvme_nqn] if nvme_nqn else []
         fc_wwns = fc_wwns.split(":") if fc_wwns else []
         iscsi_iqn = [iscsi_iqn] if iscsi_iqn else []
-        self.assertEqual(node_id_info.node_name, "host-name")
-        self.assertEqual(node_id_info.initiators.nvme_nqns, nvme_nqn)
-        self.assertEqual(node_id_info.initiators.fc_wwns, list(filter(None, fc_wwns)))
-        self.assertEqual(node_id_info.initiators.iscsi_iqns, iscsi_iqn)
+        self.assertEqual("host-name", node_id_info.node_name)
+        self.assertEqual(nvme_nqn, node_id_info.initiators.nvme_nqns)
+        self.assertEqual(list(filter(None, fc_wwns)), node_id_info.initiators.fc_wwns)
+        self.assertEqual(iscsi_iqn, node_id_info.initiators.iscsi_iqns)
 
     def test_get_node_id_info(self):
         self._test_validation_exception(utils.get_node_id_info, "bad-node-format", str_in_msg="node",
@@ -445,19 +445,19 @@ class TestUtils(unittest.TestCase):
         }
         for connectivities_found, expected_chosen_connectivity in expected_chosen_by_connectivities_found.items():
             actual_chosen = utils.choose_connectivity_type(list(connectivities_found))
-            self.assertEqual(actual_chosen, expected_chosen_connectivity)
+            self.assertEqual(expected_chosen_connectivity, actual_chosen)
 
     def _check_publish_volume_response_parameters(self, lun, connectivity_type, array_initiators):
         with patch("controller.common.config.config.controller", new=self.controller_config):
             publish_volume_response = utils.generate_csi_publish_volume_response(lun, connectivity_type,
                                                                                  array_initiators)
-            self.assertEqual(publish_volume_response.publish_context["lun"], lun)
-            self.assertEqual(publish_volume_response.publish_context["connectivity_type"], connectivity_type)
+            self.assertEqual(lun, publish_volume_response.publish_context["lun"])
+            self.assertEqual(connectivity_type, publish_volume_response.publish_context["connectivity_type"])
             if connectivity_type == NVME_OVER_FC_CONNECTIVITY_TYPE:
                 self.assertIsNone(publish_volume_response.publish_context.get("fc_wwns"))
                 self.assertIsNone(publish_volume_response.publish_context.get("array_iqn"))
             elif connectivity_type == FC_CONNECTIVITY_TYPE:
-                self.assertEqual(publish_volume_response.publish_context["fc_wwns"], ",".join(array_initiators))
+                self.assertEqual(",".join(array_initiators), publish_volume_response.publish_context["fc_wwns"])
                 self.assertIsNone(publish_volume_response.publish_context.get("array_iqn"))
             elif connectivity_type == ISCSI_CONNECTIVITY_TYPE:
                 self.assertEqual(publish_volume_response.publish_context["array_iqn"],
