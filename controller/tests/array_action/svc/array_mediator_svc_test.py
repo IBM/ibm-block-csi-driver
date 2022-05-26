@@ -164,11 +164,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC9292E", array_errors.PoolDoesNotMatchSpaceEfficiency)
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC9301E", array_errors.PoolDoesNotMatchSpaceEfficiency)
 
-    def _test_create_volume_success(self, space_efficiency):
+    def _test_create_volume_success(self, space_efficiency=None, source_id=None, source_type=None):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         vol_ret = Mock(as_single_element=self._get_cli_volume())
         self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
-        volume = self.svc.create_volume("test_volume", 1024, space_efficiency, "pool_name", None, None, None)
+        volume = self.svc.create_volume("test_volume", 1024, space_efficiency, "pool_name", None, source_id,
+                                        source_type)
 
         self.assertEqual(volume.capacity_bytes, 1024)
         self.assertEqual(volume.array_type, 'SVC')
@@ -203,6 +204,35 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def _test_create_volume_with_default_space_efficiency_success(self, space_efficiency):
         self._test_create_volume_success(space_efficiency)
         self.svc.client.svctask.mkvolume.assert_called_with(name="test_volume", unit="b", size=1024, pool="pool_name")
+
+    def _prepare_mocks_for_create_volume_mkvolumegroup(self):
+        self.svc.client.svctask.addsnapshot = Mock()
+        self.svc.client.svctask.mkvolumegroup = Mock()
+        self.svc.client.svctask.mkvolumegroup.return_value = Mock(response=(b'id [0]\n', b''))
+        vol_ret = Mock(as_single_element=self._get_cli_volume())
+        self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
+
+    def test_create_volume_mkvolumegroup_success(self):
+        self._prepare_mocks_for_create_volume_mkvolumegroup()
+        self._test_create_volume_success(source_id="source_id", source_type='snapshot')
+
+        self.svc.client.svctask.mkvolumegroup.assert_called_with(type='clone', fromsnapshotid='source_id',
+                                                                 pool='pool_name', name='test_volume')
+        remove_from_volumegroup_call = call(vdisk_id='test_id', novolumegroup=True)
+        rename_call = call(vdisk_id='test_id', name='test_volume')
+        self.svc.client.svctask.chvdisk.assert_has_calls([remove_from_volumegroup_call, rename_call])
+        self.svc.client.svctask.rmvolumegroup.assert_called_with(object_id=0)
+
+    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    def test_create_volume_mkvolumegroup_with_rollback(self, mock_warning):
+        mock_warning.return_value = False
+        self._prepare_mocks_for_create_volume_mkvolumegroup()
+        self.svc.client.svctask.chvdisk.side_effect = ["", CLIFailureError("CMMVC6035E")]
+
+        with self.assertRaises(array_errors.VolumeAlreadyExists):
+            self.svc.create_volume("test_volume", 1024, "space_efficiency", "pool_name", None, "source_id",
+                                   "snapshot")
+        self.svc.client.svctask.rmvolume.assert_called_with(vdisk_id='test_id')
 
     def test_create_volume_with_empty_string_space_efficiency_success(self):
         self._test_create_volume_with_default_space_efficiency_success("")
