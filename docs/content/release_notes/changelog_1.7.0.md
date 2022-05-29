@@ -4,3 +4,7 @@ IBM® block storage CSI driver 1.7.0 added new support and enhancements:
 - Now supports the CSI Topology feature
 - New volume replication (remote copy) support for IBM Spectrum Virtualize family storage systems
 - Additional support for Kubernetes 1.22
+
+|Ticket ID|Severity|Description|
+|---------|--------|-----------|
+|**CSI-702**|Service|Modifying the controller or node **affinity** settings may not take effect. <br />**Workaround:** If needed, delete the controller StatefulSet and/or the DaemonSet node after modifying the **affinity** settings in the IBMBlockCSI custom resource.|
