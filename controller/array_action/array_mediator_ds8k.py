@@ -266,7 +266,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             )
             raise array_errors.VolumeCreationError(name)
 
-    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, source_id, source_type):
+    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, source_ids, source_type):
         array_space_efficiency = get_array_space_efficiency(space_efficiency)
         api_volume = self._create_api_volume(name, size_in_bytes, array_space_efficiency, pool)
         self.volume_cache.add(api_volume.name, api_volume.id)

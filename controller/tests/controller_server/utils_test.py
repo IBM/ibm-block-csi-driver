@@ -376,8 +376,8 @@ class TestUtils(unittest.TestCase):
         volume_id_info = utils.get_volume_id_info(volume_id)
         self.assertEqual(volume_id_info.array_type, "xiv")
         self.assertEqual(volume_id_info.system_id, system_id)
-        self.assertEqual(volume_id_info.internal_id, internal_id)
-        self.assertEqual(volume_id_info.object_id, object_id)
+        self.assertEqual(volume_id_info.object_ids.internal_id, internal_id)
+        self.assertEqual(volume_id_info.object_ids.object_uid, object_id)
 
     def test_get_volume_id_info(self):
         self._test_get_volume_id_info(object_id="volume-id")

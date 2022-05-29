@@ -8,6 +8,7 @@ import controller.controller_server.utils as utils
 from controller.array_action import messages
 from controller.array_action.storage_agent import get_agent, detect_array_type
 from controller.common import settings
+from controller.common.common_types import ObjectIds
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.node_info import NodeIdInfo
 from controller.controller_server import messages as controller_messages
@@ -34,9 +35,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         logger.debug("volume name : {}".format(request.name))
 
-        source_type, source_id = self._get_source_type_and_id(request)
+        source_type, source_ids = self._get_source_type_and_id(request)
 
-        logger.debug("Source {0} id : {1}".format(source_type, source_id))
+        logger.debug("Source {0} ids : {1}".format(source_type, source_ids))
 
         topologies = utils.get_volume_topologies(request)
 
@@ -82,29 +83,30 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
                     array_mediator.validate_supported_space_efficiency(space_efficiency)
-                    volume = array_mediator.create_volume(volume_final_name, required_bytes, space_efficiency,
-                                                          pool, volume_parameters.io_group, source_id, source_type)
+                    volume = array_mediator.create_volume(volume_final_name, required_bytes, space_efficiency, pool,
+                                                          volume_parameters.io_group, source_ids, source_type)
                 else:
                     logger.debug("volume found : {}".format(volume))
 
                     volume_capacity_bytes = volume.capacity_bytes
-                    if not source_id and volume_capacity_bytes < required_bytes:
+                    if not source_ids and volume_capacity_bytes < required_bytes:
                         message = "Volume was already created with different size." \
                                   " volume size: {}, requested size: {}".format(volume_capacity_bytes,
                                                                                 required_bytes)
                         return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
                                                     csi_pb2.CreateVolumeResponse)
 
-                    response = self._get_create_volume_response_for_existing_volume_source(volume, source_id,
+                    response = self._get_create_volume_response_for_existing_volume_source(volume,
+                                                                                           source_ids.object_uid,
                                                                                            source_type, system_id,
                                                                                            context)
                     if response:
                         return response
 
-                if source_id:
-                    array_mediator.copy_to_existing_volume_from_source(volume, source_id,
+                if source_ids:
+                    array_mediator.copy_to_existing_volume_from_source(volume, source_ids.object_uid,
                                                                        source_type, required_bytes)
-                    volume.source_id = source_id
+                    volume.source_id = source_ids.object_uid
 
                 response = utils.generate_csi_create_volume_response(volume, array_connection_info.system_id,
                                                                      source_type)
@@ -168,7 +170,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         system_id = volume_id_info.system_id
         array_type = volume_id_info.array_type
-        volume_id = volume_id_info.object_id
+        volume_id = volume_id_info.object_ids.object_uid
         array_connection_info = utils.get_array_connection_info_from_secrets(secrets, system_id=system_id)
 
         with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
@@ -194,7 +196,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             volume_id_info = utils.get_volume_id_info(request.volume_id)
             system_id = volume_id_info.system_id
             array_type = volume_id_info.array_type
-            volume_id = volume_id_info.object_id
+            volume_id = volume_id_info.object_ids.object_uid
             node_id_info = NodeIdInfo(request.node_id)
             node_name = node_id_info.node_name
             initiators = node_id_info.initiators
@@ -230,7 +232,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             volume_id_info = utils.get_volume_id_info(request.volume_id)
             system_id = volume_id_info.system_id
             array_type = volume_id_info.array_type
-            volume_id = volume_id_info.object_id
+            volume_id = volume_id_info.object_ids.object_uid
             node_id_info = NodeIdInfo(request.node_id)
             node_name = node_id_info.node_name
             initiators = node_id_info.initiators
@@ -261,7 +263,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             volume_id_info = utils.get_volume_id_info(request.volume_id)
             system_id = volume_id_info.system_id
             array_type = volume_id_info.array_type
-            volume_id = volume_id_info.object_id
+            volume_id = volume_id_info.object_ids.object_uid
 
             array_connection_info = utils.get_array_connection_info_from_secrets(request.secrets,
                                                                                  system_id=system_id)
@@ -301,7 +303,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             volume_id_info = utils.get_volume_id_info(source_id)
             system_id = volume_id_info.system_id
             array_type = volume_id_info.array_type
-            volume_id = volume_id_info.object_id
+            volume_id = volume_id_info.object_ids.object_uid
             array_connection_info = utils.get_array_connection_info_from_secrets(secrets, system_id=system_id)
             snapshot_parameters = utils.get_snapshot_parameters(parameters=request.parameters,
                                                                 system_id=array_connection_info.system_id)
@@ -356,8 +358,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             system_id = snapshot_id_info.system_id
             array_type = snapshot_id_info.array_type
-            snapshot_id = snapshot_id_info.object_id
-            internal_snapshot_id = snapshot_id_info.internal_id
+            snapshot_id = snapshot_id_info.object_ids.object_uid
+            internal_snapshot_id = snapshot_id_info.object_ids.internal_id
             array_connection_info = utils.get_array_connection_info_from_secrets(secrets, system_id=system_id)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
@@ -389,7 +391,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         try:
             system_id = volume_id_info.system_id
             array_type = volume_id_info.array_type
-            volume_id = volume_id_info.object_id
+            volume_id = volume_id_info.object_ids.object_uid
             array_connection_info = utils.get_array_connection_info_from_secrets(secrets, system_id=system_id)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
@@ -523,7 +525,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     def _get_source_type_and_id(self, request):
         source = request.volume_content_source
-        object_id = None
+        object_ids = ObjectIds()
         source_type = None
         if source:
             logger.info(source)
@@ -536,5 +538,5 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             else:
                 return None, None
             object_id_info = utils.get_object_id_info(source_id, source_type)
-            object_id = object_id_info.object_id if object_id_info.object_id else object_id_info.internal_id
-        return source_type, object_id
+            object_ids = object_id_info.object_ids
+        return source_type, object_ids

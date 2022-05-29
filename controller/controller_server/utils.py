@@ -496,7 +496,7 @@ def get_object_id_info(full_object_id, object_type):
     else:
         raise ObjectIdError(object_type, full_object_id)
     logger.debug("volume id : {0}, array type :{1}".format(object_id, array_type))
-    return ObjectIdInfo(array_type=array_type, system_id=system_id, internal_id=internal_id, object_id=wwn)
+    return ObjectIdInfo(array_type=array_type, system_id=system_id, internal_id=internal_id, object_uid=wwn)
 
 
 def get_node_id_info(node_id):

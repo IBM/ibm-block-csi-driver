@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import MagicMock
 
 from mock import patch, Mock, call, PropertyMock
 from munch import Munch
@@ -168,7 +169,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         vol_ret = Mock(as_single_element=self._get_cli_volume())
         self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
-        volume = self.svc.create_volume("test_volume", 1024, space_efficiency, "pool_name", None, source_id,
+        volume = self.svc.create_volume("test_volume", 1024, space_efficiency, "pool_name", None,
+                                        self._mock_source_ids(source_id),
                                         source_type)
 
         self.assertEqual(volume.capacity_bytes, 1024)
@@ -212,6 +214,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
         vol_ret = Mock(as_single_element=self._get_cli_volume())
         self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
 
+    def _mock_source_ids(self, internal_id=''):
+        source_ids = MagicMock(spec=['object_uid', 'internal_id'])
+        source_ids.internal_id = internal_id
+        return source_ids
+
     def test_create_volume_mkvolumegroup_success(self):
         self._prepare_mocks_for_create_volume_mkvolumegroup()
         self._test_create_volume_success(source_id="source_id", source_type='snapshot')
@@ -228,9 +235,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         mock_warning.return_value = False
         self._prepare_mocks_for_create_volume_mkvolumegroup()
         self.svc.client.svctask.chvdisk.side_effect = ["", CLIFailureError("CMMVC6035E")]
-
         with self.assertRaises(array_errors.VolumeAlreadyExists):
-            self.svc.create_volume("test_volume", 1024, "space_efficiency", "pool_name", None, "source_id",
+            self.svc.create_volume("test_volume", 1024, "space_efficiency", "pool_name", None, self._mock_source_ids(),
                                    "snapshot")
         self.svc.client.svctask.rmvolume.assert_called_with(vdisk_id='test_id')
 
@@ -679,7 +685,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def _prepare_mocks_for_create_snapshot_addsnapshot(self):
         self.svc.client.svctask.addsnapshot = Mock()
         source_volume_to_copy_from = self._get_custom_cli_volume(False, False, pool_name='pool1')
-        volumes_to_return = [source_volume_to_copy_from, source_volume_to_copy_from]
+        volumes_to_return = [source_volume_to_copy_from, source_volume_to_copy_from, source_volume_to_copy_from]
         self.svc.client.svcinfo.lsvdisk.side_effect = self._mock_cli_objects(volumes_to_return)
         self.svc.client.svctask.addsnapshot.return_value = Mock(
             response=(b'Snapshot, id [0], successfully created or triggered\n', b''))
@@ -699,6 +705,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(snapshot.internal_id, 'snapshot_id')
 
     def _test_create_snapshot_addsnapshot_cli_failure_error(self, error_message_id, expected_error):
+        self._prepare_mocks_for_create_snapshot_addsnapshot()
         self._test_mediator_method_client_cli_failure_error(self.svc.create_snapshot,
                                                             ('source_volume_name', 'snapshot_name', '', 'pool'),
                                                             self.svc.client.svctask.addsnapshot, error_message_id,

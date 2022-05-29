@@ -520,10 +520,17 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._extract_and_remove_volume_group(volume_id, volume_group_id)
         self._rename_volume(volume_id, name)
 
-    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, source_id, source_type):
+    def _create_cli_volume_with_snapshot(self, name, pool, io_group, source_ids, source_type):
+        if source_type == controller_config.SNAPSHOT_TYPE_NAME:
+            self._create_cli_volume_from_snapshot(name, pool, io_group, source_ids.internal_id)
+
+    def _is_source_support_addsnapshot(self, object_uid):
+        return self._is_addsnapshot_supported() and not self._is_source_have_fcmaps(object_uid)
+
+    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, source_ids, source_type):
         copied = False
-        if source_type == controller_config.SNAPSHOT_TYPE_NAME and self._is_addsnapshot_supported():
-            self._create_cli_volume_from_snapshot(name, pool, io_group, source_id)
+        if source_type and self._is_source_support_addsnapshot(source_ids.object_uid):
+            self._create_cli_volume_with_snapshot(name, pool, io_group, source_ids, source_type)
             copied = True
         else:
             self._create_cli_volume(name, size_in_bytes, space_efficiency, pool, io_group)
@@ -749,7 +756,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         source_volume_name = self._get_volume_name_by_wwn(volume_id)
         source_cli_volume = self._get_cli_volume_in_pool_site(source_volume_name, pool)
-        if self._is_addsnapshot_supported():
+        if self._is_source_support_addsnapshot(volume_id):
             target_cli_snapshot = self._add_snapshot(snapshot_name, source_cli_volume, pool)
             snapshot = self._generate_snapshot_response_from_cli_snapshot(target_cli_snapshot, source_cli_volume)
         else:
@@ -1465,3 +1472,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def _extract_and_remove_volume_group(self, volume_id, volume_group_id):
         self._remove_from_volume_group(volume_id)
         self._rmvolumegroup(volume_group_id)
+
+    def _is_source_have_fcmaps(self, object_uid):
+        if not object_uid:
+            return False
+        cli_volume = self._get_cli_volume_by_wwn(object_uid, not_exist_err=False)
+        if cli_volume and cli_volume.FC_id:
+            return True
+        return False
