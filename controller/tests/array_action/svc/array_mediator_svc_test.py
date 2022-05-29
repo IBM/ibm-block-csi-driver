@@ -34,6 +34,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.fcmaps_as_target = [self._create_dummy_fcmap('source_name', 'test_fc_as_target_id')]
         self.fcmaps_as_source = [self._create_dummy_fcmap('test_snapshot', 'test_fc_id')]
         self.svc.client.svcinfo.lsfcmap.return_value = Mock(as_list=self.fcmaps)
+        del self.svc.client.svctask.addsnapshot
 
     def _create_dummy_fcmap(self, source_name, id_value):
         return Munch(
@@ -617,31 +618,31 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_lsvdisk_to_return_none()
 
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.svc.delete_snapshot("test_snapshot")
+            self.svc.delete_snapshot("test_snapshot", "internal_id")
 
     def test_delete_snapshot_no_fcmap_id_raise_snapshot_not_found(self):
         self._prepare_lsvdisk_to_return_mapless_target_volume()
 
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.svc.delete_snapshot("test_snapshot")
+            self.svc.delete_snapshot("test_snapshot", "internal_id")
 
     def test_delete_snapshot_call_rmfcmap(self):
         self._prepare_mocks_for_delete_snapshot()
         fcmaps_as_target = self.fcmaps
         self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=fcmaps_as_target), Mock(as_list=[])]
-        self.svc.delete_snapshot("test_snapshot")
+        self.svc.delete_snapshot("test_snapshot", "internal_id")
 
         self.svc.client.svctask.rmfcmap.assert_called_once_with(object_id="test_fc_id", force=True)
 
     def test_delete_snapshot_does_not_remove_hyperswap_fcmap(self):
         self._prepare_mocks_for_delete_snapshot()
         self._prepare_fcmaps_for_hyperswap()
-        self.svc.delete_snapshot("test_snapshot")
+        self.svc.delete_snapshot("test_snapshot", "internal_id")
 
         self.svc.client.svctask.rmfcmap.assert_not_called()
 
     def _test_delete_snapshot_rmvolume_cli_failure_error(self, error_message_id, expected_error, snapshot_id="snap_id"):
-        self._test_mediator_method_client_cli_failure_error(self.svc.delete_snapshot, (snapshot_id,),
+        self._test_mediator_method_client_cli_failure_error(self.svc.delete_snapshot, (snapshot_id, "internal_id"),
                                                             self.svc.client.svctask.rmvolume, error_message_id,
                                                             expected_error)
 
@@ -658,11 +659,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
         fcmaps_as_source[0].status = "not good"
         self.svc.client.svcinfo.lsfcmap.side_effect = [Mock(as_list=fcmaps_as_target), Mock(as_list=fcmaps_as_source)]
         with self.assertRaises(array_errors.ObjectIsStillInUseError):
-            self.svc.delete_snapshot("test_snapshot")
+            self.svc.delete_snapshot("test_snapshot", "internal_id")
 
-    def test_delete_snapshot_success(self):
+    def test_delete_snapshot_rmvolume_success(self):
         self._prepare_mocks_for_delete_snapshot()
-        self.svc.delete_snapshot("test_snapshot")
+        self.svc.delete_snapshot("test_snapshot", "internal_id")
         self.assertEqual(self.svc.client.svctask.rmfcmap.call_count, 2)
         self.svc.client.svctask.rmvolume.assert_called_once_with(vdisk_id="test_snapshot")
 
@@ -671,7 +672,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_mocks_for_delete_snapshot()
         mock_warning.return_value = False
         self.svc.client.svctask.stopfcmap.side_effect = [CLIFailureError('CMMVC5912E')]
-        self.svc.delete_snapshot("test_snapshot")
+        self.svc.delete_snapshot("test_snapshot", "internal_id")
         self.assertEqual(self.svc.client.svctask.rmfcmap.call_count, 2)
         self.svc.client.svctask.rmvolume.assert_called_once_with(vdisk_id="test_snapshot")
 
@@ -681,7 +682,25 @@ class TestArrayMediatorSVC(unittest.TestCase):
         mock_warning.return_value = False
         self.svc.client.svctask.stopfcmap.side_effect = [CLIFailureError('error')]
         with self.assertRaises(CLIFailureError):
-            self.svc.delete_snapshot("test_snapshot")
+            self.svc.delete_snapshot("test_snapshot", "internal_id")
+
+    def _prepare_mocks_for_delete_snapshot_addsnapshot(self):
+        self.svc.client.svctask.addsnapshot = Mock()
+
+    def _test_delete_snapshot_rmsnapshot_cli_failure_error(self, error_message_id, expected_error):
+        self._test_mediator_method_client_cli_failure_error(self.svc.delete_snapshot, ("", "internal_id"),
+                                                            self.svc.client.svctask.rmsnapshot, error_message_id,
+                                                            expected_error)
+
+    def test_delete_snapshot_rmsnapshot_errors(self):
+        self._prepare_mocks_for_delete_snapshot_addsnapshot()
+        self._test_delete_snapshot_rmsnapshot_cli_failure_error("CMMVC9755E", array_errors.ObjectNotFoundError)
+        self._test_delete_snapshot_rmsnapshot_cli_failure_error("Failed", CLIFailureError)
+
+    def test_delete_snapshot_rmsnapshot_success(self):
+        self._prepare_mocks_for_delete_snapshot_addsnapshot()
+        self.svc.delete_snapshot("", "internal_id")
+        self.svc.client.svctask.rmsnapshot.assert_called_once_with(snapshotid='internal_id')
 
     def test_validate_supported_space_efficiency_raise_error(self):
         space_efficiency = "Test"
@@ -801,34 +820,51 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
         svc_response.return_value = hosts
 
+    def test_get_host_by_name_success(self):
+        self.svc.client.svcinfo.lshost.return_value = Mock(
+            as_single_element=self._get_host_as_munch('host_id_1', 'test_host_1', nqn_list=['nqn.test.1'],
+                                                      wwpns_list=['wwn1'],
+                                                      iscsi_names_list=['iqn.test.1']))
+        host = self.svc.get_host_by_name('test_host_1')
+        self.assertEqual(host.name, "test_host_1")
+        self.assertEqual(host.connectivity_types, ['nvmeofc', 'fc', 'iscsi'])
+        self.assertEqual(host.initiators.nvme_nqns, ['nqn.test.1'])
+        self.assertEqual(host.initiators.fc_wwns, ['wwn1'])
+        self.assertEqual(host.initiators.iscsi_iqns, ['iqn.test.1'])
+
+    def test_get_host_by_name_raise_host_not_found(self):
+        self.svc.client.svcinfo.lshost.return_value = Mock(as_single_element=None)
+        with self.assertRaises(array_errors.HostNotFoundError):
+            self.svc.get_host_by_name('test_host_1')
+
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_returns_host_not_found(self, svc_response):
         self._prepare_mocks_for_get_host_by_identifiers_slow(svc_response)
         with self.assertRaises(array_errors.HostNotFoundError):
-            self.svc.get_host_by_host_identifiers(Initiators('Test_nqn', ['Test_wwn'], 'Test_iqn'))
+            self.svc.get_host_by_host_identifiers(Initiators(['Test_nqn'], ['Test_wwn'], ['Test_iqn']))
 
     def test_get_host_by_identifier_return_host_not_found_when_no_hosts_exist(self):
         self._prepare_mocks_for_get_host_by_identifiers_no_hosts()
         with self.assertRaises(array_errors.HostNotFoundError):
-            self.svc.get_host_by_host_identifiers(Initiators('Test_nqn', ['Test_wwn'], 'Test_iqn'))
+            self.svc.get_host_by_host_identifiers(Initiators(['Test_nqn'], ['Test_wwn'], ['Test_iqn']))
 
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_slow_raise_multiplehostsfounderror(self, svc_response):
         self._prepare_mocks_for_get_host_by_identifiers_slow(svc_response)
         with self.assertRaises(array_errors.MultipleHostsFoundError):
-            self.svc.get_host_by_host_identifiers(Initiators('Test_nqn', ['wwn2'], 'iqn.test.3'))
+            self.svc.get_host_by_host_identifiers(Initiators(['Test_nqn'], ['wwn2'], ['iqn.test.3']))
 
     def test_get_host_by_identifiers_raise_multiplehostsfounderror(self):
         self._prepare_mocks_for_get_host_by_identifiers(nvme_host_names=['test_host_1'],
                                                         fc_host_names=['test_host_2'])
         with self.assertRaises(array_errors.MultipleHostsFoundError):
-            self.svc.get_host_by_host_identifiers(Initiators('Test_nqn', ['wwn2'], 'iqn.test.3'))
+            self.svc.get_host_by_host_identifiers(Initiators(['Test_nqn'], ['wwn2'], ['iqn.test.3']))
 
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_slow_return_iscsi_host(self, svc_response):
         self._prepare_mocks_for_get_host_by_identifiers_slow(svc_response)
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('Test_nqn', ['Test_wwn'], 'iqn.test.2'))
+            Initiators(['Test_nqn'], ['Test_wwn'], ['iqn.test.2']))
         self.assertEqual('test_host_2', hostname)
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_types)
 
@@ -836,9 +872,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_mocks_for_get_host_by_identifiers(iscsi_host_name='test_host_1',
                                                         connectivity_types=[config.ISCSI_CONNECTIVITY_TYPE])
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('Test_nqn', ['Test_wwn'], 'iqn.test.2'))
+            Initiators(['Test_nqn'], ['Test_wwn'], ['iqn.test.2']))
         self.assertEqual('test_host_1', hostname)
         self.assertEqual({config.ISCSI_CONNECTIVITY_TYPE}, connectivity_types)
+        self.svc.client.svcinfo.lshostiplogin.assert_called_once_with(object_id='iqn.test.2')
 
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_slow_no_other_ports_return_iscsi_host(self, svc_response):
@@ -846,7 +883,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                 iscsi_names_list=['iqn.test.costume'])
         self._prepare_mocks_for_get_host_by_identifiers_slow(svc_response, custom_host=host_with_iqn)
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('Test_nqn', ['Test_wwn'], 'iqn.test.costume'))
+            Initiators(['Test_nqn'], ['Test_wwn'], ['iqn.test.costume']))
         self.assertEqual('test_costume_host', hostname)
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_types)
 
@@ -856,7 +893,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                      iscsi_names_list=['iqn.test.s1', 'iqn.test.s2'])
         self._prepare_mocks_for_get_host_by_identifiers_slow(svc_response, custom_host=host_with_iqn_list)
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('Test_nqn', ['Test_wwn'], 'iqn.test.s1'))
+            Initiators(['Test_nqn'], ['Test_wwn'], ['iqn.test.s1']))
         self.assertEqual('test_costume_host', hostname)
         self.assertEqual([config.ISCSI_CONNECTIVITY_TYPE], connectivity_types)
 
@@ -864,7 +901,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_host_by_identifiers_slow_return_nvme_host(self, svc_response):
         self._prepare_mocks_for_get_host_by_identifiers_slow(svc_response)
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('nqn.test.3', ['Test_wwn'], 'iqn.test.6'))
+            Initiators(['nqn.test.3'], ['Test_wwn'], ['iqn.test.6']))
         self.assertEqual('test_host_3', hostname)
         self.assertEqual([config.NVME_OVER_FC_CONNECTIVITY_TYPE], connectivity_types)
 
@@ -872,9 +909,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_mocks_for_get_host_by_identifiers(nvme_host_names=['test_host_3'],
                                                         connectivity_types=[config.NVME_OVER_FC_CONNECTIVITY_TYPE])
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('nqn.test.1', ['Test_wwn'], 'iqn.test.6'))
+            Initiators(['nqn.test.1'], ['Test_wwn'], ['iqn.test.6']))
         self.assertEqual('test_host_3', hostname)
         self.assertEqual({config.NVME_OVER_FC_CONNECTIVITY_TYPE}, connectivity_types)
+        self.svc.client.svcinfo.lsnvmefabric.assert_called_once_with(remotenqn='nqn.test.1')
 
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_slow_no_other_ports_return_nvme_host(self, svc_response):
@@ -882,26 +920,26 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                 nqn_list=['nqn.test.costume'])
         self._prepare_mocks_for_get_host_by_identifiers_slow(svc_response, custom_host=host_with_nqn)
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('nqn.test.costume', ['Test_wwn'], 'Test_iqn'))
+            Initiators(['nqn.test.costume'], ['Test_wwn'], ['Test_iqn']))
         self.assertEqual('test_costume_host', hostname)
         self.assertEqual([config.NVME_OVER_FC_CONNECTIVITY_TYPE], connectivity_types)
 
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_slow_return_fc_host(self, svc_response):
         host_1 = self._get_host_as_munch('host_id_1', 'test_host_1', wwpns_list=['wwn1'], iscsi_names_list=[])
-        host_2 = self._get_host_as_munch('host_id_2', 'test_host_2', wwpns_list=['wwn2'], iscsi_names_list=[''])
+        host_2 = self._get_host_as_munch('host_id_2', 'test_host_2', wwpns_list=['wwn2'], iscsi_names_list=[])
         host_3 = self._get_host_as_munch('host_id_3', 'test_host_3', wwpns_list=['wwn3', 'wwn4'],
                                          iscsi_names_list=['iqn.test.3'])
         hosts = [host_1, host_2, host_3]
         self._prepare_mocks_for_get_host_by_identifiers_slow(svc_response)
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('Test_nqn', ['wwn4', 'WWN3'], 'iqn.test.6'))
+            Initiators(['Test_nqn'], ['wwn4', 'WWN3'], ['iqn.test.6']))
         self.assertEqual('test_host_3', hostname)
         self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_types)
 
         svc_response.return_value = hosts
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('Test_nqn', ['wwn3'], 'iqn.test.6'))
+            Initiators(['Test_nqn'], ['wwn3'], ['iqn.test.6']))
         self.assertEqual('test_host_3', hostname)
         self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_types)
 
@@ -909,16 +947,17 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_mocks_for_get_host_by_identifiers(fc_host_names=['test_host_3'],
                                                         connectivity_types=[config.FC_CONNECTIVITY_TYPE])
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('nqn.test.1', ['Test_wwn'], 'iqn.test.6'))
+            Initiators(['nqn.test.1'], ['Test_wwn'], ['iqn.test.6']))
         self.assertEqual('test_host_3', hostname)
         self.assertEqual({config.FC_CONNECTIVITY_TYPE}, connectivity_types)
+        self.svc.client.svcinfo.lsfabric.assert_called_once_with(wwpn='Test_wwn')
 
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_slow_no_other_ports_return_fc_host(self, svc_response):
         host_with_wwpn = self._get_host_as_munch('costume_host_id', 'test_costume_host', wwpns_list=['WWNs'])
         self._prepare_mocks_for_get_host_by_identifiers_slow(svc_response, custom_host=host_with_wwpn)
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('Test_nqn', ['Test_wwn', 'WWNs'], 'Test_iqn'))
+            Initiators(['Test_nqn'], ['Test_wwn', 'WWNs'], ['Test_iqn']))
         self.assertEqual('test_costume_host', hostname)
         self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_types)
 
@@ -926,7 +965,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_mocks_for_get_host_by_identifiers(fc_host_names=['', 'test_host_2'],
                                                         connectivity_types=[config.FC_CONNECTIVITY_TYPE])
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('Test_nqn', ['Test_wwn', 'WWNs'], 'Test_iqn'))
+            Initiators(['Test_nqn'], ['Test_wwn', 'WWNs'], ['Test_iqn']))
         self.assertEqual('test_host_2', hostname)
         self.assertEqual({config.FC_CONNECTIVITY_TYPE}, connectivity_types)
 
@@ -940,16 +979,16 @@ class TestArrayMediatorSVC(unittest.TestCase):
         hosts = [host_1, host_2, host_3]
         self._prepare_mocks_for_get_host_by_identifiers_slow(svc_response)
         with self.assertRaises(array_errors.HostNotFoundError):
-            self.svc.get_host_by_host_identifiers(Initiators('Test_nqn', [], ''))
+            self.svc.get_host_by_host_identifiers(Initiators(['Test_nqn'], [], []))
         svc_response.return_value = hosts
         with self.assertRaises(array_errors.HostNotFoundError):
-            self.svc.get_host_by_host_identifiers(Initiators('Test_nqn', ['a', 'b'], '123'))
+            self.svc.get_host_by_host_identifiers(Initiators(['Test_nqn'], ['a', 'b'], ['123']))
 
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_slow_return_nvme_fc_and_iscsi(self, svc_response):
         self._prepare_mocks_for_get_host_by_identifiers_slow(svc_response)
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('nqn.test.2', ['WWN2'], 'iqn.test.2'))
+            Initiators(['nqn.test.2'], ['WWN2'], ['iqn.test.2']))
         self.assertEqual('test_host_2', hostname)
         self.assertEqual(
             {config.NVME_OVER_FC_CONNECTIVITY_TYPE, config.FC_CONNECTIVITY_TYPE, config.ISCSI_CONNECTIVITY_TYPE},
@@ -958,7 +997,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_host_by_identifiers_return_nvme_fc_and_iscsi(self):
         self._prepare_mocks_for_get_host_by_identifiers()
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-            Initiators('nqn.test.1', ['WWN1'], 'iqn.test.1'))
+            Initiators(['nqn.test.1'], ['WWN1'], ['iqn.test.1']))
         self.assertEqual('test_host_1', hostname)
         self.assertEqual(
             {config.NVME_OVER_FC_CONNECTIVITY_TYPE, config.FC_CONNECTIVITY_TYPE, config.ISCSI_CONNECTIVITY_TYPE},

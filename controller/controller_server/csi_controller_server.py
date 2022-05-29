@@ -210,7 +210,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                                   array_initiators)
             return response
 
-        except array_errors.VolumeMappedToMultipleHostsError as ex:
+        except array_errors.VolumeAlreadyMappedToDifferentHostsError as ex:
             return handle_exception(ex, context, grpc.StatusCode.FAILED_PRECONDITION,
                                     csi_pb2.ControllerPublishVolumeResponse)
         except (array_errors.LunAlreadyInUseError, array_errors.NoAvailableLunError) as ex:
@@ -360,11 +360,12 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             system_id = snapshot_id_info.system_id
             array_type = snapshot_id_info.array_type
             snapshot_id = snapshot_id_info.object_id
+            internal_snapshot_id = snapshot_id_info.internal_id
             array_connection_info = utils.get_array_connection_info_from_secrets(secrets, system_id=system_id)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
                 try:
-                    array_mediator.delete_snapshot(snapshot_id)
+                    array_mediator.delete_snapshot(snapshot_id, internal_snapshot_id)
                 except array_errors.ObjectNotFoundError as ex:
                     logger.debug("Snapshot was not found during deletion: {0}".format(ex))
 

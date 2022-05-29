@@ -5,7 +5,7 @@ from pyxcli.client import XCLIClient
 
 import controller.array_action.errors as array_errors
 import controller.controller_server.config as controller_config
-from controller.array_action.array_action_types import Volume, Snapshot
+from controller.array_action.array_action_types import Volume, Snapshot, Host
 from controller.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controller.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controller.array_action.utils import ClassProperty
@@ -352,7 +352,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise array_errors.PermissionDeniedError(
                 "create snapshot {0} from volume {1}".format(snapshot_name, volume_id))
 
-    def delete_snapshot(self, snapshot_id):
+    def delete_snapshot(self, snapshot_id, internal_snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
         snapshot_name = self._get_object_name_by_wwn(snapshot_id)
         try:
@@ -366,6 +366,22 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise array_errors.PermissionDeniedError("delete snapshot : {0}".format(snapshot_name))
 
         logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
+
+    def _get_cli_host(self, host_name):
+        return self.client.cmd.host_list(host=host_name).as_single_element
+
+    def get_host_by_name(self, host_name):
+        cli_host = self._get_cli_host(host_name)
+        if not cli_host:
+            raise array_errors.HostNotFoundError(host_name)
+        fc_wwns = string_to_array(cli_host.fc_ports, ',')
+        iscsi_iqn = string_to_array(cli_host.iscsi_ports, ',')
+        connectivity_types = []
+        if fc_wwns:
+            connectivity_types.append(FC_CONNECTIVITY_TYPE)
+        if iscsi_iqn:
+            connectivity_types.append(ISCSI_CONNECTIVITY_TYPE)
+        return Host(name=cli_host.name, connectivity_types=connectivity_types, fc_wwns=fc_wwns, iscsi_iqns=iscsi_iqn)
 
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host id for initiators : {0}".format(initiators))

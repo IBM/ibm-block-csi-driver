@@ -252,11 +252,12 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def delete_snapshot(self, snapshot_id):
+    def delete_snapshot(self, snapshot_id, internal_snapshot_id):
         """
         This function should delete a snapshot in the storage system.
         Args:
             snapshot_id : wwn of the snapshot to delete
+            internal_snapshot_id : storage internal snapshot id
         Returns:
             None
         Raises:
@@ -318,6 +319,22 @@ class ArrayMediator(ABC):
             HostNotFound
             multipleHostsFoundError
             PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_host_by_name(self, host_name):
+        """
+        This function will find the host by name.
+
+        Args:
+           host_name : name of the host in the storage system
+
+        Returns:
+           Host
+
+        Raises:
+            HostNotFoundError
         """
         raise NotImplementedError
 
