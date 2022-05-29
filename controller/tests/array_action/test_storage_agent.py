@@ -95,7 +95,7 @@ class TestStorageAgent(unittest.TestCase):
         self.assertEqual(1, len(get_agents()))
         new_agent = get_agent(ArrayConnectionInfo(array_addresses=endpoints, user=name, password=password))
         self.assertEqual(1, len(get_agents()))
-        self.assertEqual(id(new_agent), id(agent))
+        self.assertEqual(id(agent), id(new_agent))
 
     def test_get_agent_return_new_when_password_changed(self):
         name = "test_name"
