@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE topic PUBLIC "-//IBM//DTD DITA IBM Topic//EN" "ibm-topic.dtd">
 <?Pub Sty _display FontColor="red"?><?Pub Inc?><topic id="editionnotice" xml:lang="en-us">
-<title>First Edition (September 2021)</title>
+<title>Second Edition (May 2022)</title>
 <shortdesc>This edition applies to version 1.7.0 of the <tm trademark="IBM" tmtype="reg">IBM</tm>
 block storage CSI driver software package. Newer document editions may be issued for the same
 product version in order to add missing information, update information, or amend typographical
