@@ -28,8 +28,6 @@ import (
 
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"golang.org/x/sys/unix"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"k8s.io/apimachinery/pkg/util/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,7 +54,7 @@ const (
 	TimeOutMultipathdCmd              = TimeOutGeneralCmd
 	TimeOutNvmeCmd                    = TimeOutGeneralCmd
 	multipathdCmd                     = "multipathd"
-	blockDevCmd                       = "blockdev"
+	BlockDevCmd                       = "blockdev"
 	nvmeCmd                           = "nvme"
 	minFilesInNonEmptyDir             = 1
 	noSuchFileOrDirectoryErrorMessage = "No such file or directory"
@@ -570,16 +568,11 @@ func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error
 	volumeUuid := d.GetVolumeUuid(volumeId)
 	mpathDevice, err := d.osDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
 	if err != nil {
-		switch err.(type) {
-		case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
-			return VolumeStatistics{}, status.Errorf(codes.NotFound, "Multipath device of volume id %q does not exist", volumeId)
-		default:
-			return VolumeStatistics{}, status.Errorf(codes.Internal, "Error while discovering the device : %s", err)
-		}
+		return VolumeStatistics{}, err
 	}
 
 	args := []string{"--getsize64", mpathDevice}
-	out, err := d.Executer.ExecuteWithTimeoutSilently(device_connectivity.TimeOutBlockDevCmd, blockDevCmd, args)
+	out, err := d.Executer.ExecuteWithTimeoutSilently(device_connectivity.TimeOutBlockDevCmd, BlockDevCmd, args)
 	if err != nil {
 		return VolumeStatistics{}, err
 	}
@@ -601,7 +594,7 @@ func (d NodeUtils) IsVolumePathMatchesVolumeId(volumeId string, volumePath strin
 	logger.Infof("IsVolumePathMatchesVolumeId: Searching matching volume id for volume path: [%s] ", volumePath)
 	volumeUuid := d.GetVolumeUuid(volumeId)
 	volumeUids := d.osDeviceConnectivityHelper.GetVolumeIdVariations(volumeUuid)
-	mpathdOutput, err := d.osDeviceConnectivityHelper.GetMpathDeviceNameVolumeIds(volumeUids)
+	mpathdOutput, err := d.osDeviceConnectivityHelper.GetMpathdOutputByVolumeIds(volumeUids)
 	if err != nil {
 		return false, err
 	}

@@ -676,7 +676,12 @@ func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatis
 	if isBlock {
 		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(volumeId)
 		if err != nil {
-			return VolumeStatistics{}, status.Errorf(codes.Internal, "Failed to get statistics: %s", err)
+			switch err.(type) {
+			case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
+				return VolumeStatistics{}, status.Errorf(codes.NotFound, "Multipath device of volume id %q does not exist", volumeId)
+			default:
+				return VolumeStatistics{}, status.Errorf(codes.Internal, "Error while discovering the device : %s", err)
+			}
 		}
 	} else {
 		isVolumePathMatchesVolumeId, err := d.NodeUtils.IsVolumePathMatchesVolumeId(volumeId, path)

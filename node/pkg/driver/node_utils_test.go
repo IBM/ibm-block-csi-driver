@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -41,6 +42,8 @@ var (
 	nvmeNQN         = "nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1"
 	fcWWNs          = []string{"10000000c9934d9f", "10000000c9934d9h", "10000000c9934d9a", "10000000c9934d9b", "10000000c9934d9z"}
 	iscsiIQN        = "iqn.1994-07.com.redhat:e123456789"
+	volumeUuid      = "6oui000vendorsi0vendorsie0000000"
+	volumeNguid     = "vendorsie0000000oui0000vendorsi0"
 )
 
 func TestReadNvmeNqn(t *testing.T) {
@@ -419,4 +422,220 @@ func TestGetVolumeUuid(t *testing.T) {
 		})
 	}
 
+}
+
+func TestGetFileSystemVolumeStats(t *testing.T) {
+	dir1, err := ioutil.TempDir("", "dir_1")
+	if err != nil {
+		t.Fatalf("TestGetFileSystemVolumeStats failed: %s", err.Error())
+	}
+	defer os.RemoveAll(dir1)
+
+	tmpfile1, err := ioutil.TempFile(dir1, "test")
+	if _, err = tmpfile1.WriteString("just for testing"); err != nil {
+		t.Fatalf("TestGetFileSystemVolumeStats failed: %s", err.Error())
+	}
+	nodeUtils := driver.NewNodeUtils(nil, nil, ConfigYaml, nil)
+	volumeStats, _ := nodeUtils.GetFileSystemVolumeStats(tmpfile1.Name())
+	validateInfo(t, volumeStats)
+}
+
+func validateInfo(t *testing.T, volumeStats driver.VolumeStatistics) {
+	if volumeStats.AvailableBytes <= 0 {
+		t.Errorf("GetFileSystemVolumeStats() availablebytes should be greater than 0, got %v", volumeStats.AvailableBytes)
+	}
+	if volumeStats.TotalBytes <= 0 {
+		t.Errorf("GetFileSystemVolumeStats() capacity should be greater than 0, got %v", volumeStats.TotalBytes)
+	}
+	if volumeStats.UsedBytes <= 0 {
+		t.Errorf("GetFileSystemVolumeStats() got usage should be greater than 0, got %v", volumeStats.UsedBytes)
+	}
+	if volumeStats.TotalInodes <= 0 {
+		t.Errorf("GetFileSystemVolumeStats() inodesTotal should be greater than 0, want %v", volumeStats.TotalInodes)
+	}
+	if volumeStats.AvailableInodes <= 0 {
+		t.Errorf("GetFileSystemVolumeStats() inodesFree should be greater than 0, want %v", volumeStats.AvailableInodes)
+	}
+	if volumeStats.UsedInodes <= 0 {
+		t.Errorf("GetFileSystemVolumeStats() inodeUsage should be greater than 0, want %v", volumeStats.UsedInodes)
+	}
+}
+
+func TestGetBlockVolumeStats(t *testing.T) {
+	sizeInBytes, _ := strconv.ParseInt("1073741824", 10, 64)
+	testCases := []struct {
+		name           string
+		volumeUuid     string
+		mpathDeviceErr error
+		mpathDevice    string
+		outInBytes     []byte
+		outInBytesErr  error
+		volumeStats    driver.VolumeStatistics
+	}{
+		{
+			name:           "success",
+			volumeUuid:     "volumeUuid",
+			mpathDeviceErr: nil,
+			mpathDevice:    "mfake",
+			outInBytes:     []byte("1073741824"),
+			outInBytesErr:  nil,
+			volumeStats: driver.VolumeStatistics{
+				TotalBytes: sizeInBytes,
+			},
+		},
+		{
+			name:           "failed to get mpath device",
+			volumeUuid:     "volumeUuid",
+			mpathDeviceErr: &device_connectivity.MultipathDeviceNotFoundForVolumeError{VolumeId: ""},
+			mpathDevice:    "",
+			outInBytes:     []byte{},
+			outInBytesErr:  nil,
+			volumeStats:    driver.VolumeStatistics{},
+		},
+		{
+			name:           "failed to get size of mpath device",
+			volumeUuid:     "volumeUuid",
+			mpathDeviceErr: nil,
+			mpathDevice:    "mfake",
+			outInBytes:     []byte{},
+			outInBytesErr:  errors.New("failed to run command"),
+			volumeStats:    driver.VolumeStatistics{},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
+			mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtrl)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml, mockOsDeviceConHelper)
+			args := []string{"--getsize64", tc.mpathDevice}
+
+			mockOsDeviceConHelper.EXPECT().GetMpathDevice(tc.volumeUuid).Return(tc.mpathDevice, tc.mpathDeviceErr)
+			if tc.mpathDevice != "" {
+				fakeExecuter.EXPECT().ExecuteWithTimeoutSilently(
+					device_connectivity.TimeOutBlockDevCmd, driver.BlockDevCmd, args).Return(tc.outInBytes, tc.outInBytesErr)
+			}
+			volumestats, err := nodeUtils.GetBlockVolumeStats(tc.volumeUuid)
+
+			if volumestats != tc.volumeStats {
+				t.Fatalf("wrong volumestats: expected %v, got %v", tc.volumeStats, volumestats)
+			}
+			if tc.mpathDeviceErr != nil {
+				assertExpectedError(t, tc.mpathDeviceErr, err)
+			} else {
+				assertExpectedError(t, tc.outInBytesErr, err)
+			}
+
+		})
+	}
+}
+
+func TestIsVolumePathMatchesVolumeId(t *testing.T) {
+	testCases := []struct {
+		name                        string
+		volumeUuid                  string
+		volumePath                  string
+		mpathdOutput                string
+		mpathdOutputErr             error
+		mpathDeviceName             string
+		mpathDeviceNameErr          error
+		volumeIdByVolumePath        string
+		matchingVolumeIdErr         error
+		isVolumePathMatchesVolumeId bool
+	}{
+		{
+			name:                        "success",
+			volumeUuid:                  "volumeUuid",
+			volumePath:                  "/path",
+			mpathdOutput:                "mfake 64905684095684",
+			mpathdOutputErr:             nil,
+			mpathDeviceName:             "mfake",
+			mpathDeviceNameErr:          nil,
+			volumeIdByVolumePath:        volumeUuid,
+			matchingVolumeIdErr:         nil,
+			isVolumePathMatchesVolumeId: true,
+		},
+		{
+			name:                        "fail when trying to get mpath output",
+			volumeUuid:                  "volumeUuid",
+			volumePath:                  "/path",
+			mpathdOutput:                "",
+			mpathdOutputErr:             errors.New("failed in getting mpath output"),
+			mpathDeviceName:             "",
+			mpathDeviceNameErr:          nil,
+			volumeIdByVolumePath:        "",
+			matchingVolumeIdErr:         nil,
+			isVolumePathMatchesVolumeId: false,
+		},
+		{
+			name:                        "fail when trying to get mpath device name",
+			volumeUuid:                  "volumeUuid",
+			volumePath:                  "/path",
+			mpathdOutput:                "mfake 64905684095684",
+			mpathdOutputErr:             nil,
+			mpathDeviceName:             "",
+			mpathDeviceNameErr:          errors.New("failed in getting mpath device name"),
+			volumeIdByVolumePath:        "",
+			matchingVolumeIdErr:         nil,
+			isVolumePathMatchesVolumeId: false,
+		},
+		{
+			name:                        "fail when trying to match volume id to mpath name",
+			volumeUuid:                  "volumeUuid",
+			volumePath:                  "/path",
+			mpathdOutput:                "mfake 64905684095684",
+			mpathdOutputErr:             nil,
+			mpathDeviceName:             "mfake",
+			mpathDeviceNameErr:          nil,
+			volumeIdByVolumePath:        "",
+			matchingVolumeIdErr:         errors.New("failed in matching volume id to mpath name"),
+			isVolumePathMatchesVolumeId: false,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			volumeIdVariations := []string{volumeUuid, volumeNguid}
+
+			mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtrl)
+			nodeUtils := driver.NewNodeUtils(nil, nil, ConfigYaml, mockOsDeviceConHelper)
+
+			mockOsDeviceConHelper.EXPECT().GetVolumeIdVariations(tc.volumeUuid).Return(volumeIdVariations)
+			if tc.volumeIdByVolumePath != "" {
+				mockOsDeviceConHelper.EXPECT().GetVolumeIdVariations(tc.volumeUuid).Return(volumeIdVariations)
+			}
+			mockOsDeviceConHelper.EXPECT().GetMpathdOutputByVolumeIds(volumeIdVariations).Return(tc.mpathdOutput, tc.mpathdOutputErr)
+			if tc.mpathdOutput != "" {
+				mockOsDeviceConHelper.EXPECT().GetMpathDeviceName(tc.volumePath).Return(tc.mpathDeviceName, tc.mpathDeviceNameErr)
+			}
+			if tc.mpathDeviceName != "" {
+				mockOsDeviceConHelper.EXPECT().GetMatchingVolumeIdToMpathd(
+					tc.mpathdOutput, tc.mpathDeviceName, volumeIdVariations).Return(tc.volumeIdByVolumePath, tc.matchingVolumeIdErr)
+			}
+			isVolumePathMatchesVolumeId, err := nodeUtils.IsVolumePathMatchesVolumeId(tc.volumeUuid, tc.volumePath)
+
+			if isVolumePathMatchesVolumeId != tc.isVolumePathMatchesVolumeId {
+				t.Fatalf("wrong volumestats: expected %v, got %v", tc.isVolumePathMatchesVolumeId, isVolumePathMatchesVolumeId)
+			}
+			if tc.mpathdOutputErr != nil {
+				assertExpectedError(t, tc.mpathdOutputErr, err)
+			} else if tc.mpathDeviceNameErr != nil {
+				assertExpectedError(t, tc.mpathDeviceNameErr, err)
+			} else {
+				assertExpectedError(t, tc.matchingVolumeIdErr, err)
+			}
+
+		})
+	}
+}
+
+func assertExpectedError(t *testing.T, expectedError error, responseErr error) {
+	if expectedError != responseErr {
+		t.Fatalf("wrong error: expected %v, got %v", expectedError, responseErr)
+	}
 }

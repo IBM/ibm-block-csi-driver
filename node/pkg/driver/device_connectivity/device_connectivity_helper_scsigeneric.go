@@ -47,7 +47,7 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	ValidateLun(lun int, sysDevices []string) error
 	GetVolumeIdVariations(volumeUuid string) []string
 	GetMatchingVolumeIdToMpathd(mpathDeviceName string, mpathdOutput string, volumeUids []string) (string, error)
-	GetMpathDeviceNameVolumeIds(volumeUids []string) (string, error)
+	GetMpathdOutputByVolumeIds(volumeUids []string) (string, error)
 	GetMpathDeviceName(volumePath string) (string, error)
 }
 
@@ -98,7 +98,7 @@ func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterfac
 	}
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDeviceNameVolumeIds(volumeUids []string) (string, error) {
+func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathdOutputByVolumeIds(volumeUids []string) (string, error) {
 	return r.Helper.GetMpathdOutputByVolumeId(volumeUids)
 }
 
