@@ -47,7 +47,7 @@ class TestControllerServicerEnableVolumeReplication(BaseControllerSetUp, CommonC
 
         self.servicer.EnableVolumeReplication(self.request, self.context)
 
-        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+        self.assertEqual(grpc.StatusCode.OK, self.context.code)
         self.mediator.get_replication.assert_called_once_with(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID, SYSTEM_ID)
         self.mediator.create_replication.assert_called_once_with(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID,
                                                                  SYSTEM_ID, COPY_TYPE)

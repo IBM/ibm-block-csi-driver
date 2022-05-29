@@ -110,9 +110,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
         cli_volume_mock = Mock(as_single_element=self._get_cli_volume())
         self.svc.client.svcinfo.lsvdisk.return_value = cli_volume_mock
         volume = self.svc.get_volume("test_volume")
-        self.assertEqual(volume.capacity_bytes, 1024)
-        self.assertEqual(volume.pool, 'pool_name')
-        self.assertEqual(volume.array_type, 'SVC')
+        self.assertEqual(1024, volume.capacity_bytes)
+        self.assertEqual('pool_name', volume.pool)
+        self.assertEqual('SVC', volume.array_type)
 
     def test_get_volume_hyperswap_has_no_source(self):
         target_cli_volume = self._get_mapped_target_cli_volume()
@@ -132,7 +132,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         volume = self.svc.get_volume("volume_name")
 
-        self.assertEqual(volume.pool, 'pool1:pool2')
+        self.assertEqual('pool1:pool2', volume.pool)
 
     def test_get_volume_raise_exception(self):
         self._test_mediator_method_client_error(self.svc.get_volume, ("volume",),
@@ -169,10 +169,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
         volume = self.svc.create_volume("test_volume", 1024, space_efficiency, "pool_name", None, None)
 
-        self.assertEqual(volume.capacity_bytes, 1024)
-        self.assertEqual(volume.array_type, 'SVC')
-        self.assertEqual(volume.id, 'vol_id')
-        self.assertEqual(volume.internal_id, 'test_id')
+        self.assertEqual(1024, volume.capacity_bytes)
+        self.assertEqual('SVC', volume.array_type)
+        self.assertEqual('vol_id', volume.id)
+        self.assertEqual('test_id', volume.internal_id)
 
     def test_create_volume_with_thin_space_efficiency_success(self):
         self._test_create_volume_success(config.SPACE_EFFICIENCY_THIN)

@@ -72,16 +72,16 @@ class CommonControllerTest:
         self.request.name = ""
         context = utils.FakeContext()
         response = self.tested_method(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
+        self.assertEqual(grpc.StatusCode.INVALID_ARGUMENT, context.code)
         self.assertIn("name", context.details)
-        self.assertEqual(response, self.tested_method_response_class())
+        self.assertEqual(self.tested_method_response_class(), response)
 
     def _test_request_with_wrong_secrets_parameters(self, secrets, message="secret"):
         context = utils.FakeContext()
 
         self.request.secrets = secrets
         self.tested_method(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INVALID_ARGUMENT)
+        self.assertEqual(grpc.StatusCode.INVALID_ARGUMENT, context.code)
         self.assertIn(message, context.details)
 
     def _test_request_with_wrong_secrets(self, storage_agent):
@@ -105,14 +105,14 @@ class CommonControllerTest:
         storage_agent.side_effect = self.storage_agent
         with SyncLock(request_attribute, object_id, "test_request_already_processing"):
             response = self.tested_method(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.ABORTED)
-        self.assertEqual(type(response), self.tested_method_response_class)
+        self.assertEqual(grpc.StatusCode.ABORTED, self.context.code)
+        self.assertEqual(self.tested_method_response_class, type(response))
 
     def _test_request_with_array_connection_exception(self, storage_agent):
         storage_agent.side_effect = [Exception("error")]
         context = utils.FakeContext()
         self.tested_method(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
+        self.assertEqual(grpc.StatusCode.INTERNAL, context.code)
         self.assertIn("error", context.details)
 
     def _test_request_with_get_array_type_exception(self, storage_agent):
@@ -120,7 +120,7 @@ class CommonControllerTest:
         context = utils.FakeContext()
         self.detect_array_type.side_effect = [array_errors.FailedToFindStorageSystemType("endpoint")]
         self.tested_method(self.request, context)
-        self.assertEqual(context.code, grpc.StatusCode.INTERNAL)
+        self.assertEqual(grpc.StatusCode.INTERNAL, context.code)
         msg = array_errors.FailedToFindStorageSystemType("endpoint").message
         self.assertIn(msg, context.details)
 
@@ -177,13 +177,13 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
 
         response_snapshot = self.servicer.CreateSnapshot(self.request, self.context)
 
-        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+        self.assertEqual(grpc.StatusCode.OK, self.context.code)
         self.mediator.get_snapshot.assert_called_once_with(SNAPSHOT_VOLUME_WWN, SNAPSHOT_NAME, pool=expected_pool)
         self.mediator.create_snapshot.assert_called_once_with(SNAPSHOT_VOLUME_WWN, SNAPSHOT_NAME,
                                                               expected_space_efficiency, expected_pool)
         system_id_part = ':{}'.format(system_id) if system_id else ''
         snapshot_id = 'xiv{}:0;wwn'.format(system_id_part)
-        self.assertEqual(response_snapshot.snapshot.snapshot_id, snapshot_id)
+        self.assertEqual(snapshot_id, response_snapshot.snapshot.snapshot_id)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_snapshot_succeeds(self, storage_agent):
