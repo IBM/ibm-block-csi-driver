@@ -180,9 +180,6 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             except array_errors.ObjectNotFoundError as ex:
                 logger.debug("volume was not found during deletion: {0}".format(ex))
-            except array_errors.PermissionDeniedError as ex:
-                return handle_exception(ex, context, grpc.StatusCode.PERMISSION_DENIED,
-                                        csi_pb2.DeleteVolumeResponse)
 
         return csi_pb2.DeleteVolumeResponse()
 

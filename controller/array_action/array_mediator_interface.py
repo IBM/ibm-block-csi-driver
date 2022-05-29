@@ -47,10 +47,7 @@ class ArrayMediator(ABC):
 
         Raises:
             VolumeAlreadyExists : optional
-            PoolDoesNotExist
-            PoolDoesNotMatchSpaceEfficiency
-            IllegalObjectName
-            VolumeNameIsNotSupported
+            InvalidArgument
             PermissionDenied
         """
         raise NotImplementedError
