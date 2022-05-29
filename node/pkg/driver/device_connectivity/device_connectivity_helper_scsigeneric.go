@@ -597,7 +597,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathdOutputByVolumeId(volumeIdVar
 
 func (o OsDeviceConnectivityHelperGeneric) GetVolumeIdByMpathdName(mpathDeviceName string, mpathdOutput string) (string, error) {
 	volumeIdVariations := []string{mpathDeviceName}
-	volumeIds := o.Helper.ParseFieldValuesOfVolume(volumeIdVariations, mpathdOutput)
+	volumeIds := o.Helper.ParseMpathName(volumeIdVariations, mpathdOutput)
 	if len(volumeIds) > 1 {
 		return "", &MultipleVolumeIdsError{volumeIds, mpathDeviceName}
 	}
@@ -615,7 +615,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeIdVariations []strin
 	if err != nil {
 		return "", err
 	}
-	dms := o.Helper.ParseFieldValuesOfVolume(volumeIdVariations, mpathdOutput)
+	dms := o.Helper.ParseMpathName(volumeIdVariations, mpathdOutput)
 	return o.Helper.GetFullDmPath(dms, volumeIdVariations[0])
 }
 
@@ -642,7 +642,7 @@ func getMpathDeviceNameFromMountLine(mountLine string) string {
 type GetDmsPathHelperInterface interface {
 	WaitForDmToExist(volumeIdVariations []string, maxRetries int, intervalSeconds int, multipathdCommandFormatArgs []string) (string, error)
 	GetMpathdOutput(volumeIdVariations []string, multipathdCommandFormatArgs []string) (string, error)
-	ParseFieldValuesOfVolume(volumeIdVariations []string, mpathdOutput string) map[string]bool
+	ParseMpathName(volumeIdVariations []string, mpathdOutput string) map[string]bool
 	GetFullDmPath(dms map[string]bool, volumeId string) (string, error)
 	IsThisMatchedDmFieldValue(volumeIdVariations []string, dmFieldValue string) bool
 }
@@ -705,7 +705,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeIdVariations []string, m
 	return "", err
 }
 
-func (o GetDmsPathHelperGeneric) ParseFieldValuesOfVolume(volumeIdVariations []string, mpathdOutput string) map[string]bool {
+func (o GetDmsPathHelperGeneric) ParseMpathName(volumeIdVariations []string, mpathdOutput string) map[string]bool {
 	dmFieldValues := make(map[string]bool)
 
 	scanner := bufio.NewScanner(strings.NewReader(mpathdOutput))
@@ -713,7 +713,7 @@ func (o GetDmsPathHelperGeneric) ParseFieldValuesOfVolume(volumeIdVariations []s
 		volumeIdVariation, dmFieldValue := o.getLineParts(scanner)
 		if o.IsThisMatchedDmFieldValue(volumeIdVariations, volumeIdVariation) {
 			dmFieldValues[dmFieldValue] = true
-			logger.Infof("ParseFieldValuesOfVolume: DM field value found: %s for DM field value %s", dmFieldValue, volumeIdVariation)
+			logger.Infof("ParseMpathName: DM field value found: %s for DM field value %s", dmFieldValue, volumeIdVariation)
 		}
 	}
 

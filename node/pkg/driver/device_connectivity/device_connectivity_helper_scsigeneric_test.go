@@ -279,7 +279,7 @@ type GetMpathdOutputReturn struct {
 	err error
 }
 
-type ParseFieldValuesOfVolumeReturn struct {
+type ParseMpathNameReturn struct {
 	mpathdOutput  string
 	dmFieldValues map[string]bool
 }
@@ -292,14 +292,14 @@ type GetFullDmPathReturn struct {
 
 func TestGetDmsPath(t *testing.T) {
 	testCases := []struct {
-		name                           string
-		expErrType                     reflect.Type
-		expErr                         error
-		expDMPath                      string
-		waitForDmToExistReturn         []WaitForDmToExistReturn
-		getMpathdOutputReturn          []GetMpathdOutputReturn
-		parseFieldValuesOfVolumeReturn []ParseFieldValuesOfVolumeReturn
-		getFullDmPathReturn            []GetFullDmPathReturn
+		name                   string
+		expErrType             reflect.Type
+		expErr                 error
+		expDMPath              string
+		waitForDmToExistReturn []WaitForDmToExistReturn
+		getMpathdOutputReturn  []GetMpathdOutputReturn
+		parseMpathNameReturn   []ParseMpathNameReturn
+		getFullDmPathReturn    []GetFullDmPathReturn
 	}{
 		{
 			name: "Should fail when WaitForDmToExist did not find any dm device",
@@ -323,8 +323,8 @@ func TestGetDmsPath(t *testing.T) {
 				},
 			},
 
-			parseFieldValuesOfVolumeReturn: []ParseFieldValuesOfVolumeReturn{
-				ParseFieldValuesOfVolumeReturn{
+			parseMpathNameReturn: []ParseMpathNameReturn{
+				ParseMpathNameReturn{
 					mpathdOutput: fmt.Sprintf("dm-1,%s\ndm-2,%s\ndm-3,%s", volumeUuid, "otheruuid", volumeUuid),
 					dmFieldValues: map[string]bool{
 						"dm-1": true,
@@ -359,8 +359,8 @@ func TestGetDmsPath(t *testing.T) {
 				},
 			},
 
-			parseFieldValuesOfVolumeReturn: []ParseFieldValuesOfVolumeReturn{
-				ParseFieldValuesOfVolumeReturn{
+			parseMpathNameReturn: []ParseMpathNameReturn{
+				ParseMpathNameReturn{
 					mpathdOutput: fmt.Sprintf(" dm-1,%s", volumeUuid),
 					dmFieldValues: map[string]bool{
 						"dm-1": true,
@@ -391,8 +391,8 @@ func TestGetDmsPath(t *testing.T) {
 				},
 			},
 
-			parseFieldValuesOfVolumeReturn: []ParseFieldValuesOfVolumeReturn{
-				ParseFieldValuesOfVolumeReturn{
+			parseMpathNameReturn: []ParseMpathNameReturn{
+				ParseMpathNameReturn{
 					mpathdOutput: fmt.Sprintf("dm-1,%s", volumeUuid),
 					dmFieldValues: map[string]bool{
 						"dm-1": true,
@@ -430,8 +430,8 @@ func TestGetDmsPath(t *testing.T) {
 					device_connectivity.MultipathdWildcardsMpathAndVolumeId).Return(r.out, r.err)
 			}
 
-			for _, r := range tc.parseFieldValuesOfVolumeReturn {
-				fake_helper.EXPECT().ParseFieldValuesOfVolume(volumIds, r.mpathdOutput).Return(r.dmFieldValues)
+			for _, r := range tc.parseMpathNameReturn {
+				fake_helper.EXPECT().ParseMpathName(volumIds, r.mpathdOutput).Return(r.dmFieldValues)
 			}
 
 			for _, r := range tc.getFullDmPathReturn {
