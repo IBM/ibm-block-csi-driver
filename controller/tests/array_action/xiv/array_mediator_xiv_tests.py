@@ -34,8 +34,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=xcli_volume)
         volume = self.mediator.get_volume("some name")
 
-        self.assertEqual(volume.capacity_bytes, xcli_volume.capacity * 512)
-        self.assertEqual(volume.capacity_bytes, xcli_volume.capacity * 512)
+        self.assertEqual(xcli_volume.capacity * 512, volume.capacity_bytes)
+        self.assertEqual(xcli_volume.capacity * 512, volume.capacity_bytes)
 
     def test_get_volume_raise_illegal_object_name(self):
         self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalNameForObjectError("", "volume", "")]
@@ -83,8 +83,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
         volume = self.mediator.create_volume("mock_volume", 512, space_efficiency, "fake_pool", None)
         self.mediator.client.cmd.vol_create.assert_called_once_with(vol='mock_volume', size_blocks=1,
                                                                     pool='fake_pool')
-        self.assertEqual(volume.name, "mock_volume")
-        self.assertEqual(volume.internal_id, 'test_id')
+        self.assertEqual("mock_volume", volume.name)
+        self.assertEqual('test_id', volume.internal_id)
 
     def test_create_volume_success(self):
         self._test_create_volume_with_space_efficiency_success(None)
@@ -240,8 +240,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
         xcli_snapshot = self._get_single_snapshot_result_mock(snapshot_name, snapshot_volume_name)
         self.mediator.client.cmd.vol_list.return_value = xcli_snapshot
         snapshot = self.mediator.get_snapshot(snapshot_volume_wwn, snapshot_name)
-        self.assertEqual(snapshot.name, snapshot_name)
-        self.assertEqual(snapshot.source_id, snapshot_volume_wwn)
+        self.assertEqual(snapshot_name, snapshot.name)
+        self.assertEqual(snapshot_volume_wwn, snapshot.source_id)
 
     def test_get_snapshot_same_name_volume_exists_error(self):
         snapshot_name = "snapshot"
@@ -269,10 +269,10 @@ class TestArrayMediatorXIV(unittest.TestCase):
                                                               snapshot_capacity=size_in_blocks_string)
         self.mediator.client.cmd.snapshot_create.return_value = xcli_snapshot
         snapshot = self.mediator.create_snapshot(snapshot_volume_wwn, snapshot_name, space_efficiency=None, pool=None)
-        self.assertEqual(snapshot.name, snapshot_name)
-        self.assertEqual(snapshot.source_id, snapshot_volume_wwn)
-        self.assertEqual(snapshot.capacity_bytes, size_in_bytes)
-        self.assertEqual(snapshot.capacity_bytes, size_in_bytes)
+        self.assertEqual(snapshot_name, snapshot.name)
+        self.assertEqual(snapshot_volume_wwn, snapshot.source_id)
+        self.assertEqual(size_in_bytes, snapshot.capacity_bytes)
+        self.assertEqual(size_in_bytes, snapshot.capacity_bytes)
 
     def test_create_snapshot_raise_snapshot_source_pool_mismatch(self):
         snapshot_name = "snapshot"

@@ -21,8 +21,8 @@ class TestWithFunctionality(unittest.TestCase):
     @patch("controller.array_action.array_connection_manager.XIVArrayMediator.disconnect")
     def test_with_opens_and_closes_the_connection(self, close, connect):
         with self.array_connection as array_mediator:
-            self.assertEqual(self.array_connection.connected, True)
-            self.assertEqual(array_mediator.endpoint, [self.fqdn, self.fqdn])
+            self.assertEqual(True, self.array_connection.connected)
+            self.assertEqual([self.fqdn, self.fqdn], array_mediator.endpoint)
         connect.assert_called_with()
         close.assert_called_with()
 
@@ -35,7 +35,7 @@ class TestWithFunctionality(unittest.TestCase):
                 pass
 
         self.assertTrue(error_message in str(ex.exception))
-        self.assertEqual(get_connection.call_count, 1)
+        self.assertEqual(1, get_connection.call_count)
 
 
 class TestGetconnection(unittest.TestCase):
@@ -55,23 +55,23 @@ class TestGetconnection(unittest.TestCase):
         self.connect_patcher.stop()
 
     def test_connection_adds_the_new_endpoint_for_the_first_time(self):
-        self.assertEqual(array_connection_manager.array_connections_dict, {})
+        self.assertEqual({}, array_connection_manager.array_connections_dict)
         self.array_connection.get_array_connection()
-        self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 1})
+        self.assertEqual({self.connection_key: 1}, array_connection_manager.array_connections_dict)
 
         new_fqdn = "new-fqdn"
         array_connection2 = ArrayConnectionManager("user", "password", [new_fqdn], XIVArrayMediator.array_type)
 
         array_connection2.get_array_connection()
-        self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 1, new_fqdn: 1})
+        self.assertEqual({self.connection_key: 1, new_fqdn: 1}, array_connection_manager.array_connections_dict)
 
     def test_connection_adds_connections_to_connection_dict(self):
-        self.assertEqual(array_connection_manager.array_connections_dict, {})
+        self.assertEqual({}, array_connection_manager.array_connections_dict)
         self.array_connection.get_array_connection()
-        self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 1})
+        self.assertEqual({self.connection_key: 1}, array_connection_manager.array_connections_dict)
 
         self.array_connection.get_array_connection()
-        self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 2})
+        self.assertEqual({self.connection_key: 2}, array_connection_manager.array_connections_dict)
 
     def test_connection_returns_error_on_too_many_connection(self):
         array_connection_manager.array_connections_dict = {
@@ -90,7 +90,6 @@ class TestGetconnection(unittest.TestCase):
 
     @patch("controller.array_action.array_connection_manager._socket_connect_test")
     def test_detect_array_type(self, socket_connect_test_mock):
-
         # arrays is a [host, open_ports] dict, note that both port 22 and 8452 are opened in ds8k
         arrays = {
             "svc_host": [SVCArrayMediator.port, ],
@@ -126,17 +125,17 @@ class TestGetconnection(unittest.TestCase):
 
     def test_exit_reduces_connection_to_zero(self):
         self.array_connection.get_array_connection()
-        self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 1})
+        self.assertEqual({self.connection_key: 1}, array_connection_manager.array_connections_dict)
 
         self.array_connection.__exit__("", "", None)
-        self.assertEqual(array_connection_manager.array_connections_dict, {})
+        self.assertEqual({}, array_connection_manager.array_connections_dict)
 
     def test_exit_reduces_connection(self):
         self.array_connection.get_array_connection()
-        self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 1})
+        self.assertEqual({self.connection_key: 1}, array_connection_manager.array_connections_dict)
 
         self.array_connection.get_array_connection()
-        self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 2})
+        self.assertEqual({self.connection_key: 2}, array_connection_manager.array_connections_dict)
 
         self.array_connection.__exit__("", "", None)
-        self.assertEqual(array_connection_manager.array_connections_dict, {self.connection_key: 1})
+        self.assertEqual({self.connection_key: 1}, array_connection_manager.array_connections_dict)
