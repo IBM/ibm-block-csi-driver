@@ -29,3 +29,4 @@ class ObjectParameters:
     space_efficiency: str
     prefix: str
     io_group: str
+    volume_group: str

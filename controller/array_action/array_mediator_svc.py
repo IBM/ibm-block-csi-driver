@@ -90,8 +90,8 @@ def _get_space_efficiency_kwargs(space_efficiency):
     return {}
 
 
-def build_kwargs_from_parameters(space_efficiency, pool_name, io_group, volume_name,
-                                 volume_size):
+def build_kwargs_from_parameters(space_efficiency, pool_name, io_group,
+                                 volume_group, volume_name, volume_size):
     cli_kwargs = {}
     cli_kwargs.update({
         'name': volume_name,
@@ -103,6 +103,8 @@ def build_kwargs_from_parameters(space_efficiency, pool_name, io_group, volume_n
     cli_kwargs.update(space_efficiency_kwargs)
     if io_group:
         cli_kwargs['iogrp'] = io_group
+    if volume_group:
+        cli_kwargs['volumegroup'] = volume_group
     return cli_kwargs
 
 
@@ -456,13 +458,13 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise array_errors.ObjectNotFoundError(volume_id)
         return vol_name
 
-    def _create_cli_volume(self, name, size_in_bytes, space_efficiency, pool, io_group):
+    def _create_cli_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group=None):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with parameters : {}".format(
             name, size_in_bytes, pool, space_efficiency))
         try:
             size = self._convert_size_bytes(size_in_bytes)
             cli_kwargs = build_kwargs_from_parameters(space_efficiency, pool, io_group,
-                                                      name, size)
+                                                      volume_group, name, size)
             self.client.svctask.mkvolume(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if is_warning_message(ex.my_message):
@@ -473,7 +475,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 if OBJ_ALREADY_EXIST in ex.my_message:
                     raise array_errors.VolumeAlreadyExists(name, self.endpoint)
                 if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
-                    raise array_errors.PoolDoesNotExist(pool, self.endpoint)
+                    raise array_errors.InvalidArgumentError(ex.my_message)
                 if POOL_NOT_MATCH_VOL_SPACE_EFFICIENCY in ex.my_message or NOT_REDUCTION_POOL in ex.my_message:
                     raise array_errors.PoolDoesNotMatchSpaceEfficiency(pool, space_efficiency, ex)
                 if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in ex.my_message:
@@ -520,13 +522,13 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def _is_source_support_addsnapshot(self, object_uid):
         return self._is_addsnapshot_supported() and not self._is_source_has_fcmaps(object_uid)
 
-    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, source_ids, source_type):
+    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids, source_type):
         is_copied = False
         if source_type and self._is_source_support_addsnapshot(source_ids.object_uid):
             self._create_cli_volume_with_snapshot(name, pool, io_group, source_ids, source_type)
             is_copied = True
         else:
-            self._create_cli_volume(name, size_in_bytes, space_efficiency, pool, io_group)
+            self._create_cli_volume(name, size_in_bytes, space_efficiency, pool, io_group, volume_group)
         cli_volume = self._get_cli_volume(name)
         return self._generate_volume_response(cli_volume, is_copied)
 
@@ -1369,7 +1371,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return self.client.svcinfo.lsvolumesnapshot(**kwargs).as_single_element
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if OBJ_NOT_FOUND in ex.my_message or NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
-                logger.info("snapshot not found")
+                logger.info("snapshot not found for args: {}".format(kwargs))
             elif any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
                 raise array_errors.IllegalObjectID(ex.my_message)
             else:

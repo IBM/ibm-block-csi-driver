@@ -14,13 +14,13 @@ from controller.array_action.array_mediator_xiv import XIVArrayMediator
 from controller.common.common_types import ObjectIds
 from controller.controller_server.csi_controller_server import CSIControllerServicer
 from controller.controller_server.sync_lock import SyncLock
-from controller.controller_server.test_settings import (CLONE_VOLUME_NAME,
-                                                        OBJECT_INTERNAL_ID,
-                                                        POOL, SNAPSHOT_NAME,
-                                                        SNAPSHOT_VOLUME_NAME,
-                                                        SNAPSHOT_VOLUME_WWN,
-                                                        SPACE_EFFICIENCY,
-                                                        VOLUME_NAME)
+from controller.tests.controller_server.test_settings import (CLONE_VOLUME_NAME,
+                                                              OBJECT_INTERNAL_ID,
+                                                              POOL, SPACE_EFFICIENCY,
+                                                              IO_GROUP, VOLUME_GROUP,
+                                                              VOLUME_NAME, SNAPSHOT_NAME,
+                                                              SNAPSHOT_VOLUME_NAME,
+                                                              SNAPSHOT_VOLUME_WWN)
 from controller.tests import utils
 from controller.tests.utils import ProtoBufMock
 
@@ -426,7 +426,9 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.side_effect = array_errors.ObjectNotFoundError("vol")
 
-        self.request.parameters = {config.PARAMETERS_POOL: POOL}
+        self.request.parameters = {config.PARAMETERS_POOL: POOL,
+                                   config.PARAMETERS_IO_GROUP: IO_GROUP,
+                                   config.PARAMETERS_VOLUME_GROUP: VOLUME_GROUP}
         self.request.volume_capabilities = [self.volume_capability]
         self.request.name = VOLUME_NAME
         self.request.volume_content_source = None
@@ -447,7 +449,8 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
         self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, pool=expected_pool)
-        self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, 10, None, expected_pool, None,
+        self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, 10, None, expected_pool, IO_GROUP,
+                                                            VOLUME_GROUP,
                                                             ObjectIds(internal_id='', object_uid=''), None)
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
@@ -468,8 +471,10 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.request.accessibility_requirements.preferred = [
             ProtoBufMock(segments={"topology.block.csi.ibm.com/test": "topology_value",
                                    "topology.block.csi.ibm.com/test2": "topology_value2"})]
+        second_system_parameters = self.request.parameters.copy()
+        second_system_parameters[config.PARAMETERS_POOL] = "other_pool"
         self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
-            {"u1": {config.PARAMETERS_POOL: POOL}, "u2": {config.PARAMETERS_POOL: "other_pool"}})}
+            {"u1": self.request.parameters, "u2": second_system_parameters})}
         self._test_create_volume_succeeds(storage_agent, 'xiv:u2:0;wwn', expected_pool="other_pool")
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -482,7 +487,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
         self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, pool=POOL)
-        self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, 10, "not_none", POOL, None,
+        self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, 10, "not_none", POOL, IO_GROUP, VOLUME_GROUP,
                                                             ObjectIds(internal_id='', object_uid=''), None)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -598,8 +603,8 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(self.context.code, return_code)
         self.assertIn(msg, self.context.details)
         self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, pool=POOL)
-        self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, self.capacity_bytes, None, POOL, None,
-                                                            ObjectIds(internal_id='', object_uid=''),
+        self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, self.capacity_bytes, None, POOL, IO_GROUP,
+                                                            VOLUME_GROUP, ObjectIds(internal_id='', object_uid=''),
                                                             None)
 
     def test_create_volume_with_illegal_object_name_exception(self):
@@ -634,8 +639,9 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.validate_supported_space_efficiency = Mock()
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.create_volume.assert_called_once_with(final_name, 10, space_efficiency, POOL, None,
-                                                            ObjectIds(internal_id='', object_uid=''), None)
+        self.mediator.create_volume.assert_called_once_with(final_name, 10, space_efficiency, POOL, IO_GROUP,
+                                                            VOLUME_GROUP, ObjectIds(internal_id='', object_uid=''),
+                                                            None)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_name_prefix(self, storage_agent):
@@ -653,9 +659,10 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
                                                              final_name="default_some_name",
                                                              space_efficiency=None):
         get_array_connection_info_from_secrets.side_effect = [utils.get_fake_array_connection_info()]
-        self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
-            {"u1": {config.PARAMETERS_VOLUME_NAME_PREFIX: prefix, config.PARAMETERS_POOL: POOL,
-                    config.PARAMETERS_SPACE_EFFICIENCY: space_efficiency}})}
+        system_parameters = self.request.parameters
+        system_parameters.update({config.PARAMETERS_VOLUME_NAME_PREFIX: prefix,
+                                  config.PARAMETERS_SPACE_EFFICIENCY: space_efficiency})
+        self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps({"u1": system_parameters})}
         self._test_create_volume_parameters(final_name, space_efficiency)
 
     @patch("controller.controller_server.utils.get_array_connection_info_from_secrets")
@@ -688,7 +695,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.create_volume.assert_called_once_with(self.request.name, 2, None, POOL, None,
+        self.mediator.create_volume.assert_called_once_with(self.request.name, 2, None, POOL, IO_GROUP, VOLUME_GROUP,
                                                             ObjectIds(internal_id='', object_uid=''), None)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")

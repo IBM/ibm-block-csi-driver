@@ -4,7 +4,7 @@ from mock import patch, Mock
 
 from controller.controller_server.addons_server import ReplicationControllerServicer
 from controller.controller_server.config import PARAMETERS_SYSTEM_ID, PARAMETERS_COPY_TYPE
-from controller.controller_server.test_settings import VOLUME_NAME, VOLUME_WWN, OBJECT_INTERNAL_ID, \
+from controller.tests.controller_server.test_settings import VOLUME_NAME, VOLUME_WWN, OBJECT_INTERNAL_ID, \
     OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE
 from controller.tests import utils
 from controller.tests.controller_server.csi_controller_server_test import BaseControllerSetUp, CommonControllerTest

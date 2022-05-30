@@ -4,7 +4,9 @@ import grpc
 from mock import Mock, MagicMock
 
 from controller.controller_server.controller_types import ArrayConnectionInfo
-from controller.controller_server.test_settings import USER as test_user, PASSWORD as test_password, ARRAY as test_array
+from controller.tests.controller_server.test_settings import USER as test_user, \
+                                                             PASSWORD as test_password, \
+                                                             ARRAY as test_array
 
 
 class ProtoBufMock(MagicMock):

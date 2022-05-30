@@ -178,7 +178,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         size_in_bytes = self.volume_response.cap
         pool_id = self.volume_response.pool
         volume = self.array.create_volume(
-            name, size_in_bytes, space_efficiency, pool_id, None, None, None)
+            name, size_in_bytes, space_efficiency, pool_id, None, None, None, None)
         if space_efficiency == 'thin':
             space_efficiency = 'ese'
         else:
@@ -194,22 +194,22 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_create_volume_fail_with_client_exception(self):
         self.client_mock.create_volume.side_effect = ClientException("500")
         with self.assertRaises(array_errors.VolumeCreationError):
-            self.array.create_volume("fake_name", 1, 'thin', "fake_pool", None, None, None)
+            self.array.create_volume("fake_name", 1, 'thin', "fake_pool", None, None, None, None)
 
     def test_create_volume_fail_with_pool_not_found(self):
         self.client_mock.create_volume.side_effect = NotFound("404", message="BE7A0001")
         with self.assertRaises(array_errors.PoolDoesNotExist):
-            self.array.create_volume("fake_name", 1, 'thin', "fake_pool", None, None, None)
+            self.array.create_volume("fake_name", 1, 'thin', "fake_pool", None, None, None, None)
 
     def test_create_volume_fail_with_incorrect_id(self):
         self.client_mock.create_volume.side_effect = InternalServerError("500", message="BE7A0005")
         with self.assertRaises(array_errors.PoolDoesNotExist):
-            self.array.create_volume("fake_name", 1, 'thin', "fake_pool", None, None, None)
+            self.array.create_volume("fake_name", 1, 'thin', "fake_pool", None, None, None, None)
 
     def test_create_volume_fail_with_no_space_in_pool(self):
         self.client_mock.create_volume.side_effect = InternalServerError("500", message="BE534459")
         with self.assertRaises(array_errors.NotEnoughSpaceInPool):
-            self.array.create_volume("fake_name", 1, 'thin', "fake_pool", None, None, None)
+            self.array.create_volume("fake_name", 1, 'thin', "fake_pool", None, None, None, None)
 
     def test_delete_volume(self):
         scsi_id = "volume_scsi_id_{}".format(self.volume_response.id)

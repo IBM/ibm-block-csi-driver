@@ -43,7 +43,10 @@ class UnsupportedStorageVersionError(BaseArrayActionException):
 # Volume errors
 # =============================================================================
 class InvalidArgumentError(BaseArrayActionException):
-    pass
+
+    def __init__(self, message):
+        super().__init__()
+        self.message = message
 
 
 class ObjectNotFoundError(BaseArrayActionException):
@@ -75,25 +78,22 @@ class VolumeDeletionError(BaseArrayActionException):
 
 
 class IllegalObjectID(InvalidArgumentError):
-
-    def __init__(self, msg):
-        super().__init__()
-        self.message = "{0}".format(msg)
+    pass
 
 
 class PoolDoesNotMatchSpaceEfficiency(InvalidArgumentError):
 
     def __init__(self, pool, space_efficiency, error):
-        super().__init__()
-        self.message = messages.POOL_DOES_NOT_MATCH_SPACE_EFFICIENCY_MESSAGE.format(pool, space_efficiency,
-                                                                                    error)
+        message = messages.POOL_DOES_NOT_MATCH_SPACE_EFFICIENCY_MESSAGE.format(pool, space_efficiency,
+                                                                               error)
+        super().__init__(message)
 
 
 class SpaceEfficiencyNotSupported(InvalidArgumentError):
 
     def __init__(self, space_efficiency):
-        super().__init__()
-        self.message = messages.SPACE_EFFICIENCY_NOT_SUPPORTED_MESSAGE.format(space_efficiency)
+        message = messages.SPACE_EFFICIENCY_NOT_SUPPORTED_MESSAGE.format(space_efficiency)
+        super().__init__(message)
 
 
 class VolumeAlreadyExists(BaseArrayActionException):
@@ -106,15 +106,15 @@ class VolumeAlreadyExists(BaseArrayActionException):
 class PoolDoesNotExist(InvalidArgumentError):
 
     def __init__(self, pool, array):
-        super().__init__()
-        self.message = messages.POOL_DOES_NOT_EXIST_MESSAGE.format(pool, array)
+        message = messages.POOL_DOES_NOT_EXIST_MESSAGE.format(pool, array)
+        super().__init__(message)
 
 
 class PoolParameterIsMissing(InvalidArgumentError):
 
     def __init__(self, array_type):
-        super().__init__()
-        self.message = messages.POOL_PARAMETER_IS_MISSING.format(array_type)
+        message = messages.POOL_PARAMETER_IS_MISSING.format(array_type)
+        super().__init__(message)
 
 
 class FailedToFindStorageSystemType(BaseArrayActionException):
@@ -197,15 +197,15 @@ class NoIscsiTargetsFoundError(BaseArrayActionException):
 class UnsupportedConnectivityTypeError(InvalidArgumentError):
 
     def __init__(self, connectivity_type):
-        super().__init__()
-        self.message = messages.UNSUPPORTED_CONNECTIVITY_TYPE_ERROR_MESSAGE.format(connectivity_type)
+        message = messages.UNSUPPORTED_CONNECTIVITY_TYPE_ERROR_MESSAGE.format(connectivity_type)
+        super().__init__(message)
 
 
 class ExpectedSnapshotButFoundVolumeError(InvalidArgumentError):
 
     def __init__(self, id_or_name, array):
-        super().__init__()
-        self.message = messages.EXPECTED_SNAPSHOT_BUT_FOUND_VOLUME_ERROR_MESSAGE.format(id_or_name, array)
+        message = messages.EXPECTED_SNAPSHOT_BUT_FOUND_VOLUME_ERROR_MESSAGE.format(id_or_name, array)
+        super().__init__(message)
 
 
 class SnapshotAlreadyExists(BaseArrayActionException):
