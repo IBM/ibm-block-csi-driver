@@ -1354,7 +1354,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return self.client.svcinfo.lsvolumesnapshot(**kwargs).as_single_element
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if OBJ_NOT_FOUND in ex.my_message or NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
-                logger.info("snapshot not found")
+                logger.info("snapshot not found for args: {}".format(kwargs))
             elif any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
                 raise array_errors.IllegalObjectName(ex.my_message)
             else:
