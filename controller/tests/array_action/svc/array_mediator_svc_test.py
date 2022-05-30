@@ -235,8 +235,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_mocks_for_create_volume_mkvolumegroup()
         self.svc.client.svctask.chvdisk.side_effect = ["", CLIFailureError("CMMVC6035E")]
         with self.assertRaises(array_errors.VolumeAlreadyExists):
-            self.svc.create_volume("test_volume", 1024, "space_efficiency", "pool_name", None, self._mock_source_ids(),
-                                   "snapshot")
+            self.svc.create_volume("test_volume", 1024, "space_efficiency", "pool_name", None, None,
+                                   self._mock_source_ids(), "snapshot")
         self.svc.client.svctask.rmvolume.assert_called_with(vdisk_id='test_id')
 
     def test_create_volume_with_empty_string_space_efficiency_success(self):

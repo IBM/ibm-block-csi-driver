@@ -522,7 +522,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def _is_source_support_addsnapshot(self, object_uid):
         return self._is_addsnapshot_supported() and not self._is_source_has_fcmaps(object_uid)
 
-    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids, source_type):
+    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
+                      source_type):
         is_copied = False
         if source_type and self._is_source_support_addsnapshot(source_ids.object_uid):
             self._create_cli_volume_with_snapshot(name, pool, io_group, source_ids, source_type)
