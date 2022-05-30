@@ -36,8 +36,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         logger.debug("volume name : {}".format(request.name))
 
         source_type, source_ids = self._get_source_type_and_id(request)
+        source_id = source_ids.object_uid
 
-        logger.debug("Source {0} ids : {1}".format(source_type, source_ids))
+        logger.debug("Source {0} ids : {1}".format(source_type, source_id))
 
         topologies = utils.get_volume_topologies(request)
 
@@ -89,7 +90,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug("volume found : {}".format(volume))
 
                     volume_capacity_bytes = volume.capacity_bytes
-                    if not source_ids and volume_capacity_bytes < required_bytes:
+                    if not source_id and volume_capacity_bytes < required_bytes:
                         message = "Volume was already created with different size." \
                                   " volume size: {}, requested size: {}".format(volume_capacity_bytes,
                                                                                 required_bytes)
@@ -97,16 +98,16 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                     csi_pb2.CreateVolumeResponse)
 
                     response = self._get_create_volume_response_for_existing_volume_source(volume,
-                                                                                           source_ids.object_uid,
+                                                                                           source_id,
                                                                                            source_type, system_id,
                                                                                            context)
                     if response:
                         return response
 
-                if source_ids:
-                    array_mediator.copy_to_existing_volume_from_source(volume, source_ids.object_uid,
+                if source_id:
+                    array_mediator.copy_to_existing_volume_from_source(volume, source_id,
                                                                        source_type, required_bytes)
-                    volume.source_id = source_ids.object_uid
+                    volume.source_id = source_id
 
                 response = utils.generate_csi_create_volume_response(volume, array_connection_info.system_id,
                                                                      source_type)
