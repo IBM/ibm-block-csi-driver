@@ -207,7 +207,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def _convert_size_bytes_to_blocks(self, size_in_bytes):
         return int(size_in_bytes / self.BLOCK_SIZE_IN_BYTES)
 
-    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group):
+    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with parameters : {}".format(
             name, size_in_bytes, pool, space_efficiency))
 
