@@ -89,7 +89,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             ClientError("400", "other_error")
         with self.assertRaises(ClientError) as ex:
             DS8KArrayMediator("user", "password", self.endpoint)
-        self.assertEqual(ex.exception.message, "other_error")
+        self.assertEqual("other_error", ex.exception.message)
 
     def test_validate_space_efficiency_thin_success(self):
         self.array.validate_supported_space_efficiency(
@@ -124,7 +124,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             pool=self.volume_response.pool
         )
 
-        self.assertEqual(volume.name, self.volume_response.name)
+        self.assertEqual(self.volume_response.name, volume.name)
         self.array.volume_cache.add_or_delete.assert_called_once_with(self.volume_response.name,
                                                                       self.volume_response.id)
 
@@ -145,7 +145,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             self.volume_response.name,
             pool=self.volume_response.pool
         )
-        self.assertEqual(volume.name, self.volume_response.name)
+        self.assertEqual(self.volume_response.name, volume.name)
         self.client_mock.get_volumes_by_pool.assert_called_once_with(self.volume_response.pool)
 
     def test_get_volume_with_pool_context_not_found(self):
@@ -189,7 +189,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             thin_provisioning=space_efficiency,
             name='test_name',
         )
-        self.assertEqual(volume.name, self.volume_response.name)
+        self.assertEqual(self.volume_response.name, volume.name)
 
     def test_create_volume_fail_with_client_exception(self):
         self.client_mock.create_volume.side_effect = ClientException("500")
@@ -354,7 +354,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         connectivity_type = "fake_connectivity_type"
         self.client_mock.map_volume_to_host.return_value = Munch({"lunid": "01"})
         lun = self.array.map_volume(scsi_id, host_name, connectivity_type)
-        self.assertEqual(lun, 1)
+        self.assertEqual(1, lun)
         self.client_mock.map_volume_to_host.assert_called_once_with(host_name, scsi_id[-4:])
 
     def test_unmap_volume_host_not_found(self):
@@ -438,11 +438,11 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.get_host.return_value = Munch(
             {"name": "test_host_1", "host_ports_briefs": [{"wwpn": "wwpn1"}, {"wwpn": "wwpn2"}]})
         host = self.array.get_host_by_name('test_host_1')
-        self.assertEqual(host.name, "test_host_1")
-        self.assertEqual(host.connectivity_types, ['fc'])
-        self.assertEqual(host.initiators.nvme_nqns, [])
-        self.assertEqual(host.initiators.fc_wwns, ['wwpn1', 'wwpn2'])
-        self.assertEqual(host.initiators.iscsi_iqns, [])
+        self.assertEqual("test_host_1", host.name)
+        self.assertEqual(['fc'], host.connectivity_types)
+        self.assertEqual([], host.initiators.nvme_nqns)
+        self.assertEqual(['wwpn1', 'wwpn2'], host.initiators.fc_wwns)
+        self.assertEqual([], host.initiators.iscsi_iqns)
 
     def test_get_host_by_name_raise_host_not_found(self):
         self.client_mock.get_host.side_effect = NotFound("404", message='BE7A0001')
@@ -462,7 +462,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         host, connectivity_type = self.array.get_host_by_host_identifiers(
             Initiators([], [wwpn1, wwpn2], [])
         )
-        self.assertEqual(host, host_name)
+        self.assertEqual(host_name, host)
         self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_type)
 
     def test_get_host_by_identifiers_partial_match(self):

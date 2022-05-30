@@ -154,6 +154,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 		if SgInqWwnLower == volumeUuidLower || SgInqWwnLower == volumeNguid {
 			return dmPath, nil
 		}
+		logger.Warningf("Expected {%v} but got {%v} from sg_inq", volumeId, SgInqWwn)
 	}
 
 	if err := r.Helper.ReloadMultipath(); err != nil {
@@ -471,7 +472,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 				return "", &ErrorNoRegexWwnMatchInScsiInq{dev, line}
 			}
 			wwn = matches[1]
-			logger.Debugf("Found the expected Wwn [%s] in sg_inq", wwn)
+			logger.Debugf("Found wwn [%s] in sg_inq", wwn)
 			return wwn, nil
 		}
 		if regex.MatchString(line) {
