@@ -159,7 +159,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             return self.client.cmd.vol_list(vol=volume_name).as_single_element
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
-            raise array_errors.IllegalObjectName(ex.status)
+            raise array_errors.InvalidArgumentError(ex.status)
 
     def get_volume(self, name, pool=None):
         logger.debug("Get volume : {}".format(name))
@@ -207,7 +207,8 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def _convert_size_bytes_to_blocks(self, size_in_bytes):
         return int(size_in_bytes / self.BLOCK_SIZE_IN_BYTES)
 
-    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, source_id, source_type):
+    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
+                      source_type):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with parameters : {}".format(
             name, size_in_bytes, pool, space_efficiency))
 
@@ -220,7 +221,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             return self._generate_volume_response(cli_volume)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
-            raise array_errors.IllegalObjectName(ex.status)
+            raise array_errors.InvalidArgumentError(ex.status)
         except xcli_errors.VolumeExistsError as ex:
             logger.exception(ex)
             raise array_errors.VolumeAlreadyExists(name, self.endpoint)
@@ -256,7 +257,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                 self.client.cmd.vol_resize(vol=name, size_blocks=min_vol_size_in_blocks)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
-            raise array_errors.IllegalObjectName(ex.status)
+            raise array_errors.InvalidArgumentError(ex.status)
         except xcli_errors.SourceVolumeBadNameError as ex:
             logger.exception(ex)
             raise array_errors.ObjectNotFoundError(source_id)
@@ -272,7 +273,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             cli_object = self.client.cmd.vol_list(wwn=volume_id).as_single_element
         except xcli_errors.IllegalValueForArgumentError as ex:
             logger.exception(ex)
-            raise array_errors.IllegalObjectID(ex.status)
+            raise array_errors.InvalidArgumentError(ex.status)
         if not cli_object and not_exist_err:
             raise array_errors.ObjectNotFoundError(volume_id)
         return cli_object
@@ -310,7 +311,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             cli_snapshot = self.client.cmd.vol_list(vol=snapshot_name).as_single_element
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
-            raise array_errors.IllegalObjectName(ex.status)
+            raise array_errors.InvalidArgumentError(ex.status)
         if not cli_snapshot:
             return None
         if not cli_snapshot.master_name:
@@ -340,7 +341,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             return self._generate_snapshot_response(cli_snapshot)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
-            raise array_errors.IllegalObjectName(ex.status)
+            raise array_errors.InvalidArgumentError(ex.status)
         except xcli_errors.VolumeExistsError as ex:
             logger.exception(ex)
             raise array_errors.SnapshotAlreadyExists(snapshot_name, self.endpoint)

@@ -101,11 +101,13 @@ def get_object_parameters(parameters, prefix_param_name, system_id):
     default_space_efficiency = parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
     default_prefix = parameters.get(prefix_param_name)
     default_io_group = parameters.get(config.PARAMETERS_IO_GROUP)
+    default_volume_group = parameters.get(config.PARAMETERS_VOLUME_GROUP)
     return ObjectParameters(
         pool=system_parameters.get(config.PARAMETERS_POOL, default_pool),
         space_efficiency=system_parameters.get(config.PARAMETERS_SPACE_EFFICIENCY, default_space_efficiency),
         prefix=system_parameters.get(prefix_param_name, default_prefix),
-        io_group=system_parameters.get(config.PARAMETERS_IO_GROUP, default_io_group))
+        io_group=system_parameters.get(config.PARAMETERS_IO_GROUP, default_io_group),
+        volume_group=system_parameters.get(config.PARAMETERS_VOLUME_GROUP, default_volume_group))
 
 
 def get_volume_id(new_volume, system_id):
@@ -496,7 +498,7 @@ def get_object_id_info(full_object_id, object_type):
     else:
         raise ObjectIdError(object_type, full_object_id)
     logger.debug("volume id : {0}, array type :{1}".format(object_id, array_type))
-    return ObjectIdInfo(array_type=array_type, system_id=system_id, internal_id=internal_id, object_id=wwn)
+    return ObjectIdInfo(array_type=array_type, system_id=system_id, internal_id=internal_id, object_uid=wwn)
 
 
 def get_node_id_info(node_id):

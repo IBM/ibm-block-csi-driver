@@ -79,32 +79,32 @@ class TestStorageAgent(unittest.TestCase):
         clear_agents()
 
     def test_get_agent_return_new(self):
-        self.assertEqual(len(get_agents()), 0)
+        self.assertEqual(0, len(get_agents()))
         agent = get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="", password=""))
         self.assertIsInstance(agent, StorageAgent)
-        self.assertEqual(len(get_agents()), 1)
+        self.assertEqual(1, len(get_agents()))
         get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test", password="test"))
-        self.assertEqual(len(get_agents()), 2)
+        self.assertEqual(2, len(get_agents()))
 
     def test_get_agent_return_existing(self):
         name = "test_name"
         password = "test_password"
         endpoints = ["ds8k_host", ]
-        self.assertEqual(len(get_agents()), 0)
+        self.assertEqual(0, len(get_agents()))
         agent = get_agent(ArrayConnectionInfo(array_addresses=endpoints, user=name, password=password))
-        self.assertEqual(len(get_agents()), 1)
+        self.assertEqual(1, len(get_agents()))
         new_agent = get_agent(ArrayConnectionInfo(array_addresses=endpoints, user=name, password=password))
-        self.assertEqual(len(get_agents()), 1)
+        self.assertEqual(1, len(get_agents()))
         self.assertEqual(id(agent), id(new_agent))
 
     def test_get_agent_return_new_when_password_changed(self):
         name = "test_name"
         endpoints = ["ds8k_host", ]
-        self.assertEqual(len(get_agents()), 0)
+        self.assertEqual(0, len(get_agents()))
         agent = get_agent(ArrayConnectionInfo(array_addresses=endpoints, user=name, password="pa"))
-        self.assertEqual(len(get_agents()), 1)
+        self.assertEqual(1, len(get_agents()))
         new_agent = get_agent(ArrayConnectionInfo(array_addresses=endpoints, user=name, password="pb"))
-        self.assertEqual(len(get_agents()), 1)
+        self.assertEqual(1, len(get_agents()))
         self.assertNotEqual(id(agent), id(new_agent))
 
     @patch("controller.array_action.storage_agent.ConnectionPool")
@@ -134,44 +134,44 @@ class TestStorageAgent(unittest.TestCase):
     def test_get_mediator(self):
         with self.agent.get_mediator() as mediator:
             self.assertIsInstance(mediator, DS8KArrayMediator)
-            self.assertEqual(self.client_mock.get_system.call_count, 1)
+            self.assertEqual(1, self.client_mock.get_system.call_count)
 
     def test_get_multiple_mediators_sequentially(self):
         for _ in range(3):
             with self.agent.get_mediator() as mediator:
                 self.assertIsInstance(mediator, DS8KArrayMediator)
-                self.assertEqual(self.agent.conn_pool.current_size, 1)
-                self.assertEqual(self.client_mock.get_system.call_count, 1)
+                self.assertEqual(1, self.agent.conn_pool.current_size)
+                self.assertEqual(1, self.client_mock.get_system.call_count)
 
-        self.assertEqual(self.agent.conn_pool.current_size, 1)
+        self.assertEqual(1, self.agent.conn_pool.current_size)
 
     def test_get_multiple_mediators_parallelly(self):
         with self.agent.get_mediator() as mediator1:
             self.assertIsInstance(mediator1, DS8KArrayMediator)
-            self.assertEqual(self.agent.conn_pool.current_size, 1)
-            self.assertEqual(self.client_mock.get_system.call_count, 1)
+            self.assertEqual(1, self.agent.conn_pool.current_size)
+            self.assertEqual(1, self.client_mock.get_system.call_count)
             with self.agent.get_mediator() as mediator2:
                 self.assertIsInstance(mediator2, DS8KArrayMediator)
-                self.assertEqual(self.agent.conn_pool.current_size, 2)
-                self.assertEqual(self.client_mock.get_system.call_count, 2)
+                self.assertEqual(2, self.agent.conn_pool.current_size)
+                self.assertEqual(2, self.client_mock.get_system.call_count)
                 with self.agent.get_mediator() as mediator3:
                     self.assertIsInstance(mediator3, DS8KArrayMediator)
-                    self.assertEqual(self.agent.conn_pool.current_size, 3)
-                    self.assertEqual(self.client_mock.get_system.call_count, 3)
+                    self.assertEqual(3, self.agent.conn_pool.current_size)
+                    self.assertEqual(3, self.client_mock.get_system.call_count)
 
-        self.assertEqual(self.agent.conn_pool.current_size, 3)
+        self.assertEqual(3, self.agent.conn_pool.current_size)
 
     def test_get_mediator_find_one_inactive(self):
         with self.agent.get_mediator() as mediator, self.agent.get_mediator():
             mediator.is_active = Mock(return_value=False)
         # two clients in the pool, but one of them are inactive after using.
-        self.assertEqual(self.agent.conn_pool.current_size, 2)
+        self.assertEqual(2, self.agent.conn_pool.current_size)
 
         for _ in range(10):
             with self.agent.get_mediator():
                 pass
         # After some iteration, the inactive client is disconnected and removed.
-        self.assertEqual(self.agent.conn_pool.current_size, 1)
+        self.assertEqual(1, self.agent.conn_pool.current_size)
 
     @staticmethod
     def _wait_for_count(count, target_count):
@@ -186,7 +186,7 @@ class TestStorageAgent(unittest.TestCase):
             agent = get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test", password="test"))
             with agent.get_mediator() as mediator:
                 self.assertIsInstance(mediator, DS8KArrayMediator)
-                self.assertEqual(agent.conn_pool.current_size, current_size)
+                self.assertEqual(current_size, agent.conn_pool.current_size)
                 # get_system is called in setUp() too.
                 self.assertEqual(self.client_mock.get_system.call_count, current_size + 1)
 

@@ -13,7 +13,7 @@ class Volume:
     source_id: str
     array_type: str
     pool: str
-    copied: bool = False
+    is_copied: bool = False
     space_efficiency: str = None
     default_space_efficiency: str = None
 
