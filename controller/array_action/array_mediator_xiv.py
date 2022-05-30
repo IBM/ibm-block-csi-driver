@@ -159,7 +159,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             return self.client.cmd.vol_list(vol=volume_name).as_single_element
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
-            raise array_errors.IllegalObjectName(ex.status)
+            raise array_errors.IllegalObjectID(ex.status)
 
     def get_volume(self, name, pool=None):
         logger.debug("Get volume : {}".format(name))
@@ -220,7 +220,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             return self._generate_volume_response(cli_volume)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
-            raise array_errors.IllegalObjectName(ex.status)
+            raise array_errors.IllegalObjectID(ex.status)
         except xcli_errors.VolumeExistsError as ex:
             logger.exception(ex)
             raise array_errors.VolumeAlreadyExists(name, self.endpoint)
@@ -256,7 +256,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                 self.client.cmd.vol_resize(vol=name, size_blocks=min_vol_size_in_blocks)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
-            raise array_errors.IllegalObjectName(ex.status)
+            raise array_errors.IllegalObjectID(ex.status)
         except xcli_errors.SourceVolumeBadNameError as ex:
             logger.exception(ex)
             raise array_errors.ObjectNotFoundError(source_id)
@@ -310,7 +310,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             cli_snapshot = self.client.cmd.vol_list(vol=snapshot_name).as_single_element
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
-            raise array_errors.IllegalObjectName(ex.status)
+            raise array_errors.IllegalObjectID(ex.status)
         if not cli_snapshot:
             return None
         if not cli_snapshot.master_name:
@@ -340,7 +340,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             return self._generate_snapshot_response(cli_snapshot)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
-            raise array_errors.IllegalObjectName(ex.status)
+            raise array_errors.IllegalObjectID(ex.status)
         except xcli_errors.VolumeExistsError as ex:
             logger.exception(ex)
             raise array_errors.SnapshotAlreadyExists(snapshot_name, self.endpoint)

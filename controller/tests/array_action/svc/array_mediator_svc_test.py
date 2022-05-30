@@ -103,8 +103,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_get_volume_lsvdisk_cli_failure_errors(self):
         self._test_get_volume_lsvdisk_cli_failure_error("volume_name", 'CMMVC5753E', array_errors.ObjectNotFoundError)
-        self._test_get_volume_lsvdisk_cli_failure_error("\xff", 'CMMVC6017E', array_errors.IllegalObjectName)
-        self._test_get_volume_lsvdisk_cli_failure_error("12345", 'CMMVC5703E', array_errors.IllegalObjectName)
+        self._test_get_volume_lsvdisk_cli_failure_error("\xff", 'CMMVC6017E', array_errors.IllegalObjectID)
+        self._test_get_volume_lsvdisk_cli_failure_error("12345", 'CMMVC5703E', array_errors.IllegalObjectID)
         self._test_get_volume_lsvdisk_cli_failure_error("", 'other error', CLIFailureError)
 
     def test_get_volume_return_correct_value(self):
@@ -157,9 +157,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                 self.svc.client.svctask.mkvolume, Exception, Exception)
         self._test_create_volume_mkvolume_cli_failure_error("Failed", CLIFailureError)
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC8710E", array_errors.NotEnoughSpaceInPool)
-        self._test_create_volume_mkvolume_cli_failure_error("CMMVC6017E", array_errors.IllegalObjectName, "\xff")
-        self._test_create_volume_mkvolume_cli_failure_error("CMMVC6527E", array_errors.IllegalObjectName, "1_volume")
-        self._test_create_volume_mkvolume_cli_failure_error("CMMVC5738E", array_errors.IllegalObjectName, "a" * 64)
+        self._test_create_volume_mkvolume_cli_failure_error("CMMVC6017E", array_errors.IllegalObjectID, "\xff")
+        self._test_create_volume_mkvolume_cli_failure_error("CMMVC6527E", array_errors.IllegalObjectID, "1_volume")
+        self._test_create_volume_mkvolume_cli_failure_error("CMMVC5738E", array_errors.IllegalObjectID, "a" * 64)
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC6035E", array_errors.VolumeAlreadyExists)
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC5754E", array_errors.PoolDoesNotExist)
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC9292E", array_errors.PoolDoesNotMatchSpaceEfficiency)
@@ -423,8 +423,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                             client_method, error_message_id, expected_error)
 
     def _test_get_snapshot_illegal_name_cli_failure_errors(self, client_method):
-        self._test_get_snapshot_cli_failure_error("\xff", client_method, 'CMMVC6017E', array_errors.IllegalObjectName)
-        self._test_get_snapshot_cli_failure_error("12345", client_method, 'CMMVC5703E', array_errors.IllegalObjectName)
+        self._test_get_snapshot_cli_failure_error("\xff", client_method, 'CMMVC6017E', array_errors.IllegalObjectID)
+        self._test_get_snapshot_cli_failure_error("12345", client_method, 'CMMVC5703E', array_errors.IllegalObjectID)
 
     def test_get_snapshot_lsvdisk_cli_failure_errors(self):
         client_method = self.svc.client.svcinfo.lsvdisk
@@ -718,7 +718,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                 self.svc.client.svctask.addsnapshot, Exception, Exception)
         self._test_create_snapshot_addsnapshot_cli_failure_error("Failed", CLIFailureError)
         self._test_create_snapshot_addsnapshot_cli_failure_error("CMMVC8710E", array_errors.NotEnoughSpaceInPool)
-        self._test_create_snapshot_addsnapshot_cli_failure_error("CMMVC6017E", array_errors.IllegalObjectName)
+        self._test_create_snapshot_addsnapshot_cli_failure_error("CMMVC6017E", array_errors.IllegalObjectID)
         self._test_create_snapshot_addsnapshot_cli_failure_error("CMMVC6035E", array_errors.SnapshotAlreadyExists)
         self._test_create_snapshot_addsnapshot_cli_failure_error("CMMVC5754E", array_errors.PoolDoesNotExist)
 

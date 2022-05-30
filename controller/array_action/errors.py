@@ -74,13 +74,6 @@ class VolumeDeletionError(BaseArrayActionException):
         self.message = messages.VOLUME_DELETION_ERROR_MESSAGE.format(volume_id)
 
 
-class IllegalObjectName(InvalidArgumentError):
-
-    def __init__(self, msg):
-        super().__init__()
-        self.message = "{0}".format(msg)
-
-
 class IllegalObjectID(InvalidArgumentError):
 
     def __init__(self, msg):

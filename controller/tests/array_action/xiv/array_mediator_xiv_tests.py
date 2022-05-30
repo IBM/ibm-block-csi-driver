@@ -39,7 +39,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
     def test_get_volume_raise_illegal_object_name(self):
         self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalNameForObjectError("", "volume", "")]
-        with self.assertRaises(array_errors.IllegalObjectName):
+        with self.assertRaises(array_errors.IllegalObjectID):
             self.mediator.get_volume("volume")
 
     def test_get_volume_returns_nothing(self):
@@ -102,7 +102,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
     def test_create_volume_raise_illegal_name_for_object(self):
         self.mediator.client.cmd.vol_create.side_effect = [xcli_errors.IllegalNameForObjectError("", "volume", "")]
-        with self.assertRaises(array_errors.IllegalObjectName):
+        with self.assertRaises(array_errors.IllegalObjectID):
             self.mediator.create_volume("volume", 10, None, "pool1", None, None, None)
 
     def test_create_volume_raise_volume_exists_error(self):
@@ -256,7 +256,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         snapshot_name = "snapshot"
         snapshot_volume_wwn = "123456789"
         self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalNameForObjectError("", snapshot_name, "")]
-        with self.assertRaises(array_errors.IllegalObjectName):
+        with self.assertRaises(array_errors.IllegalObjectID):
             self.mediator.get_snapshot(snapshot_volume_wwn, snapshot_name)
 
     def test_create_snapshot_succeeds(self):
@@ -284,7 +284,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
                                           pool="different_pool")
 
     def test_create_snapshot_raise_illegal_name_for_object(self):
-        self._test_create_snapshot_error(xcli_errors.IllegalNameForObjectError, array_errors.IllegalObjectName)
+        self._test_create_snapshot_error(xcli_errors.IllegalNameForObjectError, array_errors.IllegalObjectID)
 
     def test_create_snapshot_raise_snapshot_exists_error(self):
         self._test_create_snapshot_error(xcli_errors.VolumeExistsError, array_errors.SnapshotAlreadyExists)
