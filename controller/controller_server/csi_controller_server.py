@@ -537,7 +537,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 source_id = source.volume.volume_id
                 source_type = config.VOLUME_TYPE_NAME
             else:
-                return None, None
+                return source_type, object_ids
             object_id_info = utils.get_object_id_info(source_id, source_type)
             object_ids = object_id_info.object_ids
         return source_type, object_ids
