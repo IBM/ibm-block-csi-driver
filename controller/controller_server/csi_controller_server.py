@@ -475,7 +475,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         if volume_parameters.prefix:
             prefix = volume_parameters.prefix
             if len(prefix) > array_mediator.max_object_prefix_length:
-                raise array_errors.IllegalObjectID(
+                raise array_errors.InvalidArgumentError(
                     "The {} name prefix '{}' is too long, max allowed length is {}".format(
                         object_type,
                         prefix,

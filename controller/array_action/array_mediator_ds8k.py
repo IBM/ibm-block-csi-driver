@@ -480,7 +480,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 raise array_errors.ObjectNotFoundError(volume_id)
         except (exceptions.ClientError, exceptions.InternalServerError) as ex:
             if INCORRECT_ID in str(ex.message).upper():
-                raise array_errors.IllegalObjectID(volume_id)
+                raise array_errors.InvalidArgumentError(volume_id)
         return None
 
     def _get_flashcopy_process(self, flashcopy_id, not_exist_err=True):

@@ -260,11 +260,11 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
                                                             grpc_status=grpc.StatusCode.INTERNAL)
 
     def test_create_snapshot_with_get_snapshot_illegal_object_name_exception(self):
-        self._test_create_snapshot_get_snapshot_raise_error(exception=array_errors.IllegalObjectID("snapshot"),
+        self._test_create_snapshot_get_snapshot_raise_error(exception=array_errors.InvalidArgumentError("snapshot"),
                                                             grpc_status=grpc.StatusCode.INVALID_ARGUMENT)
 
     def test_create_snapshot_with_get_snapshot_illegal_object_id_exception(self):
-        self._test_create_snapshot_get_snapshot_raise_error(exception=array_errors.IllegalObjectID("volume-id"),
+        self._test_create_snapshot_get_snapshot_raise_error(exception=array_errors.InvalidArgumentError("volume-id"),
                                                             grpc_status=grpc.StatusCode.INVALID_ARGUMENT)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
@@ -305,7 +305,7 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
 
     def test_create_snapshot_with_illegal_object_name_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
-                                           err=array_errors.IllegalObjectID("snapshot"))
+                                           err=array_errors.InvalidArgumentError("snapshot"))
 
     def test_create_snapshot_with_snapshot_source_pool_mismatch_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
@@ -318,7 +318,7 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
 
     def test_create_snapshot_with_illegal_object_id_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
-                                           err=array_errors.IllegalObjectID("volume-id"))
+                                           err=array_errors.InvalidArgumentError("volume-id"))
 
     def test_create_snapshot_with_space_efficiency_not_supported_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
@@ -565,10 +565,10 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_with_get_volume_illegal_object_name_exception(self, storage_agent):
         storage_agent.return_value = self.storage_agent
-        self.mediator.get_volume.side_effect = [array_errors.IllegalObjectID("volume")]
+        self.mediator.get_volume.side_effect = [array_errors.InvalidArgumentError("volume")]
 
         self.servicer.CreateVolume(self.request, self.context)
-        msg = array_errors.IllegalObjectID("volume").message
+        msg = array_errors.InvalidArgumentError("volume").message
 
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertIn(msg, self.context.details)
@@ -609,7 +609,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
     def test_create_volume_with_illegal_object_name_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
-                                         err=array_errors.IllegalObjectID("volume"))
+                                         err=array_errors.InvalidArgumentError("volume"))
 
     def test_create_volume_with_volume_exists_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.ALREADY_EXISTS,
@@ -823,7 +823,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_from_source_illegal_object_id(self, storage_agent):
-        array_exception = array_errors.IllegalObjectID("")
+        array_exception = array_errors.InvalidArgumentError("")
         self._test_create_volume_from_snapshot_error(storage_agent, array_exception,
                                                      grpc.StatusCode.INVALID_ARGUMENT)
 
@@ -1597,7 +1597,7 @@ class TestExpandVolume(BaseControllerSetUp, CommonControllerTest):
 
     def test_expand_volume_with_illegal_object_id_exception(self):
         self._expand_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
-                                          err=array_errors.IllegalObjectID("123"))
+                                          err=array_errors.InvalidArgumentError("123"))
 
     def test_expand_volume_with_permission_denied_exception(self):
         self._expand_volume_returns_error(return_code=grpc.StatusCode.PERMISSION_DENIED,

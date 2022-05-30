@@ -91,7 +91,7 @@ class ArrayMediator(ABC):
 
         Raises:
             ObjectNotFound
-            IllegalObjectID
+            InvalidArgument
             PermissionDenied
             ObjectIsStillInUse
         """
@@ -112,7 +112,7 @@ class ArrayMediator(ABC):
 
         Raises:
             ObjectNotFound
-            IllegalObjectName
+            InvalidArgument
             PermissionDenied
             PoolParameterIsMissing
         """
@@ -129,7 +129,7 @@ class ArrayMediator(ABC):
            None
         Raises:
             ObjectNotFound
-            IllegalObjectID
+            InvalidArgument
             ObjectIsStillInUse
             NotEnoughSpaceInPool
         """
@@ -148,7 +148,7 @@ class ArrayMediator(ABC):
 
         Raises:
             ObjectNotFound
-            IllegalObjectID
+            InvalidArgument
         """
         raise NotImplementedError
 
@@ -208,8 +208,7 @@ class ArrayMediator(ABC):
            Snapshot
         Raises:
             ExpectedSnapshotButFoundVolumeError
-            IllegalObjectName
-            IllegalObjectID
+            InvalidArgument
             PermissionDenied
         """
         raise NotImplementedError
@@ -243,8 +242,7 @@ class ArrayMediator(ABC):
             Snapshot
         Raises:
             ObjectNotFound
-            IllegalObjectName
-            IllegalObjectID
+            InvalidArgument
             PermissionDenied
             NotEnoughSpaceInPool
             SnapshotSourcePoolMismatch
@@ -262,7 +260,7 @@ class ArrayMediator(ABC):
             None
         Raises:
             ObjectNotFound
-            IllegalObjectID
+            InvalidArgument
             PermissionDenied
             ObjectIsStillInUse
         """
@@ -377,7 +375,7 @@ class ArrayMediator(ABC):
 
         Raises:
             ObjectNotFound
-            IllegalObjectName
+            InvalidArgument
             PermissionDenied
         """
         raise NotImplementedError
@@ -398,7 +396,7 @@ class ArrayMediator(ABC):
 
         Raises:
             ObjectNotFound
-            IllegalObjectName
+            InvalidArgument
             PermissionDenied
         """
         raise NotImplementedError
@@ -416,7 +414,7 @@ class ArrayMediator(ABC):
 
         Raises:
             ObjectNotFound
-            IllegalObjectName
+            InvalidArgument
             PermissionDenied
         """
         raise NotImplementedError
@@ -434,7 +432,7 @@ class ArrayMediator(ABC):
 
         Raises:
             ObjectNotFound
-            IllegalObjectName
+            InvalidArgument
             PermissionDenied
         """
         raise NotImplementedError
@@ -452,7 +450,7 @@ class ArrayMediator(ABC):
 
         Raises:
             ObjectNotFound
-            IllegalObjectName
+            InvalidArgument
             PermissionDenied
         """
         raise NotImplementedError

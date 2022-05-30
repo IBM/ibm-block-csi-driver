@@ -234,7 +234,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_delete_volume_failed_with_illegal_object_id(self):
         self.client_mock.get_volume.side_effect = InternalServerError("500", message="BE7A0005")
-        with self.assertRaises(array_errors.IllegalObjectID):
+        with self.assertRaises(array_errors.InvalidArgumentError):
             self.array.delete_volume("fake_id")
 
     def test_delete_volume_with_flashcopies_as_source_and_target_fail(self):
@@ -510,7 +510,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_get_snapshot_failed_with_incorrect_id(self):
         self.client_mock.get_volume.side_effect = InternalServerError("500", message="BE7A0005")
-        with self.assertRaises(array_errors.IllegalObjectID):
+        with self.assertRaises(array_errors.InvalidArgumentError):
             self.array.get_snapshot("volume_id", "test_name", pool=None)
 
     def _test_get_snapshot_success(self, with_cache=False):
@@ -596,7 +596,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_create_snapshot_failed_with_incorrect_id(self):
         self.client_mock.get_volume.side_effect = InternalServerError("500", message="BE7A0005")
-        with self.assertRaises(array_errors.IllegalObjectID):
+        with self.assertRaises(array_errors.InvalidArgumentError):
             self.array.create_snapshot("volume_id", "test_name", space_efficiency=None, pool=None)
 
     def test_create_snapshot_success(self):
@@ -711,7 +711,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_delete_snapshot_failed_with_illegal_object_id(self):
         self.client_mock.get_volume.side_effect = InternalServerError("500", message="BE7A0005")
-        with self.assertRaises(array_errors.IllegalObjectID):
+        with self.assertRaises(array_errors.InvalidArgumentError):
             self.array.delete_snapshot("fake_id", "internal_id")
 
     def _prepare_mocks_for_copy_to_existing_volume(self):
@@ -749,7 +749,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_copy_to_existing_volume_raise_illegal_object_id(self):
         self._test_copy_to_existing_volume_raise_errors(client_method=self.client_mock.get_volume,
                                                         client_error=InternalServerError("500", "BE7A0005"),
-                                                        expected_error=array_errors.IllegalObjectID)
+                                                        expected_error=array_errors.InvalidArgumentError)
 
     def test_get_object_by_id_snapshot(self):
         snapshot = self._prepare_mocks_for_snapshot()
@@ -799,7 +799,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_expand_volume_raise_illegal(self):
         volume = self._prepare_mocks_for_volume()
         self.client_mock.get_volume.side_effect = [InternalServerError("500", "BE7A0005")]
-        with self.assertRaises(array_errors.IllegalObjectID):
+        with self.assertRaises(array_errors.InvalidArgumentError):
             self.array.expand_volume(volume_id=volume.id, required_bytes=10)
 
     def test_expand_volume_get_volume_not_found_error(self):

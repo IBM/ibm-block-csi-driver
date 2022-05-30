@@ -77,10 +77,6 @@ class VolumeDeletionError(BaseArrayActionException):
         self.message = messages.VOLUME_DELETION_ERROR_MESSAGE.format(volume_id)
 
 
-class IllegalObjectID(InvalidArgumentError):
-    pass
-
-
 class PoolDoesNotMatchSpaceEfficiency(InvalidArgumentError):
 
     def __init__(self, pool, space_efficiency, error):

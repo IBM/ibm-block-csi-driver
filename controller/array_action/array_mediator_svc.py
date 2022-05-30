@@ -301,7 +301,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 logger.info("volume not found")
                 return None
             if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG, INVALID_FILTER_VALUE)):
-                raise array_errors.IllegalObjectID(ex.my_message)
+                raise array_errors.InvalidArgumentError(ex.my_message)
             raise ex
 
     def _get_cli_volume(self, volume_name, not_exist_err=True):
@@ -481,7 +481,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in ex.my_message:
                     raise array_errors.NotEnoughSpaceInPool(id_or_name=pool)
                 if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, INVALID_NAME, TOO_MANY_CHARS)):
-                    raise array_errors.IllegalObjectID(ex.my_message)
+                    raise array_errors.InvalidArgumentError(ex.my_message)
                 raise ex
         logger.info("finished creating cli volume : {}".format(name))
 
@@ -506,18 +506,18 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         target_volume_name = self._get_volume_name_by_wwn(volume_id)
         self._copy_to_target_volume(target_volume_name, source_name)
 
-    def _create_cli_volume_from_snapshot(self, name, pool, io_group, source_id):
+    def _create_cli_volume_from_snapshot(self, name, pool, io_group, volume_group, source_id):
         logger.info("creating volume from snapshot")
         response = self._mkvolumegroup(name, pool, io_group, source_id)
         volume_group_id = self._get_id_from_response(response)
         volume_id = self._get_volume_id_from_volume_group(volume_group_id)
 
-        self._extract_and_remove_volume_group(volume_id, volume_group_id)
+        self._extract_and_remove_volume_group(volume_id, volume_group, volume_group_id)
         self._rename_volume(volume_id, name)
 
-    def _create_cli_volume_with_snapshot(self, name, pool, io_group, source_ids, source_type):
+    def _create_cli_volume_with_snapshot(self, name, pool, io_group, volume_group, source_ids, source_type):
         if source_type == controller_config.SNAPSHOT_TYPE_NAME:
-            self._create_cli_volume_from_snapshot(name, pool, io_group, source_ids.internal_id)
+            self._create_cli_volume_from_snapshot(name, pool, io_group, volume_group, source_ids.internal_id)
 
     def _is_source_support_addsnapshot(self, object_uid):
         return self._is_addsnapshot_supported() and not self._is_source_has_fcmaps(object_uid)
@@ -526,7 +526,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                       source_type):
         is_copied = False
         if source_type and self._is_source_support_addsnapshot(source_ids.object_uid):
-            self._create_cli_volume_with_snapshot(name, pool, io_group, source_ids, source_type)
+            self._create_cli_volume_with_snapshot(name, pool, io_group, volume_group, source_ids, source_type)
             is_copied = True
         else:
             self._create_cli_volume(name, size_in_bytes, space_efficiency, pool, io_group, volume_group)
@@ -1357,7 +1357,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in ex.my_message:
                     raise array_errors.NotEnoughSpaceInPool(id_or_name=pool)
                 if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, INVALID_NAME, TOO_MANY_CHARS)):
-                    raise array_errors.IllegalObjectID(ex.my_message)
+                    raise array_errors.InvalidArgumentError(ex.my_message)
                 raise ex
             return None
 
@@ -1374,7 +1374,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             if OBJ_NOT_FOUND in ex.my_message or NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
                 logger.info("snapshot not found for args: {}".format(kwargs))
             elif any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
-                raise array_errors.IllegalObjectID(ex.my_message)
+                raise array_errors.InvalidArgumentError(ex.my_message)
             else:
                 raise ex
         return None
@@ -1417,7 +1417,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in ex.my_message:
                     raise array_errors.NotEnoughSpaceInPool(id_or_name=pool)
                 if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, INVALID_NAME, TOO_MANY_CHARS)):
-                    raise array_errors.IllegalObjectID(ex.my_message)
+                    raise array_errors.InvalidArgumentError(ex.my_message)
                 raise ex
         return None
 
@@ -1429,19 +1429,24 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def _rollback_create_volume_from_snapshot(self, volume_id):
         self._delete_volume_by_name(volume_id)
 
-    def _remove_from_volume_group(self, volume_id):
-        self._chvdisk(vdisk_id=volume_id, novolumegroup=True)
+    def _change_volume_group(self, volume_id, volume_group):
+        cli_kwargs = {}
+        if volume_group:
+            cli_kwargs['volumegroup'] = volume_group
+        else:
+            cli_kwargs['novolumegroup'] = True
+        self._chvdisk(volume_id, **cli_kwargs)
 
     def _rename_volume(self, volume_id, name):
         try:
-            self._chvdisk(vdisk_id=volume_id, name=name)
+            self._chvdisk(volume_id, name=name)
         except array_errors.VolumeAlreadyExists as ex:
             self._rollback_create_volume_from_snapshot(volume_id)
             raise ex
 
-    def _chvdisk(self, **kwargs):
+    def _chvdisk(self, volume_id, **kwargs):
         try:
-            self.client.svctask.chvdisk(**kwargs)
+            self.client.svctask.chvdisk(vdisk_id=volume_id, **kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if is_warning_message(ex.my_message):
                 logger.warning(
@@ -1465,8 +1470,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                     logger.warning(array_errors.ObjectNotFoundError(volume_group_id))
                 raise ex
 
-    def _extract_and_remove_volume_group(self, volume_id, volume_group_id):
-        self._remove_from_volume_group(volume_id)
+    def _extract_and_remove_volume_group(self, volume_id, volume_group, volume_group_id):
+        self._change_volume_group(volume_id, volume_group)
         self._rmvolumegroup(volume_group_id)
 
     def _is_source_has_fcmaps(self, object_uid):
