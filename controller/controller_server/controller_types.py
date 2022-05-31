@@ -16,11 +16,11 @@ class ObjectIdInfo:
     array_type: str
     system_id: str
     internal_id: InitVar[str]
-    object_uid: InitVar[str]
-    object_ids: ObjectIds = field(init=False)
+    uid: InitVar[str]
+    ids: ObjectIds = field(init=False)
 
-    def __post_init__(self, internal_id, object_uid):
-        self.object_ids = ObjectIds(internal_id=internal_id, object_uid=object_uid)
+    def __post_init__(self, internal_id, uid):
+        self.ids = ObjectIds(internal_id=internal_id, uid=uid)
 
 
 @dataclass
