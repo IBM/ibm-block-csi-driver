@@ -214,7 +214,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
 
     def _mock_source_ids(self, internal_id=''):
-        source_ids = MagicMock(spec=['object_uid', 'internal_id'])
+        source_ids = MagicMock(spec=['uid', 'internal_id'])
         source_ids.internal_id = internal_id
         return source_ids
 
@@ -247,6 +247,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.create_volume("test_volume", 1024, "space_efficiency", "pool_name", None, None,
                                    self._mock_source_ids(), "snapshot")
         self.svc.client.svctask.rmvolume.assert_called_with(vdisk_id='test_id')
+        self.svc.client.svctask.rmvolumegroup.assert_called_with(object_id=0)
 
     def test_create_volume_with_empty_string_space_efficiency_success(self):
         self._test_create_volume_with_default_space_efficiency_success("")
