@@ -336,9 +336,6 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         except (ObjectIdError, array_errors.SnapshotSourcePoolMismatch, array_errors.SpaceEfficiencyNotSupported) as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
                                     csi_pb2.CreateSnapshotResponse)
-        except array_errors.SnapshotAlreadyExists as ex:
-            return handle_exception(ex, context, grpc.StatusCode.ALREADY_EXISTS,
-                                    csi_pb2.CreateSnapshotResponse)
         except array_errors.NotEnoughSpaceInPool as ex:
             return handle_exception(ex, context, grpc.StatusCode.RESOURCE_EXHAUSTED,
                                     csi_pb2.CreateSnapshotResponse)
