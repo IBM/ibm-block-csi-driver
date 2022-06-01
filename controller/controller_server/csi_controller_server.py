@@ -38,7 +38,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         source_type, source_ids = self._get_source_type_and_id(request)
         source_id = source_ids.uid if source_ids.uid else source_ids.internal_id
 
-        logger.debug("Source {0} ids : {1}".format(source_type, source_id))
+        logger.debug("Source {0} id : {1}".format(source_type, source_id))
 
         topologies = utils.get_volume_topologies(request)
 
