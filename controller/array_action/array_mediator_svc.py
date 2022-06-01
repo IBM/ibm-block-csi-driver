@@ -528,8 +528,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if source_type == controller_config.SNAPSHOT_TYPE_NAME:
             self._create_cli_volume_from_snapshot(name, pool, io_group, volume_group, source_ids.internal_id)
 
-    def _is_source_support_addsnapshot(self, object_uid):
-        return self._is_addsnapshot_supported() and not self._is_source_has_fcmaps(object_uid)
+    def _is_source_support_addsnapshot(self, vdisk_uid):
+        return self._is_addsnapshot_supported() and not self._is_source_has_fcmaps(vdisk_uid)
 
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
                       source_type):
@@ -1479,10 +1479,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                         return
                 raise ex
 
-    def _is_source_has_fcmaps(self, object_uid):
-        if not object_uid:
+    def _is_source_has_fcmaps(self, vdisk_uid):
+        if not vdisk_uid:
             return False
-        cli_volume = self._get_cli_volume_by_wwn(object_uid, not_exist_err=False)
+        cli_volume = self._get_cli_volume_by_wwn(vdisk_uid, not_exist_err=False)
         if cli_volume and cli_volume.FC_id:
             return True
         return False
