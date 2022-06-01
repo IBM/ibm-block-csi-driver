@@ -510,19 +510,19 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._mkvolumegroup(name, pool, io_group, source_id)
 
     def _fix_creation_side_effects(self, name, volume_id, volume_group):
-        try:
-            self._change_volume_group(volume_id, volume_group)
-            self._rmvolumegroup(name)
-            self._rename_volume(volume_id, name)
-        except (svc_errors.CommandExecutionError, CLIFailureError, array_errors.VolumeAlreadyExists) as ex:
-            self._rollback_create_volume_from_snapshot(volume_id, name)
-            raise ex
+        self._change_volume_group(volume_id, volume_group)
+        self._rmvolumegroup(name)
+        self._rename_volume(volume_id, name)
 
     def _create_cli_volume_from_snapshot(self, name, pool, io_group, volume_group, source_id):
         logger.info("creating volume from snapshot")
         self._create_volume_in_volume_group(name, pool, io_group, source_id)
         volume_id = self._get_volume_id_from_volume_group(name)
-        self._fix_creation_side_effects(name, volume_id, volume_group)
+        try:
+            self._fix_creation_side_effects(name, volume_id, volume_group)
+        except (svc_errors.CommandExecutionError, CLIFailureError, array_errors.VolumeAlreadyExists) as ex:
+            self._rollback_create_volume_from_snapshot(volume_id, name)
+            raise ex
 
     def _create_cli_volume_from_source(self, name, pool, io_group, volume_group, source_ids, source_type):
         if source_type == controller_config.SNAPSHOT_TYPE_NAME:
