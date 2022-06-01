@@ -6,6 +6,7 @@ provisioner: block.csi.ibm.com
 parameters:
   pool: demo-pool
   io_group: demo-iogrp             # Optional.
+  volume_group: demo-volumegroup   # Optional.
   SpaceEfficiency: thin            # Optional.
   volume_name_prefix: demo-prefix  # Optional.
 
