@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field, InitVar
 
-from controller.common.common_types import ObjectIds
+from controller.array_action.array_action_types import ObjectIds
 
 
 @dataclass

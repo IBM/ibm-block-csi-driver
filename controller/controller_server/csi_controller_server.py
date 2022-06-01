@@ -8,7 +8,7 @@ import controller.controller_server.utils as utils
 from controller.array_action import messages
 from controller.array_action.storage_agent import get_agent, detect_array_type
 from controller.common import settings
-from controller.common.common_types import ObjectIds
+from controller.array_action.array_action_types import ObjectIds
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.node_info import NodeIdInfo
 from controller.controller_server import messages as controller_messages

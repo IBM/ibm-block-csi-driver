@@ -5,6 +5,7 @@ from csi_general import csi_pb2
 from mock import patch, Mock
 from munch import Munch
 
+import controller.common.utils
 import controller.controller_server.utils as utils
 from controller.array_action import config as array_config
 from controller.array_action.config import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
@@ -12,9 +13,9 @@ from controller.common.node_info import NodeIdInfo
 from controller.controller_server import config as controller_config
 from controller.controller_server.csi_controller_server import CSIControllerServicer
 from controller.controller_server.errors import ObjectIdError, ValidationException, InvalidNodeId
-from controller.tests.controller_server.test_settings import POOL, USER, PASSWORD, ARRAY
 from controller.tests import utils as test_utils
 from controller.tests.controller_server.csi_controller_server_test import ProtoBufMock
+from controller.tests.controller_server.test_settings import POOL, USER, PASSWORD, ARRAY
 from controller.tests.utils import get_fake_secret_config
 
 
@@ -413,7 +414,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(iscsi_iqn, node_id_info.initiators.iscsi_iqns)
 
     def test_get_node_id_info(self):
-        self._test_validation_exception(utils.get_node_id_info, "bad-node-format", str_in_msg="node",
+        self._test_validation_exception(controller.common.utils.get_node_id_info, "bad-node-format", str_in_msg="node",
                                         raised_error=ValueError)
         host_name = "host-name"
         nvme_nqn = "nqn.ibm"
