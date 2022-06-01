@@ -227,7 +227,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         remove_from_volumegroup_call = call(vdisk_id='test_id', novolumegroup=True)
         rename_call = call(vdisk_id='test_id', name='test_volume')
         self.svc.client.svctask.chvdisk.assert_has_calls([remove_from_volumegroup_call, rename_call])
-        self.svc.client.svctask.rmvolumegroup.assert_called_with(object_id=0)
+        self.svc.client.svctask.rmvolumegroup.assert_called_with(object_id='test_volume')
 
     def test_create_volume_mkvolumegroup_with_other_volume_group_success(self):
         self._prepare_mocks_for_create_volume_mkvolumegroup()
@@ -247,7 +247,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.create_volume("test_volume", 1024, "space_efficiency", "pool_name", None, None,
                                    self._mock_source_ids(), "snapshot")
         self.svc.client.svctask.rmvolume.assert_called_with(vdisk_id='test_id')
-        self.svc.client.svctask.rmvolumegroup.assert_called_with(object_id=0)
+        self.svc.client.svctask.rmvolumegroup.assert_called_with(object_id='test_volume')
 
     def test_create_volume_with_empty_string_space_efficiency_success(self):
         self._test_create_volume_with_default_space_efficiency_success("")

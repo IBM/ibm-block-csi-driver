@@ -507,24 +507,24 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._copy_to_target_volume(target_volume_name, source_name)
 
     def _create_volume_in_volume_group(self, name, pool, io_group, source_id):
-        return self._mkvolumegroup(name, pool, io_group, source_id)
+        self._mkvolumegroup(name, pool, io_group, source_id)
 
-    def _fix_creation_side_effects(self, name, volume_id, volume_group, volume_group_id):
+    def _fix_creation_side_effects(self, name, volume_id, volume_group):
         try:
-            self._extract_and_remove_volume_group(volume_id, volume_group, volume_group_id)
+            self._change_volume_group(volume_id, volume_group)
+            self._rmvolumegroup(name)
             self._rename_volume(volume_id, name)
         except (svc_errors.CommandExecutionError, CLIFailureError, array_errors.VolumeAlreadyExists) as ex:
-            self._rollback_create_volume_from_snapshot(volume_id, volume_group_id)
+            self._rollback_create_volume_from_snapshot(volume_id, name)
             raise ex
 
     def _create_cli_volume_from_snapshot(self, name, pool, io_group, volume_group, source_id):
         logger.info("creating volume from snapshot")
-        response = self._create_volume_in_volume_group(name, pool, io_group, source_id)
-        volume_group_id = self._get_id_from_response(response)
-        volume_id = self._get_volume_id_from_volume_group(volume_group_id)
-        self._fix_creation_side_effects(name, volume_id, volume_group, volume_group_id)
+        self._create_volume_in_volume_group(name, pool, io_group, source_id)
+        volume_id = self._get_volume_id_from_volume_group(name)
+        self._fix_creation_side_effects(name, volume_id, volume_group)
 
-    def _create_cli_volume_with_snapshot(self, name, pool, io_group, volume_group, source_ids, source_type):
+    def _create_cli_volume_from_source(self, name, pool, io_group, volume_group, source_ids, source_type):
         if source_type == controller_config.SNAPSHOT_TYPE_NAME:
             self._create_cli_volume_from_snapshot(name, pool, io_group, volume_group, source_ids.internal_id)
 
@@ -535,7 +535,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                       source_type):
         is_copied = False
         if source_type and self._is_source_support_addsnapshot(source_ids.uid):
-            self._create_cli_volume_with_snapshot(name, pool, io_group, volume_group, source_ids, source_type)
+            self._create_cli_volume_from_source(name, pool, io_group, volume_group, source_ids, source_type)
             is_copied = True
         else:
             self._create_cli_volume(name, size_in_bytes, space_efficiency, pool, io_group, volume_group)
@@ -1416,7 +1416,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return self.client.svctask.mkvolumegroup(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if is_warning_message(ex.my_message):
-                logger.warning("exception encountered during creation of volume group and volume {0}: {1}".format(name, ex.my_message))
+                logger.warning(
+                    "exception encountered during creation of volume group and volume {0}: {1}".format(name,
+                                                                                                       ex.my_message))
             else:
                 logger.error("Cannot create volume {0}, Reason is: {1}".format(name, ex.my_message))
                 if OBJ_ALREADY_EXIST in ex.my_message:
@@ -1429,14 +1431,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 raise ex
         return None
 
-    def _get_volume_id_from_volume_group(self, volume_group_id):
-        filter_value = 'volume_group_id={}'.format(volume_group_id)
+    def _get_volume_id_from_volume_group(self, volume_group_name):
+        filter_value = 'volume_group_name={}'.format(volume_group_name)
         cli_volume = self._lsvdisk(filtervalue=filter_value)
         return cli_volume.id
 
-    def _rollback_create_volume_from_snapshot(self, volume_id, volume_group_id):
+    def _rollback_create_volume_from_snapshot(self, volume_id, volume_group_name):
         self._delete_volume_by_name(volume_id)
-        self._rmvolumegroup(volume_group_id)
+        self._rmvolumegroup(volume_group_name)
 
     def _change_volume_group(self, volume_id, volume_group):
         cli_kwargs = {}
@@ -1461,25 +1463,21 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                     raise array_errors.VolumeAlreadyExists(kwargs, self.endpoint)
                 raise ex
 
-    def _rmvolumegroup(self, volume_group_id, not_exist_error=False):
-        logger.info("deleting volume group : {0}".format(volume_group_id))
+    def _rmvolumegroup(self, volume_group_name, not_exist_error=False):
+        logger.info("deleting volume group : {0}".format(volume_group_name))
         try:
-            self.client.svctask.rmvolumegroup(object_id=volume_group_id)
+            self.client.svctask.rmvolumegroup(object_id=volume_group_name)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if is_warning_message(ex.my_message):
-                logger.warning("exception encountered during deletion of volume group {}: {}".format(volume_group_id,
+                logger.warning("exception encountered during deletion of volume group {}: {}".format(volume_group_name,
                                                                                                      ex.my_message))
             else:
-                logger.error("Failed to delete volume group {}".format(volume_group_id))
+                logger.error("Failed to delete volume group {}".format(volume_group_name))
                 if OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message:
-                    logger.warning(array_errors.ObjectNotFoundError(volume_group_id))
+                    logger.warning(array_errors.ObjectNotFoundError(volume_group_name))
                     if not not_exist_error:
                         return
                 raise ex
-
-    def _extract_and_remove_volume_group(self, volume_id, volume_group, volume_group_id):
-        self._change_volume_group(volume_id, volume_group)
-        self._rmvolumegroup(volume_group_id)
 
     def _is_source_has_fcmaps(self, object_uid):
         if not object_uid:
