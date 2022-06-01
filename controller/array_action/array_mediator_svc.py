@@ -1421,11 +1421,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 logger.error("Cannot create volume {0}, Reason is: {1}".format(name, ex.my_message))
                 if OBJ_ALREADY_EXIST in ex.my_message:
                     raise array_errors.VolumeAlreadyExists(name, self.endpoint)
-                if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
-                    raise array_errors.InvalidArgumentError(ex.my_message)
                 if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in ex.my_message:
                     raise array_errors.NotEnoughSpaceInPool(id_or_name=pool)
-                if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, INVALID_NAME, TOO_MANY_CHARS)):
+                if any(msg_id in ex.my_message for msg_id in (NAME_NOT_EXIST_OR_MEET_RULES, NON_ASCII_CHARS,
+                                                              INVALID_NAME, TOO_MANY_CHARS)):
                     raise array_errors.InvalidArgumentError(ex.my_message)
                 raise ex
         return None
