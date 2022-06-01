@@ -1416,7 +1416,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return self.client.svctask.mkvolumegroup(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if is_warning_message(ex.my_message):
-                logger.warning("exception encountered during creation of volume {0}: {1}".format(name, ex.my_message))
+                logger.warning("exception encountered during creation of volume group and volume {0}: {1}".format(name, ex.my_message))
             else:
                 logger.error("Cannot create volume {0}, Reason is: {1}".format(name, ex.my_message))
                 if OBJ_ALREADY_EXIST in ex.my_message:
