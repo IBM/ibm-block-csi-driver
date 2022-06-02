@@ -54,7 +54,3 @@ func (r OsDeviceConnectivityNvmeOFc) RemovePhysicalDevice(sysDevices []string) e
 func (r OsDeviceConnectivityNvmeOFc) ValidateLun(_ int, _ []string) error {
 	return nil
 }
-
-func (r OsDeviceConnectivityNvmeOFc) GetVolumeIdVariations(volumeId string) []string {
-	return r.HelperScsiGeneric.GetVolumeIdVariations(volumeId)
-}

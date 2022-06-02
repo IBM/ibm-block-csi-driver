@@ -173,7 +173,3 @@ func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(sysDevices []string) err
 func (r OsDeviceConnectivityIscsi) ValidateLun(lun int, sysDevices []string) error {
 	return r.HelperScsiGeneric.ValidateLun(lun, sysDevices)
 }
-
-func (r OsDeviceConnectivityIscsi) GetVolumeIdVariations(volumeId string) []string {
-	return r.HelperScsiGeneric.GetVolumeIdVariations(volumeId)
-}
