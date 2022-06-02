@@ -266,7 +266,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             )
             raise array_errors.VolumeCreationError(name)
 
-    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group):
+    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group):
         array_space_efficiency = get_array_space_efficiency(space_efficiency)
         api_volume = self._create_api_volume(name, size_in_bytes, array_space_efficiency, pool)
         self.volume_cache.add(api_volume.name, api_volume.id)
@@ -607,7 +607,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     @convert_scsi_ids_to_array_ids()
-    def delete_snapshot(self, snapshot_id):
+    def delete_snapshot(self, snapshot_id, internal_snapshot_id):
         logger.info("deleting snapshot with id : {0}".format(snapshot_id))
         self._delete_object(snapshot_id, object_is_snapshot=True)
         logger.info("finished snapshot deletion. id : {0}".format(snapshot_id))

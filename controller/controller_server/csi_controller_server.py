@@ -82,8 +82,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
                     array_mediator.validate_supported_space_efficiency(space_efficiency)
-                    volume = array_mediator.create_volume(volume_final_name, required_bytes, space_efficiency,
-                                                          pool, volume_parameters.io_group)
+                    volume = array_mediator.create_volume(volume_final_name, required_bytes, space_efficiency, pool,
+                                                          volume_parameters.io_group, volume_parameters.volume_group)
                 else:
                     logger.debug("volume found : {}".format(volume))
 
@@ -180,9 +180,6 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             except array_errors.ObjectNotFoundError as ex:
                 logger.debug("volume was not found during deletion: {0}".format(ex))
-            except array_errors.PermissionDeniedError as ex:
-                return handle_exception(ex, context, grpc.StatusCode.PERMISSION_DENIED,
-                                        csi_pb2.DeleteVolumeResponse)
 
         return csi_pb2.DeleteVolumeResponse()
 
@@ -339,9 +336,6 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         except (ObjectIdError, array_errors.SnapshotSourcePoolMismatch, array_errors.SpaceEfficiencyNotSupported) as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
                                     csi_pb2.CreateSnapshotResponse)
-        except array_errors.SnapshotAlreadyExists as ex:
-            return handle_exception(ex, context, grpc.StatusCode.ALREADY_EXISTS,
-                                    csi_pb2.CreateSnapshotResponse)
         except array_errors.NotEnoughSpaceInPool as ex:
             return handle_exception(ex, context, grpc.StatusCode.RESOURCE_EXHAUSTED,
                                     csi_pb2.CreateSnapshotResponse)
@@ -360,11 +354,12 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             system_id = snapshot_id_info.system_id
             array_type = snapshot_id_info.array_type
             snapshot_id = snapshot_id_info.object_id
+            internal_snapshot_id = snapshot_id_info.internal_id
             array_connection_info = utils.get_array_connection_info_from_secrets(secrets, system_id=system_id)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
                 try:
-                    array_mediator.delete_snapshot(snapshot_id)
+                    array_mediator.delete_snapshot(snapshot_id, internal_snapshot_id)
                 except array_errors.ObjectNotFoundError as ex:
                     logger.debug("Snapshot was not found during deletion: {0}".format(ex))
 

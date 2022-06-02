@@ -207,7 +207,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def _convert_size_bytes_to_blocks(self, size_in_bytes):
         return int(size_in_bytes / self.BLOCK_SIZE_IN_BYTES)
 
-    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group):
+    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with parameters : {}".format(
             name, size_in_bytes, pool, space_efficiency))
 
@@ -352,7 +352,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             raise array_errors.PermissionDeniedError(
                 "create snapshot {0} from volume {1}".format(snapshot_name, volume_id))
 
-    def delete_snapshot(self, snapshot_id):
+    def delete_snapshot(self, snapshot_id, internal_snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
         snapshot_name = self._get_object_name_by_wwn(snapshot_id)
         try:

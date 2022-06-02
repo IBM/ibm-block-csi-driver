@@ -30,7 +30,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group):
+    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group):
         """
         This function should create a volume in the storage system.
 
@@ -40,16 +40,14 @@ class ArrayMediator(ABC):
             space_efficiency : space efficiency (None for default)
             pool             : pool name to create the volume in
             io_group         : i/o group to create the volume in
+            volume_group     : volume group to create the volume in
 
         Returns:
             volume_id : the volume WWN.
 
         Raises:
             VolumeAlreadyExists : optional
-            PoolDoesNotExist
-            PoolDoesNotMatchSpaceEfficiency
-            IllegalObjectName
-            VolumeNameIsNotSupported
+            InvalidArgument
             PermissionDenied
         """
         raise NotImplementedError
@@ -241,7 +239,6 @@ class ArrayMediator(ABC):
         Returns:
             Snapshot
         Raises:
-            SnapshotAlreadyExists
             ObjectNotFound
             IllegalObjectName
             IllegalObjectID
@@ -252,11 +249,12 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def delete_snapshot(self, snapshot_id):
+    def delete_snapshot(self, snapshot_id, internal_snapshot_id):
         """
         This function should delete a snapshot in the storage system.
         Args:
             snapshot_id : wwn of the snapshot to delete
+            internal_snapshot_id : storage internal snapshot id
         Returns:
             None
         Raises:
