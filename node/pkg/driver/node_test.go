@@ -953,6 +953,34 @@ func TestNodeGetVolumeStats(t *testing.T) {
 			},
 		},
 		{
+			name: "fail to get stats when Block because of missing mpath device",
+			testFunc: func(t *testing.T) {
+				expErrCode := codes.NotFound
+				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
+				mockNodeUtils.EXPECT().IsPathExists(volumePathWithHostPrefix).Return(true)
+				mockNodeUtils.EXPECT().IsBlock(volumePathWithHostPrefix).Return(true, nil)
+				mockNodeUtils.EXPECT().GetBlockVolumeStats(volumeId).Return(driver.VolumeStatistics{},
+					&device_connectivity.MultipathDeviceNotFoundForVolumeError{VolumeId: ""})
+
+				_, err := d.NodeGetVolumeStats(context.TODO(), req)
+				assertError(t, err, expErrCode)
+			},
+		},
+		{
+			name: "fail to get stats when Block because of general error",
+			testFunc: func(t *testing.T) {
+				expErrCode := codes.Internal
+				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
+				mockNodeUtils.EXPECT().IsPathExists(volumePathWithHostPrefix).Return(true)
+				mockNodeUtils.EXPECT().IsBlock(volumePathWithHostPrefix).Return(true, nil)
+				mockNodeUtils.EXPECT().GetBlockVolumeStats(volumeId).Return(driver.VolumeStatistics{},
+					errors.New("fail to get stats"))
+
+				_, err := d.NodeGetVolumeStats(context.TODO(), req)
+				assertError(t, err, expErrCode)
+			},
+		},
+		{
 			name: "fail to get stats",
 			testFunc: func(t *testing.T) {
 				expErrCode := codes.Internal
