@@ -638,7 +638,7 @@ func getMpathDeviceNameFromMountLine(mountLine string) string {
 type GetDmsPathHelperInterface interface {
 	WaitForDmToExist(volumeIdVariations []string, maxRetries int, intervalSeconds int, multipathdCommandFormatArgs []string) (string, error)
 	GetMpathdOutput(volumeIdVariations []string, multipathdCommandFormatArgs []string) (string, error)
-	ExtractDmFieldValues(volumeIdVariations []string, mpathdOutput string) map[string]bool
+	ExtractDmFieldValues(dmFieldValueValidators []string, mpathdOutput string) map[string]bool
 	GetFullDmPath(dms map[string]bool, volumeId string) (string, error)
 	IsThisMatchedDmFieldValue(volumeIdVariations []string, dmFieldValue string) bool
 }
@@ -701,15 +701,15 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeIdVariations []string, m
 	return "", err
 }
 
-func (o GetDmsPathHelperGeneric) ExtractDmFieldValues(volumeIdVariations []string, mpathdOutput string) map[string]bool {
+func (o GetDmsPathHelperGeneric) ExtractDmFieldValues(dmFieldValueValidators []string, mpathdOutput string) map[string]bool {
 	dmFieldValues := make(map[string]bool)
 
 	scanner := bufio.NewScanner(strings.NewReader(mpathdOutput))
 	for scanner.Scan() {
-		volumeId, dmFieldValue := o.getLineParts(scanner)
-		if o.IsThisMatchedDmFieldValue(volumeIdVariations, volumeId) {
+		dmFieldValueIndicator, dmFieldValue := o.getLineParts(scanner)
+		if o.IsThisMatchedDmFieldValue(dmFieldValueValidators, dmFieldValueIndicator) {
 			dmFieldValues[dmFieldValue] = true
-			logger.Infof("ExtractDmFieldValues: DM field value found: %s for volume Id %s", dmFieldValue, volumeId)
+			logger.Infof("ExtractDmFieldValues: found: %s for: %s", dmFieldValue, dmFieldValueIndicator)
 		}
 	}
 
@@ -722,9 +722,9 @@ func (GetDmsPathHelperGeneric) getLineParts(scanner *bufio.Scanner) (string, str
 	return lineParts[0], lineParts[1]
 }
 
-func (o GetDmsPathHelperGeneric) IsThisMatchedDmFieldValue(volumeIdVariations []string, dmFieldValue string) bool {
-	for _, volumeIdVariation := range volumeIdVariations {
-		if strings.Contains(dmFieldValue, volumeIdVariation) {
+func (o GetDmsPathHelperGeneric) IsThisMatchedDmFieldValue(dmFieldValueValidators []string, dmFieldValue string) bool {
+	for _, dmFieldValueValidator := range dmFieldValueValidators {
+		if strings.Contains(dmFieldValue, dmFieldValueValidator) {
 			return true
 		}
 	}
