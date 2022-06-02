@@ -46,8 +46,8 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	RemovePhysicalDevice(sysDevices []string) error
 	ValidateLun(lun int, sysDevices []string) error
 	GetVolumeIdVariations(volumeUuid string) []string
-	GetMatchingVolumeIdToMpathName(mpathdOutput string, mpathDeviceName string, volumeUids []string) (string, error)
-	GetMpathdOutputByVolumeIds(volumeUids []string) (string, error)
+	GetMatchingVolumeIdToMpathName(mpathdOutput string, mpathDeviceName string, volumeIdVariations []string) (string, error)
+	GetMpathdOutputByVolumeIds(volumeIdVariations []string) (string, error)
 	GetMpathDeviceName(volumePath string) (string, error)
 }
 
@@ -98,8 +98,8 @@ func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterfac
 	}
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathdOutputByVolumeIds(volumeUids []string) (string, error) {
-	return r.Helper.GetMpathdOutputByVolumeId(volumeUids)
+func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathdOutputByVolumeIds(volumeIdVariations []string) (string, error) {
+	return r.Helper.GetMpathdOutputByVolumeId(volumeIdVariations)
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDeviceName(volumePath string) (string, error) {
@@ -113,13 +113,13 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDeviceName(volumePath str
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMatchingVolumeIdToMpathName(mpathdOutput string,
-	mpathDeviceName string, volumeUids []string) (string, error) {
+	mpathDeviceName string, volumeIdVariations []string) (string, error) {
 
 	volumeId, _ := r.Helper.GetVolumeIdByMpathdName(mpathDeviceName, mpathdOutput)
 
 	dmPath := filepath.Join(devMapperPath, filepath.Base(strings.TrimSpace(mpathDeviceName)))
 	if volumeId != "" {
-		if r.Helper.IsdmPathMatchVolumeIdsWithoutErrors(dmPath, volumeUids) {
+		if r.Helper.IsDmPathMatchesVolumeId(dmPath, volumeIdVariations) {
 			return volumeId, nil
 		}
 	}
@@ -137,7 +137,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMatchingVolumeIdToMpathName(mp
 		return "", &VolumeIdNotFoundForMultipathDeviceNameError{mpathDeviceName}
 	}
 
-	if err = r.Helper.AssertDmPathMatchesVolumeId(dmPath, volumeUids); err != nil {
+	if err = r.Helper.AssertDmPathMatchesVolumeId(dmPath, volumeIdVariations); err != nil {
 		return "", err
 	}
 	return volumeId, nil
@@ -202,10 +202,9 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	dmPath, _ := r.Helper.GetDmsPath(volumeIds)
 
 	if dmPath != "" {
-		if r.Helper.IsdmPathMatchVolumeIdsWithoutErrors(dmPath, volumeIds) {
+		if r.Helper.IsDmPathMatchesVolumeId(dmPath, volumeIds) {
 			return dmPath, nil
 		}
-		logger.Warningf("Expected {%v} but got {%v} from sg_inq", volumeId, SgInqWwn)
 	}
 
 	if err := r.Helper.ReloadMultipath(); err != nil {
@@ -363,7 +362,7 @@ type OsDeviceConnectivityHelperInterface interface {
 	GetDmsPath(volumeIdVariations []string) (string, error)
 	GetWwnByScsiInq(dev string) (string, error)
 	AssertDmPathMatchesVolumeId(dmPath string, volumeIdVariations []string) error
-	IsdmPathMatchVolumeIdsWithoutErrors(dmPath string, volumeIdVariations []string) bool
+	IsDmPathMatchesVolumeId(dmPath string, volumeIdVariations []string) bool
 	ReloadMultipath() error
 	GetMpathdOutputByVolumeId(volumeIdVariations []string) (string, error)
 	GetVolumeIdByMpathdName(mpathDeviceName string, mpathdOutput string) (string, error)
@@ -466,9 +465,13 @@ func (o OsDeviceConnectivityHelperGeneric) AssertDmPathMatchesVolumeId(dmPath st
 	return &ErrorWrongDeviceFound{dmPath, volumeIdVariations[0], sgInqWwn}
 }
 
-func (o OsDeviceConnectivityHelperGeneric) IsdmPathMatchVolumeIdsWithoutErrors(dmPath string, volumeIdVariations []string) bool {
+func (o OsDeviceConnectivityHelperGeneric) IsDmPathMatchesVolumeId(dmPath string, volumeIdVariations []string) bool {
 	sgInqWwn, _ := o.GetWwnByScsiInq(dmPath)
-	return o.isSameId(sgInqWwn, volumeIdVariations)
+	if o.isSameId(sgInqWwn, volumeIdVariations) {
+		return true
+	}
+	logger.Warningf("Expected {%v} but got {%v} from sg_inq", volumeIdVariations[0], sgInqWwn)
+	return false
 }
 
 func (o OsDeviceConnectivityHelperGeneric) isSameId(wwn string, volumeIdVariations []string) bool {
@@ -597,9 +600,9 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathdOutputByVolumeId(volumeIdVar
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetVolumeIdByMpathdName(mpathDeviceName string, mpathdOutput string) (string, error) {
-	volumeIdVariations := []string{mpathDeviceName}
-	volumeIds := o.Helper.ExtractDmFieldValues(volumeIdVariations, mpathdOutput)
-	volumeId, err := getDmFieldValueWhenUniq(volumeIds, mpathDeviceName)
+	mpathDeviceNames := []string{mpathDeviceName}
+	volumeIds := o.Helper.ExtractDmFieldValues(mpathDeviceNames, mpathdOutput)
+	volumeId, err := getUniqueDmFieldValue(volumeIds, mpathDeviceName)
 	if err != nil {
 		return "", err
 	}
@@ -639,9 +642,9 @@ func getMpathDeviceNameFromMountLine(mountLine string) string {
 type GetDmsPathHelperInterface interface {
 	WaitForDmToExist(volumeIdVariations []string, maxRetries int, intervalSeconds int, multipathdCommandFormatArgs []string) (string, error)
 	GetMpathdOutput(volumeIdVariations []string, multipathdCommandFormatArgs []string) (string, error)
-	ExtractDmFieldValues(dmFieldValueValidators []string, mpathdOutput string) map[string]bool
+	ExtractDmFieldValues(dmFilterValues []string, mpathdOutput string) map[string]bool
 	GetFullDmPath(dms map[string]bool, volumeId string) (string, error)
-	IsThisMatchedDmFieldValue(volumeIdVariations []string, dmFieldValue string) bool
+	IsIndicatorMatchesFilterValues(dmFilterValues []string, dmFieldValue string) bool
 }
 
 type GetDmsPathHelperGeneric struct {
@@ -702,15 +705,15 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeIdVariations []string, m
 	return "", err
 }
 
-func (o GetDmsPathHelperGeneric) ExtractDmFieldValues(dmFieldValueValidators []string, mpathdOutput string) map[string]bool {
+func (o GetDmsPathHelperGeneric) ExtractDmFieldValues(dmFilterValues []string, mpathdOutput string) map[string]bool {
 	dmFieldValues := make(map[string]bool)
 
 	scanner := bufio.NewScanner(strings.NewReader(mpathdOutput))
 	for scanner.Scan() {
-		dmFieldValueIndicator, dmFieldValue := o.getLineParts(scanner)
-		if o.IsThisMatchedDmFieldValue(dmFieldValueValidators, dmFieldValueIndicator) {
+		dmIndicator, dmFieldValue := o.getLineParts(scanner)
+		if o.IsIndicatorMatchesFilterValues(dmFilterValues, dmIndicator) {
 			dmFieldValues[dmFieldValue] = true
-			logger.Infof("ExtractDmFieldValues: found: %s for: %s", dmFieldValue, dmFieldValueIndicator)
+			logger.Infof("ExtractDmFieldValues: found: %s for: %s", dmFieldValue, dmIndicator)
 		}
 	}
 
@@ -723,8 +726,8 @@ func (GetDmsPathHelperGeneric) getLineParts(scanner *bufio.Scanner) (string, str
 	return lineParts[0], lineParts[1]
 }
 
-func (o GetDmsPathHelperGeneric) IsThisMatchedDmFieldValue(dmFieldValueValidators []string, dmFieldValue string) bool {
-	for _, dmFieldValueValidator := range dmFieldValueValidators {
+func (o GetDmsPathHelperGeneric) IsIndicatorMatchesFilterValues(dmFilterValues []string, dmFieldValue string) bool {
+	for _, dmFieldValueValidator := range dmFilterValues {
 		if strings.Contains(dmFieldValue, dmFieldValueValidator) {
 			return true
 		}
@@ -733,7 +736,7 @@ func (o GetDmsPathHelperGeneric) IsThisMatchedDmFieldValue(dmFieldValueValidator
 }
 
 func (GetDmsPathHelperGeneric) GetFullDmPath(dms map[string]bool, volumeId string) (string, error) {
-	dm, err := getDmFieldValueWhenUniq(dms, volumeId)
+	dm, err := getUniqueDmFieldValue(dms, volumeId)
 	if err != nil {
 		return "", err
 	}
@@ -742,10 +745,10 @@ func (GetDmsPathHelperGeneric) GetFullDmPath(dms map[string]bool, volumeId strin
 	return dmPath, nil
 }
 
-func getDmFieldValueWhenUniq(dmFieldValues map[string]bool,
-	validator string) (string, error) {
+func getUniqueDmFieldValue(dmFieldValues map[string]bool,
+	filter string) (string, error) {
 	if len(dmFieldValues) > 1 {
-		return "", &MultipledmFieldValuesError{validator, dmFieldValues}
+		return "", &MultipledmFieldValuesError{filter, dmFieldValues}
 	}
 
 	var dmFieldValue string

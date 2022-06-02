@@ -593,8 +593,8 @@ func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error
 func (d NodeUtils) IsVolumePathMatchesVolumeId(volumeId string, volumePath string) (bool, error) {
 	logger.Infof("IsVolumePathMatchesVolumeId: Searching matching volume id for volume path: [%s] ", volumePath)
 	volumeUuid := d.GetVolumeUuid(volumeId)
-	volumeUids := d.osDeviceConnectivityHelper.GetVolumeIdVariations(volumeUuid)
-	mpathdOutput, err := d.osDeviceConnectivityHelper.GetMpathdOutputByVolumeIds(volumeUids)
+	volumeIdVariations := d.osDeviceConnectivityHelper.GetVolumeIdVariations(volumeUuid)
+	mpathdOutput, err := d.osDeviceConnectivityHelper.GetMpathdOutputByVolumeIds(volumeIdVariations)
 	if err != nil {
 		return false, err
 	}
@@ -604,11 +604,11 @@ func (d NodeUtils) IsVolumePathMatchesVolumeId(volumeId string, volumePath strin
 		return false, err
 	}
 
-	volumeIdByVolumePath, err := d.osDeviceConnectivityHelper.GetMatchingVolumeIdToMpathName(mpathdOutput, mpathDeviceName, volumeUids)
+	volumeIdByVolumePath, err := d.osDeviceConnectivityHelper.GetMatchingVolumeIdToMpathName(mpathdOutput, mpathDeviceName, volumeIdVariations)
 	if err != nil {
 		return false, err
 	}
-	logger.Infof("IsVolumePathMatchesVolumeId: found volume id [%s] for volume path [%s] ", volumeId, volumePath)
+	logger.Infof("IsVolumePathMatchesVolumeId: found volume id [%s] for volume path [%s] ", volumeIdByVolumePath, volumePath)
 
 	return d.isVolumeIdFromPathIsMatched(volumeIdByVolumePath, volumeUuid), nil
 }
