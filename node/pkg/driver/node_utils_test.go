@@ -614,7 +614,7 @@ func TestIsVolumePathMatchesVolumeId(t *testing.T) {
 				mockOsDeviceConHelper.EXPECT().GetMpathDeviceName(tc.volumePath).Return(tc.mpathDeviceName, tc.mpathDeviceNameErr)
 			}
 			if tc.mpathDeviceName != "" {
-				mockOsDeviceConHelper.EXPECT().GetMatchingVolumeIdToMpathd(
+				mockOsDeviceConHelper.EXPECT().GetMatchingVolumeIdToMpathName(
 					tc.mpathdOutput, tc.mpathDeviceName, volumeIdVariations).Return(tc.volumeIdByVolumePath, tc.matchingVolumeIdErr)
 			}
 			isVolumePathMatchesVolumeId, err := nodeUtils.IsVolumePathMatchesVolumeId(tc.volumeUuid, tc.volumePath)

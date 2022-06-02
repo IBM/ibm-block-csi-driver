@@ -66,7 +66,7 @@ type ReloadMultipathReturn struct {
 	err error
 }
 
-type IsMpathdMatchVolumeIdWithoutErrorsReturn struct {
+type IsdmPathMatchVolumeIdsWithoutErrorsReturn struct {
 	isMpathdMatchVolumeId bool
 }
 
@@ -76,14 +76,14 @@ type AssertDmPathMatchesVolumeIdReturn struct {
 
 func TestGetMpathDevice(t *testing.T) {
 	testCases := []struct {
-		name                                     string
-		expErrType                               reflect.Type
-		expErr                                   error
-		expDMPath                                string
-		getDmsPathReturn                         []GetDmsPathReturn
-		reloadMultipathReturn                    []ReloadMultipathReturn
-		isMpathdMatchVolumeIdWithoutErrorsReturn []IsMpathdMatchVolumeIdWithoutErrorsReturn
-		assertDmPathMatchesVolumeIdReturn        []AssertDmPathMatchesVolumeIdReturn
+		name                                      string
+		expErrType                                reflect.Type
+		expErr                                    error
+		expDMPath                                 string
+		getDmsPathReturn                          []GetDmsPathReturn
+		reloadMultipathReturn                     []ReloadMultipathReturn
+		isdmPathMatchVolumeIdsWithoutErrorsReturn []IsdmPathMatchVolumeIdsWithoutErrorsReturn
+		assertDmPathMatchesVolumeIdReturn         []AssertDmPathMatchesVolumeIdReturn
 	}{
 		{
 			name: "Should fail when WaitForDmToExist did not find any dm device",
@@ -166,8 +166,8 @@ func TestGetMpathDevice(t *testing.T) {
 					err:    nil,
 				},
 			},
-			isMpathdMatchVolumeIdWithoutErrorsReturn: []IsMpathdMatchVolumeIdWithoutErrorsReturn{
-				IsMpathdMatchVolumeIdWithoutErrorsReturn{
+			isdmPathMatchVolumeIdsWithoutErrorsReturn: []IsdmPathMatchVolumeIdsWithoutErrorsReturn{
+				IsdmPathMatchVolumeIdsWithoutErrorsReturn{
 					isMpathdMatchVolumeId: true,
 				},
 			},
@@ -224,8 +224,8 @@ func TestGetMpathDevice(t *testing.T) {
 					r.err)
 			}
 
-			for _, r := range tc.isMpathdMatchVolumeIdWithoutErrorsReturn {
-				fake_helper.EXPECT().IsMpathdMatchVolumeIdWithoutErrors(dmPath, volumeIdVariations).Return(
+			for _, r := range tc.isdmPathMatchVolumeIdsWithoutErrorsReturn {
+				fake_helper.EXPECT().IsdmPathMatchVolumeIdsWithoutErrors(dmPath, volumeIdVariations).Return(
 					r.isMpathdMatchVolumeId)
 			}
 

@@ -604,7 +604,7 @@ func (d NodeUtils) IsVolumePathMatchesVolumeId(volumeId string, volumePath strin
 		return false, err
 	}
 
-	volumeIdByVolumePath, err := d.osDeviceConnectivityHelper.GetMatchingVolumeIdToMpathd(mpathdOutput, mpathDeviceName, volumeUids)
+	volumeIdByVolumePath, err := d.osDeviceConnectivityHelper.GetMatchingVolumeIdToMpathName(mpathdOutput, mpathDeviceName, volumeUids)
 	if err != nil {
 		return false, err
 	}
