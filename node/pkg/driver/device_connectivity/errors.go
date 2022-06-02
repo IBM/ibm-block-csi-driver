@@ -4,22 +4,13 @@ import (
 	"fmt"
 )
 
-type MultipleDmDevicesError struct {
-	VolumeId         string
-	MultipathDevices map[string]bool
+type MultipledmFieldValuesError struct {
+	Validator     string
+	DmFieldValues map[string]bool
 }
 
-func (e *MultipleDmDevicesError) Error() string {
-	return fmt.Sprintf("Detected more than one multipath device (%v) for single volume (%s)", e.MultipathDevices, e.VolumeId)
-}
-
-type MultipleVolumeIdsError struct {
-	VolumeIds           map[string]bool
-	MultipathDeviceName string
-}
-
-func (e *MultipleVolumeIdsError) Error() string {
-	return fmt.Sprintf("Detected more than one volume uuid (%v) for a single multipath device name (%s)", e.VolumeIds, e.MultipathDeviceName)
+func (e *MultipledmFieldValuesError) Error() string {
+	return fmt.Sprintf("Detected more than one (%v) for single (%s)", e.DmFieldValues, e.Validator)
 }
 
 type MultipathDeviceNotFoundForVolumeError struct {

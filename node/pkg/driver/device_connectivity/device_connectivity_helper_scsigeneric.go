@@ -137,7 +137,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMatchingVolumeIdToMpathd(mpath
 		return "", &VolumeIdNotFoundForMultipathDeviceNameError{mpathDeviceName}
 	}
 
-	if _, err = r.Helper.IsMpathdMatchVolumeId(dmPath, volumeUids); err != nil {
+	if err = r.Helper.AssertDmPathMatchesVolumeId(dmPath, volumeUids); err != nil {
 		return "", err
 	}
 	return volumeId, nil
@@ -220,7 +220,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	if dmPath == "" {
 		return "", &MultipathDeviceNotFoundForVolumeError{volumeId}
 	}
-	_, err = r.Helper.IsMpathdMatchVolumeId(dmPath, volumeIds)
+	err = r.Helper.AssertDmPathMatchesVolumeId(dmPath, volumeIds)
 	if err != nil {
 		return "", err
 	}
@@ -361,7 +361,7 @@ type OsDeviceConnectivityHelperInterface interface {
 	GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error)
 	GetDmsPath(volumeIdVariations []string) (string, error)
 	GetWwnByScsiInq(dev string) (string, error)
-	IsMpathdMatchVolumeId(dmPath string, volumeIdVariations []string) (bool, error)
+	AssertDmPathMatchesVolumeId(dmPath string, volumeIdVariations []string) error
 	IsMpathdMatchVolumeIdWithoutErrors(dmPath string, volumeIdVariations []string) bool
 	ReloadMultipath() error
 	GetMpathdOutputByVolumeId(volumeIdVariations []string) (string, error)
@@ -454,15 +454,15 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 
 }
 
-func (o OsDeviceConnectivityHelperGeneric) IsMpathdMatchVolumeId(dmPath string, volumeIdVariations []string) (bool, error) {
+func (o OsDeviceConnectivityHelperGeneric) AssertDmPathMatchesVolumeId(dmPath string, volumeIdVariations []string) error {
 	sgInqWwn, err := o.GetWwnByScsiInq(dmPath)
 	if err != nil {
-		return false, err
+		return err
 	}
 	if o.isSameId(sgInqWwn, volumeIdVariations) {
-		return true, nil
+		return nil
 	}
-	return false, &ErrorWrongDeviceFound{dmPath, volumeIdVariations[0], sgInqWwn}
+	return &ErrorWrongDeviceFound{dmPath, volumeIdVariations[0], sgInqWwn}
 }
 
 func (o OsDeviceConnectivityHelperGeneric) IsMpathdMatchVolumeIdWithoutErrors(dmPath string, volumeIdVariations []string) bool {
@@ -598,13 +598,9 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathdOutputByVolumeId(volumeIdVar
 func (o OsDeviceConnectivityHelperGeneric) GetVolumeIdByMpathdName(mpathDeviceName string, mpathdOutput string) (string, error) {
 	volumeIdVariations := []string{mpathDeviceName}
 	volumeIds := o.Helper.ParseMpathName(volumeIdVariations, mpathdOutput)
-	if len(volumeIds) > 1 {
-		return "", &MultipleVolumeIdsError{volumeIds, mpathDeviceName}
-	}
-
-	var volumeId string
-	for volumeId = range volumeIds {
-		break // because its a single value in the map(1 mpath device, if not it should fail above), so just take the first
+	volumeId, err := getDmFieldValueWhenUniq(volumeIds, mpathDeviceName)
+	if err != nil {
+		return "", err
 	}
 
 	return volumeId, nil
@@ -710,10 +706,10 @@ func (o GetDmsPathHelperGeneric) ParseMpathName(volumeIdVariations []string, mpa
 
 	scanner := bufio.NewScanner(strings.NewReader(mpathdOutput))
 	for scanner.Scan() {
-		volumeIdVariation, dmFieldValue := o.getLineParts(scanner)
-		if o.IsThisMatchedDmFieldValue(volumeIdVariations, volumeIdVariation) {
+		volumeId, dmFieldValue := o.getLineParts(scanner)
+		if o.IsThisMatchedDmFieldValue(volumeIdVariations, volumeId) {
 			dmFieldValues[dmFieldValue] = true
-			logger.Infof("ParseMpathName: DM field value found: %s for DM field value %s", dmFieldValue, volumeIdVariation)
+			logger.Infof("ParseMpathName: DM field value found: %s for volume Id %s", dmFieldValue, volumeId)
 		}
 	}
 
@@ -736,15 +732,24 @@ func (o GetDmsPathHelperGeneric) IsThisMatchedDmFieldValue(volumeIdVariations []
 }
 
 func (GetDmsPathHelperGeneric) GetFullDmPath(dms map[string]bool, volumeId string) (string, error) {
-	if len(dms) > 1 {
-		return "", &MultipleDmDevicesError{volumeId, dms}
-	}
-
-	var dm string
-	for dm = range dms {
-		break // because its a single value in the map(1 mpath device, if not it should fail above), so just take the first
+	dm, err := getDmFieldValueWhenUniq(dms, volumeId)
+	if err != nil {
+		return "", err
 	}
 
 	dmPath := filepath.Join(DevPath, filepath.Base(strings.TrimSpace(dm)))
 	return dmPath, nil
+}
+
+func getDmFieldValueWhenUniq(dmFieldValues map[string]bool,
+	validator string) (string, error) {
+	if len(dmFieldValues) > 1 {
+		return "", &MultipledmFieldValuesError{validator, dmFieldValues}
+	}
+
+	var dmFieldValue string
+	for dmFieldValue = range dmFieldValues {
+		break // because its a single value in the map(1 mpath device, if not it should fail above), so just take the first
+	}
+	return dmFieldValue, nil
 }
