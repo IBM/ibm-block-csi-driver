@@ -953,7 +953,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 			},
 		},
 		{
-			name: "fail to get stats when Block because of missing mpath device",
+			name: "fail to get stats for block because of missing mpath device",
 			testFunc: func(t *testing.T) {
 				expErrCode := codes.NotFound
 				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
