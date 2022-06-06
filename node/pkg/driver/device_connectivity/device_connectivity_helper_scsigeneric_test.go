@@ -67,7 +67,7 @@ type ReloadMultipathReturn struct {
 }
 
 type IsDmPathMatchesVolumeIdReturn struct {
-	isMpathdMatchVolumeId bool
+	isDmPathMatchesVolumeId bool
 }
 
 type AssertDmPathMatchesVolumeIdReturn struct {
@@ -168,7 +168,7 @@ func TestGetMpathDevice(t *testing.T) {
 			},
 			isDmPathMatchesVolumeIdReturn: []IsDmPathMatchesVolumeIdReturn{
 				IsDmPathMatchesVolumeIdReturn{
-					isMpathdMatchVolumeId: true,
+					isDmPathMatchesVolumeId: true,
 				},
 			},
 
@@ -226,7 +226,7 @@ func TestGetMpathDevice(t *testing.T) {
 
 			for _, r := range tc.isDmPathMatchesVolumeIdReturn {
 				fake_helper.EXPECT().IsDmPathMatchesVolumeId(dmPath, volumeIdVariations).Return(
-					r.isMpathdMatchVolumeId)
+					r.isDmPathMatchesVolumeId)
 			}
 
 			for _, r := range tc.reloadMultipathReturn {

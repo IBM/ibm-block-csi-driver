@@ -115,7 +115,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDeviceName(volumePath str
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMatchingVolumeIdToMpathName(mpathdOutput string,
 	mpathDeviceName string, volumeIdVariations []string) (string, error) {
 
-	volumeId, _ := r.Helper.GetVolumeIdByMpathdName(mpathDeviceName, mpathdOutput)
+	volumeId, _ := r.Helper.GetVolumeIdByMpathDeviceName(mpathDeviceName, mpathdOutput)
 
 	dmPath := filepath.Join(devMapperPath, filepath.Base(strings.TrimSpace(mpathDeviceName)))
 	if volumeId != "" {
@@ -128,7 +128,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMatchingVolumeIdToMpathName(mp
 		return "", err
 	}
 
-	volumeId, err := r.Helper.GetVolumeIdByMpathdName(mpathDeviceName, mpathdOutput)
+	volumeId, err := r.Helper.GetVolumeIdByMpathDeviceName(mpathDeviceName, mpathdOutput)
 	if err != nil {
 		return "", err
 	}
@@ -365,7 +365,7 @@ type OsDeviceConnectivityHelperInterface interface {
 	IsDmPathMatchesVolumeId(dmPath string, volumeIdVariations []string) bool
 	ReloadMultipath() error
 	GetMpathdOutputByVolumeId(volumeIdVariations []string) (string, error)
-	GetVolumeIdByMpathdName(mpathDeviceName string, mpathdOutput string) (string, error)
+	GetVolumeIdByMpathDeviceName(mpathDeviceName string, mpathdOutput string) (string, error)
 	GetMpathDeviceNameFromProcMounts(procMounts string, volumePath string) (string, error)
 }
 
@@ -599,7 +599,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathdOutputByVolumeId(volumeIdVar
 	return mpathdOutput, nil
 }
 
-func (o OsDeviceConnectivityHelperGeneric) GetVolumeIdByMpathdName(mpathDeviceName string, mpathdOutput string) (string, error) {
+func (o OsDeviceConnectivityHelperGeneric) GetVolumeIdByMpathDeviceName(mpathDeviceName string, mpathdOutput string) (string, error) {
 	mpathDeviceNames := []string{mpathDeviceName}
 	volumeIds := o.Helper.ExtractDmFieldValues(mpathDeviceNames, mpathdOutput)
 	volumeId, err := getUniqueDmFieldValue(volumeIds, mpathDeviceName)
