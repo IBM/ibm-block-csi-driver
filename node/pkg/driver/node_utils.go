@@ -605,22 +605,9 @@ func (d NodeUtils) IsVolumePathMatchesVolumeId(volumeId string, volumePath strin
 	}
 
 	volumeIdOfVolumePath, err := d.osDeviceConnectivityHelper.GetMatchingVolumeIdToMpathName(mpathdOutput, mpathDeviceName, volumeIdVariations)
-	if err != nil {
-		return false, err
-	}
 	logger.Infof("IsVolumePathMatchesVolumeId: found volume id [%s] for volume path [%s] ", volumeIdOfVolumePath, volumePath)
+	return err == nil, err
 
-	return d.isVolumeIdFromPathIsMatched(volumeIdOfVolumePath, volumeUuid), nil
-}
-
-func (d NodeUtils) isVolumeIdFromPathIsMatched(volumeIdOfVolumePath string, volumeUuid string) bool {
-	volumIds := d.osDeviceConnectivityHelper.GetVolumeIdVariations(volumeUuid)
-	for _, volumeId := range volumIds {
-		if strings.Contains(volumeIdOfVolumePath, volumeId) {
-			return true
-		}
-	}
-	return false
 }
 
 func (d NodeUtils) GetVolumeUuid(volumeId string) string {

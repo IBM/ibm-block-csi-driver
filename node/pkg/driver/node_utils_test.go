@@ -606,9 +606,6 @@ func TestIsVolumePathMatchesVolumeId(t *testing.T) {
 			nodeUtils := driver.NewNodeUtils(nil, nil, ConfigYaml, mockOsDeviceConHelper)
 
 			mockOsDeviceConHelper.EXPECT().GetVolumeIdVariations(tc.volumeUuid).Return(volumeIdVariations)
-			if tc.volumeIdByVolumePath != "" {
-				mockOsDeviceConHelper.EXPECT().GetVolumeIdVariations(tc.volumeUuid).Return(volumeIdVariations)
-			}
 			mockOsDeviceConHelper.EXPECT().GetMpathdOutputByVolumeIds(volumeIdVariations).Return(tc.mpathdOutput, tc.mpathdOutputErr)
 			if tc.mpathdOutput != "" {
 				mockOsDeviceConHelper.EXPECT().GetMpathDeviceName(tc.volumePath).Return(tc.mpathDeviceName, tc.mpathDeviceNameErr)
