@@ -234,9 +234,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_create_volume_success(source_id="source_id", source_type='snapshot',
                                          volume_group="other_volume_group")
 
-        self.svc.client.svctask.mkvolumegroup.assert_called_with(type='clone', fromsnapshotid='source_id',
-                                                                 pool='pool_name', name='other_volume_group')
-        self.svc.client.svctask.chvdisk.assert_called_once_with(vdisk_id='test_id', name='test_volume')
+        remove_from_volumegroup_call = call(vdisk_id='test_id', volumegroup='other_volume_group')
+        rename_call = call(vdisk_id='test_id', name='test_volume')
+        self.svc.client.svctask.chvdisk.assert_has_calls([remove_from_volumegroup_call, rename_call])
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_create_volume_mkvolumegroup_with_rollback(self, mock_warning):
