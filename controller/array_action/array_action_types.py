@@ -45,3 +45,9 @@ class Host:
 
     def __post_init__(self):
         self.initiators = Initiators(nvme_nqns=self.nvme_nqns, fc_wwns=self.fc_wwns, iscsi_iqns=self.iscsi_iqns)
+
+
+@dataclass
+class ObjectIds:
+    internal_id: str = ''
+    uid: str = ''

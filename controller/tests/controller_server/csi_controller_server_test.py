@@ -9,9 +9,8 @@ from mock import patch, Mock, MagicMock, call
 import controller.array_action.errors as array_errors
 import controller.controller_server.config as config
 import controller.controller_server.errors as controller_errors
-from controller.array_action.array_action_types import Host
+from controller.array_action.array_action_types import Host, ObjectIds
 from controller.array_action.array_mediator_xiv import XIVArrayMediator
-from controller.common.common_types import ObjectIds
 from controller.controller_server.csi_controller_server import CSIControllerServicer
 from controller.controller_server.sync_lock import SyncLock
 from controller.tests.controller_server.test_settings import (CLONE_VOLUME_NAME,

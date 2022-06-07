@@ -38,6 +38,7 @@ import (
 
 	"github.com/ibm/ibm-block-csi-driver/node/goid_info"
 	"github.com/ibm/ibm-block-csi-driver/node/util"
+	"github.com/kubernetes-csi/csi-lib-utils/protosanitizer"
 	"github.com/sirupsen/logrus"
 )
 
@@ -214,6 +215,7 @@ func logEnter(callerDepth int, funcName string, request interface{}) {
 	var message = ">>>> %v"
 	if getStringFromCall(request, "String") != "" {
 		message += ": called with args %+v"
+		var request = protosanitizer.StripSecrets(request)
 		DebugfLogEnter(callerDepth, message, funcName, request)
 	} else {
 		DebugfLogEnter(callerDepth, message, funcName)
