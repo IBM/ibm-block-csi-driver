@@ -770,7 +770,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         source_volume_name = self._get_volume_name_by_wwn(volume_id)
         source_cli_volume = self._get_cli_volume_in_pool_site(source_volume_name, pool)
         if self._is_vdisk_support_addsnapshot(volume_id):
-            target_cli_snapshot = self._add_snapshot(snapshot_name, source_cli_volume, pool)
+            target_cli_snapshot = self._add_snapshot(snapshot_name, source_cli_volume.id, pool)
             snapshot = self._generate_snapshot_response_from_cli_snapshot(target_cli_snapshot, source_cli_volume)
         else:
             target_cli_volume = self._create_snapshot(snapshot_name, source_cli_volume, space_efficiency, pool)
