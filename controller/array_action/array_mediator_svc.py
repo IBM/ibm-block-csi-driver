@@ -528,13 +528,13 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if source_type == controller_config.SNAPSHOT_TYPE_NAME:
             self._create_cli_volume_from_snapshot(name, pool, io_group, volume_group, source_ids.internal_id)
 
-    def _is_source_support_addsnapshot(self, vdisk_uid):
-        return self._is_addsnapshot_supported() and not self._is_source_has_fcmaps(vdisk_uid)
+    def _is_vdisk_support_addsnapshot(self, vdisk_uid):
+        return self._is_addsnapshot_supported() and not self._is_vdisk_has_fcmaps(vdisk_uid)
 
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
                       source_type):
         is_copied = False
-        if source_type and self._is_source_support_addsnapshot(source_ids.uid):
+        if source_type and self._is_vdisk_support_addsnapshot(source_ids.uid):
             self._create_cli_volume_from_source(name, pool, io_group, volume_group, source_ids, source_type)
             is_copied = True
         else:
@@ -761,7 +761,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         source_volume_name = self._get_volume_name_by_wwn(volume_id)
         source_cli_volume = self._get_cli_volume_in_pool_site(source_volume_name, pool)
-        if self._is_source_support_addsnapshot(volume_id):
+        if self._is_vdisk_support_addsnapshot(volume_id):
             target_cli_snapshot = self._add_snapshot(snapshot_name, source_cli_volume, pool)
             snapshot = self._generate_snapshot_response_from_cli_snapshot(target_cli_snapshot, source_cli_volume)
         else:
@@ -1479,7 +1479,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                         return
                 raise ex
 
-    def _is_source_has_fcmaps(self, vdisk_uid):
+    def _is_vdisk_has_fcmaps(self, vdisk_uid):
         if not vdisk_uid:
             return False
         cli_volume = self._get_cli_volume_by_wwn(vdisk_uid, not_exist_err=False)
