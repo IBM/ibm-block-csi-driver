@@ -474,10 +474,10 @@ func TestHelperWaitForDmToExist(t *testing.T) {
 			expErr:       fmt.Errorf("error"),
 		},
 		{
-			name:         "Should return empty string when cmd succeed but with no dm.uuid pairs",
+			name:         "Should return not found error cmd succeed but with no dm.uuid pairs",
 			devices:      "",
 			cmdReturnErr: nil,
-			expErr:       nil,
+			expErr:       &device_connectivity.MultipathDeviceNotFoundForVolumeError{VolumeId: volumeUuid},
 		},
 		{
 			name:         "Should succeed",

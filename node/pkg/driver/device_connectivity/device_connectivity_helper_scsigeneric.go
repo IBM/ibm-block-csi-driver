@@ -673,9 +673,6 @@ func (o GetDmsPathHelperGeneric) GetMpathdOutput(volumeIdVariations []string,
 		return "", err
 	}
 
-	if mpathdOutput == "" {
-		return "", &MultipathDeviceNotFoundForVolumeError{volumeIdVariations[0]}
-	}
 	return mpathdOutput, nil
 }
 
@@ -684,9 +681,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeIdVariations []string, m
 	formatTemplate := strings.Join(multipathdCommandFormatArgs, mpathdSeparator)
 	args := []string{"show", "maps", "raw", "format", "\"", formatTemplate, "\""}
 	logger.Debugf("Waiting for dm to exist")
-	var err error
 	for i := 0; i < maxRetries; i++ {
-		err = nil
 		out, err := o.executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
 		if err != nil {
 			return "", err
@@ -697,11 +692,10 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeIdVariations []string, m
 				return dms, nil
 			}
 		}
-		err = os.ErrNotExist
 
 		time.Sleep(time.Second * time.Duration(intervalSeconds))
 	}
-	return "", err
+	return "", &MultipathDeviceNotFoundForVolumeError{volumeIdVariations[0]}
 }
 
 func (o GetDmsPathHelperGeneric) ExtractDmFieldValues(dmFilterValues []string, mpathdOutput string) map[string]bool {
