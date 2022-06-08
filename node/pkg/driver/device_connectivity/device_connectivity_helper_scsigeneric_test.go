@@ -117,7 +117,7 @@ func TestGetMpathDevice(t *testing.T) {
 				},
 				GetDmsPathReturn{
 					dmPath: "",
-					err:    &device_connectivity.MultipledmFieldValuesError{Validator: "", DmFieldValues: nil},
+					err:    &device_connectivity.MultipleDmFieldValuesError{Validator: "", DmFieldValues: nil},
 				},
 			},
 
@@ -127,7 +127,7 @@ func TestGetMpathDevice(t *testing.T) {
 				},
 			},
 
-			expErrType: reflect.TypeOf(&device_connectivity.MultipledmFieldValuesError{}),
+			expErrType: reflect.TypeOf(&device_connectivity.MultipleDmFieldValuesError{}),
 			expDMPath:  "",
 		},
 
@@ -338,11 +338,11 @@ func TestGetDmsPath(t *testing.T) {
 						"dm-3": true,
 					},
 					dmPath: "",
-					err:    &device_connectivity.MultipledmFieldValuesError{"", map[string]bool{}},
+					err:    &device_connectivity.MultipleDmFieldValuesError{"", map[string]bool{}},
 				},
 			},
 
-			expErrType: reflect.TypeOf(&device_connectivity.MultipledmFieldValuesError{}),
+			expErrType: reflect.TypeOf(&device_connectivity.MultipleDmFieldValuesError{}),
 			expDMPath:  "",
 		},
 

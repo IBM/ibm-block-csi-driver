@@ -4,12 +4,12 @@ import (
 	"fmt"
 )
 
-type MultipledmFieldValuesError struct {
+type MultipleDmFieldValuesError struct {
 	Validator     string
 	DmFieldValues map[string]bool
 }
 
-func (e *MultipledmFieldValuesError) Error() string {
+func (e *MultipleDmFieldValuesError) Error() string {
 	return fmt.Sprintf("Detected more than one (%v) for single (%s)", e.DmFieldValues, e.Validator)
 }
 

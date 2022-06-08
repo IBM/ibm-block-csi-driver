@@ -740,7 +740,7 @@ func (GetDmsPathHelperGeneric) GetFullDmPath(dms map[string]bool, volumeId strin
 
 func getUniqueDmFieldValue(dmFieldValues map[string]bool, filter string) (string, error) {
 	if len(dmFieldValues) > 1 {
-		return "", &MultipledmFieldValuesError{filter, dmFieldValues}
+		return "", &MultipleDmFieldValuesError{filter, dmFieldValues}
 	}
 
 	var dmFieldValue string
