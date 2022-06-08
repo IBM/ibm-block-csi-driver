@@ -67,7 +67,7 @@ var (
 	TimeOutMultipathdCmd                    = 10 * 1000
 	TimeOutBlockDevCmd                      = 10 * 1000
 	TimeOutSgInqCmd                         = 3 * 1000
-	MultipathdWildcardsMpathAndVolumeId     = []string{"%w", "%d"}
+	MultipathdWildcardsVolumeIdAndMpath     = []string{"%w", "%d"}
 	multipathdWildcardsMpathNameAndVolumeId = []string{"%n", "%w"}
 )
 
@@ -611,7 +611,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetVolumeIdByMpathDeviceName(mpathDev
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeIdVariations []string) (string, error) {
-	mpathdOutput, err := o.Helper.GetMpathdOutput(volumeIdVariations, MultipathdWildcardsMpathAndVolumeId)
+	mpathdOutput, err := o.Helper.GetMpathdOutput(volumeIdVariations, MultipathdWildcardsVolumeIdAndMpath)
 	if err != nil {
 		return "", err
 	}
@@ -632,9 +632,8 @@ func (OsDeviceConnectivityHelperGeneric) GetMpathDeviceNameFromProcMounts(procMo
 
 func getMpathDeviceNameFromMountLine(mountLine string) string {
 	lineParts := strings.Fields(mountLine)
-	fullMpathDeviceName := lineParts[0]
-	splitedFullMpathDeviceName := strings.Split(fullMpathDeviceName, "/")
-	return splitedFullMpathDeviceName[len(splitedFullMpathDeviceName)-1]
+	mpathDevicePath := lineParts[0]
+	return filepath.Base(mpathDevicePath)
 }
 
 //go:generate mockgen -destination=../../../mocks/mock_GetDmsPathHelperInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity GetDmsPathHelperInterface
@@ -745,8 +744,7 @@ func (GetDmsPathHelperGeneric) GetFullDmPath(dms map[string]bool, volumeId strin
 	return dmPath, nil
 }
 
-func getUniqueDmFieldValue(dmFieldValues map[string]bool,
-	filter string) (string, error) {
+func getUniqueDmFieldValue(dmFieldValues map[string]bool, filter string) (string, error) {
 	if len(dmFieldValues) > 1 {
 		return "", &MultipledmFieldValuesError{filter, dmFieldValues}
 	}
