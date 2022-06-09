@@ -684,7 +684,8 @@ func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatis
 			}
 		}
 	} else {
-		isVolumePathMatchesVolumeId, err := d.NodeUtils.IsVolumePathMatchesVolumeId(volumeId, path)
+		volumeUuid := d.NodeUtils.GetVolumeUuid(volumeId)
+		isVolumePathMatchesVolumeId, err := d.OsDeviceConnectivityHelper.IsVolumePathMatchesVolumeId(volumeUuid, path)
 		if err != nil {
 			return VolumeStatistics{}, status.Errorf(codes.Internal,
 				"Failed to determine if volume id [%q], is accessible on volume path [%q], error: %s",

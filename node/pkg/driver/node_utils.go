@@ -92,7 +92,6 @@ type NodeUtilsInterface interface {
 	IsBlock(devicePath string) (bool, error)
 	GetFileSystemVolumeStats(path string) (VolumeStatistics, error)
 	GetBlockVolumeStats(volumeId string) (VolumeStatistics, error)
-	IsVolumePathMatchesVolumeId(volumeId string, volumePath string) (bool, error)
 }
 
 type NodeUtils struct {
@@ -588,26 +587,6 @@ func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error
 	}
 
 	return volumeStats, nil
-}
-
-func (d NodeUtils) IsVolumePathMatchesVolumeId(volumeId string, volumePath string) (bool, error) {
-	logger.Infof("IsVolumePathMatchesVolumeId: Searching matching volume id for volume path: [%s] ", volumePath)
-	volumeUuid := d.GetVolumeUuid(volumeId)
-	volumeIdVariations := d.osDeviceConnectivityHelper.GetVolumeIdVariations(volumeUuid)
-	mpathdOutput, err := d.osDeviceConnectivityHelper.GetMpathdOutputByVolumeIds(volumeIdVariations)
-	if err != nil {
-		return false, err
-	}
-
-	mpathDeviceName, err := d.osDeviceConnectivityHelper.GetMpathDeviceName(volumePath)
-	if err != nil {
-		return false, err
-	}
-
-	volumeIdOfVolumePath, err := d.osDeviceConnectivityHelper.GetMatchingVolumeIdToMpathName(mpathdOutput, mpathDeviceName, volumeIdVariations)
-	logger.Infof("IsVolumePathMatchesVolumeId: found volume id [%s] for volume path [%s] ", volumeIdOfVolumePath, volumePath)
-	return err == nil, err
-
 }
 
 func (d NodeUtils) GetVolumeUuid(volumeId string) string {

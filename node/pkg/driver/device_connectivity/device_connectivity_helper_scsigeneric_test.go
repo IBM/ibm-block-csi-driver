@@ -17,6 +17,7 @@
 package device_connectivity_test
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -24,6 +25,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/mocks"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
@@ -62,28 +64,29 @@ type GetDmsPathReturn struct {
 	err    error
 }
 
+type GetWwnByScsiInqReturn struct {
+	wwn string
+	err error
+}
+
 type ReloadMultipathReturn struct {
 	err error
 }
 
-type IsDmPathMatchesVolumeIdReturn struct {
-	isDmPathMatchesVolumeId bool
-}
-
-type AssertDmPathMatchesVolumeIdReturn struct {
+type GetVolumeIdVariationsReturn struct {
 	err error
 }
 
 func TestGetMpathDevice(t *testing.T) {
 	testCases := []struct {
-		name                              string
-		expErrType                        reflect.Type
-		expErr                            error
-		expDMPath                         string
-		getDmsPathReturn                  []GetDmsPathReturn
-		reloadMultipathReturn             []ReloadMultipathReturn
-		isDmPathMatchesVolumeIdReturn     []IsDmPathMatchesVolumeIdReturn
-		assertDmPathMatchesVolumeIdReturn []AssertDmPathMatchesVolumeIdReturn
+		name                        string
+		expErrType                  reflect.Type
+		expErr                      error
+		expDMPath                   string
+		getDmsPathReturn            []GetDmsPathReturn
+		getWwnByScsiInqReturn       []GetWwnByScsiInqReturn
+		reloadMultipathReturn       []ReloadMultipathReturn
+		getVolumeIdVariationsReturn []GetVolumeIdVariationsReturn
 	}{
 		{
 			name: "Should fail when WaitForDmToExist did not find any dm device",
@@ -117,7 +120,7 @@ func TestGetMpathDevice(t *testing.T) {
 				},
 				GetDmsPathReturn{
 					dmPath: "",
-					err:    &device_connectivity.MultipleDmFieldValuesError{Validator: "", DmFieldValues: nil},
+					err:    &device_connectivity.MultipleDmFieldValuesError{"", nil},
 				},
 			},
 
@@ -143,14 +146,17 @@ func TestGetMpathDevice(t *testing.T) {
 					err:    nil,
 				},
 			},
+
 			reloadMultipathReturn: []ReloadMultipathReturn{
 				ReloadMultipathReturn{
 					err: nil,
 				},
 			},
-			assertDmPathMatchesVolumeIdReturn: []AssertDmPathMatchesVolumeIdReturn{
-				AssertDmPathMatchesVolumeIdReturn{
-					err: &device_connectivity.ErrorWrongDeviceFound{"", "", ""},
+
+			getWwnByScsiInqReturn: []GetWwnByScsiInqReturn{
+				GetWwnByScsiInqReturn{
+					wwn: "otheruuid",
+					err: nil,
 				},
 			},
 
@@ -166,9 +172,10 @@ func TestGetMpathDevice(t *testing.T) {
 					err:    nil,
 				},
 			},
-			isDmPathMatchesVolumeIdReturn: []IsDmPathMatchesVolumeIdReturn{
-				IsDmPathMatchesVolumeIdReturn{
-					isDmPathMatchesVolumeId: true,
+			getWwnByScsiInqReturn: []GetWwnByScsiInqReturn{
+				GetWwnByScsiInqReturn{
+					wwn: volumeUuid,
+					err: nil,
 				},
 			},
 
@@ -195,8 +202,9 @@ func TestGetMpathDevice(t *testing.T) {
 				},
 			},
 
-			assertDmPathMatchesVolumeIdReturn: []AssertDmPathMatchesVolumeIdReturn{
-				AssertDmPathMatchesVolumeIdReturn{
+			getWwnByScsiInqReturn: []GetWwnByScsiInqReturn{
+				GetWwnByScsiInqReturn{
+					wwn: volumeUuid,
 					err: nil,
 				},
 			},
@@ -216,7 +224,8 @@ func TestGetMpathDevice(t *testing.T) {
 			fake_helper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
 			fake_mutex := &sync.Mutex{}
 			volumeIdVariations := []string{volumeUuid, volumeNguid}
-			dmPath := "/dev/dm-1"
+
+			fake_helper.EXPECT().GetVolumeIdVariations(volumeUuid).Return(volumeIdVariations)
 
 			for _, r := range tc.getDmsPathReturn {
 				fake_helper.EXPECT().GetDmsPath(volumeIdVariations).Return(
@@ -224,18 +233,14 @@ func TestGetMpathDevice(t *testing.T) {
 					r.err)
 			}
 
-			for _, r := range tc.isDmPathMatchesVolumeIdReturn {
-				fake_helper.EXPECT().IsDmPathMatchesVolumeId(dmPath, volumeIdVariations).Return(
-					r.isDmPathMatchesVolumeId)
-			}
-
 			for _, r := range tc.reloadMultipathReturn {
 				fake_helper.EXPECT().ReloadMultipath().Return(
 					r.err)
 			}
 
-			for _, r := range tc.assertDmPathMatchesVolumeIdReturn {
-				fake_helper.EXPECT().AssertDmPathMatchesVolumeId(dmPath, volumeIdVariations).Return(
+			for _, r := range tc.getWwnByScsiInqReturn {
+				fake_helper.EXPECT().GetWwnByScsiInq("/dev/dm-1").Return(
+					r.wwn,
 					r.err)
 			}
 
@@ -257,6 +262,7 @@ func TestGetMpathDevice(t *testing.T) {
 			}
 
 			if tc.expDMPath != DMPath {
+				logger.Error(err)
 				t.Fatalf("Expected found device mapper  %v, got %v", tc.expDMPath, DMPath)
 			}
 
@@ -927,5 +933,98 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 			}
 
 		})
+	}
+}
+
+func TestIsVolumePathMatchesVolumeId(t *testing.T) {
+	testCases := []struct {
+		name                        string
+		volumeUuid                  string
+		volumePath                  string
+		mpathdOutput                string
+		mpathdOutputErr             error
+		mpathDeviceName             string
+		mpathDeviceNameErr          error
+		volumeIdByVolumePath        string
+		matchingVolumeIdErr         error
+		isVolumePathMatchesVolumeId bool
+	}{
+		{
+			name:                        "success",
+			volumeUuid:                  "volumeUuid",
+			volumePath:                  "/path",
+			mpathdOutput:                "fakeMpathDevice 64905684095684",
+			mpathDeviceName:             "fakeMpathDevice",
+			volumeIdByVolumePath:        volumeUuid,
+			isVolumePathMatchesVolumeId: true,
+		},
+		{
+			name:            "fail when trying to get mpath output",
+			volumeUuid:      "volumeUuid",
+			volumePath:      "/path",
+			mpathdOutputErr: errors.New("failed in getting mpath output"),
+		},
+		{
+			name:                        "fail when trying to get mpath device name",
+			volumeUuid:                  "volumeUuid",
+			volumePath:                  "/path",
+			mpathdOutput:                "fakeMpathDevice 64905684095684",
+			mpathDeviceNameErr:          errors.New("failed in getting mpath device name"),
+			isVolumePathMatchesVolumeId: false,
+		},
+		{
+			name:                        "fail when trying to match volume id to mpath name",
+			volumeUuid:                  "volumeUuid",
+			volumePath:                  "/path",
+			mpathdOutput:                "fakeMpathDevice 64905684095684",
+			mpathDeviceName:             "fakeMpathDevice",
+			matchingVolumeIdErr:         errors.New("failed in matching volume id to mpath name"),
+			isVolumePathMatchesVolumeId: false,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			volumeIdVariations := []string{volumeUuid, volumeNguid}
+
+			mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
+			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fakeExecuter, mockOsDeviceConHelper, nil)
+
+			mockOsDeviceConHelper.EXPECT().GetVolumeIdVariations(tc.volumeUuid).Return(volumeIdVariations)
+			mockOsDeviceConHelper.EXPECT().GetMpathdOutputByVolumeIds(volumeIdVariations).Return(tc.mpathdOutput, tc.mpathdOutputErr)
+			if tc.mpathdOutput != "" {
+				mockOsDeviceConHelper.EXPECT().GetMpathDeviceName(tc.volumePath).Return(tc.mpathDeviceName, tc.mpathDeviceNameErr)
+			}
+			if tc.mpathDeviceName != "" {
+				mockOsDeviceConHelper.EXPECT().GetMatchingVolumeIdToMpathName(
+					tc.mpathdOutput, tc.mpathDeviceName).Return(tc.volumeIdByVolumePath, tc.matchingVolumeIdErr)
+			}
+			if tc.volumeIdByVolumePath != "" {
+				mockOsDeviceConHelper.EXPECT().IsVolumeIdContainsOneOfVolumeIdVariations(tc.volumeIdByVolumePath, volumeIdVariations).Return(
+					tc.isVolumePathMatchesVolumeId)
+			}
+			isVolumePathMatchesVolumeId, err := o.IsVolumePathMatchesVolumeId(tc.volumeUuid, tc.volumePath)
+
+			if isVolumePathMatchesVolumeId != tc.isVolumePathMatchesVolumeId {
+				t.Fatalf("wrong volumestats: expected %v, got %v", tc.isVolumePathMatchesVolumeId, isVolumePathMatchesVolumeId)
+			}
+			if tc.mpathdOutputErr != nil {
+				assertExpectedError(t, tc.mpathdOutputErr, err)
+			} else if tc.mpathDeviceNameErr != nil {
+				assertExpectedError(t, tc.mpathDeviceNameErr, err)
+			} else {
+				assertExpectedError(t, tc.matchingVolumeIdErr, err)
+			}
+
+		})
+	}
+}
+
+func assertExpectedError(t *testing.T, expectedError error, responseErr error) {
+	if expectedError != responseErr {
+		t.Fatalf("wrong error: expected %v, got %v", expectedError, responseErr)
 	}
 }
