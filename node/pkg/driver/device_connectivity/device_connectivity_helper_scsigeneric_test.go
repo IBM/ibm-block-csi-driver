@@ -994,12 +994,12 @@ func TestIsVolumePathMatchesVolumeId(t *testing.T) {
 			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fakeExecuter, mockOsDeviceConHelper, nil)
 
 			mockOsDeviceConHelper.EXPECT().GetVolumeIdVariations(tc.volumeUuid).Return(volumeIdVariations)
-			mockOsDeviceConHelper.EXPECT().GetMpathdOutputByVolumeIds(volumeIdVariations).Return(tc.mpathdOutput, tc.mpathdOutputErr)
+			mockOsDeviceConHelper.EXPECT().GetMpathdOutputForVolume(volumeIdVariations).Return(tc.mpathdOutput, tc.mpathdOutputErr)
 			if tc.mpathdOutput != "" {
 				mockOsDeviceConHelper.EXPECT().GetMpathDeviceName(tc.volumePath).Return(tc.mpathDeviceName, tc.mpathDeviceNameErr)
 			}
 			if tc.mpathDeviceName != "" {
-				mockOsDeviceConHelper.EXPECT().GetMatchingVolumeIdToMpathName(
+				mockOsDeviceConHelper.EXPECT().GetVolumeIdOfMpathName(
 					tc.mpathdOutput, tc.mpathDeviceName).Return(tc.volumeIdByVolumePath, tc.matchingVolumeIdErr)
 			}
 			if tc.volumeIdByVolumePath != "" {
