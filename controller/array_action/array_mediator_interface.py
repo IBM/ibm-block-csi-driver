@@ -31,7 +31,7 @@ class ArrayMediator(ABC):
 
     @abstractmethod
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
-                      source_type):
+                      source_type, flashcopy_2):
         """
         This function should create a volume in the storage system.
 
@@ -44,6 +44,7 @@ class ArrayMediator(ABC):
             volume_group     : volume group to create the volume in
             source_ids       : ObjectIds of source to create from
             source_type      : volume or snapshot
+            flashcopy_2      : indicate if flashcopy 2.0 feature is enabled
 
         Returns:
             volume_id : the volume WWN.
@@ -98,13 +99,14 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_volume(self, name, pool=None):
+    def get_volume(self, name, pool, flashcopy_2):
         """
         This function return volume info about the volume.
 
         Args:
-            name: name of the volume on storage system.
-            pool: pool of the volume to find the volume more efficiently.
+            name        : name of the volume on storage system.
+            pool        : pool of the volume to find the volume more efficiently.
+            flashcopy_2 : indicate if flashcopy 2.0 feature is enabled
 
 
         Returns:
@@ -197,13 +199,14 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_snapshot(self, volume_id, snapshot_name, pool=None):
+    def get_snapshot(self, volume_id, snapshot_name, pool, flashcopy_2):
         """
         This function return snapshot info about the snapshot.
         Args:
-            volume_id : id of the source volume (used to get pool in case pool parameter not given)
+            volume_id     : id of the source volume (used to get pool in case pool parameter not given)
             snapshot_name : name of the snapshot in the storage system
-            pool: pool to find the snapshot in (if not given, pool taken from source volume)
+            pool          : pool to find the snapshot in (if not given, pool taken from source volume)
+            flashcopy_2   : indicate if flashcopy 2.0 feature is enabled
         Returns:
            Snapshot
         Raises:
@@ -230,7 +233,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool):
+    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, flashcopy_2):
         """
         This function should create a snapshot from volume in the storage system.
         Args:
@@ -238,6 +241,7 @@ class ArrayMediator(ABC):
             snapshot_name       : name of the snapshot to be created in the storage system
             space_efficiency    : space efficiency (if empty/None, space efficiency taken from source volume)
             pool                : pool to create the snapshot in (if empty/None, pool taken from source volume)
+            flashcopy_2         : indicate if flashcopy 2.0 feature is enabled
         Returns:
             Snapshot
         Raises:

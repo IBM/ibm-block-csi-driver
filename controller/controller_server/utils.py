@@ -92,6 +92,12 @@ def get_snapshot_parameters(parameters, system_id):
     return get_object_parameters(parameters, config.PARAMETERS_SNAPSHOT_NAME_PREFIX, system_id)
 
 
+def _str_to_bool(parameter):
+    if parameter and parameter.lower() == "true":
+        return True
+    return False
+
+
 def get_object_parameters(parameters, prefix_param_name, system_id):
     raw_parameters_by_system = parameters.get(config.PARAMETERS_BY_SYSTEM)
     system_parameters = {}
@@ -103,12 +109,16 @@ def get_object_parameters(parameters, prefix_param_name, system_id):
     default_prefix = parameters.get(prefix_param_name)
     default_io_group = parameters.get(config.PARAMETERS_IO_GROUP)
     default_volume_group = parameters.get(config.PARAMETERS_VOLUME_GROUP)
+    default_flashcopy_2 = parameters.get(config.PARAMETERS_VOLUME_FLASHCOPY_2)
+    flashcopy_2_str = system_parameters.get(config.PARAMETERS_VOLUME_FLASHCOPY_2, default_flashcopy_2)
+    is_flashcopy_2 = _str_to_bool(flashcopy_2_str)
     return ObjectParameters(
         pool=system_parameters.get(config.PARAMETERS_POOL, default_pool),
         space_efficiency=system_parameters.get(config.PARAMETERS_SPACE_EFFICIENCY, default_space_efficiency),
         prefix=system_parameters.get(prefix_param_name, default_prefix),
         io_group=system_parameters.get(config.PARAMETERS_IO_GROUP, default_io_group),
-        volume_group=system_parameters.get(config.PARAMETERS_VOLUME_GROUP, default_volume_group))
+        volume_group=system_parameters.get(config.PARAMETERS_VOLUME_GROUP, default_volume_group),
+        flashcopy_2=is_flashcopy_2)
 
 
 def get_volume_id(new_volume, system_id):

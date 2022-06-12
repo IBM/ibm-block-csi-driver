@@ -14,6 +14,8 @@ POOL_DOES_NOT_MATCH_SPACE_EFFICIENCY_MESSAGE = "Pool : {0} does not match the fo
 
 SPACE_EFFICIENCY_NOT_SUPPORTED_MESSAGE = "space efficiency is not supported : {0} "
 
+FLASHCOPY_2_NOT_SUPPORTED_MESSAGE = "flashcopy 2.0 is enabled but not supported with object : {0} "
+
 VOLUME_ALREADY_EXISTS_MESSAGE = "Volume already exists : {0} , array : {1}"
 
 POOL_DOES_NOT_EXIST_MESSAGE = "Pool does not exist: {0} , array : {1}"

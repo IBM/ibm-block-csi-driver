@@ -75,10 +75,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug("requested size is 0 so the default size will be used : {0} ".format(
                         required_bytes))
                 try:
-                    volume = array_mediator.get_volume(
-                        volume_final_name,
-                        pool=pool,
-                    )
+                    volume = array_mediator.get_volume(volume_final_name, pool, volume_parameters.flashcopy_2)
                 except array_errors.ObjectNotFoundError:
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
@@ -86,7 +83,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     array_mediator.validate_supported_space_efficiency(space_efficiency)
                     volume = array_mediator.create_volume(volume_final_name, required_bytes, space_efficiency, pool,
                                                           volume_parameters.io_group, volume_parameters.volume_group,
-                                                          source_ids, source_type)
+                                                          source_ids, source_type, volume_parameters.flashcopy_2)
                 else:
                     logger.debug("volume found : {}".format(volume))
 
@@ -313,11 +310,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 snapshot_final_name = self._get_snapshot_final_name(snapshot_parameters, request.name, array_mediator)
 
                 logger.info("Snapshot name : {}. Volume id : {}".format(snapshot_final_name, volume_id))
-                snapshot = array_mediator.get_snapshot(
-                    volume_id,
-                    snapshot_final_name,
-                    pool=pool
-                )
+                snapshot = array_mediator.get_snapshot(volume_id, snapshot_final_name, pool,
+                                                       snapshot_parameters.flashcopy_2)
 
                 if snapshot:
                     if snapshot.source_id != volume_id:
@@ -332,7 +326,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                             snapshot_final_name,
                             volume_id))
                     array_mediator.validate_supported_space_efficiency(space_efficiency)
-                    snapshot = array_mediator.create_snapshot(volume_id, snapshot_final_name, space_efficiency, pool)
+                    snapshot = array_mediator.create_snapshot(volume_id, snapshot_final_name, space_efficiency, pool,
+                                                              snapshot_parameters.flashcopy_2)
 
                 logger.debug("generating create snapshot response")
                 response = utils.generate_csi_create_snapshot_response(snapshot, system_id, source_id)

@@ -238,3 +238,9 @@ class NotEnoughSpaceInPool(BaseArrayActionException):
     def __init__(self, id_or_name):
         super().__init__()
         self.message = messages.NOT_ENOUGH_SPACE_IN_POOL_ERROR_MESSAGE.format(id_or_name)
+
+
+class Flashcopy2NotSupportedMessage(BaseArrayActionException):
+    def __init__(self, id_or_name):
+        super().__init__()
+        self.message = messages.FLASHCOPY_2_NOT_SUPPORTED_MESSAGE.format(id_or_name)
