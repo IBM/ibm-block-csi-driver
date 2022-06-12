@@ -243,9 +243,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def is_active(self):
         return self.client.transport.transport.get_transport().is_active()
 
-    def _generate_volume_response(self, cli_volume, is_copied=False):
+    def _generate_volume_response(self, cli_volume, flashcopy_2=False):
         pool = self._get_volume_pool(cli_volume)
-        source_volume_wwn = self._get_source_volume_wwn_if_exists(cli_volume)
+        source_id = None
+        if not flashcopy_2:
+            source_id = self._get_source_volume_wwn_if_exists(cli_volume)
         space_efficiency = _get_cli_volume_space_efficiency(cli_volume)
         return Volume(
             capacity_bytes=int(cli_volume.capacity),
@@ -254,9 +256,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             name=cli_volume.name,
             array_address=self.endpoint,
             pool=pool,
-            source_id=source_volume_wwn,
+            source_id=source_id,
             array_type=self.array_type,
-            is_copied=is_copied,
             space_efficiency=space_efficiency,
             default_space_efficiency=config.SPACE_EFFICIENCY_THICK
         )
@@ -347,7 +348,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def get_volume(self, name, pool, flashcopy_2):
         cli_volume = self._get_cli_volume(name)
-        return self._generate_volume_response(cli_volume)
+        return self._generate_volume_response(cli_volume, flashcopy_2)
 
     def _get_object_fcmaps(self, object_name):
         all_fcmaps = []
@@ -533,14 +534,15 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
                       source_type, flashcopy_2):
-        is_copied = False
-        if source_type and self._is_vdisk_support_addsnapshot(source_ids.uid):
-            self._create_cli_volume_from_source(name, pool, io_group, volume_group, source_ids, source_type)
-            is_copied = True
+        if flashcopy_2:
+            if source_type and self._is_vdisk_support_addsnapshot(source_ids.uid):
+                self._create_cli_volume_from_source(name, pool, io_group, volume_group, source_ids, source_type)
+            else:
+                raise array_errors.Flashcopy2NotSupportedMessage(name)
         else:
             self._create_cli_volume(name, size_in_bytes, space_efficiency, pool, io_group, volume_group)
         cli_volume = self._get_cli_volume(name)
-        return self._generate_volume_response(cli_volume, is_copied)
+        return self._generate_volume_response(cli_volume, flashcopy_2)
 
     def _rmvolume(self, volume_id_or_name, not_exist_err=True):
         logger.info("deleting volume with name : {0}".format(volume_id_or_name))
@@ -570,7 +572,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                     return None
                 source_cli_volume = self._get_cli_volume_by_wwn(volume_id)
                 return self._generate_snapshot_response_from_cli_snapshot(cli_snapshot, source_cli_volume)
-
             raise array_errors.Flashcopy2NotSupportedMessage(volume_id)
         target_cli_volume = self._get_cli_volume_if_exists(snapshot_name)
         if not target_cli_volume:

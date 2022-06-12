@@ -757,16 +757,25 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertFalse(response.HasField("volume"))
         self.mediator.copy_to_existing_volume.assert_not_called()
 
-    @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_volume_idempotent_with_source_volume_got_other_source(self, storage_agent):
+    def _prepare_idempotent_test_with_other_source(self, storage_agent):
         self._prepare_idempotent_tests()
         storage_agent.return_value = self.storage_agent
         volume_source_id = "wwn3"
         self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, "volume", "wwn2", "a9k",
                                                                                         source_id=volume_source_id)
         self.servicer.CreateVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
         self.mediator.copy_to_existing_volume.assert_not_called()
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_idempotent_with_source_volume_got_other_source(self, storage_agent):
+        self._prepare_idempotent_test_with_other_source(storage_agent)
+        self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
+
+    @patch("controller.controller_server.csi_controller_server.get_agent")
+    def test_create_volume_idempotent_with_other_source_and_flashcopy_enabled(self, storage_agent):
+        self.request.parameters[config.PARAMETERS_VOLUME_FLASHCOPY_2] = "true"
+        self._prepare_idempotent_test_with_other_source(storage_agent)
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
     def test_create_volume_idempotent_with_size_not_matched(self, storage_agent):

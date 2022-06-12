@@ -87,25 +87,26 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 else:
                     logger.debug("volume found : {}".format(volume))
 
-                    volume_capacity_bytes = volume.capacity_bytes
-                    if not source_id and volume_capacity_bytes < required_bytes:
-                        message = "Volume was already created with different size." \
-                                  " volume size: {}, requested size: {}".format(volume_capacity_bytes,
-                                                                                required_bytes)
-                        return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
-                                                    csi_pb2.CreateVolumeResponse)
+                    if not volume_parameters.flashcopy_2:
+                        volume_capacity_bytes = volume.capacity_bytes
+                        if not source_id and volume_capacity_bytes < required_bytes:
+                            message = "Volume was already created with different size." \
+                                      " volume size: {}, requested size: {}".format(volume_capacity_bytes,
+                                                                                    required_bytes)
+                            return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
+                                                        csi_pb2.CreateVolumeResponse)
 
-                    response = self._get_create_volume_response_for_existing_volume_source(volume,
-                                                                                           source_id,
-                                                                                           source_type, system_id,
-                                                                                           context)
-                    if response:
-                        return response
+                        response = self._get_create_volume_response_for_existing_volume_source(volume,
+                                                                                               source_id,
+                                                                                               source_type, system_id,
+                                                                                               context)
+                        if response:
+                            return response
 
-                if source_id:
+                if source_id and not volume_parameters.flashcopy_2:
                     array_mediator.copy_to_existing_volume_from_source(volume, source_id,
                                                                        source_type, required_bytes)
-                    volume.source_id = source_id
+                volume.source_id = source_id
 
                 response = utils.generate_csi_create_volume_response(volume, array_connection_info.system_id,
                                                                      source_type)

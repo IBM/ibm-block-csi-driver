@@ -76,8 +76,6 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
         self.unmap_volume(vol_id, host_name)
 
     def copy_to_existing_volume_from_source(self, volume, source_id, source_type, minimum_volume_size):
-        if volume.is_copied:
-            return
         volume_id = volume.id
         try:
             source_object = self.get_object_by_id(source_id, source_type)

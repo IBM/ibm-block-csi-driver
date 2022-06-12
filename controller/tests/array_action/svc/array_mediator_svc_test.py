@@ -107,13 +107,28 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_get_volume_lsvdisk_cli_failure_error("12345", 'CMMVC5703E', array_errors.InvalidArgumentError)
         self._test_get_volume_lsvdisk_cli_failure_error("", 'other error', CLIFailureError)
 
-    def test_get_volume_return_correct_value(self):
-        cli_volume_mock = Mock(as_single_element=self._get_cli_volume())
+    def _test_get_volume(self, get_cli_volume_args=None, flashcopy_2=False, lsvdisk_call_count=2):
+        if get_cli_volume_args is None:
+            get_cli_volume_args = {}
+        cli_volume_mock = Mock(as_single_element=self._get_cli_volume(**get_cli_volume_args))
         self.svc.client.svcinfo.lsvdisk.return_value = cli_volume_mock
-        volume = self.svc.get_volume("test_volume", pool="pool1", flashcopy_2=False)
+        volume = self.svc.get_volume("test_volume", pool="pool1", flashcopy_2=flashcopy_2)
         self.assertEqual(1024, volume.capacity_bytes)
         self.assertEqual('pool_name', volume.pool)
         self.assertEqual('SVC', volume.array_type)
+        self.assertEqual(lsvdisk_call_count, self.svc.client.svcinfo.lsvdisk.call_count)
+        return volume
+
+    def test_get_volume_success(self):
+        self._test_get_volume()
+
+    def test_get_volume_with_source_success(self):
+        volume = self._test_get_volume({'vdisk_uid': "source_id", 'fc_id': '1'})
+        self.assertEqual("source_id", volume.source_id)
+
+    def test_get_volume_with_source_and_flashcopy_enabled(self):
+        volume = self._test_get_volume({'vdisk_uid': "source_id", 'fc_id': '1'}, flashcopy_2=True, lsvdisk_call_count=1)
+        self.assertIsNone(volume.source_id)
 
     def test_get_volume_hyperswap_has_no_source(self):
         target_cli_volume = self._get_mapped_target_cli_volume()
@@ -166,12 +181,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC9292E", array_errors.PoolDoesNotMatchSpaceEfficiency)
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC9301E", array_errors.PoolDoesNotMatchSpaceEfficiency)
 
-    def _test_create_volume_success(self, space_efficiency=None, source_id=None, source_type=None, volume_group=None):
+    def _test_create_volume_success(self, space_efficiency=None, source_id=None, source_type=None, volume_group=None,
+                                    flashcopy_2=False):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         vol_ret = Mock(as_single_element=self._get_cli_volume())
         self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
         volume = self.svc.create_volume("test_volume", 1024, space_efficiency, "pool_name", None, volume_group,
-                                        self._mock_source_ids(source_id), source_type, flashcopy_2=False)
+                                        self._mock_source_ids(source_id), source_type, flashcopy_2=flashcopy_2)
 
         self.assertEqual(1024, volume.capacity_bytes)
         self.assertEqual('SVC', volume.array_type)
@@ -221,7 +237,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_create_volume_mkvolumegroup_success(self):
         self._prepare_mocks_for_create_volume_mkvolumegroup()
-        self._test_create_volume_success(source_id="source_id", source_type='snapshot')
+        self._test_create_volume_success(source_id="source_id", source_type='snapshot', flashcopy_2=True)
 
         self.svc.client.svctask.mkvolumegroup.assert_called_with(type='clone', fromsnapshotid='source_id',
                                                                  pool='pool_name', name='test_volume')
@@ -233,7 +249,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_create_volume_mkvolumegroup_with_other_volume_group_success(self):
         self._prepare_mocks_for_create_volume_mkvolumegroup()
         self._test_create_volume_success(source_id="source_id", source_type='snapshot',
-                                         volume_group="other_volume_group")
+                                         volume_group="other_volume_group", flashcopy_2=True)
 
         remove_from_volumegroup_call = call(vdisk_id='test_id', volumegroup='other_volume_group')
         rename_call = call(vdisk_id='test_id', name='test_volume')
@@ -356,7 +372,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         return map(cls._mock_cli_object, cli_objects)
 
     @staticmethod
-    def _get_cli_volume(with_deduplicated_copy=True, name='source_volume', pool_name='pool_name'):
+    def _get_cli_volume(with_deduplicated_copy=True, name='source_volume', pool_name='pool_name', vdisk_uid='vol_id',
+                        fc_id=''):
         se_copy = YES
         deduplicated_copy = 'no'
         compressed_copy = 'no'
@@ -364,13 +381,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
             se_copy = 'no'
             deduplicated_copy = YES
             compressed_copy = YES
-        return Munch({'vdisk_UID': 'vol_id',
+        return Munch({'vdisk_UID': vdisk_uid,
                       'id': 'test_id',
                       'name': name,
                       'capacity': '1024',
                       'mdisk_grp_name': pool_name,
                       'IO_group_name': 'iogrp0',
-                      'FC_id': '',
+                      'FC_id': fc_id,
                       'se_copy': se_copy,
                       'deduplicated_copy': deduplicated_copy,
                       'compressed_copy': compressed_copy
