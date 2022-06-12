@@ -448,7 +448,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, pool=expected_pool)
+        self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, expected_pool, False)
         self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, 10, None, expected_pool, IO_GROUP,
                                                             VOLUME_GROUP,
                                                             ObjectIds(internal_id='', uid=''), None, False)
@@ -486,7 +486,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.servicer.CreateVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, pool=POOL)
+        self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, POOL, False)
         self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, 10, "not_none", POOL, IO_GROUP, VOLUME_GROUP,
                                                             ObjectIds(internal_id='', uid=''), None, False)
 
@@ -602,7 +602,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
         self.assertEqual(self.context.code, return_code)
         self.assertIn(msg, self.context.details)
-        self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, pool=POOL)
+        self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, POOL, False)
         self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, self.capacity_bytes, None, POOL, IO_GROUP,
                                                             VOLUME_GROUP, ObjectIds(internal_id='', uid=''),
                                                             None, False)
