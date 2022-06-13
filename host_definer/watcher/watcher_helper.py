@@ -44,8 +44,8 @@ class WatcherHelper:
             host_object.host_name = csi_node
             host_definition_name = self.get_host_definition_name_from_host_object(host_object)
             if self._is_host_already_on_storage(host_definition_name):
-                logger.info('Host is already on storage, detected hostdefinition {} in Ready phase'.format(
-                    host_definition_name))
+                logger.info('Host {} is already on storage, detected hostdefinition {} in Ready phase'.format(
+                    csi_node, host_definition_name))
             else:
                 self.verify_on_storage(host_object)
             

@@ -11,13 +11,16 @@ class SecretWatcher(WatcherHelper):
         super().__init__()
 
     def watch_secret_resources(self):
-        watcher = watch.Watch()
-        for event in watcher.stream(self.core_api.list_secret_for_all_namespaces):
-            if event['type'] == settings.ADDED_EVENT and self._is_secret_used_by_storage_class(event):
-                self._verify_host_on_storage_from_secret_event(event)
-            if event['type'] == settings.MODIFIED_EVENT:
-                if self._is_secret_used_by_storage_class(event):
-                    self._handle_modified_secrets(event)
+        while True:
+            resource_version = self.core_api.list_secret_for_all_namespaces().metadata.resource_version
+            stream = watch.Watch().stream(self.core_api.list_secret_for_all_namespaces,
+                                          resource_version=resource_version, timeout_seconds=5)
+            for event in stream:
+                if event['type'] == settings.ADDED_EVENT and self._is_secret_used_by_storage_class(event):
+                    self._verify_host_on_storage_from_secret_event(event)
+                if event['type'] == settings.MODIFIED_EVENT:
+                    if self._is_secret_used_by_storage_class(event):
+                        self._handle_modified_secrets(event)
 
     def _is_secret_used_by_storage_class(self, event):
         secret_name = event['object'].metadata.name

@@ -1,8 +1,7 @@
 FROM registry.access.redhat.com/ubi8/python-38:1-75.1638364053 as builder
 
-#USER root
-#RUN mkdir /host_definer
-#USER default
+RUN pip3 install --ignore-installed --default-timeout=100 --upgrade pip==21.2.4
+WORKDIR /tmp
 COPY host_definer/requirements.txt .
 RUN pip3 install -r ./requirements.txt
 
@@ -24,12 +23,10 @@ LABEL name="IBM block storage CSI driver hostDefiner" \
       io.openshift.tags=ibm,csi,ibm-block-csi-driver,hostDefiner
 
 COPY --from=builder /opt/app-root /opt/app-root
-COPY host_definer /host_definer/
-WORKDIR /host_definer
-#ADD host_definition_manager.py .
-#ADD main.py .
-#ADD common ./common/
-#ADD watcher ./watcher/
-#ADD storage_manager/ ./storage_manager/
+COPY ./host_definer /driver/host_definer/
+COPY ./LICENSE /licenses/
+COPY ./NOTICES /licenses/
 
-CMD ["python3", "/host_definer/main.py"]
+WORKDIR /driver
+
+CMD ["python3", "/driver/host_definer/main.py"]
