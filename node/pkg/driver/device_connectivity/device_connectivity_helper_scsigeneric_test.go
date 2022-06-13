@@ -999,11 +999,11 @@ func TestIsVolumePathMatchesVolumeId(t *testing.T) {
 				mockOsDeviceConHelper.EXPECT().GetMpathDeviceName(tc.volumePath).Return(tc.mpathDeviceName, tc.mpathDeviceNameErr)
 			}
 			if tc.mpathDeviceName != "" {
-				mockOsDeviceConHelper.EXPECT().GetVolumeIdOfMpathName(
+				mockOsDeviceConHelper.EXPECT().GetMpathVolumeId(
 					tc.mpathdOutput, tc.mpathDeviceName).Return(tc.volumeIdByVolumePath, tc.matchingVolumeIdErr)
 			}
 			if tc.volumeIdByVolumePath != "" {
-				mockOsDeviceConHelper.EXPECT().IsVolumeIdContainsOneOfVolumeIdVariations(tc.volumeIdByVolumePath, volumeIdVariations).Return(
+				mockOsDeviceConHelper.EXPECT().IsAnyVariationInMpathVolumeId(tc.volumeIdByVolumePath, volumeIdVariations).Return(
 					tc.isVolumePathMatchesVolumeId)
 			}
 			isVolumePathMatchesVolumeId, err := o.IsVolumePathMatchesVolumeId(tc.volumeUuid, tc.volumePath)

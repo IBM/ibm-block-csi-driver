@@ -108,13 +108,13 @@ func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(volum
 		return false, err
 	}
 
-	volumeIdOfVolumePath, err := r.Helper.GetVolumeIdOfMpathName(mpathdOutput, mpathDeviceName)
+	mpathVolumeId, err := r.Helper.GetMpathVolumeId(mpathdOutput, mpathDeviceName)
 	if err != nil {
 		return false, err
 	}
 
-	logger.Infof("IsVolumePathMatchesVolumeId: found volume id [%s] for volume path [%s] ", volumeIdOfVolumePath, volumePath)
-	return r.Helper.IsVolumeIdContainsOneOfVolumeIdVariations(volumeIdOfVolumePath, volumeIdVariations), nil
+	logger.Infof("IsVolumePathMatchesVolumeId: found volume id [%s] for volume path [%s] ", mpathVolumeId, volumePath)
+	return r.Helper.IsAnyVariationInMpathVolumeId(mpathVolumeId, volumeIdVariations), nil
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIdentifiers []string) error {
@@ -172,12 +172,12 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (string, error) {
 	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] ", volumeId)
 
-	volumeIds := r.Helper.GetVolumeIdVariations(volumeId)
-	dmPath, _ := r.Helper.GetDmsPath(volumeIds)
+	volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeId)
+	dmPath, _ := r.Helper.GetDmsPath(volumeIdVariations)
 
 	if dmPath != "" {
 		SgInqWwn, _ := r.Helper.GetWwnByScsiInq(dmPath)
-		if isSameId(SgInqWwn, volumeIds) {
+		if isSameId(SgInqWwn, volumeIdVariations) {
 			return dmPath, nil
 		}
 		logger.Warningf("Expected {%v} but got {%v} from sg_inq", volumeId, SgInqWwn)
@@ -187,7 +187,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 		return "", err
 	}
 
-	dmPath, err := r.Helper.GetDmsPath(volumeIds)
+	dmPath, err := r.Helper.GetDmsPath(volumeIdVariations)
 
 	if err != nil {
 		return "", err
@@ -201,11 +201,11 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	if err != nil {
 		return "", err
 	}
-	if isSameId(SgInqWwn, volumeIds) {
+	if isSameId(SgInqWwn, volumeIdVariations) {
 		return dmPath, nil
 	}
 	// To make sure we found the right WWN, if not raise error instead of using wrong mpath
-	return "", &ErrorWrongDeviceFound{dmPath, volumeIds[0], SgInqWwn}
+	return "", &ErrorWrongDeviceFound{dmPath, volumeIdVariations[0], SgInqWwn}
 }
 
 func isSameId(wwn string, volumeIdVariations []string) bool {
@@ -350,8 +350,8 @@ type OsDeviceConnectivityHelperInterface interface {
 	GetMpathdOutputForVolume(volumeIdVariations []string) (string, error)
 	GetVolumeIdVariations(volumeUuid string) []string
 	GetMpathDeviceName(volumePath string) (string, error)
-	IsVolumeIdContainsOneOfVolumeIdVariations(volumeIdOfVolumePath string, volumeIdVariations []string) bool
-	GetVolumeIdOfMpathName(mpathdOutput string, mpathDeviceName string) (string, error)
+	IsAnyVariationInMpathVolumeId(mpathVolumeId string, volumeIdVariations []string) bool
+	GetMpathVolumeId(mpathdOutput string, mpathDeviceName string) (string, error)
 }
 
 type OsDeviceConnectivityHelperGeneric struct {
@@ -439,10 +439,10 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 
 }
 
-func (o OsDeviceConnectivityHelperGeneric) GetVolumeIdOfMpathName(
+func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(
 	mpathdOutput string, mpathDeviceName string) (string, error) {
 
-	volumeIdFromDeviceName, err := o.Helper.GetVolumeIdByMpathDeviceName(mpathDeviceName, mpathdOutput)
+	mpathVolumeId, err := o.Helper.GetVolumeIdOfMpathDeviceName(mpathDeviceName, mpathdOutput)
 	if err != nil {
 		return "", err
 	}
@@ -452,10 +452,10 @@ func (o OsDeviceConnectivityHelperGeneric) GetVolumeIdOfMpathName(
 	if err != nil {
 		return "", err
 	}
-	if o.IsVolumeIdContainsOneOfVolumeIdVariations(volumeIdFromDeviceName, []string{SgInqWwn}) {
-		return volumeIdFromDeviceName, nil
+	if o.IsAnyVariationInMpathVolumeId(mpathVolumeId, []string{SgInqWwn}) {
+		return mpathVolumeId, nil
 	}
-	return "", &ErrorWrongDeviceFound{dmPath, volumeIdFromDeviceName, SgInqWwn}
+	return "", &ErrorWrongDeviceFound{dmPath, mpathVolumeId, SgInqWwn}
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, error) {
@@ -598,9 +598,9 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(volumePath string)
 	return o.Helper.GetMpathDeviceNameFromProcMounts(procMounts, volumePath)
 }
 
-func (o OsDeviceConnectivityHelperGeneric) IsVolumeIdContainsOneOfVolumeIdVariations(volumeIdOfVolumePath string, volumeIdVariations []string) bool {
+func (o OsDeviceConnectivityHelperGeneric) IsAnyVariationInMpathVolumeId(mpathVolumeId string, volumeIdVariations []string) bool {
 	for _, volumeIdVariation := range volumeIdVariations {
-		if strings.Contains(volumeIdOfVolumePath, volumeIdVariation) {
+		if strings.Contains(mpathVolumeId, volumeIdVariation) {
 			return true
 		}
 	}
@@ -616,7 +616,7 @@ type GetDmsPathHelperInterface interface {
 	GetFullDmPath(dms map[string]bool, volumeId string) (string, error)
 	IsIndicatorMatchesFilterValues(dmFilterValues []string, dmFieldValue string) bool
 	GetMpathDeviceNameFromProcMounts(procMounts string, volumePath string) (string, error)
-	GetVolumeIdByMpathDeviceName(mpathDeviceName string, mpathdOutput string) (string, error)
+	GetVolumeIdOfMpathDeviceName(mpathDeviceName string, mpathdOutput string) (string, error)
 }
 
 type GetDmsPathHelperGeneric struct {
@@ -627,7 +627,7 @@ func NewGetDmsPathHelperGeneric(executer executer.ExecuterInterface) GetDmsPathH
 	return &GetDmsPathHelperGeneric{executer: executer}
 }
 
-func (o GetDmsPathHelperGeneric) GetVolumeIdByMpathDeviceName(mpathDeviceName string, mpathdOutput string) (string, error) {
+func (o GetDmsPathHelperGeneric) GetVolumeIdOfMpathDeviceName(mpathDeviceName string, mpathdOutput string) (string, error) {
 	mpathDeviceNames := []string{mpathDeviceName}
 	volumeIds := o.ExtractDmFieldValues(mpathDeviceNames, mpathdOutput)
 	volumeId, err := getUniqueDmFieldValue(volumeIds, mpathDeviceName)

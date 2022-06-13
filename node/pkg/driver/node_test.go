@@ -968,7 +968,7 @@ func TestNodeGetVolumeStats(t *testing.T) {
 			},
 		},
 		{
-			name: "fail to get stats when Block because of general error",
+			name: "fail to get stats for block because of general error",
 			testFunc: func(t *testing.T) {
 				expErrCode := codes.Internal
 				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
