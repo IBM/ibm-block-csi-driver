@@ -29,9 +29,9 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	mountwrapper "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/mount"
 	"google.golang.org/grpc"
-	"gopkg.in/yaml.v2"
+	yaml "gopkg.in/yaml.v2"
+	mount "k8s.io/mount-utils"
 	"k8s.io/utils/exec"
-	"k8s.io/utils/mount"
 )
 
 type Driver struct {
