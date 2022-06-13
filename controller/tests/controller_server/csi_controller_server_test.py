@@ -772,7 +772,8 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
 
     @patch("controller.controller_server.csi_controller_server.get_agent")
-    def test_create_volume_idempotent_with_other_source_and_flashcopy_enabled(self, storage_agent):
+    def test_create_volume_idempotent_with_other_source_and_flashcopy_2_enabled(self, storage_agent):
+
         self.request.parameters[config.PARAMETERS_VOLUME_FLASHCOPY_2] = "true"
         self._prepare_idempotent_test_with_other_source(storage_agent)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
