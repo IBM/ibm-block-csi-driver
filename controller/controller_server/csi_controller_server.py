@@ -87,15 +87,15 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 else:
                     logger.debug("volume found : {}".format(volume))
 
-                    if not volume_parameters.flashcopy_2:
-                        volume_capacity_bytes = volume.capacity_bytes
-                        if not source_id and volume_capacity_bytes < required_bytes:
-                            message = "Volume was already created with different size." \
-                                      " volume size: {}, requested size: {}".format(volume_capacity_bytes,
-                                                                                    required_bytes)
-                            return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
-                                                        csi_pb2.CreateVolumeResponse)
+                    volume_capacity_bytes = volume.capacity_bytes
+                    if not source_id and volume_capacity_bytes < required_bytes:
+                        message = "Volume was already created with different size." \
+                                  " volume size: {}, requested size: {}".format(volume_capacity_bytes,
+                                                                                required_bytes)
+                        return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
+                                                    csi_pb2.CreateVolumeResponse)
 
+                    if not volume_parameters.flashcopy_2:
                         response = self._get_create_volume_response_for_existing_volume_source(volume,
                                                                                                source_id,
                                                                                                source_type, system_id,
