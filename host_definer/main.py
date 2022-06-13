@@ -1,7 +1,7 @@
-from host_definition_manager import HostDefinitionManager
+from host_definer_manager import HostDefinerManager
 
 def main():
-    host_definition = HostDefinitionManager()
+    host_definition = HostDefinerManager()
     host_definition.start_host_definition()
     
 if __name__ == '__main__':

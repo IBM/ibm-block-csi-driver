@@ -9,7 +9,7 @@ from watcher.csi_host_definition_watcher import CsiHostDefinitionWatcher
 
 logger = utils.get_stdout_logger()
 
-class HostDefinitionManager:
+class HostDefinerManager:
     def __init__(self):
         self.storage_host_manager = StorageHostManager()
         self.secret_watcher = SecretWatcher()
