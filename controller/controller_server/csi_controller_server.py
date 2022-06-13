@@ -35,7 +35,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         logger.debug("volume name : {}".format(request.name))
 
-        source_type, source_ids = self._get_source_type_and_id(request)
+        source_type, source_ids = self._get_source_type_and_ids(request)
         source_id = source_ids.uid if source_ids.uid else source_ids.internal_id
 
         logger.debug("Source {0} id : {1}".format(source_type, source_id))
@@ -517,7 +517,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         context.set_code(grpc.StatusCode.OK)
         return csi_pb2.ProbeResponse()
 
-    def _get_source_type_and_id(self, request):
+    def _get_source_type_and_ids(self, request):
         source = request.volume_content_source
         object_ids = ObjectIds()
         source_type = None

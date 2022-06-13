@@ -1489,6 +1489,4 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if not vdisk_uid:
             return False
         cli_volume = self._get_cli_volume_by_wwn(vdisk_uid, not_exist_err=False)
-        if cli_volume and cli_volume.FC_id:
-            return True
-        return False
+        return cli_volume and cli_volume.FC_id
