@@ -1,0 +1,35 @@
+FROM registry.access.redhat.com/ubi8/python-38:1-75.1638364053 as builder
+
+#USER root
+#RUN mkdir /host_definer
+#USER default
+COPY host_definer/requirements.txt .
+RUN pip3 install -r ./requirements.txt
+
+FROM registry.access.redhat.com/ubi8/python-38:1-96
+
+ARG VERSION=1.10.0
+ARG BUILD_NUMBER=0
+
+###Required Labels
+LABEL name="IBM block storage CSI driver hostDefiner" \
+      vendor="IBM" \
+      maintainer="IBM Storage" \
+      version=$VERSION \
+      release=$BUILD_NUMBER \
+      summary="The hostDefiner component of the IBM block storage CSI driver" \
+      description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage." \
+      io.k8s.display-name="IBM block storage CSI driver hostDefiner" \
+      io.k8s.description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage." \
+      io.openshift.tags=ibm,csi,ibm-block-csi-driver,hostDefiner
+
+COPY --from=builder /opt/app-root /opt/app-root
+COPY host_definer /host_definer/
+WORKDIR /host_definer
+#ADD host_definition_manager.py .
+#ADD main.py .
+#ADD common ./common/
+#ADD watcher ./watcher/
+#ADD storage_manager/ ./storage_manager/
+
+CMD ["python3", "/host_definer/main.py"]
