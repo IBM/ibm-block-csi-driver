@@ -538,7 +538,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             if self._is_vdisk_support_addsnapshot(source_ids.uid):
                 self._create_cli_volume_from_source(name, pool, io_group, volume_group, source_ids, source_type)
             else:
-                raise array_errors.Flashcopy2NotSupportedMessage(name)
+                raise array_errors.SnapshotFunctionNotSupportedMessage(name)
         else:
             self._create_cli_volume(name, size_in_bytes, space_efficiency, pool, io_group, volume_group)
         cli_volume = self._get_cli_volume(name)
@@ -572,7 +572,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                     return None
                 source_cli_volume = self._get_cli_volume_by_wwn(volume_id)
                 return self._generate_snapshot_response_from_cli_snapshot(cli_snapshot, source_cli_volume)
-            raise array_errors.Flashcopy2NotSupportedMessage(volume_id)
+            raise array_errors.SnapshotFunctionNotSupportedMessage(volume_id)
         target_cli_volume = self._get_cli_volume_if_exists(snapshot_name)
         if not target_cli_volume:
             return None
@@ -770,7 +770,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 target_cli_snapshot = self._add_snapshot(snapshot_name, source_cli_volume, pool)
                 snapshot = self._generate_snapshot_response_from_cli_snapshot(target_cli_snapshot, source_cli_volume)
             else:
-                raise array_errors.Flashcopy2NotSupportedMessage(volume_id)
+                raise array_errors.SnapshotFunctionNotSupportedMessage(volume_id)
         else:
             target_cli_volume = self._create_snapshot(snapshot_name, source_cli_volume, space_efficiency, pool)
             snapshot = self._generate_snapshot_response_from_cli_volume(target_cli_volume, source_cli_volume.vdisk_UID)
