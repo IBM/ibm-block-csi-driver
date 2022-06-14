@@ -270,7 +270,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
                                                               snapshot_capacity=size_in_blocks_string)
         self.mediator.client.cmd.snapshot_create.return_value = xcli_snapshot
         snapshot = self.mediator.create_snapshot(snapshot_volume_wwn, snapshot_name, space_efficiency=None, pool=None,
-                                                 flashcopy_2=False)
+                                                 virt_snap_func=False)
         self.assertEqual(snapshot_name, snapshot.name)
         self.assertEqual(snapshot_volume_wwn, snapshot.source_id)
         self.assertEqual(size_in_bytes, snapshot.capacity_bytes)
@@ -283,7 +283,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=xcli_volume)
         with self.assertRaises(array_errors.SnapshotSourcePoolMismatch):
             self.mediator.create_snapshot(snapshot_volume_wwn, snapshot_name, space_efficiency=None,
-                                          pool="different_pool", flashcopy_2=False)
+                                          pool="different_pool", virt_snap_func=False)
 
     def test_create_snapshot_raise_illegal_name_for_object(self):
         self._test_create_snapshot_error(xcli_errors.IllegalNameForObjectError, array_errors.InvalidArgumentError)
@@ -303,19 +303,20 @@ class TestArrayMediatorXIV(unittest.TestCase):
                                                                                                   "snapshot-wwn", "")]
         with self.assertRaises(array_errors.InvalidArgumentError):
             self.mediator.create_snapshot("volume_id", "snapshot", space_efficiency=None, pool="pool1",
-                                          flashcopy_2=False)
+                                          virt_snap_func=False)
 
     @patch.object(XIVArrayMediator, "_generate_snapshot_response")
     def test_create_snapshot_generate_snapshot_response_raise_exception(self, response):
         response.side_effect = Exception("err")
         with self.assertRaises(Exception):
             self.mediator.create_snapshot("volume_id", "snapshot", space_efficiency=None, pool="pool1",
-                                          flashcopy_2=False)
+                                          virt_snap_func=False)
 
     def _test_create_snapshot_error(self, xcli_exception, expected_exception):
         self.mediator.client.cmd.snapshot_create.side_effect = [xcli_exception("", "snapshot", "")]
         with self.assertRaises(expected_exception):
-            self.mediator.create_snapshot("volume_id", "snapshot", space_efficiency=None, pool=None, flashcopy_2=False)
+            self.mediator.create_snapshot("volume_id", "snapshot", space_efficiency=None, pool=None,
+                                          virt_snap_func=False)
 
     def _get_single_snapshot_result_mock(self, snapshot_name, snapshot_volume_name, snapshot_capacity="17"):
         snapshot_wwn = "1235678"

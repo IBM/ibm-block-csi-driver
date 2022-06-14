@@ -30,4 +30,4 @@ class ObjectParameters:
     prefix: str
     io_group: str
     volume_group: str
-    flashcopy_2: bool
+    virt_snap_func: bool
