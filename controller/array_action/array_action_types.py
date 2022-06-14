@@ -50,3 +50,6 @@ class Host:
 class ObjectIds:
     internal_id: str = ''
     uid: str = ''
+
+    def __bool__(self):
+        return bool(self.internal_id or self.uid)

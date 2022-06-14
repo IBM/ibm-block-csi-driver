@@ -231,9 +231,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
 
     def _mock_source_ids(self, internal_id=''):
-        source_ids = MagicMock(spec=['uid', 'internal_id'])
-        source_ids.internal_id = internal_id
-        return source_ids
+        if internal_id:
+            source_ids = MagicMock(spec=['uid', 'internal_id'])
+            source_ids.internal_id = internal_id
+            return source_ids
+        return None
+
+    def test_create_volume_mkvolume_with_flashcopy_enable_no_source(self):
+        self._test_create_volume_success(flashcopy_2=True)
+        self.svc.client.svctask.mkvolume.assert_called_with(name="test_volume", unit="b", size=1024, pool="pool_name")
 
     def test_create_volume_mkvolumegroup_success(self):
         self._prepare_mocks_for_create_volume_mkvolumegroup()
@@ -262,7 +268,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.chvdisk.side_effect = ["", CLIFailureError("CMMVC6035E")]
         with self.assertRaises(array_errors.VolumeAlreadyExists):
             self.svc.create_volume("test_volume", 1024, "space_efficiency", "pool_name", None, None,
-                                   self._mock_source_ids(), "snapshot", flashcopy_2=True)
+                                   self._mock_source_ids("source_id"), "snapshot", flashcopy_2=True)
         self.svc.client.svctask.rmvolume.assert_called_with(vdisk_id='test_id')
         self.svc.client.svctask.rmvolumegroup.assert_called_with(object_id='test_volume')
 

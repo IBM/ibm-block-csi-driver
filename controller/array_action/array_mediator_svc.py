@@ -534,8 +534,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
                       source_type, flashcopy_2):
-        if flashcopy_2:
-            if source_type and self._is_vdisk_support_addsnapshot(source_ids.uid):
+        if flashcopy_2 and source_ids:
+            if self._is_vdisk_support_addsnapshot(source_ids.uid):
                 self._create_cli_volume_from_source(name, pool, io_group, volume_group, source_ids, source_type)
             else:
                 raise array_errors.Flashcopy2NotSupportedMessage(name)
