@@ -161,7 +161,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise array_errors.InvalidArgumentError(ex.status)
 
-    def get_volume(self, name, pool, flashcopy_2):
+    def get_volume(self, name, pool, virt_snap_func):
         logger.debug("Get volume : {}".format(name))
         cli_volume = self._get_cli_object_by_name(name)
 
@@ -208,7 +208,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         return int(size_in_bytes / self.BLOCK_SIZE_IN_BYTES)
 
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
-                      source_type, flashcopy_2):
+                      source_type, virt_snap_func):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with parameters : {}".format(
             name, size_in_bytes, pool, space_efficiency))
 
@@ -305,7 +305,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
-    def get_snapshot(self, volume_id, snapshot_name, pool, flashcopy_2):
+    def get_snapshot(self, volume_id, snapshot_name, pool, virt_snap_func):
         logger.debug("Get snapshot : {}".format(snapshot_name))
         try:
             cli_snapshot = self.client.cmd.vol_list(vol=snapshot_name).as_single_element
@@ -329,7 +329,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             return self._generate_snapshot_response(cli_object)
         return self._generate_volume_response(cli_object)
 
-    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, flashcopy_2):
+    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, virt_snap_func):
         logger.info("creating snapshot {0} from volume {1}".format(snapshot_name, volume_id))
         source_cli_volume = self._get_cli_object_by_wwn(volume_id)
         if pool and pool != source_cli_volume.pool_name:
