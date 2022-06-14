@@ -522,7 +522,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvdisk.assert_called_once_with(bytes=True, filtervalue='vdisk_UID=volume_id')
 
     def test_get_snapshot_lsvolumesnapshot_not_supported_error(self):
-        with self.assertRaises(array_errors.SnapshotFunctionNotSupportedMessage):
+        with self.assertRaises(array_errors.VirtSnapshotFunctionNotSupportedMessage):
             self.svc.get_snapshot("volume_id", "snapshot_name", pool="pool1", virt_snap_func=True)
 
     def test_get_object_by_id_snapshot_has_no_fcmap_id_raise_error(self):
@@ -761,7 +761,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual('snapshot_id', snapshot.internal_id)
 
     def test_create_snapshot_addsnapshot_not_supported_error(self):
-        with self.assertRaises(array_errors.SnapshotFunctionNotSupportedMessage):
+        with self.assertRaises(array_errors.VirtSnapshotFunctionNotSupportedMessage):
             self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="pool1",
                                      virt_snap_func=True)
 
