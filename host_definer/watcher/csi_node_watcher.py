@@ -107,18 +107,18 @@ class CsiNodeWatcher(WatcherHelper):
         try:
             self.storage_host_manager.verify_host_removed_from_storage(host_object)
             self.delete_host_definition_object(host_definition_name)
-        except StorageException:
-            self._set_host_definition_action_to_delete(host_object)
+        except StorageException as ex:
+            self._set_host_definition_status_to_pending_deletion(host_object)
+            self.create_event_to_host_definition_from_host_object(host_object, ex)
         except Exception as ex:
             logger.error('Failed to delete hostdefinition {}, got error: {}'.format(
                 host_definition_name, ex))
 
-    def _set_host_definition_action_to_delete(self, host_object, host_definition_name):
-        host_object.phase = settings.PENDING_PHASE
-        host_object.action = settings.DELETE_ACTION
+    def _set_host_definition_status_to_pending_deletion(self, host_object, host_definition_name):
         host_definition_manifest = self.get_host_definition_manifest_from_host_object(host_object, host_definition_name)
         try:
             self.patch_host_definition(host_definition_manifest)
+            self.set_host_definition_status(host_definition_name, settings.PENDING_DELETION_PHASE)
         except Exception as ex:
             logger.error('Failed to set hostdefinition {} action to delete, got error: {}'.format(
                 host_definition_name, ex))

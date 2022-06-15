@@ -29,7 +29,10 @@ class CsiHostDefinitionWatcher(WatcherHelper):
                     self._is_host_definition_in_use(csi_host_definition_event))
 
     def _is_host_definition_in_pending_phase(self, csi_host_definition_event):
-        return csi_host_definition_event['object'].spec.hostDefinition.phase == settings.PENDING_PHASE
+        phase = self.get_phase_of_host_definition_object(csi_host_definition_event['object'])
+        if phase:
+            return settings.PENDING_PHASE in phase
+        return False
 
     def _is_host_definition_in_use(self, csi_host_definition_event):
         return csi_host_definition_event['object'].metadata.name not in host_definition_objects_in_use
@@ -43,7 +46,7 @@ class CsiHostDefinitionWatcher(WatcherHelper):
         remove_host_thread.start()
         
     def _verify_host_on_storage_using_exponential_backoff(self, csi_host_definition_event):
-        retries = 10
+        retries = 3
         backoff_in_seconds = 3
         delay_in_seconds = 3
         csi_host_definition_name = csi_host_definition_event['object'].metadata.name
@@ -51,21 +54,13 @@ class CsiHostDefinitionWatcher(WatcherHelper):
             csi_host_definition_name))
         while retries > 1:
             host_definition_object = csi_host_definition_event['object']
+            self._remove_host_definition_from_in_use_list_if_ready(csi_host_definition_name)
+            if csi_host_definition_name not in host_definition_objects_in_use:
+                return
             try:
-                if self.is_host_definition_ready(csi_host_definition_name):
-                    logger.info('host definition {} is in Ready phase'.format(
-                        csi_host_definition_name))
-                    return host_definition_objects_in_use.remove(
-                        csi_host_definition_name)
-            except dynamic.exceptions.NotFoundError:
-                    return host_definition_objects_in_use.remove(
-                        csi_host_definition_name)
+                return self._verify_host_state_on_storage(host_definition_object)
             except Exception as ex:
-                logger.error(ex)
-            try:
-                return self._verify_host_state_on_storage(csi_host_definition_event, host_definition_object)
-            except Exception as ex:
-                self._set_host_definition_message(host_definition_object, str(ex))
+                self._add_event_to_host_definition_object(host_definition_object, str(ex))
                 retries -= 1
                 delay_in_seconds *= backoff_in_seconds
                 sleep(delay_in_seconds)
@@ -74,14 +69,27 @@ class CsiHostDefinitionWatcher(WatcherHelper):
         host_definition_objects_in_use.remove(
             csi_host_definition_name)
 
-    def _verify_host_state_on_storage(self, csi_host_definition_event, host_definition_object):
-        host_definition_action = host_definition_object.spec.hostDefinition.action
-        if host_definition_action == settings.CREATE_ACTION:
+    def _remove_host_definition_from_in_use_list_if_ready(self, csi_host_definition_name):
+        try:
+            if self.is_host_definition_ready(csi_host_definition_name):
+                logger.info('host definition {} is in Ready phase'.format(
+                    csi_host_definition_name))
+                return host_definition_objects_in_use.remove(
+                    csi_host_definition_name)
+        except dynamic.exceptions.NotFoundError:
+                return host_definition_objects_in_use.remove(
+                    csi_host_definition_name)
+        except Exception as ex:
+            logger.error(ex)
+
+    def _verify_host_state_on_storage(self, host_definition_object):
+        host_definition_phase = self.get_phase_of_host_definition_object(host_definition_object)
+        if host_definition_phase == settings.PENDING_CREATION_PHASE:
             self._verify_host_on_storage(host_definition_object)
-        elif host_definition_action == settings.DELETE_ACTION:
+        elif host_definition_phase == settings.PENDING_DELETION_PHASE:
             self._verify_host_not_on_storage(host_definition_object)
         host_definition_objects_in_use.remove(
-            csi_host_definition_event['object'].metadata.name)
+            host_definition_object.metadata.name)
     
     def _verify_host_on_storage(self, host_definition_object):
         host_object = self._get_host_object_from_host_definition_object(host_definition_object)
@@ -109,41 +117,17 @@ class CsiHostDefinitionWatcher(WatcherHelper):
         host_object.host_name = host_definition_object.spec.hostDefinition.hostNameInStorage
         return host_object
 
-    def _set_host_definition_message(self, host_definition_object, message):
-        logger.info('Set host definition: {} error message: {}'.format(
+    def _add_event_to_host_definition_object(self, host_definition_object, message):
+        logger.info('Create host definition: {} error event: {}'.format(
             host_definition_object.metadata.name, message))
-        host_definition_object.spec.hostDefinition.message = message
-        self._patch_host_definition_object(host_definition_object)
-        
-    def _set_host_definition_phase_to_error(self, host_definition_object):
-        logger.info('Set host definition: {} error phase'.format(
-            host_definition_object.metadata.name))
-        host_definition_object.spec.hostDefinition.phase = settings.ERROR_PHASE
-        self._patch_host_definition_object(host_definition_object)
+        event = self.get_event_for_object(host_definition_object, message)
+        self.create_event(settings.DEFAULT_NAMESPACE, event)
 
-    def _patch_host_definition_object(self, host_definition_object):
-        host_definition_manifest = self._get_host_definition_manifest(host_definition_object)
+    def _set_host_definition_phase_to_error(self, host_definition_object):
+        host_definition_name = host_definition_object.metadata.name
+        logger.info('Set host definition: {} error phase'.format(
+            host_definition_name))
         try:
-            self.patch_host_definition(host_definition_manifest)
+            self.set_host_definition_status(host_definition_name, settings.ERROR_PHASE)
         except Exception as ex:
             logger.error(ex)
-
-    def _get_host_definition_manifest(self, host_definition_object):
-        manifest = {
-            'apiVersion': settings.CSI_IBM_BLOCK_API_VERSION,
-            'kind': settings.HOSTDEFINITION_KIND,
-            'metadata': {
-                'name': host_definition_object.metadata.name,
-            },
-            'spec': {
-                'hostDefinition': {
-                    'storageServer': host_definition_object.spec.hostDefinition.storageServer,
-                    'hostNameInStorage': host_definition_object.spec.hostDefinition.hostNameInStorage,
-                    'secretName': host_definition_object.spec.hostDefinition.secretName,
-                    'secretNamespace': host_definition_object.spec.hostDefinition.secretNamespace,
-                    'phase': host_definition_object.spec.hostDefinition.phase,
-                    'message': host_definition_object.spec.hostDefinition.message,
-                },
-            },
-        }
-        return manifest

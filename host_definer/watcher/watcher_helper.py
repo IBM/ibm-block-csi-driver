@@ -1,4 +1,5 @@
 import base64
+import datetime
 from kubernetes import client, config, dynamic
 from kubernetes.client import api_client
 from kubernetes.client.rest import ApiException
@@ -22,6 +23,7 @@ class WatcherHelper:
         self.dynamic_client = self._get_dynamic_client()
         self.storage_api = client.StorageV1Api()
         self.core_api = client.CoreV1Api()
+        self.custom_object_api = client.CustomObjectsApi()
         self.csi_nodes_api = self._get_csi_nodes_api()
         self.csi_hostdefinitions_api = self._get_csi_hostdefinitions_api()
     
@@ -60,7 +62,7 @@ class WatcherHelper:
 
     def is_host_definition_ready(self, csi_host_definition_name):
         host_definition_object = self._get_host_definition_object(csi_host_definition_name)
-        return host_definition_object.spec.hostDefinition.phase == settings.READY_PHASE
+        return self.get_phase_of_host_definition_object(host_definition_object) == settings.READY_PHASE
 
     def _get_host_definition_object(self, host_definition_name):
         try:
@@ -69,22 +71,26 @@ class WatcherHelper:
             raise ex
         except ApiException:
             raise exceptions.FailedToGetHostDefinitionObject
-        
+
+    def get_phase_of_host_definition_object(self, host_definition_object):
+        if host_definition_object.status:
+            return host_definition_object.status.phase
+        return None
             
     def verify_on_storage(self, host_object):
         try:
             self.storage_host_manager.verify_host_on_storage(host_object)
             host_object.phase = settings.READY_PHASE
             self.verify_csi_host_definition_from_host_object(host_object)
-        except StorageException:
-            host_object.phase = settings.PENDING_PHASE
+        except StorageException as ex:
+            host_object.phase = settings.PENDING_CREATION_PHASE
             self.verify_csi_host_definition_from_host_object(host_object)
+            self.create_event_to_host_definition_from_host_object(host_object, ex)
         
     def verify_csi_host_definition_from_host_object(self, host_object):
         host_definition_name = self.get_host_definition_name_from_host_object(host_object)
-        host_definition_manifest = self.get_host_definition_manifest_from_host_object(host_object, host_definition_name)
         try:
-            self._verify_host_definition_manifest(host_definition_name, host_definition_manifest)
+            self._verify_host_definition(host_definition_name, host_object)
         except Exception as ex:
             logger.error('Failed to verify hostdefinition {} in {} phase, got error: {}'.format(
                 host_definition_name, host_object.phase, ex))
@@ -107,9 +113,6 @@ class WatcherHelper:
                     'hostNameInStorage': host_object.host_name,
                     'secretName': host_object.secret_name,
                     'secretNamespace': host_object.secret_namespace,
-                    'phase': host_object.phase,
-                    'message': host_object.message,
-                    'action' : host_object.action,
                     'retryVerifying' : host_object.retryVerifying,
                 },
             },
@@ -117,29 +120,22 @@ class WatcherHelper:
         return manifest
 
     def _set_defaults(self, host_object):
-        if not hasattr(host_object, 'message'):
-            host_object.message = ''  
-        if not hasattr(host_object, 'action'):
-            host_object.action = settings.CREATE_ACTION
-        if not hasattr(host_object, 'phase'):
-            host_object.phase = settings.PENDING_PHASE
         if not hasattr(host_object, 'retryVerifying'):
             host_object.retryVerifying = False
         return host_object
     
-    def _verify_host_definition_manifest(self, host_definition_name, host_definition_manifest):
+    def _verify_host_definition(self, host_definition_name, host_object):
+        host_definition_manifest = self.get_host_definition_manifest_from_host_object(host_object, host_definition_name)
         logger.info('Verifying hostDefinition {} is in {} phase'.format(
-            host_definition_name, host_definition_manifest['spec']['hostDefinition']['phase']))
+            host_definition_name, host_object.phase))
         try:
             _ = self._get_host_definition_object(host_definition_name)
             self.patch_host_definition(host_definition_manifest)
         except dynamic.exceptions.NotFoundError:
             logger.info('Creating host Definition object: {}'.format(
                     host_definition_name))
-            try:
-                self.csi_hostdefinitions_api.create(body=host_definition_manifest)
-            except ApiException as ex:
-                raise exceptions.FailedToCreateHostDefinitionObject(host_definition_name, ex.body)
+            self._create_host_definition(host_definition_manifest)
+        self.set_host_definition_status(host_definition_name, host_object.phase)
         
     def patch_host_definition(self, host_definition_manifest):
         host_definition_name = host_definition_manifest['metadata']['name']
@@ -153,7 +149,16 @@ class WatcherHelper:
         except dynamic.exceptions.NotFoundError as ex:
             raise ex
         except ApiException as ex:
-            raise exceptions.FailedToPatchHostDefinitionObject(host_definition_name, ex.body)
+            if ex.status == 404:
+                raise exceptions.HostDefinitionDoesNotExist(host_definition_name)
+            else:
+                raise exceptions.FailedToPatchHostDefinitionObject(host_definition_name, ex.body)
+            
+    def _create_host_definition(self, host_definition_manifest):
+        try:
+            self.csi_hostdefinitions_api.create(body=host_definition_manifest)
+        except ApiException as ex:
+            raise exceptions.FailedToCreateHostDefinitionObject(host_definition_manifest['metadata']['name'], ex.body)
 
     def get_host_object_from_secret_id(self, secret):
         secret_name, secret_namespace = self._get_secret_id_properties(secret)
@@ -181,10 +186,10 @@ class WatcherHelper:
             secret_data = self.core_api.read_namespaced_secret(
                 name=secret_name, namespace=secret_namespace).data
         except ApiException as ex:
-            if ex.status == 400:
+            if ex.status == 404:
                 raise exceptions.SecretDoesNotExist(secret_name, secret_namespace)
             else:
-                raise exceptions.SecretDoesNotExistsFromUnknownReason(secret_name, secret_namespace, ex.body)
+                raise exceptions.FailedToGetSecret(secret_name, secret_namespace, ex.body)
         
         return self._get_storage_from_secret_data(secret_data)
     
@@ -208,3 +213,59 @@ class WatcherHelper:
 
     def _generate_secret_id_From_secret_and_namespace(self, secret_name, secret_namespace):
         return secret_name + ',' + secret_namespace
+
+    def set_host_definition_status(self, host_definition_name, host_definition_name_phase):
+        logger.info("Set host definition {} status to: {}".format(
+            host_definition_name, host_definition_name_phase))
+        status = {
+            'status': {
+                'phase': host_definition_name_phase,
+            }
+        }
+        try:
+            self.custom_object_api.patch_cluster_custom_object_status(settings.CSI_IBM_BLOCK_GROUP, settings.VERSION,
+                                                                      settings.HOSTDEFINITION_PLURAL, host_definition_name,
+                                                                      status)
+        except ApiException as ex:
+            if ex.status == 404:
+                raise exceptions.HostDefinitionDoesNotExist(host_definition_name)
+            else:
+                raise exceptions.FailedToSetHostDefinitionStatus(host_definition_name, ex.body)
+
+    def create_event_to_host_definition_from_host_object(self, host_object, message):
+        host_definition_name = self.get_host_definition_name_from_host_object(host_object)
+        try:
+            host_definition_object = self._get_host_definition_object(host_definition_name)
+        except Exception as ex:
+            logger.error(ex)
+            return
+        event = self.get_event_for_object(host_definition_object, message)
+        self.create_event(settings.DEFAULT_NAMESPACE, event)
+
+    def get_event_for_object(self, obj, message):
+        return client.CoreV1Event(
+            metadata=client.V1ObjectMeta(
+                generate_name=f'{obj.metadata.name}.',
+            ),
+            reporting_component='hostDefiner',
+            reporting_instance='hostDefiner',
+            action='Verifying',
+            type='Error',
+            reason=settings.FAILED_VERIFYING,
+            message=str(message),
+            event_time=datetime.datetime.utcnow().isoformat(timespec='microseconds') + 'Z',
+            involved_object=client.V1ObjectReference(
+                api_version=obj.api_version,
+                kind=obj.kind,
+                name=obj.metadata.name,
+                resource_version=obj.metadata.resource_version,
+                uid=obj.metadata.uid,
+            )
+        )
+
+    def create_event(self, namespace, event):
+        try:
+            self.core_api.create_namespaced_event(namespace, event)
+        except ApiException as ex:
+            logger.error('Failed to create event for host definition {}, go this error: {}'.format(
+                event.involved_object.name, ex.body))
