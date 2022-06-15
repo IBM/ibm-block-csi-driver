@@ -8,10 +8,10 @@ class SecretDoesNotExist(WatcherException):
         self.message = 'Secret {} in namespace {} does not exist'.format(
             secret_name, secret_namespace)
 
-class SecretDoesNotExistsFromUnknownReason(WatcherException):
+class FailedToGetSecret(WatcherException):
     def __init__(self, secret_name, secret_namespace, message):
         super().__init__()
-        self.message = 'Failed to find Secret {} in namespace {}, go this error: {}'.format(
+        self.message = 'Failed to get Secret {} in namespace {}, go this error: {}'.format(
             secret_name, secret_namespace, message)
 
 class FailedToCreateHostDefinitionObject(WatcherException):
@@ -25,9 +25,21 @@ class FailedToPatchHostDefinitionObject(WatcherException):
         super().__init__()
         self.message = 'Failed to patch host definition {}, go this error: {}'.format(
             host_definition_name, message)
+
+class FailedToSetHostDefinitionStatus(WatcherException):
+    def __init__(self, host_definition_name, message):
+        super().__init__()
+        self.message = 'Failed to set host definition {} status, go this error: {}'.format(
+            host_definition_name, message)
         
 class FailedToGetHostDefinitionObject(WatcherException):
     def __init__(self, host_definition_name, message):
         super().__init__()
         self.message = 'Failed to get host definition {}, go this error: {}'.format(
             host_definition_name, message)
+
+class HostDefinitionDoesNotExist(WatcherException):
+    def __init__(self, host_definition_name):
+        super().__init__()
+        self.message = 'host definition {}does not exist'.format(
+            host_definition_name)
