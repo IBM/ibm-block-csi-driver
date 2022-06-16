@@ -48,6 +48,8 @@ HOST_ISCSI_NAME = 'iscsi_name'
 HOST_PORTSET_ID = 'portset_id'
 LIST_HOSTS_CMD_FORMAT = 'lshost {HOST_ID};echo;'
 HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
+DEFAULT_LIST_DELIMITER = ":"
+COMMA_LIST_DELIMITER = ","
 
 LUN_INTERVAL = 128
 
@@ -88,6 +90,19 @@ def _get_space_efficiency_kwargs(space_efficiency):
                                 config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED):
             return {'deduplicated': True, 'compressed': True}
     return {}
+
+
+def build_create_host_kwargs(host_name, connectivity_type, ports):
+    cli_kwargs = {'name': host_name}
+    if connectivity_type == config.NVME_OVER_FC_CONNECTIVITY_TYPE:
+        cli_kwargs.update({'nqn': COMMA_LIST_DELIMITER.join(ports), 'protocol': 'nvme'})
+    elif connectivity_type == config.FC_CONNECTIVITY_TYPE:
+        cli_kwargs['fcwwpn'] = DEFAULT_LIST_DELIMITER.join(ports)
+    elif connectivity_type == config.ISCSI_CONNECTIVITY_TYPE:
+        cli_kwargs['iscsiname'] = COMMA_LIST_DELIMITER.join(ports)
+    else:
+        raise array_errors.UnsupportedConnectivityTypeError(connectivity_type)
+    return cli_kwargs
 
 
 def build_kwargs_from_parameters(space_efficiency, pool_name, io_group,
@@ -1383,3 +1398,28 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if cli_snapshot is None:
             raise array_errors.ObjectNotFoundError(snapshot_id)
         return cli_snapshot
+
+    def _mkhost(self, host_name, connectivity_type, ports):
+        cli_kwargs = build_create_host_kwargs(host_name, connectivity_type, ports)
+        self.client.svctask.mkhost(**cli_kwargs)
+
+    def _get_connectivity_type_by_initiators(self,initiators):
+        if initiators.nvme_nqns:
+            return config.NVME_OVER_FC_CONNECTIVITY_TYPE
+        if initiators.fc_wwns:
+            return config.FC_CONNECTIVITY_TYPE
+        else:
+            return config.ISCSI_CONNECTIVITY_TYPE
+
+    def create_host(self, host_name, initiators, connectivity_type):
+        host_name, connectivity_type = self.get_host_by_host_identifiers(initiators)
+        if host_name:
+            return host_name
+        if not connectivity_type:
+            connectivity_type = self._get_connectivity_type_by_initiators(initiators)
+        ports = initiators.get_by_connectivity_type(connectivity_type)
+        self._mkhost(host_name, connectivity_type, ports)
+        return ports, connectivity_type
+
+    def delete_host(self, host_name):
+        raise NotImplementedError

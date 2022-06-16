@@ -324,7 +324,43 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_host_by_name(self, host_name):
+    def get_host_by_name(self, initiators):
+        """
+        This function will find the host by name.
+
+        Args:
+           initiators : initiators (e.g. fc wwns, iqn) of the wanted host.
+
+        Returns:
+           Host
+
+        Raises:
+            HostNotFoundError
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def create_host(self, host_name, initiators, connectivity_type):
+        """
+        This function will find the host by name.
+
+        Args:
+           host_name         : name of the host to be created in the storage system
+           initiators        : initiators (e.g. fc wwns, iqn) of the host.
+           connectivity_type : the connectivity_type chosen by the user
+
+
+        Returns:
+           ports
+           connectivity_type
+
+        Raises:
+
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def delete_host(self, host_name):
         """
         This function will find the host by name.
 
@@ -332,10 +368,10 @@ class ArrayMediator(ABC):
            host_name : name of the host in the storage system
 
         Returns:
-           Host
+           None
 
         Raises:
-            HostNotFoundError
+            PermissionDenied
         """
         raise NotImplementedError
 
