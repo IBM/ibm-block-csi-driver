@@ -16,10 +16,10 @@ class CsiNodeWatcher(WatcherHelper):
 
     def watch_csi_nodes_resources(self):
         for event in self.csi_nodes_api.watch():
-            if (event['type'] == settings.DELETED_EVENT) and (
+            if (event[settings.TYPE_KEY] == settings.DELETED_EVENT) and (
                     self._get_csi_node_name_with_prefix(event) in CSI_NODES):
                 self._handle_removal_csi_ibm_block_from_node(event)
-            elif event['type'] == settings.MODIFIED_EVENT:
+            elif event[settings.TYPE_KEY] == settings.MODIFIED_EVENT:
                 self._handle_modified_csi_node(event)
             elif self._is_this_new_ibm_block_csi_node(event):
                 CSI_NODES.append(self._get_csi_node_name_with_prefix(event))
@@ -34,7 +34,7 @@ class CsiNodeWatcher(WatcherHelper):
         if self._is_this_new_ibm_block_csi_node(csi_node_event) and (
                 self._get_csi_node_name_with_prefix(csi_node_event) not in CSI_NODES):
             logger.info('New Kubernetes node {}, has csi IBM block'.format(
-                csi_node_event['object'].metadata.name))
+                csi_node_event[settings.OBJECT_KEY].metadata.name))
             CSI_NODES.append(
                 self._get_csi_node_name_with_prefix(csi_node_event))
             self._verify_host_on_all_storages(csi_node_event)
@@ -62,7 +62,7 @@ class CsiNodeWatcher(WatcherHelper):
     def _verify_host_removed_from_all_storages_when_node_is_not_updated(
             self, csi_node_event):
         if self._is_host_part_of_deletion(
-                csi_node_event['object'].metadata.name):
+                csi_node_event[settings.OBJECT_KEY].metadata.name):
             self._verify_host_removed_from_all_storages(csi_node_event)
 
     def _is_host_part_of_deletion(self, worker):
@@ -99,7 +99,7 @@ class CsiNodeWatcher(WatcherHelper):
         CSI_NODES.remove(self._get_csi_node_name_with_prefix(csi_node_event))
         logger.info(
             'Kubernetes node {}, is ont using csi IBM block anymore'.format(
-                csi_node_event['object'].metadata.name))
+                csi_node_event[settings.OBJECT_KEY].metadata.name))
         for secret_id in SECRET_IDS:
             host_name = self._get_csi_node_name_with_prefix(csi_node_event)
             try:
@@ -113,7 +113,7 @@ class CsiNodeWatcher(WatcherHelper):
 
     def _verify_not_on_storage(self, host_object):
         logger.info('Verifying that host {} is not on storage {}'.format(
-            host_object.host_name, host_object.storage_server))
+            host_object.host_name, host_object.management_address))
         host_definition_name = self.get_host_definition_name_from_host_object(
             host_object)
         try:
@@ -150,15 +150,15 @@ class CsiNodeWatcher(WatcherHelper):
         return False
 
     def _is_csi_node_has_ibm_csi_block_driver(self, csi_node_event):
-        if csi_node_event['object'].spec.drivers:
-            for driver in csi_node_event['object'].spec.drivers:
+        if csi_node_event[settings.OBJECT_KEY].spec.drivers:
+            for driver in csi_node_event[settings.OBJECT_KEY].spec.drivers:
                 if driver.name == settings.IBM_BLOCK_CSI_DRIVER_NAME:
                     return True
         return False
 
     def _get_csi_node_name_with_prefix(self, csi_node_event):
         prefix = self._get_prefix()
-        return prefix + csi_node_event['object'].metadata.name
+        return prefix + csi_node_event[settings.OBJECT_KEY].metadata.name
 
     def _get_prefix(self):
         return os.getenv('PREFIX')

@@ -108,10 +108,7 @@ class WatcherHelper:
 
     def get_host_definition_name_from_host_object(self, host_object):
         return '{0}.{1}'.format(
-            host_object.storage_server,
-            host_object.host_name).replace(
-            '_',
-            '.')
+            host_object.management_address, host_object.host_name).replace('_', '.')
 
     def get_host_definition_manifest_from_host_object(
             self, host_object, host_definition_name):
@@ -125,7 +122,7 @@ class WatcherHelper:
             },
             'spec': {
                 'hostDefinition': {
-                    'storageServer': host_object.storage_server,
+                    'managementAddress': host_object.management_address,
                     'hostNameInStorage': host_object.host_name,
                     'secretName': host_object.secret_name,
                     'secretNamespace': host_object.secret_namespace,
@@ -200,7 +197,7 @@ class WatcherHelper:
 
     def _get_host_object_from_storage_data(self, storage_data):
         host_object = HostObject()
-        host_object.storage_server = storage_data[settings.STORAGE_SERVER_KEY]
+        host_object.management_address = storage_data[settings.STORAGE_SERVER_KEY]
         host_object.storage_username = storage_data[settings.STORAGE_SERVER_USERNAME_KEY]
         host_object.storage_password = storage_data[settings.STORAGE_SERVER_PASSWORD_KEY]
         return host_object

@@ -13,14 +13,14 @@ class StorageClassWatcher(WatcherHelper):
     def watch_storage_class_resources(self):
         watcher = watch.Watch()
         for event in watcher.stream(self.storage_api.list_storage_class):
-            storage_class_name = event['object'].metadata.name
+            storage_class_name = event[settings.OBJECT_KEY].metadata.name
             secrets = self._get_secrets_from_storage_class_when_it_has_csi_ibm_block_as_a_provisioner(
-                event['object'])
-            if event['type'] == settings.ADDED_EVENT:
+                event[settings.OBJECT_KEY])
+            if event[settings.TYPE_KEY] == settings.ADDED_EVENT:
                 logger.info('New storageClass {}'.format(storage_class_name))
                 self._handle_added_event_on_storage_class(
                     storage_class_name, secrets)
-            elif event['type'] == settings.DELETED_EVENT:
+            elif event[settings.TYPE_KEY] == settings.DELETED_EVENT:
                 self._handle_deleted_event_on_storage_class(secrets)
 
     def _get_secrets_from_storage_class_when_it_has_csi_ibm_block_as_a_provisioner(

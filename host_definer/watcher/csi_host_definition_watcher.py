@@ -24,27 +24,27 @@ class CsiHostDefinitionWatcher(WatcherHelper):
             self, csi_host_definition_event):
         return self._is_host_definition_in_pending_phase(csi_host_definition_event) and (
             self._is_host_definition_in_use(csi_host_definition_event)) and (
-                csi_host_definition_event['type'] != settings.DELETED_EVENT)
+                csi_host_definition_event[settings.TYPE_KEY] != settings.DELETED_EVENT)
 
     def _is_host_definition_has_retry_true(self, csi_host_definition_event):
-        return csi_host_definition_event['object'].spec.hostDefinition.retryVerifying and (
-            csi_host_definition_event['type'] != settings.DELETED_EVENT) and (
+        return csi_host_definition_event[settings.OBJECT_KEY].spec.hostDefinition.retryVerifying and (
+            csi_host_definition_event[settings.TYPE_KEY] != settings.DELETED_EVENT) and (
             self._is_host_definition_in_use(csi_host_definition_event))
 
     def _is_host_definition_in_pending_phase(self, csi_host_definition_event):
         phase = self.get_phase_of_host_definition_object(
-            csi_host_definition_event['object'])
+            csi_host_definition_event[settings.OBJECT_KEY])
         if phase:
             return settings.PENDING_PHASE in phase
         return False
 
     def _is_host_definition_in_use(self, csi_host_definition_event):
-        return csi_host_definition_event['object'].metadata.name not in host_definition_objects_in_use
+        return csi_host_definition_event[settings.OBJECT_KEY].metadata.name not in host_definition_objects_in_use
 
     def _verify_host_on_storage_after_pending_host_definition(
             self, csi_host_definition_event):
         host_definition_objects_in_use.append(
-            csi_host_definition_event['object'].metadata.name)
+            csi_host_definition_event[settings.OBJECT_KEY].metadata.name)
         remove_host_thread = Thread(
             target=self._verify_host_on_storage_using_exponential_backoff,
             args=(csi_host_definition_event,))
@@ -55,11 +55,11 @@ class CsiHostDefinitionWatcher(WatcherHelper):
         retries = 3
         backoff_in_seconds = 3
         delay_in_seconds = 3
-        csi_host_definition_name = csi_host_definition_event['object'].metadata.name
+        csi_host_definition_name = csi_host_definition_event[settings.OBJECT_KEY].metadata.name
         logger.info('Verifying host definition {}, using exponantial backoff'.format(
             csi_host_definition_name))
         while retries > 1:
-            host_definition_object = csi_host_definition_event['object']
+            host_definition_object = csi_host_definition_event[settings.OBJECT_KEY]
             self._remove_host_definition_from_in_use_list_if_ready(
                 csi_host_definition_name)
             if csi_host_definition_name not in host_definition_objects_in_use:

@@ -9,8 +9,8 @@ class StorageHostManager:
 
     def verify_host_on_storage(self, host_object):
         logger.info('Verifying host: {} created on storage: {}'.format(
-            host_object.host_name, host_object.storage_server))
-        logger.info('storage server: {0}'.format(host_object.storage_server))
+            host_object.host_name, host_object.management_address))
+        logger.info('storage server: {0}'.format(host_object.management_address))
         logger.info(
             'storage username: {0}'.format(
                 host_object.storage_username))
@@ -21,8 +21,8 @@ class StorageHostManager:
 
     def verify_host_removed_from_storage(self, host_object):
         logger.info('Verifying host: {} removed from storage: {}'.format(
-            host_object.host_name, host_object.storage_server))
-        logger.info('storage server: {0}'.format(host_object.storage_server))
+            host_object.host_name, host_object.management_address))
+        logger.info('storage server: {0}'.format(host_object.management_address))
         logger.info(
             'storage username: {0}'.format(
                 host_object.storage_username))
