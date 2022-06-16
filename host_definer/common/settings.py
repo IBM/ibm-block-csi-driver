@@ -26,7 +26,7 @@ PENDING_CREATION_PHASE = 'PendingForCreation'
 PENDING_DELETION_PHASE = 'PendingForDeletion'
 ERROR_PHASE = 'Error'
 READY_PHASE = 'Ready'
-CSI_IBM_BLOCK_PRODUCT_LABEL='product=ibm-block-csi-driver'
+CSI_IBM_BLOCK_PRODUCT_LABEL = 'product=ibm-block-csi-driver'
 IBM_BLOCK_CSI_NODE_PREFIX = 'ibm-block-csi-node'
 BINARY_VALUE_FOR_DELETED_POD = 0
 BINARY_VALUE_FOR_EXISTING_POD = 1

@@ -9,6 +9,7 @@ from host_definer.watcher.csi_host_definition_watcher import CsiHostDefinitionWa
 
 logger = utils.get_stdout_logger()
 
+
 class HostDefinerManager:
     def __init__(self):
         self.storage_host_manager = StorageHostManager()
