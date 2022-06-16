@@ -3,9 +3,9 @@ import os
 from threading import Thread
 from kubernetes.client.rest import ApiException
 
-from watcher.watcher_helper import WatcherHelper, CSI_NODES, SECRET_IDS
-from storage_manager.exceptions import StorageException
-from common import settings, utils
+from host_definer.watcher.watcher_helper import WatcherHelper, CSI_NODES, SECRET_IDS
+from host_definer.storage_manager.exceptions import StorageException
+from host_definer.common import settings, utils
 
 logger = utils.get_stdout_logger()
 

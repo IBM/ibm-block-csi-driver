@@ -1,8 +1,8 @@
 from kubernetes import watch
 
-from watcher.watcher_helper import WatcherHelper, SECRET_IDS
-from watcher.exceptions import WatcherException
-from common import settings, utils
+from host_definer.watcher.watcher_helper import WatcherHelper, SECRET_IDS
+from host_definer.watcher.exceptions import WatcherException
+from host_definer.common import settings, utils
 
 logger = utils.get_stdout_logger()
 

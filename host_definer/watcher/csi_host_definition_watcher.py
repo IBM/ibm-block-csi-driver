@@ -2,8 +2,8 @@ from threading import Thread
 from time import sleep
 from kubernetes import dynamic
 
-from watcher.watcher_helper import WatcherHelper
-from common import utils, settings
+from host_definer.watcher.watcher_helper import WatcherHelper
+from host_definer.common import utils, settings
 
 host_definition_objects_in_use = []
 logger = utils.get_stdout_logger()

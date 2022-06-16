@@ -4,10 +4,10 @@ from kubernetes import client, config, dynamic
 from kubernetes.client import api_client
 from kubernetes.client.rest import ApiException
 
-from common import settings, utils
-from storage_manager.exceptions import StorageException
-from storage_manager.host import StorageHostManager
-import watcher.exceptions as exceptions
+from host_definer.common import settings, utils
+from host_definer.storage_manager.exceptions import StorageException
+from host_definer.storage_manager.host import StorageHostManager
+import host_definer.watcher.exceptions as exceptions
 
 SECRET_IDS = {}
 CSI_NODES = []

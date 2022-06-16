@@ -1,4 +1,4 @@
-from common import utils
+from host_definer.common import utils
 
 logger = utils.get_stdout_logger()
 

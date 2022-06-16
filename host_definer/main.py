@@ -1,4 +1,4 @@
-from host_definer_manager import HostDefinerManager
+from host_definer.host_definer_manager import HostDefinerManager
 
 def main():
     host_definition = HostDefinerManager()

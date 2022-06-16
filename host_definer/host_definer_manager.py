@@ -1,11 +1,11 @@
 from threading import Thread
 
-from common import utils
-from storage_manager.host import StorageHostManager
-from watcher.csi_node_watcher import CsiNodeWatcher
-from watcher.secret_watcher import SecretWatcher
-from watcher.storage_class_watcher import StorageClassWatcher
-from watcher.csi_host_definition_watcher import CsiHostDefinitionWatcher
+from host_definer.common import utils
+from host_definer.storage_manager.host import StorageHostManager
+from host_definer.watcher.csi_node_watcher import CsiNodeWatcher
+from host_definer.watcher.secret_watcher import SecretWatcher
+from host_definer.watcher.storage_class_watcher import StorageClassWatcher
+from host_definer.watcher.csi_host_definition_watcher import CsiHostDefinitionWatcher
 
 logger = utils.get_stdout_logger()
 
