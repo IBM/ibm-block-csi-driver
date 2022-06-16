@@ -31,20 +31,20 @@ class ArrayMediator(ABC):
 
     @abstractmethod
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
-                      source_type, virt_snap_func):
+                      source_type, is_virt_snap_func):
         """
         This function should create a volume in the storage system.
 
         Args:
-            name             : name of the volume to be created in the storage system
-            size_in_bytes    : size in bytes of the volume
-            space_efficiency : space efficiency (None for default)
-            pool             : pool name to create the volume in
-            io_group         : i/o group to create the volume in
-            volume_group     : volume group to create the volume in
-            source_ids       : ObjectIds of source to create from
-            source_type      : volume or snapshot
-            virt_snap_func   : indicate if svc's snapshot function feature is enabled
+            name              : name of the volume to be created in the storage system
+            size_in_bytes     : size in bytes of the volume
+            space_efficiency  : space efficiency (None for default)
+            pool              : pool name to create the volume in
+            io_group          : i/o group to create the volume in
+            volume_group      : volume group to create the volume in
+            source_ids        : ObjectIds of source to create from
+            source_type       : volume or snapshot
+            is_virt_snap_func : indicate if svc's snapshot function feature is enabled
 
         Returns:
             volume_id : the volume WWN.
@@ -99,14 +99,14 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_volume(self, name, pool, virt_snap_func):
+    def get_volume(self, name, pool, is_virt_snap_func):
         """
         This function return volume info about the volume.
 
         Args:
-            name           : name of the volume on storage system.
-            pool           : pool of the volume to find the volume more efficiently.
-            virt_snap_func : indicate if svc's snapshot function feature is enabled
+            name              : name of the volume on storage system.
+            pool              : pool of the volume to find the volume more efficiently.
+            is_virt_snap_func : indicate if svc's snapshot function feature is enabled
 
 
         Returns:
@@ -199,14 +199,14 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_snapshot(self, volume_id, snapshot_name, pool, virt_snap_func):
+    def get_snapshot(self, volume_id, snapshot_name, pool, is_virt_snap_func):
         """
         This function return snapshot info about the snapshot.
         Args:
-            volume_id        : id of the source volume (used to get pool in case pool parameter not given)
-            snapshot_name    : name of the snapshot in the storage system
-            pool             : pool to find the snapshot in (if not given, pool taken from source volume)
-            virt_snap_func   : indicate if svc's snapshot function feature is enabled
+            volume_id         : id of the source volume (used to get pool in case pool parameter not given)
+            snapshot_name     : name of the snapshot in the storage system
+            pool              : pool to find the snapshot in (if not given, pool taken from source volume)
+            is_virt_snap_func : indicate if svc's snapshot function feature is enabled
         Returns:
            Snapshot
         Raises:
@@ -233,7 +233,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, virt_snap_func):
+    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func):
         """
         This function should create a snapshot from volume in the storage system.
         Args:
@@ -241,7 +241,7 @@ class ArrayMediator(ABC):
             snapshot_name       : name of the snapshot to be created in the storage system
             space_efficiency    : space efficiency (if empty/None, space efficiency taken from source volume)
             pool                : pool to create the snapshot in (if empty/None, pool taken from source volume)
-            virt_snap_func      : indicate if svc's snapshot function feature is enabled
+            is_virt_snap_func   : indicate if svc's snapshot function feature is enabled
         Returns:
             Snapshot
         Raises:
