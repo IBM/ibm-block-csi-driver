@@ -65,7 +65,7 @@ The following IBM block storage CSI driver features are not supported on volumes
 
 ## NVMe®/FC usage limitations
 
- Red Hat® Enterprise Linux CoreOS (RHCOS) does not support NVMe®/FC.
+ - Red Hat® Enterprise Linux CoreOS (RHCOS) does not support NVMe®/FC.
  
  For other limitations with your storage system, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Configuring** > **Host attachment** > **NVMe over Fibre Channel host attachments** > **FC-NVMe limitations and SAN configuration guidelines**.
  
@@ -81,3 +81,9 @@ The following IBM block storage CSI driver features are not supported on volumes
 ## I/O group limitations
 
 **Note:** I/O group configuration is only supported for use with IBM Spectrum Virtualize family storage systems.
+
+## Automatic host definition limitations
+- Automatic host definition is only supported for use with IBM Spectrum Virtualize family storage systems.
+- Automatic host definition does not work with I/O groups.
+- Automatic host definition does not work with CSI Topology. For more information, see [Configuring for CSI Topology](configuring/configuring_topology.md).
+

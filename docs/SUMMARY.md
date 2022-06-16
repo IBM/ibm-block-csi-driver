@@ -30,6 +30,7 @@
 		* [Installing the driver with the OpenShift web console](content/installation/install_driver_openshift_web.md)
 		* [Installing the driver with GitHub](content/installation/install_driver_github.md)
 		* [Installing the driver with OperatorHub.io](content/installation/install_driver_operatorhub.md)
+	* [Installing the `HostDefinition` custom resource](install_hostdefinition.md)	
 	* [Uninstalling the operator and driver](content/installation/uninstalling.md)
 		* [Uninstalling the driver with the OpenShift web console](content/installation/uninstall_driver_openshift_web.md)
 		* [Uninstalling the driver with GitHub](content/installation/uninstall_driver_github.md)
