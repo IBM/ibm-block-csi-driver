@@ -77,8 +77,8 @@ class StorageClassWatcher(WatcherHelper):
             self._verify_csi_node_on_storage_from_secret(secret)
 
     def _verify_csi_node_on_storage_from_secret(self, secret):
-        host_object = self.get_host_object_from_secret_id(secret)
-        self.verify_csi_nodes_on_storage(host_object)
+        host_request = self.get_host_request_from_secret_id(secret)
+        self.verify_csi_nodes_on_storage(host_request)
 
     def _add_secret_if_uniq_or_add_secret_counter(self, secret):
         if secret in SECRET_IDS:

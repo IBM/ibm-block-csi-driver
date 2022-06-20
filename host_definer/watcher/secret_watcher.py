@@ -41,12 +41,12 @@ class SecretWatcher(WatcherHelper):
         secret_name = secret_event[settings.OBJECT_KEY].metadata.name
         secret_namespace = secret_event[settings.OBJECT_KEY].metadata.namespace
         try:
-            host_object = self.get_host_object_from_secret_name_and_namespace(
+            host_request = self.get_host_request_from_secret_name_and_namespace(
                 secret_name, secret_namespace)
             logger.info(
                 'Verifying hosts on new storage {}'.format(
-                    host_object.management_address))
-            self.verify_csi_nodes_on_storage(host_object)
+                    host_request.system_info[settings.MANAGEMENT_ADDRESS_KEY]))
+            self.verify_csi_nodes_on_storage(host_request)
         except WatcherException as ex:
             logger.error(
                 'Failed to find secret {} in namespace {}, got: {}'.format(
