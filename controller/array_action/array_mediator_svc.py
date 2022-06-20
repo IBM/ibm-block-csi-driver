@@ -1491,3 +1491,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return False
         cli_volume = self._get_cli_volume_by_wwn(vdisk_uid, not_exist_err=False)
         return cli_volume and cli_volume.FC_id
+
+    def validate_space_efficiency_match_source(self, target_volume_space_efficiency, source_id, source_type):
+        if source_type == controller_config.SNAPSHOT_TYPE_NAME:
+            cli_snapshot = self._get_cli_snapshot_by_id(source_id)
+            cli_source_volume = self._get_cli_volume(cli_snapshot.volume_id)
+        else:
+            cli_source_volume = self._get_cli_volume_by_wwn(source_id)
+        source_volume_space_efficiency = _get_cli_volume_space_efficiency(cli_source_volume)
+        if target_volume_space_efficiency != source_volume_space_efficiency:
+            raise array_errors.TargetSpaceEfficiencyMismatch(target_volume_space_efficiency,
+                                                             source_volume_space_efficiency)

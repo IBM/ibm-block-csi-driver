@@ -74,6 +74,10 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     required_bytes = min_size
                     logger.debug("requested size is 0 so the default size will be used : {0} ".format(
                         required_bytes))
+
+                if volume_parameters.virt_snap_func and source_id:
+                    array_mediator.validate_space_efficiency_match_source(space_efficiency, source_id, source_type)
+
                 try:
                     volume = array_mediator.get_volume(volume_final_name, pool, volume_parameters.virt_snap_func)
                 except array_errors.ObjectNotFoundError:
@@ -306,6 +310,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                                 system_id=array_connection_info.system_id)
             pool = snapshot_parameters.pool
             space_efficiency = snapshot_parameters.space_efficiency
+            if snapshot_parameters.virt_snap_func and space_efficiency:
+                raise array_errors.SpaceEfficiencyNotSupported(space_efficiency)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
                 snapshot_final_name = self._get_snapshot_final_name(snapshot_parameters, request.name, array_mediator)

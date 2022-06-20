@@ -1507,3 +1507,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._expand_volume_lsvdisk_errors(CLIFailureError("CMMVC5741E"), array_errors.InvalidArgumentError, "!@#")
         self._expand_volume_lsvdisk_errors(CLIFailureError("Failed"), CLIFailureError)
         self._expand_volume_lsvdisk_errors(Exception("Failed"), Exception)
+
+    def test_validate_space_efficiency_match_source_volume_failed(self):
+        source_volume = self._get_cli_volume(with_deduplicated_copy=False)
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(source_volume)
+        with self.assertRaises(array_errors.TargetSpaceEfficiencyMismatch):
+            self.svc.validate_space_efficiency_match_source('dedup_compressed', 'source_id', 'volume')
+
+    def test_validate_space_efficiency_match_source_volume_dedup_compressed_success(self):
+        source_volume = self._get_cli_volume()
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(source_volume)
+        self.svc.validate_space_efficiency_match_source('dedup_compressed', 'source_id', 'volume')
