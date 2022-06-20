@@ -1383,3 +1383,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if cli_snapshot is None:
             raise array_errors.ObjectNotFoundError(snapshot_id)
         return cli_snapshot
+
+    def create_host(self, host_name, initiators, connectivity_type):
+        raise NotImplementedError
+
+    def delete_host(self, host_name):
+        raise NotImplementedError
