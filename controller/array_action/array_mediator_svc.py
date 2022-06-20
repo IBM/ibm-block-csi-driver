@@ -528,8 +528,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def _create_cli_volume_from_volume(self, name, pool, io_group, volume_group, source_id):
         logger.info("creating volume from volume")
         cli_snapshot = self._add_snapshot(name, source_id, pool)
-        self._create_cli_volume_from_snapshot(name, pool, io_group, volume_group, cli_snapshot.id)
-        self._rmsnapshot(cli_snapshot.id)
+        self._create_cli_volume_from_snapshot(name, pool, io_group, volume_group, cli_snapshot.snapshot_id)
+        self._rmsnapshot(cli_snapshot.snapshot_id)
 
     def _create_cli_volume_from_source(self, name, pool, io_group, volume_group, source_ids, source_type):
         if source_type == controller_config.SNAPSHOT_TYPE_NAME:
@@ -775,7 +775,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         source_cli_volume = self._get_cli_volume_in_pool_site(source_volume_name, pool)
         if is_virt_snap_func:
             if self._is_vdisk_support_addsnapshot(volume_id):
-                target_cli_snapshot = self._add_snapshot(snapshot_name, source_cli_volume, pool)
+                target_cli_snapshot = self._add_snapshot(snapshot_name, source_cli_volume.id, pool)
                 snapshot = self._generate_snapshot_response_from_cli_snapshot(target_cli_snapshot, source_cli_volume)
             else:
                 raise array_errors.VirtSnapshotFunctionNotSupportedMessage(volume_id)

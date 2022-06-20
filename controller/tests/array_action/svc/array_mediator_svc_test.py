@@ -243,9 +243,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_create_volume_success(is_virt_snap_func=True)
         self.svc.client.svctask.mkvolume.assert_called_with(name="test_volume", unit="b", size=1024, pool="pool_name")
 
-    def test_create_volume_mkvolumegroup_success(self):
+    def _test_create_volume_mkvolumegroup_success(self, source_type):
         self._prepare_mocks_for_create_volume_mkvolumegroup()
-        self._test_create_volume_success(source_id="source_id", source_type='snapshot', is_virt_snap_func=True)
+        if source_type == 'volume':
+            self._prepare_mocks_for_create_snapshot_addsnapshot(snapshot_id='source_id')
+        self._test_create_volume_success(source_id="source_id", source_type=source_type, is_virt_snap_func=True)
 
         self.svc.client.svctask.mkvolumegroup.assert_called_with(type='clone', fromsnapshotid='source_id',
                                                                  pool='pool_name', name='test_volume')
@@ -254,14 +256,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.chvdisk.assert_has_calls([remove_from_volumegroup_call, rename_call])
         self.svc.client.svctask.rmvolumegroup.assert_called_with(object_id='test_volume')
 
-    def test_create_volume_mkvolumegroup_with_other_volume_group_success(self):
-        self._prepare_mocks_for_create_volume_mkvolumegroup()
-        self._test_create_volume_success(source_id="source_id", source_type='snapshot',
-                                         volume_group="other_volume_group", is_virt_snap_func=True)
+    def test_create_volume_mkvolumegroup_from_snapshot_success(self):
+        self._test_create_volume_mkvolumegroup_success(source_type='snapshot')
 
-        remove_from_volumegroup_call = call(vdisk_id='test_id', volumegroup='other_volume_group')
-        rename_call = call(vdisk_id='test_id', name='test_volume')
-        self.svc.client.svctask.chvdisk.assert_has_calls([remove_from_volumegroup_call, rename_call])
+    def test_create_volume_mkvolumegroup_from_volume_success(self):
+        self._test_create_volume_mkvolumegroup_success(source_type='volume')
 
     @patch("controller.array_action.array_mediator_svc.is_warning_message")
     def test_create_volume_mkvolumegroup_with_rollback(self, mock_warning):
@@ -402,8 +401,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
                       })
 
     @staticmethod
-    def _get_cli_snapshot():
-        return Munch({'snapshot_id': 'snapshot_id',
+    def _get_cli_snapshot(snapshot_id='snapshot_id'):
+        return Munch({'snapshot_id': snapshot_id,
                       'snapshot_name': 'snapshot_name',
                       'volume_id': 'volume_id',
                       'volume_name': 'volume_name',
@@ -738,7 +737,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual('SVC', snapshot.array_type)
         self.assertEqual('snap_id', snapshot.id)
 
-    def _prepare_mocks_for_create_snapshot_addsnapshot(self):
+    def _prepare_mocks_for_create_snapshot_addsnapshot(self, snapshot_id='snapshot_id'):
         self.svc.client.svctask.addsnapshot = Mock()
         source_volume_to_copy_from = self._get_custom_cli_volume(False, False, pool_name='pool1')
         volumes_to_return = [source_volume_to_copy_from, source_volume_to_copy_from, source_volume_to_copy_from]
@@ -746,7 +745,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.addsnapshot.return_value = Mock(
             response=(b'Snapshot, id [0], successfully created or triggered\n', b''))
         self.svc.client.svcinfo.lsvolumesnapshot = Mock()
-        self.svc.client.svcinfo.lsvolumesnapshot.return_value = self._mock_cli_object(self._get_cli_snapshot())
+        self.svc.client.svcinfo.lsvolumesnapshot.return_value = self._mock_cli_object(
+            self._get_cli_snapshot(snapshot_id))
 
     def test_create_snapshot_addsnapshot_success(self):
         self._prepare_mocks_for_create_snapshot_addsnapshot()
