@@ -30,3 +30,4 @@ class ObjectParameters:
     prefix: str
     io_group: str
     volume_group: str
+    virt_snap_func: bool

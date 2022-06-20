@@ -13,7 +13,6 @@ class Volume:
     source_id: str
     array_type: str
     pool: str
-    is_copied: bool = False
     space_efficiency: str = None
     default_space_efficiency: str = None
 
@@ -51,3 +50,6 @@ class Host:
 class ObjectIds:
     internal_id: str = ''
     uid: str = ''
+
+    def __bool__(self):
+        return bool(self.internal_id or self.uid)

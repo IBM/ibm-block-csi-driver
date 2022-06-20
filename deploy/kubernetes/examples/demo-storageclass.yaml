@@ -6,8 +6,10 @@ provisioner: block.csi.ibm.com
 parameters:
   pool: demo-pool
   io_group: demo-iogrp             # Optional.
+  volume_group: demo-volumegroup   # Optional.
   SpaceEfficiency: thin            # Optional.
   volume_name_prefix: demo-prefix  # Optional.
+  virt_snap_func: "false"          # Optional. Values true/false. The default is false.
 
   csi.storage.k8s.io/fstype: xfs   # Optional. Values ext4/xfs. The default is ext4.
   csi.storage.k8s.io/secret-name: demo-secret

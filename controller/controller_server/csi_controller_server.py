@@ -35,7 +35,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         logger.debug("volume name : {}".format(request.name))
 
-        source_type, source_ids = self._get_source_type_and_id(request)
+        source_type, source_ids = self._get_source_type_and_ids(request)
         source_id = source_ids.uid if source_ids.uid else source_ids.internal_id
 
         logger.debug("Source {0} id : {1}".format(source_type, source_id))
@@ -75,10 +75,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug("requested size is 0 so the default size will be used : {0} ".format(
                         required_bytes))
                 try:
-                    volume = array_mediator.get_volume(
-                        volume_final_name,
-                        pool=pool,
-                    )
+                    volume = array_mediator.get_volume(volume_final_name, pool, volume_parameters.virt_snap_func)
                 except array_errors.ObjectNotFoundError:
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
@@ -86,7 +83,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     array_mediator.validate_supported_space_efficiency(space_efficiency)
                     volume = array_mediator.create_volume(volume_final_name, required_bytes, space_efficiency, pool,
                                                           volume_parameters.io_group, volume_parameters.volume_group,
-                                                          source_ids, source_type)
+                                                          source_ids, source_type, volume_parameters.virt_snap_func)
                 else:
                     logger.debug("volume found : {}".format(volume))
 
@@ -98,17 +95,18 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
                                                     csi_pb2.CreateVolumeResponse)
 
-                    response = self._get_create_volume_response_for_existing_volume_source(volume,
-                                                                                           source_id,
-                                                                                           source_type, system_id,
-                                                                                           context)
-                    if response:
-                        return response
+                    if not volume_parameters.virt_snap_func:
+                        response = self._get_create_volume_response_for_existing_volume_source(volume,
+                                                                                               source_id,
+                                                                                               source_type, system_id,
+                                                                                               context)
+                        if response:
+                            return response
 
-                if source_id:
+                if source_id and not volume_parameters.virt_snap_func:
                     array_mediator.copy_to_existing_volume_from_source(volume, source_id,
                                                                        source_type, required_bytes)
-                    volume.source_id = source_id
+                volume.source_id = source_id
 
                 response = utils.generate_csi_create_volume_response(volume, array_connection_info.system_id,
                                                                      source_type)
@@ -313,11 +311,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 snapshot_final_name = self._get_snapshot_final_name(snapshot_parameters, request.name, array_mediator)
 
                 logger.info("Snapshot name : {}. Volume id : {}".format(snapshot_final_name, volume_id))
-                snapshot = array_mediator.get_snapshot(
-                    volume_id,
-                    snapshot_final_name,
-                    pool=pool
-                )
+                snapshot = array_mediator.get_snapshot(volume_id, snapshot_final_name, pool,
+                                                       snapshot_parameters.virt_snap_func)
 
                 if snapshot:
                     if snapshot.source_id != volume_id:
@@ -332,7 +327,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                             snapshot_final_name,
                             volume_id))
                     array_mediator.validate_supported_space_efficiency(space_efficiency)
-                    snapshot = array_mediator.create_snapshot(volume_id, snapshot_final_name, space_efficiency, pool)
+                    snapshot = array_mediator.create_snapshot(volume_id, snapshot_final_name, space_efficiency, pool,
+                                                              snapshot_parameters.virt_snap_func)
 
                 logger.debug("generating create snapshot response")
                 response = utils.generate_csi_create_snapshot_response(snapshot, system_id, source_id)
@@ -522,7 +518,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         context.set_code(grpc.StatusCode.OK)
         return csi_pb2.ProbeResponse()
 
-    def _get_source_type_and_id(self, request):
+    def _get_source_type_and_ids(self, request):
         source = request.volume_content_source
         object_ids = ObjectIds()
         source_type = None

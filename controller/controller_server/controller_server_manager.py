@@ -5,10 +5,9 @@ import grpc
 from csi_general import csi_pb2_grpc
 from csi_general import replication_pb2_grpc
 
-from controller.common import settings
+from controller.common.config import config
 from controller.common.csi_logger import get_stdout_logger
 from controller.controller_server.addons_server import ReplicationControllerServicer
-from controller.common.config import config
 from controller.controller_server.csi_controller_server import CSIControllerServicer
 
 logger = get_stdout_logger()
@@ -21,7 +20,7 @@ class ControllerServerManager:
         self.replication_servicer = ReplicationControllerServicer()
 
     def start_server(self):
-        controller_server = grpc.server(futures.ThreadPoolExecutor(max_workers=settings.CSI_CONTROLLER_SERVER_WORKERS))
+        controller_server = grpc.server(futures.ThreadPoolExecutor())
 
         csi_pb2_grpc.add_ControllerServicer_to_server(self.csi_servicer, controller_server)
         csi_pb2_grpc.add_IdentityServicer_to_server(self.csi_servicer, controller_server)
