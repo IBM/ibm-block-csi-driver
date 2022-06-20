@@ -4,9 +4,7 @@ Create a VolumeSnapshot YAML file for a specific PersistentVolumeClaim (PVC).
 
 VolumeSnapshotClass needs to be present before a VolumeSnapshot can be created. For more information, see [Creating a VolumeSnapshotClass](creating_volumesnapshotclass.md).
 
-**Note:**
-
--   IBM® FlashCopy® function is referred to as the more generic volume snapshots and cloning within this documentation set. Not all supported products use the FlashCopy function terminology.
+**Note:** This section refers to both the IBM FlashCopy® function and Snapshot function in Spectrum Virtualize storage systems.
 
 When creating volume snapshots, be sure to follow all of the snapshot configurations, found in [Compatibility and requirements](../installation/install_compatibility_requirements.md) before snapshot creation.
 
