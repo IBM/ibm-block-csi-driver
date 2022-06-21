@@ -1,16 +1,14 @@
-from controller.array_action.errors import BaseArrayActionException
+from host_definer.common.types import VerifyHostResponse
 from controller.array_action.storage_agent import detect_array_type, get_agent
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.node_info import NodeIdInfo
-from controller.controller_server.utils import get_array_connection_info_from_secrets, \
-    generate_host_definer_create_volume_response
-from host_definer.common.types import VerifyHostResponse
+from controller.controller_server.utils import get_array_connection_info_from_secrets
 
 logger = get_stdout_logger()
 
 
 class HostDefinerServicer:
-    def VerifyHostDefinitionOnStorage(self, request):
+    def VerifyHostDefinitionOnStorage(self, request):  # pylint: disable=invalid-name
         host_name = request.host_name
         logger.debug("host name : {}".format(host_name))
 
@@ -37,5 +35,5 @@ class HostDefinerServicer:
             logger.exception(ex)
             return VerifyHostResponse(error_message=str(ex))
 
-    def VerifyHostDefinitionNotOnStorag(self, request):
+    def VerifyHostDefinitionNotOnStorag(self, request):  # pylint: disable=invalid-name
         raise NotImplementedError
