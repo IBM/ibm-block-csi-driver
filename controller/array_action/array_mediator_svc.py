@@ -1516,15 +1516,13 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return config.NVME_OVER_FC_CONNECTIVITY_TYPE
         if initiators.fc_wwns:
             return config.FC_CONNECTIVITY_TYPE
-        else:
-            return config.ISCSI_CONNECTIVITY_TYPE
+        return config.ISCSI_CONNECTIVITY_TYPE
 
     def create_host(self, host_name, initiators, connectivity_type):
         if not connectivity_type:
             connectivity_type = self._get_connectivity_type_by_initiators(initiators)
         ports = initiators.get_by_connectivity_type(connectivity_type)
         self._mkhost(host_name, connectivity_type, ports)
-        return ports, connectivity_type
 
     def delete_host(self, host_name):
         raise NotImplementedError
