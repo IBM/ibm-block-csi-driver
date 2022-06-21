@@ -351,8 +351,7 @@ class ArrayMediator(ABC):
 
 
         Returns:
-           ports
-           connectivity_type
+           None
 
         Raises:
 
@@ -372,6 +371,22 @@ class ArrayMediator(ABC):
 
         Raises:
             PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def delete_host(self, host_name):
+        """
+        This function will find the host by name.
+
+        Args:
+           host_name : name of the host in the storage system
+
+        Returns:
+            None
+
+        Raises:
+            None
         """
         raise NotImplementedError
 

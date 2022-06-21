@@ -27,6 +27,7 @@ COPY ./host_definer /driver/host_definer/
 COPY ./LICENSE /licenses/
 COPY ./NOTICES /licenses/
 
-WORKDIR /driver
+WORKDIR /host_definer
+ENV PYTHONPATH=/driver
 
 CMD ["python3", "/driver/host_definer/main.py"]
