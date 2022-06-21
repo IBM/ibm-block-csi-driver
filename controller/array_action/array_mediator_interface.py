@@ -365,20 +365,20 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def validate_space_efficiency_match_source(self, target_volume_space_efficiency, source_id, source_type):
+    def validate_space_efficiency_match_source(self, space_efficiency, source_id, source_type):
         """
         This function will check if the space efficiency passed to CreateVolume is match the volume source.
 
         Args:
-            target_volume_space_efficiency : as passed from the storage class
-            source_id                      : id of source to create from
-            source_type                    : volume or snapshot
+            space_efficiency : as passed from the storage class
+            source_id        : id of source to create from
+            source_type      : volume or snapshot
 
         Returns:
             None
 
         Raises:
-            SpaceEfficiencyNotSupported
+            TargetSpaceEfficiencyMismatch
         """
         raise NotImplementedError
 
