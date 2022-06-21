@@ -1,4 +1,5 @@
 from host_definer.common.types import VerifyHostResponse
+from controller.array_action.errors import HostNotFoundError
 from controller.array_action.storage_agent import detect_array_type, get_agent
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.node_info import NodeIdInfo
@@ -9,7 +10,7 @@ logger = get_stdout_logger()
 
 class HostDefinerServicer:
     def VerifyHostDefinitionOnStorage(self, request):  # pylint: disable=invalid-name
-        host_name = request.host_name
+        host_name = request.name
         logger.debug("host name : {}".format(host_name))
 
         node_id_info = NodeIdInfo(request.node_id)
@@ -22,10 +23,10 @@ class HostDefinerServicer:
             array_type = detect_array_type(array_connection_info.array_addresses)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
 
-                host_name, _ = array_mediator.get_host_by_host_identifiers(initiators)
-                if host_name:
+                try:
+                    array_mediator.get_host_by_host_identifiers(initiators)
                     logger.debug("host found : {}".format(host_name))
-                else:
+                except HostNotFoundError:
                     logger.debug("host was not found. creating a new host with initiators: {0}".format(initiators))
 
                     array_mediator.create_host(host_name, initiators, connectivity_type)
