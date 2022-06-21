@@ -46,7 +46,7 @@ class CsiHostDefinitionWatcher(WatcherHelper):
 
     def _verify_host_defined_using_exponential_backoff(
             self, csi_host_definition_event):
-        retries = 3
+        retries = 10
         backoff_in_seconds = 3
         delay_in_seconds = 3
         csi_host_definition_name = csi_host_definition_event[settings.OBJECT_KEY].metadata.name
@@ -124,8 +124,14 @@ class CsiHostDefinitionWatcher(WatcherHelper):
         host_request = self.get_host_request_from_secret_name_and_namespace(
             secret_name, secret_namespace)
         if host_request:
-            host_request.name = host_definition_object.spec.hostDefinition.hostNameInStorage
+            node_name = host_definition_object.spec.hostDefinition.nodeName
+            host_request.node_id = self._get_node_id_from_node_name(node_name)
+            host_request.connectivity_type = self.get_connectivity()
         return host_request
+
+    def _get_node_id_from_node_name(self, node_name):
+        csi_node = self.csi_nodes_api.get(name=node_name)
+        return self.get_node_id_from_csi_node(csi_node)
 
     def _add_event_to_host_definition_object(
             self, host_definition_object, message):
