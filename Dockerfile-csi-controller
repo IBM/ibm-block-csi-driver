@@ -47,7 +47,7 @@ LABEL name="IBM block storage CSI driver controller" \
       io.openshift.tags=ibm,csi,ibm-block-csi-driver,ibm-block-csi-node
 
 COPY --from=builder /opt/app-root /opt/app-root
-COPY ./common /driver/common
+COPY ./common /driver/csi_server/common
 COPY ./controllers/csi_server /driver/controllers/csi_server
 COPY ./LICENSE /licenses/
 COPY ./NOTICES /licenses/
