@@ -1412,9 +1412,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return config.ISCSI_CONNECTIVITY_TYPE
 
     def create_host(self, host_name, initiators, connectivity_type):
-        host_name, connectivity_type = self.get_host_by_host_identifiers(initiators)
-        if host_name:
-            return host_name
         if not connectivity_type:
             connectivity_type = self._get_connectivity_type_by_initiators(initiators)
         ports = initiators.get_by_connectivity_type(connectivity_type)
