@@ -9,10 +9,9 @@ logger = get_stdout_logger()
 status_codes_by_exception = {
     NotImplementedError: grpc.StatusCode.UNIMPLEMENTED,
     ValidationException: grpc.StatusCode.INVALID_ARGUMENT,
-    array_errors.IllegalObjectID: grpc.StatusCode.INVALID_ARGUMENT,
-    array_errors.IllegalObjectName: grpc.StatusCode.INVALID_ARGUMENT,
+    array_errors.InvalidArgumentError: grpc.StatusCode.INVALID_ARGUMENT,
     array_errors.PoolParameterIsMissing: grpc.StatusCode.INVALID_ARGUMENT,
-    array_errors.Flashcopy2NotSupportedMessage: grpc.StatusCode.INVALID_ARGUMENT,
+    array_errors.VirtSnapshotFunctionNotSupportedMessage: grpc.StatusCode.INVALID_ARGUMENT,
     array_errors.ObjectNotFoundError: grpc.StatusCode.NOT_FOUND,
     array_errors.HostNotFoundError: grpc.StatusCode.NOT_FOUND,
     array_errors.PermissionDeniedError: grpc.StatusCode.PERMISSION_DENIED,

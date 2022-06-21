@@ -11,9 +11,10 @@ import controller.controller_server.config as config
 import controller.controller_server.messages as messages
 from controller.array_action.config import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
     ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC
+from controller.common import settings
+from controller.common.config import config as common_config
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.settings import NAME_PREFIX_SEPARATOR
-from controller.common.config import config as common_config
 from controller.controller_server.controller_types import ArrayConnectionInfo, ObjectIdInfo, ObjectParameters
 from controller.controller_server.errors import ObjectIdError, ValidationException, InvalidNodeId
 
@@ -108,16 +109,16 @@ def get_object_parameters(parameters, prefix_param_name, system_id):
     default_prefix = parameters.get(prefix_param_name)
     default_io_group = parameters.get(config.PARAMETERS_IO_GROUP)
     default_volume_group = parameters.get(config.PARAMETERS_VOLUME_GROUP)
-    default_flashcopy_2 = parameters.get(config.PARAMETERS_VOLUME_FLASHCOPY_2)
-    flashcopy_2_str = system_parameters.get(config.PARAMETERS_VOLUME_FLASHCOPY_2, default_flashcopy_2)
-    is_flashcopy_2 = _str_to_bool(flashcopy_2_str)
+    default_virt_snap_func = parameters.get(config.PARAMETERS_VIRT_SNAP_FUNC)
+    virt_snap_func_str = system_parameters.get(config.PARAMETERS_VIRT_SNAP_FUNC, default_virt_snap_func)
+    is_virt_snap_func = _str_to_bool(virt_snap_func_str)
     return ObjectParameters(
         pool=system_parameters.get(config.PARAMETERS_POOL, default_pool),
         space_efficiency=system_parameters.get(config.PARAMETERS_SPACE_EFFICIENCY, default_space_efficiency),
         prefix=system_parameters.get(prefix_param_name, default_prefix),
         io_group=system_parameters.get(config.PARAMETERS_IO_GROUP, default_io_group),
         volume_group=system_parameters.get(config.PARAMETERS_VOLUME_GROUP, default_volume_group),
-        flashcopy_2=is_flashcopy_2)
+        virt_snap_func=is_virt_snap_func)
 
 
 def get_volume_id(new_volume, system_id):
@@ -449,7 +450,7 @@ def validate_delete_volume_request(request):
 def _validate_node_id(node_id):
     logger.debug("validating node id")
 
-    delimiter_count = node_id.count(config.PARAMETERS_NODE_ID_DELIMITER)
+    delimiter_count = node_id.count(settings.PARAMETERS_NODE_ID_DELIMITER)
 
     if not 1 <= delimiter_count <= 3:
         raise InvalidNodeId(node_id)
@@ -508,24 +509,7 @@ def get_object_id_info(full_object_id, object_type):
     else:
         raise ObjectIdError(object_type, full_object_id)
     logger.debug("volume id : {0}, array type :{1}".format(object_id, array_type))
-    return ObjectIdInfo(array_type=array_type, system_id=system_id, internal_id=internal_id, object_id=wwn)
-
-
-def get_node_id_info(node_id):
-    logger.debug("getting node info for node id : {0}".format(node_id))
-    split_node = node_id.split(config.PARAMETERS_NODE_ID_DELIMITER)
-    hostname, nvme_nqn, fc_wwns, iscsi_iqn = "", "", "", ""
-    if len(split_node) == 4:
-        hostname, nvme_nqn, fc_wwns, iscsi_iqn = split_node
-    elif len(split_node) == 3:
-        hostname, nvme_nqn, fc_wwns = split_node
-    elif len(split_node) == 2:
-        hostname, nvme_nqn = split_node
-    else:
-        raise ValueError(messages.WRONG_FORMAT_MESSAGE.format("node id"))
-    logger.debug("node name : {0}, nvme_nqn: {1}, fc_wwns : {2}, iscsi_iqn : {3} ".format(
-        hostname, nvme_nqn, fc_wwns, iscsi_iqn))
-    return hostname, nvme_nqn, fc_wwns, iscsi_iqn
+    return ObjectIdInfo(array_type=array_type, system_id=system_id, internal_id=internal_id, uid=wwn)
 
 
 def choose_connectivity_type(connectivity_types):
