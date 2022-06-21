@@ -4,12 +4,13 @@ from controller.common.csi_logger import get_stdout_logger
 from controller.common.node_info import NodeIdInfo
 from controller.controller_server.utils import get_array_connection_info_from_secrets, \
     generate_host_definer_create_volume_response
+from host_definer.common.types import VerifyHostResponse
 
 logger = get_stdout_logger()
 
 
 class HostDefinerServicer:
-    def verifyHostDefinitionOnStorage(self, request):
+    def VerifyHostDefinitionOnStorage(self, request):
         host_name = request.host_name
         logger.debug("host name : {}".format(host_name))
 
@@ -18,20 +19,23 @@ class HostDefinerServicer:
         connectivity_type = request.connectivity_type
 
         try:
-            array_connection_info = get_array_connection_info_from_secrets(request.secrets)
+            array_connection_info = get_array_connection_info_from_secrets(request.system_info)
 
             array_type = detect_array_type(array_connection_info.array_addresses)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
 
-                host_name, connectivity_types = array_mediator.get_host_by_host_identifiers(initiators)
+                host_name, _ = array_mediator.get_host_by_host_identifiers(initiators)
                 if host_name:
                     logger.debug("host found : {}".format(host_name))
                 else:
-                    logger.debug("hos was not found. creating a new host with initiators: {0}".format(initiators))
+                    logger.debug("host was not found. creating a new host with initiators: {0}".format(initiators))
 
-                    host = array_mediator.create_host(host_name, initiators, connectivity_type)
+                    array_mediator.create_host(host_name, initiators, connectivity_type)
 
-                response = generate_host_definer_create_volume_response(host)
-                return response
-        except BaseArrayActionException as ex:
-            return
+                return VerifyHostResponse()
+        except Exception as ex:
+            logger.exception(ex)
+            return VerifyHostResponse(error_message=str(ex))
+
+    def VerifyHostDefinitionNotOnStorag(self, request):
+        raise NotImplementedError
