@@ -525,9 +525,17 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self._rollback_create_volume_from_snapshot(cli_volume_id, name)
             raise ex
 
+    def _create_cli_volume_from_volume(self, name, pool, io_group, volume_group, source_id):
+        logger.info("creating volume from volume")
+        cli_snapshot = self._add_snapshot(name, source_id, pool)
+        self._create_cli_volume_from_snapshot(name, pool, io_group, volume_group, cli_snapshot.snapshot_id)
+        self._rmsnapshot(cli_snapshot.snapshot_id)
+
     def _create_cli_volume_from_source(self, name, pool, io_group, volume_group, source_ids, source_type):
         if source_type == controller_config.SNAPSHOT_TYPE_NAME:
             self._create_cli_volume_from_snapshot(name, pool, io_group, volume_group, source_ids.internal_id)
+        else:
+            self._create_cli_volume_from_volume(name, pool, io_group, volume_group, source_ids.internal_id)
 
     def _is_vdisk_support_addsnapshot(self, vdisk_uid):
         return self._is_addsnapshot_supported() and not self._is_vdisk_has_fcmaps(vdisk_uid)
@@ -767,7 +775,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         source_cli_volume = self._get_cli_volume_in_pool_site(source_volume_name, pool)
         if is_virt_snap_func:
             if self._is_vdisk_support_addsnapshot(volume_id):
-                target_cli_snapshot = self._add_snapshot(snapshot_name, source_cli_volume, pool)
+                target_cli_snapshot = self._add_snapshot(snapshot_name, source_cli_volume.id, pool)
                 snapshot = self._generate_snapshot_response_from_cli_snapshot(target_cli_snapshot, source_cli_volume)
             else:
                 raise array_errors.VirtSnapshotFunctionNotSupportedMessage(volume_id)
@@ -1402,8 +1410,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         filter_value = 'snapshot_name={}'.format(snapshot_name)
         return self._lsvolumesnapshot(filtervalue=filter_value)
 
-    def _add_snapshot(self, snapshot_name, source_cli_volume, pool):
-        svc_response = self._addsnapshot(name=snapshot_name, source_volume_id=source_cli_volume.id, pool=pool)
+    def _add_snapshot(self, snapshot_name, source_id, pool):
+        svc_response = self._addsnapshot(name=snapshot_name, source_volume_id=source_id, pool=pool)
         snapshot_id = self._get_id_from_response(svc_response)
         cli_snapshot = self._get_cli_snapshot_by_id(snapshot_id)
         if cli_snapshot is None:
