@@ -45,9 +45,9 @@ class CsiNodeWatcher(WatcherHelper):
                 continue
             host_name = self._get_csi_node_name_with_prefix(csi_node_event)
             try:
-                host_object = self.get_host_object_from_secret_id(secret_id)
-                host_object.host_name = host_name
-                self.verify_on_storage(host_object)
+                host_request = self.get_host_request_from_secret_id(secret_id)
+                host_request.name = host_name
+                self.verify_on_storage(host_request)
             except Exception as ex:
                 logger.error(
                     'Failed to verify that host {} is on a storage, got: {}'.format(
@@ -103,36 +103,36 @@ class CsiNodeWatcher(WatcherHelper):
         for secret_id in SECRET_IDS:
             host_name = self._get_csi_node_name_with_prefix(csi_node_event)
             try:
-                host_object = self.get_host_object_from_secret_id(secret_id)
-                host_object.host_name = host_name
-                self._verify_not_on_storage(host_object)
+                host_request = self.get_host_request_from_secret_id(secret_id)
+                host_request.name = host_name
+                self._verify_not_on_storage(host_request)
             except Exception as ex:
                 logger.error(
                     'Failed to verify that host {} is not on a storage, got: {}'.format(
                         host_name, ex))
 
-    def _verify_not_on_storage(self, host_object):
+    def _verify_not_on_storage(self, host_request):
         logger.info('Verifying that host {} is not on storage {}'.format(
-            host_object.host_name, host_object.management_address))
-        host_definition_name = self.get_host_definition_name_from_host_object(
-            host_object)
+            host_request.name, host_request.system_info[settings.MANAGEMENT_ADDRESS_KEY]))
+        host_definition_name = self.get_host_definition_name_from_host_request(
+            host_request)
         try:
             self.storage_host_manager.verify_host_removed_from_storage(
-                host_object)
+                host_request)
             self.delete_host_definition_object(host_definition_name)
         except StorageException as ex:
-            self._set_host_definition_status_to_pending_deletion(host_object)
-            self.create_event_to_host_definition_from_host_object(
-                host_object, ex)
+            self._set_host_definition_status_to_pending_deletion(host_request)
+            self.create_event_to_host_definition_from_host_request(
+                host_request, ex)
         except Exception as ex:
             logger.error(
                 'Failed to delete hostdefinition {}, got error: {}'.format(
                     host_definition_name, ex))
 
     def _set_host_definition_status_to_pending_deletion(
-            self, host_object, host_definition_name):
-        host_definition_manifest = self.get_host_definition_manifest_from_host_object(
-            host_object, host_definition_name)
+            self, host_request, host_definition_name):
+        host_definition_manifest = self.get_host_definition_manifest_from_host_request(
+            host_request, host_definition_name)
         try:
             self.patch_host_definition(host_definition_manifest)
             self.set_host_definition_status(
