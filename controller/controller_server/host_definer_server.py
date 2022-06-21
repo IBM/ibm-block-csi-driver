@@ -10,12 +10,12 @@ logger = get_stdout_logger()
 
 class HostDefinerServicer:
     def VerifyHostDefinitionOnStorage(self, request):  # pylint: disable=invalid-name
-        host_name = request.name
-        logger.debug("host name : {}".format(host_name))
-
         node_id_info = NodeIdInfo(request.node_id)
         initiators = node_id_info.initiators
         connectivity_type = request.connectivity_type
+
+        host_name = "{}{}".format(request.prefix, node_id_info.node_name)
+        logger.debug("host name : {}".format(host_name))
 
         try:
             array_connection_info = get_array_connection_info_from_secrets(request.system_info)

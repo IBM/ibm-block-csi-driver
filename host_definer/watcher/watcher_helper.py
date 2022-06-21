@@ -1,12 +1,12 @@
 import base64
 import datetime
+import os
 from kubernetes import client, config, dynamic
 from kubernetes.client import api_client
 from kubernetes.client.rest import ApiException
 
 from host_definer.common import settings, utils
 from host_definer.common.types import VerifyHostRequest
-from host_definer.storage_manager.exceptions import StorageException
 from host_definer.storage_manager.host import StorageHostManager
 import host_definer.watcher.exceptions as exceptions
 
@@ -45,9 +45,9 @@ class WatcherHelper:
 
     def verify_csi_nodes_on_storage(self, host_request):
         for csi_node in CSI_NODES:
-            host_request.name = csi_node
-            host_definition_name = self.get_host_definition_name_from_host_request(
-                host_request)
+            node_name = csi_node
+            host_definition_name = self.get_host_definition_name(
+                host_request, node_name)
             if self._is_host_already_on_storage(host_definition_name):
                 logger.info(
                     'Host {} is already on storage, detected hostdefinition {} in Ready phase'.format(
@@ -92,8 +92,9 @@ class WatcherHelper:
             self.verify_csi_host_definition_from_host_request(host_request, settings.READY_PHASE)
 
     def verify_csi_host_definition_from_host_request(self, host_request, phase):
-        host_definition_name = self.get_host_definition_name_from_host_request(
-            host_request)
+        node_name = self.get_node_name_from_node_id(host_request.node_id)
+        host_definition_name = self.get_host_definition_name(
+            host_request, node_name)
         try:
             self._verify_host_definition(host_definition_name, host_request, phase)
         except Exception as ex:
@@ -101,13 +102,18 @@ class WatcherHelper:
                 'Failed to verify hostdefinition {} in {} phase, got error: {}'.format(
                     host_definition_name, phase, ex))
 
-    def get_host_definition_name_from_host_request(self, host_request):
+    def get_host_definition_name(self, host_request, node_name):
+        host_name_on_storage = self._get_host_name_on_storage(node_name)
         return '{0}.{1}'.format(
-            host_request.system_info[settings.MANAGEMENT_ADDRESS_KEY], host_request.name).replace('_', '.')
+            host_request.system_info[settings.MANAGEMENT_ADDRESS_KEY], host_name_on_storage).replace('_', '.')
+
+    def _get_host_name_on_storage(self, node_name):
+        prefix = self._get_prefix()
+        return prefix + node_name
 
     def get_host_definition_manifest_from_host_request(
             self, host_request, host_definition_name):
-
+        node_name = self.get_node_name_from_node_id(host_request.node_id)
         return {
             'apiVersion': settings.CSI_IBM_BLOCK_API_VERSION,
             'kind': settings.HOSTDEFINITION_KIND,
@@ -117,7 +123,7 @@ class WatcherHelper:
             'spec': {
                 'hostDefinition': {
                     'managementAddress': host_request.system_info[settings.MANAGEMENT_ADDRESS_KEY],
-                    'hostNameInStorage': host_request.name,
+                    'nodeName': node_name,
                     'secretName': host_request.secret_name,
                     'secretNamespace': host_request.secret_namespace,
                 },
@@ -174,7 +180,7 @@ class WatcherHelper:
 
     def get_host_request_from_secret_name_and_namespace(
             self, secret_name, secret_namespace):
-        host_request = VerifyHostRequest()
+        host_request = self._get_new_host_request()
         try:
             host_request.system_info = self._get_system_info_from_secret(
                 secret_name, secret_namespace)
@@ -184,6 +190,14 @@ class WatcherHelper:
         host_request.secret_name = secret_name
         host_request.secret_namespace = secret_namespace
         return host_request
+
+    def _get_new_host_request(self):
+        host_request = VerifyHostRequest()
+        host_request.prefix = self._get_prefix()
+        return host_request
+
+    def _get_prefix(self):
+        return os.getenv('PREFIX')
 
     def _get_system_info_from_secret(self, secret_name, secret_namespace):
         try:
@@ -257,8 +271,9 @@ class WatcherHelper:
 
     def create_event_to_host_definition_from_host_request(
             self, host_request, message):
-        host_definition_name = self.get_host_definition_name_from_host_request(
-            host_request)
+        node_name = self.get_node_name_from_node_id(host_request.node_id)
+        host_definition_name = self.get_host_definition_name(
+            host_request, node_name)
         try:
             host_definition_object = self._get_host_definition_object(
                 host_definition_name)
@@ -296,3 +311,15 @@ class WatcherHelper:
             logger.error(
                 'Failed to create event for host definition {}, go this error: {}'.format(
                     event.involved_object.name, ex.body))
+
+    def get_node_name_from_node_id(self, node_id):
+        return node_id.split(';')[0]
+
+    def get_node_id_from_csi_node(self, csi_node_event):
+        for driver in csi_node_event.spec.drivers:
+            if driver.name == settings.IBM_BLOCK_CSI_DRIVER_NAME:
+                return driver.nodeID
+        return None
+
+    def get_connectivity(self):
+        return os.getenv('CONNECTIVITY')
