@@ -703,5 +703,3 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def delete_host(self, host_name):
         raise NotImplementedError
-
-
