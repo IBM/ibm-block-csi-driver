@@ -1,7 +1,7 @@
 from csi_general import csi_pb2
 
-from controller.common.settings import ALL_ARRAY_TYPES
 from controller.common.config import config
+from controller.common.settings import ALL_ARRAY_TYPES
 
 SUPPORTED_FS_TYPES = ["ext4", "xfs"]
 
@@ -36,7 +36,7 @@ PARAMETERS_BY_SYSTEM = "by_management_id"
 PARAMETERS_SPACE_EFFICIENCY = "SpaceEfficiency"
 PARAMETERS_IO_GROUP = "io_group"
 PARAMETERS_VOLUME_GROUP = "volume_group"
-PARAMETERS_VOLUME_FLASHCOPY_2 = "flashcopy_2"
+PARAMETERS_VIRT_SNAP_FUNC = "virt_snap_func"
 PARAMETERS_VOLUME_NAME_PREFIX = "volume_name_prefix"
 PARAMETERS_SNAPSHOT_NAME_PREFIX = "snapshot_name_prefix"
 PARAMETERS_SYSTEM_ID = "system_id"
@@ -45,7 +45,6 @@ PARAMETERS_CAPACITY_DELIMITER = "="
 PARAMETERS_CAPABILITIES_DELIMITER = "="
 PARAMETERS_OBJECT_ID_INFO_DELIMITER = config.parameters.object_id_info.delimiter
 PARAMETERS_OBJECT_IDS_DELIMITER = config.parameters.object_id_info.ids_delimiter
-PARAMETERS_NODE_ID_DELIMITER = config.parameters.node_id_info.delimiter
 PARAMETERS_FC_WWN_DELIMITER = config.parameters.node_id_info.fcs_delimiter
 PARAMETERS_TOPOLOGY_DELIMITER = "/"
 PARAMETERS_ARRAY_ADDRESSES_DELIMITER = ","

@@ -77,14 +77,6 @@ class VolumeDeletionError(BaseArrayActionException):
         self.message = messages.VOLUME_DELETION_ERROR_MESSAGE.format(volume_id)
 
 
-class IllegalObjectName(InvalidArgumentError):
-    pass
-
-
-class IllegalObjectID(InvalidArgumentError):
-    pass
-
-
 class PoolDoesNotMatchSpaceEfficiency(InvalidArgumentError):
 
     def __init__(self, pool, space_efficiency, error):
@@ -248,7 +240,7 @@ class NotEnoughSpaceInPool(BaseArrayActionException):
         self.message = messages.NOT_ENOUGH_SPACE_IN_POOL_ERROR_MESSAGE.format(id_or_name)
 
 
-class Flashcopy2NotSupportedMessage(BaseArrayActionException):
+class VirtSnapshotFunctionNotSupportedMessage(BaseArrayActionException):
     def __init__(self, id_or_name):
         super().__init__()
-        self.message = messages.FLASHCOPY_2_NOT_SUPPORTED_MESSAGE.format(id_or_name)
+        self.message = messages.VIRT_SNAPSHOT_FUNCTION_NOT_SUPPORTED_MESSAGE.format(id_or_name)
