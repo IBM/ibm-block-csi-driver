@@ -83,13 +83,13 @@ class WatcherHelper:
         return None
 
     def verify_on_storage(self, host_request):
-        try:
-            self.storage_host_manager.verify_host_on_storage(host_request)
-            self.verify_csi_host_definition_from_host_request(host_request, settings.READY_PHASE)
-        except StorageException as ex:
+        response = self.storage_host_manager.verify_host_defined(host_request)
+        if response.error_message:
             self.verify_csi_host_definition_from_host_request(host_request, settings.PENDING_CREATION_PHASE)
             self.create_event_to_host_definition_from_host_request(
-                host_request, ex)
+                host_request, response.error_message)
+        else:
+            self.verify_csi_host_definition_from_host_request(host_request, settings.READY_PHASE)
 
     def verify_csi_host_definition_from_host_request(self, host_request, phase):
         host_definition_name = self.get_host_definition_name_from_host_request(
@@ -108,7 +108,7 @@ class WatcherHelper:
     def get_host_definition_manifest_from_host_request(
             self, host_request, host_definition_name):
 
-        manifest = {
+        return {
             'apiVersion': settings.CSI_IBM_BLOCK_API_VERSION,
             'kind': settings.HOSTDEFINITION_KIND,
             'metadata': {
@@ -123,7 +123,6 @@ class WatcherHelper:
                 },
             },
         }
-        return manifest
 
     def _verify_host_definition(self, host_definition_name, host_request, phase):
         host_definition_manifest = self.get_host_definition_manifest_from_host_request(
@@ -137,8 +136,7 @@ class WatcherHelper:
             logger.info('Creating host Definition object: {}'.format(
                 host_definition_name))
             self._create_host_definition(host_definition_manifest)
-        self.set_host_definition_status(
-            host_definition_name, phase)
+        self.set_host_definition_status(host_definition_name, phase)
 
     def patch_host_definition(self, host_definition_manifest):
         host_definition_name = host_definition_manifest['metadata']['name']
@@ -167,18 +165,22 @@ class WatcherHelper:
                 host_definition_manifest['metadata']['name'], ex.body)
 
     def get_host_request_from_secret_id(self, secret):
-        secret_name, secret_namespace = self._get_secret_id_properties(secret)
+        secret_name, secret_namespace = self._get_secret_name_and_namespace_from_id(secret)
         return self.get_host_request_from_secret_name_and_namespace(
             secret_name, secret_namespace)
 
-    def _get_secret_id_properties(self, secret_id):
+    def _get_secret_name_and_namespace_from_id(self, secret_id):
         return secret_id.split(',')
 
     def get_host_request_from_secret_name_and_namespace(
             self, secret_name, secret_namespace):
         host_request = VerifyHostRequest()
-        host_request.system_info = self._get_system_info_from_secret(
-            secret_name, secret_namespace)
+        try:
+            host_request.system_info = self._get_system_info_from_secret(
+                secret_name, secret_namespace)
+        except Exception as ex:
+            logger.error(ex)
+            return None
         host_request.secret_name = secret_name
         host_request.secret_namespace = secret_namespace
         return host_request
@@ -212,8 +214,16 @@ class WatcherHelper:
         decoded_string_in_bytes = base64.b64decode(base64_bytes)
         return decoded_string_in_bytes.decode('ascii')
 
-    def delete_host_definition_object(self, object_name):
-        self.csi_hostdefinitions_api.delete(name=object_name, body={})
+    def delete_host_definition(self, host_definition_name):
+        try:
+            self.csi_hostdefinitions_api.delete(name=host_definition_name, body={})
+        except ApiException as ex:
+            if ex.status == 404:
+                logger.error('Failed to delete hostDefinition {} because it does not exist'.format(
+                    host_definition_name))
+            else:
+                logger.error('Failed to delete hostDefinition {}, got: {}'.format(
+                    host_definition_name. ex.body))
 
     def _generate_secret_id_From_secret_and_namespace(
             self, secret_name, secret_namespace):

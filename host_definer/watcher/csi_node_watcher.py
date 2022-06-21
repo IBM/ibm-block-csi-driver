@@ -44,14 +44,7 @@ class CsiNodeWatcher(WatcherHelper):
             if SECRET_IDS[secret_id] == 0:
                 continue
             host_name = self._get_csi_node_name_with_prefix(csi_node_event)
-            try:
-                host_request = self.get_host_request_from_secret_id(secret_id)
-                host_request.name = host_name
-                self.verify_on_storage(host_request)
-            except Exception as ex:
-                logger.error(
-                    'Failed to verify that host {} is on a storage, got: {}'.format(
-                        host_name, ex))
+            self._verify_host_request(secret_id, host_name, self.verify_on_storage)
 
     def _handle_removal_csi_ibm_block_from_node(self, csi_node_event):
         remove_host_thread = Thread(
@@ -102,32 +95,27 @@ class CsiNodeWatcher(WatcherHelper):
                 csi_node_event[settings.OBJECT_KEY].metadata.name))
         for secret_id in SECRET_IDS:
             host_name = self._get_csi_node_name_with_prefix(csi_node_event)
-            try:
-                host_request = self.get_host_request_from_secret_id(secret_id)
-                host_request.name = host_name
-                self._verify_not_on_storage(host_request)
-            except Exception as ex:
-                logger.error(
-                    'Failed to verify that host {} is not on a storage, got: {}'.format(
-                        host_name, ex))
+            self._verify_host_request(secret_id, host_name, self._verify_not_on_storage)
+
+    def _verify_host_request(self, secret_id, host_name, verify_function):
+        host_request = self.get_host_request_from_secret_id(secret_id)
+        if host_request:
+            host_request.name = host_name
+            verify_function(host_request)
 
     def _verify_not_on_storage(self, host_request):
         logger.info('Verifying that host {} is not on storage {}'.format(
             host_request.name, host_request.system_info[settings.MANAGEMENT_ADDRESS_KEY]))
         host_definition_name = self.get_host_definition_name_from_host_request(
             host_request)
-        try:
-            self.storage_host_manager.verify_host_removed_from_storage(
-                host_request)
-            self.delete_host_definition_object(host_definition_name)
-        except StorageException as ex:
-            self._set_host_definition_status_to_pending_deletion(host_request)
+        response = self.storage_host_manager.verify_host_undefined(
+            host_request)
+        if response.error_message:
+            self._set_host_definition_status_to_pending_deletion(host_request, host_definition_name)
             self.create_event_to_host_definition_from_host_request(
-                host_request, ex)
-        except Exception as ex:
-            logger.error(
-                'Failed to delete hostdefinition {}, got error: {}'.format(
-                    host_definition_name, ex))
+                host_request, response.error_message)
+        else:
+            self.delete_host_definition(host_definition_name)
 
     def _set_host_definition_status_to_pending_deletion(
             self, host_request, host_definition_name):

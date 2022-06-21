@@ -19,7 +19,7 @@ class StorageClassWatcher(WatcherHelper):
             if event[settings.TYPE_KEY] == settings.ADDED_EVENT:
                 logger.info('New storageClass {}'.format(storage_class_name))
                 self._handle_added_event_on_storage_class(
-                    storage_class_name, secrets)
+                    secrets)
             elif event[settings.TYPE_KEY] == settings.DELETED_EVENT:
                 self._handle_deleted_event_on_storage_class(secrets)
 
@@ -59,14 +59,9 @@ class StorageClassWatcher(WatcherHelper):
                 prefix + secret_name_substring.replace('name', 'namespace')])
 
     def _handle_added_event_on_storage_class(
-            self, storage_class_name, secrets):
+            self, secrets):
         for secret in secrets:
-            try:
-                self._verify_csi_nodes_on_storage_when_new_secret(secret)
-            except Exception as ex:
-                logger.error(
-                    'Failed to get secret data for storageclass {}, got: {}'.format(
-                        storage_class_name, ex))
+            self._verify_csi_nodes_on_storage_when_new_secret(secret)
             if secret:
                 self._add_secret_if_uniq_or_add_secret_counter(secret)
 
@@ -78,7 +73,8 @@ class StorageClassWatcher(WatcherHelper):
 
     def _verify_csi_node_on_storage_from_secret(self, secret):
         host_request = self.get_host_request_from_secret_id(secret)
-        self.verify_csi_nodes_on_storage(host_request)
+        if host_request:
+            self.verify_csi_nodes_on_storage(host_request)
 
     def _add_secret_if_uniq_or_add_secret_counter(self, secret):
         if secret in SECRET_IDS:

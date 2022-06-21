@@ -12,6 +12,4 @@ class VerifyHostRequest:
 
 @dataclass
 class VerifyHostResponse:
-    connectivity_type: str = field(default_factory=str)
     error_message: str = field(default_factory=str)
-    connectivity_ports: list = field(default_factory=list)
