@@ -90,6 +90,11 @@ def _get_space_efficiency_kwargs(space_efficiency):
     return {}
 
 
+def _is_parameter_space_efficiency_match_array_space_efficiency(parameter_space_efficiency, array_space_efficiency):
+    return (not parameter_space_efficiency and array_space_efficiency == config.SPACE_EFFICIENCY_THICK) or \
+           (parameter_space_efficiency and parameter_space_efficiency == array_space_efficiency)
+
+
 def build_kwargs_from_parameters(space_efficiency, pool_name, io_group,
                                  volume_group, volume_name, volume_size):
     cli_kwargs = {}
@@ -1503,10 +1508,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def validate_space_efficiency_match_source(self, target_volume_space_efficiency, source_id, source_type):
         if source_type == controller_config.SNAPSHOT_TYPE_NAME:
             cli_snapshot = self._get_cli_snapshot_by_id(source_id)
-            cli_source_volume = self._get_cli_volume(cli_snapshot.volume_id)
+            source_cli_volume = self._get_cli_volume(cli_snapshot.volume_id)
         else:
-            cli_source_volume = self._get_cli_volume_by_wwn(source_id)
-        source_volume_space_efficiency = _get_cli_volume_space_efficiency(cli_source_volume)
-        if target_volume_space_efficiency != source_volume_space_efficiency:
+            source_volume_name = self._get_volume_name_by_wwn(source_id)
+            source_cli_volume = self._get_cli_volume(source_volume_name)
+        source_volume_space_efficiency = _get_cli_volume_space_efficiency(source_cli_volume)
+        if not _is_parameter_space_efficiency_match_array_space_efficiency(target_volume_space_efficiency,
+                                                                       source_volume_space_efficiency):
             raise array_errors.TargetSpaceEfficiencyMismatch(target_volume_space_efficiency,
                                                              source_volume_space_efficiency)
