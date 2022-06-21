@@ -1514,6 +1514,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             source_cli_volume = self._get_cli_volume(source_volume_name)
         source_volume_space_efficiency = _get_cli_volume_space_efficiency(source_cli_volume)
         if not _is_parameter_space_efficiency_match_array_space_efficiency(target_volume_space_efficiency,
-                                                                       source_volume_space_efficiency):
+                                                                           source_volume_space_efficiency):
             raise array_errors.TargetSpaceEfficiencyMismatch(target_volume_space_efficiency,
                                                              source_volume_space_efficiency)
