@@ -83,7 +83,9 @@ The following IBM block storage CSI driver features are not supported on volumes
 **Note:** I/O group configuration is only supported for use with IBM Spectrum Virtualize family storage systems.
 
 ## Automatic host definition limitations
-- Automatic host definition is only supported for use with IBM Spectrum Virtualize family storage systems.
-- Automatic host definition does not work with I/O groups.
-- Automatic host definition does not work with CSI Topology. For more information, see [Configuring for CSI Topology](./configuring/configuring_topology.md).
 
+Automatic host definition is only supported for use with IBM Spectrum Virtualize family storage systems.
+
+In addition, the following are not supported when using automatic host definitions with the IBM block storage CSI driver:
+- I/O groups
+- CSI Topology (see [Configuring for CSI Topology](./configuring/configuring_topology.md))
