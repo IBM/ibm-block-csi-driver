@@ -378,7 +378,7 @@ class ArrayMediator(ABC):
             None
 
         Raises:
-            TargetSpaceEfficiencyMismatch
+            SpaceEfficiencyMismatch
         """
         raise NotImplementedError
 
