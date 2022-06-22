@@ -266,7 +266,8 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             )
             raise array_errors.VolumeCreationError(name)
 
-    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, flashcopy_2):
+    def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
+                      source_type, is_virt_snap_func):
         array_space_efficiency = get_array_space_efficiency(space_efficiency)
         api_volume = self._create_api_volume(name, size_in_bytes, array_space_efficiency, pool)
         self.volume_cache.add(api_volume.name, api_volume.id)
@@ -363,7 +364,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             api_volume = self._get_api_volume_by_name(volume_name=name, pool_id=pool_id)
         return api_volume
 
-    def get_volume(self, name, pool, flashcopy_2):
+    def get_volume(self, name, pool, is_virt_snap_func):
         logger.debug("getting volume {} in pool {}".format(name, pool))
         api_volume = self._get_api_volume_with_cache(name, pool)
         if api_volume:
@@ -479,7 +480,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 raise array_errors.ObjectNotFoundError(volume_id)
         except (exceptions.ClientError, exceptions.InternalServerError) as ex:
             if INCORRECT_ID in str(ex.message).upper():
-                raise array_errors.IllegalObjectID(volume_id)
+                raise array_errors.InvalidArgumentError(volume_id)
         return None
 
     def _get_flashcopy_process(self, flashcopy_id, not_exist_err=True):
@@ -508,7 +509,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return api_snapshot
 
     @convert_scsi_ids_to_array_ids()
-    def get_snapshot(self, volume_id, snapshot_name, pool, flashcopy_2):
+    def get_snapshot(self, volume_id, snapshot_name, pool, is_virt_snap_func):
         if not pool:
             source_api_volume = self._get_api_volume_by_id(volume_id)
             pool = source_api_volume.pool
@@ -583,7 +584,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return self._generate_volume_response(api_object)
 
     @convert_scsi_ids_to_array_ids()
-    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, flashcopy_2):
+    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         source_api_volume = self._get_api_volume_by_id(volume_id)
         if source_api_volume is None:

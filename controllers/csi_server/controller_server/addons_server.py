@@ -20,11 +20,11 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         utils.validate_addons_request(request)
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
-        volume_id = volume_id_info.object_id
-        volume_internal_id = volume_id_info.internal_id
+        volume_id = volume_id_info.ids.uid
+        volume_internal_id = volume_id_info.ids.internal_id
 
         other_volume_id_info = utils.get_volume_id_info(request.replication_id)
-        other_volume_internal_id = other_volume_id_info.internal_id
+        other_volume_internal_id = other_volume_id_info.ids.internal_id
 
         other_system_id = request.parameters.get(config.PARAMETERS_SYSTEM_ID)
         copy_type = request.parameters.get(config.PARAMETERS_COPY_TYPE, REPLICATION_DEFAULT_COPY_TYPE)
@@ -57,10 +57,10 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         utils.validate_addons_request(request)
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
-        volume_internal_id = volume_id_info.internal_id
+        volume_internal_id = volume_id_info.ids.internal_id
 
         other_volume_id_info = utils.get_volume_id_info(request.replication_id)
-        other_volume_internal_id = other_volume_id_info.internal_id
+        other_volume_internal_id = other_volume_id_info.ids.internal_id
 
         other_system_id = request.parameters.get(config.PARAMETERS_SYSTEM_ID)
 
@@ -97,10 +97,10 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         utils.validate_addons_request(request)
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
-        volume_internal_id = volume_id_info.internal_id
+        volume_internal_id = volume_id_info.ids.internal_id
 
         other_volume_id_info = utils.get_volume_id_info(request.replication_id)
-        other_volume_internal_id = other_volume_id_info.internal_id
+        other_volume_internal_id = other_volume_id_info.ids.internal_id
 
         other_system_id = request.parameters.get(config.PARAMETERS_SYSTEM_ID)
 
@@ -133,10 +133,10 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         utils.validate_addons_request(request)
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
-        volume_internal_id = volume_id_info.internal_id
+        volume_internal_id = volume_id_info.ids.internal_id
 
         other_volume_id_info = utils.get_volume_id_info(request.replication_id)
-        other_volume_internal_id = other_volume_id_info.internal_id
+        other_volume_internal_id = other_volume_id_info.ids.internal_id
 
         other_system_id = request.parameters.get(config.PARAMETERS_SYSTEM_ID)
 

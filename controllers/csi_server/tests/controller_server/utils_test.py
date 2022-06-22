@@ -5,6 +5,7 @@ from csi_general import csi_pb2
 from mock import patch, Mock
 from munch import Munch
 
+import controllers.csi_server.common.utils
 import controllers.csi_server.controller_server.utils as utils
 from controllers.csi_server.array_action import config as array_config
 from controllers.csi_server.array_action.config import (NVME_OVER_FC_CONNECTIVITY_TYPE,
@@ -18,6 +19,8 @@ from controllers.csi_server.tests.controller_server.test_settings import POOL, U
 from controllers.csi_server.tests import utils as test_utils
 from controllers.csi_server.tests.controller_server.csi_controller_server_test import ProtoBufMock
 from controllers.csi_server.tests.utils import get_fake_secret_config
+
+
 
 
 class TestUtils(unittest.TestCase):
@@ -378,8 +381,8 @@ class TestUtils(unittest.TestCase):
         volume_id_info = utils.get_volume_id_info(volume_id)
         self.assertEqual("xiv", volume_id_info.array_type)
         self.assertEqual(system_id, volume_id_info.system_id)
-        self.assertEqual(internal_id, volume_id_info.internal_id)
-        self.assertEqual(object_id, volume_id_info.object_id)
+        self.assertEqual(internal_id, volume_id_info.ids.internal_id)
+        self.assertEqual(object_id, volume_id_info.ids.uid)
 
     def test_get_volume_id_info(self):
         self._test_get_volume_id_info(object_id="volume-id")
@@ -415,7 +418,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(iscsi_iqn, node_id_info.initiators.iscsi_iqns)
 
     def test_get_node_id_info(self):
-        self._test_validation_exception(utils.get_node_id_info, "bad-node-format", str_in_msg="node",
+        self._test_validation_exception(controllers.csi_server.common.utils.get_node_id_info, "bad-node-format", str_in_msg="node",
                                         raised_error=ValueError)
         host_name = "host-name"
         nvme_nqn = "nqn.ibm"
