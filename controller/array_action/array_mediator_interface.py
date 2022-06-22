@@ -370,7 +370,7 @@ class ArrayMediator(ABC):
         This function will check if the space efficiency passed to CreateVolume is match the volume source.
 
         Args:
-            space_efficiency : as passed from the storage class
+            space_efficiency : as passed from the CSI request
             source_id        : id of source to create from
             source_type      : volume or snapshot
 
