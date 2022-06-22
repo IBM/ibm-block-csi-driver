@@ -354,7 +354,7 @@ class ArrayMediator(ABC):
         This function will check if the space efficiency passed to the create volume is valid
 
         Args:
-           space_efficiency : as passed from the storage class
+           space_efficiency : as passed from the CSI request
 
         Returns:
             None
