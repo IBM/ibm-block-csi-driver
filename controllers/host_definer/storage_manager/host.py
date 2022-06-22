@@ -1,5 +1,5 @@
-from host_definer.common import utils, settings
-from host_definer.common.types import VerifyHostResponse
+from controllers.host_definer.common import utils, settings
+from controllers.host_definer.common.types import VerifyHostResponse
 
 logger = utils.get_stdout_logger()
 

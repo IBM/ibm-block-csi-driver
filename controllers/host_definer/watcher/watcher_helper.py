@@ -5,10 +5,10 @@ from kubernetes import client, config, dynamic
 from kubernetes.client import api_client
 from kubernetes.client.rest import ApiException
 
-from host_definer.common import settings, utils
-from host_definer.common.types import VerifyHostRequest
-from host_definer.storage_manager.host import StorageHostManager
-import host_definer.watcher.exceptions as exceptions
+from controllers.host_definer.common import settings, utils
+from controllers.host_definer.common.types import VerifyHostRequest
+from controllers.host_definer.storage_manager.host import StorageHostManager
+import controllers.host_definer.watcher.exceptions as exceptions
 
 SECRET_IDS = {}
 NODES = {}
