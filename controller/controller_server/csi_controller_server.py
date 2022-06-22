@@ -7,7 +7,6 @@ import controller.controller_server.config as config
 import controller.controller_server.utils as utils
 from controller.array_action import messages
 from controller.array_action.storage_agent import get_agent, detect_array_type
-from controller.common import settings
 from controller.array_action.array_action_types import ObjectIds
 from controller.common.csi_logger import get_stdout_logger
 from controller.common.node_info import NodeIdInfo
@@ -480,16 +479,11 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 )
         if not prefix:
             prefix = array_mediator.default_object_prefix
-        full_name = self._join_object_prefix_with_name(prefix, name)
+        full_name = utils.join_object_prefix_with_name(prefix, name)
         if len(full_name) > array_mediator.max_object_name_length:
             hashed_name = utils.hash_string(name)
-            full_name = self._join_object_prefix_with_name(prefix, hashed_name)
+            full_name = utils.join_object_prefix_with_name(prefix, hashed_name)
         return full_name[:array_mediator.max_object_name_length]
-
-    def _join_object_prefix_with_name(self, prefix, name):
-        if prefix:
-            return settings.NAME_PREFIX_SEPARATOR.join((prefix, name))
-        return name
 
     def GetPluginCapabilities(self, _, __):  # pylint: disable=invalid-name
         logger.info("GetPluginCapabilities")
