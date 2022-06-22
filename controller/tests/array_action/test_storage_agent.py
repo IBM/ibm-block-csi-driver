@@ -230,21 +230,20 @@ class TestStorageAgent(unittest.TestCase):
                 with keep_alive_lock:
                     pass
 
-        keep_alive_lock.acquire()
+        with keep_alive_lock:
 
-        # max_size for ds8k is 10
-        for _ in range(10):
-            thread = Thread(target=blocking_action)
-            thread.start()
+            # max_size for ds8k is 10
+            for _ in range(10):
+                thread = Thread(target=blocking_action)
+                thread.start()
 
-        # all the clients are in use, the next section waits for an available one.
-        if is_timeout:
-            with self.assertRaises(array_errors.NoConnectionAvailableException):
-                with get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test",
-                                                   password="test")).get_mediator(timeout=timeout):
-                    pass
+            # all the clients are in use, the next section waits for an available one.
+            if is_timeout:
+                with self.assertRaises(array_errors.NoConnectionAvailableException):
+                    with get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test",
+                                                       password="test")).get_mediator(timeout=timeout):
+                        pass
 
-        keep_alive_lock.release()
         if not is_timeout:
             with get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test",
                                                password="test")).get_mediator():
