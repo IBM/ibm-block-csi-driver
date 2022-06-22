@@ -200,7 +200,7 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.request.parameters = {config.PARAMETERS_SPACE_EFFICIENCY: SPACE_EFFICIENCY}
         self._test_create_snapshot_succeeds(storage_agent, expected_space_efficiency=SPACE_EFFICIENCY)
 
-    def test_create_snapshot_with_space_efficiency_and_virt_snap_func_enabled_failed(self):
+    def test_create_snapshot_with_space_efficiency_and_virt_snap_func_enabled_fail(self):
         self.request.parameters = {config.PARAMETERS_SPACE_EFFICIENCY: SPACE_EFFICIENCY,
                                    config.PARAMETERS_VIRT_SNAP_FUNC: VIRT_SNAP_FUNC_TRUE}
 
@@ -433,7 +433,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.side_effect = array_errors.ObjectNotFoundError("vol")
-        self.mediator.validate_space_efficiency_match_source = Mock()
+        self.mediator.validate_space_efficiency_matches_source = Mock()
 
         self.request.parameters = {config.PARAMETERS_POOL: POOL,
                                    config.PARAMETERS_IO_GROUP: IO_GROUP,

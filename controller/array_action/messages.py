@@ -14,7 +14,7 @@ POOL_DOES_NOT_MATCH_SPACE_EFFICIENCY_MESSAGE = "Pool : {0} does not match the fo
 
 SPACE_EFFICIENCY_NOT_SUPPORTED_MESSAGE = "space efficiency is not supported : {0} "
 
-TARGET_SPACE_EFFICIENCY_MISMATCH_MESSAGE = "space efficiency : {0}" \
+SPACE_EFFICIENCY_MISMATCH_MESSAGE = "space efficiency : {0}" \
                                            " does not match the source volume space efficiency : {1}"
 
 VIRT_SNAPSHOT_FUNCTION_NOT_SUPPORTED_MESSAGE = "Snapshot function is enabled but not supported with object : {0} "

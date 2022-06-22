@@ -76,7 +76,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                         required_bytes))
 
                 if volume_parameters.virt_snap_func and source_id:
-                    array_mediator.validate_space_efficiency_match_source(space_efficiency, source_id, source_type)
+                    array_mediator.validate_space_efficiency_matches_source(space_efficiency, source_id, source_type)
 
                 try:
                     volume = array_mediator.get_volume(volume_final_name, pool, volume_parameters.virt_snap_func)
