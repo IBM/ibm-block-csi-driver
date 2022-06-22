@@ -18,10 +18,10 @@ class StorageClassWatcher(WatcherHelper):
                 event[settings.OBJECT_KEY])
             if event[settings.TYPE_KEY] == settings.ADDED_EVENT:
                 logger.info('New storageClass {}'.format(storage_class_name))
-                self._handle_added_event_on_storage_class(
+                self._handle_added_storage_class_event(
                     secrets)
             elif event[settings.TYPE_KEY] == settings.DELETED_EVENT:
-                self._handle_deleted_event_on_storage_class(secrets)
+                self._handle_deleted_storage_class_event(secrets)
 
     def _get_secrets_from_storage_class_when_it_has_csi_ibm_block_as_a_provisioner(
             self, storage_class):
@@ -58,23 +58,23 @@ class StorageClassWatcher(WatcherHelper):
             storage_class.parameters[parameter], storage_class.parameters[
                 prefix + secret_name_substring.replace('name', 'namespace')])
 
-    def _handle_added_event_on_storage_class(
+    def _handle_added_storage_class_event(
             self, secrets):
         for secret in secrets:
-            self._verify_csi_nodes_on_storage_when_new_secret(secret)
+            self._verify_nodes_defined_when_new_secret(secret)
             if secret:
                 self._add_secret_if_uniq_or_add_secret_counter(secret)
 
-    def _verify_csi_nodes_on_storage_when_new_secret(self, secret):
+    def _verify_nodes_defined_when_new_secret(self, secret):
         if secret not in SECRET_IDS:
-            self._verify_csi_node_on_storage_from_secret(secret)
+            self._verify_node_defined_on_storage_from_secret(secret)
         elif SECRET_IDS[secret] == 0:
-            self._verify_csi_node_on_storage_from_secret(secret)
+            self._verify_node_defined_on_storage_from_secret(secret)
 
-    def _verify_csi_node_on_storage_from_secret(self, secret):
+    def _verify_node_defined_on_storage_from_secret(self, secret):
         host_request = self.get_host_request_from_secret_id(secret)
         if host_request:
-            self.verify_csi_nodes_on_storage(host_request)
+            self.verify_nodes_defined(host_request)
 
     def _add_secret_if_uniq_or_add_secret_counter(self, secret):
         if secret in SECRET_IDS:
@@ -82,6 +82,6 @@ class StorageClassWatcher(WatcherHelper):
         else:
             SECRET_IDS[secret] = 1
 
-    def _handle_deleted_event_on_storage_class(self, secrets):
+    def _handle_deleted_storage_class_event(self, secrets):
         for secret in secrets:
             SECRET_IDS[secret] -= 1

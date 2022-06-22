@@ -17,8 +17,8 @@ class SecretWatcher(WatcherHelper):
             stream = watch.Watch().stream(self.core_api.list_secret_for_all_namespaces,
                                           resource_version=resource_version, timeout_seconds=5)
             for event in stream:
-                if event[settings.TYPE_KEY] == settings.ADDED_EVENT and self._is_secret_used_by_storage_class(
-                        event):
+                if event[settings.TYPE_KEY] == settings.ADDED_EVENT and (
+                        self._is_secret_used_by_storage_class(event)):
                     self._verify_host_defined_from_secret_event(event)
                 if event[settings.TYPE_KEY] == settings.MODIFIED_EVENT:
                     if self._is_secret_used_by_storage_class(event):
@@ -45,4 +45,4 @@ class SecretWatcher(WatcherHelper):
         logger.info(
             'Verifying hosts on new storage {}'.format(
                 host_request.system_info[settings.MANAGEMENT_ADDRESS_KEY]))
-        self.verify_csi_nodes_on_storage(host_request)
+        self.verify_nodes_defined(host_request)

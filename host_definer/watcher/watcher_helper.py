@@ -11,7 +11,7 @@ from host_definer.storage_manager.host import StorageHostManager
 import host_definer.watcher.exceptions as exceptions
 
 SECRET_IDS = {}
-CSI_NODES = []
+NODES = {}
 logger = utils.get_stdout_logger()
 
 
@@ -43,19 +43,19 @@ class WatcherHelper:
             api_version=settings.CSI_IBM_BLOCK_API_VERSION,
             kind=settings.HOSTDEFINITION_KIND)
 
-    def verify_csi_nodes_on_storage(self, host_request):
-        for csi_node in CSI_NODES:
-            node_name = csi_node
+    def verify_nodes_defined(self, host_request):
+        for node in NODES:
             host_definition_name = self.get_host_definition_name(
-                host_request, node_name)
-            if self._is_host_already_on_storage(host_definition_name):
+                host_request, node)
+            if self._is_host_already_defined(host_definition_name):
                 logger.info(
                     'Host {} is already on storage, detected hostdefinition {} in Ready phase'.format(
-                        csi_node, host_definition_name))
+                        node, host_definition_name))
             else:
-                self.verify_on_storage(host_request)
+                host_request.node_id = self.get_node_id_from_node_name(node)
+                self.verify_host_defined_and_has_host_definition(host_request)
 
-    def _is_host_already_on_storage(self, host_definition_name):
+    def _is_host_already_defined(self, host_definition_name):
         try:
             return self.is_host_definition_ready(host_definition_name)
         except dynamic.exceptions.NotFoundError:
@@ -82,14 +82,19 @@ class WatcherHelper:
             return host_definition_object.status.phase
         return None
 
-    def verify_on_storage(self, host_request):
-        response = self.storage_host_manager.verify_host_defined(host_request)
+    def verify_host_defined_and_has_host_definition(self, host_request):
+        response = self.verify_host_defined_on_storage_and_on_cluster(host_request)
         if response.error_message:
             self.verify_csi_host_definition_from_host_request(host_request, settings.PENDING_CREATION_PHASE)
             self.create_event_to_host_definition_from_host_request(
                 host_request, response.error_message)
-        else:
-            self.verify_csi_host_definition_from_host_request(host_request, settings.READY_PHASE)
+
+    def verify_host_defined_on_storage_and_on_cluster(self, host_request):
+        response = self.storage_host_manager.verify_host_defined(host_request)
+        if response.error_message:
+            return response
+        self.verify_csi_host_definition_from_host_request(host_request, settings.READY_PHASE)
+        return response
 
     def verify_csi_host_definition_from_host_request(self, host_request, phase):
         node_name = self.get_node_name_from_node_id(host_request.node_id)
@@ -194,6 +199,7 @@ class WatcherHelper:
     def _get_new_host_request(self):
         host_request = VerifyHostRequest()
         host_request.prefix = self._get_prefix()
+        host_request.connectivity_type = self.get_connectivity()
         return host_request
 
     def _get_prefix(self):
@@ -227,6 +233,13 @@ class WatcherHelper:
         base64_bytes = content_with_base64.encode('ascii')
         decoded_string_in_bytes = base64.b64decode(base64_bytes)
         return decoded_string_in_bytes.decode('ascii')
+
+    def verify_host_undefined_on_storage_and_on_cluster(self, host_request, host_definition_name):
+        response = self.storage_host_manager.verify_host_undefined(host_request)
+        if response.error_message:
+            return response
+        self.delete_host_definition(host_definition_name)
+        return response
 
     def delete_host_definition(self, host_definition_name):
         try:
@@ -280,6 +293,12 @@ class WatcherHelper:
         except Exception as ex:
             logger.error(ex)
             return
+        self.add_event_to_host_definition_object(host_definition_object, message)
+
+    def add_event_to_host_definition_object(
+            self, host_definition_object, message):
+        logger.info('Creating event for host definition: {} error event: {}'.format(
+            host_definition_object.metadata.name, message))
         event = self.get_event_for_object(host_definition_object, message)
         self.create_event(settings.DEFAULT_NAMESPACE, event)
 
@@ -315,11 +334,8 @@ class WatcherHelper:
     def get_node_name_from_node_id(self, node_id):
         return node_id.split(';')[0]
 
-    def get_node_id_from_csi_node(self, csi_node_event):
-        for driver in csi_node_event.spec.drivers:
-            if driver.name == settings.IBM_BLOCK_CSI_DRIVER_NAME:
-                return driver.nodeID
-        return None
+    def get_node_id_from_node_name(self, node_name):
+        return NODES[node_name]
 
     def get_connectivity(self):
         return os.getenv('CONNECTIVITY')

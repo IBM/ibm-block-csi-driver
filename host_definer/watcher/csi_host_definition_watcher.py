@@ -58,7 +58,7 @@ class CsiHostDefinitionWatcher(WatcherHelper):
                 csi_host_definition_name)
             if csi_host_definition_name not in host_definition_objects_in_use:
                 return
-            self._verify_host_state_on_storage(host_definition_object)
+            self._verify_host_definition(host_definition_object)
             retries -= 1
             delay_in_seconds *= backoff_in_seconds
             sleep(delay_in_seconds)
@@ -82,40 +82,31 @@ class CsiHostDefinitionWatcher(WatcherHelper):
         except Exception as ex:
             logger.error(ex)
 
-    def _verify_host_state_on_storage(self, host_definition_object):
-        host_definition_phase = self.get_phase_of_host_definition_object(
-            host_definition_object)
+    def _verify_host_definition(self, host_definition_object):
         host_request = self._get_host_request_from_host_definition_object(
             host_definition_object)
-        host_definition_name = host_definition_object.metadata.name
         if not host_request:
             return
+        response = self._verify_pending_host_definition(host_definition_object, host_request)
+        self._add_event_when_response_has_error_message(response, host_definition_object)
+
+    def _verify_pending_host_definition(self, host_definition_object, host_request):
+        host_definition_phase = self.get_phase_of_host_definition_object(
+            host_definition_object)
+        host_definition_name = host_definition_object.metadata.name
         if host_definition_phase == settings.PENDING_CREATION_PHASE:
-            response = self._verify_host_defined(host_request, host_definition_name)
+            response = self.verify_host_defined_on_storage_and_on_cluster(host_request)
         elif host_definition_phase == settings.PENDING_DELETION_PHASE:
-            response = self._verify_host_not_on_storage(host_request, host_definition_name)
+            response = self.verify_host_undefined_on_storage_and_on_cluster(host_request, host_definition_name)
+        return response
+
+    def _add_event_when_response_has_error_message(self, response, host_definition):
+        host_definition_name = host_definition.metadata.name
         if response:
-            return self._add_event_to_host_definition_object(
-                host_definition_object, str(response.error_message))
+            return self.add_event_to_host_definition_object(
+                host_definition, str(response.error_message))
         host_definition_objects_in_use.remove(
             host_definition_name)
-
-    def _verify_host_defined(self, host_request, host_definition_name):
-        response = self.storage_host_manager.verify_host_defined(host_request)
-        if response.error_message:
-            return response
-        try:
-            self.verify_csi_host_definition_from_host_request(host_request, settings.READY_PHASE)
-        except Exception as ex:
-            logger.error(
-                'Failed to verify that hostdefinition {} is ready, got error: {}'.format(
-                    host_definition_name, ex))
-
-    def _verify_host_not_on_storage(self, host_request, host_definition_name):
-        response = self.storage_host_manager.verify_host_undefined(host_request)
-        if response.error_message:
-            return response
-        self.delete_host_definition(host_definition_name)
 
     def _get_host_request_from_host_definition_object(
             self, host_definition_object):
@@ -125,20 +116,8 @@ class CsiHostDefinitionWatcher(WatcherHelper):
             secret_name, secret_namespace)
         if host_request:
             node_name = host_definition_object.spec.hostDefinition.nodeName
-            host_request.node_id = self._get_node_id_from_node_name(node_name)
-            host_request.connectivity_type = self.get_connectivity()
+            host_request.node_id = self.get_node_id_from_node_name(node_name)
         return host_request
-
-    def _get_node_id_from_node_name(self, node_name):
-        csi_node = self.csi_nodes_api.get(name=node_name)
-        return self.get_node_id_from_csi_node(csi_node)
-
-    def _add_event_to_host_definition_object(
-            self, host_definition_object, message):
-        logger.info('Creating event for host definition: {} error event: {}'.format(
-            host_definition_object.metadata.name, message))
-        event = self.get_event_for_object(host_definition_object, message)
-        self.create_event(settings.DEFAULT_NAMESPACE, event)
 
     def _set_host_definition_phase_to_error(self, host_definition_object):
         host_definition_name = host_definition_object.metadata.name
