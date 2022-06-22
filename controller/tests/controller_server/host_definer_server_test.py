@@ -6,11 +6,12 @@ from mock import MagicMock
 from controller.array_action.errors import HostNotFoundError
 from controller.common.node_info import Initiators
 from controller.controller_server.host_definer_server import HostDefinerServicer
+from controller.tests.controller_server.test_settings import VOLUME_NAME
 
-HOST_DEFINER_SERVER_PATH = "controller.controller_server.host_definer_server"
+HOST_DEFINER_SERVER_PATH = 'controller.controller_server.host_definer_server'
 
 
-class TestVerifyHostDefinitionOnStorage(unittest.TestCase):
+class BaseSetUp(unittest.TestCase):
 
     def setUp(self):
         super().setUp()
@@ -32,17 +33,23 @@ class TestVerifyHostDefinitionOnStorage(unittest.TestCase):
 
         self.request = Mock(spec_set=['prefix', 'connectivity_type', 'node_id', 'system_info'])
 
-        self.hostname = "hostname"
-        self.iqn = "iqn.1994-05.com.redhat:686358c930fe"
+        self.hostname = 'hostname'
+        self.iqn = 'iqn.1994-05.com.redhat:686358c930fe'
 
         self.request.prefix = None
         self.request.connectivity_type = 'fc'
-        self.request.node_id = "{};;;{}".format(self.hostname, self.iqn)
-        self.request.system_info = {"username": "user", "password": "pass", "management_address": "mg111"}
+        self.request.node_id = '{};;;{}'.format(self.hostname, self.iqn)
+        self.request.system_info = {'username': 'user', 'password': 'pass', 'management_address': 'mg111'}
+
+
+class TestVerifyHostDefinitionOnStorage(BaseSetUp):
+
+    def setUp(self):
+        super().setUp()
 
     def _prepare_verify_host_definition_on_storage_success(self, is_idempotency=False):
         if is_idempotency:
-            self.mediator.get_host_by_host_identifiers.return_value = ("found_host_name", "")
+            self.mediator.get_host_by_host_identifiers.return_value = (VOLUME_NAME, '')
         else:
             self.mediator.get_host_by_host_identifiers.side_effect = HostNotFoundError('host_identifier')
 
@@ -60,7 +67,37 @@ class TestVerifyHostDefinitionOnStorage(unittest.TestCase):
         self.mediator.create_host.assert_not_called()
 
     def test_verify_host_definition_on_storage_failed(self):
-        error_message = "error"
+        error_message = 'error'
         self.mediator.get_host_by_host_identifiers.side_effect = Exception(error_message)
         response = self.servicer.VerifyHostDefinitionOnStorage(self.request)
+        self.assertEqual(response.error_message, error_message)
+
+
+class TestVerifyHostDefinitionNotOnStorage(BaseSetUp):
+
+    def setUp(self):
+        super().setUp()
+
+    def _prepare_verify_host_definition_not_on_storage_success(self, is_found=True):
+        if is_found:
+            self.mediator.get_host_by_host_identifiers.return_value = (VOLUME_NAME, '')
+        else:
+            self.mediator.get_host_by_host_identifiers.side_effect = HostNotFoundError('error')
+
+        response = self.servicer.VerifyHostDefinitionNotOnStorage(self.request)
+        self.mediator.get_host_by_host_identifiers.assert_called_once_with(Initiators(iscsi_iqns=[self.iqn]))
+        self.assertEqual(response.error_message, '')
+
+    def test_verify_host_definition_not_on_storage_success(self):
+        self._prepare_verify_host_definition_not_on_storage_success()
+        self.mediator.delete_host.assert_called_once_with(VOLUME_NAME)
+
+    def test_verify_host_definition_not_on_storage_idempotency_success(self):
+        self._prepare_verify_host_definition_not_on_storage_success(is_found=False)
+        self.mediator.delete_host.assert_not_called()
+
+    def test_verify_host_definition_on_storage_failed(self):
+        error_message = 'error'
+        self.mediator.get_host_by_host_identifiers.side_effect = Exception(error_message)
+        response = self.servicer.VerifyHostDefinitionNotOnStorage(self.request)
         self.assertEqual(response.error_message, error_message)
