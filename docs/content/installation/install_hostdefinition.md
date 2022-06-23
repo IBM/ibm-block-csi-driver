@@ -1,6 +1,6 @@
 # Installing the `HostDefinition` custom resource
 
-Install the `HostDefinition` custom resource to enable automatic host definitions from within the CSI driver.
+Install the `HostDefinition` custom resource to enable dynamic host definitions from within the CSI driver.
 
 Use the following steps to install the `HostDefinition` custom resource, with [GitHub](https://github.com/IBM/ibm-block-csi-operator).
 

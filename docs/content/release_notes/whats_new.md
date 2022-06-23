@@ -4,9 +4,9 @@ IBM® block storage CSI driver 1.10.0 introduces the enhancements that are detai
 
 **General availability date:** 15 July 2022
 
-## New automatic host connectivity definition
+## New dynamic host connectivity definition
 
-IBM® block storage CSI driver 1.10.0 now supports automatic host definition for new host connectivity.
+IBM® block storage CSI driver 1.10.0 now supports dynamic host definition for newly defined storage host connectivity.
 
 ## Additional supported orchestration platforms for deployment
 
