@@ -18,8 +18,8 @@ class TestWithFunctionality(unittest.TestCase):
         self.array_connection = ArrayConnectionManager(
             "user", "password", [self.fqdn, self.fqdn], XIVArrayMediator.array_type)
 
-    @patch("controller.array_action.array_connection_manager.XIVArrayMediator._connect")
-    @patch("controller.array_action.array_connection_manager.XIVArrayMediator.disconnect")
+    @patch("controllers.array_action.array_connection_manager.XIVArrayMediator._connect")
+    @patch("controllers.array_action.array_connection_manager.XIVArrayMediator.disconnect")
     def test_with_opens_and_closes_the_connection(self, close, connect):
         with self.array_connection as array_mediator:
             self.assertEqual(True, self.array_connection.connected)
@@ -27,7 +27,7 @@ class TestWithFunctionality(unittest.TestCase):
         connect.assert_called_with()
         close.assert_called_with()
 
-    @patch("controller.array_action.array_connection_manager.ArrayConnectionManager.get_array_connection")
+    @patch("controllers.array_action.array_connection_manager.ArrayConnectionManager.get_array_connection")
     def test_with_throws_error_if_other_error_occures(self, get_connection):
         error_message = "this is a dummy error "
         get_connection.side_effect = [Exception(error_message)]
@@ -48,7 +48,7 @@ class TestGetconnection(unittest.TestCase):
         self.array_connection = ArrayConnectionManager(
             "user", "password", self.connections, XIVArrayMediator.array_type)
         array_connection_manager.array_connections_dict = {}
-        self.connect_patcher = patch("controller.array_action.array_connection_manager.XIVArrayMediator._connect")
+        self.connect_patcher = patch("controllers.array_action.array_connection_manager.XIVArrayMediator._connect")
         self.connect = self.connect_patcher.start()
 
     def tearDown(self):
@@ -89,7 +89,7 @@ class TestGetconnection(unittest.TestCase):
 
         self.assertTrue(error_msg in str(ex.exception))
 
-    @patch("controller.array_action.array_connection_manager._socket_connect_test")
+    @patch("controllers.array_action.array_connection_manager._socket_connect_test")
     def test_detect_array_type(self, socket_connect_test_mock):
         # arrays is a [host, open_ports] dict, note that both port 22 and 8452 are opened in ds8k
         arrays = {
