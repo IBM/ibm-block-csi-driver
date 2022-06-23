@@ -18,13 +18,13 @@ RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
 USER default
 RUN pip3 install --ignore-installed --default-timeout=100 --upgrade pip==21.2.4
 WORKDIR /tmp
-COPY controllers/csi_server/requirements.txt .
+COPY controllers/servers/csi/requirements.txt .
 # avoid default boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
 RUN pip3 install -r ./requirements.txt
 
 USER root
-COPY controllers/csi_server/scripts/csi_general .
+COPY controllers/servers/csi/scripts/csi_general .
 RUN ./csi_pb2.sh
 RUN pip3 install .
 
@@ -47,8 +47,8 @@ LABEL name="IBM block storage CSI driver controller" \
       io.openshift.tags=ibm,csi,ibm-block-csi-driver,ibm-block-csi-node
 
 COPY --from=builder /opt/app-root /opt/app-root
-COPY ./common /driver/controllers/common
-COPY ./controllers/csi_server /driver/controllers/csi_server
+COPY ./common /driver/common
+COPY ./controllers/ /driver/controllers/
 COPY ./LICENSE /licenses/
 COPY ./NOTICES /licenses/
 
@@ -57,4 +57,4 @@ ENV PYTHONPATH=/driver
 
 # Note: UBI runs with app-user by default.
 
-ENTRYPOINT ["/driver/controllers/csi_server/scripts/entrypoint.sh"]
+ENTRYPOINT ["/driver/controllers/servers/csi/scripts/entrypoint.sh"]
