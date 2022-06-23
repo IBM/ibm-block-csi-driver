@@ -91,7 +91,7 @@ class WatcherHelper:
                 host_request, response.error_message)
 
     def verify_host_defined_on_storage_and_on_cluster(self, host_request):
-        response = self.storage_host_manager.verify_host_defined(host_request)
+        response = self.storage_host_manager.define_host(host_request)
         if response.error_message:
             return response
         self.verify_csi_host_definition_from_host_request(host_request, settings.READY_PHASE)
@@ -109,13 +109,8 @@ class WatcherHelper:
                     host_definition_name, phase, ex))
 
     def get_host_definition_name(self, host_request, node_name):
-        host_name_on_storage = self._get_host_name_on_storage(node_name)
         return '{0}.{1}'.format(
-            host_request.system_info[settings.MANAGEMENT_ADDRESS_KEY], host_name_on_storage).replace('_', '.')
-
-    def _get_host_name_on_storage(self, node_name):
-        prefix = self._get_prefix()
-        return prefix + node_name
+            host_request.system_info[settings.MANAGEMENT_ADDRESS_KEY], node_name).replace('_', '.')
 
     def get_host_definition_manifest_from_host_request(
             self, host_request, host_definition_name):
@@ -236,7 +231,7 @@ class WatcherHelper:
         return decoded_string_in_bytes.decode('ascii')
 
     def verify_host_undefined_on_storage_and_on_cluster(self, host_request, host_definition_name):
-        response = self.storage_host_manager.verify_host_undefined(host_request)
+        response = self.storage_host_manager.undefine_host(host_request)
         if response.error_message:
             return response
         self.delete_host_definition(host_definition_name)

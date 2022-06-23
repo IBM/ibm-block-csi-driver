@@ -9,7 +9,7 @@ class StorageHostManager:
     def __init__(self):
         pass
 
-    def verify_host_defined(self, host_request):
+    def define_host(self, host_request):
         node_name = host_request.node_id.split(';')[0]
         logger.info('Verifying host: {} created on storage: {}'.format(
             node_name, host_request.system_info[settings.MANAGEMENT_ADDRESS_KEY]))
@@ -25,7 +25,7 @@ class StorageHostManager:
         host_response = VerifyHostResponse()
         return host_response
 
-    def verify_host_undefined(self, host_request):
+    def undefine_host(self, host_request):
         node_name = host_request.node_id.split(';')[0]
         logger.info('Verifying host: {} removed from storage: {}'.format(
             node_name, host_request.system_info[settings.MANAGEMENT_ADDRESS_KEY]))
