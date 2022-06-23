@@ -37,4 +37,21 @@ class HostDefinerServicer:
             return VerifyHostResponse(error_message=str(ex))
 
     def undefine_host(self, request):  # pylint: disable=invalid-name
-        raise NotImplementedError
+        node_id_info = NodeIdInfo(request.node_id)
+        initiators = node_id_info.initiators
+        try:
+            array_connection_info = get_array_connection_info_from_secrets(request.system_info)
+            array_type = detect_array_type(array_connection_info.array_addresses)
+            with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
+
+                try:
+                    found_host_name, _ = array_mediator.get_host_by_host_identifiers(initiators)
+                    logger.debug("host found : {}".format(found_host_name))
+                    array_mediator.delete_host(found_host_name)
+                except HostNotFoundError:
+                    logger.debug("host was not found")
+
+                return VerifyHostResponse()
+        except Exception as ex:
+            logger.exception(ex)
+            return VerifyHostResponse(error_message=str(ex))
