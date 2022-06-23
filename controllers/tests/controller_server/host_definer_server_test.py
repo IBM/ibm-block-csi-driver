@@ -6,6 +6,7 @@ from mock import MagicMock
 from controllers.array_action.errors import HostNotFoundError
 from controllers.common.node_info import Initiators
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
+from controllers.tests.controller_server.test_settings import VOLUME_NAME
 
 HOST_DEFINER_SERVER_PATH = "controllers.servers.host_definer.storage_manager.host_definer_server"
 
@@ -13,7 +14,6 @@ HOST_DEFINER_SERVER_PATH = "controllers.servers.host_definer.storage_manager.hos
 class BaseSetUp(unittest.TestCase):
 
     def setUp(self):
-        super().setUp()
         self.servicer = HostDefinerServicer()
 
         detect_array_type_path = '.'.join((HOST_DEFINER_SERVER_PATH, 'detect_array_type'))
@@ -43,9 +43,6 @@ class BaseSetUp(unittest.TestCase):
 
 class TestDefineHost(BaseSetUp):
 
-    def setUp(self):
-        super().setUp()
-
     def _prepare_define_host_success(self, is_idempotency=False):
         if is_idempotency:
             self.mediator.get_host_by_host_identifiers.return_value = (VOLUME_NAME, '')
@@ -73,9 +70,6 @@ class TestDefineHost(BaseSetUp):
 
 
 class TestUndefineHost(BaseSetUp):
-
-    def setUp(self):
-        super().setUp()
 
     def _prepare_undefine_host_success(self, is_found=True):
         if is_found:
