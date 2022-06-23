@@ -73,31 +73,31 @@ class TestDefineHost(BaseSetUp):
         self.assertEqual(response.error_message, error_message)
 
 
-class TestVerifyHostDefinitionNotOnStorage(BaseSetUp):
+class TestUndefineHost(BaseSetUp):
 
     def setUp(self):
         super().setUp()
 
-    def _prepare_verify_host_definition_not_on_storage_success(self, is_found=True):
+    def _prepare_undefine_host_success(self, is_found=True):
         if is_found:
             self.mediator.get_host_by_host_identifiers.return_value = (VOLUME_NAME, '')
         else:
             self.mediator.get_host_by_host_identifiers.side_effect = HostNotFoundError('error')
 
-        response = self.servicer.VerifyHostDefinitionNotOnStorage(self.request)
+        response = self.servicer.undefine_host(self.request)
         self.mediator.get_host_by_host_identifiers.assert_called_once_with(Initiators(iscsi_iqns=[self.iqn]))
         self.assertEqual(response.error_message, '')
 
-    def test_verify_host_definition_not_on_storage_success(self):
-        self._prepare_verify_host_definition_not_on_storage_success()
+    def test_undefine_host_success(self):
+        self._prepare_undefine_host_success()
         self.mediator.delete_host.assert_called_once_with(VOLUME_NAME)
 
-    def test_verify_host_definition_not_on_storage_idempotency_success(self):
-        self._prepare_verify_host_definition_not_on_storage_success(is_found=False)
+    def test_undefine_host_idempotency_success(self):
+        self._prepare_undefine_host_success(is_found=False)
         self.mediator.delete_host.assert_not_called()
 
     def test_verify_host_definition_on_storage_failed(self):
         error_message = 'error'
         self.mediator.get_host_by_host_identifiers.side_effect = Exception(error_message)
-        response = self.servicer.VerifyHostDefinitionNotOnStorage(self.request)
+        response = self.servicer.undefine_host(self.request)
         self.assertEqual(response.error_message, error_message)
