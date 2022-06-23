@@ -6,17 +6,16 @@ import controllers.array_action.errors as array_errors
 import controllers.servers.config as config
 import controllers.servers.utils as utils
 from controllers.array_action import messages
-from controllers.array_action.storage_agent import get_agent, detect_array_type
-from controllers.common import settings
 from controllers.array_action.array_action_types import ObjectIds
+from controllers.array_action.storage_agent import get_agent, detect_array_type
+from controllers.common.config import config as common_config
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.node_info import NodeIdInfo
 from controllers.servers import messages as controller_messages
-from controllers.common.config import config as common_config
 from controllers.servers.csi.decorators import csi_method
-from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controllers.servers.csi.exception_handler import handle_exception, \
     build_error_response
+from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
 
 logger = get_stdout_logger()
 
