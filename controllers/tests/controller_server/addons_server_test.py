@@ -42,7 +42,7 @@ class TestControllerServicerEnableVolumeReplication(BaseControllerSetUp, CommonC
         self.mediator.get_replication.return_value = None
         self.mediator.create_replication = Mock()
 
-    @patch("controller.controller_server.addons_server.get_agent")
+    @patch("controllers.servers.csi.addons_server.get_agent")
     def test_enable_replication_succeeds(self, storage_agent):
         self._prepare_enable_replication_mocks(storage_agent)
 
@@ -53,14 +53,14 @@ class TestControllerServicerEnableVolumeReplication(BaseControllerSetUp, CommonC
         self.mediator.create_replication.assert_called_once_with(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID,
                                                                  SYSTEM_ID, COPY_TYPE)
 
-    @patch("controller.controller_server.addons_server.get_agent")
+    @patch("controllers.servers.csi.addons_server.get_agent")
     def test_enable_replication_already_processing(self, storage_agent):
         self._test_request_already_processing(storage_agent, "volume_id", self.request.volume_id)
 
-    @patch("controller.controller_server.addons_server.get_agent")
+    @patch("controllers.servers.csi.addons_server.get_agent")
     def test_enable_replication_with_wrong_secrets(self, storage_agent):
         self._test_request_with_wrong_secrets(storage_agent)
 
-    @patch("controller.controller_server.addons_server.get_agent")
+    @patch("controllers.servers.csi.addons_server.get_agent")
     def test_enable_replication_with_array_connection_exception(self, storage_agent):
         self._test_request_with_array_connection_exception(storage_agent)

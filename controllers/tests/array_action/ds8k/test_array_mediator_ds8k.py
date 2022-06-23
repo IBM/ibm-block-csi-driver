@@ -19,7 +19,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def setUp(self):
         self.endpoint = ["1.2.3.4"]
         self.client_mock = NonCallableMagicMock()
-        patcher = patch('controller.array_action.array_mediator_ds8k.RESTClient')
+        patcher = patch('controllers.array_action.array_mediator_ds8k.RESTClient')
         self.connect_mock = patcher.start()
         self.addCleanup(patcher.stop)
         self.connect_mock.return_value = self.client_mock
