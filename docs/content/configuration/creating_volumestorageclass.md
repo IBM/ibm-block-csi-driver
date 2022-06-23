@@ -58,7 +58,7 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in the 
         io_group: demo-iogrp             # Optional.
         SpaceEfficiency: thin            # Optional.
         volume_name_prefix: demo-prefix  # Optional.
-        virt_snap_func: "false"            # Optional. Values true/false. The default is false.
+        virt_snap_func: "false"          # Optional. Values true/false. The default is false.
 
         csi.storage.k8s.io/fstype: xfs   # Optional. Values ext4/xfs. The default is ext4.
         csi.storage.k8s.io/secret-name: demo-secret
