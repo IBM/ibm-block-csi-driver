@@ -9,7 +9,7 @@ logger = get_stdout_logger()
 
 
 class HostDefinerServicer:
-    def VerifyHostDefinitionOnStorage(self, request):  # pylint: disable=invalid-name
+    def define_host(self, request):  # pylint: disable=invalid-name
         node_id_info = NodeIdInfo(request.node_id)
         initiators = node_id_info.initiators
         connectivity_type = request.connectivity_type
@@ -36,5 +36,5 @@ class HostDefinerServicer:
             logger.exception(ex)
             return VerifyHostResponse(error_message=str(ex))
 
-    def VerifyHostDefinitionNotOnStorag(self, request):  # pylint: disable=invalid-name
+    def undefine_host(self, request):  # pylint: disable=invalid-name
         raise NotImplementedError
