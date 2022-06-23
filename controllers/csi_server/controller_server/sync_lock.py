@@ -39,21 +39,20 @@ class SyncLock:
         logger.debug(
             ("trying to acquire lock for action {} with {}: {}".format(self.action_name, self.lock_key,
                                                                        self.object_id)))
-        ids_in_use_lock.acquire()
-        if self.object_id in ids_in_use[self.lock_key]:
-            ids_in_use_lock.release()
-            logger.error(
-                "lock for action {} with {}: {} is already in use by another thread".format(self.action_name,
-                                                                                            self.lock_key,
-                                                                                            self.object_id))
-            raise ObjectAlreadyProcessingError(self.object_id)
-        _add_to_ids_in_use(self.lock_key, self.object_id)
-        logger.debug(
-            "succeed to acquire lock for action {} with {}: {}".format(self.action_name, self.lock_key, self.object_id))
-        ids_in_use_lock.release()
+        with ids_in_use_lock:
+            if self.object_id in ids_in_use[self.lock_key]:
+                logger.error(
+                    "lock for action {} with {}: {} is already in use by another thread".format(self.action_name,
+                                                                                                self.lock_key,
+                                                                                                self.object_id))
+                raise ObjectAlreadyProcessingError(self.object_id)
+            _add_to_ids_in_use(self.lock_key, self.object_id)
+            logger.debug(
+                "succeed to acquire lock for action {} with {}: {}".format(self.action_name,
+                                                                           self.lock_key,
+                                                                           self.object_id))
 
     def _remove_object_lock(self):
         logger.debug("release lock for action {} with {}: {}".format(self.action_name, self.lock_key, self.object_id))
-        ids_in_use_lock.acquire()
-        _remove_from_ids_in_use(self.lock_key, self.object_id)
-        ids_in_use_lock.release()
+        with ids_in_use_lock:
+            _remove_from_ids_in_use(self.lock_key, self.object_id)
