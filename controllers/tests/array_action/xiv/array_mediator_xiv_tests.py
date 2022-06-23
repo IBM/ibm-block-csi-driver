@@ -9,7 +9,7 @@ from controllers.array_action.array_mediator_xiv import XIVArrayMediator
 from controllers.array_action.config import FC_CONNECTIVITY_TYPE
 from controllers.array_action.config import ISCSI_CONNECTIVITY_TYPE
 from controllers.common.node_info import Initiators
-from controllers.servers.csi.tests.array_action.xiv import utils
+from controllers.tests.array_action.xiv import utils
 
 
 class TestArrayMediatorXIV(unittest.TestCase):

@@ -1,12 +1,12 @@
 #!/bin/bash
 
-./controllers/servers/csi/scripts/pycodestyle.sh
+./controllers/scripts/pycodestyle.sh
 PYCODESTYLE=$?
 
-./controllers/servers/csi/scripts/pylint.sh
+./controllers/scripts/pylint.sh
 PYLINT=$?
 
-./controllers/servers/csi/scripts/unitests.sh
+./controllers/scripts/unitests.sh
 UNITESTS=$?
 
 echo "-------- Summary of exit codes --------"

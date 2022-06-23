@@ -4,7 +4,7 @@ import grpc
 from mock import Mock, MagicMock
 
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
-from controllers.servers.csi.tests.controller_server.test_settings import USER as test_user, \
+from controllers.tests.controller_server.test_settings import USER as test_user, \
     PASSWORD as test_password, \
     ARRAY as test_array
 

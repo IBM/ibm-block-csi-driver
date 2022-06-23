@@ -4,11 +4,11 @@ from mock import patch, Mock
 
 from controllers.servers.csi.addons_server import ReplicationControllerServicer
 from controllers.servers.config import PARAMETERS_SYSTEM_ID, PARAMETERS_COPY_TYPE
-from controllers.servers.csi.tests.controller_server.test_settings import VOLUME_NAME, VOLUME_WWN, OBJECT_INTERNAL_ID, \
+from controllers.tests.controller_server.test_settings import VOLUME_NAME, VOLUME_WWN, OBJECT_INTERNAL_ID, \
     OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE
-from controllers.servers.csi.tests import utils
-from controllers.servers.csi.tests.controller_server.csi_controller_server_test import (BaseControllerSetUp,
-                                                                                        CommonControllerTest)
+from controllers.tests import utils
+from controllers.tests.controller_server.csi_controller_server_test import (BaseControllerSetUp,
+                                                                            CommonControllerTest)
 
 
 class TestControllerServicerEnableVolumeReplication(BaseControllerSetUp, CommonControllerTest):
