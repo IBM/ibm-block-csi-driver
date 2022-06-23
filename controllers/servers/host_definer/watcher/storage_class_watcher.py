@@ -1,9 +1,10 @@
 from kubernetes import watch
 
-from controllers.host_definer.watcher.watcher_helper import WatcherHelper, SECRET_IDS
-from controllers.host_definer.common import settings, utils
+from controllers.common.csi_logger import get_stdout_logger
+from controllers.servers.host_definer.watcher.watcher_helper import WatcherHelper, SECRET_IDS
+from controllers.servers.host_definer.common import settings
 
-logger = utils.get_stdout_logger()
+logger = get_stdout_logger()
 
 
 class StorageClassWatcher(WatcherHelper):

@@ -2,11 +2,12 @@ from threading import Thread
 from time import sleep
 from kubernetes import dynamic
 
-from controllers.host_definer.watcher.watcher_helper import WatcherHelper
-from controllers.host_definer.common import utils, settings
+from controllers.common.csi_logger import get_stdout_logger
+from controllers.servers.host_definer.watcher.watcher_helper import WatcherHelper
+from controllers.servers.host_definer.common import settings
 
 host_definition_objects_in_use = []
-logger = utils.get_stdout_logger()
+logger = get_stdout_logger()
 
 
 class CsiHostDefinitionWatcher(WatcherHelper):

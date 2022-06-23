@@ -1,7 +1,8 @@
-from controllers.host_definer.common import utils, settings
-from controllers.host_definer.common.types import VerifyHostResponse
+from controllers.common.csi_logger import get_stdout_logger
+from controllers.servers.host_definer.common import settings
+from controllers.servers.host_definer.common.types import VerifyHostResponse
 
-logger = utils.get_stdout_logger()
+logger = get_stdout_logger()
 
 
 class StorageHostManager:

@@ -5,14 +5,15 @@ from kubernetes import client, config, dynamic
 from kubernetes.client import api_client
 from kubernetes.client.rest import ApiException
 
-from controllers.host_definer.common import settings, utils
-from controllers.host_definer.common.types import VerifyHostRequest
-from controllers.host_definer.storage_manager.host import StorageHostManager
-import controllers.host_definer.watcher.exceptions as exceptions
+from controllers.common.csi_logger import get_stdout_logger
+from controllers.servers.host_definer.common import settings
+from controllers.servers.host_definer.common.types import VerifyHostRequest
+from controllers.servers.host_definer.storage_manager.host import StorageHostManager
+import controllers.servers.host_definer.watcher.exceptions as exceptions
 
 SECRET_IDS = {}
 NODES = {}
-logger = utils.get_stdout_logger()
+logger = get_stdout_logger()
 
 
 class WatcherHelper:
