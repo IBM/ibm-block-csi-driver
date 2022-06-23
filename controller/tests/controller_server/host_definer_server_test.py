@@ -42,34 +42,34 @@ class BaseSetUp(unittest.TestCase):
         self.request.system_info = {'username': 'user', 'password': 'pass', 'management_address': 'mg111'}
 
 
-class TestVerifyHostDefinitionOnStorage(BaseSetUp):
+class TestDefineHost(BaseSetUp):
 
     def setUp(self):
         super().setUp()
 
-    def _prepare_verify_host_definition_on_storage_success(self, is_idempotency=False):
+    def _prepare_define_host_success(self, is_idempotency=False):
         if is_idempotency:
             self.mediator.get_host_by_host_identifiers.return_value = (VOLUME_NAME, '')
         else:
             self.mediator.get_host_by_host_identifiers.side_effect = HostNotFoundError('host_identifier')
 
-        response = self.servicer.VerifyHostDefinitionOnStorage(self.request)
+        response = self.servicer.define_host(self.request)
         self.mediator.get_host_by_host_identifiers.assert_called_once_with(Initiators(iscsi_iqns=[self.iqn]))
         self.assertEqual(response.error_message, '')
 
-    def test_verify_host_definition_on_storage_success(self):
-        self._prepare_verify_host_definition_on_storage_success()
+    def test_define_host_success(self):
+        self._prepare_define_host_success()
         self.mediator.create_host.assert_called_once_with(self.hostname, Initiators(iscsi_iqns=[self.iqn]),
                                                           self.request.connectivity_type)
 
-    def test_verify_host_definition_on_storage_idempotency_success(self):
-        self._prepare_verify_host_definition_on_storage_success(is_idempotency=True)
+    def test_define_host_idempotency_success(self):
+        self._prepare_define_host_success(is_idempotency=True)
         self.mediator.create_host.assert_not_called()
 
-    def test_verify_host_definition_on_storage_failed(self):
+    def test_define_host_failed(self):
         error_message = 'error'
         self.mediator.get_host_by_host_identifiers.side_effect = Exception(error_message)
-        response = self.servicer.VerifyHostDefinitionOnStorage(self.request)
+        response = self.servicer.define_host(self.request)
         self.assertEqual(response.error_message, error_message)
 
 
