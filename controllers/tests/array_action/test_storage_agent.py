@@ -48,7 +48,7 @@ class TestStorageAgent(unittest.TestCase):
     def setUp(self):
         self.endpoint = ["1.2.3.4"]
         self.client_mock = NonCallableMagicMock()
-        patcher = patch('controller.array_action.array_mediator_ds8k.RESTClient')
+        patcher = patch('controllers.array_action.array_mediator_ds8k.RESTClient')
         self.connect_mock = patcher.start()
         self.addCleanup(patcher.stop)
         self.connect_mock.return_value = self.client_mock
@@ -69,7 +69,7 @@ class TestStorageAgent(unittest.TestCase):
              }
         )
 
-        socket_patcher = patch('controller.array_action.storage_agent._socket_connect_test')
+        socket_patcher = patch('controllers.array_action.storage_agent._socket_connect_test')
         self.socket_mock = socket_patcher.start()
         self.addCleanup(socket_patcher.stop)
         self.socket_mock.side_effect = _fake_socket_connect_test
@@ -108,7 +108,7 @@ class TestStorageAgent(unittest.TestCase):
         self.assertEqual(1, len(get_agents()))
         self.assertNotEqual(id(agent), id(new_agent))
 
-    @patch("controller.array_action.storage_agent.ConnectionPool")
+    @patch("controllers.array_action.storage_agent.ConnectionPool")
     def test_detect_array_type(self, _):
         self.assertEqual(
             detect_array_type(["svc_host", ]),
