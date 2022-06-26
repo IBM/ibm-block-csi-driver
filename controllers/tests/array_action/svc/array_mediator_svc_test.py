@@ -19,7 +19,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def setUp(self):
         self.endpoint = ["IP_1"]
-        with patch("controller.array_action.array_mediator_svc.SVCArrayMediator._connect"):
+        with patch("controllers.array_action.array_mediator_svc.SVCArrayMediator._connect"):
             self.svc = SVCArrayMediator("user", "password", self.endpoint)
         self.svc.client = Mock()
         self.svc.client.svcinfo.lssystem.return_value = [Munch({'location': 'local',
@@ -46,7 +46,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
              'copy_rate': 'non_zero_value',
              'rc_controlled': 'no'})
 
-    @patch("controller.array_action.array_mediator_svc.connect")
+    @patch("controllers.array_action.array_mediator_svc.connect")
     def test_init_unsupported_system_version(self, connect_mock):
         code_level_below_min_supported = '7.7.77.77 (build 777.77.7777777777777)'
         svc_mock = Mock()
@@ -67,7 +67,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                 array_errors.StorageManagementIPsNotSupportError):
             SVCArrayMediator("user", "password", self.endpoint)
 
-    @patch("controller.array_action.array_mediator_svc.connect")
+    @patch("controllers.array_action.array_mediator_svc.connect")
     def test_connect_errors(self, connect_mock):
         connect_mock.side_effect = [
             svc_errors.IncorrectCredentials('Failed_a')]
@@ -83,7 +83,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertGreaterEqual(self.svc.max_object_prefix_length, prefix_length)
         self.assertGreaterEqual(self.svc.max_object_prefix_length, prefix_length)
 
-    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    @patch("controllers.array_action.array_mediator_svc.is_warning_message")
     def _test_mediator_method_client_error(self, mediator_method, args, client_method, client_error, expected_error,
                                            mock_warning):
         mock_warning.return_value = False
@@ -262,7 +262,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_create_volume_mkvolumegroup_from_volume_success(self):
         self._test_create_volume_mkvolumegroup_success(source_type='volume')
 
-    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    @patch("controllers.array_action.array_mediator_svc.is_warning_message")
     def test_create_volume_mkvolumegroup_with_rollback(self, mock_warning):
         mock_warning.return_value = False
         self._prepare_mocks_for_create_volume_mkvolumegroup()
@@ -334,7 +334,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.delete_volume("volume")
         self.svc.client.svctask.rmfcmap.assert_called_once()
 
-    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    @patch("controllers.array_action.array_mediator_svc.is_warning_message")
     def test_delete_volume_has_clone_rmfcmap_raise_error(self, mock_warning):
         mock_warning.return_value = False
         fcmaps_as_target = Mock(as_list=[])
@@ -353,7 +353,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkfcmap.assert_called_once()
         self.svc.client.svctask.startfcmap.assert_called_once()
 
-    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    @patch("controllers.array_action.array_mediator_svc.is_warning_message")
     def _test_copy_to_existing_volume_raise_errors(self, mock_warning, client_return_value, expected_error):
         mock_warning.return_value = False
         self.svc.client.svcinfo.lsvdisk.side_effect = [client_return_value, client_return_value]
@@ -445,7 +445,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_mocks_for_delete_snapshot()
         self.fcmaps[0].copy_rate = "0"
 
-    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    @patch("controllers.array_action.array_mediator_svc.is_warning_message")
     def test_get_snapshot_not_exist_return_none(self, mock_warning):
         self._prepare_lsvdisk_to_raise_not_found_error(mock_warning)
 
@@ -477,7 +477,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.ExpectedSnapshotButFoundVolumeError):
             self.svc.get_snapshot("volume_id", "test_snapshot", pool="pool1", is_virt_snap_func=False)
 
-    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    @patch("controllers.array_action.array_mediator_svc.is_warning_message")
     def test_get_snapshot_get_fcmap_not_exist_raise_error(self, mock_warning):
         target_cli_volume = self._get_mapped_target_cli_volume()
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(target_cli_volume)
@@ -604,7 +604,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvdisk.side_effect = self._mock_cli_objects(volumes_to_return)
         self.svc.client.svctask.startfcmap.return_value = Mock()
 
-    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    @patch("controllers.array_action.array_mediator_svc.is_warning_message")
     def test_create_snapshot_create_volume_error(self, mock_warning):
         source_cli_volume = self._get_cli_volume()
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(source_cli_volume)
@@ -635,7 +635,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="pool1",
                                      is_virt_snap_func=False)
 
-    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    @patch("controllers.array_action.array_mediator_svc.is_warning_message")
     def test_create_snapshot_create_fcmap_error(self, mock_warning):
         self._prepare_mocks_for_create_snapshot_mkvolume()
         mock_warning.return_value = False
@@ -646,7 +646,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="pool1",
                                      is_virt_snap_func=False)
 
-    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    @patch("controllers.array_action.array_mediator_svc.is_warning_message")
     def test_create_snapshot_start_fcmap_error(self, mock_warning):
         self._prepare_mocks_for_create_snapshot_mkvolume()
         mock_warning.return_value = False
@@ -839,7 +839,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(2, self.svc.client.svctask.rmfcmap.call_count)
         self.svc.client.svctask.rmvolume.assert_called_once_with(vdisk_id="test_snapshot")
 
-    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    @patch("controllers.array_action.array_mediator_svc.is_warning_message")
     def test_delete_snapshot_with_fcmap_already_stopped_success(self, mock_warning):
         self._prepare_mocks_for_delete_snapshot()
         mock_warning.return_value = False
@@ -848,7 +848,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(2, self.svc.client.svctask.rmfcmap.call_count)
         self.svc.client.svctask.rmvolume.assert_called_once_with(vdisk_id="test_snapshot")
 
-    @patch("controller.array_action.array_mediator_svc.is_warning_message")
+    @patch("controllers.array_action.array_mediator_svc.is_warning_message")
     def test_delete_snapshot_with_stopfcmap_raise_error(self, mock_warning):
         self._prepare_mocks_for_delete_snapshot()
         mock_warning.return_value = False
@@ -1242,7 +1242,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             self.assertNotIn(lun, lun_list)
         self.assertEqual(lun, expected_lun)
 
-    @patch("controller.array_action.array_mediator_svc.choice")
+    @patch("controllers.array_action.array_mediator_svc.choice")
     def test_get_free_lun_with_no_host_mappings(self, random_choice):
         random_choice.return_value = '0'
         self._test_get_free_lun_host_mappings([])
@@ -1254,7 +1254,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @patch.object(SVCArrayMediator, "MAX_LUN_NUMBER", 4)
     @patch.object(SVCArrayMediator, "MIN_LUN_NUMBER", 0)
-    @patch("controller.array_action.array_mediator_svc.LUN_INTERVAL", 1)
+    @patch("controllers.array_action.array_mediator_svc.LUN_INTERVAL", 1)
     def test_get_free_lun_in_interval_success(self):
         self._test_get_free_lun_host_mappings(('0', '1'), expected_lun='2')
 
@@ -1272,7 +1272,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.NoAvailableLunError):
             self.svc._get_free_lun('Test_P')
 
-    @patch("controller.array_action.array_mediator_svc.SVCArrayMediator._get_free_lun")
+    @patch("controllers.array_action.array_mediator_svc.SVCArrayMediator._get_free_lun")
     def _test_map_volume_mkvdiskhostmap_error(self, client_error, expected_error, mock_get_free_lun):
         mock_get_free_lun.return_value = '1'
         self._test_mediator_method_client_error(self.svc.map_volume, ("volume", "host", "connectivity_type"),
@@ -1290,7 +1290,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                    array_errors.MappingError)
         self._test_map_volume_mkvdiskhostmap_error(Exception, Exception)
 
-    @patch("controller.array_action.array_mediator_svc.SVCArrayMediator._get_free_lun")
+    @patch("controllers.array_action.array_mediator_svc.SVCArrayMediator._get_free_lun")
     def test_map_volume_success(self, mock_get_free_lun):
         mock_get_free_lun.return_value = '5'
         self.svc.client.svctask.mkvdiskhostmap.return_value = None
