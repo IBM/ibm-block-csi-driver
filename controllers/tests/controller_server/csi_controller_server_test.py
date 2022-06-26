@@ -1320,7 +1320,7 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "fc")
 
         self.mediator.map_volume.side_effect = [array_errors.LunAlreadyInUseError("", "")] \
-                                               * (self.mediator.max_lun_retries + 1)
+            * (self.mediator.max_lun_retries + 1)
         storage_agent.return_value = self.storage_agent
 
         self.servicer.ControllerPublishVolume(self.request, self.context)
