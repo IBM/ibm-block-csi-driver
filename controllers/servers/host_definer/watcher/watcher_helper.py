@@ -1,15 +1,16 @@
 import base64
 import datetime
 import os
+
 from kubernetes import client, config, dynamic
 from kubernetes.client import api_client
 from kubernetes.client.rest import ApiException
 
+import controllers.servers.host_definer.watcher.exceptions as exceptions
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.common import settings
 from controllers.servers.host_definer.common.types import VerifyHostRequest
-from controllers.servers.host_definer.storage_manager.host import StorageHostManager
-import controllers.servers.host_definer.watcher.exceptions as exceptions
+from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
 
 SECRET_IDS = {}
 NODES = {}
@@ -18,7 +19,7 @@ logger = get_stdout_logger()
 
 class WatcherHelper:
     def __init__(self):
-        self.storage_host_manager = StorageHostManager()
+        self.storage_host_servicer = HostDefinerServicer()
         self._load_cluster_configuration()
         self.dynamic_client = self._get_dynamic_client()
         self.storage_api = client.StorageV1Api()
@@ -91,7 +92,7 @@ class WatcherHelper:
                 host_request, response.error_message)
 
     def verify_host_defined_on_storage_and_on_cluster(self, host_request):
-        response = self.storage_host_manager.define_host(host_request)
+        response = self.storage_host_servicer.define_host(host_request)
         if response.error_message:
             return response
         self.verify_csi_host_definition_from_host_request(host_request, settings.READY_PHASE)
@@ -231,7 +232,7 @@ class WatcherHelper:
         return decoded_string_in_bytes.decode('ascii')
 
     def verify_host_undefined_on_storage_and_on_cluster(self, host_request, host_definition_name):
-        response = self.storage_host_manager.undefine_host(host_request)
+        response = self.storage_host_servicer.undefine_host(host_request)
         if response.error_message:
             return response
         self.delete_host_definition(host_definition_name)
@@ -246,7 +247,7 @@ class WatcherHelper:
                     host_definition_name))
             else:
                 logger.error('Failed to delete hostDefinition {}, got: {}'.format(
-                    host_definition_name. ex.body))
+                    host_definition_name.ex.body))
 
     def _generate_secret_id_From_secret_and_namespace(
             self, secret_name, secret_namespace):
