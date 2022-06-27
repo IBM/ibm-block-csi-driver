@@ -100,6 +100,14 @@ class SpaceEfficiencyMismatch(BaseArrayActionException):
                                                                          source_space_efficiency)
 
 
+class RequiredBytesMismatch(BaseArrayActionException):
+
+    def __init__(self, target_required_bytes, source_required_bytes):
+        super().__init__()
+        self.message = messages.REQUIRED_BYTES_MISMATCH_MESSAGE.format(target_required_bytes,
+                                                                       source_required_bytes)
+
+
 class VolumeAlreadyExists(BaseArrayActionException):
 
     def __init__(self, volume_name, array):

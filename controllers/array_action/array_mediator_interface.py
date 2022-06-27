@@ -383,6 +383,24 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def validate_required_bytes_matches_source(self, required_bytes, source_id, source_type):
+        """
+        This function will check if the required bytes passed to CreateVolume matches the volume source.
+
+        Args:
+            required_bytes   : as passed from the CSI request
+            source_id        : id of source to create from
+            source_type      : volume or snapshot
+
+        Returns:
+            None
+
+        Raises:
+            RequiredBytesMismatch
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
         """
         This function will return the volume replication relationship info

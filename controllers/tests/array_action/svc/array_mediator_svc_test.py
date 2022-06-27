@@ -1526,3 +1526,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(source_volume)
         self.svc.validate_space_efficiency_matches_source('thick', 'source_id', 'volume')
         self.svc.validate_space_efficiency_matches_source('', 'source_id', 'volume')
+
+    def test_validate_required_bytes_matches_source_success(self):
+        source_volume = self._get_cli_volume()
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(source_volume)
+        self.svc.validate_required_bytes_matches_source(1024, 'source_id', 'volume')
+        self.svc.validate_required_bytes_matches_source(512, 'source_id', 'volume')
+
+    def test_validate_required_bytes_matches_source_failed(self):
+        source_volume = self._get_cli_volume()
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(source_volume)
+        with self.assertRaises(array_errors.RequiredBytesMismatch):
+            self.svc.validate_required_bytes_matches_source(9999, 'source_id', 'volume')
