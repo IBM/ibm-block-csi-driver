@@ -434,6 +434,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.side_effect = array_errors.ObjectNotFoundError("vol")
         self.mediator.validate_space_efficiency_matches_source = Mock()
+        self.mediator.validate_required_bytes_matches_source = Mock()
 
         self.request.parameters = {config.PARAMETERS_POOL: POOL,
                                    config.PARAMETERS_IO_GROUP: IO_GROUP,
@@ -782,7 +783,6 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
     @patch("controllers.servers.csi.csi_controller_server.get_agent")
     def test_create_volume_idempotent_with_other_source_and_virt_snap_func_enabled(self, storage_agent):
-
         self.request.parameters[config.PARAMETERS_VIRT_SNAP_FUNC] = "true"
         self._prepare_idempotent_test_with_other_source(storage_agent)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
