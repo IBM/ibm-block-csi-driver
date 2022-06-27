@@ -528,3 +528,6 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def demote_replication_volume(self, replication_name):
         raise NotImplementedError
+
+    def validate_space_efficiency_matches_source(self, space_efficiency, source_id, source_type):
+        raise NotImplementedError

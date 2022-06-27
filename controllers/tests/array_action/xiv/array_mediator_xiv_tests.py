@@ -16,7 +16,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
 
     def setUp(self):
         self.fqdn = "fqdn"
-        with patch("controller.array_action.array_mediator_xiv.XIVArrayMediator._connect"):
+        with patch("controllers.array_action.array_mediator_xiv.XIVArrayMediator._connect"):
             self.mediator = XIVArrayMediator("user", "password", self.fqdn)
         self.mediator.client = Mock()
         self.required_bytes = 2000
@@ -47,7 +47,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.mediator.get_volume("volume", None, False)
 
-    @patch("controller.array_action.array_mediator_xiv.XCLIClient")
+    @patch("controllers.array_action.array_mediator_xiv.XCLIClient")
     def test_connect_errors(self, client):
         client.connect_multiendpoint_ssl.return_value = Mock()
         client.connect_multiendpoint_ssl.side_effect = [xcli_errors.CredentialsError("a", "b", "c")]

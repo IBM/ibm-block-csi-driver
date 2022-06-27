@@ -3,6 +3,7 @@ PASSWORD = "temp"
 ARRAY = "arr"
 POOL = "pool1"
 SPACE_EFFICIENCY = "thin"
+VIRT_SNAP_FUNC_TRUE = "true"
 IO_GROUP = 'iogrp1'
 VOLUME_GROUP = 'volgrp1'
 VOLUME_NAME = "volume"

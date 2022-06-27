@@ -201,8 +201,8 @@ class TestUtils(unittest.TestCase):
     def _test_validate_create_volume_request_validation_exception(self, request, msg):
         self._test_validation_exception(utils.validate_create_volume_request, request, str_in_msg=msg)
 
-    @patch('controller.controller_server.utils.validate_secrets')
-    @patch('controller.controller_server.utils.validate_csi_volume_capabilities')
+    @patch('controllers.servers.utils.validate_secrets')
+    @patch('controllers.servers.utils.validate_csi_volume_capabilities')
     def test_validate_create_volume_request(self, validate_capabilities, validate_secrets):
         request = Mock()
         request.name = ""
@@ -251,14 +251,14 @@ class TestUtils(unittest.TestCase):
         request.capacity_range.required_bytes = 0
         utils.validate_create_volume_request(request)
 
-    @patch('controller.controller_server.utils.validate_secrets', Mock())
+    @patch('controllers.servers.utils.validate_secrets', Mock())
     def test_validate_delete_snapshot_request(self):
         request = Mock()
         request.snapshot_id = ""
 
         self._test_validation_exception(utils.validate_delete_snapshot_request, request)
 
-    @patch("controller.controller_server.utils.get_volume_id")
+    @patch("controllers.servers.utils.get_volume_id")
     def test_get_create_volume_response(self, get_volume_id):
         new_volume = Mock()
         new_volume.name = "name"
@@ -279,7 +279,7 @@ class TestUtils(unittest.TestCase):
         with self.assertRaises(Exception):
             utils.generate_csi_create_volume_response(new_volume)
 
-    @patch("controller.controller_server.utils.get_volume_id")
+    @patch("controllers.servers.utils.get_volume_id")
     def test_get_create_volume_response_with_single_ip(self, get_volume_id):
         new_volume = Mock()
         new_volume.name = "name"
@@ -296,7 +296,7 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(10, response.volume.capacity_bytes)
         self.assertEqual("9.1.1.1", response.volume.volume_context['array_address'])
 
-    @patch("controller.controller_server.utils.get_volume_id")
+    @patch("controllers.servers.utils.get_volume_id")
     def test_get_create_volume_response_with_multiple_ip(self, get_volume_id):
         new_volume = Mock()
         new_volume.name = "name"
@@ -316,9 +316,9 @@ class TestUtils(unittest.TestCase):
     def _test_validate_publish_volume_request_validation_exception(self, request, msg):
         self._test_validation_exception(utils.validate_publish_volume_request, request, str_in_msg=msg)
 
-    @patch('controller.controller_server.utils.validate_secrets')
-    @patch('controller.controller_server.utils.validate_csi_volume_capability')
-    @patch('controller.controller_server.utils._validate_node_id')
+    @patch('controllers.servers.utils.validate_secrets')
+    @patch('controllers.servers.utils.validate_csi_volume_capability')
+    @patch('controllers.servers.utils._validate_node_id')
     def test_validate_publish_volume_request(self, validate_node_id, validate_capabilities, validate_secrets):
         request = Mock()
         request.readonly = True
@@ -349,8 +349,8 @@ class TestUtils(unittest.TestCase):
         self._test_validation_exception(utils.validate_unpublish_volume_request, request, str_in_msg=str_in_msg,
                                         raised_error=raised_error)
 
-    @patch('controller.controller_server.utils._validate_node_id')
-    @patch('controller.controller_server.utils.validate_secrets')
+    @patch('controllers.servers.utils._validate_node_id')
+    @patch('controllers.servers.utils.validate_secrets')
     def test_validate_unpublish_volume_request(self, validate_secrets, validate_node_id):
         request = Mock()
         request.volume_id = "somebadvolumename"
@@ -451,7 +451,7 @@ class TestUtils(unittest.TestCase):
             self.assertEqual(expected_chosen_connectivity, actual_chosen)
 
     def _check_publish_volume_response_parameters(self, lun, connectivity_type, array_initiators):
-        with patch("controller.common.config.config.controller", new=self.controller_config):
+        with patch("controllers.common.config.config.controller", new=self.controller_config):
             publish_volume_response = utils.generate_csi_publish_volume_response(lun, connectivity_type,
                                                                                  array_initiators)
             self.assertEqual(lun, publish_volume_response.publish_context["lun"])
