@@ -8,8 +8,6 @@ logger = get_stdout_logger()
 
 
 class SecretWatcher(WatcherHelper):
-    def __init__(self):
-        super().__init__()
 
     def watch_secret_resources(self):
         while True:
@@ -27,7 +25,7 @@ class SecretWatcher(WatcherHelper):
     def _is_secret_used_by_storage_class(self, event):
         secret_name = event[settings.OBJECT_KEY].metadata.name
         secret_namespace = event[settings.OBJECT_KEY].metadata.namespace
-        return self._generate_secret_id_From_secret_and_namespace(
+        return self.generate_secret_id_from_secret_and_namespace(
             secret_name, secret_namespace) in SECRET_IDS
 
     def _handle_modified_secrets(self, secret_event):

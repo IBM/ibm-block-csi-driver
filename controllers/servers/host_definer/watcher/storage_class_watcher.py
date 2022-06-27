@@ -8,8 +8,6 @@ logger = get_stdout_logger()
 
 
 class StorageClassWatcher(WatcherHelper):
-    def __init__(self):
-        super().__init__()
 
     def watch_storage_class_resources(self):
         watcher = watch.Watch()
@@ -29,6 +27,7 @@ class StorageClassWatcher(WatcherHelper):
         if self._is_storage_class_has_csi_ibm_block_as_a_provisioner(
                 storage_class):
             return self._get_secrets_from_storage_class(storage_class)
+        return []
 
     def _is_storage_class_has_csi_ibm_block_as_a_provisioner(
             self, storage_class):
@@ -46,7 +45,7 @@ class StorageClassWatcher(WatcherHelper):
         if parameter.endswith(settings.SECRET_NAME_SUBSTRING):
             return self._get_secret(
                 storage_class, parameter, settings.SECRET_NAME_SUBSTRING)
-        elif parameter.endswith(settings.DEPRECATED_SECRET_NAME_SUBSTRING):
+        if parameter.endswith(settings.DEPRECATED_SECRET_NAME_SUBSTRING):
             return self._get_secret(
                 storage_class,
                 parameter,
@@ -55,7 +54,7 @@ class StorageClassWatcher(WatcherHelper):
 
     def _get_secret(self, storage_class, parameter, secret_name_substring):
         prefix = parameter.split(secret_name_substring)[0]
-        return self._generate_secret_id_From_secret_and_namespace(
+        return self.generate_secret_id_from_secret_and_namespace(
             storage_class.parameters[parameter], storage_class.parameters[
                 prefix + secret_name_substring.replace('name', 'namespace')])
 
