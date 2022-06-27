@@ -88,6 +88,7 @@ The following IBM block storage CSI driver features are not supported on volumes
 
 - Snapshot function is only supported for use with IBM Spectrum Virtualize family storage system versions 8.5.1 or higher. For more information, see **Product overview** > **Technical overview** > **Volume groups** > **Snapshot function** within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
 - Both source and target PVCs (in a source PVC to snapshot to target PVC scenario) must have the same space efficiency set within their storage classes. If the space efficiency is set differently, the target PVC creation fails.
+- A PVC target must have the same volume size as the source volume.
 - A snapshot that uses the Snapshot function cannot be created with space efficiency set. If the VolumeSnapshotClass has the `SpaceEfficiency` parameter set along with the snapshot flag (`virt_snap_func`) enabled, the snapshot creation fails.
 - In very rare cases, there can be leftover or undeleted volumes.
 - A snapshot that uses the Snapshot function must be created within the same pool or child pool as the original PVC.
