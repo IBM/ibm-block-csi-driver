@@ -434,6 +434,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.side_effect = array_errors.ObjectNotFoundError("vol")
         self.mediator.validate_space_efficiency_matches_source = Mock()
+        self.mediator.validate_required_bytes_matches_source = Mock()
 
         self.request.parameters = {config.PARAMETERS_POOL: POOL,
                                    config.PARAMETERS_IO_GROUP: IO_GROUP,

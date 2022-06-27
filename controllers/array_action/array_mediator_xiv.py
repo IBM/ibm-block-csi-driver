@@ -531,3 +531,6 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def validate_space_efficiency_matches_source(self, space_efficiency, source_id, source_type):
         raise NotImplementedError
+
+    def validate_required_bytes_matches_source(self, required_bytes, source_id, source_type):
+        raise NotImplementedError
