@@ -7,7 +7,7 @@ from kubernetes.client.rest import ApiException
 
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.common import settings
-from controllers.servers.host_definer.common.types import VerifyHostRequest
+from controllers.servers.host_definer.common.types import DefineHostRequest
 from controllers.servers.host_definer.storage_manager.host import StorageHostManager
 import controllers.servers.host_definer.watcher.exceptions as exceptions
 
@@ -219,7 +219,7 @@ class WatcherHelper:
         return host_request
 
     def _get_new_host_request(self):
-        host_request = VerifyHostRequest()
+        host_request = DefineHostRequest()
         host_request.prefix = self._get_prefix()
         host_request.connectivity_type = self.get_connectivity()
         return host_request

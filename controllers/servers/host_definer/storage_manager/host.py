@@ -1,6 +1,6 @@
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.common import settings
-from controllers.servers.host_definer.common.types import VerifyHostResponse
+from controllers.servers.host_definer.common.types import DefineHostResponse
 
 logger = get_stdout_logger()
 
@@ -22,7 +22,7 @@ class StorageHostManager:
         logger.info(
             'prefix: {0}'.format(
                 host_request.prefix))
-        host_response = VerifyHostResponse()
+        host_response = DefineHostResponse()
         return host_response
 
     def undefine_host(self, host_request):
@@ -38,5 +38,5 @@ class StorageHostManager:
         logger.info(
             'prefix: {0}'.format(
                 host_request.prefix))
-        host_response = VerifyHostResponse()
+        host_response = DefineHostResponse()
         return host_response

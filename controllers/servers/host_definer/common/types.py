@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 
 
 @dataclass
-class VerifyHostRequest:
+class DefineHostRequest:
     prefix: str = field(default_factory=str)
     secret_name: str = field(default_factory=str)
     secret_namespace: str = field(default_factory=str)
@@ -12,5 +12,5 @@ class VerifyHostRequest:
 
 
 @dataclass
-class VerifyHostResponse:
+class DefineHostResponse:
     error_message: str = field(default_factory=str)
