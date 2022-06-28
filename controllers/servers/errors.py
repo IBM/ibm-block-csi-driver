@@ -1,4 +1,5 @@
 import controllers.servers.messages as messages
+from controllers.array_action.errors import BaseArrayActionException
 
 
 class BaseControllerServerException(Exception):
@@ -32,3 +33,11 @@ class ObjectAlreadyProcessingError(BaseControllerServerException):
     def __init__(self, object_id_or_name):
         super().__init__()
         self.message = messages.OBJECT_ALREADY_PROCESSING_MESSAGE.format(object_id_or_name)
+
+
+class RequiredBytesMismatch(BaseArrayActionException):
+
+    def __init__(self, target_required_bytes, source_required_bytes):
+        super().__init__()
+        self.message = messages.REQUIRED_BYTES_MISMATCH_MESSAGE.format(target_required_bytes,
+                                                                       source_required_bytes)

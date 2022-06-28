@@ -319,7 +319,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         array_snapshot = self._generate_snapshot_response(cli_snapshot)
         return array_snapshot
 
-    def get_object_by_id(self, object_id, object_type):
+    def get_object_by_id(self, object_id, object_type, is_virt_snap_func=False):
         cli_object = self._get_cli_object_by_wwn(object_id)
         if not cli_object:
             return None
@@ -527,10 +527,4 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         raise NotImplementedError
 
     def demote_replication_volume(self, replication_name):
-        raise NotImplementedError
-
-    def validate_space_efficiency_matches_source(self, space_efficiency, source_id, source_type):
-        raise NotImplementedError
-
-    def validate_required_bytes_matches_source(self, required_bytes, source_id, source_type):
         raise NotImplementedError

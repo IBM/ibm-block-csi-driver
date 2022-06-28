@@ -140,19 +140,20 @@ def build_stop_replication_kwargs(rcrelationship_id, add_access):
     return cli_kwargs
 
 
-def _get_cli_volume_space_efficiency(cli_volume):
-    space_efficiency = config.SPACE_EFFICIENCY_THICK
+def _get_cli_volume_space_efficiency_aliases(cli_volume):
+    space_efficiency_aliases = [config.SPACE_EFFICIENCY_THICK, '']
     if cli_volume.se_copy == YES:
-        space_efficiency = config.SPACE_EFFICIENCY_THIN
+        space_efficiency_aliases = [config.SPACE_EFFICIENCY_THIN]
     if cli_volume.compressed_copy == YES:
-        space_efficiency = config.SPACE_EFFICIENCY_COMPRESSED
+        space_efficiency_aliases = [config.SPACE_EFFICIENCY_COMPRESSED]
     if hasattr(cli_volume, "deduplicated_copy"):
         if cli_volume.deduplicated_copy == YES:
             if cli_volume.se_copy == YES:
-                space_efficiency = config.SPACE_EFFICIENCY_DEDUPLICATED_THIN
+                space_efficiency_aliases = [config.SPACE_EFFICIENCY_DEDUPLICATED_THIN]
             else:
-                space_efficiency = config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED
-    return space_efficiency
+                space_efficiency_aliases = [config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED,
+                                            config.SPACE_EFFICIENCY_DEDUPLICATED]
+    return space_efficiency_aliases
 
 
 class SVCArrayMediator(ArrayMediatorAbstract):
@@ -253,7 +254,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         source_id = None
         if not is_virt_snap_func:
             source_id = self._get_source_volume_wwn_if_exists(cli_volume)
-        space_efficiency = _get_cli_volume_space_efficiency(cli_volume)
+        space_efficiency = _get_cli_volume_space_efficiency_aliases(cli_volume)
         return Volume(
             capacity_bytes=int(cli_volume.capacity),
             id=cli_volume.vdisk_UID,
@@ -591,20 +592,25 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return None
         return self._generate_snapshot_response_with_verification(target_cli_volume)
 
-    def get_object_by_id(self, object_id, object_type):
-        cli_object = self._get_cli_volume_by_wwn(object_id)
-        if not cli_object:
+    def get_object_by_id(self, object_id, object_type, is_virt_snap_func=False):
+        if is_virt_snap_func and object_type is controller_config.SNAPSHOT_TYPE_NAME:
+            cli_snapshot = self._get_cli_snapshot_by_id(object_id)
+            source_cli_volume = self._get_cli_volume_by_wwn(cli_snapshot.volume_id)
+            return self._generate_snapshot_response_from_cli_snapshot(cli_snapshot, source_cli_volume)
+        cli_volume = self._get_cli_volume_by_wwn(object_id)
+        if not cli_volume:
             return None
         if object_type is controller_config.SNAPSHOT_TYPE_NAME:
-            return self._generate_snapshot_response_with_verification(cli_object)
-        cli_volume = self._get_cli_volume(cli_object.name)
+            return self._generate_snapshot_response_with_verification(cli_volume)
+        cli_volume = self._get_cli_volume(cli_volume.name)
         return self._generate_volume_response(cli_volume)
 
     def _create_similar_volume(self, source_cli_volume, target_volume_name, space_efficiency, pool):
         logger.info("creating target cli volume '{0}' from source volume '{1}'".format(target_volume_name,
                                                                                        source_cli_volume.name))
         if not space_efficiency:
-            space_efficiency = _get_cli_volume_space_efficiency(source_cli_volume)
+            space_efficiency_aliases = _get_cli_volume_space_efficiency_aliases(source_cli_volume)
+            space_efficiency = space_efficiency_aliases[0]
         size_in_bytes = int(source_cli_volume.capacity)
         if not pool:
             pool = self._get_volume_pools(source_cli_volume)[0]
@@ -1504,23 +1510,3 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return False
         cli_volume = self._get_cli_volume_by_wwn(vdisk_uid, not_exist_err=False)
         return cli_volume and cli_volume.FC_id
-
-    def _get_source_cli_volume(self, source_id, source_type):
-        if source_type == controller_config.SNAPSHOT_TYPE_NAME:
-            cli_snapshot = self._get_cli_snapshot_by_id(source_id)
-            return self._get_cli_volume(cli_snapshot.volume_id)
-        source_volume_name = self._get_volume_name_by_wwn(source_id)
-        return self._get_cli_volume(source_volume_name)
-
-    def validate_space_efficiency_matches_source(self, space_efficiency, source_id, source_type):
-        source_cli_volume = self._get_source_cli_volume(source_id, source_type)
-        source_volume_space_efficiency = _get_cli_volume_space_efficiency(source_cli_volume)
-        if not _is_space_efficiency_matches_source(space_efficiency,
-                                                   source_volume_space_efficiency):
-            raise array_errors.SpaceEfficiencyMismatch(space_efficiency, source_volume_space_efficiency)
-
-    def validate_required_bytes_matches_source(self, required_bytes, source_id, source_type):
-        source_cli_volume = self._get_source_cli_volume(source_id, source_type)
-        size_in_bytes = int(source_cli_volume.capacity)
-        if size_in_bytes < required_bytes:
-            raise array_errors.RequiredBytesMismatch(required_bytes, size_in_bytes)

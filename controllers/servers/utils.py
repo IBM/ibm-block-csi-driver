@@ -18,7 +18,7 @@ from controllers.common.config import config as common_config
 from controllers.servers.csi.controller_types import (ArrayConnectionInfo,
                                                       ObjectIdInfo,
                                                       ObjectParameters)
-from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
+from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId, RequiredBytesMismatch
 
 logger = get_stdout_logger()
 
@@ -601,15 +601,20 @@ def _validate_parameter_match_volume(parameter_value, value_from_volume, error_m
         raise ValidationException(error_message_format.format(parameter_value, value_from_volume))
 
 
-def validate_parameters_match_volume(parameters, volume):
-    logger.debug("validating space efficiency parameter matches volume's")
-    space_efficiency = parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
+def _validate_sapce_efficiency_match(space_efficiency, volume):
     if space_efficiency:
         space_efficiency = space_efficiency.lower()
     else:
         space_efficiency = volume.default_space_efficiency
     _validate_parameter_match_volume(space_efficiency, volume.space_efficiency,
-                                     messages.SPACE_EFFICIENCY_NOT_MATCH_VOLUME_MESSAGE)
+                                     messages.SPACE_EFFICIENCY_NOT_MATCH_VOLUME_MESSAGE,
+                                     lambda se, se_aliases: se in se_aliases)
+
+
+def validate_parameters_match_volume(parameters, volume):
+    logger.debug("validating space efficiency parameter matches volume's")
+    space_efficiency = parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
+    _validate_sapce_efficiency_match(space_efficiency, volume)
 
     logger.debug("validating pool parameter matches volume's")
     pool = parameters.get(config.PARAMETERS_POOL)
@@ -619,3 +624,10 @@ def validate_parameters_match_volume(parameters, volume):
     prefix = parameters.get(config.PARAMETERS_VOLUME_NAME_PREFIX)
     _validate_parameter_match_volume(prefix, volume.name, messages.PREFIX_NOT_MATCH_VOLUME_MESSAGE,
                                      lambda pref, name: name.startswith(pref + NAME_PREFIX_SEPARATOR))
+
+
+def validate_parameters_match_source_volume(space_efficiency, required_bytes, volume):
+    _validate_sapce_efficiency_match(space_efficiency, volume)
+    volume_capacity_bytes = volume.capacity_bytes
+    if volume_capacity_bytes < required_bytes:
+        raise RequiredBytesMismatch(required_bytes, volume_capacity_bytes)

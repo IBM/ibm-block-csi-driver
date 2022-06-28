@@ -502,6 +502,13 @@ class TestUtils(unittest.TestCase):
                                                     parameter_field=controller_config.PARAMETERS_SPACE_EFFICIENCY,
                                                     parameter_value="thin")
 
+    def test_validate_parameters_match_volume_dedup_aliases_success(self):
+        self._test_validate_parameters_match_volume(volume_field="space_efficiency",
+                                                    volume_value=[array_config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED,
+                                                                  array_config.SPACE_EFFICIENCY_DEDUPLICATED],
+                                                    parameter_field=controller_config.PARAMETERS_SPACE_EFFICIENCY,
+                                                    parameter_value="deduplicated")
+
     def test_validate_parameters_match_volume_default_se_success(self):
         self._test_validate_parameters_match_volume(volume_field="space_efficiency",
                                                     volume_value=array_config.SPACE_EFFICIENCY_NONE,

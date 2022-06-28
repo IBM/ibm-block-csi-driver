@@ -575,7 +575,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return self._generate_snapshot_response(api_object, flashcopy_as_target.sourcevolume)
 
     @convert_scsi_ids_to_array_ids()
-    def get_object_by_id(self, object_id, object_type):
+    def get_object_by_id(self, object_id, object_type, is_virt_snap_func=False):
         api_object = self._get_api_volume_by_id(object_id, not_exist_err=False)
         if not api_object:
             return None
@@ -696,10 +696,4 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         raise NotImplementedError
 
     def demote_replication_volume(self, replication_name):
-        raise NotImplementedError
-
-    def validate_space_efficiency_matches_source(self, space_efficiency, source_id, source_type):
-        raise NotImplementedError
-
-    def validate_required_bytes_matches_source(self, required_bytes, source_id, source_type):
         raise NotImplementedError

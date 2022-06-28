@@ -13,7 +13,7 @@ class Volume:
     source_id: str
     array_type: str
     pool: str
-    space_efficiency: str = None
+    space_efficiency: list = field(default_factory=list)
     default_space_efficiency: str = None
 
 
