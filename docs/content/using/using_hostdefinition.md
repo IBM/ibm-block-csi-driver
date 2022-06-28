@@ -51,7 +51,7 @@ Some of the parameters within the `HostDefiner.yaml` are configurable. Use this 
 
 ## Blocking a specific node from being deleted
 
-In order to block a specific node from being deleted by the CSI driver, you can add the following label to the node: `hostdefiner.block.csi.ibm.com/avoid-deletion=true`.
+In order to block a specific host definition from being deleted by the CSI driver, you can add the following label to the node: `hostdefiner.block.csi.ibm.com/avoid-deletion=true`.
 
 This works on a per node basis, where the `allowDelete` parameter definition in the `HostDefiner.yaml` is for all nodes on the system.
 
