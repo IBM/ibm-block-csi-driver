@@ -2,7 +2,7 @@
 
 Install the `HostDefiner` custom resource to enable dynamic host definitions from within the CSI driver.
 
-For more information on using dynamic host connectivity, see [Using dynamic host connectivity](../using/using_hostdefinition.md).
+For more information on using dynamic host connectivity definition, see [Using dynamic host definition](../using/using_hostdefinition.md).
 
 Use the following steps to install the `HostDefiner` custom resource, with [GitHub](https://github.com/IBM/ibm-block-csi-operator).
 

@@ -1,4 +1,4 @@
-# Using dynamic host connectivity
+# Using dynamic host definition
 
 Dynamic host connectivity removes the necessity for manual host definitions. This is also facilitates the scaling out process of a node. 
 
@@ -33,9 +33,9 @@ If any of the host definitions have an Error status, follow this procedure to ha
 
     ```
     $> kubectl get hostdefinition
-    NAME                     AGE    PHASE   STORAGE          NODE
-    <host_definition_name1>  102m   Ready   <storage_name>   <node_name1>
-    <host_definition_name2>  102m   Ready   <storage_name>   <node_name2>
+    NAME                     AGE    PHASE   STORAGE               NODE
+    <host_definition_name1>  102m   Ready   <management_address>  <node_name1>
+    <host_definition_name2>  102m   Ready   <management_address>  <node_name2>
     ```
 
 ## Updating the `HostDefiner.yaml`
