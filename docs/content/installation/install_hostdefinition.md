@@ -12,4 +12,4 @@ Download the `HostDefiner` customer resource manifest from [GitHub](https://gith
 
     curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.10.0/config/samples/csi_v1_hostdefiner.yaml > csi_v1_hostdefiner.yaml
 
-After the `HostDefiner` is installed it searches for host on storage definitions that have not yet been defined.
+After the `HostDefiner` is installed, it searches for nodes that have not yet been defined on storage, and defines them.
