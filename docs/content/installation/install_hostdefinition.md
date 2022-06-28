@@ -17,8 +17,8 @@ Use the following steps to install the `HostDefinition` custom resource, with [G
     ```
     $> kubectl get hostdefinition
     NAME                  AGE    PHASE   STORAGE          HOST
-    <k8s_resource_name1>  102m   Ready   <storage_name>   <host_name_w1>
-    k8s_resource_name2>  102m   Ready   <storage_name>   <host_name_w2>
+    <host_definition_name1>  102m   Ready   <storage_name>   <host_name1>
+    <host_definition_name2>  102m   Ready   <storage_name>   <host_name2>
     ```
 
     If in an `Error` state, a retry can be forced using TBD.
@@ -28,4 +28,4 @@ Use the following steps to install the `HostDefinition` custom resource, with [G
     |Field|Description|
     |---------|--------|
     |prefix|Adds a prefix to the hosts defined by the CSI driver.|
-    |connectivity|Selects the connectivity type for the host ports.<br>Possible input values are:<br>- `iscsi` for use with iSCSI connectivity<br>- `fc` for use with Fibre Channel over SCSI connectivity<br>- `nvme` for use with NVME over Fibre Channel connectivity (Spectrum Virtualize storage systems only)<br>By default, this field is blank and the driver selects the strongest of available connectivity options.|
+    |connectivity|Selects the connectivity type for the host ports.<br>Possible input values are:<br>- `iscsi` for use with iSCSI connectivity<br>- `fc` for use with Fibre Channel over SCSI connectivity<br>- `nvme` for use with NVME over Fibre Channel connectivity (Spectrum Virtualize storage systems only)<br>By default, this field is blank and the driver selects the first of available connectivity types available on the storage system, according to the following hierarchy: NVMe, FC, iSCSI.|
