@@ -1,13 +1,13 @@
 from kubernetes import watch
 
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.host_definer.watcher.watcher_helper import WatcherHelper, SECRET_IDS
+from controllers.servers.host_definer.watcher.watcher_helper import Watcher, SECRET_IDS
 from controllers.servers.host_definer.common import settings
 
 logger = get_stdout_logger()
 
 
-class StorageClassWatcher(WatcherHelper):
+class StorageClassWatcher(Watcher):
 
     def watch_storage_class_resources(self):
         watcher = watch.Watch()
@@ -31,7 +31,7 @@ class StorageClassWatcher(WatcherHelper):
 
     def _is_storage_class_has_csi_ibm_block_as_a_provisioner(
             self, storage_class):
-        return storage_class.provisioner == settings.IBM_BLOCK_CSI_DRIVER_NAME
+        return storage_class.provisioner == settings.IBM_BLOCK_CSI_PROVISIONER_NAME
 
     def _get_secrets_from_storage_class(self, storage_class):
         secrets = set()
@@ -45,11 +45,6 @@ class StorageClassWatcher(WatcherHelper):
         if parameter.endswith(settings.SECRET_NAME_SUBSTRING):
             return self._get_secret(
                 storage_class, parameter, settings.SECRET_NAME_SUBSTRING)
-        if parameter.endswith(settings.DEPRECATED_SECRET_NAME_SUBSTRING):
-            return self._get_secret(
-                storage_class,
-                parameter,
-                settings.DEPRECATED_SECRET_NAME_SUBSTRING)
         return ''
 
     def _get_secret(self, storage_class, parameter, secret_name_substring):

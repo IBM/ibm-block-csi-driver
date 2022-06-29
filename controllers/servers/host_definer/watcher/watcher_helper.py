@@ -5,6 +5,10 @@ from kubernetes import client, config, dynamic
 from kubernetes.client import api_client
 from kubernetes.client.rest import ApiException
 
+from controllers.servers.config import (SECRET_ARRAY_PARAMETER,
+                                        SECRET_PASSWORD_PARAMETER,
+                                        SECRET_USERNAME_PARAMETER)
+from controllers.common import utils
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.common import settings
 from controllers.servers.host_definer.common.types import DefineHostRequest
@@ -16,7 +20,7 @@ NODES = {}
 logger = get_stdout_logger()
 
 
-class WatcherHelper:
+class Watcher:
     def __init__(self):
         self.storage_host_manager = StorageHostManager()
         self._load_cluster_configuration()
@@ -41,12 +45,12 @@ class WatcherHelper:
 
     def _get_host_definitions_api(self):
         return self.dynamic_client.resources.get(
-            api_version=settings.CSI_IBM_BLOCK_API_VERSION,
-            kind=settings.HOSTDEFINITION_KIND)
+            api_version=settings.CSI_IBM_API_VERSION,
+            kind=settings.HOST_DEFINITION_KIND)
 
     def verify_nodes_defined(self, host_request):
-        for node in NODES:
-            host_request.node_id = self.get_node_id_from_node_name(node)
+        for _, node_id in NODES.items():
+            host_request.node_id = node_id
             self._verify_host_defined_and_has_host_definition(host_request)
 
     def _verify_host_defined_and_has_host_definition(self, host_request):
@@ -131,20 +135,20 @@ class WatcherHelper:
 
     def get_host_definition_name(self, host_request, node_name):
         return '{0}.{1}'.format(
-            host_request.system_info[settings.MANAGEMENT_ADDRESS_KEY], node_name).replace('_', '.')
+            host_request.system_info[SECRET_ARRAY_PARAMETER], node_name).replace('_', '.')
 
     def get_host_definition_manifest_from_host_request(
             self, host_request, host_definition_name):
         node_name = self.get_node_name_from_node_id(host_request.node_id)
         return {
-            'apiVersion': settings.CSI_IBM_BLOCK_API_VERSION,
-            'kind': settings.HOSTDEFINITION_KIND,
+            'apiVersion': settings.CSI_IBM_API_VERSION,
+            'kind': settings.HOST_DEFINITION_KIND,
             'metadata': {
                 'name': host_definition_name,
             },
             'spec': {
                 'hostDefinition': {
-                    'managementAddress': host_request.system_info[settings.MANAGEMENT_ADDRESS_KEY],
+                    'managementAddress': host_request.system_info[SECRET_ARRAY_PARAMETER],
                     'nodeName': node_name,
                     'nodeId': host_request.node_id,
                     'secretName': host_request.secret_name,
@@ -181,11 +185,8 @@ class WatcherHelper:
     def get_host_request_from_secret_and_node_name(self, secret_id, node_name):
         host_request = self.get_host_request_from_secret_id(secret_id)
         if host_request:
-            host_request.node_id = self.get_node_id_from_node_name(node_name)
+            host_request.node_id = NODES[node_name]
         return host_request
-
-    def get_node_id_from_node_name(self, node_name):
-        return NODES[node_name]
 
     def get_host_request_from_secret_id(self, secret):
         secret_name, secret_namespace = self._get_secret_name_and_namespace_from_id(secret)
@@ -245,12 +246,12 @@ class WatcherHelper:
 
     def _get_system_info_from_secret_data(self, secret_data):
         return {
-            settings.MANAGEMENT_ADDRESS_KEY: self._decode_base64_to_string(
-                secret_data[settings.MANAGEMENT_ADDRESS_KEY]),
-            settings.USERNAME_KEY: self._decode_base64_to_string(
-                secret_data[settings.USERNAME_KEY]),
-            settings.PASSWORD_KEY: self._decode_base64_to_string(
-                secret_data[settings.PASSWORD_KEY])
+            SECRET_ARRAY_PARAMETER: self._decode_base64_to_string(
+                secret_data[SECRET_ARRAY_PARAMETER]),
+            SECRET_USERNAME_PARAMETER: self._decode_base64_to_string(
+                secret_data[SECRET_USERNAME_PARAMETER]),
+            SECRET_PASSWORD_PARAMETER: self._decode_base64_to_string(
+                secret_data[SECRET_PASSWORD_PARAMETER])
         }
 
     def _decode_base64_to_string(self, content_with_base64):
@@ -261,10 +262,10 @@ class WatcherHelper:
     def undefine_host_and_host_definition_with_events(self, host_request):
         node_name = self.get_node_name_from_node_id(host_request.node_id)
         logger.info('Verifying that host {} is undefined from storage {}'.format(
-            node_name, host_request.system_info[settings.MANAGEMENT_ADDRESS_KEY]))
+            node_name, host_request.system_info[SECRET_ARRAY_PARAMETER]))
         host_definition_name = self.get_host_definition_name(
             host_request, node_name)
-        response = self.define_host_and_host_definition(host_request, host_definition_name)
+        response = self.undefine_host_and_host_definition(host_request, host_definition_name)
         if response.error_message:
             self.set_host_definition_status_to_pending_deletion(host_definition_name)
             self._create_event_to_host_definition_from_host_request(
@@ -293,9 +294,9 @@ class WatcherHelper:
         }
         try:
             self.custom_object_api.patch_cluster_custom_object_status(
-                settings.CSI_IBM_BLOCK_GROUP,
+                settings.CSI_IBM_GROUP,
                 settings.VERSION,
-                settings.HOSTDEFINITION_PLURAL,
+                settings.HOST_DEFINITION_PLURAL,
                 host_definition_name,
                 status)
         except ApiException as ex:
@@ -319,7 +320,8 @@ class WatcherHelper:
         self.add_event_to_host_definition(host_definition, message)
 
     def get_node_name_from_node_id(self, node_id):
-        return node_id.split(';')[0]
+        node_name, _, _, _ = utils.get_node_id_info(node_id)
+        return node_name
 
     def add_event_to_host_definition(
             self, host_definition, message):
@@ -333,8 +335,8 @@ class WatcherHelper:
             metadata=client.V1ObjectMeta(
                 generate_name='{}.'.format(obj.metadata.name),
             ),
-            reporting_component=settings.HOSTDEFINER,
-            reporting_instance=settings.HOSTDEFINER,
+            reporting_component=settings.HOST_DEFINER,
+            reporting_instance=settings.HOST_DEFINER,
             action='Verifying',
             type='Error',
             reason=settings.FAILED_VERIFYING,
@@ -378,7 +380,7 @@ class WatcherHelper:
         return self._is_host_has_label_in_true(node_name, settings.MANAGED_BY_HOST_DEFINER_LABEL)
 
     def _is_node_has_host_definer_avoid_deletion_label(self, node_name):
-        return self._is_host_has_label_in_true(node_name, settings.HOST_DEFINER_AVOID_DELETION_LABEL)
+        return self._is_host_has_label_in_true(node_name, settings.HOST_DEFINER_FORBID_DELETION_LABEL)
 
     def _is_host_has_label_in_true(self, node_name, label):
         try:
@@ -391,7 +393,7 @@ class WatcherHelper:
             return node.metadata.labels[label] == 'true'
         return False
 
-    def define_host_and_host_definition(self, host_request, host_definition_name):
+    def undefine_host_and_host_definition(self, host_request, host_definition_name):
         response = self.storage_host_manager.undefine_host(host_request)
         if response.error_message:
             return response
@@ -409,10 +411,10 @@ class WatcherHelper:
                 logger.error('Failed to delete hostDefinition {}, got: {}'.format(
                     host_definition_name, ex.body))
 
-    def is_csi_node_has_ibm_csi_block_driver(self, csi_node):
+    def is_ibm_csi_block_driver_in(self, csi_node):
         if csi_node.spec.drivers:
             for driver in csi_node.spec.drivers:
-                if driver.name == settings.IBM_BLOCK_CSI_DRIVER_NAME:
+                if driver.name == settings.IBM_BLOCK_CSI_PROVISIONER_NAME:
                     return True
         return False
 
@@ -426,7 +428,7 @@ class WatcherHelper:
 
     def _get_node_id_from_csi_node(self, csi_node):
         for driver in csi_node.spec.drivers:
-            if driver.name == settings.IBM_BLOCK_CSI_DRIVER_NAME:
+            if driver.name == settings.IBM_BLOCK_CSI_PROVISIONER_NAME:
                 return driver.nodeID
         return None
 

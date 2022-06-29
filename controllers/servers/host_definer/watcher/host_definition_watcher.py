@@ -3,13 +3,13 @@ from time import sleep
 from kubernetes import dynamic
 
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.host_definer.watcher.watcher_helper import WatcherHelper
+from controllers.servers.host_definer.watcher.watcher_helper import Watcher
 from controllers.servers.host_definer.common import settings
 
 logger = get_stdout_logger()
 
 
-class HostDefinitionWatcher(WatcherHelper):
+class HostDefinitionWatcher(Watcher):
     def __init__(self):
         super().__init__()
         self.host_definitions_in_use = []
@@ -100,7 +100,7 @@ class HostDefinitionWatcher(WatcherHelper):
             response = self.verify_host_defined_on_storage_and_on_cluster(host_request)
         elif host_definition_phase == settings.PENDING_DELETION_PHASE and \
                 (self.is_host_can_be_undefined(node_name)):
-            response = self.define_host_and_host_definition(host_request, host_definition_name)
+            response = self.undefine_host_and_host_definition(host_request, host_definition_name)
         return response
 
     def _add_event_when_response_has_error_message(self, response, host_definition):

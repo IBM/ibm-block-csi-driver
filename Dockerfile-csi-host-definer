@@ -5,24 +5,30 @@ WORKDIR /tmp
 COPY controllers/servers/host_definer/requirements.txt .
 RUN pip3 install -r ./requirements.txt
 
+USER root
+COPY controllers/scripts/csi_general .
+RUN ./csi_pb2.sh
+RUN pip3 install .
+
 FROM registry.access.redhat.com/ubi8/python-38:1-96
 
 ARG VERSION=1.10.0
 ARG BUILD_NUMBER=0
 
 ###Required Labels
-LABEL name="IBM block storage CSI driver hostDefiner" \
+LABEL name="IBM block storage CSI driver host definer" \
       vendor="IBM" \
       maintainer="IBM Storage" \
       version=$VERSION \
       release=$BUILD_NUMBER \
-      summary="The hostDefiner component of the IBM block storage CSI driver" \
+      summary="The host definer component of the IBM block storage CSI driver" \
       description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage." \
-      io.k8s.display-name="IBM block storage CSI driver hostDefiner" \
+      io.k8s.display-name="IBM block storage CSI driver host definer" \
       io.k8s.description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage." \
-      io.openshift.tags=ibm,csi,ibm-block-csi-driver,hostDefiner
+      io.openshift.tags=ibm,csi,ibm-block-csi-driver,host-definer
 
 COPY --from=builder /opt/app-root /opt/app-root
+COPY ./common /driver/common
 COPY ./controllers/ /driver/controllers/
 COPY ./LICENSE /licenses/
 COPY ./NOTICES /licenses/

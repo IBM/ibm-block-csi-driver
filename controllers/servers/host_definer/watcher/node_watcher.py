@@ -3,13 +3,13 @@ from kubernetes import watch
 from kubernetes.client.rest import ApiException
 
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.host_definer.watcher.watcher_helper import NODES, WatcherHelper
+from controllers.servers.host_definer.watcher.watcher_helper import NODES, Watcher
 from controllers.servers.host_definer.common import settings
 
 logger = get_stdout_logger()
 
 
-class NodeWatcher(WatcherHelper):
+class NodeWatcher(Watcher):
 
     def watch_nodes_resources(self):
         watcher = watch.Watch()
@@ -43,7 +43,7 @@ class NodeWatcher(WatcherHelper):
         node_name = self.get_node_name_from_csi_node(csi_node)
         return self.is_node_has_managed_by_host_definer_label(node_name) and \
             self._is_node_has_host_definitions(node_name) and \
-            not self.is_csi_node_has_ibm_csi_block_driver(csi_node)
+            not self.is_ibm_csi_block_driver_in(csi_node)
 
     def _is_node_has_host_definitions(self, node_name):
         host_definitions = self._get_all_node_host_definitions(node_name)
@@ -79,4 +79,4 @@ class NodeWatcher(WatcherHelper):
         return not self.is_dynamic_node_labeling_allowed() and \
             self.is_node_has_managed_by_host_definer_label(node_name) and \
             node_name not in NODES and \
-            self.is_csi_node_has_ibm_csi_block_driver(csi_node)
+            self.is_ibm_csi_block_driver_in(csi_node)

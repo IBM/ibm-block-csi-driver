@@ -4,25 +4,25 @@ from threading import Thread
 from kubernetes.client.rest import ApiException
 
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.host_definer.watcher.watcher_helper import WatcherHelper, NODES, SECRET_IDS
+from controllers.servers.host_definer.watcher.watcher_helper import Watcher, NODES, SECRET_IDS
 from controllers.servers.host_definer.common import settings
 
 logger = get_stdout_logger()
 
 
-class CsiNodeWatcher(WatcherHelper):
+class CsiNodeWatcher(Watcher):
 
     def add_initial_nodes(self):
         csi_nodes = self.csi_nodes_api.get().items
         for csi_node in csi_nodes:
             node_name = csi_node.metadata.name
-            if self._is_this_new_ibm_block_csi_node(csi_node) and \
+            if self._is_new(csi_node) and \
                     self.is_host_can_be_defined(node_name):
                 self.add_node_to_nodes(node_name, csi_node)
 
-    def _is_this_new_ibm_block_csi_node(self, csi_node):
+    def _is_new(self, csi_node):
         node_name = csi_node.metadata.name
-        return (self.is_csi_node_has_ibm_csi_block_driver(csi_node)) and \
+        return (self.is_ibm_csi_block_driver_in(csi_node)) and \
             (node_name not in NODES)
 
     def watch_csi_nodes_resources(self):
@@ -37,7 +37,7 @@ class CsiNodeWatcher(WatcherHelper):
 
     def _handle_modified_csi_node(self, csi_node):
         node_name = self.get_node_name_from_csi_node(csi_node)
-        if self.is_csi_node_has_ibm_csi_block_driver(csi_node) and \
+        if self.is_ibm_csi_block_driver_in(csi_node) and \
                 self.is_host_can_be_defined(node_name):
             self._handle_modified_csi_node_with_ibm_block_csi(csi_node)
         elif node_name in NODES:
@@ -45,7 +45,7 @@ class CsiNodeWatcher(WatcherHelper):
 
     def _handle_modified_csi_node_with_ibm_block_csi(self, csi_node):
         node_name = self.get_node_name_from_csi_node(csi_node)
-        if self._is_this_new_ibm_block_csi_node(csi_node) and (node_name not in NODES):
+        if self._is_new(csi_node) and (node_name not in NODES):
             logger.info('New Kubernetes node {}, has csi IBM block'.format(
                 node_name))
             self.add_node_to_nodes(node_name, csi_node)

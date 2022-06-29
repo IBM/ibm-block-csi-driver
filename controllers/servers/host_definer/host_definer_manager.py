@@ -21,18 +21,17 @@ class HostDefinerManager:
         self.node_watcher = NodeWatcher()
 
     def start_host_definition(self):
-        print('starting host definer')
+        logger.info('starting host definer')
         self.csi_node_watcher.add_initial_nodes()
         self._start_watchers()
 
     def _start_watchers(self):
-        watchers = [
+        watchers = (
             self.csi_node_watcher.watch_csi_nodes_resources,
             self.host_definition_watcher.watch_host_definitions_resources,
             self.secret_watcher.watch_secret_resources,
             self.node_watcher.watch_nodes_resources,
-            self.storage_class_watcher.watch_storage_class_resources]
-        threads = []
-        for index, watch_function in enumerate(watchers):
-            threads.append(Thread(target=watch_function,))
-            threads[index].start()
+            self.storage_class_watcher.watch_storage_class_resources)
+        for watch_function in watchers:
+            thread = Thread(target=watch_function,)
+            thread.start()
