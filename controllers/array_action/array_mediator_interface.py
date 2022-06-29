@@ -389,13 +389,31 @@ class ArrayMediator(ABC):
         This function will check if the space efficiency passed to the create volume is valid
 
         Args:
-           space_efficiency : as passed from the storage class
+           space_efficiency : as passed from the CSI request
 
         Returns:
             None
 
         Raises:
             SpaceEfficiencyNotSupported
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def validate_space_efficiency_matches_source(self, space_efficiency, source_id, source_type):
+        """
+        This function will check if the space efficiency passed to CreateVolume matches the volume source.
+
+        Args:
+            space_efficiency : as passed from the CSI request
+            source_id        : id of source to create from
+            source_type      : volume or snapshot
+
+        Returns:
+            None
+
+        Raises:
+            SpaceEfficiencyMismatch
         """
         raise NotImplementedError
 
