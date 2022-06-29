@@ -546,6 +546,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
                  call(bytes=True, object_id='source_name')]
         self.svc.client.svcinfo.lsvdisk.assert_has_calls(calls)
 
+    def test_get_object_by_id_snapshot_virt_snap_func_enabled_success(self):
+        self._prepare_mocks_for_get_snapshot()
+        self._prepare_mocks_for_lsvolumesnapshot()
+        snapshot = self.svc.get_object_by_id("snapshot_name", "snapshot", is_virt_snap_func=True)
+        self.assertEqual("snapshot_name", snapshot.name)
+        self.svc.client.svcinfo.lsvdisk.assert_called_once_with(bytes=True, object_id='volume_name')
+        self.svc.client.svcinfo.lsvolumesnapshot.assert_called_once_with(object_id='snapshot_name')
+
     def test_get_object_by_id_volume_success(self):
         target_cli_volume = self._get_mapped_target_cli_volume()
         target_cli_volume.name = "volume_id"
@@ -739,6 +747,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual('SVC', snapshot.array_type)
         self.assertEqual('snap_id', snapshot.id)
 
+    def _prepare_mocks_for_lsvolumesnapshot(self, snapshot_id='snapshot_id'):
+        self.svc.client.svcinfo.lsvolumesnapshot = Mock()
+        self.svc.client.svcinfo.lsvolumesnapshot.return_value = self._mock_cli_object(
+            self._get_cli_snapshot(snapshot_id))
+
     def _prepare_mocks_for_create_snapshot_addsnapshot(self, snapshot_id='snapshot_id'):
         self.svc.client.svctask.addsnapshot = Mock()
         source_volume_to_copy_from = self._get_custom_cli_volume(False, False, pool_name='pool1')
@@ -746,9 +759,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvdisk.side_effect = self._mock_cli_objects(volumes_to_return)
         self.svc.client.svctask.addsnapshot.return_value = Mock(
             response=(b'Snapshot, id [0], successfully created or triggered\n', b''))
-        self.svc.client.svcinfo.lsvolumesnapshot = Mock()
-        self.svc.client.svcinfo.lsvolumesnapshot.return_value = self._mock_cli_object(
-            self._get_cli_snapshot(snapshot_id))
+        self._prepare_mocks_for_lsvolumesnapshot(snapshot_id)
 
     def test_create_snapshot_addsnapshot_success(self):
         self._prepare_mocks_for_create_snapshot_addsnapshot()

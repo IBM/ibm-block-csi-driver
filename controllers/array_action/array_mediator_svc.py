@@ -595,7 +595,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def get_object_by_id(self, object_id, object_type, is_virt_snap_func=False):
         if is_virt_snap_func and object_type == controller_config.SNAPSHOT_TYPE_NAME:
             cli_snapshot = self._get_cli_snapshot_by_id(object_id)
-            source_cli_volume = self._get_cli_volume_by_wwn(cli_snapshot.source_volume_id)
+            if not cli_snapshot:
+                return None
+            source_cli_volume = self._get_cli_volume(cli_snapshot.volume_name)
+            if not source_cli_volume:
+                return None
             return self._generate_snapshot_response_from_cli_snapshot(cli_snapshot, source_cli_volume)
         cli_volume = self._get_cli_volume_by_wwn(object_id)
         if not cli_volume:

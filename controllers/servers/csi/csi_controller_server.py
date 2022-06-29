@@ -78,10 +78,14 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 is_virt_snap_func = volume_parameters.virt_snap_func
                 if is_virt_snap_func and source_id:
                     source_object = array_mediator.get_object_by_id(source_id, source_type, is_virt_snap_func)
+                    if not source_object:
+                        handle_exception("source {}: {} not found".format(source_type, source_id), context,
+                                         grpc.StatusCode.NOT_FOUND, csi_pb2.CreateVolumeResponse)
                     if source_type == config.SNAPSHOT_TYPE_NAME:
                         source_object = array_mediator.get_object_by_id(source_object.source_id,
                                                                         config.VOLUME_TYPE_NAME)
-                    utils.validate_parameters_match_source_volume(space_efficiency, required_bytes, source_object)
+                    if source_object:
+                        utils.validate_parameters_match_source_volume(space_efficiency, required_bytes, source_object)
 
                 try:
                     volume = array_mediator.get_volume(volume_final_name, pool, is_virt_snap_func)
