@@ -2,7 +2,7 @@ from controllers.array_action.errors import HostNotFoundError
 from controllers.array_action.storage_agent import detect_array_type, get_agent
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.node_info import NodeIdInfo
-from controllers.servers.host_definer.common.types import VerifyHostResponse
+from controllers.servers.host_definer.common.types import DefineHostResponse
 from controllers.servers.utils import join_object_prefix_with_name, get_array_connection_info_from_secrets
 
 logger = get_stdout_logger()
@@ -31,10 +31,10 @@ class HostDefinerServicer:
 
                     array_mediator.create_host(host_name, initiators, connectivity_type)
 
-                return VerifyHostResponse()
+                return DefineHostResponse()
         except Exception as ex:
             logger.exception(ex)
-            return VerifyHostResponse(error_message=str(ex))
+            return DefineHostResponse(error_message=str(ex))
 
     def undefine_host(self, request):  # pylint: disable=invalid-name
         node_id_info = NodeIdInfo(request.node_id)
@@ -51,7 +51,7 @@ class HostDefinerServicer:
                 except HostNotFoundError:
                     logger.debug("host was not found")
 
-                return VerifyHostResponse()
+                return DefineHostResponse()
         except Exception as ex:
             logger.exception(ex)
-            return VerifyHostResponse(error_message=str(ex))
+            return DefineHostResponse(error_message=str(ex))

@@ -13,14 +13,14 @@ from controllers.array_action.array_action_types import Host, ObjectIds
 from controllers.array_action.array_mediator_xiv import XIVArrayMediator
 from controllers.servers.csi.csi_controller_server import CSIControllerServicer
 from controllers.servers.csi.sync_lock import SyncLock
+from controllers.tests import utils
 from controllers.tests.controller_server.test_settings import (CLONE_VOLUME_NAME,
                                                                OBJECT_INTERNAL_ID,
                                                                POOL, SPACE_EFFICIENCY,
                                                                IO_GROUP, VOLUME_GROUP,
                                                                VOLUME_NAME, SNAPSHOT_NAME,
                                                                SNAPSHOT_VOLUME_NAME,
-                                                               SNAPSHOT_VOLUME_WWN)
-from controllers.tests import utils
+                                                               SNAPSHOT_VOLUME_WWN, VIRT_SNAP_FUNC_TRUE)
 from controllers.tests.utils import ProtoBufMock
 
 
@@ -199,6 +199,14 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.mediator.validate_supported_space_efficiency = Mock()
         self.request.parameters = {config.PARAMETERS_SPACE_EFFICIENCY: SPACE_EFFICIENCY}
         self._test_create_snapshot_succeeds(storage_agent, expected_space_efficiency=SPACE_EFFICIENCY)
+
+    def test_create_snapshot_with_space_efficiency_and_virt_snap_func_enabled_fail(self):
+        self.request.parameters = {config.PARAMETERS_SPACE_EFFICIENCY: SPACE_EFFICIENCY,
+                                   config.PARAMETERS_VIRT_SNAP_FUNC: VIRT_SNAP_FUNC_TRUE}
+
+        self.servicer.CreateSnapshot(self.request, self.context)
+
+        self.assertEqual(grpc.StatusCode.INVALID_ARGUMENT, self.context.code)
 
     @patch("controllers.servers.csi.csi_controller_server.get_agent")
     def test_create_snapshot_already_processing(self, storage_agent):
@@ -425,6 +433,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.side_effect = array_errors.ObjectNotFoundError("vol")
+        self.mediator.validate_space_efficiency_matches_source = Mock()
 
         self.request.parameters = {config.PARAMETERS_POOL: POOL,
                                    config.PARAMETERS_IO_GROUP: IO_GROUP,
@@ -1310,8 +1319,8 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '2')
         self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "fc")
 
-        self.mediator.map_volume.side_effect = [array_errors.LunAlreadyInUseError("", "")] \
-            * (self.mediator.max_lun_retries + 1)
+        self.mediator.map_volume.side_effect = [array_errors.LunAlreadyInUseError("", "")] * (
+                    self.mediator.max_lun_retries + 1)
         storage_agent.return_value = self.storage_agent
 
         self.servicer.ControllerPublishVolume(self.request, self.context)
