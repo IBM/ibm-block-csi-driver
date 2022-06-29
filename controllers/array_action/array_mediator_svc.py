@@ -1522,7 +1522,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _mkhost(self, host_name, connectivity_type, ports):
         cli_kwargs = build_create_host_kwargs(host_name, connectivity_type, ports)
-        self.client.svctask.mkhost(**cli_kwargs)
+        try:
+            self.client.svctask.mkhost(**cli_kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if OBJ_ALREADY_EXIST in ex.my_message:
+                raise array_errors.HostAlreadyExists(host_name, self.endpoint)
+            raise ex
 
     def _get_connectivity_type_by_initiators(self, initiators):
         if initiators.nvme_nqns:
