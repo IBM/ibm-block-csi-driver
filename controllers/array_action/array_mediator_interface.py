@@ -355,7 +355,7 @@ class ArrayMediator(ABC):
             None
 
         Raises:
-            None
+            HostAlreadyExists
         """
         raise NotImplementedError
 

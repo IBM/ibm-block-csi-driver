@@ -1,4 +1,4 @@
-from controllers.array_action.errors import HostNotFoundError
+from controllers.array_action.errors import HostNotFoundError, HostAlreadyExists
 from controllers.array_action.storage_agent import detect_array_type, get_agent
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.node_info import NodeIdInfo
@@ -28,8 +28,15 @@ class HostDefinerServicer:
                     logger.debug("host found : {}".format(found_host_name))
                 except HostNotFoundError:
                     logger.debug("host was not found. creating a new host with initiators: {0}".format(initiators))
-
-                    array_mediator.create_host(host_name, initiators, connectivity_type)
+                    try:
+                        array_mediator.create_host(host_name, initiators, connectivity_type)
+                    except HostAlreadyExists:
+                        host = array_mediator.get_host_by_name(host_name)
+                        if host.initiators not in initiators:
+                            error_message = "host () found but with different initiators: {}".format(host,
+                                                                                                     host.initiators)
+                            logger.exception(error_message)
+                            return DefineHostResponse(error_message=str(error_message))
 
                 return DefineHostResponse()
         except Exception as ex:
