@@ -5,7 +5,7 @@ from controllers.servers.host_definer.common.types import DefineHostResponse
 logger = get_stdout_logger()
 
 
-class StorageHostManager:
+class HostDefinerServicer:
 
     def define_host(self, host_request):
         node_name = host_request.node_id.split(';')[0]

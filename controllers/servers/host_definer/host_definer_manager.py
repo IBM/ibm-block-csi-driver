@@ -1,7 +1,7 @@
 from threading import Thread
 
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.host_definer.storage_manager.host import StorageHostManager
+from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
 from controllers.servers.host_definer.watcher.csi_node_watcher import CsiNodeWatcher
 from controllers.servers.host_definer.watcher.secret_watcher import SecretWatcher
 from controllers.servers.host_definer.watcher.storage_class_watcher import StorageClassWatcher
@@ -13,7 +13,7 @@ logger = get_stdout_logger()
 
 class HostDefinerManager:
     def __init__(self):
-        self.storage_host_manager = StorageHostManager()
+        self.storage_host_servicer = HostDefinerServicer()
         self.secret_watcher = SecretWatcher()
         self.storage_class_watcher = StorageClassWatcher()
         self.csi_node_watcher = CsiNodeWatcher()
