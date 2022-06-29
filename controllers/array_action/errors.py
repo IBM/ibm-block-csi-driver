@@ -92,6 +92,14 @@ class SpaceEfficiencyNotSupported(InvalidArgumentError):
         super().__init__(message)
 
 
+class SpaceEfficiencyMismatch(BaseArrayActionException):
+
+    def __init__(self, target_space_efficiency, source_space_efficiency):
+        super().__init__()
+        self.message = messages.SPACE_EFFICIENCY_MISMATCH_MESSAGE.format(target_space_efficiency,
+                                                                         source_space_efficiency)
+
+
 class VolumeAlreadyExists(BaseArrayActionException):
 
     def __init__(self, volume_name, array):

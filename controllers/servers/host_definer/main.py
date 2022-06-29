@@ -2,8 +2,8 @@ from controllers.servers.host_definer.host_definer_manager import HostDefinerMan
 
 
 def main():
-    host_definition = HostDefinerManager()
-    host_definition.start_host_definition()
+    host_definition_manager = HostDefinerManager()
+    host_definition_manager.start_host_definition()
 
 
 if __name__ == '__main__':

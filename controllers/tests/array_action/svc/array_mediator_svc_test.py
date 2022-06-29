@@ -380,14 +380,16 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @staticmethod
     def _get_cli_volume(with_deduplicated_copy=True, name='source_volume', pool_name='pool_name', vdisk_uid='vol_id',
-                        fc_id=''):
-        se_copy = YES
+                        fc_id='', thick=False):
+
         deduplicated_copy = 'no'
         compressed_copy = 'no'
+        se_copy = 'no'
         if with_deduplicated_copy:
-            se_copy = 'no'
             deduplicated_copy = YES
             compressed_copy = YES
+        elif not thick:
+            se_copy = YES
         return Munch({'vdisk_UID': vdisk_uid,
                       'id': 'test_id',
                       'name': name,
@@ -1507,6 +1509,23 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._expand_volume_lsvdisk_errors(CLIFailureError("CMMVC5741E"), array_errors.InvalidArgumentError, "!@#")
         self._expand_volume_lsvdisk_errors(CLIFailureError("Failed"), CLIFailureError)
         self._expand_volume_lsvdisk_errors(Exception("Failed"), Exception)
+
+    def test_validate_space_efficiency_matches_source_volume_failed(self):
+        source_volume = self._get_cli_volume(with_deduplicated_copy=False)
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(source_volume)
+        with self.assertRaises(array_errors.SpaceEfficiencyMismatch):
+            self.svc.validate_space_efficiency_matches_source('dedup_compressed', 'source_id', 'volume')
+
+    def test_validate_space_efficiency_matches_source_volume_dedup_compressed_success(self):
+        source_volume = self._get_cli_volume()
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(source_volume)
+        self.svc.validate_space_efficiency_matches_source('dedup_compressed', 'source_id', 'volume')
+
+    def test_validate_space_efficiency_matches_source_volume_thick_success(self):
+        source_volume = self._get_cli_volume(with_deduplicated_copy=False, thick=True)
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(source_volume)
+        self.svc.validate_space_efficiency_matches_source('thick', 'source_id', 'volume')
+        self.svc.validate_space_efficiency_matches_source('', 'source_id', 'volume')
 
     def test_create_host_nvme_success(self):
         self.svc.create_host("host_name", Initiators(['Test_nqn'], ['wwn1', 'WWN2'], ['iqn.test.s1']), "")
