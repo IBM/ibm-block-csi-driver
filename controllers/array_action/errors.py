@@ -219,6 +219,13 @@ class SnapshotAlreadyExists(BaseArrayActionException):
         self.message = messages.SNAPSHOT_ALREADY_EXISTS_ERROR_MESSAGE.format(snapshot_id_or_name, array)
 
 
+class HostAlreadyExists(BaseArrayActionException):
+
+    def __init__(self, host_name, array):
+        super().__init__()
+        self.message = messages.HOST_ALREADY_EXISTS_ERROR_MESSAGE.format(host_name, array)
+
+
 class SnapshotSourcePoolMismatch(BaseArrayActionException):
 
     def __init__(self, snapshot_pool, source_pool):

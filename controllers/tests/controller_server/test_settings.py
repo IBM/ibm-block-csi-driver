@@ -8,6 +8,7 @@ IO_GROUP = 'iogrp1'
 VOLUME_GROUP = 'volgrp1'
 VOLUME_NAME = "volume"
 VOLUME_WWN = "volume_wwn"
+HOST_NAME = "host_name"
 OBJECT_INTERNAL_ID = "object_internal_id"
 OTHER_OBJECT_INTERNAL_ID = "other_object_internal_id"
 SNAPSHOT_NAME = "snapshot"
