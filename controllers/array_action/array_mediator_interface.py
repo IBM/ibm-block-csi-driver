@@ -355,7 +355,7 @@ class ArrayMediator(ABC):
            None
 
         Raises:
-
+            HostAlreadyExists
         """
         raise NotImplementedError
 
@@ -371,7 +371,7 @@ class ArrayMediator(ABC):
            None
 
         Raises:
-            PermissionDenied
+            None
         """
         raise NotImplementedError
 
