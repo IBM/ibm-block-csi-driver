@@ -8,9 +8,6 @@ IBM® block storage CSI driver 1.10.0 introduces the enhancements that are detai
 
 IBM® block storage CSI driver 1.10.0 enables users to not have the need to statically define dynamic objects on the storage in advance. The `HostDefiner` custom resource handles changes in the Kubernetes clusters that relate to the host definition feature and applies them to the relevant clusters.
 
-statically define the "dynamic object" on storage in advance
- The hostDefiner will handle any change in the Kubernetes cluster that relates to the HostDefinition feature (like a new storageClass with new storage) and apply them to the relevant clusters, for each host on storage it will create a hostDefinition resource that will show the status of the host on the storage
-
 ## Additional supported orchestration platforms for deployment
 
 This version adds support for orchestration platforms Kubernetes 1.24 and Red Hat® OpenShift 4.11, suitable for deployment of the CSI (Container Storage Interface) driver.
