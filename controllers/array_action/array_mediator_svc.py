@@ -141,18 +141,18 @@ def build_stop_replication_kwargs(rcrelationship_id, add_access):
 
 
 def _get_cli_volume_space_efficiency_aliases(cli_volume):
-    space_efficiency_aliases = [config.SPACE_EFFICIENCY_THICK, '']
+    space_efficiency_aliases = {config.SPACE_EFFICIENCY_THICK, ''}
     if cli_volume.se_copy == YES:
-        space_efficiency_aliases = [config.SPACE_EFFICIENCY_THIN]
+        space_efficiency_aliases = {config.SPACE_EFFICIENCY_THIN}
     if cli_volume.compressed_copy == YES:
-        space_efficiency_aliases = [config.SPACE_EFFICIENCY_COMPRESSED]
+        space_efficiency_aliases = {config.SPACE_EFFICIENCY_COMPRESSED}
     if hasattr(cli_volume, "deduplicated_copy"):
         if cli_volume.deduplicated_copy == YES:
             if cli_volume.se_copy == YES:
-                space_efficiency_aliases = [config.SPACE_EFFICIENCY_DEDUPLICATED_THIN]
+                space_efficiency_aliases = {config.SPACE_EFFICIENCY_DEDUPLICATED_THIN}
             else:
-                space_efficiency_aliases = [config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED,
-                                            config.SPACE_EFFICIENCY_DEDUPLICATED]
+                space_efficiency_aliases = {config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED,
+                                            config.SPACE_EFFICIENCY_DEDUPLICATED}
     return space_efficiency_aliases
 
 
@@ -614,7 +614,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                                                                                        source_cli_volume.name))
         if not space_efficiency:
             space_efficiency_aliases = _get_cli_volume_space_efficiency_aliases(source_cli_volume)
-            space_efficiency = space_efficiency_aliases[0]
+            space_efficiency = space_efficiency_aliases.pop()
         size_in_bytes = int(source_cli_volume.capacity)
         if not pool:
             pool = self._get_volume_pools(source_cli_volume)[0]

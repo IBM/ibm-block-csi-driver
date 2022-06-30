@@ -9,16 +9,16 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 import controllers.servers.config as config
 import controllers.servers.messages as messages
-from controllers.common import settings
 from controllers.array_action.config import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
     ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC
+from controllers.common import settings
+from controllers.common.config import config as common_config
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.settings import NAME_PREFIX_SEPARATOR
-from controllers.common.config import config as common_config
 from controllers.servers.csi.controller_types import (ArrayConnectionInfo,
                                                       ObjectIdInfo,
                                                       ObjectParameters)
-from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId, RequiredBytesMismatch
+from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
 
 logger = get_stdout_logger()
 
@@ -630,4 +630,4 @@ def validate_parameters_match_source_volume(space_efficiency, required_bytes, vo
     _validate_sapce_efficiency_match(space_efficiency, volume)
     volume_capacity_bytes = volume.capacity_bytes
     if volume_capacity_bytes < required_bytes:
-        raise RequiredBytesMismatch(required_bytes, volume_capacity_bytes)
+        raise ValidationException(messages.REQUIRED_BYTES_MISMATCH_MESSAGE(required_bytes, volume_capacity_bytes))
