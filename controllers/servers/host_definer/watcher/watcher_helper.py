@@ -5,7 +5,7 @@ from controllers.servers.config import (SECRET_ARRAY_PARAMETER,
                                         SECRET_PASSWORD_PARAMETER,
                                         SECRET_USERNAME_PARAMETER)
 from controllers.common import utils
-from controllers.servers.host_definer.kubernetes.manager import KubernetesManager
+from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer import settings
 from controllers.servers.host_definer.types import DefineHostRequest, HostDefinition
