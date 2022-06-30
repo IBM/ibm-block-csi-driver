@@ -2,7 +2,7 @@
 
 Install the operator for IBM® block storage CSI driver in order to deploy, install, and manage the CSI (Container Storage Interface) driver.
 
-The CSI operator and driver can be downloaded in one of the following ways:
+The CSI operator and driver can be downloaded in the following ways:
 
 -   With the OpenShift web console (see [Installing the driver with the OpenShift web console](install_driver_openshift_web.md)).
 -   With GitHub (see [Installing the driver with GitHub](install_driver_github.md)).

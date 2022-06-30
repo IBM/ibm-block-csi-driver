@@ -1,12 +1,14 @@
 # Using dynamic host definition
 
-Dynamic host connectivity removes the necessity for manual host definitions. This is also facilitates the scaling out process of a node. 
+Dynamic host connectivity eliminates the necessity for manual host definitions. The `HostDefiner` custom resource handles changes in the Kubernetes clusters that relate to the host definition feature and applies them to the relevant clusters. This is also facilitates the scaling out process of a cluster. 
 
-The `HostDefiner` identifies the hosts available for host definition on each storage system and controls each of the host definitions. To see the statuses of the managed host definitions by the host definer, use the `hostdefinition` command.
+A use case example of this is when creating a new storage class with a new storage. With the `HostDefiner` feature, the new storage is applied to the relevant clusters and for each host on the storage, a new host definition resource is created. With these resources the status of the host on the storage system can easily be retrieved.
 
-Use the `hostdefinitions` command to see the phase status of all definitions on the storage side.
+The host definer identifies the hosts available for host definition on each storage system and controls each of the host definitions. To see the statuses of the managed host definitions by the host definer, use:
 
      $> kubectl get hostdefinitions
+
+Use the `get hostdefinitions` command to see the phase status of all definitions on the storage side.
 
 |Phase|Description|
 |---------|--------|
@@ -44,16 +46,16 @@ Some of the parameters within the `HostDefiner.yaml` are configurable. Use this 
     
 |Field|Description|
 |---------|--------|
-|prefix|Adds a prefix to the hosts defined by the CSI driver.|
-|connectivity|Selects the connectivity type for the host ports.<br>Possible input values are:<br>- `nvme` for use with NVME over Fibre Channel connectivity<br>- `fc` for use with Fibre Channel over SCSI connectivity<br>- `iscsi` for use with iSCSI connectivity<br><br>By default, this field is blank and the driver selects the first of available connectivity types available on the storage system, according to the following hierarchy: NVMe, FC, iSCSI.|
+|prefix|Adds a prefix to the hosts defined by the host definer.|
+|connectivity|Selects the connectivity type for the host ports.<br>Possible input values are:<br>- `nvme` for use with NVME over Fibre Channel connectivity<br>- `fc` for use with Fibre Channel over SCSI connectivity<br>- `iscsi` for use with iSCSI connectivity<br><br>By default, this field is blank and the host definer selects the first of available connectivity types on the storage system, according to the following hierarchy: NVMe, FC, iSCSI.|
 |allowDelete|Defines whether the `HostDefiner` is allowed to delete host definitions.<br>Input values are `true` or `false`.<br>The default value is `true`.|
-|dynamicNodeLabeling|Defines whether the `HostDefiner` chooses which nodes to manage dynamically by their CSI node resource or if the user must create the `hostdefiner.block.csi.ibm.com/managed-by=true` label on each relevant node.<br>Input values are `true` or `false`.<br>The default value is `false`, where the user must create each label.|
+|dynamicNodeLabeling|Defines whether the nodes that run our CSI node pod are dynamically labelled or if the user must create the `hostdefiner.block.csi.ibm.com/managed-by=true` label on each relevant node. In addition, this label allows the host definer to find all nodes with this label and manages their storage definition.<br>Input values are `true` or `false`.<br>The default value is `false`, where the user must create each label.|
 
-## Blocking a specific node from being deleted
+## Blocking a specific node definition from being deleted
 
-In order to block a specific host definition from being deleted by the CSI driver, you can add the following label to the node: `hostdefiner.block.csi.ibm.com/avoid-deletion=true`.
+In order to block a specific host definition from being deleted by the host definer, you can add the following label to the node: `hostdefiner.block.csi.ibm.com/avoid-deletion=true`.
 
-This works on a per node basis, where the `allowDelete` parameter definition in the `HostDefiner.yaml` is for all nodes on the system.
+This works on a per node basis, where the `allowDelete` parameter definition in the `csi_v1_hostdefiner.yaml` is for all cluster nodes.
 
 ## Changing host connectivity
 
@@ -69,4 +71,4 @@ To be able to identify new host connectivity, when the host connectivity type on
 3. From the host, change the host connectivity type.
 4. Redeploy the CSI node pod on the relevant node.
 
-     The HostDefiner handles all of the new host definitions.
+     The host definer handles all of the new host definitions.
