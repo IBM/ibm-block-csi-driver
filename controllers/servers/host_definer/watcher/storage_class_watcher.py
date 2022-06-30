@@ -2,7 +2,7 @@ from kubernetes import watch
 
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher, SECRET_IDS
-from controllers.servers.host_definer.common import settings
+from controllers.servers.host_definer import settings
 
 logger = get_stdout_logger()
 
@@ -12,17 +12,18 @@ class StorageClassWatcher(Watcher):
     def watch_storage_class_resources(self):
         watcher = watch.Watch()
         for event in watcher.stream(self.storage_api.list_storage_class):
-            storage_class_name = event[settings.OBJECT_KEY].metadata.name
-            secrets = self._get_secrets_from_storage_class_when_it_has_csi_ibm_block_as_a_provisioner(
-                event[settings.OBJECT_KEY])
+            storage_class = event[settings.OBJECT_KEY]
+            storage_class_name = storage_class.metadata.name
+            secrets = self._get_secrets_from_storage_class_with_driver_provisioner(storage_class)
+
             if event[settings.TYPE_KEY] == settings.ADDED_EVENT:
                 logger.info('New storageClass {}'.format(storage_class_name))
-                self._handle_added_storage_class_event(
-                    secrets)
+                self._handle_added_storage_class_event(secrets)
+
             elif event[settings.TYPE_KEY] == settings.DELETED_EVENT:
                 self._handle_deleted_storage_class_event(secrets)
 
-    def _get_secrets_from_storage_class_when_it_has_csi_ibm_block_as_a_provisioner(
+    def _get_secrets_from_storage_class_with_driver_provisioner(
             self, storage_class):
         if self._is_storage_class_has_csi_ibm_block_as_a_provisioner(
                 storage_class):
@@ -53,8 +54,7 @@ class StorageClassWatcher(Watcher):
             storage_class.parameters[parameter], storage_class.parameters[
                 prefix + secret_name_substring.replace('name', 'namespace')])
 
-    def _handle_added_storage_class_event(
-            self, secrets):
+    def _handle_added_storage_class_event(self, secrets):
         for secret in secrets:
             self._verify_nodes_defined_when_new_secret(secret)
             if secret:
@@ -66,10 +66,11 @@ class StorageClassWatcher(Watcher):
         elif SECRET_IDS[secret] == 0:
             self._verify_node_defined_on_storage_from_secret(secret)
 
-    def _verify_node_defined_on_storage_from_secret(self, secret):
-        host_request = self.get_host_request_from_secret_id(secret)
-        if host_request:
-            self.verify_nodes_defined(host_request)
+    def _verify_node_defined_on_storage_from_secret(self, secret_id):
+        secret = self._get_secret_name_and_namespace_from_id(secret_id)
+        host_definition = self._get_host_definition_from_secret(secret)
+        if host_definition.management_address:
+            self.verify_nodes_defined(host_definition)
 
     def _add_secret_if_uniq_or_add_secret_counter(self, secret):
         if secret in SECRET_IDS:

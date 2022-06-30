@@ -1,6 +1,6 @@
 from controllers.servers.config import SECRET_ARRAY_PARAMETER
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.host_definer.common.types import DefineHostResponse
+from controllers.servers.host_definer.types import DefineHostResponse
 
 logger = get_stdout_logger()
 
