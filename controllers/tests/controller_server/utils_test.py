@@ -491,26 +491,26 @@ class TestUtils(unittest.TestCase):
 
     def test_validate_parameters_match_volume_se_fail(self):
         with self.assertRaises(ValidationException):
-            self._test_validate_parameters_match_volume(volume_field="space_efficiency",
+            self._test_validate_parameters_match_volume(volume_field="space_efficiency_aliases",
                                                         volume_value=array_config.SPACE_EFFICIENCY_NONE,
                                                         parameter_field=controller_config.PARAMETERS_SPACE_EFFICIENCY,
                                                         parameter_value="thin")
 
     def test_validate_parameters_match_volume_thin_se_success(self):
-        self._test_validate_parameters_match_volume(volume_field="space_efficiency",
+        self._test_validate_parameters_match_volume(volume_field="space_efficiency_aliases",
                                                     volume_value=array_config.SPACE_EFFICIENCY_THIN,
                                                     parameter_field=controller_config.PARAMETERS_SPACE_EFFICIENCY,
                                                     parameter_value="thin")
 
     def test_validate_parameters_match_volume_dedup_aliases_success(self):
-        self._test_validate_parameters_match_volume(volume_field="space_efficiency",
+        self._test_validate_parameters_match_volume(volume_field="space_efficiency_aliases",
                                                     volume_value=[array_config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED,
                                                                   array_config.SPACE_EFFICIENCY_DEDUPLICATED],
                                                     parameter_field=controller_config.PARAMETERS_SPACE_EFFICIENCY,
                                                     parameter_value="deduplicated")
 
     def test_validate_parameters_match_volume_default_se_success(self):
-        self._test_validate_parameters_match_volume(volume_field="space_efficiency",
+        self._test_validate_parameters_match_volume(volume_field="space_efficiency_aliases",
                                                     volume_value=array_config.SPACE_EFFICIENCY_NONE,
                                                     parameter_field=None,
                                                     parameter_value=None,

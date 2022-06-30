@@ -264,7 +264,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             pool=pool,
             source_id=source_id,
             array_type=self.array_type,
-            space_efficiency=space_efficiency,
+            space_efficiency_aliases=space_efficiency,
             default_space_efficiency=config.SPACE_EFFICIENCY_THICK
         )
 

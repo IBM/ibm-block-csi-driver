@@ -109,9 +109,9 @@ def get_array_space_efficiency(space_efficiency):
 
 def _get_parameter_space_efficiency(array_space_efficiency):
     if array_space_efficiency == ARRAY_SPACE_EFFICIENCY_THIN:
-        return config.SPACE_EFFICIENCY_THIN
+        return {config.SPACE_EFFICIENCY_THIN}
     if array_space_efficiency == ARRAY_SPACE_EFFICIENCY_NONE:
-        return config.SPACE_EFFICIENCY_NONE
+        return {config.SPACE_EFFICIENCY_NONE, ""}
     raise array_errors.SpaceEfficiencyNotSupported(array_space_efficiency)
 
 
@@ -231,7 +231,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             source_id=self._get_source_id(api_volume=api_volume),
             pool=api_volume.pool,
             array_type=self.array_type,
-            space_efficiency=space_efficiency,
+            space_efficiency_aliases=space_efficiency,
             default_space_efficiency=config.SPACE_EFFICIENCY_NONE
         )
 

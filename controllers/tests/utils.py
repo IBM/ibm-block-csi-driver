@@ -26,7 +26,7 @@ def get_mock_mediator_response_volume(size=10, name=VOLUME_NAME, wwn="wwn1", arr
     volume.pool = "pool1"
     volume.array_type = array_type
     volume.source_id = source_id
-    volume.space_efficiency = space_efficiency if isinstance(space_efficiency, list) else [space_efficiency]
+    volume.space_efficiency_aliases = space_efficiency if isinstance(space_efficiency, set) else {space_efficiency}
     volume.default_space_efficiency = default_space_efficiency
     return volume
 

@@ -606,7 +606,7 @@ def _validate_sapce_efficiency_match(space_efficiency, volume):
         space_efficiency = space_efficiency.lower()
     else:
         space_efficiency = volume.default_space_efficiency
-    _validate_parameter_match_volume(space_efficiency, volume.space_efficiency,
+    _validate_parameter_match_volume(space_efficiency, volume.space_efficiency_aliases,
                                      messages.SPACE_EFFICIENCY_NOT_MATCH_VOLUME_MESSAGE,
                                      lambda se, se_aliases: se in se_aliases)
 
