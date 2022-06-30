@@ -59,8 +59,7 @@ This works on a per node basis, where the `allowDelete` parameter definition in 
 
 ## Changing host connectivity
 
-To be able to identify new host connectivity, when the host connectivity type on the storage system needs to be changed, use the following procedure:
-
+When node connectivity changes take place, use the following procedure to redefine host connectivity:
 
 1. Undeploy the CSI node pod from the relevant node that the `HostDefinition` is a part of.
 2. Verify that all `HostDefinition` instances of the node are deleted.
