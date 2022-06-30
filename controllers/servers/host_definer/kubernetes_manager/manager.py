@@ -23,21 +23,18 @@ class KubernetesManager():
         self.host_definitions_api = self._get_host_definitions_api()
 
     def _get_dynamic_client(self):
-        return dynamic.DynamicClient(api_client.ApiClient(
-            configuration=self._load_cluster_configuration()))
+        return dynamic.DynamicClient(api_client.ApiClient(configuration=self._load_cluster_configuration()))
 
     def _load_cluster_configuration(self):
         return config.load_incluster_config()
 
     def _get_csi_nodes_api(self):
-        return self.dynamic_client.resources.get(
-            api_version=settings.STORAGE_API_VERSION,
-            kind=settings.CSINODE_KIND)
+        return self.dynamic_client.resources.get(api_version=settings.STORAGE_API_VERSION,
+                                                 kind=settings.CSINODE_KIND)
 
     def _get_host_definitions_api(self):
-        return self.dynamic_client.resources.get(
-            api_version=settings.CSI_IBM_API_VERSION,
-            kind=settings.HOST_DEFINITION_KIND)
+        return self.dynamic_client.resources.get(api_version=settings.CSI_IBM_API_VERSION,
+                                                 kind=settings.HOST_DEFINITION_KIND)
 
     def _get_csi_nodes_with_driver(self):
         csi_nodes_with_driver = []
@@ -107,12 +104,14 @@ class KubernetesManager():
         host_definition_obj = HostDefinition()
         host_definition_obj.name = host_definition.metadata.name
         host_definition_obj.phase = self._get_phase_of_host_definition(host_definition)
-        host_definition_obj.secret_name = self._get_attr_from_host_definition(host_definition, 'secretName')
-        host_definition_obj.secret_namespace = self._get_attr_from_host_definition(host_definition, 'secretNamespace')
-        host_definition_obj.node_name = self._get_attr_from_host_definition(host_definition, 'nodeName')
-        host_definition_obj.node_id = self._get_attr_from_host_definition(host_definition, 'nodeId')
+        host_definition_obj.secret_name = self._get_attr_from_host_definition(
+            host_definition, settings.SECRET_NAME_FIELD)
+        host_definition_obj.secret_namespace = self._get_attr_from_host_definition(
+            host_definition, settings.SECRET_NAMESPACE_FIELD)
+        host_definition_obj.node_name = self._get_attr_from_host_definition(host_definition, settings.NODE_NAME_FIELD)
+        host_definition_obj.node_id = self._get_attr_from_host_definition(host_definition, settings.NODE_ID_FIELD)
         host_definition_obj.management_address = self._get_attr_from_host_definition(
-            host_definition, 'managementAddress')
+            host_definition, settings.MANAGEMENT_ADDRESS_FIELD)
         return host_definition_obj
 
     def _get_attr_from_host_definition(self, host_definition, attribute):
@@ -123,11 +122,9 @@ class KubernetesManager():
 
     def patch_host_definition(self, host_definition_manifest):
         host_definition_name = host_definition_manifest['metadata']['name']
-        logger.info('Patching host definition: {}'.format(
-            host_definition_name))
+        logger.info('Patching host definition: {}'.format(host_definition_name))
         try:
-            self.host_definitions_api.patch(body=host_definition_manifest,
-                                            name=host_definition_name,
+            self.host_definitions_api.patch(body=host_definition_manifest, name=host_definition_name,
                                             content_type='application/merge-patch+json')
         except ApiException as ex:
             if ex.status == 404:
@@ -178,13 +175,11 @@ class KubernetesManager():
             message=str(message),
             event_time=datetime.datetime.utcnow().isoformat(
                 timespec='microseconds') + 'Z',
-            involved_object=client.V1ObjectReference(
-                api_version=obj.api_version,
-                kind=obj.kind,
-                name=obj.metadata.name,
-                resource_version=obj.metadata.resource_version,
-                uid=obj.metadata.uid,
-            ))
+            involved_object=client.V1ObjectReference(api_version=obj.api_version, kind=obj.kind,
+                                                     name=obj.metadata.name,
+                                                     resource_version=obj.metadata.resource_version,
+                                                     uid=obj.metadata.uid,
+                                                     ))
 
     def create_event(self, namespace, event):
         try:

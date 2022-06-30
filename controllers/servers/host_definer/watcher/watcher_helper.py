@@ -41,7 +41,7 @@ class Watcher(KubernetesManager):
         return False
 
     def is_host_definition_ready(self, host_definition_name):
-        host_definition, _= self._get_host_definition(host_definition_name)
+        host_definition, _ = self._get_host_definition(host_definition_name)
         if host_definition:
             return self._get_host_definition_phase(host_definition) == settings.READY_PHASE
         return False
@@ -81,11 +81,11 @@ class Watcher(KubernetesManager):
             },
             'spec': {
                 'hostDefinition': {
-                    'managementAddress': host_definition.management_address,
-                    'nodeName': host_definition.node_name,
-                    'nodeId': host_definition.node_id,
-                    'secretName': host_definition.secret_name,
-                    'secretNamespace': host_definition.secret_namespace,
+                    settings.MANAGEMENT_ADDRESS_FIELD: host_definition.management_address,
+                    settings.NODE_NAME_FIELD: host_definition.node_name,
+                    settings.NODE_ID_FIELD: host_definition.node_id,
+                    settings.SECRET_NAME_FIELD: host_definition.secret_name,
+                    settings.SECRET_NAMESPACE_FIELD: host_definition.secret_namespace,
                 },
             },
         }
@@ -98,8 +98,8 @@ class Watcher(KubernetesManager):
 
     def undefine_host_and_host_definition_with_events(self, host_definition):
         node_name = host_definition.node_name
-        logger.info('Verifying that host {} is undefined from storage {}'.format(
-            node_name, host_definition.management_address))
+        logger.info('Verifying that host {} is undefined from storage {}'.format(node_name,
+                                                                                 host_definition.management_address))
         response = self.undefine_host_and_host_definition(host_definition)
         if response.error_message:
             self.set_host_definition_status(host_definition.name, settings.PENDING_DELETION_PHASE)
@@ -164,8 +164,8 @@ class Watcher(KubernetesManager):
         return define_function(host_request)
 
     def _get_host_request_from_host_definition(self, host_definition):
-        host_request = self.get_host_request_from_secret_name_and_namespace(
-            host_definition.secret_name, host_definition.secret_namespace)
+        host_request = self.get_host_request_from_secret_name_and_namespace(host_definition.secret_name,
+                                                                            host_definition.secret_namespace)
         if host_request:
             host_request.node_id = host_definition.node_id
             host_request.node_name = host_definition.node_name
@@ -213,12 +213,9 @@ class Watcher(KubernetesManager):
         if not secret_data:
             return ''
         return {
-            SECRET_ARRAY_PARAMETER: self._decode_base64_to_string(
-                secret_data[SECRET_ARRAY_PARAMETER]),
-            SECRET_USERNAME_PARAMETER: self._decode_base64_to_string(
-                secret_data[SECRET_USERNAME_PARAMETER]),
-            SECRET_PASSWORD_PARAMETER: self._decode_base64_to_string(
-                secret_data[SECRET_PASSWORD_PARAMETER])
+            SECRET_ARRAY_PARAMETER: self._decode_base64_to_string(secret_data[SECRET_ARRAY_PARAMETER]),
+            SECRET_USERNAME_PARAMETER: self._decode_base64_to_string(secret_data[SECRET_USERNAME_PARAMETER]),
+            SECRET_PASSWORD_PARAMETER: self._decode_base64_to_string(secret_data[SECRET_PASSWORD_PARAMETER])
         }
 
     def _decode_base64_to_string(self, content_with_base64):
@@ -262,6 +259,5 @@ class Watcher(KubernetesManager):
             if host_definition.management_address:
                 self._verify_host_defined_and_has_host_definition(host_definition)
 
-    def generate_secret_id_from_secret_and_namespace(
-            self, secret_name, secret_namespace):
+    def generate_secret_id_from_secret_and_namespace(self, secret_name, secret_namespace):
         return secret_name + ',' + secret_namespace

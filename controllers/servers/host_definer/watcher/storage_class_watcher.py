@@ -23,10 +23,8 @@ class StorageClassWatcher(Watcher):
             elif event[settings.TYPE_KEY] == settings.DELETED_EVENT:
                 self._handle_deleted_storage_class_event(secrets)
 
-    def _get_secrets_from_storage_class_with_driver_provisioner(
-            self, storage_class):
-        if self._is_storage_class_has_csi_ibm_block_as_a_provisioner(
-                storage_class):
+    def _get_secrets_from_storage_class_with_driver_provisioner(self, storage_class):
+        if self._is_storage_class_has_csi_ibm_block_as_a_provisioner(storage_class):
             return self._get_secrets_from_storage_class(storage_class)
         return []
 
@@ -37,22 +35,20 @@ class StorageClassWatcher(Watcher):
     def _get_secrets_from_storage_class(self, storage_class):
         secrets = set()
         for parameter in storage_class.parameters:
-            secret = self._get_secret_if_parameter_is_valid(
-                storage_class, parameter)
+            secret = self._get_secret_if_parameter_is_valid(storage_class, parameter)
             secrets.add(secret)
         return list(filter(None, secrets))
 
     def _get_secret_if_parameter_is_valid(self, storage_class, parameter):
         if parameter.endswith(settings.SECRET_NAME_SUBSTRING):
-            return self._get_secret(
-                storage_class, parameter, settings.SECRET_NAME_SUBSTRING)
+            return self._get_secret(storage_class, parameter, settings.SECRET_NAME_SUBSTRING)
         return ''
 
     def _get_secret(self, storage_class, parameter, secret_name_substring):
         prefix = parameter.split(secret_name_substring)[0]
         return self.generate_secret_id_from_secret_and_namespace(
-            storage_class.parameters[parameter], storage_class.parameters[
-                prefix + secret_name_substring.replace('name', 'namespace')])
+            storage_class.parameters[parameter],
+            storage_class.parameters[prefix + secret_name_substring.replace('name', 'namespace')])
 
     def _handle_added_storage_class_event(self, secrets):
         for secret in secrets:
