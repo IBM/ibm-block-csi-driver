@@ -8,4 +8,5 @@
 node/mocks
 build/reports
 /.run/
-*.json
+
+docs/.vscode/settings.json
