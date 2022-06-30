@@ -49,9 +49,9 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 
    `oc apply -f 99-ibm-attach.yaml`
 
-2. (Optional): Configure your storage system host attachment, per worker node.
+2. Configure your storage system host attachment, per worker node.
 
-    **Note:** As of IBM® block storage CSI driver 1.10 release, defining the host attachment is now automatic for new host connectivity, if the HostDefinition custom resource is installed. For more information and installation instructions, see [Installing the `HostDefinition` custom resource](install_hostdefinition.md). If this CR is not installed, the CSI driver does not define hosts on your storage system.
+    **Note:** IBM® block storage CSI driver 1.10 introduces dynamic host definition. For more information and installation instructions, see [Installing the `HostDefiner` custom resource](install_hostdefinition.md). If this custom resource is not installed, the CSI driver does not dynamically define hosts on your storage system and they must be defined manually.
     
     Be sure to configure your storage system host attachment according to your storage system instructions.
 
