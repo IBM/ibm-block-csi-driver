@@ -11,12 +11,11 @@ Connectivity limits on the storage side might be reached with DS8000 family prod
 The following limitations apply when using volume snapshots with the IBM block storage CSI driver:
 
 -   When deleting a PersistentVolumeClaim (PVC), the persistent volume (PV) remains until all snapshots of the specific PV are deleted.
+    
+    **Note:** This limitation is not relevant when using Snapshot function. For more information, see [Snapshot function limitations](#snapshot-function-limitations).
 -   When using the CSI (Container Storage Interface) driver with IBM Spectrum® Virtualize family products, a snapshot can only be used to provision a new volume of equal size.
 
-**Note:** 
-    
-- For volume snapshot limitations pertaining specifically to HyperSwap usage, see [HyperSwap volume limitations](#hyperswap-volume-limitations).
-- For volume snapshot limitations pertaining specifically to Snapshot function usage, see [Snapshot function limitations](#snapshot-function-limitations).
+**Note:** For volume snapshot limitations pertaining specifically to HyperSwap usage, see [HyperSwap volume limitations](#hyperswap-volume-limitations).
 
 ## Volume clone limitations
 
@@ -35,6 +34,8 @@ The following limitations apply when using volume clones with the IBM block stor
 The following limitations apply when expanding volumes with the IBM block storage CSI driver:
 
 -   When using the CSI driver with IBM Spectrum Virtualize family and IBM DS8000 family products, during size expansion of a PersistentVolumeClaim (PVC), the size remains until all snapshots of the specific PVC are deleted.
+
+     **Note:** This limitation is not relevant when using Snapshot function. For more information, see [Snapshot function limitations](#snapshot-function-limitations).
 -   When expanding a PVC while not in use by a pod, the volume size immediately increases on the storage side. However, PVC size only increases after a pod uses the PVC.
 -   When expanding a file system PVC for a volume that was previously formatted but is now no longer being used by a pod, any copy or replication operations performed on the PVC (such as snapshots or cloning) results in a copy with the newer, larger, size on the storage. However, its file system has the original, smaller, size.
 
