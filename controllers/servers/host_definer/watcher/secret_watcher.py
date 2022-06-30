@@ -16,26 +16,23 @@ class SecretWatcher(Watcher):
                                           resource_version=resource_version, timeout_seconds=5)
             for event in stream:
                 secret = event[settings.OBJECT_KEY]
-                if event[settings.TYPE_KEY] == settings.ADDED_EVENT and (self._is_secret_used_by_storage_class(secret)):
-                    self._verify_host_defined_from_secret_event(secret)
+                secret_name = secret.metadata.name
+                secret_namespace = secret.metadata.namespace
+                if event[settings.TYPE_KEY] == settings.ADDED_EVENT and \
+                        self._is_secret_used_by_storage_class(secret_name, secret_namespace):
+                    self._verify_host_defined_from_secret_event(secret_name, secret_namespace)
                 if event[settings.TYPE_KEY] == settings.MODIFIED_EVENT and \
-                        self._is_secret_used_by_storage_class(secret):
-                    self._handle_modified_secrets(secret)
+                        self._is_secret_used_by_storage_class(secret_name, secret_namespace):
+                    self._handle_modified_secrets(secret_name, secret_namespace)
 
-    def _is_secret_used_by_storage_class(self, secret):
-        secret_name = secret.metadata.name
-        secret_namespace = secret.metadata.namespace
+    def _is_secret_used_by_storage_class(self, secret_name, secret_namespace):
         return self.generate_secret_id_from_secret_and_namespace(secret_name, secret_namespace) in SECRET_IDS
 
-    def _handle_modified_secrets(self, secret):
-        secret_name = secret.metadata.name
-        secret_namespace = secret.metadata.namespace
+    def _handle_modified_secrets(self, secret_name, secret_namespace):
         logger.info('Secret {} in namespace {}, has been modified'.format(secret_name, secret_namespace))
         self._verify_host_defined_from_secret_event(secret_name, secret_namespace)
 
-    def _verify_host_defined_from_secret_event(self, secret):
-        secret_name = secret.metadata.name
-        secret_namespace = secret.metadata.namespace
+    def _verify_host_defined_from_secret_event(self, secret_name, secret_namespace):
         host_definition = self._get_host_definition_from_secret(secret_name, secret_namespace)
         if host_definition.management_address:
             logger.info('Verifying hosts on new storage {}'.format(host_definition.management_address))
