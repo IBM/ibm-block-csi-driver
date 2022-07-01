@@ -6,7 +6,7 @@ IBM® block storage CSI driver 1.10.0 introduces the enhancements that are detai
 
 ## New dynamic host definition
 
-IBM® block storage CSI driver 1.10.0 enables users to not need to statically define dynamic objects on the storage in advance, eliminating the need for manual static host definitions. The `HostDefiner` custom resource handles changes in the Kubernetes clusters that relate to the host definition feature and applies them to the relevant clusters.
+IBM® block storage CSI driver 1.10.0 enables users to not need to statically define dynamic objects on the storage in advance, eliminating the need for manual static host definitions. The host definer custom resource handles changes in the Kubernetes clusters that relate to the host definition feature and applies them to the relevant clusters.
 
 ## Additional supported orchestration platforms for deployment
 

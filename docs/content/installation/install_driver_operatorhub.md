@@ -4,6 +4,6 @@ When using OperatorHub.io, the operator for IBM® block storage CSI driver can b
 
 To install the CSI driver from OperatorHub.io, go to https://operatorhub.io/operator/ibm-block-csi-operator-community and follow the installation instructions, once clicking the **Install** button.
 
-The `HostDefiner` custom resource can optionally be installed as part of this process. For more information, see [Installing the `HostDefiner` custom resource](install_hostdefiner.md).
+The host definer custom resource can optionally be installed as part of this process. For more information, see [Installing the host definer custom resource](install_hostdefiner.md).
 
 **Note:** To ensure that the operator installs the driver, be sure to apply the YAML file that is located as part of the ibm-block-csi-operator-community page mentioned above.

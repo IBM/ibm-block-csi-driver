@@ -4,7 +4,7 @@ Download and install the IBM® block storage CSI driver installation package for
 
 -   [Compatibility and requirements](install_compatibility_requirements.md)
 -   [Installing the operator and driver](install_operator_driver.md)
--   [Installing the `HostDefiner` custom resource](install_hostdefiner.md)
+-   [Installing the host definer custom resource](install_hostdefiner.md)
 -   [Upgrading the CSI driver](upgrade.md)
 
 For information about uninstallation, see [Uninstalling](uninstalling.md).

@@ -1,6 +1,6 @@
 # Using dynamic host definition
 
-Dynamic host connectivity eliminates the necessity for manual host definitions. The `HostDefiner` custom resource handles changes in the Kubernetes clusters that relate to the host definition feature and applies them to the relevant clusters. This is also facilitates the scaling out process of a cluster. 
+Dynamic host connectivity eliminates the necessity for manual host definitions. The host definer custom resource handles changes in the Kubernetes clusters that relate to the host definition feature and applies them to the relevant clusters. This is also facilitates the scaling out process of a cluster. 
 
 A use case example of this is when creating a new storage class with a new storage. With the dynamic host definition feature, the new storage is applied to the relevant clusters and for each host on the storage, a new host definition resource is created. With these resources the status of the host on the storage system can easily be retrieved.
 
@@ -40,9 +40,9 @@ If any of the host definitions have an Error status, follow this procedure to ha
     <host_definition_name2>  102m   Ready   <management_address>  <node_name2>
     ```
 
-## Updating the `HostDefiner` custom resource
+## Updating the host definer` custom resource
 
-Some of the parameters within the `HostDefiner` custom resource are configurable. Use this information to help decide whether the parameters for your storage system need to be updated.
+Some of the parameters within the host definer custom resource are configurable. Use this information to help decide whether the parameters for your storage system need to be updated.
     
 |Field|Description|
 |---------|--------|
