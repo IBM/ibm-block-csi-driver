@@ -30,7 +30,9 @@ For example:
 ```
 mkdir logs
 ```
-Save logs and status reports directly to the created directory by adding in the following string at the end of the collection command: `> logs/<log_filename>.log`.
+Save logs and status reports directly to the created directory by adding in the following string at the end of the collection command:
+
+    > logs/<log_filename>.log
 
 **Important:** Be sure that the logs cover any relevant timeframes for the specific issues that you are trying to debug when gathering logs from the storage system.
 
@@ -47,7 +49,7 @@ Be sure to run the following steps and copy the output to an external file, when
     `kubectl get -all-namespaces pod -o wide | grep ibm-block-csi`
 3. Check if the PersistentVolumeClaims (PVCs) are _Bound_.
 
-    `kubectl get -n <namespace> pvc -o=jsonpath='{range .items[?(@.metadata.annotations.volume\.beta\.kubernetes\.io/storage-provisioner=="block.csi.ibm.com")]}{"PVC NAME: "}{@.metadata.name}{" PVC STATUS: "}{@.status.phase}{"\n"}{end}'`
+        kubectl get -n <namespace> pvc -o=jsonpath='{range .items[?(@.metadata.annotations.volume\.beta\.kubernetes\.io/storage-provisioner=="block.csi.ibm.com")]}{"PVC NAME: "}{@.metadata.name}{" PVC STATUS: "}{@.status.phase}{"\n"}{end}'
 
     The output should be similar to the following:
 

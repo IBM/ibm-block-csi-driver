@@ -91,7 +91,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
         
         curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.2.0/config/crd/bases/replication.storage.openshift.io_volumereplications.yaml
         kubectl apply -f ./replication.storage.openshift.io_volumereplications.yaml
-        ````
+        ```
     
     2. To enable support on your storage system, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Administering** > **Managing Copy Services** > **Managing remote-copy partnerships**.
 
