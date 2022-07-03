@@ -9,10 +9,17 @@ Perform the following steps in order to uninstall the CSI driver and operator.
     kubectl delete -f csi.ibm.com_v1_ibmblockcsi_cr.yaml
     ```
 
-2. Delete the operator.
+2. If applicable, delete the HostDefiner custom resource.
+    ```
+    kubectl delete -f csi_v1_hostdefiner.yaml
+    ```
+
+3. Delete the operator.
 
     ```
     kubectl delete -f ibm-block-csi-operator.yaml
     ```
+
+
 
 
