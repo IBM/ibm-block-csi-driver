@@ -54,18 +54,3 @@ Some of the parameters within the host definer custom resource are configurable.
 In order to block a specific host definition from being deleted by the host definer, you can add the following label to the node: `hostdefiner.block.csi.ibm.com/avoid-deletion=true`.
 
 This works on a per node basis, where the `allowDelete` parameter definition in the `csi_v1_hostdefiner.yaml` is for all cluster nodes.
-
-## Changing host connectivity
-
-When node connectivity changes take place, use the following procedure to redefine host connectivity:
-
-1. Undeploy the CSI node pod from the relevant node that the `HostDefinition` is a part of.
-2. Verify that all `HostDefinition` instances of the node are deleted.
-     
-          $> kubectl get hostdefinition | grep <hostname> | wc -l
-     
-     The output should be `0`.
-3. From the host, change the host connectivity type.
-4. Redeploy the CSI node pod on the relevant node.
-
-     The host definer handles all of the new host definitions.
