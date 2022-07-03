@@ -13,4 +13,4 @@ Use the following procedure to redefine host connectivity:
 3. From the host, change the host connectivity type.
 4. Redeploy the CSI node pod on the relevant node.
 
-     When using dynamic host definition, the host definer handles all of the new host definitions.
+     The host definer handles the creation of the new host definition on the storage side.

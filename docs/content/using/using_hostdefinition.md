@@ -27,7 +27,7 @@ If any of the host definitions have an Error status, follow this procedure to ha
      The output should be `0`.
 3. Redeploy the CSI node pod on the relevant node.
 
-     The host definer handles the creation of the new host definition.
+     The host definer handles the creation of the new host definition on the storage side.
         
 4. Verify that the `hostdefinition` is in the _Ready_ phase.
 
