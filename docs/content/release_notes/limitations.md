@@ -11,6 +11,8 @@ Connectivity limits on the storage side might be reached with DS8000 family prod
 The following limitations apply when using volume snapshots with the IBM block storage CSI driver:
 
 -   When deleting a PersistentVolumeClaim (PVC), the persistent volume (PV) remains until all snapshots of the specific PV are deleted.
+    
+    **Note:** This limitation is not relevant when using Snapshot function. For more information, see [Snapshot function limitations](#snapshot-function-limitations).
 -   When using the CSI (Container Storage Interface) driver with IBM Spectrum® Virtualize family products, a snapshot can only be used to provision a new volume of equal size.
 
 **Note:** For volume snapshot limitations pertaining specifically to HyperSwap usage, see [HyperSwap volume limitations](#hyperswap-volume-limitations).
@@ -32,6 +34,8 @@ The following limitations apply when using volume clones with the IBM block stor
 The following limitations apply when expanding volumes with the IBM block storage CSI driver:
 
 -   When using the CSI driver with IBM Spectrum Virtualize family and IBM DS8000 family products, during size expansion of a PersistentVolumeClaim (PVC), the size remains until all snapshots of the specific PVC are deleted.
+
+     **Note:** This limitation is not relevant when using Snapshot function. For more information, see [Snapshot function limitations](#snapshot-function-limitations).
 -   When expanding a PVC while not in use by a pod, the volume size immediately increases on the storage side. However, PVC size only increases after a pod uses the PVC.
 -   When expanding a file system PVC for a volume that was previously formatted but is now no longer being used by a pod, any copy or replication operations performed on the PVC (such as snapshots or cloning) results in a copy with the newer, larger, size on the storage. However, its file system has the original, smaller, size.
 
@@ -89,3 +93,19 @@ Dynamic host definition is only supported for use with IBM Spectrum Virtualize f
 In addition, the following are not supported when using dynamic host definitions with the IBM block storage CSI driver:
 - I/O groups
 - CSI Topology (see [Configuring for CSI Topology](./configuring/configuring_topology.md))
+
+## Snapshot function limitations
+
+**Important:** Snapshot function support is only Alpha support.
+
+- Snapshot function is only supported for use with IBM Spectrum Virtualize family storage system versions 8.5.1 or higher. For more information, see **Product overview** > **Technical overview** > **Volume groups** > **Snapshot function** within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
+- Both source and target PVCs (in a source PVC to snapshot to target PVC scenario) must have the same space efficiency set within their storage classes. If the space efficiency is set differently, the target PVC creation fails.
+- A PVC target must have the same volume size as the source volume.
+- A snapshot that uses the Snapshot function cannot be created with space efficiency set. If the VolumeSnapshotClass has the `SpaceEfficiency` parameter set along with the snapshot flag (`virt_snap_func`) enabled, the snapshot creation fails.
+- In very rare cases, there can be leftover or undeleted volumes.
+- A snapshot that uses the Snapshot function must be created within the same pool or child pool as the original PVC.
+- Snapshots do not have unique identifiers (UIDs). As a result, if a snapshot with Snapshot function is deleted another snapshot can get the same ID number.
+- Any object that is linked in any way (for example, a clone or a snapshot) must have the same definition of snapshot support. For example, a clone cannot be created with `virt_snap_func` disabled (indicating FlashCopy mapping is enabled) from a PVC with an existing Snapshot function connection.
+
+    **Note:** FlashCopy mapping (`fcmap`) and Snapshot function cannot be used together on the same volume. However, they can be used on different volumes within the same storage system.
+
