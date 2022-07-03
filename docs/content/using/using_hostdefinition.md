@@ -4,7 +4,7 @@ Dynamic host connectivity eliminates the necessity for manual host definitions. 
 
 A use case example of using dynamic host definition is when creating a new storage class with a new storage. With the dynamic host definition feature, new host definitions are created on the storage for the relevant nodes. For each host definition on the storage, a new host definition resource is created. With these resources, the status of the host definition on the storage system can easily be retrieved.
 
-The host definer identifies the hosts available for host definition on each storage system and controls each of the host definitions. To see the phase status of all managed host definitions by the host definer, use:
+The host definer identifies the nodes available for host definition on each storage system and controls each of the host definitions. To see the phase status of all managed host definitions by the host definer, use:
 
      $> kubectl get hostdefinitions
 
