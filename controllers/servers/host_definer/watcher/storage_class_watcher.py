@@ -1,5 +1,6 @@
 from kubernetes import watch
 
+import controllers.servers.messages as messages
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher, SECRET_IDS
 from controllers.servers.host_definer import settings
@@ -11,13 +12,14 @@ class StorageClassWatcher(Watcher):
 
     def watch_storage_class_resources(self):
         watcher = watch.Watch()
-        for event in watcher.stream(self.storage_api.list_storage_class):
+        stream = watcher.stream(self.storage_api.list_storage_class)
+        for event in stream:
             storage_class = event[settings.OBJECT_KEY]
             storage_class_name = storage_class.metadata.name
             secrets = self._get_secrets_from_storage_class_with_driver_provisioner(storage_class)
 
             if event[settings.TYPE_KEY] == settings.ADDED_EVENT:
-                logger.info('New storageClass {}'.format(storage_class_name))
+                logger.info(messages.NEW_STORAGE_CLASS.format(storage_class_name))
                 self._handle_added_storage_class_event(secrets)
 
             elif event[settings.TYPE_KEY] == settings.DELETED_EVENT:
@@ -46,9 +48,9 @@ class StorageClassWatcher(Watcher):
 
     def _get_secret(self, storage_class, parameter, secret_name_substring):
         prefix = parameter.split(secret_name_substring)[0]
-        return self.generate_secret_id_from_secret_and_namespace(
+        return self._generate_secret_id_from_secret_and_namespace(
             storage_class.parameters[parameter],
-            storage_class.parameters[prefix + secret_name_substring.replace('name', 'namespace')])
+            storage_class.parameters[prefix + secret_name_substring.replace(settings.NAME, settings.NAMESPACE)])
 
     def _handle_added_storage_class_event(self, secrets):
         for secret in secrets:
@@ -63,10 +65,10 @@ class StorageClassWatcher(Watcher):
             self._verify_node_defined_on_storage_from_secret(secret)
 
     def _verify_node_defined_on_storage_from_secret(self, secret_id):
-        secret = self._get_secret_name_and_namespace_from_id(secret_id)
-        host_definition = self._get_host_definition_from_secret(secret)
+        secret_name, secret_namespace = self._get_secret_name_and_namespace_from_id(secret_id)
+        host_definition = self._get_host_definition_from_secret(secret_name, secret_namespace)
         if host_definition.management_address:
-            self.verify_nodes_defined(host_definition)
+            self._verify_nodes_defined(host_definition)
 
     def _add_secret_if_uniq_or_add_secret_counter(self, secret):
         if secret in SECRET_IDS:

@@ -3,31 +3,29 @@ from dataclasses import dataclass, field
 
 @dataclass
 class DefineHostRequest:
-    prefix: str = field(default_factory=str)
-    secret_name: str = field(default_factory=str)
-    secret_namespace: str = field(default_factory=str)
-    connectivity_type: str = field(default_factory=str)
-    node_id: str = field(default_factory=str)
+    prefix: str = ''
+    connectivity_type: str = ''
+    node_id: str = ''
     system_info: dict = field(default_factory=dict)
 
 
 @dataclass
 class DefineHostResponse:
-    error_message: str = field(default_factory=str)
+    error_message: str = ''
 
 
 @dataclass
 class HostDefinition:
-    name: str = field(default_factory=str)
-    secret_name: str = field(default_factory=str)
-    secret_namespace: str = field(default_factory=str)
-    node_name: str = field(default_factory=str)
-    node_id: str = field(default_factory=str)
-    management_address: str = field(default_factory=str)
-    phase: str = field(default_factory=str)
+    name: str = ''
+    secret_name: str = ''
+    secret_namespace: str = ''
+    node_name: str = ''
+    node_id: str = ''
+    management_address: str = ''
+    phase: str = ''
 
 
 @dataclass
 class CsiNode:
-    name: str = field(default_factory=str)
-    node_id: str = field(default_factory=str)
+    name: str = ''
+    node_id: str = ''

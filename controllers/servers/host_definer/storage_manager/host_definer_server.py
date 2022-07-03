@@ -7,16 +7,16 @@ logger = get_stdout_logger()
 
 class HostDefinerServicer:
 
-    def define_host(self, host_request):
-        node_name = host_request.node_id.split(';')[0]
+    def define_host(self, request):
+        node_name = request.node_id.split(';')[0]
         logger.info('Verifying host: {} created on storage: {}'.format(
-            host_request.prefix+'.'+node_name, host_request.system_info[SECRET_ARRAY_PARAMETER]))
+            request.prefix+'.'+node_name, request.system_info[SECRET_ARRAY_PARAMETER]))
         host_response = DefineHostResponse()
         return host_response
 
-    def undefine_host(self, host_request):
-        node_name = host_request.node_id.split(';')[0]
+    def undefine_host(self, request):
+        node_name = request.node_id.split(';')[0]
         logger.info('Verifying host: {} removed from storage: {}'.format(
-            node_name, host_request.system_info[SECRET_ARRAY_PARAMETER]))
+            node_name, request.system_info[SECRET_ARRAY_PARAMETER]))
         host_response = DefineHostResponse()
         return host_response

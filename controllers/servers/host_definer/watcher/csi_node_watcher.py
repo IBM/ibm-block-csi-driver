@@ -14,8 +14,8 @@ class CsiNodeWatcher(Watcher):
     def add_initial_nodes(self):
         csi_nodes = self._get_csi_nodes_with_driver()
         for csi_node in csi_nodes:
-            if self.is_host_can_be_defined(csi_node.name):
-                self.add_node_to_nodes(csi_node)
+            if self._is_host_can_be_defined(csi_node.name):
+                self._add_node_to_nodes(csi_node)
 
     def watch_csi_nodes_resources(self):
         for event in self.csi_nodes_api.watch():
@@ -26,14 +26,14 @@ class CsiNodeWatcher(Watcher):
                 self._handle_modified_csi_node(csi_node)
 
     def _handle_modified_csi_node(self, csi_node):
-        if csi_node.node_id and self.is_host_can_be_defined(csi_node.name) and csi_node.name not in NODES:
-            self.add_node_to_nodes(csi_node)
-            self.define_host_on_all_storages_from_secrets(csi_node.name)
+        if csi_node.node_id and self._is_host_can_be_defined(csi_node.name) and csi_node.name not in NODES:
+            self._add_node_to_nodes(csi_node)
+            self._define_host_on_all_storages_from_secrets(csi_node.name)
         elif csi_node.name in NODES:
             self._handle_deleted_csi_node_pod(csi_node.name)
 
     def _handle_deleted_csi_node_pod(self, node_name):
-        if self.is_host_can_be_undefined(node_name):
+        if self._is_host_can_be_undefined(node_name):
             remove_host_thread = Thread(target=self._undefine_host_when_node_pod_is_deleted, args=(node_name,))
             remove_host_thread.start()
         else:
@@ -41,7 +41,7 @@ class CsiNodeWatcher(Watcher):
 
     def _undefine_host_when_node_pod_is_deleted(self, node_name):
         if self._is_host_part_of_deletion(node_name):
-            self._undefine_host_from_all_storages_from_secrets(node_name)
+            self._undefine_hosts(node_name)
 
     def _is_host_part_of_deletion(self, worker):
         counter = 0
@@ -69,11 +69,11 @@ class CsiNodeWatcher(Watcher):
                     return pod
         return None
 
-    def _undefine_host_from_all_storages_from_secrets(self, node_name):
+    def _undefine_hosts(self, node_name):
         for secret_id in SECRET_IDS:
             host_definition = self._get_host_definition_from_secret_and_node_name(node_name, secret_id)
             if host_definition.management_address:
-                self.undefine_host_and_host_definition_with_events(host_definition)
+                self._delete_definition(host_definition)
 
-        self.remove_managed_by_host_definer_label(node_name)
+        self._remove_managed_by_host_definer_label(node_name)
         NODES.pop(node_name)

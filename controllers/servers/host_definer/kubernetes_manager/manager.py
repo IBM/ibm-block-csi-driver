@@ -5,6 +5,7 @@ from kubernetes.client import api_client
 from kubernetes.client.rest import ApiException
 
 from controllers.common.csi_logger import get_stdout_logger
+import controllers.servers.messages as messages
 from controllers.servers.host_definer.types import HostDefinition
 from controllers.servers.host_definer import settings
 from controllers.servers.host_definer.types import CsiNode
@@ -50,8 +51,7 @@ class KubernetesManager():
     def _is_csi_node_has_driver(self, csi_node):
         if csi_node.spec.drivers:
             for driver in csi_node.spec.drivers:
-                if driver.name == settings.IBM_BLOCK_CSI_PROVISIONER_NAME:
-                    return True
+                return driver.name == settings.IBM_BLOCK_CSI_PROVISIONER_NAME
         return False
 
     def _get_csi_node(self, node_name):
@@ -60,15 +60,16 @@ class KubernetesManager():
             return self._get_csi_node_object(csi_node)
         except ApiException as ex:
             if ex.status != 404:
-                logger.error('Could not get csi node {}, got: {}'.format(node_name, ex.body))
+                logger.error(messages.CSI_NODE_DOES_NOT_EXIST.format(node_name))
             else:
-                logger.error('node {}, do not have csi node'.format(node_name))
+                logger.error(messages.FAILED_TO_GET_CSI_NODE.format(node_name, ex.body))
             return CsiNode()
 
     def _get_csi_node_object(self, csi_node):
         csi_node_obj = CsiNode()
         csi_node_obj.name = csi_node.metadata.name
         csi_node_obj.node_id = self._get_node_id_from_csi_node(csi_node)
+        return csi_node_obj
 
     def _get_node_id_from_csi_node(self, csi_node):
         if csi_node.spec.drivers:
@@ -82,10 +83,9 @@ class KubernetesManager():
             return (self.host_definitions_api.get(name=host_definition_name), 200)
         except ApiException as ex:
             if ex.status == 404:
-                logger.error('Host definition {} does not exists'.format(host_definition_name))
+                logger.error(messages.HOST_DEFINITION_DOES_NOT_EXIST.format(host_definition_name))
             else:
-                logger.error('Failed to get host definition {}, go this error: {}'.format(
-                    host_definition_name, ex.body))
+                logger.error(messages.FAILED_TO_GET_HOST_DEFINITION.format(host_definition_name, ex.body))
             return '', ex.status
 
     def _get_host_definitions(self):
@@ -97,13 +97,13 @@ class KubernetesManager():
             return host_definitions_obj
 
         except ApiException as ex:
-            logger.error("Could not get all hostDefinitions, got: {}".format(ex.body))
+            logger.error(messages.FAILED_TO_GET_LIST_OF_HOST_DEFINITIONS.format(ex.body))
             return []
 
     def _get_host_definition_object(self, host_definition):
         host_definition_obj = HostDefinition()
         host_definition_obj.name = host_definition.metadata.name
-        host_definition_obj.phase = self._get_phase_of_host_definition(host_definition)
+        host_definition_obj.phase = self._get_host_definition_phase(host_definition)
         host_definition_obj.secret_name = self._get_attr_from_host_definition(
             host_definition, settings.SECRET_NAME_FIELD)
         host_definition_obj.secret_namespace = self._get_attr_from_host_definition(
@@ -120,43 +120,47 @@ class KubernetesManager():
         except:
             return ''
 
-    def patch_host_definition(self, host_definition_manifest):
-        host_definition_name = host_definition_manifest['metadata']['name']
-        logger.info('Patching host definition: {}'.format(host_definition_name))
+    def _get_host_definition_phase(self, host_definition):
+        if host_definition.status:
+            return host_definition.status.phase
+        return ''
+
+    def _patch_host_definition(self, host_definition_manifest):
+        host_definition_name = host_definition_manifest[settings.METADATA][settings.NAME]
+        logger.info(messages.PATCHING_HOST_DEFINITION.format(host_definition_name))
         try:
             self.host_definitions_api.patch(body=host_definition_manifest, name=host_definition_name,
                                             content_type='application/merge-patch+json')
         except ApiException as ex:
             if ex.status == 404:
-                logger.error('host definition {}does not exist'.format(host_definition_name))
+                logger.error(messages.HOST_DEFINITION_DOES_NOT_EXIST.format(host_definition_name))
             else:
-                logger.error('Failed to patch host definition {}, go this error: {}'.format(
-                    host_definition_name, ex.body))
+                logger.error(messages.FAILED_TO_PATCH_HOST_DEFINITION.format(host_definition_name, ex.body))
 
     def _create_host_definition(self, host_definition_manifest):
         try:
             self.host_definitions_api.create(body=host_definition_manifest)
         except ApiException as ex:
-            logger.error('Failed to create host definition {}, go this error: {}'.format(
-                host_definition_manifest['metadata']['name'], ex.body))
+            if ex != 404:
+                logger.error(messages.FAILED_TO_CREATE_HOST_DEFINITION.format(
+                    host_definition_manifest[settings.METADATA][settings.NAME], ex.body))
 
-    def set_host_definition_status(self, host_definition_name, host_definition_phase):
-        logger.info('Set host definition {} status to: {}'.format(host_definition_name, host_definition_phase))
+    def _set_host_definition_status(self, host_definition_name, host_definition_phase):
+        logger.info(messages.SET_HOST_DEFINITION_STATUS.format(host_definition_name, host_definition_phase))
         status = self._get_status_manifest(host_definition_phase)
         try:
             self.custom_object_api.patch_cluster_custom_object_status(
                 settings.CSI_IBM_GROUP, settings.VERSION, settings.HOST_DEFINITION_PLURAL, host_definition_name, status)
         except ApiException as ex:
             if ex.status == 404:
-                logger.error('host definition {}does not exist'.format(host_definition_name))
+                logger.error(messages.HOST_DEFINITION_DOES_NOT_EXIST.format(host_definition_name))
             else:
-                logger.error('Failed to set host definition {} status, go this error: {}'.format(
-                    host_definition_name, ex.body))
+                logger.error(messages.FAILED_TO_SET_HOST_DEFINITION_STATUS.format(host_definition_name, ex.body))
 
     def _get_status_manifest(self, host_definition_phase):
         status = {
-            'status': {
-                'phase': host_definition_phase,
+            settings.STATUS: {
+                settings.PHASE: host_definition_phase,
             }
         }
 
@@ -181,35 +185,32 @@ class KubernetesManager():
                                                      uid=obj.metadata.uid,
                                                      ))
 
-    def create_event(self, namespace, event):
+    def _create_event(self, namespace, event):
         try:
             self.core_api.create_namespaced_event(namespace, event)
         except ApiException as ex:
-            logger.error('Failed to create event for host definition {}, go this error: {}'.format(
+            logger.error(messages.FAILED_TO_CREATE_EVENT_FOR_HOST_DEFINITION.format(
                 event.involved_object.name, ex.body))
 
-    def delete_host_definition(self, host_definition_name):
+    def _delete_host_definition(self, host_definition_name):
         try:
             self.host_definitions_api.delete(name=host_definition_name, body={})
         except ApiException as ex:
-            if ex.status == 404:
-                logger.error('Failed to delete hostDefinition {} because it does not exist'.format(
-                    host_definition_name))
-            else:
-                logger.error('Failed to delete hostDefinition {}, got: {}'.format(host_definition_name, ex.body))
+            if ex.status != 404:
+                logger.error(messages.FAILED_TO_DELETE_HOST_DEFINITION.format(host_definition_name, ex.body))
 
     def _update_node_managed_by_host_definer_label(self, node_name, label_value):
         body = self._get_body_for_labels(label_value)
         try:
             self.core_api.patch_node(node_name, body)
         except ApiException as ex:
-            logger.error('Could not update node {} {} label, got: {}'.format(
+            logger.error(messages.FAILED_TO_UPDATE_NODE_LABEL.format(
                 node_name, settings.MANAGED_BY_HOST_DEFINER_LABEL, ex.body))
 
     def _get_body_for_labels(self, label_value):
         body = {
-            'metadata': {
-                'labels': {
+            settings.METADATA: {
+                settings.LABELS: {
                     settings.MANAGED_BY_HOST_DEFINER_LABEL: label_value}
             }
         }
@@ -221,15 +222,14 @@ class KubernetesManager():
             return self.core_api.read_namespaced_secret(name=secret_name, namespace=secret_namespace).data
         except ApiException as ex:
             if ex.status == 404:
-                logger.info('Secret {} in namespace {} does not exist'.format(secret_name, secret_namespace))
+                logger.error(messages.SECRET_DOES_NOT_EXIST.format(secret_name, secret_namespace))
             else:
-                logger.info('Failed to get Secret {} in namespace {}, go this error: {}'.format(
-                    secret_name, secret_namespace, ex.body))
+                logger.error(messages.FAILED_TO_GET_SECRET.format(secret_name, secret_namespace, ex.body))
             return None
 
     def _read_node(self, node_name):
         try:
             return self.core_api.read_node(name=node_name)
         except ApiException as ex:
-            logger.error('Could not get node {}, got: {}'.format(node_name, ex.body))
+            logger.error(messages.FAILED_TO_GET_NODE.format(node_name, ex.body))
             return None
