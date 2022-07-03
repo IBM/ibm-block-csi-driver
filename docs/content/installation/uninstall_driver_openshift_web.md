@@ -13,7 +13,7 @@ Perform the following steps in order to uninstall the CSI driver and operator th
 
 4. If applicable, click on the **more** menu for the **ibm-block-csi_hostdefiner** plugin and select **Delete IBMBlock CSI HostDefiner**.
 
-    Wait for the controller and node pods to terminate.
+    Wait for the host definer pod to terminate.
 
     This deletes the host definer. 
 
