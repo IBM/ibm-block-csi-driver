@@ -4,7 +4,7 @@ When using OperatorHub.io, the operator for IBM® block storage CSI driver can b
 
 1. Install the CSI operator from OperatorHub.io, go to https://operatorhub.io/operator/ibm-block-csi-operator-community and follow the installation instructions, once clicking the **Install** button.
 
-2. Apply the IBM block storage CSI driver custom resource definition yaml provided.
+2. Apply the IBMBlockCSI custom resource definition yaml provided.
 
     **Note:** To ensure that the operator installs the driver, be sure to apply the YAML file that is located as part of the ibm-block-csi-operator-community page mentioned above.
 
