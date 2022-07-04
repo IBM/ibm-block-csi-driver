@@ -84,7 +84,11 @@ The following IBM block storage CSI driver features are not supported on volumes
 
 ## I/O group limitations
 
-**Note:** I/O group configuration is only supported for use with IBM Spectrum Virtualize family storage systems.
+I/O group configuration is only supported for use with IBM Spectrum Virtualize family storage systems.
+
+## Volume group limitations
+
+Volume group configuration is only supported for use with IBM Spectrum Virtualize family storage systems.
 
 ## Dynamic host definition limitations
 
