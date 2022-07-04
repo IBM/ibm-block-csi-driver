@@ -34,7 +34,6 @@ class HostDefinitionWatcher(Watcher):
         delay_in_seconds = 3
         logger.info(messages.VERIFY_HOST_DEFINITION_USING_EXPONANTIAL_BACKOFF.format(host_definition.name))
         while retries > 1:
-            logger.info('matan')
             if self._is_host_definition_in_desired_state(host_definition):
                 return
             self._handle_pending_host_definition(host_definition)
@@ -47,12 +46,8 @@ class HostDefinitionWatcher(Watcher):
     def _is_host_definition_in_desired_state(self, host_definition):
         host_definition_instance, status_code = self._get_host_definition(host_definition.name)
         phase = host_definition.phase
-        logger.info('matan2')
         if status_code == 400 and phase == settings.PENDING_DELETION_PHASE:
-            logger.info('matan3')
             return True
-        logger.info('matan4 {}'.format(host_definition_instance.phase ==
-                    settings.READY_PHASE and phase == settings.PENDING_CREATION_PHASE))
         return host_definition_instance.phase == settings.READY_PHASE and phase == settings.PENDING_CREATION_PHASE
 
     def _handle_pending_host_definition(self, host_definition):
