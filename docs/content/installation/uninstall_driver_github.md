@@ -11,7 +11,7 @@ Perform the following steps in order to uninstall the CSI driver and operator.
 
 2. If applicable, delete the HostDefiner custom resource.
     ```
-    kubectl delete -f csi_v1_hostdefiner.yaml
+    kubectl delete -f csi_v1_hostdefiner_cr.yaml
     ```
 
 3. Delete the operator.

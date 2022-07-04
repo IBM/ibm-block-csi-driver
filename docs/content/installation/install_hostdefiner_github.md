@@ -8,10 +8,10 @@ Use the following steps to install the HostDefiner custom resource, with [GitHub
 
 1. Download the custom resource manifest from [GitHub](https://github.com/IBM/ibm-block-csi-operator).
 
-        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.10.0/config/samples/csi_v1_hostdefiner.yaml > csi_v1_hostdefiner.yaml
+        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.10.0/config/samples/csi_v1_hostdefiner_cr.yaml > csi_v1_hostdefiner_cr.yaml
 
-2. Install the `csi_v1_hostdefiner.yaml`.
+2. Install the `csi_v1_hostdefiner_cr.yaml`.
 
-        kubectl apply -f csi_v1_hostdefiner.yaml
+        kubectl apply -f csi_v1_hostdefiner_cr.yaml
 
 After the host definer is installed, it searches for nodes that have not yet been defined on storage, and defines them.

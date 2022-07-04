@@ -42,4 +42,4 @@ If any of the host definitions have an Error status, follow this procedure to ha
 
 To block a specific host definition from being deleted by the host definer, you can add the following label to the node: `hostdefiner.block.csi.ibm.com/avoid-deletion=true`.
 
-This label works on a per node basis, where the `allowDelete` parameter definition in the `csi_v1_hostdefiner.yaml` is for all cluster nodes.
+This label works on a per node basis, where the `allowDelete` parameter definition in the `csi_v1_hostdefiner_cr.yaml` is for all cluster nodes.

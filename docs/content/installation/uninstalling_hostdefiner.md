@@ -11,4 +11,4 @@ The host definer can be uninstalled in the following ways:
   
 The host definer can also be uninstalled at any time with GitHub, using the following command:
   
-    kubectl delete -f csi_v1_hostdefiner.yaml
+    kubectl delete -f csi_v1_hostdefiner_cr.yaml
