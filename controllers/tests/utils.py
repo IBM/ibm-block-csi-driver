@@ -15,8 +15,7 @@ class ProtoBufMock(MagicMock):
 
 
 def get_mock_mediator_response_volume(size=10, name=VOLUME_NAME, wwn="wwn1", array_type="a9k", source_id=None,
-                                      space_efficiency='thick',
-                                      default_space_efficiency=None):
+                                      space_efficiency='thick'):
     volume = Mock()
     volume.capacity_bytes = size
     volume.id = wwn
@@ -27,7 +26,6 @@ def get_mock_mediator_response_volume(size=10, name=VOLUME_NAME, wwn="wwn1", arr
     volume.array_type = array_type
     volume.source_id = source_id
     volume.space_efficiency_aliases = space_efficiency if isinstance(space_efficiency, set) else {space_efficiency}
-    volume.default_space_efficiency = default_space_efficiency
     return volume
 
 

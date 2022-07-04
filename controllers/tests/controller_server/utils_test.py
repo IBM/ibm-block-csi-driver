@@ -477,11 +477,9 @@ class TestUtils(unittest.TestCase):
         self._check_publish_volume_response_parameters("0", ISCSI_CONNECTIVITY_TYPE,
                                                        {"iqn": ["1.1.1.1", "2.2.2.2"], "iqn2": ["3.3.3.3", "::1"]})
 
-    def _test_validate_parameters_match_volume(self, volume_field, volume_value, parameter_field, parameter_value,
-                                               default_space_efficiency=None):
+    def _test_validate_parameters_match_volume(self, volume_field, volume_value, parameter_field, parameter_value):
         volume = test_utils.get_mock_mediator_response_volume(10, "vol", "wwn2", "a9k")
         setattr(volume, volume_field, volume_value)
-        volume.default_space_efficiency = default_space_efficiency
         if parameter_field:
             parameters = {parameter_field: parameter_value}
         else:
@@ -512,32 +510,26 @@ class TestUtils(unittest.TestCase):
     def test_validate_parameters_match_volume_default_se_success(self):
         self._test_validate_parameters_match_volume(volume_field="space_efficiency_aliases",
                                                     volume_value=array_config.SPACE_EFFICIENCY_NONE,
-                                                    parameter_field=None,
-                                                    parameter_value=None,
-                                                    default_space_efficiency='none')
+                                                    parameter_field=None, parameter_value=None)
 
     def test_validate_parameters_match_volume_pool_fail(self):
         with self.assertRaises(ValidationException):
-            self._test_validate_parameters_match_volume(volume_field="pool",
-                                                        volume_value="test_pool",
+            self._test_validate_parameters_match_volume(volume_field="pool", volume_value="test_pool",
                                                         parameter_field=controller_config.PARAMETERS_POOL,
                                                         parameter_value="fake_pool")
 
     def test_validate_parameters_match_volume_pool_success(self):
-        self._test_validate_parameters_match_volume(volume_field="pool",
-                                                    volume_value="test_pool",
+        self._test_validate_parameters_match_volume(volume_field="pool", volume_value="test_pool",
                                                     parameter_field=controller_config.PARAMETERS_POOL,
                                                     parameter_value="test_pool")
 
     def test_validate_parameters_match_volume_prefix_fail(self):
         with self.assertRaises(ValidationException):
-            self._test_validate_parameters_match_volume(volume_field="name",
-                                                        volume_value="vol-with-no-prefix",
+            self._test_validate_parameters_match_volume(volume_field="name", volume_value="vol-with-no-prefix",
                                                         parameter_field=controller_config.PARAMETERS_VOLUME_NAME_PREFIX,
                                                         parameter_value="prefix")
 
     def test_validate_parameters_match_volume_prefix_success(self):
-        self._test_validate_parameters_match_volume(volume_field="name",
-                                                    volume_value="prefix_vol",
+        self._test_validate_parameters_match_volume(volume_field="name", volume_value="prefix_vol",
                                                     parameter_field=controller_config.PARAMETERS_VOLUME_NAME_PREFIX,
                                                     parameter_value="prefix")

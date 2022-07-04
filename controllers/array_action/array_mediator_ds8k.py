@@ -232,7 +232,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             pool=api_volume.pool,
             array_type=self.array_type,
             space_efficiency_aliases=space_efficiency,
-            default_space_efficiency=config.SPACE_EFFICIENCY_NONE
         )
 
     def _create_api_volume(self, name, size_in_bytes, array_space_efficiency, pool_id):
