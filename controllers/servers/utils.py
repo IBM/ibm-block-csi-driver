@@ -620,7 +620,7 @@ def validate_parameters_match_volume(parameters, volume):
 
     logger.debug("validating prefix parameter matches volume's")
     prefix = parameters.get(config.PARAMETERS_VOLUME_NAME_PREFIX)
-    _validate_parameter_match_volume(prefix, volume.name, messages.PREFIX_NOT_MATCH_VOLUME_MESSAGE,
+    _validate_parameter_matches_volume(prefix, volume.name, messages.PREFIX_NOT_MATCH_VOLUME_MESSAGE,
                                      lambda pref, name: name.startswith(pref + NAME_PREFIX_SEPARATOR))
 
 
