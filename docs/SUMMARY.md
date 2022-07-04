@@ -36,7 +36,7 @@
 		* [Uninstalling the driver with the OpenShift web console](content/installation/uninstall_driver_openshift_web.md)
 		* [Uninstalling the driver with GitHub](content/installation/uninstall_driver_github.md)
 		* [Uninstalling the driver with OperatorHub.io](content/installation/uninstall_driver_operatorhub.md)
-	* [Uninstalling the host definer](content/installation/uninstalling_hostefiner.md)
+	* [Uninstalling the host definer](content/installation/uninstalling_hostdefiner.md)
 	* [Upgrading the CSI driver](content/installation/upgrade.md)
 		* [Manual upgrade with OpenShift](content/installation/upgrade_manual_openshift.md)
 * [Configuring](content/configuration/configuring.md)
