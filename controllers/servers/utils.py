@@ -601,7 +601,7 @@ def _validate_parameter_match_volume(parameter_value, value_from_volume, error_m
         raise ValidationException(error_message_format.format(parameter_value, value_from_volume))
 
 
-def _validate_sapce_efficiency_match(space_efficiency, volume):
+def _validate_sapce_efficiencies_match(space_efficiency, volume):
     if space_efficiency:
         space_efficiency = space_efficiency.lower()
     _validate_parameter_match_volume(space_efficiency, volume.space_efficiency_aliases,
