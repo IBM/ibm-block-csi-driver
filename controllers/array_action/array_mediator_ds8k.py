@@ -107,7 +107,7 @@ def get_array_space_efficiency(space_efficiency):
     return ARRAY_SPACE_EFFICIENCY_NONE
 
 
-def _get_parameter_space_efficiency(array_space_efficiency):
+def _get_space_efficiency_aliases(array_space_efficiency):
     if array_space_efficiency == ARRAY_SPACE_EFFICIENCY_THIN:
         return {config.SPACE_EFFICIENCY_THIN}
     if array_space_efficiency == ARRAY_SPACE_EFFICIENCY_NONE:
