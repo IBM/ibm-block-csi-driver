@@ -24,7 +24,7 @@ The various `by_management_id` parameters are chosen within the following hierar
           # non-csi.storage.k8s.io parameters may be specified in by_management_id per system and/or outside by_management_id as the cross-system default.
 
           by_management_id: '{"demo-management-id-1":{"pool":"demo-pool-1","SpaceEfficiency":"dedup_compressed","volume_name_prefix":"demo-prefix-1"},
-                              "demo-management-id-2":{"pool":"demo-pool-2","volume_name_prefix":"demo-prefix-2", "io_group": "demo-iogrp"}}'  # Optional.
+                              "demo-management-id-2":{"pool":"demo-pool-2","volume_name_prefix":"demo-prefix-2", "io_group": "demo-iogrp": "volume_group": "demo-volumegroup"}}'  # Optional.
           pool: demo-pool
           SpaceEfficiency: thin            # Optional.
           volume_name_prefix: demo-prefix  # Optional.
