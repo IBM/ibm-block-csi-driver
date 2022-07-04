@@ -3,7 +3,7 @@
 * [Welcome](book_files/csi_block_storage_kc_welcome.md)
 * [What's new](book_files/csi_block_storage_kc_whatsnew.md)
 * [Release notes](book_files/csi_block_storage_kc_rn.md)
-	* [What's new in 1.9.0](content/release_notes/whats_new.md)
+	* [What's new in 1.10.0](content/release_notes/whats_new.md)
 	* [Compatibility and requirements](content/release_notes/compatibility_requirements.md)
 		* [Supported storage systems](content/release_notes/supported_storage.md)
 		* [Supported operating systems](content/release_notes/supported_os.md)

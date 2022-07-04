@@ -41,7 +41,7 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in the 
 
 - The `csi.storage.k8s.io/fstype` parameter is optional. The values that are allowed are _ext4_ or _xfs_. The default value is _ext4_.
 - The `volume_name_prefix` parameter is optional.
-- The `io_group` parameter is only available on Spectrum Virtualize storage systems. For more information about I/O groups, see **Product overview** > **Technical overview** > **I/O group** within your product documentation on [IBM Documentation](https://www.ibm.com/docs).
+- The `io_group` and `volume_group` parameters are only available on Spectrum Virtualize storage systems.
 - The `virt_snap_func` parameter is optional but necessary in Spectrum Virtualize storage systems if using the Snapshot function. To enable the Snapshot function, set the value to _true_. the default value is _false_.
 
     **Note:**
@@ -56,6 +56,7 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in the 
       parameters:
         pool: demo-pool
         io_group: demo-iogrp             # Optional.
+        volume_group: demo-volumegroup   # Optional.
         SpaceEfficiency: thin            # Optional.
         volume_name_prefix: demo-prefix  # Optional.
         virt_snap_func: "false"          # Optional. Values true/false. The default is false.
