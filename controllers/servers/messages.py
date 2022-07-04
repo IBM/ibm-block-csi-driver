@@ -66,3 +66,5 @@ CREATE_EVENT_FOR_HOST_DEFINITION = 'Creating event for host definition: {} error
 NEW_KUBERNETES_NODE = 'New Kubernetes node {}, has csi IBM block'
 ADD_LABEL_TO_NODE = 'Add {} label to node {}'
 REMOVE_LABEL_FROM_NODE = 'Remove {} label from node {}'
+FAILED_TO_LIST_DAEMON_SETS = 'Failed to list csi IBM block daemon set, got: {}'
+FAILED_TO_LIST_PODS = 'Failed to list csi IBM block pods, got: {}'

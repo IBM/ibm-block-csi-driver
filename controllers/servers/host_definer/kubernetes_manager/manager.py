@@ -20,6 +20,7 @@ class KubernetesManager():
         self.storage_api = client.StorageV1Api()
         self.core_api = client.CoreV1Api()
         self.custom_object_api = client.CustomObjectsApi()
+        self.apps_api = client.AppsV1Api()
         self.csi_nodes_api = self._get_csi_nodes_api()
         self.host_definitions_api = self._get_host_definitions_api()
 
@@ -232,4 +233,21 @@ class KubernetesManager():
             return self.core_api.read_node(name=node_name)
         except ApiException as ex:
             logger.error(messages.FAILED_TO_GET_NODE.format(node_name, ex.body))
+            return None
+
+    def _get_csi_ibm_block_daemon_set(self):
+        try:
+            daemon_sets = self.apps_api.list_daemon_set_for_all_namespaces(label_selector=settings.DRIVER_PRODUCT_LABEL)
+            if daemon_sets.items:
+                return daemon_sets.items[0]
+            return None
+        except ApiException as ex:
+            logger.error(messages.FAILED_TO_LIST_DAEMON_SETS.format(ex.body))
+            return None
+
+    def _get_csi_ibm_block_pods(self):
+        try:
+            return self.core_api.list_pod_for_all_namespaces(label_selector=settings.DRIVER_PRODUCT_LABEL)
+        except ApiException as ex:
+            logger.error(messages.FAILED_TO_LIST_PODS.format(ex.body))
             return None

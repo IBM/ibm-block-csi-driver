@@ -1,6 +1,5 @@
 import time
 from threading import Thread
-from kubernetes.client.rest import ApiException
 
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher, NODES, SECRET_IDS
@@ -40,34 +39,42 @@ class CsiNodeWatcher(Watcher):
             NODES.pop(node_name)
 
     def _undefine_host_when_node_pod_is_deleted(self, node_name):
-        if self._is_host_part_of_deletion(node_name):
+        if self._is_host_part_of_update(node_name):
+            pass
+        else:
             self._undefine_hosts(node_name)
 
-    def _is_host_part_of_deletion(self, worker):
-        counter = 0
-        pod_phase = settings.BINARY_VALUE_FOR_DELETED_POD
-        while counter < settings.SECONDS_TO_CHECK_POD_PHASE:
-            pod = self._get_csi_ibm_block_node_pod_on_specific_worker(worker)
-            if (pod and pod_phase == settings.BINARY_VALUE_FOR_DELETED_POD) or (
-                    not pod and pod_phase == settings.BINARY_VALUE_FOR_EXISTING_POD):
-                counter = 0
-                pod_phase = 1 - pod_phase
-            else:
-                counter += 1
-            time.sleep(1)
-        return pod_phase == settings.BINARY_VALUE_FOR_DELETED_POD
+    def _is_host_part_of_update(self, worker):
+        daemon_set_name = self._wait_until_all_daemon_set_pods_are_up_to_date()
+        if daemon_set_name:
+            return self._is_csi_ibm_block_node_pod_running_on_worker(worker, daemon_set_name)
+        return False
 
-    def _get_csi_ibm_block_node_pod_on_specific_worker(self, worker):
-        try:
-            csi_ibm_block_pods = self.core_api.list_pod_for_all_namespaces(
-                label_selector=settings.CSI_IBM_BLOCK_PRODUCT_LABEL)
-        except ApiException as ex:
-            logger.error('Failed to get csi IBM block pods, got: {}'.format(ex.body))
+    def _wait_until_all_daemon_set_pods_are_up_to_date(self):
+        csi_ibm_block_daemon_set = self._get_csi_ibm_block_daemon_set()
+        if not csi_ibm_block_daemon_set:
+            return None
+        status = csi_ibm_block_daemon_set.status
+        while status.updated_number_scheduled != status.desired_number_scheduled:
+            if status.desired_number_scheduled == 0:
+                return None
+            csi_ibm_block_daemon_set = self._get_csi_ibm_block_daemon_set()
+            if not csi_ibm_block_daemon_set:
+                return None
+            status = csi_ibm_block_daemon_set.status
+            time.sleep(0.5)
+        return csi_ibm_block_daemon_set.metadata.name
+
+    def _is_csi_ibm_block_node_pod_running_on_worker(self, worker, daemon_set_name):
+        csi_ibm_block_pods = self._get_csi_ibm_block_pods()
+        if not csi_ibm_block_pods:
+            return False
+
         if csi_ibm_block_pods.items:
             for pod in csi_ibm_block_pods.items:
-                if (pod.spec.node_name == worker) and (settings.IBM_BLOCK_CSI_NODE_PREFIX in pod.metadata.name):
-                    return pod
-        return None
+                if (pod.spec.node_name == worker) and (daemon_set_name in pod.metadata.name):
+                    return True
+        return False
 
     def _undefine_hosts(self, node_name):
         for secret_id in SECRET_IDS:
