@@ -98,9 +98,11 @@ Volume group configuration is only supported for use with IBM Spectrum Virtualiz
 - Both source and target PVCs (in a source PVC to snapshot to target PVC scenario) must have the same space efficiency set within their storage classes. If the space efficiency is set differently, the target PVC creation fails.
 - A PVC target must have the same volume size as the source volume.
 - A snapshot that uses the Snapshot function cannot be created with space efficiency set. If the VolumeSnapshotClass has the `SpaceEfficiency` parameter set along with the snapshot flag (`virt_snap_func`) enabled, the snapshot creation fails.
-- In very rare cases, there can be leftover or undeleted volumes.
+- In very rare cases, there can be leftover or undeleted volumes. As a result of the Kubernetes/Openshift and CSI being stateless, in cases where the storage is not able to save a specific state, the CSI driver might administer the wrong process.
+
+    For example, this can happen in a case where a volume is created from a snapshot and then a request to delete the same volume. In such a case, the driver might delete a volume that was not created from the snapshot. This occurs as a result of no record that is kept if the volume is created from a snapshot or not.
+
 - A snapshot that uses the Snapshot function must be created within the same pool or child pool as the original PVC.
-- Snapshots do not have unique identifiers (UIDs). As a result, if a snapshot with Snapshot function is deleted another snapshot can get the same ID number.
 - Any object that is linked in any way (for example, a clone or a snapshot) must have the same definition of snapshot support. For example, a clone cannot be created with `virt_snap_func` disabled (indicating FlashCopy mapping is enabled) from a PVC with an existing Snapshot function connection.
 
     **Note:** FlashCopy mapping (`fcmap`) and Snapshot function cannot be used together on the same volume. However, they can be used on different volumes within the same storage system.
