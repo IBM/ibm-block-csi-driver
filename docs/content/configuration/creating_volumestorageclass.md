@@ -56,7 +56,7 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in the 
       parameters:
         pool: demo-pool
         io_group: demo-iogrp             # Optional.
-        volume_group: demo-volumegroup             # Optional.
+        volume_group: demo-volumegroup   # Optional.
         SpaceEfficiency: thin            # Optional.
         volume_name_prefix: demo-prefix  # Optional.
         virt_snap_func: "false"          # Optional. Values true/false. The default is false.
