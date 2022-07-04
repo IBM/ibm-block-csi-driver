@@ -4,6 +4,7 @@ from time import sleep
 import controllers.servers.messages as messages
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher
+from controllers.servers.host_definer.types import DefineHostResponse
 from controllers.servers.host_definer import settings
 
 logger = get_stdout_logger()
@@ -17,24 +18,23 @@ class HostDefinitionWatcher(Watcher):
             host_definition = self._get_host_definition_object(event_object)
             if self._is_host_definition_in_pending_phase(host_definition.phase) and \
                     event[settings.TYPE_KEY] != settings.DELETED_EVENT:
-                self._verify_host_defined_after_pending_host_definition(event)
+                self._verify_host_defined_after_pending_host_definition(host_definition)
 
     def _is_host_definition_in_pending_phase(self, phase):
         return settings.PENDING_PREFIX in phase
 
-    def _verify_host_defined_after_pending_host_definition(self, host_definition_event):
-        host_definition = host_definition_event[settings.OBJECT_KEY]
+    def _verify_host_defined_after_pending_host_definition(self, host_definition):
         remove_host_thread = Thread(target=self._verify_host_defined_using_exponential_backoff,
-                                    args=(host_definition,))
+                                    args=(host_definition, ))
         remove_host_thread.start()
 
     def _verify_host_defined_using_exponential_backoff(self, host_definition):
-        retries = 10
+        retries = 3
         backoff_in_seconds = 3
         delay_in_seconds = 3
-        host_definition_name = host_definition.metadata.name
-        logger.info(messages.VERIFY_HOST_DEFINITION_USING_EXPONANTIAL_BACKOFF.format(host_definition_name))
+        logger.info(messages.VERIFY_HOST_DEFINITION_USING_EXPONANTIAL_BACKOFF.format(host_definition.name))
         while retries > 1:
+            logger.info('matan')
             if self._is_host_definition_in_desired_state(host_definition):
                 return
             self._handle_pending_host_definition(host_definition)
@@ -45,40 +45,38 @@ class HostDefinitionWatcher(Watcher):
         self._set_host_definition_phase_to_error(host_definition)
 
     def _is_host_definition_in_desired_state(self, host_definition):
-        host_definition_name = host_definition.metadata.name
-        _, status_code = self._get_host_definition(host_definition_name)
-        phase = self._get_host_definition_phase(host_definition)
+        host_definition_instance, status_code = self._get_host_definition(host_definition.name)
+        phase = host_definition.phase
+        logger.info('matan2')
         if status_code == 400 and phase == settings.PENDING_DELETION_PHASE:
+            logger.info('matan3')
             return True
-        return status_code == 200 and phase == settings.PENDING_CREATION_PHASE
+        logger.info('matan4 {}'.format(host_definition_instance.phase ==
+                    settings.READY_PHASE and phase == settings.PENDING_CREATION_PHASE))
+        return host_definition_instance.phase == settings.READY_PHASE and phase == settings.PENDING_CREATION_PHASE
 
     def _handle_pending_host_definition(self, host_definition):
-        host_definition_obj = self._get_host_definition_object(host_definition)
-        response = self._verify_pending_host_definition(host_definition_obj)
+        response = DefineHostResponse()
+        phase = host_definition.phase
+        if phase == settings.PENDING_CREATION_PHASE:
+            response = self._define_host(host_definition)
+        elif self._is_pending_for_deletion_need_to_be_handled(phase, host_definition.node_name):
+            response = self._undefine_host(host_definition)
         self._handle_error_message_for_pending_host_definition(
-            host_definition, response.error_message, host_definition_obj.node_name)
+            host_definition, response.error_message)
 
-    def _handle_error_message_for_pending_host_definition(self, host_definition, error_message, node_name):
-        host_definition_name = host_definition.metadata.name
-        phase = self._get_host_definition_phase(host_definition)
+    def _handle_error_message_for_pending_host_definition(self, host_definition, error_message):
+        phase = host_definition.phase
         if error_message:
             self._add_event_to_host_definition(host_definition, str(error_message))
         elif phase == settings.PENDING_CREATION_PHASE:
-            self._set_host_definition_status(host_definition_name, settings.READY_PHASE)
-        elif self._is_pending_for_deletion_need_to_be_handled(phase, node_name):
-            self._delete_host_definition(host_definition_name)
-
-    def _verify_pending_host_definition(self, host_definition):
-        phase = host_definition.phase
-        if phase == settings.PENDING_CREATION_PHASE:
-            return self._define_host(host_definition)
+            self._set_host_definition_status(host_definition.name, settings.READY_PHASE)
         elif self._is_pending_for_deletion_need_to_be_handled(phase, host_definition.node_name):
-            return self._undefine_host(host_definition)
+            self._delete_host_definition(host_definition.name)
 
     def _is_pending_for_deletion_need_to_be_handled(self, phase, node_name):
         return phase == settings.PENDING_DELETION_PHASE and self._is_host_can_be_undefined(node_name)
 
     def _set_host_definition_phase_to_error(self, host_definition):
-        host_definition_name = host_definition.metadata.name
-        logger.info(messages.SET_HOST_DEFINITION_PHASE_TO_ERROR.format(host_definition_name))
-        self._set_host_definition_status(host_definition_name, settings.ERROR_PHASE)
+        logger.info(messages.SET_HOST_DEFINITION_PHASE_TO_ERROR.format(host_definition.name))
+        self._set_host_definition_status(host_definition.name, settings.ERROR_PHASE)

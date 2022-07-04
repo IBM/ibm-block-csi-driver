@@ -81,10 +81,11 @@ class KubernetesManager():
 
     def _get_host_definition(self, host_definition_name):
         try:
-            return (self.host_definitions_api.get(name=host_definition_name), 200)
+            host_definition = self.host_definitions_api.get(name=host_definition_name)
+            return (self._get_host_definition_object(host_definition), 200)
         except ApiException as ex:
             if ex.status == 404:
-                logger.error(messages.HOST_DEFINITION_DOES_NOT_EXIST.format(host_definition_name))
+                logger.info(messages.HOST_DEFINITION_DOES_NOT_EXIST.format(host_definition_name))
             else:
                 logger.error(messages.FAILED_TO_GET_HOST_DEFINITION.format(host_definition_name, ex.body))
             return '', ex.status
@@ -104,6 +105,8 @@ class KubernetesManager():
     def _get_host_definition_object(self, host_definition):
         host_definition_obj = HostDefinition()
         host_definition_obj.name = host_definition.metadata.name
+        host_definition_obj.resource_version = host_definition.metadata.resource_version
+        host_definition_obj.uid = host_definition.metadata.uid
         host_definition_obj.phase = self._get_host_definition_phase(host_definition)
         host_definition_obj.secret_name = self._get_attr_from_host_definition(
             host_definition, settings.SECRET_NAME_FIELD)
@@ -167,24 +170,15 @@ class KubernetesManager():
 
         return status
 
-    def _get_event_for_object(self, obj, message):
+    def _get_event_for_host_definition(self, host_definition, message):
         return client.CoreV1Event(
-            metadata=client.V1ObjectMeta(
-                generate_name='{}.'.format(obj.metadata.name),
-            ),
-            reporting_component=settings.HOST_DEFINER,
-            reporting_instance=settings.HOST_DEFINER,
-            action='Verifying',
-            type='Error',
-            reason=settings.FAILED_VERIFYING,
-            message=str(message),
-            event_time=datetime.datetime.utcnow().isoformat(
-                timespec='microseconds') + 'Z',
-            involved_object=client.V1ObjectReference(api_version=obj.api_version, kind=obj.kind,
-                                                     name=obj.metadata.name,
-                                                     resource_version=obj.metadata.resource_version,
-                                                     uid=obj.metadata.uid,
-                                                     ))
+            metadata=client.V1ObjectMeta(generate_name='{}.'.format(host_definition.name),),
+            reporting_component=settings.HOST_DEFINER, reporting_instance=settings.HOST_DEFINER, action='Verifying',
+            type='Error', reason=settings.FAILED_VERIFYING, message=str(message),
+            event_time=datetime.datetime.utcnow().isoformat(timespec='microseconds') + 'Z',
+            involved_object=client.V1ObjectReference(
+                api_version=settings.CSI_IBM_API_VERSION, kind=settings.HOST_DEFINITION_KIND, name=host_definition.name,
+                resource_version=host_definition.resource_version, uid=host_definition.uid,))
 
     def _create_event(self, namespace, event):
         try:

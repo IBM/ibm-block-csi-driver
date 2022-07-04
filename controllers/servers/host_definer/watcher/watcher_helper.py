@@ -45,7 +45,7 @@ class Watcher(KubernetesManager):
 
     def _is_host_definition_in_ready_state(self, host_definition):
         if host_definition:
-            return self._get_host_definition_phase(host_definition) == settings.READY_PHASE
+            return host_definition.phase == settings.READY_PHASE
         return False
 
     def _define_host(self, host_definition):
@@ -104,7 +104,7 @@ class Watcher(KubernetesManager):
 
     def _add_event_to_host_definition(self, host_definition, message):
         logger.info(messages.CREATE_EVENT_FOR_HOST_DEFINITION.format(host_definition.name, message))
-        event = self._get_event_for_object(host_definition, message)
+        event = self._get_event_for_host_definition(host_definition, message)
         self._create_event(settings.DEFAULT_NAMESPACE, event)
 
     def _is_host_can_be_defined(self, node_name):

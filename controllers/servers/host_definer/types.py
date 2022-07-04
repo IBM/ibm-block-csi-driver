@@ -23,6 +23,8 @@ class HostDefinition:
     node_id: str = ''
     management_address: str = ''
     phase: str = ''
+    resource_version: str = ''
+    uid: str = ''
 
 
 @dataclass
