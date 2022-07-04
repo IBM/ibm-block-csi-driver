@@ -37,14 +37,16 @@ class StorageClassWatcher(Watcher):
     def _get_secrets_from_storage_class(self, storage_class):
         secrets = set()
         for parameter in storage_class.parameters:
-            secret = self._get_secret_if_parameter_is_valid(storage_class, parameter)
-            secrets.add(secret)
+            if self._is_secret(parameter):
+                secret = self._get_secret_if_parameter_is_valid(storage_class, parameter)
+                secrets.add(secret)
         return list(filter(None, secrets))
 
+    def _is_secret(self, parameter):
+        return parameter.endswith(settings.SECRET_NAME_SUBSTRING)
+
     def _get_secret_if_parameter_is_valid(self, storage_class, parameter):
-        if parameter.endswith(settings.SECRET_NAME_SUBSTRING):
-            return self._get_secret(storage_class, parameter, settings.SECRET_NAME_SUBSTRING)
-        return ''
+        return self._get_secret(storage_class, parameter, settings.SECRET_NAME_SUBSTRING)
 
     def _get_secret(self, storage_class, parameter, secret_name_substring):
         prefix = parameter.split(secret_name_substring)[0]
