@@ -34,18 +34,6 @@ The following IBM block storage CSI driver features are not supported on volumes
 
 I/O group configuration is only supported for use with IBM Spectrum Virtualize family storage systems.
 
-## Volume clone limitations
-
-The following limitations apply when using volume clones with the IBM block storage CSI driver:
-
-**Note:** For high availability volume clone limitations, see [High availability (HA) limitations](#high-availability-ha-limitations).
-
--   When cloning a PersistentVolumeClaim (PVC), the clone cannot contain a smaller size than the source PVC.
-
-    **Note:** The size can be expanded after the cloning process.
-
--   A PVC and its clone need to both have the same volume mode (**Filesystem** or **Block**).
-
 ## NVMe®/FC usage limitations
 
  Red Hat® Enterprise Linux CoreOS (RHCOS) does not support NVMe®/FC.
@@ -77,6 +65,18 @@ The following limitations apply when using volume clones with the IBM block stor
 
 - Red Hat Bug [2022328](https://bugzilla.redhat.com/show_bug.cgi?id=2022328)
 - Kubernetes Issue [106710](https://github.com/kubernetes/kubernetes/issues/106710)
+
+## Volume clone limitations
+
+The following limitations apply when using volume clones with the IBM block storage CSI driver:
+
+**Note:** For high availability volume clone limitations, see [High availability (HA) limitations](#high-availability-ha-limitations).
+
+-   When cloning a PersistentVolumeClaim (PVC), the clone cannot contain a smaller size than the source PVC.
+
+    **Note:** The size can be expanded after the cloning process.
+
+-   A PVC and its clone need to both have the same volume mode (**Filesystem** or **Block**).
 
 ## Volume expansion limitations
 
