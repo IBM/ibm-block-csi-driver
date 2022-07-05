@@ -92,7 +92,7 @@ When a role switch is conducted, this is not reflected within the other orchestr
 
  1. Change the reclaim policy of the relevant PersistentVolumes to `Retain`.
  2. Delete the relevant PersistentVolumes.
- 3. Import the volumes, by using the latest import procedure (version 1.7.0 or later) (see **CSI driver configuration** > **Advanced configuration** > **Importing an existing volume** in the user information).
+ 3. Import the volumes, by using the latest import procedure (version 1.7.0 or later) (see [Importing an existing volume](../configuration/importing_existing_volume.md)).
       
     For more information, see the [Change the Reclaim Policy of a PersistentVolume](https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy/) information in the Kubernetes documentation.
 
