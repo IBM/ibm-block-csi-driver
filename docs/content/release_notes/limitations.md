@@ -108,9 +108,5 @@ When a role switch is conducted, this is not reflected within the other orchestr
 
 The following limitations apply when using volume snapshots with the IBM block storage CSI driver:
 
-**Note:** For volume snapshot limitations pertaining specifically to HyperSwap usage, see [HyperSwap volume limitations](#hyperswap-volume-limitations).
-
--   When deleting a PersistentVolumeClaim (PVC), the persistent volume (PV) remains until all snapshots of the specific PV are deleted.
-    
     **Note:** This limitation is not relevant when using Snapshot function. For more information, see [Snapshot function limitations](#snapshot-function-limitations).
 -   When using the CSI (Container Storage Interface) driver with IBM Spectrum® Virtualize family products, a snapshot can only be used to provision a new volume of equal size.
