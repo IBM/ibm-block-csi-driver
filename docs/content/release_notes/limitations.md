@@ -108,5 +108,5 @@ When a role switch is conducted, this is not reflected within the other orchestr
 
 The following limitations apply when using volume snapshots with the IBM block storage CSI driver:
 
-    **Note:** This limitation is not relevant when using Snapshot function. For more information, see [Snapshot function limitations](#snapshot-function-limitations).
+**Note:** This limitation is not relevant when using Snapshot function. For more information, see [Snapshot function limitations](#snapshot-function-limitations).
 -   When using the CSI (Container Storage Interface) driver with IBM Spectrum® Virtualize family products, a snapshot can only be used to provision a new volume of equal size.
