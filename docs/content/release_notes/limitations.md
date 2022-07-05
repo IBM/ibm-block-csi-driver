@@ -17,26 +17,26 @@ The following IBM block storage CSI driver features are not supported on volumes
 - A HyperSwap volume cannot be created from a snapshot.
 
     **Note:** A snapshot can be created from a HyperSwap volume.
- - Volume cloning.
+- Volume cloning.
+
+### Stretched volume limitations
+ When conducting volume cloning, both volumes must use stretched topology.
 
 ## I/O group limitations
 
 I/O group configuration is only supported for use with IBM Spectrum Virtualize family storage systems.
 
-### Stretched volume limitations
- When conducting volume cloning, both volumes must use stretched topology.
-
 ## Volume clone limitations
 
 The following limitations apply when using volume clones with the IBM block storage CSI driver:
+
+**Note:** For high availability volume clone limitations, see [High availability (HA) limitations](#high-availability-ha-limitations).
 
 -   When cloning a PersistentVolumeClaim (PVC), the clone cannot contain a smaller size than the source PVC.
 
     **Note:** The size can be expanded after the cloning process.
 
 -   A PVC and its clone need to both have the same volume mode (**Filesystem** or **Block**).
-
-**Note:** For high availability volume clone limitations, see [High availability (HA) limitations](#high-availability-ha-limitations).
 
 ## NVMe®/FC usage limitations
 
@@ -100,9 +100,9 @@ When a role switch is conducted, this is not reflected within the other orchestr
 
 The following limitations apply when using volume snapshots with the IBM block storage CSI driver:
 
+**Note:** For volume snapshot limitations pertaining specifically to HyperSwap usage, see [HyperSwap volume limitations](#hyperswap-volume-limitations).
+
 -   When deleting a PersistentVolumeClaim (PVC), the persistent volume (PV) remains until all snapshots of the specific PV are deleted.
     
     **Note:** This limitation is not relevant when using Snapshot function. For more information, see [Snapshot function limitations](#snapshot-function-limitations).
 -   When using the CSI (Container Storage Interface) driver with IBM Spectrum® Virtualize family products, a snapshot can only be used to provision a new volume of equal size.
-
-**Note:** For volume snapshot limitations pertaining specifically to HyperSwap usage, see [HyperSwap volume limitations](#hyperswap-volume-limitations).
