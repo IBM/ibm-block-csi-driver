@@ -11,19 +11,22 @@ logger = get_stdout_logger()
 class StorageClassWatcher(Watcher):
 
     def watch_storage_class_resources(self):
-        watcher = watch.Watch()
-        stream = watcher.stream(self.storage_api.list_storage_class)
-        for event in stream:
-            storage_class = event[settings.OBJECT_KEY]
-            storage_class_name = storage_class.metadata.name
-            secrets = self._get_secrets_from_storage_class_with_driver_provisioner(storage_class)
+        resource_version = ''
+        while True:
+            stream = watch.Watch().stream(self.storage_api.list_storage_class,
+                                          resource_version=resource_version, timeout_seconds=5)
+            resource_version = self.storage_api.list_storage_class().metadata.resource_version
+            for event in stream:
+                storage_class = event[settings.OBJECT_KEY]
+                storage_class_name = storage_class.metadata.name
+                secrets = self._get_secrets_from_storage_class_with_driver_provisioner(storage_class)
 
-            if event[settings.TYPE_KEY] == settings.ADDED_EVENT:
-                logger.info(messages.NEW_STORAGE_CLASS.format(storage_class_name))
-                self._handle_added_storage_class_event(secrets)
+                if event[settings.TYPE_KEY] == settings.ADDED_EVENT:
+                    logger.info(messages.NEW_STORAGE_CLASS.format(storage_class_name))
+                    self._handle_added_storage_class_event(secrets)
 
-            elif event[settings.TYPE_KEY] == settings.DELETED_EVENT:
-                self._handle_deleted_storage_class_event(secrets)
+                elif event[settings.TYPE_KEY] == settings.DELETED_EVENT:
+                    self._handle_deleted_storage_class_event(secrets)
 
     def _get_secrets_from_storage_class_with_driver_provisioner(self, storage_class):
         if self._is_storage_class_has_csi_ibm_block_as_a_provisioner(storage_class):

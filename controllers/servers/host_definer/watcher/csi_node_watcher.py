@@ -17,12 +17,15 @@ class CsiNodeWatcher(Watcher):
                 self._add_node_to_nodes(csi_node)
 
     def watch_csi_nodes_resources(self):
-        for event in self.csi_nodes_api.watch():
-            csi_node = self._get_csi_node_object(event[settings.OBJECT_KEY])
-            if (event[settings.TYPE_KEY] == settings.DELETED_EVENT) and (csi_node.name in NODES):
-                self._handle_deleted_csi_node_pod(csi_node.name)
-            elif event[settings.TYPE_KEY] == settings.MODIFIED_EVENT:
-                self._handle_modified_csi_node(csi_node)
+        while True:
+            resource_version = self.csi_nodes_api.get().metadata.resourceVersion
+            stream = self.csi_nodes_api.watch(resource_version=resource_version, timeout=5)
+            for event in stream:
+                csi_node = self._get_csi_node_object(event[settings.OBJECT_KEY])
+                if (event[settings.TYPE_KEY] == settings.DELETED_EVENT) and (csi_node.name in NODES):
+                    self._handle_deleted_csi_node_pod(csi_node.name)
+                elif event[settings.TYPE_KEY] == settings.MODIFIED_EVENT:
+                    self._handle_modified_csi_node(csi_node)
 
     def _handle_modified_csi_node(self, csi_node):
         if csi_node.node_id and self._is_host_can_be_defined(csi_node.name) and csi_node.name not in NODES:
@@ -82,5 +85,4 @@ class CsiNodeWatcher(Watcher):
             if host_definition.management_address:
                 self._delete_definition(host_definition)
 
-        self._remove_managed_by_host_definer_label(node_name)
         NODES.pop(node_name)

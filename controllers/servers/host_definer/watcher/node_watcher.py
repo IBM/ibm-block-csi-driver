@@ -11,20 +11,22 @@ logger = get_stdout_logger()
 class NodeWatcher(Watcher):
 
     def watch_nodes_resources(self):
-        watcher = watch.Watch()
-        stream = watcher.stream(self.core_api.list_node)
-        for event in stream:
-            node_name = event[settings.OBJECT_KEY].metadata.name
-            csi_node = self._get_csi_node(node_name)
-            if event[settings.TYPE_KEY] == settings.ADDED_EVENT and \
-                    self._is_csi_driver_node_deleted_while_host_definer_was_down(csi_node):
-                self._delete_host_definitions(node_name)
-                self._remove_managed_by_host_definer_label(node_name)
+        resource_version = ''
+        while True:
+            stream = watch.Watch().stream(self.core_api.list_node, resource_version=resource_version, timeout_seconds=5)
+            resource_version = self.core_api.list_node().metadata.resource_version
+            for event in stream:
+                node_name = event[settings.OBJECT_KEY].metadata.name
+                csi_node = self._get_csi_node(node_name)
+                if event[settings.TYPE_KEY] == settings.ADDED_EVENT and \
+                        self._is_csi_driver_node_deleted_while_host_definer_was_down(csi_node):
+                    self._delete_host_definitions(node_name)
+                    self._remove_managed_by_host_definer_label(node_name)
 
-            elif event[settings.TYPE_KEY] == settings.MODIFIED_EVENT and \
-                    self._is_node_has_new_managed_by_host_definer_label(csi_node):
-                self._add_node_to_nodes(csi_node)
-                self._define_host_on_all_storages_from_secrets(node_name)
+                elif event[settings.TYPE_KEY] == settings.MODIFIED_EVENT and \
+                        self._is_node_has_new_managed_by_host_definer_label(csi_node):
+                    self._add_node_to_nodes(csi_node)
+                    self._define_host_on_all_storages_from_secrets(node_name)
 
     def _is_csi_driver_node_deleted_while_host_definer_was_down(self, csi_node):
         return self._is_node_has_managed_by_host_definer_label(csi_node.name) and \

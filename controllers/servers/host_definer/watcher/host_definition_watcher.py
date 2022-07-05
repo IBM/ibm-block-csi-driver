@@ -13,12 +13,15 @@ logger = get_stdout_logger()
 class HostDefinitionWatcher(Watcher):
 
     def watch_host_definitions_resources(self):
-        for event in self.host_definitions_api.watch():
-            event_object = event[settings.OBJECT_KEY]
-            host_definition = self._get_host_definition_object(event_object)
-            if self._is_host_definition_in_pending_phase(host_definition.phase) and \
-                    event[settings.TYPE_KEY] != settings.DELETED_EVENT:
-                self._verify_host_defined_after_pending_host_definition(host_definition)
+        while True:
+            resource_version = self.host_definitions_api.get().metadata.resourceVersion
+            stream = self.host_definitions_api.watch(resource_version=resource_version, timeout=5)
+            for event in stream:
+                event_object = event[settings.OBJECT_KEY]
+                host_definition = self._get_host_definition_object(event_object)
+                if self._is_host_definition_in_pending_phase(host_definition.phase) and \
+                        event[settings.TYPE_KEY] != settings.DELETED_EVENT:
+                    self._verify_host_defined_after_pending_host_definition(host_definition)
 
     def _is_host_definition_in_pending_phase(self, phase):
         return settings.PENDING_PREFIX in phase
@@ -29,7 +32,7 @@ class HostDefinitionWatcher(Watcher):
         remove_host_thread.start()
 
     def _verify_host_defined_using_exponential_backoff(self, host_definition):
-        retries = 3
+        retries = 5
         backoff_in_seconds = 3
         delay_in_seconds = 3
         logger.info(messages.VERIFY_HOST_DEFINITION_USING_EXPONANTIAL_BACKOFF.format(host_definition.name))
@@ -48,7 +51,7 @@ class HostDefinitionWatcher(Watcher):
         phase = host_definition.phase
         if status_code == 400 and phase == settings.PENDING_DELETION_PHASE:
             return True
-        return host_definition_instance.phase == settings.READY_PHASE and phase == settings.PENDING_CREATION_PHASE
+        return host_definition_instance.phase == settings.READY_PHASE
 
     def _handle_pending_host_definition(self, host_definition):
         response = DefineHostResponse()

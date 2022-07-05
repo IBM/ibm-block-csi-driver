@@ -93,6 +93,7 @@ class Watcher(KubernetesManager):
             self._create_event_to_host_definition(host_definition.name, response.error_message)
         else:
             self._delete_host_definition(host_definition.name)
+            self._remove_managed_by_host_definer_label(node_name)
 
     def _undefine_host(self, host_definition):
         return self._ensure_definition_state(host_definition, self.storage_host_servicer.undefine_host)
