@@ -276,11 +276,6 @@ type WaitForDmToExistReturn struct {
 	err error
 }
 
-type GetMpathdOutputReturn struct {
-	out string
-	err error
-}
-
 type ExtractDmFieldValuesReturn struct {
 	mpathdOutput  string
 	dmFieldValues map[string]bool
@@ -299,14 +294,13 @@ func TestGetDmsPath(t *testing.T) {
 		expErr                     error
 		expDMPath                  string
 		waitForDmToExistReturn     []WaitForDmToExistReturn
-		getMpathdOutputReturn      []GetMpathdOutputReturn
 		extractDmFieldValuesReturn []ExtractDmFieldValuesReturn
 		getFullDmPathReturn        []GetFullDmPathReturn
 	}{
 		{
 			name: "Should fail when WaitForDmToExist did not find any dm device",
-			getMpathdOutputReturn: []GetMpathdOutputReturn{
-				GetMpathdOutputReturn{
+			waitForDmToExistReturn: []WaitForDmToExistReturn{
+				WaitForDmToExistReturn{
 					out: "",
 					err: &device_connectivity.MultipathDeviceNotFoundForVolumeError{""},
 				},
@@ -318,8 +312,8 @@ func TestGetDmsPath(t *testing.T) {
 
 		{
 			name: "Should fail when WaitForDmToExist found more than 1 dm for volume",
-			getMpathdOutputReturn: []GetMpathdOutputReturn{
-				GetMpathdOutputReturn{
+			waitForDmToExistReturn: []WaitForDmToExistReturn{
+				WaitForDmToExistReturn{
 					out: fmt.Sprintf("dm-1,%s\ndm-2,%s\ndm-3,%s", volumeUuid, "otheruuid", volumeUuid),
 					err: nil,
 				},
@@ -354,8 +348,8 @@ func TestGetDmsPath(t *testing.T) {
 
 		{
 			name: "Should succeed to GetDmPath with space in start of input",
-			getMpathdOutputReturn: []GetMpathdOutputReturn{
-				GetMpathdOutputReturn{
+			waitForDmToExistReturn: []WaitForDmToExistReturn{
+				WaitForDmToExistReturn{
 					out: fmt.Sprintf(" dm-1,%s", volumeUuid),
 					err: nil,
 				},
@@ -386,8 +380,8 @@ func TestGetDmsPath(t *testing.T) {
 
 		{
 			name: "Should succeed to GetDmPath",
-			getMpathdOutputReturn: []GetMpathdOutputReturn{
-				GetMpathdOutputReturn{
+			waitForDmToExistReturn: []WaitForDmToExistReturn{
+				WaitForDmToExistReturn{
 					out: fmt.Sprintf("dm-1,%s", volumeUuid),
 					err: nil,
 				},
@@ -427,9 +421,9 @@ func TestGetDmsPath(t *testing.T) {
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 			fake_helper := mocks.NewMockGetDmsPathHelperInterface(mockCtrl)
 
-			for _, r := range tc.getMpathdOutputReturn {
-				fake_helper.EXPECT().GetMpathdOutput(volumeIdVariations,
-					device_connectivity.MultipathdWildcardsVolumeIdAndMpath).Return(r.out, r.err)
+			for _, r := range tc.waitForDmToExistReturn {
+				fake_helper.EXPECT().WaitForDmToExist(volumeIdVariations, device_connectivity.WaitForMpathRetries,
+					device_connectivity.WaitForMpathWaitIntervalSec, device_connectivity.MultipathdWildcardsVolumeIdAndMpath).Return(r.out, r.err)
 			}
 
 			for _, r := range tc.extractDmFieldValuesReturn {

@@ -442,7 +442,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(
 	mpathdOutput string, mpathDeviceName string) (string, error) {
 
-	mpathVolumeId, err := o.Helper.GetVolumeIdOfMpathDeviceName(mpathDeviceName, mpathdOutput)
+	mpathVolumeId, err := o.Helper.ExtractVolumeId(mpathDeviceName, mpathdOutput)
 	if err != nil {
 		return "", err
 	}
@@ -566,7 +566,8 @@ func (o OsDeviceConnectivityHelperGeneric) ReloadMultipath() error {
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetMpathdOutputForVolume(volumeIdVariations []string) (string, error) {
-	mpathdOutput, err := o.Helper.GetMpathdOutput(volumeIdVariations, multipathdWildcardsMpathNameAndVolumeId)
+	mpathdOutput, err := o.Helper.WaitForDmToExist(volumeIdVariations, WaitForMpathRetries,
+		WaitForMpathWaitIntervalSec, multipathdWildcardsMpathNameAndVolumeId)
 	if err != nil {
 		return "", err
 	}
@@ -574,7 +575,8 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathdOutputForVolume(volumeIdVari
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeIdVariations []string) (string, error) {
-	mpathdOutput, err := o.Helper.GetMpathdOutput(volumeIdVariations, MultipathdWildcardsVolumeIdAndMpath)
+	mpathdOutput, err := o.Helper.WaitForDmToExist(volumeIdVariations, WaitForMpathRetries,
+		WaitForMpathWaitIntervalSec, MultipathdWildcardsVolumeIdAndMpath)
 	if err != nil {
 		return "", err
 	}
@@ -611,12 +613,11 @@ func (o OsDeviceConnectivityHelperGeneric) IsAnyVariationInMpathVolumeId(mpathVo
 
 type GetDmsPathHelperInterface interface {
 	WaitForDmToExist(volumeIdVariations []string, maxRetries int, intervalSeconds int, multipathdCommandFormatArgs []string) (string, error)
-	GetMpathdOutput(volumeIdVariations []string, multipathdCommandFormatArgs []string) (string, error)
 	ExtractDmFieldValues(dmFilterValues []string, mpathdOutput string) map[string]bool
 	GetFullDmPath(dms map[string]bool, volumeId string) (string, error)
 	IsIndicatorMatchesFilterValues(dmFilterValues []string, dmFieldValue string) bool
 	GetMpathDeviceNameFromProcMounts(procMounts string, volumePath string) (string, error)
-	GetVolumeIdOfMpathDeviceName(mpathDeviceName string, mpathdOutput string) (string, error)
+	ExtractVolumeId(mpathDeviceName string, mpathdOutput string) (string, error)
 }
 
 type GetDmsPathHelperGeneric struct {
@@ -627,7 +628,7 @@ func NewGetDmsPathHelperGeneric(executer executer.ExecuterInterface) GetDmsPathH
 	return &GetDmsPathHelperGeneric{executer: executer}
 }
 
-func (o GetDmsPathHelperGeneric) GetVolumeIdOfMpathDeviceName(mpathDeviceName string, mpathdOutput string) (string, error) {
+func (o GetDmsPathHelperGeneric) ExtractVolumeId(mpathDeviceName string, mpathdOutput string) (string, error) {
 	mpathDeviceNames := []string{mpathDeviceName}
 	volumeIds := o.ExtractDmFieldValues(mpathDeviceNames, mpathdOutput)
 	volumeId, err := getUniqueDmFieldValue(volumeIds, mpathDeviceName)
@@ -650,12 +651,6 @@ func convertScsiIdToNguid(scsiId string) string {
 	finalNguid := vendorIdentifierExtension + oui + "0" + vendorIdentifier
 	logger.Infof("Nguid is : %s", finalNguid)
 	return finalNguid
-}
-
-func (o GetDmsPathHelperGeneric) GetMpathdOutput(volumeIdVariations []string,
-	multipathdCommandFormatArgs []string) (string, error) {
-	return o.WaitForDmToExist(volumeIdVariations, WaitForMpathRetries,
-		WaitForMpathWaitIntervalSec, multipathdCommandFormatArgs)
 }
 
 func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeIdVariations []string, maxRetries int, intervalSeconds int,

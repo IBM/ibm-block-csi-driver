@@ -424,43 +424,6 @@ func TestGetVolumeUuid(t *testing.T) {
 
 }
 
-func TestGetFileSystemVolumeStats(t *testing.T) {
-	dir1, err := ioutil.TempDir("", "dir_1")
-	if err != nil {
-		t.Fatalf("TestGetFileSystemVolumeStats failed: %s", err.Error())
-	}
-	defer os.RemoveAll(dir1)
-
-	tmpfile1, err := ioutil.TempFile(dir1, "test")
-	if _, err = tmpfile1.WriteString("just for testing"); err != nil {
-		t.Fatalf("TestGetFileSystemVolumeStats failed: %s", err.Error())
-	}
-	nodeUtils := driver.NewNodeUtils(nil, nil, ConfigYaml, nil)
-	volumeStats, _ := nodeUtils.GetFileSystemVolumeStats(tmpfile1.Name())
-	validateInfo(t, volumeStats)
-}
-
-func validateInfo(t *testing.T, volumeStats driver.VolumeStatistics) {
-	if volumeStats.AvailableBytes <= 0 {
-		t.Errorf("GetFileSystemVolumeStats() availablebytes should be greater than 0, got %v", volumeStats.AvailableBytes)
-	}
-	if volumeStats.TotalBytes <= 0 {
-		t.Errorf("GetFileSystemVolumeStats() capacity should be greater than 0, got %v", volumeStats.TotalBytes)
-	}
-	if volumeStats.UsedBytes <= 0 {
-		t.Errorf("GetFileSystemVolumeStats() got usage should be greater than 0, got %v", volumeStats.UsedBytes)
-	}
-	if volumeStats.TotalInodes <= 0 {
-		t.Errorf("GetFileSystemVolumeStats() inodesTotal should be greater than 0, want %v", volumeStats.TotalInodes)
-	}
-	if volumeStats.AvailableInodes <= 0 {
-		t.Errorf("GetFileSystemVolumeStats() inodesFree should be greater than 0, want %v", volumeStats.AvailableInodes)
-	}
-	if volumeStats.UsedInodes <= 0 {
-		t.Errorf("GetFileSystemVolumeStats() inodeUsage should be greater than 0, want %v", volumeStats.UsedInodes)
-	}
-}
-
 func TestGetBlockVolumeStats(t *testing.T) {
 	sizeInBytes, _ := strconv.ParseInt("1073741824", 10, 64)
 	testCases := []struct {
