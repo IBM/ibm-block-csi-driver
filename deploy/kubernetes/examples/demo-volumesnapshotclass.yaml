@@ -8,7 +8,7 @@ parameters:
   pool: demo-pool                    # Optional. Use to create the snapshot on a different pool than the source.
   SpaceEfficiency: thin              # Optional. Use to create the snapshot with a different space efficiency than the source.
   snapshot_name_prefix: demo-prefix  # Optional.
-  flashcopy_2: "false"               # Optional. Values true/false. The default is false.
+  virt_snap_func: "false"            # Optional. Values true/false. The default is false.
 
   csi.storage.k8s.io/snapshotter-secret-name: demo-secret
   csi.storage.k8s.io/snapshotter-secret-namespace: default
