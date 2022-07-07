@@ -22,7 +22,9 @@ class HostDefinerManager:
 
     def start_host_definition(self):
         logger.info('starting host definer')
-        self.csi_node_watcher.add_initial_nodes()
+        self.csi_node_watcher.add_initial_csi_nodes()
+        self.storage_class_watcher.add_initial_storage_classes()
+        self.node_watcher.add_initial_nodes()
         self._start_watchers()
 
     def _start_watchers(self):
