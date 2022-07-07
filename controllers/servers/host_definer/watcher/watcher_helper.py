@@ -1,257 +1,206 @@
 import base64
-import datetime
 import os
-from kubernetes import client, config, dynamic
-from kubernetes.client import api_client
-from kubernetes.client.rest import ApiException
+import random
+import string
 
 from controllers.servers.config import (SECRET_ARRAY_PARAMETER,
                                         SECRET_PASSWORD_PARAMETER,
                                         SECRET_USERNAME_PARAMETER)
-from controllers.common import utils
+import controllers.servers.messages as messages
+from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.host_definer.common import settings
-from controllers.servers.host_definer.common.types import DefineHostRequest
+from controllers.servers.host_definer import settings
+from controllers.servers.host_definer.types import DefineHostRequest, DefineHostResponse, HostDefinition, Secret
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
-import controllers.servers.host_definer.watcher.exceptions as exceptions
 
 SECRET_IDS = {}
 NODES = {}
 logger = get_stdout_logger()
 
 
-class Watcher:
+class Watcher(KubernetesManager):
     def __init__(self):
+        super().__init__()
         self.storage_host_servicer = HostDefinerServicer()
-        self._load_cluster_configuration()
-        self.dynamic_client = self._get_dynamic_client()
-        self.storage_api = client.StorageV1Api()
-        self.core_api = client.CoreV1Api()
-        self.custom_object_api = client.CustomObjectsApi()
-        self.csi_nodes_api = self._get_csi_nodes_api()
-        self.host_definitions_api = self._get_host_definitions_api()
 
-    def _get_dynamic_client(self):
-        return dynamic.DynamicClient(api_client.ApiClient(
-            configuration=self._load_cluster_configuration()))
+    def _verify_nodes_defined(self, host_definition):
+        for node_name, _ in NODES.items():
+            host_definition = self._add_name_to_host_definition(node_name, host_definition)
+            self._create_definition(host_definition)
 
-    def _load_cluster_configuration(self):
-        return config.load_incluster_config()
-
-    def _get_csi_nodes_api(self):
-        return self.dynamic_client.resources.get(
-            api_version=settings.STORAGE_API_VERSION,
-            kind=settings.CSINODE_KIND)
-
-    def _get_host_definitions_api(self):
-        return self.dynamic_client.resources.get(
-            api_version=settings.CSI_IBM_API_VERSION,
-            kind=settings.HOST_DEFINITION_KIND)
-
-    def verify_nodes_defined(self, host_request):
-        for _, node_id in NODES.items():
-            host_request.node_id = node_id
-            self._verify_host_defined_and_has_host_definition(host_request)
-
-    def _verify_host_defined_and_has_host_definition(self, host_request):
-        if self._is_host_already_defined(host_request):
+    def _create_definition(self, host_definition):
+        if self._is_host_defined(host_definition.node_name, host_definition.secret):
+            logger.info(messages.HOST_ALREADY_ON_STORAGE_HOST_DEFINITION_READY.format(
+                host_definition.node_name, host_definition.secret.name,
+                host_definition.secret.namespace, host_definition.name))
             return
-        response = self.verify_host_defined_on_storage_and_on_cluster(host_request)
+        response = self._define_host(host_definition)
+        host_definition.name = self._create_host_definition_if_not_exist(host_definition)
         if response.error_message:
-            self._verify_host_definition_in_phase(host_request, settings.PENDING_CREATION_PHASE)
-            self._create_event_to_host_definition_from_host_request(
-                host_request, response.error_message)
+            self._set_host_definition_status(host_definition.name, settings.PENDING_CREATION_PHASE)
+            self._create_event_to_host_definition(host_definition, response.error_message)
+        else:
+            self._set_host_definition_status(host_definition.name, settings.READY_PHASE)
 
-    def _is_host_already_defined(self, host_request):
-        node = self.get_node_name_from_node_id(host_request.node_id)
-        host_definition_name = self.get_host_definition_name(
-            host_request, node)
-        if self._is_host_definition_in_ready_state(host_definition_name):
-            logger.info(
-                'Host {} is already on storage, detected hostdefinition {} in Ready phase'.format(
-                    node, host_definition_name))
-            return True
+    def _is_host_defined(self, node_name, secret):
+        host_definition, _ = self._get_host_definition(node_name, secret)
+        return self._is_host_definition_in_ready_state(host_definition)
+
+    def _is_host_definition_in_ready_state(self, host_definition):
+        if host_definition:
+            return host_definition.phase == settings.READY_PHASE
         return False
 
-    def _is_host_definition_in_ready_state(self, host_definition_name):
-        try:
-            return self.is_host_definition_ready(host_definition_name)
-        except dynamic.exceptions.NotFoundError:
-            return False
-        except Exception as ex:
-            logger.error(ex)
-            return False
+    def _define_host(self, host_definition):
+        return self._ensure_definition_state(host_definition, self.storage_host_servicer.define_host)
 
-    def is_host_definition_ready(self, host_definition_name):
-        host_definition = self._get_host_definition(
-            host_definition_name)
-        return self.get_phase_of_host_definition(
-            host_definition) == settings.READY_PHASE
-
-    def _get_host_definition(self, host_definition_name):
-        try:
-            return self.host_definitions_api.get(name=host_definition_name)
-        except dynamic.exceptions.NotFoundError as ex:
-            raise ex
-        except ApiException:
-            raise exceptions.FailedToGetHostDefinitionObject
-
-    def get_phase_of_host_definition(self, host_definition):
-        if host_definition.status:
-            return host_definition.status.phase
-        return None
-
-    def verify_host_defined_on_storage_and_on_cluster(self, host_request):
-        response = self.storage_host_servicer.define_host(host_request)
-        if response.error_message:
-            return response
-        self._verify_host_definition_in_phase(host_request, settings.READY_PHASE)
-        return response
-
-    def _verify_host_definition_in_phase(self, host_request, phase):
-        node_name = self.get_node_name_from_node_id(host_request.node_id)
-        host_definition_name = self.get_host_definition_name(
-            host_request, node_name)
-        try:
-            self._verify_host_definition(host_definition_name, host_request, phase)
-        except Exception as ex:
-            logger.error(
-                'Failed to verify hostdefinition {} in {} phase, got: {}'.format(
-                    host_definition_name, phase, ex))
-
-    def _verify_host_definition(self, host_definition_name, host_request, phase):
-        host_definition_manifest = self.get_host_definition_manifest_from_host_request(
-            host_request, host_definition_name)
-        logger.info('Verifying hostDefinition {} is in {} phase'.format(
-            host_definition_name, phase))
-        try:
-            _ = self._get_host_definition(host_definition_name)
-            self.patch_host_definition(host_definition_manifest)
-        except dynamic.exceptions.NotFoundError:
-            logger.info('Creating host Definition: {}'.format(
-                host_definition_name))
+    def _create_host_definition_if_not_exist(self, host_definition):
+        host_definition_manifest = self._get_host_definition_manifest(host_definition)
+        host_definition_instance, _ = self._get_host_definition(host_definition.node_name, host_definition.secret)
+        if host_definition_instance:
+            host_definition_manifest[settings.METADATA][settings.NAME] = host_definition_instance.name
+            self._patch_host_definition(host_definition_manifest)
+        else:
+            logger.info(messages.CREATING_NEW_HOST_DEFINITION.format(host_definition.name))
             self._create_host_definition(host_definition_manifest)
-        self.set_host_definition_status(host_definition_name, phase)
+        return host_definition_manifest[settings.METADATA][settings.NAME]
 
-    def get_host_definition_name(self, host_request, node_name):
-        return '{0}.{1}'.format(
-            host_request.system_info[SECRET_ARRAY_PARAMETER], node_name).replace('_', '.')
-
-    def get_host_definition_manifest_from_host_request(
-            self, host_request, host_definition_name):
-        node_name = self.get_node_name_from_node_id(host_request.node_id)
+    def _get_host_definition_manifest(self, host_definition):
         return {
-            'apiVersion': settings.CSI_IBM_API_VERSION,
-            'kind': settings.HOST_DEFINITION_KIND,
-            'metadata': {
-                'name': host_definition_name,
+            settings.API_VERSION: settings.CSI_IBM_API_VERSION,
+            settings.KIND: settings.HOST_DEFINITION_KIND,
+            settings.METADATA: {
+                settings.NAME: host_definition.name,
             },
-            'spec': {
-                'hostDefinition': {
-                    'managementAddress': host_request.system_info[SECRET_ARRAY_PARAMETER],
-                    'nodeName': node_name,
-                    'nodeId': host_request.node_id,
-                    'secretName': host_request.secret_name,
-                    'secretNamespace': host_request.secret_namespace,
+            settings.SPEC: {
+                settings.HOST_DEFINITION_FIELD: {
+                    settings.NODE_NAME_FIELD: host_definition.node_name,
+                    settings.NODE_ID_FIELD: host_definition.node_id,
+                    settings.SECRET_NAME_FIELD: host_definition.secret.name,
+                    settings.SECRET_NAMESPACE_FIELD: host_definition.secret.namespace,
                 },
             },
         }
 
-    def patch_host_definition(self, host_definition_manifest):
-        host_definition_name = host_definition_manifest['metadata']['name']
-        logger.info('Patching host definition: {}'.format(
-            host_definition_name))
-        try:
-            self.host_definitions_api.patch(
-                body=host_definition_manifest,
-                name=host_definition_name,
-                content_type='application/merge-patch+json')
-        except dynamic.exceptions.NotFoundError as ex:
-            raise ex
-        except ApiException as ex:
-            if ex.status == 404:
-                raise exceptions.HostDefinitionDoesNotExist(
-                    host_definition_name)
-            raise exceptions.FailedToPatchHostDefinitionObject(
-                host_definition_name, ex.body)
-
-    def _create_host_definition(self, host_definition_manifest):
-        try:
-            self.host_definitions_api.create(body=host_definition_manifest)
-        except ApiException as ex:
-            raise exceptions.FailedToCreateHostDefinitionObject(
-                host_definition_manifest['metadata']['name'], ex.body)
-
-    def get_host_request_from_secret_and_node_name(self, secret_id, node_name):
-        host_request = self.get_host_request_from_secret_id(secret_id)
-        if host_request:
-            host_request.node_id = NODES[node_name]
-        return host_request
-
-    def get_host_request_from_secret_id(self, secret):
-        secret_name, secret_namespace = self._get_secret_name_and_namespace_from_id(secret)
-        return self.get_host_request_from_secret_name_and_namespace(
-            secret_name, secret_namespace)
-
-    def get_host_request_from_host_definition(
-            self, host_definition):
-        secret_name = host_definition.spec.hostDefinition.secretName
-        secret_namespace = host_definition.spec.hostDefinition.secretNamespace
-        host_request = self.get_host_request_from_secret_name_and_namespace(
-            secret_name, secret_namespace)
-        if host_request:
-            host_request.node_id = host_definition.spec.hostDefinition.nodeId
-        return host_request
-
-    def _get_secret_name_and_namespace_from_id(self, secret_id):
-        return secret_id.split(',')
-
-    def get_host_request_from_secret_name_and_namespace(
-            self, secret_name, secret_namespace):
-        host_request = self._get_new_host_request()
-        try:
-            host_request.system_info = self._get_system_info_from_secret(
-                secret_name, secret_namespace)
-        except Exception as ex:
-            logger.error(ex)
-            return None
-        host_request.secret_name = secret_name
-        host_request.secret_namespace = secret_namespace
-        return host_request
-
-    def _get_new_host_request(self):
-        host_request = DefineHostRequest()
-        host_request.prefix = self._get_prefix()
-        host_request.connectivity_type = self.get_connectivity()
-        return host_request
-
     def _get_prefix(self):
-        return os.getenv('PREFIX')
+        return os.getenv(settings.PREFIX_ENV_VAR)
 
-    def get_connectivity(self):
-        return os.getenv('CONNECTIVITY')
+    def _get_connectivity(self):
+        return os.getenv(settings.CONNECTIVITY_ENV_VAR)
 
-    def _get_system_info_from_secret(self, secret_name, secret_namespace):
-        try:
-            secret_data = self.core_api.read_namespaced_secret(
-                name=secret_name, namespace=secret_namespace).data
-        except ApiException as ex:
-            if ex.status == 404:
-                raise exceptions.SecretDoesNotExist(
-                    secret_name, secret_namespace)
-            raise exceptions.FailedToGetSecret(
-                secret_name, secret_namespace, ex.body)
+    def _delete_definition(self, host_definition):
+        node_name = host_definition.node_name
+        secret = host_definition.secret
+        logger.info(messages.VERIFY_HOST_IS_UNDEFINED.format(node_name, secret.name, secret.namespace))
+        response = self._undefine_host(host_definition)
+        host_definition_instance, _ = self._get_host_definition(host_definition.node_name, host_definition.secret)
+        if response.error_message and host_definition_instance:
+            self._set_host_definition_status(host_definition_instance.name, settings.PENDING_DELETION_PHASE)
+            self._create_event_to_host_definition(host_definition_instance, response.error_message)
+        elif not response.error_message and host_definition_instance:
+            self._delete_host_definition(host_definition_instance.name)
+            self._remove_managed_by_host_definer_label(node_name)
 
+    def _undefine_host(self, host_definition):
+        return self._ensure_definition_state(host_definition, self.storage_host_servicer.undefine_host)
+
+    def _create_event_to_host_definition(self, host_definition, message):
+        self._add_event_to_host_definition(host_definition, message)
+        if host_definition:
+            self._add_event_to_host_definition(host_definition, message)
+
+    def _add_event_to_host_definition(self, host_definition, message):
+        logger.info(messages.CREATE_EVENT_FOR_HOST_DEFINITION.format(host_definition.name, message))
+        event = self._get_event_for_host_definition(host_definition, message)
+        self._create_event(settings.DEFAULT_NAMESPACE, event)
+
+    def _is_host_can_be_defined(self, node_name):
+        if self._is_dynamic_node_labeling_allowed():
+            return True
+        return self._is_node_has_managed_by_host_definer_label(node_name)
+
+    def _is_dynamic_node_labeling_allowed(self):
+        return os.getenv(settings.DYNAMIC_NODE_LABELING_ENV_VAR) == settings.TRUE_STRING
+
+    def _is_host_can_be_undefined(self, node_name):
+        if self._is_host_definer_can_delete_hosts():
+            return self._is_node_has_managed_by_host_definer_label(node_name) and \
+                (not self._is_node_has_host_definer_avoid_deletion_label(node_name))
+        return False
+
+    def _is_host_definer_can_delete_hosts(self):
+        return os.getenv(settings.ALLOW_DELETE_ENV_VAR) == settings.TRUE_STRING
+
+    def _is_node_has_managed_by_host_definer_label(self, node_name):
+        return self._is_host_has_label_in_true(node_name, settings.MANAGED_BY_HOST_DEFINER_LABEL)
+
+    def _is_node_has_host_definer_avoid_deletion_label(self, node_name):
+        return self._is_host_has_label_in_true(node_name, settings.HOST_DEFINER_FORBID_DELETION_LABEL)
+
+    def _is_host_has_label_in_true(self, node_name, label):
+        node = self._read_node(node_name)
+        if not node:
+            return False
+        return node.metadata.labels.get(label) == settings.TRUE_STRING
+
+    def _ensure_definition_state(self, host_definition, define_function):
+        request = self._get_request_from_host_definition(host_definition)
+        if not request:
+            response = DefineHostResponse()
+            response.error_message = 'Failed to get Secret'
+            return response
+        return define_function(request)
+
+    def _get_request_from_host_definition(self, host_definition):
+        request = self._get_request_from_secret(host_definition.secret)
+        if request:
+            request.node_id = host_definition.node_id
+            request.node_name = host_definition.node_name
+        return request
+
+    def _get_request_from_secret(self, secret):
+        request = self._get_new_request()
+        request.system_info = self._get_system_info_from_secret(secret)
+        if request.system_info:
+            return request
+        return None
+
+    def _get_new_request(self):
+        request = DefineHostRequest()
+        request.prefix = self._get_prefix()
+        request.connectivity_type = self._get_connectivity()
+        return request
+
+    def _get_host_definition_from_secret_and_node_name(self, node_name, secret_id):
+        secret = self._get_secret_object_from_id(secret_id)
+        host_definition = self._get_host_definition_from_secret(secret)
+        host_definition = self._add_name_to_host_definition(node_name, host_definition)
+        return host_definition
+
+    def _get_host_definition_from_secret(self, secret):
+        host_definition = HostDefinition()
+        host_definition.secret = secret
+        return host_definition
+
+    def _get_system_info_from_secret(self, secret):
+        secret_data = self._get_data_from_secret(secret)
         return self._get_system_info_from_secret_data(secret_data)
 
     def _get_system_info_from_secret_data(self, secret_data):
+        try:
+            return self._get_system_info(secret_data)
+        except:
+            logger.error(messages.INVALID_SECRET_CONFIG_MESSAGE)
+            return ''
+
+    def _get_system_info(self, secret_data):
+        if not secret_data:
+            return ''
+
         return {
-            SECRET_ARRAY_PARAMETER: self._decode_base64_to_string(
-                secret_data[SECRET_ARRAY_PARAMETER]),
-            SECRET_USERNAME_PARAMETER: self._decode_base64_to_string(
-                secret_data[SECRET_USERNAME_PARAMETER]),
-            SECRET_PASSWORD_PARAMETER: self._decode_base64_to_string(
-                secret_data[SECRET_PASSWORD_PARAMETER])
+            SECRET_ARRAY_PARAMETER: self._decode_base64_to_string(secret_data[SECRET_ARRAY_PARAMETER]),
+            SECRET_USERNAME_PARAMETER: self._decode_base64_to_string(secret_data[SECRET_USERNAME_PARAMETER]),
+            SECRET_PASSWORD_PARAMETER: self._decode_base64_to_string(secret_data[SECRET_PASSWORD_PARAMETER])
         }
 
     def _decode_base64_to_string(self, content_with_base64):
@@ -259,213 +208,45 @@ class Watcher:
         decoded_string_in_bytes = base64.b64decode(base64_bytes)
         return decoded_string_in_bytes.decode('ascii')
 
-    def undefine_host_and_host_definition_with_events(self, host_request):
-        node_name = self.get_node_name_from_node_id(host_request.node_id)
-        logger.info('Verifying that host {} is undefined from storage {}'.format(
-            node_name, host_request.system_info[SECRET_ARRAY_PARAMETER]))
-        host_definition_name = self.get_host_definition_name(
-            host_request, node_name)
-        response = self.undefine_host_and_host_definition(host_request, host_definition_name)
-        if response.error_message:
-            self.set_host_definition_status_to_pending_deletion(host_definition_name)
-            self._create_event_to_host_definition_from_host_request(
-                host_request, response.error_message)
+    def _add_name_to_host_definition(self, node_name, host_definition):
+        host_definition.node_name = node_name
+        host_definition.node_id = NODES[node_name]
+        host_definition.name = self._get_host_definition_name(node_name)
+        return host_definition
 
-    def set_host_definition_status_to_pending_deletion(
-            self, host_definition_name):
-        try:
-            self.set_host_definition_status(
-                host_definition_name, settings.PENDING_DELETION_PHASE)
-        except Exception as ex:
-            logger.error(
-                'Failed to set hostdefinition {} phase to pending for deletion, got: {}'.format(
-                    host_definition_name, ex))
+    def _get_host_definition_name(self, node_name):
+        return '{0}.{1}'.format(node_name, self._get_random_string()).replace('_', '.')
 
-    def set_host_definition_status(
-            self,
-            host_definition_name,
-            host_definition_name_phase):
-        logger.info('Set host definition {} status to: {}'.format(
-            host_definition_name, host_definition_name_phase))
-        status = {
-            'status': {
-                'phase': host_definition_name_phase,
-            }
-        }
-        try:
-            self.custom_object_api.patch_cluster_custom_object_status(
-                settings.CSI_IBM_GROUP,
-                settings.VERSION,
-                settings.HOST_DEFINITION_PLURAL,
-                host_definition_name,
-                status)
-        except ApiException as ex:
-            if ex.status == 404:
-                raise exceptions.HostDefinitionDoesNotExist(
-                    host_definition_name)
-            raise exceptions.FailedToSetHostDefinitionStatus(
-                host_definition_name, ex.body)
+    def _get_random_string(self):
+        return ''.join(random.choices(string.ascii_lowercase + string.digits, k=20))
 
-    def _create_event_to_host_definition_from_host_request(
-            self, host_request, message):
-        node_name = self.get_node_name_from_node_id(host_request.node_id)
-        host_definition_name = self.get_host_definition_name(
-            host_request, node_name)
-        try:
-            host_definition = self._get_host_definition(
-                host_definition_name)
-        except Exception as ex:
-            logger.error(ex)
-            return
-        self.add_event_to_host_definition(host_definition, message)
+    def _get_secret_object_from_id(self, secret_id):
+        secret = Secret()
+        secret.name, secret.namespace = secret_id.split(',')
+        return secret
 
-    def get_node_name_from_node_id(self, node_id):
-        node_name, _, _, _ = utils.get_node_id_info(node_id)
-        return node_name
-
-    def add_event_to_host_definition(
-            self, host_definition, message):
-        logger.info('Creating event for host definition: {} error event: {}'.format(
-            host_definition.metadata.name, message))
-        event = self._get_event_for_object(host_definition, message)
-        self.create_event(settings.DEFAULT_NAMESPACE, event)
-
-    def _get_event_for_object(self, obj, message):
-        return client.CoreV1Event(
-            metadata=client.V1ObjectMeta(
-                generate_name='{}.'.format(obj.metadata.name),
-            ),
-            reporting_component=settings.HOST_DEFINER,
-            reporting_instance=settings.HOST_DEFINER,
-            action='Verifying',
-            type='Error',
-            reason=settings.FAILED_VERIFYING,
-            message=str(message),
-            event_time=datetime.datetime.utcnow().isoformat(
-                timespec='microseconds') + 'Z',
-            involved_object=client.V1ObjectReference(
-                api_version=obj.api_version,
-                kind=obj.kind,
-                name=obj.metadata.name,
-                resource_version=obj.metadata.resource_version,
-                uid=obj.metadata.uid,
-            ))
-
-    def create_event(self, namespace, event):
-        try:
-            self.core_api.create_namespaced_event(namespace, event)
-        except ApiException as ex:
-            logger.error(
-                'Failed to create event for host definition {}, go this error: {}'.format(
-                    event.involved_object.name, ex.body))
-
-    def is_host_can_be_defined(self, node_name):
-        if self.is_dynamic_node_labeling_allowed():
-            return True
-        return self.is_node_has_managed_by_host_definer_label(node_name)
-
-    def is_dynamic_node_labeling_allowed(self):
-        return os.getenv('DYNAMIC_NODE_LABELING') == 'true'
-
-    def is_host_can_be_undefined(self, node_name):
-        if self._is_host_definer_can_delete_hosts():
-            return self.is_node_has_managed_by_host_definer_label(node_name) and \
-                (not self._is_node_has_host_definer_avoid_deletion_label(node_name))
-        return False
-
-    def _is_host_definer_can_delete_hosts(self):
-        return os.getenv('ALLOW_DELETE') == 'true'
-
-    def is_node_has_managed_by_host_definer_label(self, node_name):
-        return self._is_host_has_label_in_true(node_name, settings.MANAGED_BY_HOST_DEFINER_LABEL)
-
-    def _is_node_has_host_definer_avoid_deletion_label(self, node_name):
-        return self._is_host_has_label_in_true(node_name, settings.HOST_DEFINER_FORBID_DELETION_LABEL)
-
-    def _is_host_has_label_in_true(self, node_name, label):
-        try:
-            node = self.core_api.read_node(name=node_name)
-        except ApiException as ex:
-            logger.error('Could not get node {}, got: {}'.format(
-                node_name, ex.body))
-            return False
-        if label in node.metadata.labels:
-            return node.metadata.labels[label] == 'true'
-        return False
-
-    def undefine_host_and_host_definition(self, host_request, host_definition_name):
-        response = self.storage_host_servicer.undefine_host(host_request)
-        if response.error_message:
-            return response
-        self.delete_host_definition(host_definition_name)
-        return response
-
-    def delete_host_definition(self, host_definition_name):
-        try:
-            self.host_definitions_api.delete(name=host_definition_name, body={})
-        except ApiException as ex:
-            if ex.status == 404:
-                logger.error('Failed to delete hostDefinition {} because it does not exist'.format(
-                    host_definition_name))
-            else:
-                logger.error('Failed to delete hostDefinition {}, got: {}'.format(
-                    host_definition_name, ex.body))
-
-    def is_ibm_csi_block_driver_in(self, csi_node):
-        if csi_node.spec.drivers:
-            for driver in csi_node.spec.drivers:
-                if driver.name == settings.IBM_BLOCK_CSI_PROVISIONER_NAME:
-                    return True
-        return False
-
-    def get_node_name_from_csi_node(self, csi_node):
-        return csi_node.metadata.name
-
-    def add_node_to_nodes(self, node_name, csi_node):
-        self._add_managed_by_host_definer_label_to_node(node_name)
-        NODES[node_name] = self._get_node_id_from_csi_node(
-            csi_node)
-
-    def _get_node_id_from_csi_node(self, csi_node):
-        for driver in csi_node.spec.drivers:
-            if driver.name == settings.IBM_BLOCK_CSI_PROVISIONER_NAME:
-                return driver.nodeID
-        return None
+    def _add_node_to_nodes(self, csi_node):
+        logger.info(messages.NEW_KUBERNETES_NODE.format(csi_node.name))
+        self._add_managed_by_host_definer_label_to_node(csi_node.name)
+        NODES[csi_node.name] = csi_node.node_id
 
     def _add_managed_by_host_definer_label_to_node(self, node_name):
-        if self.is_node_has_managed_by_host_definer_label(node_name):
+        if self._is_node_has_managed_by_host_definer_label(node_name):
             return
-        logger.info('Add {} label to node {}'.format(
-            settings.MANAGED_BY_HOST_DEFINER_LABEL, node_name))
-        self._update_node_managed_by_host_definer_label(node_name, 'true')
+        logger.info(messages.ADD_LABEL_TO_NODE.format(settings.MANAGED_BY_HOST_DEFINER_LABEL, node_name))
+        self._update_node_managed_by_host_definer_label(node_name, settings.TRUE_STRING)
 
-    def remove_managed_by_host_definer_label(self, node_name):
-        if self.is_dynamic_node_labeling_allowed():
-            logger.info('Remove {} label from node {}'.format(
-                settings.MANAGED_BY_HOST_DEFINER_LABEL, node_name))
+    def _remove_managed_by_host_definer_label(self, node_name):
+        if self._is_dynamic_node_labeling_allowed():
+            logger.info(messages.REMOVE_LABEL_FROM_NODE.format(settings.MANAGED_BY_HOST_DEFINER_LABEL, node_name))
             self._update_node_managed_by_host_definer_label(node_name, None)
 
-    def _update_node_managed_by_host_definer_label(self, node_name, label_value):
-        body = {
-            'metadata': {
-                'labels': {
-                    settings.MANAGED_BY_HOST_DEFINER_LABEL: label_value}
-            }
-        }
-        try:
-            self.core_api.patch_node(node_name, body)
-        except ApiException as ex:
-            logger.error('Could not update node {} {} label, got: {}'.format(
-                node_name, settings.MANAGED_BY_HOST_DEFINER_LABEL, ex.body))
-
-    def define_host_on_all_storages_from_secrets(self, node_name):
+    def _define_host_on_all_storages_from_secrets(self, node_name):
         for secret_id, storage_classes_using_this_secret in SECRET_IDS.items():
             if storage_classes_using_this_secret == 0:
                 continue
-            host_request = self.get_host_request_from_secret_and_node_name(secret_id, node_name)
-            if host_request:
-                self._verify_host_defined_and_has_host_definition(host_request)
+            host_definition = self._get_host_definition_from_secret_and_node_name(node_name, secret_id)
+            self._create_definition(host_definition)
 
-    def generate_secret_id_from_secret_and_namespace(
-            self, secret_name, secret_namespace):
-        return secret_name + ',' + secret_namespace
+    def _generate_secret_id_from_secret_and_namespace(self, secret_name, secret_namespace):
+        return secret_name + settings.SECRET_SEPARATOR + secret_namespace
