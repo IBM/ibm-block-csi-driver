@@ -2,7 +2,7 @@ from controllers.array_action.errors import HostNotFoundError, HostAlreadyExists
 from controllers.array_action.storage_agent import detect_array_type, get_agent
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.node_info import NodeIdInfo
-from controllers.servers.host_definer.common.types import DefineHostResponse
+from controllers.servers.host_definer.types import DefineHostResponse
 from controllers.servers.utils import join_object_prefix_with_name, get_array_connection_info_from_secrets
 
 logger = get_stdout_logger()
