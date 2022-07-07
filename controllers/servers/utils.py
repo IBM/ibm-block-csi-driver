@@ -596,27 +596,27 @@ def hash_string(string):
     return base58.b58encode(sha256(string.encode()).digest()).decode()
 
 
-def _validate_parameter_match_volume(parameter_value, value_from_volume, error_message_format, cmp=eq):
+def _validate_parameter_matches_volume(parameter_value, value_from_volume, error_message_format, cmp=eq):
     if parameter_value and not cmp(parameter_value, value_from_volume):
         raise ValidationException(error_message_format.format(parameter_value, value_from_volume))
 
 
-def _validate_sapce_efficiencies_match(space_efficiency, volume):
+def _validate_space_efficiency_match(space_efficiency, volume):
     if space_efficiency:
         space_efficiency = space_efficiency.lower()
-    _validate_parameter_match_volume(space_efficiency, volume.space_efficiency_aliases,
-                                     messages.SPACE_EFFICIENCY_NOT_MATCH_VOLUME_MESSAGE,
-                                     lambda se, se_aliases: se in se_aliases)
+    _validate_parameter_matches_volume(space_efficiency, volume.space_efficiency_aliases,
+                                       messages.SPACE_EFFICIENCY_NOT_MATCH_VOLUME_MESSAGE,
+                                       lambda se, se_aliases: se in se_aliases)
 
 
 def validate_parameters_match_volume(parameters, volume):
     logger.debug("validating space efficiency parameter matches volume's")
     space_efficiency = parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
-    _validate_sapce_efficiency_match(space_efficiency, volume)
+    _validate_space_efficiency_match(space_efficiency, volume)
 
     logger.debug("validating pool parameter matches volume's")
     pool = parameters.get(config.PARAMETERS_POOL)
-    _validate_parameter_match_volume(pool, volume.pool, messages.POOL_NOT_MATCH_VOLUME_MESSAGE)
+    _validate_parameter_matches_volume(pool, volume.pool, messages.POOL_NOT_MATCH_VOLUME_MESSAGE)
 
     logger.debug("validating prefix parameter matches volume's")
     prefix = parameters.get(config.PARAMETERS_VOLUME_NAME_PREFIX)
@@ -625,7 +625,7 @@ def validate_parameters_match_volume(parameters, volume):
 
 
 def validate_parameters_match_source_volume(space_efficiency, required_bytes, volume):
-    _validate_sapce_efficiency_match(space_efficiency, volume)
+    _validate_space_efficiency_match(space_efficiency, volume)
     volume_capacity_bytes = volume.capacity_bytes
     if volume_capacity_bytes < required_bytes:
         raise ValidationException(messages.REQUIRED_BYTES_MISMATCH_MESSAGE(required_bytes, volume_capacity_bytes))
