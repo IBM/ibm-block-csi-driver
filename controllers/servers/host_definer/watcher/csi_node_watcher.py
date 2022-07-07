@@ -10,7 +10,7 @@ logger = get_stdout_logger()
 
 class CsiNodeWatcher(Watcher):
 
-    def add_initial_nodes(self):
+    def add_initial_csi_nodes(self):
         csi_nodes = self._get_csi_nodes_with_driver()
         for csi_node in csi_nodes:
             if self._is_host_can_be_defined(csi_node.name):
@@ -82,7 +82,5 @@ class CsiNodeWatcher(Watcher):
     def _undefine_hosts(self, node_name):
         for secret_id in SECRET_IDS:
             host_definition = self._get_host_definition_from_secret_and_node_name(node_name, secret_id)
-            if host_definition.management_address:
-                self._delete_definition(host_definition)
-
+            self._delete_definition(host_definition)
         NODES.pop(node_name)

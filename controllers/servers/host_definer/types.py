@@ -15,13 +15,17 @@ class DefineHostResponse:
 
 
 @dataclass
+class Secret:
+    name: str = ''
+    namespace: str = ''
+
+
+@dataclass
 class HostDefinition:
     name: str = ''
-    secret_name: str = ''
-    secret_namespace: str = ''
+    secret: Secret = Secret()
     node_name: str = ''
     node_id: str = ''
-    management_address: str = ''
     phase: str = ''
     resource_version: str = ''
     uid: str = ''

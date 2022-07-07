@@ -1,5 +1,7 @@
 import base64
 import os
+import random
+import string
 
 from controllers.servers.config import (SECRET_ARRAY_PARAMETER,
                                         SECRET_PASSWORD_PARAMETER,
@@ -8,7 +10,7 @@ import controllers.servers.messages as messages
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer import settings
-from controllers.servers.host_definer.types import DefineHostRequest, HostDefinition
+from controllers.servers.host_definer.types import DefineHostRequest, DefineHostResponse, HostDefinition, Secret
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
 
 SECRET_IDS = {}
@@ -27,20 +29,21 @@ class Watcher(KubernetesManager):
             self._create_definition(host_definition)
 
     def _create_definition(self, host_definition):
-        if self._is_host_defined(host_definition.name):
+        if self._is_host_defined(host_definition.node_name, host_definition.secret):
             logger.info(messages.HOST_ALREADY_ON_STORAGE_HOST_DEFINITION_READY.format(
-                host_definition.node_name, host_definition.name))
+                host_definition.node_name, host_definition.secret.name,
+                host_definition.secret.namespace, host_definition.name))
             return
         response = self._define_host(host_definition)
-        self._create_host_definition_if_not_exist(host_definition)
+        host_definition.name = self._create_host_definition_if_not_exist(host_definition)
         if response.error_message:
             self._set_host_definition_status(host_definition.name, settings.PENDING_CREATION_PHASE)
-            self._create_event_to_host_definition(host_definition.name, response.error_message)
+            self._create_event_to_host_definition(host_definition, response.error_message)
         else:
             self._set_host_definition_status(host_definition.name, settings.READY_PHASE)
 
-    def _is_host_defined(self, host_definition_name):
-        host_definition, _ = self._get_host_definition(host_definition_name)
+    def _is_host_defined(self, node_name, secret):
+        host_definition, _ = self._get_host_definition(node_name, secret)
         return self._is_host_definition_in_ready_state(host_definition)
 
     def _is_host_definition_in_ready_state(self, host_definition):
@@ -53,12 +56,14 @@ class Watcher(KubernetesManager):
 
     def _create_host_definition_if_not_exist(self, host_definition):
         host_definition_manifest = self._get_host_definition_manifest(host_definition)
-        host_definition_instance, _ = self._get_host_definition(host_definition.name)
+        host_definition_instance, _ = self._get_host_definition(host_definition.node_name, host_definition.secret)
         if host_definition_instance:
+            host_definition_manifest[settings.METADATA][settings.NAME] = host_definition_instance.name
             self._patch_host_definition(host_definition_manifest)
         else:
             logger.info(messages.CREATING_NEW_HOST_DEFINITION.format(host_definition.name))
             self._create_host_definition(host_definition_manifest)
+        return host_definition_manifest[settings.METADATA][settings.NAME]
 
     def _get_host_definition_manifest(self, host_definition):
         return {
@@ -69,11 +74,10 @@ class Watcher(KubernetesManager):
             },
             settings.SPEC: {
                 settings.HOST_DEFINITION_FIELD: {
-                    settings.MANAGEMENT_ADDRESS_FIELD: host_definition.management_address,
                     settings.NODE_NAME_FIELD: host_definition.node_name,
                     settings.NODE_ID_FIELD: host_definition.node_id,
-                    settings.SECRET_NAME_FIELD: host_definition.secret_name,
-                    settings.SECRET_NAMESPACE_FIELD: host_definition.secret_namespace,
+                    settings.SECRET_NAME_FIELD: host_definition.secret.name,
+                    settings.SECRET_NAMESPACE_FIELD: host_definition.secret.namespace,
                 },
             },
         }
@@ -86,20 +90,22 @@ class Watcher(KubernetesManager):
 
     def _delete_definition(self, host_definition):
         node_name = host_definition.node_name
-        logger.info(messages.VERIFY_HOST_IS_UNDEFINED.format(node_name, host_definition.management_address))
+        secret = host_definition.secret
+        logger.info(messages.VERIFY_HOST_IS_UNDEFINED.format(node_name, secret.name, secret.namespace))
         response = self._undefine_host(host_definition)
-        if response.error_message:
-            self._set_host_definition_status(host_definition.name, settings.PENDING_DELETION_PHASE)
-            self._create_event_to_host_definition(host_definition.name, response.error_message)
-        else:
-            self._delete_host_definition(host_definition.name)
+        host_definition_instance, _ = self._get_host_definition(host_definition.node_name, host_definition.secret)
+        if response.error_message and host_definition_instance:
+            self._set_host_definition_status(host_definition_instance.name, settings.PENDING_DELETION_PHASE)
+            self._create_event_to_host_definition(host_definition_instance, response.error_message)
+        elif not response.error_message and host_definition_instance:
+            self._delete_host_definition(host_definition_instance.name)
             self._remove_managed_by_host_definer_label(node_name)
 
     def _undefine_host(self, host_definition):
         return self._ensure_definition_state(host_definition, self.storage_host_servicer.undefine_host)
 
-    def _create_event_to_host_definition(self, host_definition_name, message):
-        host_definition, _ = self._get_host_definition(host_definition_name)
+    def _create_event_to_host_definition(self, host_definition, message):
+        self._add_event_to_host_definition(host_definition, message)
         if host_definition:
             self._add_event_to_host_definition(host_definition, message)
 
@@ -140,20 +146,21 @@ class Watcher(KubernetesManager):
     def _ensure_definition_state(self, host_definition, define_function):
         request = self._get_request_from_host_definition(host_definition)
         if not request:
-            return
+            response = DefineHostResponse()
+            response.error_message = 'Failed to get Secret'
+            return response
         return define_function(request)
 
     def _get_request_from_host_definition(self, host_definition):
-        request = self._get_request_from_secret_name_and_namespace(host_definition.secret_name,
-                                                                   host_definition.secret_namespace)
+        request = self._get_request_from_secret(host_definition.secret)
         if request:
             request.node_id = host_definition.node_id
             request.node_name = host_definition.node_name
         return request
 
-    def _get_request_from_secret_name_and_namespace(self, secret_name, secret_namespace):
+    def _get_request_from_secret(self, secret):
         request = self._get_new_request()
-        request.system_info = self._get_system_info_from_secret(secret_name, secret_namespace)
+        request.system_info = self._get_system_info_from_secret(secret)
         if request.system_info:
             return request
         return None
@@ -165,28 +172,18 @@ class Watcher(KubernetesManager):
         return request
 
     def _get_host_definition_from_secret_and_node_name(self, node_name, secret_id):
-        secret_name, secret_namespace = self._get_secret_name_and_namespace_from_id(secret_id)
-        host_definition = self._get_host_definition_from_secret(secret_name, secret_namespace)
-        if host_definition.management_address:
-            host_definition = self._add_name_to_host_definition(node_name, host_definition)
+        secret = self._get_secret_object_from_id(secret_id)
+        host_definition = self._get_host_definition_from_secret(secret)
+        host_definition = self._add_name_to_host_definition(node_name, host_definition)
         return host_definition
 
-    def _get_host_definition_from_secret(self, secret_name, secret_namespace):
+    def _get_host_definition_from_secret(self, secret):
         host_definition = HostDefinition()
-        host_definition.secret_name = secret_name
-        host_definition.secret_namespace = secret_namespace
-        host_definition.management_address = self._get_management_address(
-            host_definition.secret_name, host_definition.secret_namespace)
+        host_definition.secret = secret
         return host_definition
 
-    def _get_management_address(self, secret_name, secret_namespace):
-        system_info = self._get_system_info_from_secret(secret_name, secret_namespace)
-        if system_info:
-            return system_info[SECRET_ARRAY_PARAMETER]
-        return ''
-
-    def _get_system_info_from_secret(self, secret_name, secret_namespace):
-        secret_data = self._get_data_from_secret(secret_name, secret_namespace)
+    def _get_system_info_from_secret(self, secret):
+        secret_data = self._get_data_from_secret(secret)
         return self._get_system_info_from_secret_data(secret_data)
 
     def _get_system_info_from_secret_data(self, secret_data):
@@ -214,14 +211,19 @@ class Watcher(KubernetesManager):
     def _add_name_to_host_definition(self, node_name, host_definition):
         host_definition.node_name = node_name
         host_definition.node_id = NODES[node_name]
-        host_definition.name = self._get_host_definition_name(host_definition.management_address, node_name)
+        host_definition.name = self._get_host_definition_name(node_name)
         return host_definition
 
-    def _get_host_definition_name(self, management_address, node_name):
-        return '{0}.{1}'.format(management_address, node_name).replace('_', '.')
+    def _get_host_definition_name(self, node_name):
+        return '{0}.{1}'.format(node_name, self._get_random_string()).replace('_', '.')
 
-    def _get_secret_name_and_namespace_from_id(self, secret_id):
-        return secret_id.split(',')
+    def _get_random_string(self):
+        return ''.join(random.choices(string.ascii_lowercase + string.digits, k=20))
+
+    def _get_secret_object_from_id(self, secret_id):
+        secret = Secret()
+        secret.name, secret.namespace = secret_id.split(',')
+        return secret
 
     def _add_node_to_nodes(self, csi_node):
         logger.info(messages.NEW_KUBERNETES_NODE.format(csi_node.name))
@@ -244,8 +246,7 @@ class Watcher(KubernetesManager):
             if storage_classes_using_this_secret == 0:
                 continue
             host_definition = self._get_host_definition_from_secret_and_node_name(node_name, secret_id)
-            if host_definition.management_address:
-                self._create_definition(host_definition)
+            self._create_definition(host_definition)
 
     def _generate_secret_id_from_secret_and_namespace(self, secret_name, secret_namespace):
         return secret_name + settings.SECRET_SEPARATOR + secret_namespace

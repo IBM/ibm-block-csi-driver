@@ -47,7 +47,25 @@ class KubernetesManager():
         return csi_nodes_with_driver
 
     def _get_csi_nodes(self):
-        return self.csi_nodes_api.get().items
+        try:
+            return self.csi_nodes_api.get().items
+        except ApiException as ex:
+            logger.error(messages.FAILED_TO_GET_CSI_NODES.format(ex.body))
+            return []
+
+    def _get_nodes(self):
+        try:
+            return self.core_api.list_node().items
+        except ApiException as ex:
+            logger.error(messages.FAILED_TO_GET_NODES.format(ex.body))
+            return []
+
+    def _get_storage_classes(self):
+        try:
+            return self.storage_api.list_storage_class().items
+        except ApiException as ex:
+            logger.error(messages.FAILED_TO_GET_STORAGE_CLASSES.format(ex.body))
+            return []
 
     def _is_csi_node_has_driver(self, csi_node):
         if csi_node.spec.drivers:
@@ -79,24 +97,22 @@ class KubernetesManager():
                     return driver.nodeID
         return None
 
-    def _get_host_definition(self, host_definition_name):
+    def _get_host_definition(self, node_name, secret):
         try:
-            host_definition = self.host_definitions_api.get(name=host_definition_name)
-            return (self._get_host_definition_object(host_definition), 200)
+            host_definitions = self._get_host_definitions()
+            for host_definition in host_definitions:
+                host_definition_obj = self._get_host_definition_object(host_definition)
+                if self._is_host_definition_matches(host_definition_obj, node_name, secret):
+                    return (host_definition_obj, 200)
+            return ('', 404)
         except ApiException as ex:
-            if ex.status == 404:
-                logger.info(messages.HOST_DEFINITION_DOES_NOT_EXIST.format(host_definition_name))
-            else:
-                logger.error(messages.FAILED_TO_GET_HOST_DEFINITION.format(host_definition_name, ex.body))
+            logger.error(messages.FAILED_TO_GET_HOST_DEFINITION.format(
+                node_name, secret.name, secret.namespace, ex.body))
             return '', ex.status
 
     def _get_host_definitions(self):
         try:
-            host_definitions_obj = []
-            host_definitions = self.host_definitions_api.get().items
-            for host_definition in host_definitions:
-                host_definitions_obj.append(self._get_host_definition_object(host_definition))
-            return host_definitions_obj
+            return self.host_definitions_api.get().items
 
         except ApiException as ex:
             logger.error(messages.FAILED_TO_GET_LIST_OF_HOST_DEFINITIONS.format(ex.body))
@@ -108,15 +124,18 @@ class KubernetesManager():
         host_definition_obj.resource_version = host_definition.metadata.resource_version
         host_definition_obj.uid = host_definition.metadata.uid
         host_definition_obj.phase = self._get_host_definition_phase(host_definition)
-        host_definition_obj.secret_name = self._get_attr_from_host_definition(
+        host_definition_obj.secret.name = self._get_attr_from_host_definition(
             host_definition, settings.SECRET_NAME_FIELD)
-        host_definition_obj.secret_namespace = self._get_attr_from_host_definition(
+        host_definition_obj.secret.namespace = self._get_attr_from_host_definition(
             host_definition, settings.SECRET_NAMESPACE_FIELD)
         host_definition_obj.node_name = self._get_attr_from_host_definition(host_definition, settings.NODE_NAME_FIELD)
         host_definition_obj.node_id = self._get_attr_from_host_definition(host_definition, settings.NODE_ID_FIELD)
-        host_definition_obj.management_address = self._get_attr_from_host_definition(
-            host_definition, settings.MANAGEMENT_ADDRESS_FIELD)
         return host_definition_obj
+
+    def _get_host_definition_phase(self, host_definition):
+        if host_definition.status:
+            return host_definition.status.phase
+        return ''
 
     def _get_attr_from_host_definition(self, host_definition, attribute):
         try:
@@ -124,10 +143,9 @@ class KubernetesManager():
         except:
             return ''
 
-    def _get_host_definition_phase(self, host_definition):
-        if host_definition.status:
-            return host_definition.status.phase
-        return ''
+    def _is_host_definition_matches(self, host_definition, node_name, secret):
+        return host_definition.node_name == node_name and \
+            host_definition.secret.name == secret.name and host_definition.secret.namespace == secret.namespace
 
     def _patch_host_definition(self, host_definition_manifest):
         host_definition_name = host_definition_manifest[settings.METADATA][settings.NAME]
@@ -212,14 +230,14 @@ class KubernetesManager():
 
         return body
 
-    def _get_data_from_secret(self, secret_name, secret_namespace):
+    def _get_data_from_secret(self, secret):
         try:
-            return self.core_api.read_namespaced_secret(name=secret_name, namespace=secret_namespace).data
+            return self.core_api.read_namespaced_secret(name=secret.name, namespace=secret.namespace).data
         except ApiException as ex:
             if ex.status == 404:
-                logger.error(messages.SECRET_DOES_NOT_EXIST.format(secret_name, secret_namespace))
+                logger.error(messages.SECRET_DOES_NOT_EXIST.format(secret.name, secret.namespace))
             else:
-                logger.error(messages.FAILED_TO_GET_SECRET.format(secret_name, secret_namespace, ex.body))
+                logger.error(messages.FAILED_TO_GET_SECRET.format(secret.name, secret.namespace, ex.body))
             return None
 
     def _read_node(self, node_name):

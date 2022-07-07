@@ -35,9 +35,9 @@ class HostDefinitionWatcher(Watcher):
         retries = 5
         backoff_in_seconds = 3
         delay_in_seconds = 3
-        logger.info(messages.VERIFY_HOST_DEFINITION_USING_EXPONANTIAL_BACKOFF.format(host_definition.name))
+        logger.info(messages.VERIFY_HOST_DEFINITION_USING_EXPONENTIAL_BACKOFF.format(host_definition.name))
         while retries > 1:
-            if self._is_host_definition_in_desired_state(host_definition):
+            if self._is_host_definition_in_desired_state(host_definition) and retries != 5:
                 return
             self._handle_pending_host_definition(host_definition)
             retries -= 1
@@ -47,9 +47,10 @@ class HostDefinitionWatcher(Watcher):
         self._set_host_definition_phase_to_error(host_definition)
 
     def _is_host_definition_in_desired_state(self, host_definition):
-        host_definition_instance, status_code = self._get_host_definition(host_definition.name)
+        host_definition_instance, status_code = self._get_host_definition(
+            host_definition.node_name, host_definition.secret)
         phase = host_definition.phase
-        if status_code == 400 and phase == settings.PENDING_DELETION_PHASE:
+        if status_code == 404 and phase == settings.PENDING_DELETION_PHASE:
             return True
         return host_definition_instance.phase == settings.READY_PHASE
 
