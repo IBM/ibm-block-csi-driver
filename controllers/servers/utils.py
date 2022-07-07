@@ -628,4 +628,5 @@ def validate_parameters_match_source_volume(space_efficiency, required_bytes, vo
     _validate_space_efficiency_match(space_efficiency, volume)
     volume_capacity_bytes = volume.capacity_bytes
     if volume_capacity_bytes < required_bytes:
-        raise ValidationException(messages.REQUIRED_BYTES_MISMATCH_MESSAGE(required_bytes, volume_capacity_bytes))
+        raise ValidationException(messages.REQUIRED_BYTES_MISMATCH_MESSAGE.format(
+            required_bytes, volume_capacity_bytes))
