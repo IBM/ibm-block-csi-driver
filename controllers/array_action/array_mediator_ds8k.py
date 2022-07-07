@@ -221,7 +221,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return source_id
 
     def _generate_volume_response(self, api_volume):
-        space_efficiency = _get_parameter_space_efficiency(api_volume.tp)
+        space_efficiency = _get_space_efficiency_aliases(api_volume.tp)
         return Volume(
             capacity_bytes=int(api_volume.cap),
             id=self._generate_volume_scsi_identifier(volume_id=api_volume.id),
