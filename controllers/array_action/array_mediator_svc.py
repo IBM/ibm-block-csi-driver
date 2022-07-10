@@ -1555,4 +1555,4 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._mkhost(host_name, connectivity_type, ports)
 
     def delete_host(self, host_name):
-        raise NotImplementedError
+        self.client.svctask.rmhost(object_id=host_name)
