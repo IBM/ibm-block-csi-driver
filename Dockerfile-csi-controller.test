@@ -22,11 +22,10 @@ RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
 USER default
 RUN pip3 install --ignore-installed --default-timeout=100 --upgrade pip==21.2.4
 WORKDIR /tmp
-COPY controllers/servers/csi/requirements.txt ./csi_requirements.txt
-COPY controllers/servers/host_definer/requirements.txt ./host_definer_requirements.txt
+COPY controllers/servers/csi/requirements.txt .
 # avoid default- boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
-RUN pip3 install -r ./csi_requirements.txt -r ./host_definer_requirements.txt
+RUN pip3 install -r ./requirements.txt
 
 USER root
 COPY controllers/scripts/csi_general .
@@ -34,7 +33,7 @@ RUN ./csi_pb2.sh
 RUN pip3 install .
 
 # Requires to run local testing
-COPY controllers/tests/requirements.txt ./requirements-tests.txt
+COPY controllers/servers/csi/requirements-tests.txt .
 RUN pip3 install -r ./requirements-tests.txt
 
 
