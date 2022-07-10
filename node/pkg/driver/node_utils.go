@@ -54,7 +54,7 @@ const (
 	TimeOutMultipathdCmd              = TimeOutGeneralCmd
 	TimeOutNvmeCmd                    = TimeOutGeneralCmd
 	multipathdCmd                     = "multipathd"
-	blockDevCmd                       = "blockdev"
+	BlockDevCmd                       = "blockdev"
 	nvmeCmd                           = "nvme"
 	minFilesInNonEmptyDir             = 1
 	noSuchFileOrDirectoryErrorMessage = "No such file or directory"
@@ -91,20 +91,23 @@ type NodeUtilsInterface interface {
 	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
 	IsBlock(devicePath string) (bool, error)
 	GetFileSystemVolumeStats(path string) (VolumeStatistics, error)
-	GetBlockVolumeStats(mpathDevice string) (VolumeStatistics, error)
+	GetBlockVolumeStats(volumeId string) (VolumeStatistics, error)
 }
 
 type NodeUtils struct {
-	Executer   executer.ExecuterInterface
-	mounter    mount.Interface
-	ConfigYaml ConfigFile
+	Executer                   executer.ExecuterInterface
+	mounter                    mount.Interface
+	osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface
+	ConfigYaml                 ConfigFile
 }
 
-func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface, configYaml ConfigFile) *NodeUtils {
+func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface, configYaml ConfigFile,
+	osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface) *NodeUtils {
 	return &NodeUtils{
-		Executer:   executer,
-		mounter:    mounter,
-		ConfigYaml: configYaml,
+		Executer:                   executer,
+		mounter:                    mounter,
+		osDeviceConnectivityHelper: osDeviceConnectivityHelper,
+		ConfigYaml:                 configYaml,
 	}
 }
 
@@ -560,9 +563,15 @@ func (d NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, erro
 	return volumeStats, nil
 }
 
-func (d NodeUtils) GetBlockVolumeStats(mpathDevice string) (VolumeStatistics, error) {
+func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error) {
+	volumeUuid := d.GetVolumeUuid(volumeId)
+	mpathDevice, err := d.osDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
+	if err != nil {
+		return VolumeStatistics{}, err
+	}
+
 	args := []string{"--getsize64", mpathDevice}
-	out, err := d.Executer.ExecuteWithTimeoutSilently(device_connectivity.TimeOutBlockDevCmd, blockDevCmd, args)
+	out, err := d.Executer.ExecuteWithTimeoutSilently(device_connectivity.TimeOutBlockDevCmd, BlockDevCmd, args)
 	if err != nil {
 		return VolumeStatistics{}, err
 	}

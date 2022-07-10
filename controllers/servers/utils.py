@@ -624,6 +624,12 @@ def validate_parameters_match_volume(parameters, volume):
                                        lambda pref, name: name.startswith(pref + NAME_PREFIX_SEPARATOR))
 
 
+def join_object_prefix_with_name(prefix, name):
+    if prefix:
+        return settings.NAME_PREFIX_SEPARATOR.join((prefix, name))
+    return name
+
+
 def validate_parameters_match_source_volume(space_efficiency, required_bytes, volume):
     _validate_space_efficiency_match(space_efficiency, volume)
     volume_capacity_bytes = volume.capacity_bytes

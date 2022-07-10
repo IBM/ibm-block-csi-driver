@@ -13,6 +13,7 @@ from controllers.array_action.array_action_types import Host, ObjectIds
 from controllers.array_action.array_mediator_xiv import XIVArrayMediator
 from controllers.servers.csi.csi_controller_server import CSIControllerServicer
 from controllers.servers.csi.sync_lock import SyncLock
+from controllers.tests import utils
 from controllers.tests.controller_server.test_settings import (CLONE_VOLUME_NAME,
                                                                OBJECT_INTERNAL_ID,
                                                                POOL, SPACE_EFFICIENCY,
@@ -20,7 +21,6 @@ from controllers.tests.controller_server.test_settings import (CLONE_VOLUME_NAME
                                                                VOLUME_NAME, SNAPSHOT_NAME,
                                                                SNAPSHOT_VOLUME_NAME,
                                                                SNAPSHOT_VOLUME_WWN, VIRT_SNAP_FUNC_TRUE)
-from controllers.tests import utils
 from controllers.tests.utils import ProtoBufMock
 
 
@@ -1317,8 +1317,8 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '2')
         self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "fc")
 
-        self.mediator.map_volume.side_effect = [array_errors.LunAlreadyInUseError("", "")] \
-            * (self.mediator.max_lun_retries + 1)
+        self.mediator.map_volume.side_effect = [array_errors.LunAlreadyInUseError("", "")] * (
+                    self.mediator.max_lun_retries + 1)
         storage_agent.return_value = self.storage_agent
 
         self.servicer.ControllerPublishVolume(self.request, self.context)

@@ -696,3 +696,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def demote_replication_volume(self, replication_name):
         raise NotImplementedError
+
+    def create_host(self, host_name, initiators, connectivity_type):
+        raise NotImplementedError
+
+    def delete_host(self, host_name):
+        raise NotImplementedError

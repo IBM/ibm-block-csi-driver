@@ -1520,3 +1520,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._expand_volume_lsvdisk_errors(CLIFailureError("CMMVC5741E"), array_errors.InvalidArgumentError, "!@#")
         self._expand_volume_lsvdisk_errors(CLIFailureError("Failed"), CLIFailureError)
         self._expand_volume_lsvdisk_errors(Exception("Failed"), Exception)
+
+    def test_create_host_nvme_success(self):
+        self.svc.create_host("host_name", Initiators(['Test_nqn'], ['wwn1', 'WWN2'], ['iqn.test.s1']), "")
+        self.svc.client.svctask.mkhost.assert_called_once_with(name='host_name', nqn='Test_nqn', protocol='nvme')
+
+    def test_create_host_fc_success(self):
+        self.svc.create_host("host_name", Initiators([], ['wwn1', 'WWN2'], ['iqn.test.s1']), "")
+        self.svc.client.svctask.mkhost.assert_called_once_with(name='host_name', fcwwpn='wwn1:WWN2')
+
+    def test_create_host_iscsi_success(self):
+        self.svc.create_host("host_name", Initiators([], [], ['iqn.test.s1']), "")
+        self.svc.client.svctask.mkhost.assert_called_once_with(name='host_name', iscsiname='iqn.test.s1')
