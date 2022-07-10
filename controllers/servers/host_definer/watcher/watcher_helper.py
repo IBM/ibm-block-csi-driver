@@ -189,7 +189,7 @@ class Watcher(KubernetesManager):
     def _get_system_info_from_secret_data(self, secret_data):
         try:
             return self._get_system_info(secret_data)
-        except:
+        except KeyError:
             logger.error(messages.INVALID_SECRET_CONFIG_MESSAGE)
             return ''
 
