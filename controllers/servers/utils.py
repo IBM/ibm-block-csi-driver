@@ -619,3 +619,9 @@ def validate_parameters_match_volume(parameters, volume):
     prefix = parameters.get(config.PARAMETERS_VOLUME_NAME_PREFIX)
     _validate_parameter_match_volume(prefix, volume.name, messages.PREFIX_NOT_MATCH_VOLUME_MESSAGE,
                                      lambda pref, name: name.startswith(pref + NAME_PREFIX_SEPARATOR))
+
+
+def join_object_prefix_with_name(prefix, name):
+    if prefix:
+        return settings.NAME_PREFIX_SEPARATOR.join((prefix, name))
+    return name

@@ -341,6 +341,41 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def create_host(self, host_name, initiators, connectivity_type):
+        """
+        This function will find the host by name.
+
+        Args:
+           host_name         : name of the host to be created in the storage system
+           initiators        : initiators (e.g. fc wwns, iqn) of the host.
+           connectivity_type : the connectivity_type chosen by the user
+
+
+        Returns:
+            None
+
+        Raises:
+            HostAlreadyExists
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def delete_host(self, host_name):
+        """
+        This function will find the host by name.
+
+        Args:
+           host_name : name of the host in the storage system
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def is_active(self):
         """
         This function will return True if the storage connection is still active.
