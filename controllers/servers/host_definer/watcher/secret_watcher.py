@@ -26,7 +26,9 @@ class SecretWatcher(Watcher):
                     self._handle_storage_class_secret(secret, event_type)
 
     def _handle_storage_class_secret(self, secret, secret_event_type):
-        if secret_event_type in (settings.ADDED_EVENT, settings.MODIFIED_EVENT):
+        secret_id = self._generate_secret_id_from_secret_and_namespace(secret.name, secret.namespace)
+        if secret_event_type in (settings.ADDED_EVENT, settings.MODIFIED_EVENT) and \
+                SECRET_IDS[secret_id] > 0:
             self._verify_host_defined_after_secret_event(secret)
 
     def _is_secret_used_by_storage_class(self, secret):
