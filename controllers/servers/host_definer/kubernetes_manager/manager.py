@@ -138,10 +138,9 @@ class KubernetesManager():
         return ''
 
     def _get_attr_from_host_definition(self, host_definition, attribute):
-        try:
+        if hasattr(host_definition.spec.hostDefinition, attribute):
             return getattr(host_definition.spec.hostDefinition, attribute)
-        except:
-            return ''
+        return ''
 
     def _is_host_definition_matches(self, host_definition, node_name, secret):
         return host_definition.node_name == node_name and \

@@ -46,7 +46,8 @@ FAILED_TO_GET_CSI_NODES = 'Failed to get csi nodes, got: {}'
 FAILED_TO_GET_CSI_NODE = 'Failed to get csi node {}, got: {}'
 FAILED_TO_GET_NODES = 'Failed to get nodes, got: {}'
 FAILED_TO_GET_STORAGE_CLASSES = 'Failed to get storage classes, got: {}'
-FAILED_TO_GET_HOST_DEFINITION = 'Failed to get host definition for node {}, with {} secret in {} namespace, go this error: {}'
+FAILED_TO_GET_HOST_DEFINITION = "Failed to get host definition for node {}," \
+    " with {} secret in {} namespace, go this error: {}"
 FAILED_TO_GET_LIST_OF_HOST_DEFINITIONS = 'Could not get list of hostDefinitions, got: {}'
 FAILED_TO_PATCH_HOST_DEFINITION = 'Failed to patch host definition {}, go this error: {}'
 FAILED_TO_CREATE_HOST_DEFINITION = 'Failed to create host definition {}, go this error: {}'
@@ -61,7 +62,8 @@ VERIFY_HOST_DEFINITION_USING_EXPONENTIAL_BACKOFF = 'Verifying host definition {}
 SET_HOST_DEFINITION_PHASE_TO_ERROR = 'Set host definition {} phase to error'
 SECRET_HAS_BEEN_MODIFIED = 'Secret {} in namespace {}, has been modified'
 NEW_STORAGE_CLASS = 'New storageClass {}'
-HOST_ALREADY_ON_STORAGE_HOST_DEFINITION_READY = 'Host {} is already on storage of {} secret in {} namespace, detected host definition {} in Ready phase'
+HOST_ALREADY_ON_STORAGE_HOST_DEFINITION_READY = "Host {} is already on storage of {} secret in {} namespace,"\
+    " detected host definition {} in Ready phase"
 CREATING_NEW_HOST_DEFINITION = 'Creating host Definition: {}'
 VERIFY_HOST_IS_UNDEFINED = 'Verifying that host {} is undefined from {} secret in {} namespace'
 CREATE_EVENT_FOR_HOST_DEFINITION = 'Creating event for host definition: {} error event: {}'
