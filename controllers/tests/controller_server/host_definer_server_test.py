@@ -13,7 +13,6 @@ HOST_DEFINER_SERVER_PATH = "controllers.servers.host_definer.storage_manager.hos
 
 
 class BaseSetUp(unittest.TestCase):
-
     def setUp(self):
         self.servicer = HostDefinerServicer()
 
