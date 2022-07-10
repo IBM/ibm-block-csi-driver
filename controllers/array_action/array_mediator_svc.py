@@ -1516,3 +1516,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if not _is_space_efficiency_matches_source(space_efficiency,
                                                    source_volume_space_efficiency):
             raise array_errors.SpaceEfficiencyMismatch(space_efficiency, source_volume_space_efficiency)
+
+    def create_host(self, host_name, initiators, connectivity_type):
+        raise NotImplementedError
+
+    def delete_host(self, host_name):
+        raise NotImplementedError
