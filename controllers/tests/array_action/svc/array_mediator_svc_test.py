@@ -1526,3 +1526,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(source_volume)
         self.svc.validate_space_efficiency_matches_source('thick', 'source_id', 'volume')
         self.svc.validate_space_efficiency_matches_source('', 'source_id', 'volume')
+
+    def test_create_host_nvme_success(self):
+        self.svc.create_host("host_name", Initiators(['Test_nqn'], ['wwn1', 'WWN2'], ['iqn.test.s1']), "")
+        self.svc.client.svctask.mkhost.assert_called_once_with(name='host_name', nqn='Test_nqn', protocol='nvme')
+
+    def test_create_host_fc_success(self):
+        self.svc.create_host("host_name", Initiators([], ['wwn1', 'WWN2'], ['iqn.test.s1']), "")
+        self.svc.client.svctask.mkhost.assert_called_once_with(name='host_name', fcwwpn='wwn1:WWN2')
+
+    def test_create_host_iscsi_success(self):
+        self.svc.create_host("host_name", Initiators([], [], ['iqn.test.s1']), "")
+        self.svc.client.svctask.mkhost.assert_called_once_with(name='host_name', iscsiname='iqn.test.s1')

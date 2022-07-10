@@ -352,7 +352,7 @@ class ArrayMediator(ABC):
 
 
         Returns:
-            None
+           None
 
         Raises:
             HostAlreadyExists
@@ -368,7 +368,7 @@ class ArrayMediator(ABC):
            host_name : name of the host in the storage system
 
         Returns:
-            None
+           None
 
         Raises:
             None

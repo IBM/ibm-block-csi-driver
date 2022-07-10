@@ -48,6 +48,8 @@ HOST_ISCSI_NAME = 'iscsi_name'
 HOST_PORTSET_ID = 'portset_id'
 LIST_HOSTS_CMD_FORMAT = 'lshost {HOST_ID};echo;'
 HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
+DEFAULT_LIST_DELIMITER = ":"
+COMMA_LIST_DELIMITER = ","
 
 LUN_INTERVAL = 128
 
@@ -93,6 +95,19 @@ def _get_space_efficiency_kwargs(space_efficiency):
 def _is_space_efficiency_matches_source(parameter_space_efficiency, array_space_efficiency):
     return (not parameter_space_efficiency and array_space_efficiency == config.SPACE_EFFICIENCY_THICK) or \
            (parameter_space_efficiency and parameter_space_efficiency == array_space_efficiency)
+
+
+def build_create_host_kwargs(host_name, connectivity_type, ports):
+    cli_kwargs = {'name': host_name}
+    if connectivity_type == config.NVME_OVER_FC_CONNECTIVITY_TYPE:
+        cli_kwargs.update({'nqn': COMMA_LIST_DELIMITER.join(ports), 'protocol': 'nvme'})
+    elif connectivity_type == config.FC_CONNECTIVITY_TYPE:
+        cli_kwargs['fcwwpn'] = DEFAULT_LIST_DELIMITER.join(ports)
+    elif connectivity_type == config.ISCSI_CONNECTIVITY_TYPE:
+        cli_kwargs['iscsiname'] = COMMA_LIST_DELIMITER.join(ports)
+    else:
+        raise array_errors.UnsupportedConnectivityTypeError(connectivity_type)
+    return cli_kwargs
 
 
 def build_kwargs_from_parameters(space_efficiency, pool_name, io_group,
@@ -1505,6 +1520,22 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         cli_volume = self._get_cli_volume_by_wwn(vdisk_uid, not_exist_err=False)
         return cli_volume and cli_volume.FC_id
 
+    def _mkhost(self, host_name, connectivity_type, ports):
+        cli_kwargs = build_create_host_kwargs(host_name, connectivity_type, ports)
+        try:
+            self.client.svctask.mkhost(**cli_kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if OBJ_ALREADY_EXIST in ex.my_message:
+                raise array_errors.HostAlreadyExists(host_name, self.endpoint)
+            raise ex
+
+    def _get_connectivity_type_by_initiators(self, initiators):
+        if initiators.nvme_nqns:
+            return config.NVME_OVER_FC_CONNECTIVITY_TYPE
+        if initiators.fc_wwns:
+            return config.FC_CONNECTIVITY_TYPE
+        return config.ISCSI_CONNECTIVITY_TYPE
+
     def validate_space_efficiency_matches_source(self, space_efficiency, source_id, source_type):
         if source_type == controller_config.SNAPSHOT_TYPE_NAME:
             cli_snapshot = self._get_cli_snapshot_by_id(source_id)
@@ -1518,7 +1549,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise array_errors.SpaceEfficiencyMismatch(space_efficiency, source_volume_space_efficiency)
 
     def create_host(self, host_name, initiators, connectivity_type):
-        raise NotImplementedError
+        if not connectivity_type:
+            connectivity_type = self._get_connectivity_type_by_initiators(initiators)
+        ports = initiators.get_by_connectivity_type(connectivity_type)
+        self._mkhost(host_name, connectivity_type, ports)
 
     def delete_host(self, host_name):
         raise NotImplementedError
