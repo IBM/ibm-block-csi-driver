@@ -728,8 +728,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def _delete_volume(self, volume_id, is_snapshot=False):
         cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
         object_name = cli_volume.name
-        if self._is_has_snapshots(cli_volume):
-            raise array_errors.ObjectIsStillInUseError(object_name, controller_config.SNAPSHOT_TYPE_NAME)
         if is_snapshot and not cli_volume.FC_id:
             raise array_errors.ObjectNotFoundError(object_name)
         fcmap_as_target = self._get_fcmap_as_target_if_exists(object_name)
@@ -1530,9 +1528,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return False
         cli_volume = self._get_cli_volume_by_wwn(vdisk_uid, not_exist_err=False)
         return cli_volume and cli_volume.FC_id
-
-    def _is_has_snapshots(self, cli_volume):
-        return hasattr(cli_volume, 'snapshot_count') and int(cli_volume.snapshot_count) > 0
 
     def _mkhost(self, host_name, connectivity_type, ports):
         cli_kwargs = build_create_host_kwargs(host_name, connectivity_type, ports)

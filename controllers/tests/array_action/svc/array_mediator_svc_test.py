@@ -300,11 +300,6 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectIsStillInUseError):
             self.svc.delete_volume("volume")
 
-    def test_delete_volume_with_snapshot(self):
-        self._prepare_mocks_for_delete_volume(has_snapshot=True)
-        with self.assertRaises(array_errors.ObjectIsStillInUseError):
-            self.svc.delete_volume("volume")
-
     def test_delete_volume_still_copy_fcmaps_not_removed(self):
         self._prepare_mocks_for_delete_volume()
         fcmaps_as_target = Mock(as_list=[])
@@ -348,11 +343,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(CLIFailureError):
             self.svc.delete_volume("volume")
 
-    def _prepare_mocks_for_delete_volume(self, has_snapshot=False):
+    def _prepare_mocks_for_delete_volume(self):
         cli_volume = self._get_cli_volume()
         cli_volume.FC_id = 'many'
-        if has_snapshot:
-            cli_volume.snapshot_count = '1'
+
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(cli_volume)
 
     def test_delete_volume_success(self):
