@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/python-38:1-75.1638364053 as builder
+FROM registry.access.redhat.com/ubi8/python-38:1-100 as builder
 
 RUN pip3 install --ignore-installed --default-timeout=100 --upgrade pip==21.2.4
 WORKDIR /tmp
