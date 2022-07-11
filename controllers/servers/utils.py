@@ -9,12 +9,12 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 import controllers.servers.config as config
 import controllers.servers.messages as messages
-from controllers.common import settings
 from controllers.array_action.config import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
     ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC
+from controllers.common import settings
+from controllers.common.config import config as common_config
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.settings import NAME_PREFIX_SEPARATOR
-from controllers.common.config import config as common_config
 from controllers.servers.csi.controller_types import (ArrayConnectionInfo,
                                                       ObjectIdInfo,
                                                       ObjectParameters)
@@ -334,7 +334,7 @@ def validate_volume_context_match_volume(volume_context, volume):
     logger.debug("validate volume_context is matching volume")
     context_from_existing_volume = _get_context_from_volume(volume)
 
-    if volume_context != context_from_existing_volume:
+    if volume_context and volume_context != context_from_existing_volume:
         raise ValidationException(
             messages.VOLUME_CONTEXT_NOT_MATCH_VOLUME_MESSAGE.format(volume_context, context_from_existing_volume))
     logger.debug("volume_context validation finished.")
@@ -361,8 +361,6 @@ def validate_expand_volume_request(request):
 def generate_csi_create_volume_response(new_volume, system_id=None, source_type=None):
     logger.debug("creating create volume response for volume : {0}".format(new_volume))
 
-    volume_context = _get_context_from_volume(new_volume)
-
     content_source = None
     if new_volume.source_id:
         if source_type == config.SNAPSHOT_TYPE_NAME:
@@ -375,8 +373,7 @@ def generate_csi_create_volume_response(new_volume, system_id=None, source_type=
     response = csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(
         capacity_bytes=new_volume.capacity_bytes,
         volume_id=get_volume_id(new_volume, system_id),
-        content_source=content_source,
-        volume_context=volume_context))
+        content_source=content_source))
 
     logger.debug("finished creating volume response : {0}".format(response))
     return response
@@ -596,26 +593,43 @@ def hash_string(string):
     return base58.b58encode(sha256(string.encode()).digest()).decode()
 
 
-def _validate_parameter_match_volume(parameter_value, value_from_volume, error_message_format, cmp=eq):
+def _validate_parameter_matches_volume(parameter_value, value_from_volume, error_message_format, cmp=eq):
     if parameter_value and not cmp(parameter_value, value_from_volume):
         raise ValidationException(error_message_format.format(parameter_value, value_from_volume))
+
+
+def _validate_space_efficiency_match(space_efficiency, volume):
+    if space_efficiency:
+        space_efficiency = space_efficiency.lower()
+    _validate_parameter_matches_volume(space_efficiency, volume.space_efficiency_aliases,
+                                       messages.SPACE_EFFICIENCY_NOT_MATCH_VOLUME_MESSAGE,
+                                       lambda se, se_aliases: se in se_aliases)
 
 
 def validate_parameters_match_volume(parameters, volume):
     logger.debug("validating space efficiency parameter matches volume's")
     space_efficiency = parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
-    if space_efficiency:
-        space_efficiency = space_efficiency.lower()
-    else:
-        space_efficiency = volume.default_space_efficiency
-    _validate_parameter_match_volume(space_efficiency, volume.space_efficiency,
-                                     messages.SPACE_EFFICIENCY_NOT_MATCH_VOLUME_MESSAGE)
+    _validate_space_efficiency_match(space_efficiency, volume)
 
     logger.debug("validating pool parameter matches volume's")
     pool = parameters.get(config.PARAMETERS_POOL)
-    _validate_parameter_match_volume(pool, volume.pool, messages.POOL_NOT_MATCH_VOLUME_MESSAGE)
+    _validate_parameter_matches_volume(pool, volume.pool, messages.POOL_NOT_MATCH_VOLUME_MESSAGE)
 
     logger.debug("validating prefix parameter matches volume's")
     prefix = parameters.get(config.PARAMETERS_VOLUME_NAME_PREFIX)
-    _validate_parameter_match_volume(prefix, volume.name, messages.PREFIX_NOT_MATCH_VOLUME_MESSAGE,
-                                     lambda pref, name: name.startswith(pref + NAME_PREFIX_SEPARATOR))
+    _validate_parameter_matches_volume(prefix, volume.name, messages.PREFIX_NOT_MATCH_VOLUME_MESSAGE,
+                                       lambda pref, name: name.startswith(pref + NAME_PREFIX_SEPARATOR))
+
+
+def join_object_prefix_with_name(prefix, name):
+    if prefix:
+        return settings.NAME_PREFIX_SEPARATOR.join((prefix, name))
+    return name
+
+
+def validate_parameters_match_source_volume(space_efficiency, required_bytes, volume):
+    _validate_space_efficiency_match(space_efficiency, volume)
+    volume_capacity_bytes = volume.capacity_bytes
+    if volume_capacity_bytes < required_bytes:
+        raise ValidationException(messages.REQUIRED_BYTES_MISMATCH_MESSAGE.format(
+            required_bytes, volume_capacity_bytes))

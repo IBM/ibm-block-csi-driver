@@ -636,6 +636,7 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 	if err != nil {
 		return nil, err
 	}
+
 	return &csi.NodeGetVolumeStatsResponse{
 		Usage: []*csi.VolumeUsage{
 			{
@@ -673,8 +674,7 @@ func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatis
 	}
 
 	if isBlock {
-		volumeUuid := d.NodeUtils.GetVolumeUuid(volumeId)
-		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
+		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(volumeId)
 		if err != nil {
 			switch err.(type) {
 			case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
@@ -683,13 +683,22 @@ func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatis
 				return VolumeStatistics{}, status.Errorf(codes.Internal, "Error while discovering the device : %s", err)
 			}
 		}
-		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(mpathDevice)
 	} else {
+		volumeUuid := d.NodeUtils.GetVolumeUuid(volumeId)
+		isVolumePathMatchesVolumeId, err := d.OsDeviceConnectivityHelper.IsVolumePathMatchesVolumeId(volumeUuid, path)
+		if err != nil {
+			return VolumeStatistics{}, status.Errorf(codes.Internal,
+				"Failed to determine if volume id [%q], is accessible on volume path [%q], error: %s",
+				volumeId, path, err)
+		}
+		if !isVolumePathMatchesVolumeId {
+			return VolumeStatistics{}, status.Errorf(codes.NotFound,
+				"Volume id [%q] is not accessible on volume path [%q]", volumeId, path)
+		}
 		volumeStats, err = d.NodeUtils.GetFileSystemVolumeStats(path)
-	}
-
-	if err != nil {
-		return VolumeStatistics{}, status.Errorf(codes.Internal, "Failed to get statistics: %s", err)
+		if err != nil {
+			return VolumeStatistics{}, status.Errorf(codes.Internal, "Failed to get statistics: %s", err)
+		}
 	}
 	return volumeStats, nil
 }

@@ -6,17 +6,16 @@ import controllers.array_action.errors as array_errors
 import controllers.servers.config as config
 import controllers.servers.utils as utils
 from controllers.array_action import messages
-from controllers.array_action.storage_agent import get_agent, detect_array_type
-from controllers.common import settings
 from controllers.array_action.array_action_types import ObjectIds
+from controllers.array_action.storage_agent import get_agent, detect_array_type
+from controllers.common.config import config as common_config
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.node_info import NodeIdInfo
 from controllers.servers import messages as controller_messages
-from controllers.common.config import config as common_config
 from controllers.servers.csi.decorators import csi_method
-from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controllers.servers.csi.exception_handler import handle_exception, \
     build_error_response
+from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
 
 logger = get_stdout_logger()
 
@@ -75,11 +74,26 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug("requested size is 0 so the default size will be used : {0} ".format(
                         required_bytes))
 
-                if volume_parameters.virt_snap_func and source_id:
-                    array_mediator.validate_space_efficiency_matches_source(space_efficiency, source_id, source_type)
+                is_virt_snap_func = volume_parameters.virt_snap_func
+                if is_virt_snap_func and source_id:
+                    source_object = array_mediator.get_object_by_id(source_id, source_type, is_virt_snap_func)
+                    if not source_object:
+                        return handle_exception("source {}: {} not found".format(source_type, source_id), context,
+                                                grpc.StatusCode.NOT_FOUND, csi_pb2.CreateVolumeResponse)
+                    if source_type == config.SNAPSHOT_TYPE_NAME:
+                        source_volume = array_mediator.get_object_by_id(source_object.source_id,
+                                                                        config.VOLUME_TYPE_NAME)
+                        if not source_volume:
+                            return handle_exception("source volume: {} not found".format(source_object.source_id),
+                                                    context, grpc.StatusCode.INVALID_ARGUMENT,
+                                                    csi_pb2.CreateVolumeResponse)
+                    else:
+                        source_volume = source_object
+                    if source_volume:
+                        utils.validate_parameters_match_source_volume(space_efficiency, required_bytes, source_volume)
 
                 try:
-                    volume = array_mediator.get_volume(volume_final_name, pool, volume_parameters.virt_snap_func)
+                    volume = array_mediator.get_volume(volume_final_name, pool, is_virt_snap_func)
                 except array_errors.ObjectNotFoundError:
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
@@ -87,7 +101,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     array_mediator.validate_supported_space_efficiency(space_efficiency)
                     volume = array_mediator.create_volume(volume_final_name, required_bytes, space_efficiency, pool,
                                                           volume_parameters.io_group, volume_parameters.volume_group,
-                                                          source_ids, source_type, volume_parameters.virt_snap_func)
+                                                          source_ids, source_type, is_virt_snap_func)
                 else:
                     logger.debug("volume found : {}".format(volume))
 
@@ -99,7 +113,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
                                                     csi_pb2.CreateVolumeResponse)
 
-                    if not volume_parameters.virt_snap_func:
+                    if not is_virt_snap_func:
                         response = self._get_create_volume_response_for_existing_volume_source(volume,
                                                                                                source_id,
                                                                                                source_type, system_id,
@@ -107,7 +121,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                         if response:
                             return response
 
-                if source_id and not volume_parameters.virt_snap_func:
+                if source_id and not is_virt_snap_func:
                     array_mediator.copy_to_existing_volume_from_source(volume, source_id,
                                                                        source_type, required_bytes)
                 volume.source_id = source_id
@@ -486,16 +500,11 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 )
         if not prefix:
             prefix = array_mediator.default_object_prefix
-        full_name = self._join_object_prefix_with_name(prefix, name)
+        full_name = utils.join_object_prefix_with_name(prefix, name)
         if len(full_name) > array_mediator.max_object_name_length:
             hashed_name = utils.hash_string(name)
-            full_name = self._join_object_prefix_with_name(prefix, hashed_name)
+            full_name = utils.join_object_prefix_with_name(prefix, hashed_name)
         return full_name[:array_mediator.max_object_name_length]
-
-    def _join_object_prefix_with_name(self, prefix, name):
-        if prefix:
-            return settings.NAME_PREFIX_SEPARATOR.join((prefix, name))
-        return name
 
     def GetPluginCapabilities(self, _, __):  # pylint: disable=invalid-name
         logger.info("GetPluginCapabilities")

@@ -6,7 +6,7 @@ from mock import Mock, MagicMock
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
 from controllers.tests.controller_server.test_settings import USER as test_user, \
     PASSWORD as test_password, \
-    ARRAY as test_array
+    ARRAY as test_array, VOLUME_NAME
 
 
 class ProtoBufMock(MagicMock):
@@ -14,8 +14,8 @@ class ProtoBufMock(MagicMock):
         return hasattr(self, field)
 
 
-def get_mock_mediator_response_volume(size, name, wwn, array_type, source_id=None, space_efficiency=None,
-                                      default_space_efficiency=None):
+def get_mock_mediator_response_volume(size=10, name=VOLUME_NAME, wwn="wwn1", array_type="a9k", source_id=None,
+                                      space_efficiency='thick'):
     volume = Mock()
     volume.capacity_bytes = size
     volume.id = wwn
@@ -25,8 +25,7 @@ def get_mock_mediator_response_volume(size, name, wwn, array_type, source_id=Non
     volume.pool = "pool1"
     volume.array_type = array_type
     volume.source_id = source_id
-    volume.space_efficiency = space_efficiency
-    volume.default_space_efficiency = default_space_efficiency
+    volume.space_efficiency_aliases = space_efficiency if isinstance(space_efficiency, set) else {space_efficiency}
     return volume
 
 
