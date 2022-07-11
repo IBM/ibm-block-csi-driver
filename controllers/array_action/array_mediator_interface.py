@@ -217,12 +217,13 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_object_by_id(self, object_id, object_type):
+    def get_object_by_id(self, object_id, object_type, is_virt_snap_func=False):
         """
         This function return info about volume or snapshot.
         Args:
-            object_id   : id of the object in the storage system
-            object_type : volume or snapshot
+            object_id         : id of the object in the storage system
+            object_type       : volume or snapshot
+            is_virt_snap_func : indicate if svc's snapshot function feature is enabled
         Returns:
            Snapshot
            Volume
@@ -396,24 +397,6 @@ class ArrayMediator(ABC):
 
         Raises:
             SpaceEfficiencyNotSupported
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def validate_space_efficiency_matches_source(self, space_efficiency, source_id, source_type):
-        """
-        This function will check if the space efficiency passed to CreateVolume matches the volume source.
-
-        Args:
-            space_efficiency : as passed from the CSI request
-            source_id        : id of source to create from
-            source_type      : volume or snapshot
-
-        Returns:
-            None
-
-        Raises:
-            SpaceEfficiencyMismatch
         """
         raise NotImplementedError
 

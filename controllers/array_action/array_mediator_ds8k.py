@@ -107,11 +107,11 @@ def get_array_space_efficiency(space_efficiency):
     return ARRAY_SPACE_EFFICIENCY_NONE
 
 
-def _get_parameter_space_efficiency(array_space_efficiency):
+def _get_space_efficiency_aliases(array_space_efficiency):
     if array_space_efficiency == ARRAY_SPACE_EFFICIENCY_THIN:
-        return config.SPACE_EFFICIENCY_THIN
+        return {config.SPACE_EFFICIENCY_THIN}
     if array_space_efficiency == ARRAY_SPACE_EFFICIENCY_NONE:
-        return config.SPACE_EFFICIENCY_NONE
+        return {config.SPACE_EFFICIENCY_NONE, ""}
     raise array_errors.SpaceEfficiencyNotSupported(array_space_efficiency)
 
 
@@ -221,7 +221,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return source_id
 
     def _generate_volume_response(self, api_volume):
-        space_efficiency = _get_parameter_space_efficiency(api_volume.tp)
+        space_efficiency = _get_space_efficiency_aliases(api_volume.tp)
         return Volume(
             capacity_bytes=int(api_volume.cap),
             id=self._generate_volume_scsi_identifier(volume_id=api_volume.id),
@@ -231,8 +231,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             source_id=self._get_source_id(api_volume=api_volume),
             pool=api_volume.pool,
             array_type=self.array_type,
-            space_efficiency=space_efficiency,
-            default_space_efficiency=config.SPACE_EFFICIENCY_NONE
+            space_efficiency_aliases=space_efficiency,
         )
 
     def _create_api_volume(self, name, size_in_bytes, array_space_efficiency, pool_id):
@@ -575,7 +574,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return self._generate_snapshot_response(api_object, flashcopy_as_target.sourcevolume)
 
     @convert_scsi_ids_to_array_ids()
-    def get_object_by_id(self, object_id, object_type):
+    def get_object_by_id(self, object_id, object_type, is_virt_snap_func=False):
         api_object = self._get_api_volume_by_id(object_id, not_exist_err=False)
         if not api_object:
             return None
@@ -696,9 +695,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         raise NotImplementedError
 
     def demote_replication_volume(self, replication_name):
-        raise NotImplementedError
-
-    def validate_space_efficiency_matches_source(self, space_efficiency, source_id, source_type):
         raise NotImplementedError
 
     def create_host(self, host_name, initiators, connectivity_type):

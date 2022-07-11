@@ -433,7 +433,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.side_effect = array_errors.ObjectNotFoundError("vol")
-        self.mediator.validate_space_efficiency_matches_source = Mock()
+        self.mediator.get_object_by_id = Mock()
 
         self.request.parameters = {config.PARAMETERS_POOL: POOL,
                                    config.PARAMETERS_IO_GROUP: IO_GROUP,
@@ -744,8 +744,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
     def test_create_volume_idempotent_with_source_volume_have_no_source(self, storage_agent):
         self._prepare_idempotent_tests()
         storage_agent.return_value = self.storage_agent
-        self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, VOLUME_NAME, "wwn2",
-                                                                                        "a9k")
+        self.mediator.get_volume.return_value = utils.get_mock_mediator_response_volume(10, VOLUME_NAME, "wwn2", "a9k")
         response = self.servicer.CreateVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
@@ -782,8 +781,8 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
     @patch("controllers.servers.csi.csi_controller_server.get_agent")
     def test_create_volume_idempotent_with_other_source_and_virt_snap_func_enabled(self, storage_agent):
-
         self.request.parameters[config.PARAMETERS_VIRT_SNAP_FUNC] = "true"
+        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume()
         self._prepare_idempotent_test_with_other_source(storage_agent)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
@@ -914,8 +913,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.request.volume_content_source = self._get_source_volume(volume_id)
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(volume_capacity_bytes,
                                                                                               CLONE_VOLUME_NAME,
-                                                                                              volume_id,
-                                                                                              "a9k")
+                                                                                              volume_id, "a9k")
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
         self.mediator.copy_to_existing_volume.assert_called_once_with('wwn2', volume_id,
@@ -1496,14 +1494,9 @@ class TestExpandVolume(BaseControllerSetUp, CommonControllerTest):
         self.request.volume_id = "{}:{}".format("xiv", self.volume_id)
         self.request.volume_content_source = None
         self.mediator.get_object_by_id = Mock()
-        self.volume_before_expand = utils.get_mock_mediator_response_volume(2,
-                                                                            VOLUME_NAME,
-                                                                            self.volume_id,
-                                                                            "a9k")
-        self.volume_after_expand = utils.get_mock_mediator_response_volume(self.capacity_bytes,
-                                                                           VOLUME_NAME,
-                                                                           self.volume_id,
-                                                                           "a9k")
+        self.volume_before_expand = utils.get_mock_mediator_response_volume(2, VOLUME_NAME, self.volume_id, "a9k")
+        self.volume_after_expand = utils.get_mock_mediator_response_volume(self.capacity_bytes, VOLUME_NAME,
+                                                                           self.volume_id, "a9k")
         self.mediator.get_object_by_id.side_effect = [self.volume_before_expand, self.volume_after_expand]
         self.request.volume_capability = self.volume_capability
 
