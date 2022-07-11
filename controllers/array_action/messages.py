@@ -60,6 +60,8 @@ SNAPSHOT_NOT_FOUND_ERROR_MESSAGE = "Snapshot was not found : {0} "
 
 SNAPSHOT_ALREADY_EXISTS_ERROR_MESSAGE = "Snapshot already exists : {0} , array : {1}"
 
+HOST_ALREADY_EXISTS_ERROR_MESSAGE = "Host already exists : {0} , array : {1}"
+
 EXPECTED_SNAPSHOT_BUT_FOUND_VOLUME_ERROR_MESSAGE = "Could not find info about the source of: {0}, array: {1}"
 
 SNAPSHOT_WRONG_VOLUME_ERROR_MESSAGE = "Snapshot {0} exists but it is of Volume {1} and not {2}"

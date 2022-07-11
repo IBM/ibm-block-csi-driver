@@ -4,13 +4,13 @@ import (
 	"fmt"
 )
 
-type MultipleDmDevicesError struct {
-	VolumeId         string
-	MultipathDevices map[string]bool
+type MultipleDmFieldValuesError struct {
+	Validator     string
+	DmFieldValues map[string]bool
 }
 
-func (e *MultipleDmDevicesError) Error() string {
-	return fmt.Sprintf("Detected more than one multipath device (%v) for single volume (%s)", e.MultipathDevices, e.VolumeId)
+func (e *MultipleDmFieldValuesError) Error() string {
+	return fmt.Sprintf("Detected more than one (%v) for single (%s)", e.DmFieldValues, e.Validator)
 }
 
 type MultipathDeviceNotFoundForVolumeError struct {
@@ -19,6 +19,22 @@ type MultipathDeviceNotFoundForVolumeError struct {
 
 func (e *MultipathDeviceNotFoundForVolumeError) Error() string {
 	return fmt.Sprintf("Couldn't find multipath device for volumeID [%s]. Please check the host connectivity to the storage.", e.VolumeId)
+}
+
+type MultipathDeviceNotFoundForVolumePathError struct {
+	VolumePath string
+}
+
+func (e *MultipathDeviceNotFoundForVolumePathError) Error() string {
+	return fmt.Sprintf("Couldn't find multipath device for VolumePath [%s]. Please verify the path is mounted", e.VolumePath)
+}
+
+type VolumeIdNotFoundForMultipathDeviceNameError struct {
+	mpathDeviceName string
+}
+
+func (e *VolumeIdNotFoundForMultipathDeviceNameError) Error() string {
+	return fmt.Sprintf("Couldn't find Volume Id for Multipath device name [%s]. Please check the host connectivity to the storage.", e.mpathDeviceName)
 }
 
 type ConnectivityIdentifierStorageTargetNotFoundError struct {
@@ -66,13 +82,13 @@ func (e *ErrorNoRegexWwnMatchInScsiInq) Error() string {
 }
 
 type ErrorWrongDeviceFound struct {
-	devPath    string
-	reqVolName string
-	volName    string
+	DevPath       string
+	DmVolumeId    string
+	SgInqVolumeId string
 }
 
 func (e *ErrorWrongDeviceFound) Error() string {
 	return fmt.Sprintf("Multipath device [%s] was found as WWN [%s] via multipath -ll command, "+
-		"BUT sg_inq identify this device as a different WWN: [%s]. Check your multipathd.", e.devPath,
-		e.reqVolName, e.volName)
+		"BUT sg_inq identify this device as a different WWN: [%s]. Check your multipathd.", e.DevPath,
+		e.DmVolumeId, e.SgInqVolumeId)
 }

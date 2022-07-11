@@ -46,6 +46,13 @@ class Initiators:
     def __iter__(self):
         return self._get_iter()
 
+    def get_by_connectivity_type(self, connectivity_type):
+        return {
+            array_config.NVME_OVER_FC_CONNECTIVITY_TYPE: self.nvme_nqns,
+            array_config.FC_CONNECTIVITY_TYPE: self.fc_wwns,
+            array_config.ISCSI_CONNECTIVITY_TYPE: self.iscsi_iqns
+        }[connectivity_type]
+
     def _lower(self, ports):
         return {port.lower() for port in ports if ports}
 

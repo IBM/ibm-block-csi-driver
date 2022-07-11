@@ -334,7 +334,7 @@ def validate_volume_context_match_volume(volume_context, volume):
     logger.debug("validate volume_context is matching volume")
     context_from_existing_volume = _get_context_from_volume(volume)
 
-    if volume_context != context_from_existing_volume:
+    if volume_context and volume_context != context_from_existing_volume:
         raise ValidationException(
             messages.VOLUME_CONTEXT_NOT_MATCH_VOLUME_MESSAGE.format(volume_context, context_from_existing_volume))
     logger.debug("volume_context validation finished.")
@@ -361,8 +361,6 @@ def validate_expand_volume_request(request):
 def generate_csi_create_volume_response(new_volume, system_id=None, source_type=None):
     logger.debug("creating create volume response for volume : {0}".format(new_volume))
 
-    volume_context = _get_context_from_volume(new_volume)
-
     content_source = None
     if new_volume.source_id:
         if source_type == config.SNAPSHOT_TYPE_NAME:
@@ -375,8 +373,7 @@ def generate_csi_create_volume_response(new_volume, system_id=None, source_type=
     response = csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(
         capacity_bytes=new_volume.capacity_bytes,
         volume_id=get_volume_id(new_volume, system_id),
-        content_source=content_source,
-        volume_context=volume_context))
+        content_source=content_source))
 
     logger.debug("finished creating volume response : {0}".format(response))
     return response
@@ -619,3 +616,9 @@ def validate_parameters_match_volume(parameters, volume):
     prefix = parameters.get(config.PARAMETERS_VOLUME_NAME_PREFIX)
     _validate_parameter_match_volume(prefix, volume.name, messages.PREFIX_NOT_MATCH_VOLUME_MESSAGE,
                                      lambda pref, name: name.startswith(pref + NAME_PREFIX_SEPARATOR))
+
+
+def join_object_prefix_with_name(prefix, name):
+    if prefix:
+        return settings.NAME_PREFIX_SEPARATOR.join((prefix, name))
+    return name
