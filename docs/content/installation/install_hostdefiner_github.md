@@ -4,8 +4,6 @@ The host definer for IBM® block storage CSI driver can be installed directly wi
 
 Use the following steps to install the HostDefiner custom resource, with [GitHub](https://github.com/IBM/ibm-block-csi-operator).
 
-**Note:** Only hosts added after the host definer installation are dynamically defined within the CSI driver.
-
 1. Download the custom resource manifest from [GitHub](https://github.com/IBM/ibm-block-csi-operator).
 
         curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.10.0/config/samples/csi_v1_hostdefiner_cr.yaml > csi_v1_hostdefiner_cr.yaml
