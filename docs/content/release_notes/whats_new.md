@@ -2,7 +2,7 @@
 
 IBM® block storage CSI driver 1.10.0 introduces the enhancements that are detailed in the following section.
 
-**General availability date:** 15 July 2022
+**General availability date:** 26 July 2022
 
 ## Alpha support for the new snapshot function that was introduced in IBM Spectrum Virtualize 8.5.1 release
 
