@@ -2,7 +2,7 @@
 
 Host connectivity for dynamic host definition needs to be updated when node connectivity changes take place.
 
-Before you begin, be sure to delete the old host definition.
+Before you begin, ensure that the old host definition is deleted.
 
 Use the following procedure to redefine host connectivity:
 
