@@ -11,7 +11,7 @@ Perform the following steps in order to uninstall the CSI driver and operator th
 
     **Operators** > **Installed Operators** > **Operator Details**.
 
-4. If applicable, click on the **more** menu for the **host-definer** plugin and select **Delete HostDefiner**.
+4. If applicable, click on the **more** menu for the **host-definer** driver and select **Delete HostDefiner**.
 
     Wait for the host definer pod to terminate.
 

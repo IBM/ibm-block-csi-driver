@@ -11,8 +11,8 @@ The host definer identifies the nodes available for host definition on each stor
 |Phase|Description|
 |---------|--------|
 |Ready|Host definition is created and is working as expected.|
-|PendingForCreation|Host definition did not complete during the last attempt. The host definer will try again.|
-|PendingForDeletion|Host deletion did not complete during the last attempt. The host definer will try again.|
+|PendingCreation|Host definition did not complete during the last attempt. The host definer will try again.|
+|PendingDeletion|Host deletion did not complete during the last attempt. The host definer will try again.|
 |Error|Host definition or deletion did not complete and will not try again.|
 
 ## Recovering from an Error state
@@ -33,9 +33,9 @@ If any of the host definitions have an Error status, follow this procedure to ha
 
     ```
     $> kubectl get hostdefinition
-    NAME                     AGE    PHASE   STORAGE               NODE
-    <host_definition_name1>  102m   Ready   <management_address>  <node_name1>
-    <host_definition_name2>  102m   Ready   <management_address>  <node_name2>
+    NAME                     AGE    PHASE   NODE
+    <host_definition_name1>  102m   Ready   <node_name1>
+    <host_definition_name2>  102m   Ready   <node_name2>
     ```
 
 ## Blocking a specific node definition from being deleted
