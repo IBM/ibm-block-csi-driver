@@ -10,7 +10,4 @@ The host definer can be downloaded and installed from the OpenShift web console 
 
 The host definer can also be installed directly with GitHub (see [Installing the host definer with GitHub](install_hostdefiner_github.md)).
 
-**Note:** 
-    
-- The host definer can be installed at any time.
-- Installing the host definer with GitHub requires all later host definer updates to be conducted manually.
+**Note:** The host definer can be installed at any time.
