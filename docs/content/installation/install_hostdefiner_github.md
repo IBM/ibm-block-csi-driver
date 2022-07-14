@@ -12,4 +12,4 @@ Use the following steps to install the HostDefiner custom resource, with [GitHub
 
         kubectl apply -f csi_v1_hostdefiner_cr.yaml
 
-After the host definer is installed, it searches for nodes that have not yet been defined on storage, and defines them according to the host definer parameters configured by the user (see [Configuring the host definer](../configuration/configuring_hostdefiner)).
+After the host definer is installed, it searches for nodes that have not yet been defined on storage, and defines them according to the host definer parameters configured by the user (see [Configuring the host definer](../configuration/configuring_hostdefiner.md)).
