@@ -40,6 +40,11 @@ The Red Hat OpenShift Container Platform uses the following `SecurityContextCons
 
     A YAML file opens in the web console. This file can be left as-is, or edited as needed.
 
+11. (Optional) Click **Create Instance** to create the host definer (`HostDefiner`).
+
+    A YAML file opens in the web console. This file can be left as-is, or edited as needed. For more information, see [Configuring the host definer](../configuration/configuring_hostdefiner).
+
+
 11. Update the YAML file to include your user-defined namespace.
 
 12. Click **Create**.
