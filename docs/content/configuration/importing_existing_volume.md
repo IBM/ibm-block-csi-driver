@@ -2,18 +2,7 @@
 
 Use this information to import volumes that were created externally from the IBM® block storage CSI driver by using a persistent volume (PV) YAML file.
 
-Before starting to import an existing volume, find the following information in the existing volume in order to include the information in the persistent volume (PV) YAML file:
-- `volumeHandle`
-- `volumeAttributes` (optional)
-  
-  Including:
-
-    - `pool_name`: _Name of Pool where volume is located_ (Listed as `pool_id` for DS8000® family systems.)
-    - `storage_type`: <`SVC` | `A9000` | `DS8K`>
-    - `volume_name`: _Volume name_
-    - `array_address`: _Array address_
-
-To find the `volumeHandle`, use one of the following procedures:
+Before starting to import an existing volume, find the `volumeHandle` in the existing volume in order to include the information in the persistent volume (PV) YAML file. To find the `volumeHandle`, use one of the following procedures:
 
 - **For Spectrum Virtualize family**
 
