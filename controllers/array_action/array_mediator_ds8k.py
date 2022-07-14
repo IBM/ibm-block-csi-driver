@@ -220,7 +220,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             source_id = self._generate_volume_scsi_identifier(volume_id=source_volume_id)
         return source_id
 
-    def _generate_volume_response(self, api_volume):
+    def _generate_volume_response(self, api_volume, source_type):
         space_efficiency = _get_space_efficiency_aliases(api_volume.tp)
         return Volume(
             capacity_bytes=int(api_volume.cap),
@@ -231,6 +231,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             source_id=self._get_source_id(api_volume=api_volume),
             pool=api_volume.pool,
             array_type=self.array_type,
+            source_type=source_type,
             space_efficiency_aliases=space_efficiency,
         )
 
@@ -270,7 +271,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         array_space_efficiency = get_array_space_efficiency(space_efficiency)
         api_volume = self._create_api_volume(name, size_in_bytes, array_space_efficiency, pool)
         self.volume_cache.add(api_volume.name, api_volume.id)
-        return self._generate_volume_response(api_volume)
+        return self._generate_volume_response(api_volume, source_type)
 
     def _extend_volume(self, api_volume, new_size_in_bytes):
         try:
@@ -363,12 +364,12 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             api_volume = self._get_api_volume_by_name(volume_name=name, pool_id=pool_id)
         return api_volume
 
-    def get_volume(self, name, pool, is_virt_snap_func):
+    def get_volume(self, name, pool, source_type, is_virt_snap_func):
         logger.debug("getting volume {} in pool {}".format(name, pool))
         api_volume = self._get_api_volume_with_cache(name, pool)
         if api_volume:
             self.volume_cache.add_or_delete(api_volume.name, api_volume.id)
-            return self._generate_volume_response(api_volume)
+            return self._generate_volume_response(api_volume, source_type)
         raise array_errors.ObjectNotFoundError(name)
 
     @convert_scsi_ids_to_array_ids()
@@ -580,7 +581,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             return None
         if object_type is controller_config.SNAPSHOT_TYPE_NAME:
             return self._generate_snapshot_response_with_verification(api_object)
-        return self._generate_volume_response(api_object)
+        return self._generate_volume_response(api_object, object_type)
 
     @convert_scsi_ids_to_array_ids()
     def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func):

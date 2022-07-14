@@ -93,7 +93,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                         utils.validate_parameters_match_source_volume(space_efficiency, required_bytes, source_volume)
 
                 try:
-                    volume = array_mediator.get_volume(volume_final_name, pool, is_virt_snap_func)
+                    volume = array_mediator.get_volume(volume_final_name, pool, source_type, is_virt_snap_func)
                 except array_errors.ObjectNotFoundError:
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))

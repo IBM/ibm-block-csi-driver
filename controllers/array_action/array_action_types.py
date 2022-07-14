@@ -13,6 +13,7 @@ class Volume:
     source_id: str
     array_type: str
     pool: str
+    source_type: str
     space_efficiency_aliases: set = field(default_factory=set)
 
 

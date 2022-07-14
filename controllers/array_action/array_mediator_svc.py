@@ -264,7 +264,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def is_active(self):
         return self.client.transport.transport.get_transport().is_active()
 
-    def _generate_volume_response(self, cli_volume, is_virt_snap_func=False):
+    def _generate_volume_response(self, cli_volume, source_type, is_virt_snap_func=False):
         pool = self._get_volume_pool(cli_volume)
         source_id = None
         if not is_virt_snap_func:
@@ -279,6 +279,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             pool=pool,
             source_id=source_id,
             array_type=self.array_type,
+            source_type=source_type,
             space_efficiency_aliases=space_efficiency,
         )
 
@@ -366,9 +367,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         pools = self._get_volume_pools(cli_volume)
         return ':'.join(pools)
 
-    def get_volume(self, name, pool, is_virt_snap_func):
+    def get_volume(self, name, pool, source_type, is_virt_snap_func):
         cli_volume = self._get_cli_volume(name)
-        return self._generate_volume_response(cli_volume, is_virt_snap_func)
+        return self._generate_volume_response(cli_volume, source_type, is_virt_snap_func)
 
     def _get_object_fcmaps(self, object_name):
         all_fcmaps = []
@@ -570,7 +571,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         else:
             self._create_cli_volume(name, size_in_bytes, space_efficiency, pool, io_group, volume_group)
         cli_volume = self._get_cli_volume(name)
-        return self._generate_volume_response(cli_volume, is_virt_snap_func)
+        return self._generate_volume_response(cli_volume, source_type, is_virt_snap_func)
 
     def _rmvolume(self, volume_id_or_name, not_exist_err=True):
         logger.info("deleting volume with name : {0}".format(volume_id_or_name))
@@ -621,7 +622,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if object_type is controller_config.SNAPSHOT_TYPE_NAME:
             return self._generate_snapshot_response_with_verification(cli_volume)
         cli_volume = self._get_cli_volume(cli_volume.name)
-        return self._generate_volume_response(cli_volume)
+        return self._generate_volume_response(cli_volume, object_type)
 
     def _create_similar_volume(self, source_cli_volume, target_volume_name, space_efficiency, pool):
         logger.info("creating target cli volume '{0}' from source volume '{1}'".format(target_volume_name,
