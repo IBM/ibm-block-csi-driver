@@ -1,6 +1,6 @@
-# Changing host connectivity
+# Changing node connectivity
 
-Host connectivity for dynamic host definition needs to be updated when node connectivity changes take place.
+Node connectivity for dynamic host definition needs to be updated when node connectivity changes take place.
 
 Before you begin, ensure that the old host definition is deleted.
 
@@ -9,7 +9,7 @@ Use the following procedure to redefine host connectivity:
 1. Undeploy the CSI node pod from the relevant node that the host definition is a part of.
 2. Verify that all host definition instances of the node are deleted.
      
-          $> kubectl get hostdefinition | grep <nodename> | wc -l
+          $> kubectl get hostdefinition | grep <node-name> | wc -l
      
      The output should be `0`.
 3. From the host, change the host connectivity type.
