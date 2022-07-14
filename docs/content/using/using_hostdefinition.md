@@ -4,7 +4,7 @@ Dynamic host connectivity eliminates the necessity for manual host definitions. 
 
 A use case example of using dynamic host definition is when creating a new storage class with a new storage. With the dynamic host definition feature, new host definitions are created on the storage for the relevant nodes. For each host definition on the storage, a new host definition resource is created. With these resources, the status of the host definition on the storage system can easily be retrieved.
 
-The host definer identifies the nodes available for host definition on each storage system and controls each of the host definitions. To see the phase status of all managed host definitions by the host definer, use:
+The host definer identifies the nodes available for host definition on each storage system and controls each of the host definitions. To see the phase status of all managed HostDefinitions by the host definer, use:
 
      $> kubectl get hostdefinitions
 
@@ -22,7 +22,7 @@ If any of the host definitions have an Error status, follow this procedure to ha
 1. Undeploy the CSI node pod from the relevant node that the `HostDefinition` is a part of.
 2. Verify that all `HostDefinition` instances of the node are deleted.
      
-          $> kubectl get hostdefinition | grep <nodename> | wc -l
+          $> kubectl get hostdefinition | grep <node-name> | wc -l
      
      The output should be `0`.
 3. Redeploy the CSI node pod on the relevant node.
