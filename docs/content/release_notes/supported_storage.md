@@ -4,9 +4,9 @@ IBM® block storage CSI driver 1.10.0 supports different IBM storage systems as 
 
 |Storage system|Microcode version|
 |--------------|-----------------|
-|FlashSystem™ A9000|12.3.2.b or later|
-|FlashSystem A9000R|12.3.2.b or later|
-|Spectrum Virtualize™ family including Spectrum Virtualize as software only, Spectrum Virtualize for Public Cloud, SAN Volume Controller (SVC), and FlashSystem® family members built with Spectrum® Virtualize (including FlashSystem 5xxx, 7xxx, 9xxx)|7.8 and above, 8.x|
+|FlashSystem™ A9000|12.3.2.c or later|
+|FlashSystem A9000R|12.3.2.c or later|
+|Spectrum Virtualize™ family including Spectrum Virtualize as software only, Spectrum Virtualize for Public Cloud, SAN Volume Controller (SVC), and FlashSystem® family members built with Spectrum® Virtualize (including FlashSystem 5xxx, 7xxx, 9xxx)|7.8.x, 8.2.x, 8.3.x, 8.4.x, 8.5.x|
 |DS8000® family|8.x and higher with same API interface|
 
 **Note:**
