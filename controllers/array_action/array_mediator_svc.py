@@ -278,8 +278,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             array_address=self.endpoint,
             pool=pool,
             source_id=source_id,
-            array_type=self.array_type,
             source_type=source_type,
+            array_type=self.array_type,
             space_efficiency_aliases=space_efficiency,
         )
 

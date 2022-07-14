@@ -229,9 +229,9 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             name=api_volume.name,
             array_address=self.service_address,
             source_id=self._get_source_id(api_volume=api_volume),
+            source_type=source_type,
             pool=api_volume.pool,
             array_type=self.array_type,
-            source_type=source_type,
             space_efficiency_aliases=space_efficiency,
         )
 
