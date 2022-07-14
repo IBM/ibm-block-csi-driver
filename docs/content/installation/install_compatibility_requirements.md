@@ -43,7 +43,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 
    **Important:**
    - The `99-ibm-attach.yaml` configuration file overrides any files that exist on your system. Only use this file if the files mentioned are not already created. <br />If one or more were created, edit this YAML file, as necessary.
-   - The `99-ibm-attach.yaml` configuration file with the default configuration by the CSI driver. It is best practice to update the file according to your storage system and application networking needs.
+   - The `99-ibm-attach.yaml` configuration file contains the default configuration for the CSI driver. It is best practice to update the file according to your storage system and application networking needs.
 
    Apply the YAML file.
 
@@ -91,7 +91,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
         
         curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.2.0/config/crd/bases/replication.storage.openshift.io_volumereplications.yaml
         kubectl apply -f ./replication.storage.openshift.io_volumereplications.yaml
-        ````
+        ```
     
     2. To enable support on your storage system, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Administering** > **Managing Copy Services** > **Managing remote-copy partnerships**.
 
