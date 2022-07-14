@@ -12,7 +12,7 @@ Dynamic host definition is only supported for use with IBM Spectrum Virtualize f
 
 In addition, the following are not supported when using dynamic host definitions with the IBM block storage CSI driver:
 - I/O groups
-- CSI Topology (see [Configuring for CSI Topology](./configuring/configuring_topology.md))
+- CSI Topology (see [Configuring for CSI Topology](../configuration/configuring_topology.md))
 
 ## High availability (HA) limitations
 **Note:**
