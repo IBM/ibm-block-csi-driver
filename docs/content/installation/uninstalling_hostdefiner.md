@@ -2,6 +2,8 @@
 
 Use this information to uninstall the host definer.
 
+**Note:** Uninstalling the host definer does not remove any hosts from teh storage, even if these hosts have been configured on storage by the host definer.
+
 The host definer can be uninstalled in the following ways:
 
 **Note:** Be sure to use the corresponding uninstall method to the host definer installation originally used.

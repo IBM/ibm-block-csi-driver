@@ -4,7 +4,7 @@ Use this information to uninstall the IBM® CSI (Container Storage Interface) op
 
 Perform the following steps to uninstall the CSI driver and operator.
 
-**Note:** When using host definition and `dynamicNodeLabeling` is set to `true`, if these steps is not completed in the correct order, `hostdefiner.block.csi.ibm.com/managed-by=true` labels can be left on the nodes.
+**Note:** When using host definition and `dynamicNodeLabeling` is set to `true`, if these steps is not completed in the correct order, `hostdefiner.block.csi.ibm.com/manage-node=true` labels can be left on the nodes.
 
 1. Delete the IBMBlockCSI custom resource.
 
@@ -16,7 +16,7 @@ Perform the following steps to uninstall the CSI driver and operator.
 
     1. Verify that all host definition instances of the node are deleted.
      
-            $> kubectl get hostdefinition | grep <hostname> | wc -l
+            $> kubectl get hostdefinition | grep <nodename> | wc -l
      
         The output should be `0`.
 

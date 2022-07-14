@@ -4,7 +4,7 @@ Use this information to uninstall the IBM® CSI (Container Storage Interface) op
 
 Perform the following steps in order to uninstall the CSI driver and operator through Red Hat OpenShift Container Platform web console.
 
-**Note:** When using host definition and `dynamicNodeLabeling` is set to `true`, if these steps is not completed in the correct order, `hostdefiner.block.csi.ibm.com/managed-by=true` labels can be left on the nodes.
+**Note:** When using host definition and `dynamicNodeLabeling` is set to `true`, if these steps is not completed in the correct order, `hostdefiner.block.csi.ibm.com/manage-node=true` labels can be left on the nodes.
 
 1.  From the web console go to **Operators** > **Installed Operators**. Select the Project namespace, where installed, from `Projects: <namespace>`.
 

@@ -22,7 +22,7 @@ If any of the host definitions have an Error status, follow this procedure to ha
 1. Undeploy the CSI node pod from the relevant node that the `HostDefinition` is a part of.
 2. Verify that all `HostDefinition` instances of the node are deleted.
      
-          $> kubectl get hostdefinition | grep <hostname> | wc -l
+          $> kubectl get hostdefinition | grep <nodename> | wc -l
      
      The output should be `0`.
 3. Redeploy the CSI node pod on the relevant node.
