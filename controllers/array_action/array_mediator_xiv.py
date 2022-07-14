@@ -129,7 +129,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             return None
         return cli_volume.copy_master_wwn
 
-    def _generate_volume_response(self, cli_volume, source_type):
+    def _generate_volume_response(self, cli_volume):
         source_object_wwn = self._get_volume_source_wwn(cli_volume)
         return Volume(
             capacity_bytes=self._convert_size_blocks_to_bytes(cli_volume.capacity),
@@ -139,7 +139,6 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             array_address=self.endpoint,
             pool=cli_volume.pool_name,
             source_id=source_object_wwn,
-            source_type=source_type,
             array_type=self.array_type
         )
 
@@ -162,7 +161,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise array_errors.InvalidArgumentError(ex.status)
 
-    def get_volume(self, name, pool, source_type, is_virt_snap_func):
+    def get_volume(self, name, pool, is_virt_snap_func):
         logger.debug("Get volume : {}".format(name))
         cli_volume = self._get_cli_object_by_name(name)
 
@@ -173,7 +172,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         if cli_volume.master_name:
             raise array_errors.VolumeNameBelongsToSnapshotError(name, self.endpoint)
 
-        array_volume = self._generate_volume_response(cli_volume, source_type)
+        array_volume = self._generate_volume_response(cli_volume)
         return array_volume
 
     def _expand_cli_volume(self, cli_volume, increase_in_blocks):
@@ -219,7 +218,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             cli_volume = self.client.cmd.vol_create(vol=name, size_blocks=size_in_blocks,
                                                     pool=pool).as_single_element
             logger.info("finished creating cli volume : {}".format(cli_volume))
-            return self._generate_volume_response(cli_volume, source_type)
+            return self._generate_volume_response(cli_volume)
         except xcli_errors.IllegalNameForObjectError as ex:
             logger.exception(ex)
             raise array_errors.InvalidArgumentError(ex.status)
@@ -328,7 +327,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             if not cli_object.master_name:
                 raise array_errors.ExpectedSnapshotButFoundVolumeError(object_id, self.endpoint)
             return self._generate_snapshot_response(cli_object)
-        return self._generate_volume_response(cli_object, object_type)
+        return self._generate_volume_response(cli_object)
 
     def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func):
         logger.info("creating snapshot {0} from volume {1}".format(snapshot_name, volume_id))
