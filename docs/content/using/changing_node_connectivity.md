@@ -12,7 +12,7 @@ Use the following procedure to redefine host connectivity:
           $> kubectl get hostdefinition | grep <node-name> | wc -l
      
      The output should be `0`.
-3. From the host, change the host connectivity type.
+3. From the host, change the host connectivity.
 4. Redeploy the CSI node pod on the relevant node.
 
      The host definer handles the creation of the new host definition on the storage side.
