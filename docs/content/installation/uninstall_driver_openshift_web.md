@@ -14,17 +14,17 @@ Perform the following steps in order to uninstall the CSI driver and operator th
 
     **Operators** > **Installed Operators** > **Operator Details**.
 
-4. If applicable, click on the **more** menu for the **host-definer** driver and select **Delete HostDefiner**.
-
-    Wait for the host definer pod to terminate.
-
-    This deletes the host definer. 
-
-5. Click on the **more** menu for the **ibm-block-csi** driver and select **Delete IBMBlockCSI**.
+4. Click on the **more** menu for the **ibm-block-csi** driver and select **Delete IBMBlockCSI**.
 
     Wait for the controller and node pods to terminate.
 
     This deletes the CSI driver. Continue to the next step to delete the Operator for IBM block storage CSI driver.
+
+5. If applicable, click on the **more** menu for the **host-definer** driver and select **Delete HostDefiner**.
+
+    Wait for the host definer pod to terminate.
+
+    This deletes the host definer.
 
 6. From the **Installed Operators** page, click on the **more** menu for the **IBM block storage CSI driver operator** and select **Uninstall Operator**.
 
