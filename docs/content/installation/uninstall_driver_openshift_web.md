@@ -18,7 +18,7 @@ Perform the following steps in order to uninstall the CSI driver and operator th
 
     Wait for the controller and node pods to terminate.
 
-    This deletes the CSI driver. Continue to the next step to delete the Operator for IBM block storage CSI driver.
+    This deletes the CSI driver.
 
 5. If applicable, click on the **more** menu for the **host-definer** driver and select **Delete HostDefiner**.
 
