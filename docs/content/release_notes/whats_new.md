@@ -4,9 +4,9 @@ IBM® block storage CSI driver 1.10.0 introduces the enhancements that are detai
 
 **General availability date:** 26 July 2022
 
-## Alpha support for the new snapshot function that was introduced in IBM Spectrum Virtualize 8.5.1 release
+## Alpha support for the new Snapshot function that was introduced in IBM Spectrum Virtualize 8.5.1 release
 
-This version adds Alpha support for the new snapshot function that was introduced in IBM Spectrum Virtualize 8.5.1 release. The main use case of snapshot is corruption protection. It protects the user data from deliberate or accidental data corruption from the host's systems. For more information about the snapshot function, see **Product overview** > **Technical overview** > **Volume groups** > **Snapshot function** within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
+This version adds Alpha support for the new Snapshot function that was introduced in IBM Spectrum Virtualize 8.5.1 release. The main use case of snapshot is corruption protection. It protects the user data from deliberate or accidental data corruption from the host's systems. For more information about the Snapshot function, see **Product overview** > **Technical overview** > **Volume groups** > **Snapshot function** within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
 
 **Note:** The IBM® FlashCopy and Snapshot function are both referred to as the more generic volume snapshots and cloning within this documentation set. Not all supported products use the FlashCopy and Snapshot function terminology. Spectrum Virtualize storage systems introduced the new Snapshot function as of Spectrum Virtualize 8.5.1 release. Notes clarifying which function is being referred to within this document are made, as necessary.
 

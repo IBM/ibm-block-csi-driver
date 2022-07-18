@@ -16,9 +16,8 @@ When configuring the file, be sure to use the same array secret and array secret
     
 - To create a stretched snapshot on SAN Volume Controller storage systems, put a colon (:) between the two pools within the `pool` value. For example:
   
-  ```
-  pool: demo-pool1:demo-pool2 
-  ```
+  `pool: demo-pool1:demo-pool2`
+  
    **Important:** The two pools must be from different sites.
 
    For more information about stretched snapshot limitations and requirements, see [Limitations](../release_notes/limitations.md) and [Compatibility and requirements](../installation/install_compatibility_requirements.md).

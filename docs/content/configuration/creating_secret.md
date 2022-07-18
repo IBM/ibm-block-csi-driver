@@ -31,10 +31,11 @@ Use one of the following procedures to create and apply the secret:
        
 2. Apply the secret using the following command:
 
-    `kubectl apply -f <filename>.yaml`
+    
+        kubectl apply -f <filename>.yaml
     
 
-     The `secret/<secret-name> created` message is emitted.
+    The `secret/<secret-name> created` message is emitted.
 
 
 ## Creating an array secret via command line

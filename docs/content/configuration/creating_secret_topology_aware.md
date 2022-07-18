@@ -6,7 +6,7 @@ Create an array secret YAML file to define the storage credentials (username and
 
 Within the Secret, each user-defined management ID (here, represented by `demo-management-id-x`), is used to identify the storage system within other configuration files.
 
-**Note:** The management ID must start and end with a character or number. In addition, the following symbols may be used within the management ID: -, _, and ..
+**Note:** The management ID must start and end with a character or number. In addition, the following symbols may be used within the management ID:<br>_ . -
 
 1. Create the secret file, similar to the following `demo-secret-config.json`:
 
@@ -39,8 +39,10 @@ Within the Secret, each user-defined management ID (here, represented by `demo-m
        
 2. Apply the secret using the following command:
 
-    `kubectl create secret generic <secret-name> -n <secret-namespace> --from-file=config=demo-secret-config.json`
+    ```
+    kubectl create secret generic <secret-name> -n <secret-namespace> --from-file=config=demo-secret-config.json
+    ```
     
 
-     The `secret/<secret-name> created` message is emitted.
+    The `secret/<secret-name> created` message is emitted.
  

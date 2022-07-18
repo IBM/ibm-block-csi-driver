@@ -26,9 +26,8 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in the 
 - Be sure that the `pool` value is the name of an existing pool on the storage system.
 - To create a volume with high availability (HA) (HyperSwap or stretched topology) on IBM Spectrum Virtualize storage systems, put a colon (:) between the two pools within the `pool` value. For example:
   
-  ```
-  pool: demo-pool1:demo-pool2 
-  ```
+  `pool: demo-pool1:demo-pool2`
+  
    **Important:** The two pools must be from different sites.
    
   For more information about high availability limitations, see [Limitations](../release_notes/limitations.md).

@@ -3,7 +3,7 @@
 Use this information to upgrade the IBM® block storage CSI driver and host definer.
 
 **Important:** To enable the optional host definer feature when upgrading from IBM® block storage CSI driver 1.9.0 or earlier, the host definer must be manually installed. If the host definer was installed with GitHub, the host definer must be updated manually. If the host definer was installed from the OpenShift web console or OperatorHub.io, the host definer automatically updates along with the driver version. 
-  - For manual installation of the host definer with GitHub and OperatorHub.io, see [Installing the host definer](install_hostdefiner.md)
+  - For manual installation of the host definer with GitHub and OperatorHub.io, see [Installing the host definer](install_hostdefiner.md).
   - For manual upgrade with the OpenShift webconsole, see [Manual upgrade with OpenShift](upgrade_manual_openshift.md).
 
 The OpenShift web console and OperatorHub.io both automatically upgrade the CSI (Container Storage Interface) driver when a new version is released.

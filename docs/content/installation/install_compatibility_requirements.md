@@ -47,7 +47,9 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 
    Apply the YAML file.
 
-   `oc apply -f 99-ibm-attach.yaml`
+   ```
+   oc apply -f 99-ibm-attach.yaml
+    ```
 
 2. Configure your storage system host attachment, per worker node.
 
@@ -101,7 +103,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 
       For more information, see [Configuring for CSI Topology](../configuration/configuring_topology.md).
 
-7. (Optional) If planning on using an HA feature (either HyperSwap or stretched topology) on your storage system, see the appropriate sections within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/):
+7. (Optional) If planning on using a high availability (HA) feature (either HyperSwap or stretched topology) on your storage system, see the appropriate sections within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/):
     - HyperSwap topology planning and configuration
         - **Planning** > **Planning for high availability** > **Planning for a HyperSwap topology system**
         - **Configuring** > **Configuration details** > **HyperSwap system configuration details**
