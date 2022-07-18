@@ -43,6 +43,5 @@ Within the Secret, each user-defined management ID (here, represented by `demo-m
     kubectl create secret generic <secret-name> -n <secret-namespace> --from-file=config=demo-secret-config.json
     ```
     
-
-    The `secret/<secret-name> created` message is emitted.
+   The `secret/<secret-name> created` message is emitted.
  
