@@ -232,7 +232,7 @@ def validate_create_volume_source(request):
         elif source.HasField(config.VOLUME_TYPE_NAME):
             _validate_source_info(source, config.VOLUME_TYPE_NAME)
         else:
-            raise ValidationException(messages.UNSUPPORTED_VOLUME_SOURCE_TYPE_MESSAGE)
+            raise ValidationException(messages.UNSUPPORTED_VOLUME_SOURCE_TYPE_MESSAGE.format(source))
 
 
 def _validate_source_info(source, source_type):
