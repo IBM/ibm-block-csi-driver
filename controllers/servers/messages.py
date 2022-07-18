@@ -18,6 +18,7 @@ CAPABILITIES_NOT_SET_MESSAGE = "capabilities were not set"
 UNSUPPORTED_FS_TYPE_MESSAGE = "unsupported fs_type : {}"
 UNSUPPORTED_MOUNT_FLAGS_MESSAGE = "mount_flags is unsupported"
 UNSUPPORTED_VOLUME_ACCESS_TYPE_MESSAGE = "unsupported volume access type"
+UNSUPPORTED_VOLUME_SOURCE_TYPE_MESSAGE = "unsupported volume source type"
 UNSUPPORTED_ACCESS_MODE_MESSAGE = "unsupported access mode : {}"
 NAME_SHOULD_NOT_BE_EMPTY_MESSAGE = 'name should not be empty'
 VOLUME_ID_SHOULD_NOT_BE_EMPTY_MESSAGE = 'volume id should not be empty'
