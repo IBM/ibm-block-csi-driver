@@ -14,12 +14,12 @@ pipeline {
         label  "${env.AGENT_LABEL}"
     }
     stages {
-        stage ('CSI-controller: static code analysis') {
+        stage ('controllers: static code analysis') {
             steps {
                 sh './scripts/run_static_code_analysis.sh'
             }
         }
-        stage ('CSI-controller: Unit testing + coverage') {
+        stage ('controllers: Unit testing + coverage') {
             steps {
                 sh 'mkdir -p build/reports && chmod 777 build/reports'
                 sh './scripts/run_unitests.sh `pwd`/build/reports'
@@ -36,7 +36,7 @@ pipeline {
                 sh './scripts/run_yamlcheck.sh'
             }
         }
-        stage ('CSI-controller & node: Build and push images') {
+        stage ('CSI-controller & node & hostDefiner: Build and push images') {
             steps {
                 script {
                     registryUrl = "${DOCKER_REGISTRY}"
