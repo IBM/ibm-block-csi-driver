@@ -20,7 +20,7 @@ When using host definition and `dynamicNodeLabeling` is set to `true`, if these 
 
     1. Verify that all host definition instances of the node are deleted.
      
-            kubectl get hostdefinition | grep <node-name> | wc -l
+            kubectl get hostdefinition | grep <node-name>
      
         The output should be `0`.
 
