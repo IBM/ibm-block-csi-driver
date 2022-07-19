@@ -45,13 +45,13 @@ I/O group configuration is only supported for use with IBM Spectrum Virtualize f
 **Important:** Snapshot function support is only Alpha support.
 
 - Snapshot function is only supported for use with IBM Spectrum Virtualize family storage system versions 8.5.1 or higher. For more information, see **Product overview** > **Technical overview** > **Volume groups** > **Snapshot function** within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
+- In very rare cases, due to a race condition, a different snapshot than intended may be mistakenly deleted during a snapshot deletion. This occurs as no snapshot unique ID (UID) is present on the storage side.
 - Both source and target PVCs (in a source PVC to snapshot to target PVC scenario) must have the same space efficiency set within their storage classes. If the space efficiency is set differently, the target PVC creation fails.
 - A PVC target must have the same volume size as the source volume.
 - A snapshot that uses the Snapshot function cannot be created with space efficiency set. If the VolumeSnapshotClass has the `SpaceEfficiency` parameter set along with the snapshot flag (`virt_snap_func`) enabled, the snapshot creation fails.
 - In very rare cases, there can be leftover or undeleted volumes. As a result of the Kubernetes/Openshift and CSI being stateless, in cases where the driver is not able to save a specific state, the CSI driver might administer the wrong process.
 
     For example, this can happen in a case where a volume is created from a snapshot but during the volume creation process a driver issue occurs. In such a case, the driver is not able to find the newly created volume and creates a new one. This results in both the initial volume that was created, but not found or linked by the snapshot, and the newly created volume.
-
 - A snapshot that uses the Snapshot function must be created within the same pool or child pool as the original PVC.
 - Any object that is linked in any way (for example, a clone or a snapshot) must have the same definition of snapshot support. For example, a clone cannot be created with `virt_snap_func` disabled (indicating FlashCopy mapping is enabled) from a PVC with an existing Snapshot function connection.
 
