@@ -1,3 +1,4 @@
 SpaceEfficiency: thin
 pool: POOL_NAME
+virt_snap_func: "true"
 #volume_name_prefix:
