@@ -18,7 +18,7 @@ When using host definition and `dynamicNodeLabeling` is set to `true`, if these 
      
             kubectl get hostdefinition | grep <node-name>
      
-        The output should be `0`.
+        The output displays all host definitions that do not need to be deleted. If all get deleted, the output displays `No resources found`.
 
      2. Delete the custom resource.
     
