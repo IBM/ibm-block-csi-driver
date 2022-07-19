@@ -16,6 +16,7 @@ TESTS=`cat ${TESTS_TO_SKIP_FILE}| sed -Ez '$ s/\n+$//' | tr '\n' "|"`
 --csi.controllerendpoint ${ENDPOINT_CONTROLLER} \
 --csi.secrets ${SECRET_FILE} \
 --csi.testvolumeparameters ${PARAM_FILE} \
+--csi.testsnapshotparameters ${SNAPSHOT_PARAM_FILE} \
 --csi.junitfile ${JUNIT_OUTPUT} \
 --ginkgo.v \
 --ginkgo.debug \
