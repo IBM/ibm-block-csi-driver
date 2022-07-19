@@ -2,39 +2,15 @@
 
 When using the Red Hat® OpenShift® Container Platform, the CSI (Container Storage Interface) driver can be manually updated through the OpenShift web console.
 
-1.  From Red Hat OpenShift Container Platform **Operators** > **Installed Operators** see the status of the **ibm-block-csi-operator**.
+1.  From Red Hat OpenShift Container Platform web console, see the status of the **ibm-block-csi-operator**.
 
-    If the **Status** is _UpgradePending_, click on the operator.
+2. Check if any subscription upgrade approvals are pending.
 
-2.  From the **Subscription Overview** view, click on **1 requires approval**.
+3. Install the IBM block storage CSI driver operator and driver.
 
-    The **Review Manual Install Plan** notice appears.
+4. Verify that both the **Controller Image Tab** and **Node Image Tag** are showing the most up-to-date version of the driver and the **Status** is _Running_.
 
-3.  Click on **Preview Install Plan**.
-
-4.  Review the manual install plan and click **Approve**.
-
-5.  From the **Subscription** tab, check the upgrade status and the installed version.
-
-6.  From **Operators** > **Installed Operators** > **IBM block storage CSI driver operator**, click **Create Instance**.
-
-7.  Check the **Subscriptions** > **Subscription Overview** tab see the Operator status.
-
-    Wait for the **Upgrade Status** to be **Upgrading** and **1 requires approval** appears.
-
-8.  Click **1 requires approval**.
-
-    The **Review Manual Install Plan** notice appears.
-
-9.  Click on **Preview Install Plan**.
-
-10. Review the manual install plan and click **Approve**.
-
-11. From the **Subscription** tab, check the upgrade status and the installed version.
-
-12. Check the **Overview** tab and that the **Controller Image Tab** and **Node Image Tag** are showing the most up-to-date version of the driver and the **Status** is _Running_.
-
-13. (Optional for initial host definer installation) If desired, create the host definer by clicking **Create Instance** to create the host definer (`HostDefiner`).
+13. (Optional for initial host definer installation) If desired, create the host definer (`HostDefiner`).
 
     A YAML file opens in the web console. This file can be left as-is, or edited as needed. For more information, see [Configuring the host definer](../configuration/configuring_hostdefiner.md).
 

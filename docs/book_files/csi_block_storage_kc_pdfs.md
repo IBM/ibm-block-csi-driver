@@ -29,6 +29,7 @@ IBM resources
 -   [IBM Storage for Red Hat® OpenShift Blueprint](http://www.redbooks.ibm.com/abstracts/redp5565.html?Open)
 
 External resources
+-   [Red Hat OpenShift Documentation](https://docs.openshift.com/)   
 -   [Persistent volumes on Kubernetes](https://kubernetes.io/docs/concepts/storage/volumes/)
 -   [Kubernetes Documentation](https://kubernetes.io/docs/home/)
 -   [Kubernetes Blog](https://kubernetes.io/blog/)

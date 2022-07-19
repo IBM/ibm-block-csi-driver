@@ -6,13 +6,7 @@ Perform the following steps in order to uninstall the CSI driver and operator th
 
 **Note:** When using host definition and `dynamicNodeLabeling` is set to `true`, if these steps are not completed in the correct order, `hostdefiner.block.csi.ibm.com/manage-node=true` labels can be left on the nodes.
 
-1.  From the web console go to **Operators** > **Installed Operators**. Select the Project namespace, where installed, from `Projects: <namespace>`.
-
-2.  Select **IBM block storage CSI driver operator**.
-
-3.  Select **IBM block storage CSI driver**.
-
-    **Operators** > **Installed Operators** > **Operator Details**.
+1.  From the web console, select **IBM block storage CSI driver** within the **IBM block storage CSI driver operator**.
 
 4. Click on the **more** menu for the **ibm-block-csi** driver and select **Delete IBMBlockCSI**.
 
