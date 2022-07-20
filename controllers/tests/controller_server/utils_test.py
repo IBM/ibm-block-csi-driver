@@ -169,9 +169,9 @@ class TestUtils(unittest.TestCase):
 
     def test_validate_create_volume_source_empty(self):
         request = Mock()
-        source = ProtoBufMock(spec=[])
+        source = None
         request.volume_content_source = source
-        self._test_validate_create_volume_request_validation_exception(request, "source type")
+        utils.validate_create_volume_source(request)
 
     def test_validate_create_volume_source_snapshot(self):
         request = Mock()
