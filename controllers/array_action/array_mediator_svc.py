@@ -630,8 +630,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             space_efficiency_aliases = _get_cli_volume_space_efficiency_aliases(source_cli_volume)
             space_efficiency = space_efficiency_aliases.pop()
         size_in_bytes = int(source_cli_volume.capacity)
-        if not pool:
-            pool = self._get_volume_pools(source_cli_volume)[0]
         io_group = source_cli_volume.IO_group_name
         self._create_cli_volume(target_volume_name, size_in_bytes, space_efficiency, pool, io_group)
 
@@ -802,6 +800,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         source_volume_name = self._get_volume_name_by_wwn(volume_id)
         source_cli_volume = self._get_cli_volume_in_pool_site(source_volume_name, pool)
+        if not pool:
+            pool = self._get_volume_pools(source_cli_volume)[0]
         if is_virt_snap_func:
             if self._is_vdisk_support_addsnapshot(volume_id):
                 target_cli_snapshot = self._add_snapshot(snapshot_name, source_cli_volume.id, pool)

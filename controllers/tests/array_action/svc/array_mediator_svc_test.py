@@ -767,18 +767,27 @@ class TestArrayMediatorSVC(unittest.TestCase):
             response=(b'Snapshot, id [0], successfully created or triggered\n', b''))
         self._prepare_mocks_for_lsvolumesnapshot(snapshot_id)
 
-    def test_create_snapshot_addsnapshot_success(self):
+    def _test_create_snapshot_addsnapshot_success(self, pool='pool1'):
         self._prepare_mocks_for_create_snapshot_addsnapshot()
-        snapshot = self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="pool1",
+        snapshot = self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool=pool,
                                             is_virt_snap_func=True)
-
+        if not pool:
+            pool = 'pool1'
         self.assertEqual(1024, snapshot.capacity_bytes)
-        self.svc.client.svctask.addsnapshot.assert_called_once_with(name='test_snapshot', volumes='test_id',
-                                                                    pool='pool1')
+        self.svc.client.svctask.addsnapshot.assert_called_once_with(name='test_snapshot', volumes='test_id', pool=pool)
         self.svc.client.svcinfo.lsvolumesnapshot.assert_called_once_with(object_id=0)
         self.assertEqual('SVC', snapshot.array_type)
         self.assertEqual('', snapshot.id)
         self.assertEqual('snapshot_id', snapshot.internal_id)
+
+    def test_create_snapshot_addsnapshot_success(self):
+        self._test_create_snapshot_addsnapshot_success()
+
+    def test_create_snapshot_addsnapshot_no_pool_success(self):
+        self._test_create_snapshot_addsnapshot_success(pool='')
+
+    def test_create_snapshot_addsnapshot_different_pool_success(self):
+        self._test_create_snapshot_addsnapshot_success(pool='different_pool')
 
     def test_create_snapshot_addsnapshot_not_supported_error(self):
         with self.assertRaises(array_errors.VirtSnapshotFunctionNotSupportedMessage):
