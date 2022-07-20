@@ -14,9 +14,9 @@ When using host definition and `dynamicNodeLabeling` is set to `true`, if these 
 
 2. If applicable, delete the HostDefiner custom resource.
 
-    1. Verify that all host definition instances of the node are deleted.
+    1. Verify that all host definition instances, per configuration allowances, are deleted.
      
-            kubectl get hostdefinition | grep <node-name>
+            kubectl get hostdefinition
      
         The output displays all host definitions that do not need to be deleted. If all get deleted, the output displays `No resources found`.
 

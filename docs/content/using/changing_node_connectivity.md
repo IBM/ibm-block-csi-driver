@@ -9,9 +9,9 @@ Use the following procedure to redefine host connectivity:
 1. Undeploy the CSI node pod from the relevant node that the host definition is a part of.
 2. Verify that all host definition instances of the node are deleted.
      
-          kubectl get hostdefinition | grep <node-name> | wc -l
+          kubectl get hostdefinition | grep <node-name>
      
-     The output should be `0`.
+     The output displays all host definitions that do not need to be deleted. If all get deleted, the output displays `No resources found`.
 3. From the node, perform the connectivity changes.
 4. Redeploy the CSI node pod on the relevant node.
 

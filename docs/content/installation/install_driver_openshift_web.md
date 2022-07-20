@@ -32,14 +32,14 @@ The Red Hat OpenShift Container Platform uses the following `SecurityContextCons
 
 9. After the operator installation progress is complete, click the installed IBM block storage CSI driver operator.
 
-10. Create the IBM block storage CSI driver (`IBMBlockCSI`).
+10. (Optional) Create the host definer (`HostDefiner`).
+
+    A YAML file opens in the web console. This file can be left as-is, or edited as needed. For more information, see [Configuring the host definer](../configuration/configuring_hostdefiner.md).
+
+11. Create the IBM block storage CSI driver (`IBMBlockCSI`).
 
     A YAML file opens in the web console. This file can be left as-is, or edited as needed.
 
-11. Update the YAML file to include your user-defined namespace.
-
-12. (Optional) Create the host definer (`HostDefiner`).
-
-    A YAML file opens in the web console. This file can be left as-is, or edited as needed. For more information, see [Configuring the host definer](../configuration/configuring_hostdefiner.md).
+12. Update the YAML file to include your user-defined namespace.
 
 13. After everything is created, wait until the **Status** is _Running_.
