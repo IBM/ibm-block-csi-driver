@@ -167,14 +167,11 @@ class TestUtils(unittest.TestCase):
         cap.access_mode.mode = access_mode.SINGLE_NODE_READER_ONLY
         self._test_validate_csi_volume_capabilities_validation_exception([cap])
 
-    def _test_validate_create_volume_source_empty_validation_exception(self, request):
-        self._test_validation_exception(utils.validate_create_volume_source, request)
-
     def test_validate_create_volume_source_empty(self):
         request = Mock()
         source = ProtoBufMock(spec=[])
         request.volume_content_source = source
-        self._test_validate_create_volume_source_empty_validation_exception(request)
+        self._test_validate_create_volume_request_validation_exception(request, "source type")
 
     def test_validate_create_volume_source_snapshot(self):
         request = Mock()
