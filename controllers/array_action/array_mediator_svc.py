@@ -598,7 +598,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 cli_snapshot = self._get_cli_snapshot_by_name(snapshot_name)
                 if not cli_snapshot:
                     return None
-                source_cli_volume = self._get_cli_volume_by_wwn(volume_id)
+                source_cli_volume = self._get_cli_volume(cli_snapshot.volume_name)
                 return self._generate_snapshot_response_from_cli_snapshot(cli_snapshot, source_cli_volume)
             raise array_errors.VirtSnapshotFunctionNotSupportedMessage(volume_id)
         target_cli_volume = self._get_cli_volume_if_exists(snapshot_name)

@@ -527,7 +527,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         snapshot = self.svc.get_snapshot("volume_id", "snapshot_name", pool="pool1", is_virt_snap_func=True)
         self.assertEqual("snapshot_name", snapshot.name)
         self.svc.client.svcinfo.lsvolumesnapshot.assert_called_once_with(filtervalue='snapshot_name=snapshot_name')
-        self.svc.client.svcinfo.lsvdisk.assert_called_once_with(bytes=True, filtervalue='vdisk_UID=volume_id')
+        self.svc.client.svcinfo.lsvdisk.assert_called_once_with(bytes=True, object_id='volume_name')
 
     def test_get_snapshot_lsvolumesnapshot_not_supported_error(self):
         with self.assertRaises(array_errors.VirtSnapshotFunctionNotSupportedMessage):
