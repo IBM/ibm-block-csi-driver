@@ -881,9 +881,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                          "is: {0}".format(ex))
             raise ex
 
+    def _is_lsnvmefabric_supported(self):
+        return hasattr(self.client.svcinfo, "lsnvmefabric")
+
     def _get_host_names_by_nqn(self, nqn):
-        nvme_fabrics = self._lsnvmefabric(nqn)
-        return set(nvme_fabric.object_name for nvme_fabric in nvme_fabrics)
+        if self._is_lsnvmefabric_supported():
+            nvme_fabrics = self._lsnvmefabric(nqn)
+            return set(nvme_fabric.object_name for nvme_fabric in nvme_fabrics)
+        return None
 
     def _lshostiplogin(self, iqn):
         try:
@@ -895,10 +900,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                          "is: {0}".format(ex))
             raise ex
 
+    def _is_lshostiplogin_supported(self):
+        return hasattr(self.client.svcinfo, "lshostiplogin")
+
     def _get_host_name_by_iqn(self, iqn):
-        iscsi_login = self._lshostiplogin(iqn)
-        if iscsi_login:
-            return iscsi_login.host_name
+        if self._is_lshostiplogin_supported():
+            iscsi_login = self._lshostiplogin(iqn)
+            if iscsi_login:
+                return iscsi_login.host_name
         return None
 
     def _get_host_names_and_connectivity_types(self, initiators):
