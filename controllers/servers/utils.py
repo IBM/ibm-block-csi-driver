@@ -225,8 +225,10 @@ def validate_csi_volume_capabilities(capabilities):
 
 def validate_create_volume_source(request):
     source = request.volume_content_source
+    logger.info(f"request type : {type(request)},source type : {type(source)}")
     if source:
-        logger.info(request)
+        hexs = ":".join("{:02x}".format(ord(c)) for c in source)
+        logger.info(f"source :'{hexs}'")
         if source.HasField(config.SNAPSHOT_TYPE_NAME):
             _validate_source_info(source, config.SNAPSHOT_TYPE_NAME)
         elif source.HasField(config.VOLUME_TYPE_NAME):
