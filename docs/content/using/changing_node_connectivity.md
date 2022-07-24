@@ -11,7 +11,7 @@ Use the following procedure to redefine host connectivity:
      
           kubectl get hostdefinitions -o=jsonpath='{range .items[?(@.spec.hostDefinition.nodeName=="<node-name>")]}{.metadata.name}{"\n"}{end}'
      
-     The output displays all HostDefinitions that do not need to be deleted for the `<node-name>` specified and all host definitions for other nodes in the cluster.
+     The output displays all HostDefinitions that do not need to be deleted for the `<node-name>`.
 
 3. From the node, perform the connectivity changes.
 4. Redeploy the CSI node pod on the relevant node.
