@@ -19,12 +19,13 @@ The host definer identifies the nodes available for host definition on each stor
 
 If any of the host definitions have an Error status, follow this procedure to have the host definer reattempt to define the hosts.
 
-1. Undeploy the CSI node pod from the relevant node that the `HostDefinition` is a part of.
-2. Verify that all `HostDefinition` instances of the node are deleted.
+1. Undeploy the CSI node pod from the relevant node that the HostDefinition is a part of.
+2. Verify that all HostDefinition instances of the node are deleted.
      
-          kubectl get hostdefinition | grep <node-name>
+          kubectl get hostdefinitions -o=jsonpath='{range .items[?(@.spec.hostDefinition.nodeName=="<node-name>")]}{.metadata.name}{"\n"}{end}'
      
-     The output displays all host definitions that do not need to be deleted. If all get deleted, the output displays `No resources found`.
+     The output displays all HostDefinitions that do not need to be deleted for the `<node-name>`.
+
 3. Redeploy the CSI node pod on the relevant node.
 
      The host definer handles the creation of the new host definition on the storage side.

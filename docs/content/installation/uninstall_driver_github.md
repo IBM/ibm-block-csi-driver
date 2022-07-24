@@ -14,11 +14,11 @@ Perform the following steps to uninstall the CSI driver and operator.
 
 2. If applicable, delete the HostDefiner custom resource.
 
-    1. Verify that all host definition instances, per configuration allowances, are deleted.
-     
+    1. Verify that all HostDefinition instances, per configuration allowances, are deleted.
+         
             kubectl get hostdefinition
      
-        The output displays all host definitions that do not need to be deleted. If all get deleted, the output displays `No resources found`.
+        The output displays all HostDefinition instances that do not need to be deleted. If all get deleted, the output displays `No resources found`.
 
      2. Delete the custom resource.
     
