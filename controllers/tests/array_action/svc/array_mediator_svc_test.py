@@ -767,18 +767,27 @@ class TestArrayMediatorSVC(unittest.TestCase):
             response=(b'Snapshot, id [0], successfully created or triggered\n', b''))
         self._prepare_mocks_for_lsvolumesnapshot(snapshot_id)
 
-    def test_create_snapshot_addsnapshot_success(self):
+    def _test_create_snapshot_addsnapshot_success(self, pool='pool1'):
         self._prepare_mocks_for_create_snapshot_addsnapshot()
-        snapshot = self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool="pool1",
+        snapshot = self.svc.create_snapshot("source_volume_id", "test_snapshot", space_efficiency=None, pool=pool,
                                             is_virt_snap_func=True)
-
+        if not pool:
+            pool = 'pool1'
         self.assertEqual(1024, snapshot.capacity_bytes)
-        self.svc.client.svctask.addsnapshot.assert_called_once_with(name='test_snapshot', volumes='test_id',
-                                                                    pool='pool1')
+        self.svc.client.svctask.addsnapshot.assert_called_once_with(name='test_snapshot', volumes='test_id', pool=pool)
         self.svc.client.svcinfo.lsvolumesnapshot.assert_called_once_with(object_id=0)
         self.assertEqual('SVC', snapshot.array_type)
         self.assertEqual('', snapshot.id)
         self.assertEqual('snapshot_id', snapshot.internal_id)
+
+    def test_create_snapshot_addsnapshot_success(self):
+        self._test_create_snapshot_addsnapshot_success()
+
+    def test_create_snapshot_addsnapshot_no_pool_success(self):
+        self._test_create_snapshot_addsnapshot_success(pool='')
+
+    def test_create_snapshot_addsnapshot_different_pool_success(self):
+        self._test_create_snapshot_addsnapshot_success(pool='different_pool')
 
     def test_create_snapshot_addsnapshot_not_supported_error(self):
         with self.assertRaises(array_errors.VirtSnapshotFunctionNotSupportedMessage):
@@ -1012,6 +1021,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
         svc_response.return_value = hosts
 
+    def _prepare_mocks_for_get_host_by_identifiers_backward_compatible(self, svc_response):
+        self._prepare_mocks_for_get_host_by_identifiers_slow(svc_response)
+        del self.svc.client.svcinfo.lshostiplogin
+        del self.svc.client.svcinfo.lsnvmefabric
+
     def test_get_host_by_name_success(self):
         self.svc.client.svcinfo.lshost.return_value = Mock(
             as_single_element=self._get_host_as_munch('host_id_1', 'test_host_1', nqn_list=['nqn.test.1'],
@@ -1175,6 +1189,16 @@ class TestArrayMediatorSVC(unittest.TestCase):
         svc_response.return_value = hosts
         with self.assertRaises(array_errors.HostNotFoundError):
             self.svc.get_host_by_host_identifiers(Initiators(['Test_nqn'], ['a', 'b'], ['123']))
+
+    @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
+    def test_get_host_by_identifiers_slow_backward_compatible_return_nvme_fc_and_iscsi(self, svc_response):
+        self._prepare_mocks_for_get_host_by_identifiers_backward_compatible(svc_response)
+        hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
+                    Initiators(['nqn.test.2'], ['WWN2'], ['iqn.test.2']))
+        self.assertEqual('test_host_2', hostname)
+        self.assertEqual(
+            {config.NVME_OVER_FC_CONNECTIVITY_TYPE, config.FC_CONNECTIVITY_TYPE, config.ISCSI_CONNECTIVITY_TYPE},
+            set(connectivity_types))
 
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_slow_return_nvme_fc_and_iscsi(self, svc_response):
