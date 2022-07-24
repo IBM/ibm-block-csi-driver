@@ -226,7 +226,7 @@ def validate_csi_volume_capabilities(capabilities):
 def validate_create_volume_source(request):
     source = request.volume_content_source
     if source:
-        logger.info(source)
+        logger.info(request)
         if source.HasField(config.SNAPSHOT_TYPE_NAME):
             _validate_source_info(source, config.SNAPSHOT_TYPE_NAME)
         elif source.HasField(config.VOLUME_TYPE_NAME):
