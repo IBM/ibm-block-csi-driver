@@ -41,7 +41,7 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in the 
 - The `csi.storage.k8s.io/fstype` parameter is optional. The values that are allowed are _ext4_ or _xfs_. The default value is _ext4_.
 - The `volume_name_prefix` parameter is optional.
 - The `io_group` and `volume_group` parameters are only available on Spectrum Virtualize storage systems.
-- The `virt_snap_func` parameter is optional but necessary in Spectrum Virtualize storage systems if using the Snapshot function. To enable the Snapshot function, set the value to _true_. the default value is _false_.
+- The `virt_snap_func` parameter is optional but necessary in Spectrum Virtualize storage systems if using the Snapshot function. To enable the Snapshot function, set the value to _"true"_. The default value is _"false"_. If the value is `"false"` the snapshot will use the FlashCopy function.
 
     **Note:**
     For IBM DS8000 family, the maximum prefix length is five characters. The maximum prefix length for other systems is 20 characters. <br /><br />For storage systems that use Spectrum Virtualize, the `CSI` prefix is added as default if not specified by the user.
@@ -58,7 +58,7 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in the 
         volume_group: demo-volumegroup   # Optional.
         SpaceEfficiency: thin            # Optional.
         volume_name_prefix: demo-prefix  # Optional.
-        virt_snap_func: "false"          # Optional. Values true/false. The default is false.
+        virt_snap_func: "false"          # Optional. Values "true"/"false". The default is "false".
 
         csi.storage.k8s.io/fstype: xfs   # Optional. Values ext4/xfs. The default is ext4.
         csi.storage.k8s.io/secret-name: demo-secret

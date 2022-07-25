@@ -12,7 +12,7 @@ When configuring the file, be sure to use the same array secret and array secret
 
     **Note:** For IBM DS8000® family, the maximum prefix length is five characters.<br/>The maximum prefix length for other systems is 20 characters.<br/>For storage systems that use Spectrum Virtualize, the `CSI` prefix is added as default if not specified by the user.
 
-- The `virt_snap_func` parameter is optional but necessary in Spectrum Virtualize storage systems if using the Snapshot function. To enable the Snapshot function, set the value to _true_. The default value is _false_. If the value is `false` the snapshot will use the FlashCopy function.
+- The `virt_snap_func` parameter is optional but necessary in Spectrum Virtualize storage systems if using the Snapshot function. To enable the Snapshot function, set the value to _"true"_. The default value is _"false"_. If the value is `"false"` the snapshot will use the FlashCopy function.
     
 - To create a stretched snapshot on SAN Volume Controller storage systems, put a colon (:) between the two pools within the `pool` value. For example:
   
@@ -35,7 +35,7 @@ parameters:
   pool: demo-pool                    # Optional. Use to create the snapshot on a different pool than the source.
   SpaceEfficiency: thin              # Optional. Use to create the snapshot with a different space efficiency than the source.
   snapshot_name_prefix: demo-prefix  # Optional.
-  virt_snap_func: "false"            # Optional. Values true/false. The default is false.
+  virt_snap_func: "false"            # Optional. Values "true"/"false". The default is "false".
 
   csi.storage.k8s.io/snapshotter-secret-name: demo-secret
   csi.storage.k8s.io/snapshotter-secret-namespace: default
