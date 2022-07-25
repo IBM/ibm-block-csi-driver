@@ -17,3 +17,4 @@ Use the following procedure to redefine host connectivity:
 4. Redeploy the CSI node pod on the relevant node.
 
      The host definer handles the creation of the new host definition on the storage side.
+
