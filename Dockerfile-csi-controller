@@ -16,20 +16,21 @@ FROM registry.access.redhat.com/ubi8/python-38:1-75.1638364053 as builder
 USER root
 RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
 USER default
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN pip3 install --ignore-installed --default-timeout=100 --upgrade pip==21.2.4
 WORKDIR /tmp
-COPY controller/requirements.txt .
+COPY controllers/servers/csi/requirements.txt .
 # avoid default boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
 RUN pip3 install -r ./requirements.txt
 
 USER root
-COPY controller/scripts/csi_general .
+COPY controllers/scripts/csi_general .
 RUN ./csi_pb2.sh
 RUN pip3 install .
 
 
-FROM registry.access.redhat.com/ubi8/python-38:1-96
+FROM registry.access.redhat.com/ubi8/python-38:1-100
 MAINTAINER IBM Storage
 
 ARG VERSION=1.10.0
@@ -48,7 +49,7 @@ LABEL name="IBM block storage CSI driver controller" \
 
 COPY --from=builder /opt/app-root /opt/app-root
 COPY ./common /driver/common
-COPY ./controller /driver/controller
+COPY ./controllers/ /driver/controllers/
 COPY ./LICENSE /licenses/
 COPY ./NOTICES /licenses/
 
@@ -57,4 +58,4 @@ ENV PYTHONPATH=/driver
 
 # Note: UBI runs with app-user by default.
 
-ENTRYPOINT ["/driver/controller/scripts/entrypoint.sh"]
+ENTRYPOINT ["/driver/controllers/scripts/entrypoint.sh"]

@@ -16,7 +16,7 @@ The various `by_management_id` parameters are chosen within the following hierar
 2. Outside of the parameter, as a cross-system default (if not specified within the `by_management_id` parameter for the relevant `management-id`).
     
 ```
-apiVersion: snapshot.storage.k8s.io/v1beta1
+apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshotClass
 metadata:
   name: demo-volumesnapshotclass-config-secret

@@ -25,7 +25,7 @@ When configuring the file, be sure to use the same array secret and array secret
 -   The `pool` parameter is not available on IBM FlashSystem A9000 and A9000R storage systems. For these storage systems, the snapshot must be created on the same pool as the source.
 
 ```
-apiVersion: snapshot.storage.k8s.io/v1beta1
+apiVersion: snapshot.storage.k8s.io/v1
 kind: VolumeSnapshotClass
 metadata:
   name: demo-volumesnapshotclass
