@@ -23,7 +23,7 @@ When replicating a volume, be sure to follow all of the replication configuratio
     spec:
       volumeReplicationClass: demo-volumereplicationclass
       replicationState: primary
-      replicationHandle: demo-replicationhandle
+      replicationHandle: demo-volumehandle
       dataSource:
         kind: PersistentVolumeClaim
         name: demo-pvc-file-system  # Ensure that this is in the same namespace as VolumeReplication.

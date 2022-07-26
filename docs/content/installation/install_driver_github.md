@@ -4,7 +4,10 @@ The operator for IBM® block storage CSI driver can be installed directly with G
 
 Use the following steps to install the operator and driver, with [GitHub](https://github.com/IBM/ibm-block-csi-operator).
 
-**Note:** Before you begin, it is best practice to create a user-defined namespace. Create the project namespace, using the `kubectl create ns <namespace>` command.
+**Note:**
+    
+-  Before you begin, it is best practice to create a user-defined namespace. Create the project namespace, using the `kubectl create ns <namespace>` command.
+- When host definer is being installed, it is preferable to do so before installing the CSI driver IBMBlockCSI custom resource (see [Installing the host definer](install_hostdefiner.md).
 
 1.  Install the operator.
 

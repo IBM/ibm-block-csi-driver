@@ -5,7 +5,7 @@ When using the CSI Topology feature, different parameters must be taken into acc
 **Note:** 
   - For information and parameter definitions that are not related to topology awareness, be sure to see the information that is provided in [Creating a VolumeSnapshotClass](creating_volumesnapshotclass.md), in addition to the current section.
   
-  - IBM® FlashCopy® function is referred to as the more generic volume snapshots and cloning within this documentation set. Not all supported products use the FlashCopy function terminology.
+  - This section refers to both the IBM FlashCopy® function and Snapshot function in Spectrum Virtualize storage systems.
 
 In order to enable creation and deletion of volume snapshots for your storage system, create a VolumeSnapshotClass YAML file, similar to the following `demo-volumesnapshotclass-config-secret.yaml`.
 

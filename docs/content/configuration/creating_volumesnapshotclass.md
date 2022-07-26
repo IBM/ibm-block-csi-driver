@@ -2,7 +2,7 @@
 
 Create a VolumeSnapshotClass YAML file to enable creation and deletion of volume snapshots.
 
-**Note:** IBM® FlashCopy® function is referred to as the more generic volume snapshots and cloning within this documentation set. Not all supported products use the FlashCopy function terminology.
+**Note:** This section refers to both the IBM FlashCopy® function and Snapshot function in Spectrum Virtualize storage systems.
 
 In order to enable creation and deletion of volume snapshots for your storage system, create a VolumeSnapshotClass YAML file, similar to the following `demo-volumesnapshotclass.yaml`.
 
@@ -11,12 +11,13 @@ When configuring the file, be sure to use the same array secret and array secret
 -   The `snapshot_name_prefix` parameter is optional.
 
     **Note:** For IBM DS8000® family, the maximum prefix length is five characters.<br/>The maximum prefix length for other systems is 20 characters.<br/>For storage systems that use Spectrum Virtualize, the `CSI` prefix is added as default if not specified by the user.
+
+- The `virt_snap_func` parameter is optional but necessary in Spectrum Virtualize storage systems if using the Snapshot function. To enable the Snapshot function, set the value to _"true"_. The default value is _"false"_. If the value is `"false"` the snapshot will use the FlashCopy function.
     
 - To create a stretched snapshot on SAN Volume Controller storage systems, put a colon (:) between the two pools within the `pool` value. For example:
   
-  ```
-  pool: demo-pool1:demo-pool2 
-  ```
+  `pool: demo-pool1:demo-pool2`
+  
    **Important:** The two pools must be from different sites.
 
    For more information about stretched snapshot limitations and requirements, see [Limitations](../release_notes/limitations.md) and [Compatibility and requirements](../installation/install_compatibility_requirements.md).
@@ -34,6 +35,7 @@ parameters:
   pool: demo-pool                    # Optional. Use to create the snapshot on a different pool than the source.
   SpaceEfficiency: thin              # Optional. Use to create the snapshot with a different space efficiency than the source.
   snapshot_name_prefix: demo-prefix  # Optional.
+  virt_snap_func: "false"            # Optional. Values "true"/"false". The default is "false".
 
   csi.storage.k8s.io/snapshotter-secret-name: demo-secret
   csi.storage.k8s.io/snapshotter-secret-namespace: default
