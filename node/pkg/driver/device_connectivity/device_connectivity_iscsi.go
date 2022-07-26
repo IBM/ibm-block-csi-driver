@@ -18,11 +18,12 @@ package device_connectivity
 
 import (
 	"errors"
-	"github.com/ibm/ibm-block-csi-driver/node/logger"
-	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/ibm/ibm-block-csi-driver/node/logger"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
 const (

@@ -27,10 +27,10 @@ COPY . .
 RUN make ibm-block-csi-driver
 
 # Final stage
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.5-230.1645809059
+FROM registry.access.redhat.com/ubi8/ubi-minimal:8.6-854
 MAINTAINER IBM Storage
 
-ARG VERSION=1.9.0
+ARG VERSION=1.10.0
 ARG BUILD_NUMBER=0
 
 LABEL name="IBM block storage CSI driver node" \

@@ -22,7 +22,7 @@ import (
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
-	"k8s.io/utils/mount"
+	mount "k8s.io/mount-utils"
 )
 
 // default mount/unmount timeout interval, 30s

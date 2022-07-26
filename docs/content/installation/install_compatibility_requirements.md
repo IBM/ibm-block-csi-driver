@@ -43,15 +43,17 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 
    **Important:**
    - The `99-ibm-attach.yaml` configuration file overrides any files that exist on your system. Only use this file if the files mentioned are not already created. <br />If one or more were created, edit this YAML file, as necessary.
-   - The `99-ibm-attach.yaml` configuration file with the default configuration by the CSI driver. It is best practice to update the file according to your storage system and application networking needs.
+   - The `99-ibm-attach.yaml` configuration file contains the default configuration for the CSI driver. It is best practice to update the file according to your storage system and application networking needs.
 
    Apply the YAML file.
 
-   `oc apply -f 99-ibm-attach.yaml`
+   ```
+   oc apply -f 99-ibm-attach.yaml
+    ```
 
 2. Configure your storage system host attachment, per worker node.
 
-    **Important:** The CSI driver does not define hosts on your storage system.
+    **Note:** IBM® block storage CSI driver 1.10 introduces dynamic host definition. For more information and installation instructions, see [Installing the host definer](install_hostdefiner.md). If this feature is not installed, the nodes are not dynamically defined on the  storage system and they must be defined manually.
     
     Be sure to configure your storage system host attachment according to your storage system instructions.
 
@@ -91,7 +93,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
         
         curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.2.0/config/crd/bases/replication.storage.openshift.io_volumereplications.yaml
         kubectl apply -f ./replication.storage.openshift.io_volumereplications.yaml
-        ````
+        ```
     
     2. To enable support on your storage system, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Administering** > **Managing Copy Services** > **Managing remote-copy partnerships**.
 
@@ -101,7 +103,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 
       For more information, see [Configuring for CSI Topology](../configuration/configuring_topology.md).
 
-7. (Optional) If planning on using an HA feature (either HyperSwap or stretched topology) on your storage system, see the appropriate sections within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/):
+7. (Optional) If planning on using a high availability (HA) feature (either HyperSwap or stretched topology) on your storage system, see the appropriate sections within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/):
     - HyperSwap topology planning and configuration
         - **Planning** > **Planning for high availability** > **Planning for a HyperSwap topology system**
         - **Configuring** > **Configuration details** > **HyperSwap system configuration details**

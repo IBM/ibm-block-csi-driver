@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -34,13 +35,15 @@ import (
 )
 
 var (
-	nodeUtils       = driver.NewNodeUtils(&executer.Executer{}, nil)
+	nodeUtils       = driver.NewNodeUtils(&executer.Executer{}, nil, ConfigYaml, device_connectivity.OsDeviceConnectivityHelperScsiGeneric{})
 	maxNodeIdLength = driver.MaxNodeIdLength
 	hostName        = "test-hostname"
 	longHostName    = strings.Repeat(hostName, 15)
 	nvmeNQN         = "nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1"
 	fcWWNs          = []string{"10000000c9934d9f", "10000000c9934d9h", "10000000c9934d9a", "10000000c9934d9b", "10000000c9934d9z"}
 	iscsiIQN        = "iqn.1994-07.com.redhat:e123456789"
+	volumeUuid      = "6oui000vendorsi0vendorsie0000000"
+	volumeNguid     = "vendorsie0000000oui0000vendorsi0"
 )
 
 func TestReadNvmeNqn(t *testing.T) {
@@ -127,11 +130,11 @@ func TestParseFCPortsName(t *testing.T) {
 		{
 			name:          "fc port file with wrong content",
 			file_contents: []string{"wrong content"},
-			expErr:        fmt.Errorf(driver.ErrorWhileTryingToReadPort, device_connectivity.ConnectionTypeFC, "wrong content"),
+			expErr:        fmt.Errorf(driver.ErrorWhileTryingToReadPort, ConfigYaml.Connectivity_type.Fc, "wrong content"),
 		},
 		{
 			name:   "fc unsupported",
-			expErr: fmt.Errorf(driver.ErrorUnsupportedConnectivityType, device_connectivity.ConnectionTypeFC),
+			expErr: fmt.Errorf(driver.ErrorUnsupportedConnectivityType, ConfigYaml.Connectivity_type.Fc),
 		},
 		{
 			name:          "one fc port",
@@ -192,7 +195,7 @@ func TestParseFCPortsName(t *testing.T) {
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 			devicePath := "/sys/class/fc_host/host*/port_name"
 			fakeExecuter.EXPECT().FilepathGlob(devicePath).Return(fpaths, tc.err)
-			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml, nil)
 
 			fcs, err := nodeUtils.ParseFCPorts()
 
@@ -224,7 +227,7 @@ func TestParseIscsiInitiators(t *testing.T) {
 		{
 			name:         "wrong iqn file",
 			file_content: "wrong-content",
-			expErr:       fmt.Errorf(driver.ErrorWhileTryingToReadPort, device_connectivity.ConnectionTypeISCSI, "wrong-content"),
+			expErr:       fmt.Errorf(driver.ErrorWhileTryingToReadPort, ConfigYaml.Connectivity_type.Iscsi, "wrong-content"),
 		},
 		{
 			name:   "non existing file",
@@ -366,7 +369,7 @@ func TestGenerateNodeID(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
-			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml, nil)
 
 			nodeId, err := nodeUtils.GenerateNodeID(tc.hostName, tc.nvmeNQN, tc.fcWWNs, tc.iscsiIQN)
 
@@ -385,5 +388,116 @@ func TestGenerateNodeID(t *testing.T) {
 
 			}
 		})
+	}
+}
+
+func TestGetVolumeUuid(t *testing.T) {
+	testCases := []struct {
+		name     string
+		volumeId string
+	}{
+		{name: "success",
+			volumeId: "fakeArray:volumeUuid",
+		},
+		{name: "success with internal volumeId",
+			volumeId: "fakeArray:internalVolumeId;volumeUuid",
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml, nil)
+
+			volumeUuid := nodeUtils.GetVolumeUuid(tc.volumeId)
+
+			expectedVolumeUuid := "volumeUuid"
+			if volumeUuid != expectedVolumeUuid {
+				t.Fatalf("wrong volumeUuid: expected %v, got %v", expectedVolumeUuid, volumeUuid)
+			}
+
+		})
+	}
+
+}
+
+func TestGetBlockVolumeStats(t *testing.T) {
+	sizeInBytes, _ := strconv.ParseInt("1073741824", 10, 64)
+	testCases := []struct {
+		name           string
+		volumeUuid     string
+		mpathDeviceErr error
+		mpathDevice    string
+		outInBytes     []byte
+		outInBytesErr  error
+		volumeStats    driver.VolumeStatistics
+	}{
+		{
+			name:           "success",
+			volumeUuid:     "volumeUuid",
+			mpathDeviceErr: nil,
+			mpathDevice:    "fakeMpathDevice",
+			outInBytes:     []byte("1073741824"),
+			outInBytesErr:  nil,
+			volumeStats: driver.VolumeStatistics{
+				TotalBytes: sizeInBytes,
+			},
+		},
+		{
+			name:           "failed to get mpath device",
+			volumeUuid:     "volumeUuid",
+			mpathDeviceErr: &device_connectivity.MultipathDeviceNotFoundForVolumeError{VolumeId: ""},
+			mpathDevice:    "",
+			outInBytes:     []byte{},
+			outInBytesErr:  nil,
+			volumeStats:    driver.VolumeStatistics{},
+		},
+		{
+			name:           "failed to get size of mpath device",
+			volumeUuid:     "volumeUuid",
+			mpathDeviceErr: nil,
+			mpathDevice:    "fakeMpathDevice",
+			outInBytes:     []byte{},
+			outInBytesErr:  errors.New("failed to run command"),
+			volumeStats:    driver.VolumeStatistics{},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
+			mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtrl)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml, mockOsDeviceConHelper)
+			args := []string{"--getsize64", tc.mpathDevice}
+
+			mockOsDeviceConHelper.EXPECT().GetMpathDevice(tc.volumeUuid).Return(tc.mpathDevice, tc.mpathDeviceErr)
+			if tc.mpathDevice != "" {
+				fakeExecuter.EXPECT().ExecuteWithTimeoutSilently(
+					device_connectivity.TimeOutBlockDevCmd, driver.BlockDevCmd, args).Return(tc.outInBytes, tc.outInBytesErr)
+			}
+			volumestats, err := nodeUtils.GetBlockVolumeStats(tc.volumeUuid)
+
+			if volumestats != tc.volumeStats {
+				t.Fatalf("wrong volumestats: expected %v, got %v", tc.volumeStats, volumestats)
+			}
+			if tc.mpathDeviceErr != nil {
+				assertExpectedError(t, tc.mpathDeviceErr, err)
+			} else {
+				assertExpectedError(t, tc.outInBytesErr, err)
+			}
+
+		})
+	}
+}
+
+func assertExpectedError(t *testing.T, expectedError error, responseErr error) {
+	if expectedError != responseErr {
+		t.Fatalf("wrong error: expected %v, got %v", expectedError, responseErr)
 	}
 }

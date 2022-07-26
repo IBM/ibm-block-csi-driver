@@ -7,3 +7,5 @@
 /bin/
 node/mocks
 build/reports
+/.run/
+docs/.vscode/settings.json
