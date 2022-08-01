@@ -38,7 +38,7 @@ var (
 	nodeUtils       = driver.NewNodeUtils(&executer.Executer{}, nil, ConfigYaml, device_connectivity.OsDeviceConnectivityHelperScsiGeneric{})
 	maxNodeIdLength = driver.MaxNodeIdLength
 	hostName        = "test-hostname"
-	longHostName    = strings.Repeat(hostName, 15)
+	longHostName    = strings.Repeat(hostName, 25)
 	nvmeNQN         = "nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1"
 	fcWWNs          = []string{"10000000c9934d9f", "10000000c9934d9h", "10000000c9934d9a", "10000000c9934d9b", "10000000c9934d9z"}
 	iscsiIQN        = "iqn.1994-07.com.redhat:e123456789"
