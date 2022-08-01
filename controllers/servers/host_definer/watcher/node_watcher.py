@@ -59,6 +59,7 @@ class NodeWatcher(Watcher):
         host_definitions = self._get_all_node_host_definitions(node_name)
         for host_definition in host_definitions:
             self._delete_definition(host_definition)
+        self._remove_managed_by_host_definer_label(node_name)
 
     def _get_all_node_host_definitions(self, node_name):
         node_host_definitions = []
