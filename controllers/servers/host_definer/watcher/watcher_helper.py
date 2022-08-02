@@ -237,13 +237,18 @@ class Watcher(KubernetesManager):
         self._update_node_managed_by_host_definer_label(node_name, settings.TRUE_STRING)
 
     def _remove_managed_by_host_definer_label(self, node_name):
-        if self._is_dynamic_node_labeling_allowed() and self._is_node_has_ibm_block_csi(node_name):
+        if self._is_managed_by_host_definer_label_should_be_removed(node_name):
             logger.info(messages.REMOVE_LABEL_FROM_NODE.format(settings.MANAGED_BY_HOST_DEFINER_LABEL, node_name))
             self._update_node_managed_by_host_definer_label(node_name, None)
 
+    def _is_managed_by_host_definer_label_should_be_removed(self, node_name):
+        return self._is_dynamic_node_labeling_allowed() and \
+            not self._is_node_has_ibm_block_csi(node_name) and \
+            self._is_node_has_managed_by_host_definer_label(node_name)
+
     def _is_node_has_ibm_block_csi(self, node_name):
         csi_node = self._get_csi_node(node_name)
-        return csi_node.node_id != ''
+        return csi_node.node_id != None
 
     def _define_host_on_all_storages_from_secrets(self, node_name):
         for secret_id, storage_classes_using_this_secret in SECRET_IDS.items():
