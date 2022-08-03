@@ -57,19 +57,27 @@ class HostDefinitionWatcher(Watcher):
     def _handle_pending_host_definition(self, host_definition):
         response = DefineHostResponse()
         phase = host_definition.phase
+        action = self._get_action(phase)
         if phase == settings.PENDING_CREATION_PHASE:
             response = self._define_host(host_definition)
         elif self._is_pending_for_deletion_need_to_be_handled(phase, host_definition.node_name):
             response = self._undefine_host(host_definition)
         self._handle_error_message_for_pending_host_definition(
-            host_definition, response.error_message)
+            host_definition, response.error_message, action)
 
-    def _handle_error_message_for_pending_host_definition(self, host_definition, error_message):
+    def _get_action(self, phase):
+        if phase == settings.PENDING_CREATION_PHASE:
+            return settings.DEFINE
+        elif phase == settings.PENDING_DELETION_PHASE:
+            return settings.UNDEFINE
+        return ''
+
+    def _handle_error_message_for_pending_host_definition(self, host_definition, error_message, action):
         phase = host_definition.phase
         if error_message:
-            self._add_event_to_host_definition(host_definition, str(error_message))
+            self._create_fail_event_for_host_definition(host_definition, str(error_message), action)
         elif phase == settings.PENDING_CREATION_PHASE:
-            self._set_host_definition_status(host_definition.name, settings.READY_PHASE)
+            self._set_host_definition_status_to_ready(host_definition)
         elif self._is_pending_for_deletion_need_to_be_handled(phase, host_definition.node_name):
             self._delete_host_definition(host_definition.name)
 

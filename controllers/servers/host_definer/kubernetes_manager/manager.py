@@ -121,7 +121,7 @@ class KubernetesManager():
     def _get_host_definition_object(self, host_definition):
         host_definition_obj = HostDefinition()
         host_definition_obj.name = host_definition.metadata.name
-        host_definition_obj.resource_version = host_definition.metadata.resource_version
+        host_definition_obj.resource_version = self._get_host_definition_resource_version(host_definition)
         host_definition_obj.uid = host_definition.metadata.uid
         host_definition_obj.phase = self._get_host_definition_phase(host_definition)
         host_definition_obj.secret.name = self._get_attr_from_host_definition(
@@ -131,6 +131,11 @@ class KubernetesManager():
         host_definition_obj.node_name = self._get_attr_from_host_definition(host_definition, settings.NODE_NAME_FIELD)
         host_definition_obj.node_id = self._get_attr_from_host_definition(host_definition, settings.NODE_ID_FIELD)
         return host_definition_obj
+
+    def _get_host_definition_resource_version(self, host_definition):
+        if host_definition.metadata.resource_version:
+            return host_definition.metadata.resource_version
+        return host_definition.metadata.resourceVersion
 
     def _get_host_definition_phase(self, host_definition):
         if host_definition.status:
@@ -160,7 +165,8 @@ class KubernetesManager():
 
     def _create_host_definition(self, host_definition_manifest):
         try:
-            self.host_definitions_api.create(body=host_definition_manifest)
+            host_definition = self.host_definitions_api.create(body=host_definition_manifest)
+            return self._get_host_definition_object(host_definition)
         except ApiException as ex:
             if ex != 404:
                 logger.error(messages.FAILED_TO_CREATE_HOST_DEFINITION.format(
@@ -187,15 +193,20 @@ class KubernetesManager():
 
         return status
 
-    def _get_event_for_host_definition(self, host_definition, message):
+    def _get_event_for_host_definition(self, host_definition, message, action, message_type):
         return client.CoreV1Event(
             metadata=client.V1ObjectMeta(generate_name='{}.'.format(host_definition.name),),
-            reporting_component=settings.HOST_DEFINER, reporting_instance=settings.HOST_DEFINER, action='Verifying',
-            type='Error', reason=settings.FAILED_VERIFYING, message=str(message),
+            reporting_component=settings.HOST_DEFINER, reporting_instance=settings.HOST_DEFINER, action=action,
+            type=self._get_event_type(message_type), reason=action+message_type, message=str(message),
             event_time=datetime.datetime.utcnow().isoformat(timespec='microseconds') + 'Z',
             involved_object=client.V1ObjectReference(
                 api_version=settings.CSI_IBM_API_VERSION, kind=settings.HOST_DEFINITION_KIND, name=host_definition.name,
                 resource_version=host_definition.resource_version, uid=host_definition.uid,))
+
+    def _get_event_type(self, message_type):
+        if message_type != settings.SUCCESSFUL:
+            return settings.WARNING
+        return settings.NORMAL
 
     def _create_event(self, namespace, event):
         try:
