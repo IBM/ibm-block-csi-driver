@@ -248,7 +248,7 @@ class Watcher(KubernetesManager):
 
     def _is_node_has_ibm_block_csi(self, node_name):
         csi_node = self._get_csi_node(node_name)
-        return csi_node.node_id != None
+        return csi_node.node_id is not None
 
     def _define_host_on_all_storages_from_secrets(self, node_name):
         for secret_id, storage_classes_using_this_secret in SECRET_IDS.items():
