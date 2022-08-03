@@ -109,7 +109,7 @@ Use this procedure to help build a PV YAML file for your volumes.
               nodeStageSecretRef:
                 name: demo-secret-2
                 namespace: default
-            # fsType: ext4
+              # fsType: ext4
               driver: block.csi.ibm.com
               # volumeAttributes:
                 # pool_name: demo-pool
