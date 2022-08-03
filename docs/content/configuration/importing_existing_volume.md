@@ -99,16 +99,16 @@ Use this procedure to help build a PV YAML file for your volumes.
         storage: 1Gi
       csi:
         controllerExpandSecretRef:
-          name: demo-secret-2
+          name: demo-secret
           namespace: default
         controllerPublishSecretRef:
-          name: demo-secret-2
+          name: demo-secret
           namespace: default
         nodePublishSecretRef:
-          name: demo-secret-2
+          name: demo-secret
           namespace: default
         nodeStageSecretRef:
-          name: demo-secret-2
+          name: demo-secret
           namespace: default
         # fsType: ext4
         driver: block.csi.ibm.com
