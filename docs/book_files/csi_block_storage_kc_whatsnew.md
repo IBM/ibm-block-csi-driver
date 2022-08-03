@@ -4,6 +4,7 @@ This topic lists the dates and nature of updates to the published information of
 
 |Date|Nature of updates to the published information|
 |----|----------------------------------------------|
+|3 August 2022|Updated [Importing an existing volume](../content/configuration/importing_existing_volume.md).|
 |1 August 2022|General typo and formatting updates.|
 |26 July 2022|The version information was added to IBM Documentation.<br>For more information about this version, see the [What's new in 1.10.0](../content/release_notes/whats_new.md) section in the release notes.|
 
