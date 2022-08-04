@@ -68,9 +68,7 @@ class HostDefinitionWatcher(Watcher):
     def _get_action(self, phase):
         if phase == settings.PENDING_CREATION_PHASE:
             return settings.DEFINE_ACTION
-        if phase == settings.PENDING_DELETION_PHASE:
-            return settings.UNDEFINE_ACTION
-        return ''
+        return settings.UNDEFINE_ACTION
 
     def _handle_error_message_for_pending_host_definition(self, host_definition, error_message, action):
         phase = host_definition.phase
