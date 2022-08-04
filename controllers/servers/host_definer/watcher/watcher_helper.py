@@ -39,7 +39,7 @@ class Watcher(KubernetesManager):
         if response.error_message and host_definition_instance:
             self._set_host_definition_status(host_definition_instance.name, settings.PENDING_CREATION_PHASE)
             self._create_fail_event_for_host_definition(
-                host_definition_instance, response.error_message, settings.DEFINE)
+                host_definition_instance, response.error_message, settings.DEFINE_ACTION)
         elif host_definition_instance:
             self._set_host_definition_status_to_ready(host_definition_instance)
 
@@ -98,7 +98,7 @@ class Watcher(KubernetesManager):
         if response.error_message and host_definition_instance:
             self._set_host_definition_status(host_definition_instance.name, settings.PENDING_DELETION_PHASE)
             self._create_fail_event_for_host_definition(
-                host_definition_instance, response.error_message, settings.UNDEFINE)
+                host_definition_instance, response.error_message, settings.UNDEFINE_ACTION)
         elif not response.error_message and host_definition_instance:
             self._delete_host_definition(host_definition_instance.name)
 
@@ -111,7 +111,7 @@ class Watcher(KubernetesManager):
 
     def _set_host_definition_status_to_ready(self, host_definition):
         self._set_host_definition_status(host_definition.name, settings.READY_PHASE)
-        self._create_success_event_for_host_definition(host_definition, settings.DEFINE)
+        self._create_success_event_for_host_definition(host_definition, settings.DEFINE_ACTION)
 
     def _create_success_event_for_host_definition(self, host_definition, action):
         message = settings.SUCCESS_MESSAGE

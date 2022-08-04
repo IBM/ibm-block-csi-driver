@@ -197,7 +197,7 @@ class KubernetesManager():
         return client.CoreV1Event(
             metadata=client.V1ObjectMeta(generate_name='{}.'.format(host_definition.name),),
             reporting_component=settings.HOST_DEFINER, reporting_instance=settings.HOST_DEFINER, action=action,
-            type=self._get_event_type(message_type), reason=action+message_type, message=str(message),
+            type=self._get_event_type(message_type), reason=message_type+action, message=str(message),
             event_time=datetime.datetime.utcnow().isoformat(timespec='microseconds') + 'Z',
             involved_object=client.V1ObjectReference(
                 api_version=settings.CSI_IBM_API_VERSION, kind=settings.HOST_DEFINITION_KIND, name=host_definition.name,
