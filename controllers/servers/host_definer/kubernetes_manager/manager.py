@@ -204,9 +204,9 @@ class KubernetesManager():
                 resource_version=host_definition.resource_version, uid=host_definition.uid,))
 
     def _get_event_type(self, message_type):
-        if message_type != settings.SUCCESSFUL:
-            return settings.WARNING
-        return settings.NORMAL
+        if message_type != settings.SUCCESSFUL_MESSAGE_TYPE:
+            return settings.WARNING_EVENT_TYPE
+        return settings.NORMAL_EVENT_TYPE
 
     def _create_event(self, namespace, event):
         try:

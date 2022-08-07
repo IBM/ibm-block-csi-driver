@@ -73,7 +73,9 @@ class HostDefinitionWatcher(Watcher):
     def _handle_error_message_for_pending_host_definition(self, host_definition, error_message, action):
         phase = host_definition.phase
         if error_message:
-            self._create_fail_event_for_host_definition(host_definition, str(error_message), action)
+            self._create_event_for_host_definition(
+                host_definition, str(error_message),
+                action, settings.FAILED_MESSAGE_TYPE)
         elif phase == settings.PENDING_CREATION_PHASE:
             self._set_host_definition_status_to_ready(host_definition)
         elif self._is_pending_for_deletion_need_to_be_handled(phase, host_definition.node_name):

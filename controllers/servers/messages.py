@@ -67,8 +67,7 @@ HOST_ALREADY_ON_STORAGE_HOST_DEFINITION_READY = "Host {} is already on storage o
     " detected host definition {} in Ready phase"
 CREATING_NEW_HOST_DEFINITION = 'Creating host Definition: {}'
 VERIFY_HOST_IS_UNDEFINED = 'Verifying that host {} is undefined from {} secret in {} namespace'
-CREATE_ERROR_EVENT_FOR_HOST_DEFINITION = 'Creating event for host definition: {} error event: {}'
-CREATE_SUCCESS_EVENT_FOR_HOST_DEFINITION = 'Creating event for host definition: {}'
+CREATE_EVENT_FOR_HOST_DEFINITION = 'Creating event : {} for host definition: {}'
 NEW_KUBERNETES_NODE = 'New Kubernetes node {}, has csi IBM block'
 ADD_LABEL_TO_NODE = 'Add {} label to node {}'
 REMOVE_LABEL_FROM_NODE = 'Remove {} label from node {}'

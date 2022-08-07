@@ -38,8 +38,8 @@ class Watcher(KubernetesManager):
         host_definition_instance = self._create_host_definition_if_not_exist(host_definition)
         if response.error_message and host_definition_instance:
             self._set_host_definition_status(host_definition_instance.name, settings.PENDING_CREATION_PHASE)
-            self._create_fail_event_for_host_definition(
-                host_definition_instance, response.error_message, settings.DEFINE_ACTION)
+            self._create_event_for_host_definition(
+                host_definition_instance, response.error_message, settings.DEFINE_ACTION, settings.FAILED_MESSAGE_TYPE)
         elif host_definition_instance:
             self._set_host_definition_status_to_ready(host_definition_instance)
 
@@ -97,28 +97,21 @@ class Watcher(KubernetesManager):
         host_definition_instance, _ = self._get_host_definition(host_definition.node_name, host_definition.secret)
         if response.error_message and host_definition_instance:
             self._set_host_definition_status(host_definition_instance.name, settings.PENDING_DELETION_PHASE)
-            self._create_fail_event_for_host_definition(
-                host_definition_instance, response.error_message, settings.UNDEFINE_ACTION)
+            self._create_event_for_host_definition(
+                host_definition_instance, response.error_message, settings.UNDEFINE_ACTION, settings.FAILED_MESSAGE_TYPE)
         elif not response.error_message and host_definition_instance:
             self._delete_host_definition(host_definition_instance.name)
 
     def _undefine_host(self, host_definition):
         return self._ensure_definition_state(host_definition, self.storage_host_servicer.undefine_host)
 
-    def _create_fail_event_for_host_definition(self, host_definition, message, action):
-        logger.info(messages.CREATE_ERROR_EVENT_FOR_HOST_DEFINITION.format(host_definition.name, message))
-        self._generate_and_create_event(host_definition, action, message, settings.FAILED)
-
     def _set_host_definition_status_to_ready(self, host_definition):
         self._set_host_definition_status(host_definition.name, settings.READY_PHASE)
-        self._create_success_event_for_host_definition(host_definition, settings.DEFINE_ACTION)
+        self._create_event_for_host_definition(
+            host_definition, settings.SUCCESS_MESSAGE, settings.DEFINE_ACTION, settings.SUCCESSFUL_MESSAGE_TYPE)
 
-    def _create_success_event_for_host_definition(self, host_definition, action):
-        message = settings.SUCCESS_MESSAGE
-        logger.info(messages.CREATE_SUCCESS_EVENT_FOR_HOST_DEFINITION.format(host_definition.name))
-        self._generate_and_create_event(host_definition, action, message, settings.SUCCESSFUL)
-
-    def _generate_and_create_event(self, host_definition, action, message, message_type):
+    def _create_event_for_host_definition(self, host_definition, message, action, message_type):
+        logger.info(messages.CREATE_EVENT_FOR_HOST_DEFINITION.format(message, host_definition.name))
         event = self._get_event_for_host_definition(host_definition, message, action, message_type)
         self._create_event(settings.DEFAULT_NAMESPACE, event)
 
