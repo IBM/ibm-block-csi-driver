@@ -2,18 +2,7 @@
 
 Use this information to import volumes that were created externally from the IBM® block storage CSI driver by using a persistent volume (PV) YAML file.
 
-Before starting to import an existing volume, find the following information in the existing volume in order to include the information in the persistent volume (PV) YAML file:
-- `volumeHandle`
-- `volumeAttributes` (optional)
-  
-  Including:
-
-    - `pool_name`: _Name of Pool where volume is located_ (Listed as `pool_id` for DS8000® family systems.)
-    - `storage_type`: <`SVC` | `A9000` | `DS8K`>
-    - `volume_name`: _Volume name_
-    - `array_address`: _Array address_
-
-To find the `volumeHandle`, use one of the following procedures:
+Before starting to import an existing volume, find the `volumeHandle` in the existing volume in order to include the information in the persistent volume (PV) YAML file. To find the `volumeHandle`, use one of the following procedures:
 
 - **For Spectrum Virtualize family**
 
@@ -94,33 +83,45 @@ Use this procedure to help build a PV YAML file for your volumes.
 
 2. Take the `volume_name` and other optional information (collected before the procedure) and insert it into the YAML file (under `spec.csi.volumeAttributes`).
 
-    **Important:** If using the CSI Topology feature, the `spec.csi.volumeHandle` contains the management ID (see [Creating a StorageClass with topology awareness](creating_storageclass_topology_aware.md)). In the example below, the `spec.csi.volumeHandle` would read similar to the following: `SVC:demo-system-id-1:0;600507640082000B08000000000004FF`.
+    **Important:** If using the CSI Topology feature, the `spec.csi.volumeHandle` contains the management ID (see [Creating a StorageClass with topology awareness](creating_storageclass_topology_aware.md)). In the example below, the `spec.csi.volumeHandle` would read similar to the following:<br> `SVC:demo-system-id-1:0;600507640082000B08000000000004FF`
     
-        apiVersion: v1
-        kind: PersistentVolume
-        metadata:
-          # annotations:
-            # pv.kubernetes.io/provisioned-by: block.csi.ibm.com
-          name: demo-pv
-        spec:
-          accessModes:
-          - ReadWriteOnce
-          capacity:
-            storage: 1Gi
-          csi:
-            controllerPublishSecretRef:
-              name: demo-secret
-              namespace: default
-            driver: block.csi.ibm.com
-            # volumeAttributes:
-              # pool_name: demo-pool
-              # storage_type: SVC
-              # volume_name: demo-prefix_demo-pvc-file-system
-              # array_address: demo-management-address
-            volumeHandle: SVC:0;600507640082000B08000000000004FF
-          # persistentVolumeReclaimPolicy: Retain
-          storageClassName: demo-storageclass
-          # volumeMode: Filesystem
+    ```
+    apiVersion: v1
+    kind: PersistentVolume
+    metadata:
+      # annotations:
+        # pv.kubernetes.io/provisioned-by: block.csi.ibm.com
+      name: demo-pv
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      capacity:
+        storage: 1Gi
+      csi:
+        controllerExpandSecretRef:
+          name: demo-secret
+          namespace: default
+        controllerPublishSecretRef:
+          name: demo-secret
+          namespace: default
+        nodePublishSecretRef:
+          name: demo-secret
+          namespace: default
+        nodeStageSecretRef:
+          name: demo-secret
+          namespace: default
+        # fsType: ext4
+        driver: block.csi.ibm.com
+        # volumeAttributes:
+          # pool_name: demo-pool
+          # storage_type: SVC
+          # volume_name: demo-prefix_demo-pvc-file-system
+          # array_address: demo-management-address
+        volumeHandle: SVC:0;600507640082000B08000000000004FF
+      # persistentVolumeReclaimPolicy: Retain
+      storageClassName: demo-storageclass
+      # volumeMode: Filesystem
+    ```
 
 3. Create a PersistentVolumeClaim (PVC) YAML file.
 

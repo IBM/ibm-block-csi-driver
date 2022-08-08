@@ -30,7 +30,9 @@ For example:
 ```
 mkdir logs
 ```
-Save logs and status reports directly to the created directory by adding in the following string at the end of the collection command: `> logs/<log_filename>.log`.
+Save logs and status reports directly to the created directory by adding in the following string at the end of the collection command:
+
+    > logs/<log_filename>.log
 
 **Important:** Be sure that the logs cover any relevant timeframes for the specific issues that you are trying to debug when gathering logs from the storage system.
 
@@ -41,13 +43,13 @@ Be sure to run the following steps and copy the output to an external file, when
 
 1. Check the node status.
     
-    `kubectl get nodes`
+        kubectl get nodes
 2. Check the CSI driver component status.
 
-    `kubectl get -all-namespaces pod -o wide | grep ibm-block-csi`
+        kubectl get -all-namespaces pod -o wide | grep ibm-block-csi
 3. Check if the PersistentVolumeClaims (PVCs) are _Bound_.
 
-    `kubectl get -n <namespace> pvc -o=jsonpath='{range .items[?(@.metadata.annotations.volume\.beta\.kubernetes\.io/storage-provisioner=="block.csi.ibm.com")]}{"PVC NAME: "}{@.metadata.name}{" PVC STATUS: "}{@.status.phase}{"\n"}{end}'`
+        kubectl get -n <namespace> pvc -o=jsonpath='{range .items[?(@.metadata.annotations.volume\.beta\.kubernetes\.io/storage-provisioner=="block.csi.ibm.com")]}{"PVC NAME: "}{@.metadata.name}{" PVC STATUS: "}{@.status.phase}{"\n"}{end}'
 
     The output should be similar to the following:
 
@@ -79,27 +81,27 @@ To collect CSI operator logs, use the following commands:
 
 
 ### Collecting details of all CSI objects and components
-`kubectl describe all -l product=ibm-block-csi-driver -n <namespace> > logs/describe_ibm-block-csi-driver.log`
+    kubectl describe all -l product=ibm-block-csi-driver -n <namespace> > logs/describe_ibm-block-csi-driver.log
 
 
 ### Status collection for CSI pods, daemonset, and statefulset
-`kubectl get all -n <namespace> -l product=ibm-block-csi-driver > logs/get_all_ibm-block-csi-driver.log`
+    kubectl get all -n <namespace> -l product=ibm-block-csi-driver > logs/get_all_ibm-block-csi-driver.log
 
 
 
 ### Log collection for the CSI driver controller
-`kubectl logs -f -n <namespace> ibm-block-csi-controller-0 -c ibm-block-csi-controller > logs/ibm-block-csi-controller.log`
+    kubectl logs -f -n <namespace> ibm-block-csi-controller-0 -c ibm-block-csi-controller > logs/ibm-block-csi-controller.log
 
 
 ### Log collection for the CSI driver node (per worker node or PODID)
-`kubectl logs -f -n <namespace> ibm-block-csi-node-<PODID> -c ibm-block-csi-node > logs/csi-node-<PODID>.log`
+    kubectl logs -f -n <namespace> ibm-block-csi-node-<PODID> -c ibm-block-csi-node > logs/csi-node-<PODID>.log
 
 
 
 ### Details collection for unbound PVCs
-`kubectl describe -n <pvc_namespace> pvc <pvc-name> > logs/pvc_not_bounded.log`
+    kubectl describe -n <pvc_namespace> pvc <pvc-name> > logs/pvc_not_bounded.log
 
 
 
 ### Details collection for pods not in the _Running_ state
-`kubectl describe -n <pod_namespace> pod <not-running-pod-name> > logs/pod_not_running.log`
+    kubectl describe -n <pod_namespace> pod <not-running-pod-name> > logs/pod_not_running.log

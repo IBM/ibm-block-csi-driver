@@ -16,4 +16,5 @@ Multiple YAML files per type can be created (with different configurations), acc
 - [Creating a VolumeReplication](creating_volumereplication.md)
 - [Expanding a PersistentVolumeClaim (PVC)](expanding_pvc.md)
 - [Configuring for CSI Topology](configuring_topology.md)
+- [Configuring the host definer](configuring_hostdefiner.md)
 - [Advanced configuration](advanced_configuration.md)
