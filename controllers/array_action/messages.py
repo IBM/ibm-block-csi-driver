@@ -76,3 +76,5 @@ SIZE_OUT_OF_RANGE_ERROR_MESSAGE = "requested size is out of limits. requested: {
                                   " max_in_byte: {1}"
 
 SNAPSHOT_SOURCE_POOL_MISMATCH_ERROR_MESSAGE = "Snapshot pool : {0} does not match the source volume pool : {1}"
+
+NO_PORT_FOUND_BY_CONNECTIVITY_TYPE_ERROR_MESSAGE = "no port in : {} found by connectivity type : {}"
