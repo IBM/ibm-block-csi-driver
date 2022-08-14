@@ -4,9 +4,9 @@ import grpc
 from mock import Mock, MagicMock
 
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
-from controllers.tests.controller_server.test_settings import USER as test_user, \
+from controllers.tests.common.test_settings import USER as test_user, \
     PASSWORD as test_password, \
-    ARRAY as test_array, VOLUME_NAME
+    ARRAY as test_array, VOLUME_NAME, VOLUME_UID, POOL, INTERNAL_VOLUME_ID
 
 
 class ProtoBufMock(MagicMock):
@@ -14,25 +14,25 @@ class ProtoBufMock(MagicMock):
         return hasattr(self, field)
 
 
-def get_mock_mediator_response_volume(size=10, name=VOLUME_NAME, wwn="wwn1", array_type="a9k", source_id=None,
+def get_mock_mediator_response_volume(size=10, name=VOLUME_NAME, volume_id=VOLUME_UID, array_type="a9k", source_id=None,
                                       space_efficiency='thick'):
     volume = Mock()
     volume.capacity_bytes = size
-    volume.id = wwn
-    volume.internal_id = "0"
+    volume.id = volume_id
+    volume.internal_id = INTERNAL_VOLUME_ID
     volume.name = name
     volume.array_address = "arr1"
-    volume.pool = "pool1"
+    volume.pool = POOL
     volume.array_type = array_type
     volume.source_id = source_id
     volume.space_efficiency_aliases = space_efficiency if isinstance(space_efficiency, set) else {space_efficiency}
     return volume
 
 
-def get_mock_mediator_response_snapshot(capacity, name, wwn, volume_name, array_type):
+def get_mock_mediator_response_snapshot(capacity, name, snapshot_id, volume_name, array_type):
     snapshot = Mock()
     snapshot.capacity_bytes = capacity
-    snapshot.id = wwn
+    snapshot.id = snapshot_id
     snapshot.internal_id = "0"
     snapshot.name = name
     snapshot.volume_name = volume_name

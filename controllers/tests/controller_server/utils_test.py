@@ -15,7 +15,7 @@ from controllers.common.node_info import NodeIdInfo
 from controllers.servers import config as controller_config
 from controllers.servers.csi.csi_controller_server import CSIControllerServicer
 from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
-from controllers.tests.controller_server.test_settings import POOL, USER, PASSWORD, ARRAY
+from controllers.tests.common.test_settings import POOL, USER, PASSWORD, ARRAY
 from controllers.tests import utils as test_utils
 from controllers.tests.controller_server.csi_controller_server_test import ProtoBufMock
 from controllers.tests.utils import get_fake_secret_config

@@ -7,7 +7,8 @@ from controllers.array_action.array_action_types import Host
 from controllers.array_action.errors import HostNotFoundError, HostAlreadyExists
 from controllers.common.node_info import Initiators
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
-from controllers.tests.controller_server.test_settings import VOLUME_NAME, HOST_NAME
+from controllers.tests.common.test_settings import VOLUME_NAME, HOST_NAME
+from controllers.tests.controller_server.common import mock_get_agent
 
 HOST_DEFINER_SERVER_PATH = "controllers.servers.host_definer.storage_manager.host_definer_server"
 
@@ -24,11 +25,7 @@ class BaseSetUp(unittest.TestCase):
         self.mediator = Mock()
 
         self.storage_agent = MagicMock()
-        self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
-        get_agent_path = '.'.join((HOST_DEFINER_SERVER_PATH, 'get_agent'))
-        get_agent_patcher = patch(get_agent_path, return_value=self.storage_agent)
-        self.detect_array_type = get_agent_patcher.start()
-        self.addCleanup(get_agent_patcher.stop)
+        mock_get_agent(self, HOST_DEFINER_SERVER_PATH)
 
         self.request = Mock(spec_set=['prefix', 'connectivity_type', 'node_id', 'system_info'])
 
