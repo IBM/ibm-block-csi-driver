@@ -8,7 +8,7 @@ For more information on using dynamic host connectivity definition, see [Using d
 
 The host definer can be installed at any time in the following ways:
 
-- With the OpenShift web console (see [Installing the host definer with the OpenShift web console](install_hostdefiner_openshift_web.md)).
+- With the Red Hat OpenShift web console (see [Installing the host definer with the OpenShift web console](install_hostdefiner_openshift_web.md)).
 - With GitHub (see [Installing the host definer with GitHub](install_hostdefiner_github.md)).
 -   With OperatorHub.io (see [Installing the host definer with OperatorHub.io](install_hostdefiner_operatorhub.md)).
 

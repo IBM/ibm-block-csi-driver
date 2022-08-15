@@ -6,5 +6,5 @@ IBM® block storage CSI driver 1.8.0 added new support and enhancements:
     - New NVMe®/FC support
     - Increased StorageClass `SpaceEfficiency` parameter capabilities
 - Added custom resource configurability for the CSI driver health port
-- Additional support for OpenShift 4.9
-- Reintroduces support for OpenShift 4.7
+- Additional support for Red Hat OpenShift 4.9
+- Reintroduces support for Red Hat OpenShift 4.7
