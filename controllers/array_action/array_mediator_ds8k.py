@@ -102,16 +102,16 @@ def get_flashcopy_as_target_if_exists(api_volume):
 def get_array_space_efficiency(space_efficiency):
     if space_efficiency:
         space_efficiency_lower = space_efficiency.lower()
-        if space_efficiency_lower == config.SPACE_EFFICIENCY_THIN:
+        if space_efficiency_lower == settings.SPACE_EFFICIENCY_THIN:
             return ARRAY_SPACE_EFFICIENCY_THIN
     return ARRAY_SPACE_EFFICIENCY_NONE
 
 
 def _get_space_efficiency_aliases(array_space_efficiency):
     if array_space_efficiency == ARRAY_SPACE_EFFICIENCY_THIN:
-        return {config.SPACE_EFFICIENCY_THIN}
+        return {settings.SPACE_EFFICIENCY_THIN}
     if array_space_efficiency == ARRAY_SPACE_EFFICIENCY_NONE:
-        return {config.SPACE_EFFICIENCY_NONE, ""}
+        return {settings.SPACE_EFFICIENCY_NONE, ""}
     raise array_errors.SpaceEfficiencyNotSupported(array_space_efficiency)
 
 
@@ -661,7 +661,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.debug("validate_supported_space_efficiency for space efficiency : {0}".format(space_efficiency))
 
         if (space_efficiency and space_efficiency.lower() not in
-                [config.SPACE_EFFICIENCY_THIN, config.SPACE_EFFICIENCY_NONE]):
+                [settings.SPACE_EFFICIENCY_THIN, settings.SPACE_EFFICIENCY_NONE]):
             logger.error("space efficiency is not supported.")
             raise array_errors.SpaceEfficiencyNotSupported(
                 space_efficiency)

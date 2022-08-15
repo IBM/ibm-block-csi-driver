@@ -7,16 +7,17 @@ from munch import Munch
 
 import controllers.common.utils
 import controllers.servers.utils as utils
-from controllers.array_action import config as array_config
 from controllers.array_action.config import (NVME_OVER_FC_CONNECTIVITY_TYPE,
                                              FC_CONNECTIVITY_TYPE,
                                              ISCSI_CONNECTIVITY_TYPE)
 from controllers.common.node_info import NodeIdInfo
+from controllers.common.settings import SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED, SPACE_EFFICIENCY_NONE, \
+    SPACE_EFFICIENCY_DEDUPLICATED, SPACE_EFFICIENCY_THIN
 from controllers.servers import config as controller_config
 from controllers.servers.csi.csi_controller_server import CSIControllerServicer
 from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
-from controllers.tests.common.test_settings import POOL, USER, PASSWORD, ARRAY
 from controllers.tests import utils as test_utils
+from controllers.tests.common.test_settings import DUMMY_POOL1, USER, PASSWORD, ARRAY
 from controllers.tests.controller_server.csi_controller_server_test import ProtoBufMock
 from controllers.tests.utils import get_fake_secret_config
 
@@ -135,16 +136,17 @@ class TestUtils(unittest.TestCase):
                                                           topologies={"topology.block.csi.ibm.com/test1": "zone1",
                                                                       "topology.block.csi.ibm.com/test2": "dev1"})
 
-    def _test_get_pool_from_parameters(self, parameters, expected_pool=POOL, system_id=None):
+    def _test_get_pool_from_parameters(self, parameters, expected_pool=DUMMY_POOL1, system_id=None):
         volume_parameters = utils.get_volume_parameters(parameters, system_id)
         self.assertEqual(expected_pool, volume_parameters.pool)
 
     def test_get_pool_from_parameters(self):
-        parameters = {controller_config.PARAMETERS_POOL: POOL}
+        parameters = {controller_config.PARAMETERS_POOL: DUMMY_POOL1}
         self._test_get_pool_from_parameters(parameters)
         self._test_get_pool_from_parameters(parameters, system_id="u1")
         parameters = {controller_config.PARAMETERS_BY_SYSTEM: json.dumps(
-            {"u1": {controller_config.PARAMETERS_POOL: POOL}, "u2": {controller_config.PARAMETERS_POOL: "other_pool"}})}
+            {"u1": {controller_config.PARAMETERS_POOL: DUMMY_POOL1},
+             "u2": {controller_config.PARAMETERS_POOL: "other_pool"}})}
         self._test_get_pool_from_parameters(parameters, system_id="u1")
         self._test_get_pool_from_parameters(parameters, expected_pool="other_pool", system_id="u2")
         self._test_get_pool_from_parameters(parameters, expected_pool=None)
@@ -239,13 +241,13 @@ class TestUtils(unittest.TestCase):
 
         self._test_validate_create_volume_request_validation_exception(request, "parameter")
 
-        request.parameters = {controller_config.PARAMETERS_POOL: POOL,
+        request.parameters = {controller_config.PARAMETERS_POOL: DUMMY_POOL1,
                               controller_config.PARAMETERS_SPACE_EFFICIENCY: "thin "}
         request.volume_content_source = None
 
         utils.validate_create_volume_request(request)
 
-        request.parameters = {controller_config.PARAMETERS_POOL: POOL}
+        request.parameters = {controller_config.PARAMETERS_POOL: DUMMY_POOL1}
         utils.validate_create_volume_request(request)
 
         request.capacity_range.required_bytes = 0
@@ -264,7 +266,7 @@ class TestUtils(unittest.TestCase):
         new_volume.name = "name"
         new_volume.array_address = ["fqdn1", "fqdn2"]
 
-        new_volume.pool = POOL
+        new_volume.pool = DUMMY_POOL1
         new_volume.array_type = "a9k"
         new_volume.capacity_bytes = 10
         new_volume.source_id = None
@@ -285,7 +287,7 @@ class TestUtils(unittest.TestCase):
         new_volume.name = "name"
         new_volume.array_address = "9.1.1.1"
 
-        new_volume.pool = POOL
+        new_volume.pool = DUMMY_POOL1
         new_volume.array_type = "svc"
         new_volume.capacity_bytes = 10
         new_volume.source_id = None
@@ -301,7 +303,7 @@ class TestUtils(unittest.TestCase):
         new_volume.name = "name"
         new_volume.array_address = ["9.1.1.1", "9.1.1.2"]
 
-        new_volume.pool = POOL
+        new_volume.pool = DUMMY_POOL1
         new_volume.array_type = "svc"
         new_volume.capacity_bytes = 10
         new_volume.source_id = None
@@ -488,26 +490,27 @@ class TestUtils(unittest.TestCase):
     def test_validate_parameters_match_volume_se_fail(self):
         with self.assertRaises(ValidationException):
             self._test_validate_parameters_match_volume(volume_field="space_efficiency_aliases",
-                                                        volume_value=array_config.SPACE_EFFICIENCY_NONE,
+                                                        volume_value=SPACE_EFFICIENCY_NONE,
                                                         parameter_field=controller_config.PARAMETERS_SPACE_EFFICIENCY,
                                                         parameter_value="thin")
 
     def test_validate_parameters_match_volume_thin_se_success(self):
         self._test_validate_parameters_match_volume(volume_field="space_efficiency_aliases",
-                                                    volume_value=array_config.SPACE_EFFICIENCY_THIN,
+                                                    volume_value=SPACE_EFFICIENCY_THIN,
                                                     parameter_field=controller_config.PARAMETERS_SPACE_EFFICIENCY,
                                                     parameter_value="thin")
 
     def test_validate_parameters_match_volume_dedup_aliases_success(self):
         self._test_validate_parameters_match_volume(volume_field="space_efficiency_aliases",
-                                                    volume_value=[array_config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED,
-                                                                  array_config.SPACE_EFFICIENCY_DEDUPLICATED],
+                                                    volume_value=[
+                                                        SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED,
+                                                        SPACE_EFFICIENCY_DEDUPLICATED],
                                                     parameter_field=controller_config.PARAMETERS_SPACE_EFFICIENCY,
                                                     parameter_value="deduplicated")
 
     def test_validate_parameters_match_volume_default_se_success(self):
         self._test_validate_parameters_match_volume(volume_field="space_efficiency_aliases",
-                                                    volume_value=array_config.SPACE_EFFICIENCY_NONE,
+                                                    volume_value=SPACE_EFFICIENCY_NONE,
                                                     parameter_field=None, parameter_value=None)
 
     def test_validate_parameters_match_volume_pool_fail(self):

@@ -6,7 +6,7 @@ from mock import Mock, MagicMock
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
 from controllers.tests.common.test_settings import USER as test_user, \
     PASSWORD as test_password, \
-    ARRAY as test_array, VOLUME_NAME, VOLUME_UID, POOL, INTERNAL_VOLUME_ID
+    ARRAY as test_array, VOLUME_NAME, VOLUME_UID, DUMMY_POOL1, INTERNAL_VOLUME_ID
 
 
 class ProtoBufMock(MagicMock):
@@ -22,7 +22,7 @@ def get_mock_mediator_response_volume(size=10, name=VOLUME_NAME, volume_id=VOLUM
     volume.internal_id = INTERNAL_VOLUME_ID
     volume.name = name
     volume.array_address = "arr1"
-    volume.pool = POOL
+    volume.pool = DUMMY_POOL1
     volume.array_type = array_type
     volume.source_id = source_id
     volume.space_efficiency_aliases = space_efficiency if isinstance(space_efficiency, set) else {space_efficiency}

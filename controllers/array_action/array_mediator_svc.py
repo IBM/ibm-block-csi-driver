@@ -80,20 +80,20 @@ def is_warning_message(exception):
 def _get_space_efficiency_kwargs(space_efficiency):
     if space_efficiency:
         space_efficiency = space_efficiency.lower()
-        if space_efficiency == config.SPACE_EFFICIENCY_THIN:
+        if space_efficiency == settings.SPACE_EFFICIENCY_THIN:
             return {'thin': True}
-        if space_efficiency == config.SPACE_EFFICIENCY_COMPRESSED:
+        if space_efficiency == settings.SPACE_EFFICIENCY_COMPRESSED:
             return {'compressed': True}
-        if space_efficiency == config.SPACE_EFFICIENCY_DEDUPLICATED_THIN:
+        if space_efficiency == settings.SPACE_EFFICIENCY_DEDUPLICATED_THIN:
             return {'deduplicated': True, 'thin': True}
-        if space_efficiency in (config.SPACE_EFFICIENCY_DEDUPLICATED,
-                                config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED):
+        if space_efficiency in (settings.SPACE_EFFICIENCY_DEDUPLICATED,
+                                settings.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED):
             return {'deduplicated': True, 'compressed': True}
     return {}
 
 
 def _is_space_efficiency_matches_source(parameter_space_efficiency, array_space_efficiency):
-    return (not parameter_space_efficiency and array_space_efficiency == config.SPACE_EFFICIENCY_THICK) or \
+    return (not parameter_space_efficiency and array_space_efficiency == settings.SPACE_EFFICIENCY_THICK) or \
            (parameter_space_efficiency and parameter_space_efficiency == array_space_efficiency)
 
 
@@ -156,18 +156,18 @@ def build_stop_replication_kwargs(rcrelationship_id, add_access):
 
 
 def _get_cli_volume_space_efficiency_aliases(cli_volume):
-    space_efficiency_aliases = {config.SPACE_EFFICIENCY_THICK, ''}
+    space_efficiency_aliases = {settings.SPACE_EFFICIENCY_THICK, ''}
     if cli_volume.se_copy == YES:
-        space_efficiency_aliases = {config.SPACE_EFFICIENCY_THIN}
+        space_efficiency_aliases = {settings.SPACE_EFFICIENCY_THIN}
     if cli_volume.compressed_copy == YES:
-        space_efficiency_aliases = {config.SPACE_EFFICIENCY_COMPRESSED}
+        space_efficiency_aliases = {settings.SPACE_EFFICIENCY_COMPRESSED}
     if hasattr(cli_volume, "deduplicated_copy"):
         if cli_volume.deduplicated_copy == YES:
             if cli_volume.se_copy == YES:
-                space_efficiency_aliases = {config.SPACE_EFFICIENCY_DEDUPLICATED_THIN}
+                space_efficiency_aliases = {settings.SPACE_EFFICIENCY_DEDUPLICATED_THIN}
             else:
-                space_efficiency_aliases = {config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED,
-                                            config.SPACE_EFFICIENCY_DEDUPLICATED}
+                space_efficiency_aliases = {settings.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED,
+                                            settings.SPACE_EFFICIENCY_DEDUPLICATED}
     return space_efficiency_aliases
 
 
@@ -424,11 +424,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.debug("validate_supported_space_efficiency for "
                      "space efficiency : {0}".format(space_efficiency))
         if (space_efficiency and space_efficiency.lower() not in
-                [config.SPACE_EFFICIENCY_THIN, config.SPACE_EFFICIENCY_THICK,
-                 config.SPACE_EFFICIENCY_COMPRESSED,
-                 config.SPACE_EFFICIENCY_DEDUPLICATED,
-                 config.SPACE_EFFICIENCY_DEDUPLICATED_THIN,
-                 config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED]):
+                [settings.SPACE_EFFICIENCY_THIN, settings.SPACE_EFFICIENCY_THICK,
+                 settings.SPACE_EFFICIENCY_COMPRESSED,
+                 settings.SPACE_EFFICIENCY_DEDUPLICATED,
+                 settings.SPACE_EFFICIENCY_DEDUPLICATED_THIN,
+                 settings.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED]):
             logger.error("space efficiency value is not "
                          "supported {0}".format(space_efficiency))
             raise array_errors.SpaceEfficiencyNotSupported(

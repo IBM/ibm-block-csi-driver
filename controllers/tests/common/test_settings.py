@@ -2,12 +2,13 @@ USER = "temp"
 PASSWORD = "temp"
 MANAGEMENT_ADDRESS = "management_address"
 ARRAY = "arr"
-POOL = "pool1"
-OTHER_POOL = "other_pool"
+DUMMY_POOL1 = "pool1"
+DUMMY_POOL2 = "pool2"
+STRETCHED_POOL = "pool1:pool2"
 SPACE_EFFICIENCY = "thin"
 VIRT_SNAP_FUNC_TRUE = "true"
-IO_GROUP = 'iogrp1'
-VOLUME_GROUP = 'volgrp1'
+DUMMY_IO_GROUP = "iogrp1"
+DUMMY_VOLUME_GROUP = "volgrp1"
 
 VOLUME_OBJECT_TYPE = "volume"
 VOLUME_NAME = "volume_name"
