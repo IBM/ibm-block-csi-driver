@@ -20,7 +20,11 @@ from controllers.tests.controller_server.test_settings import (CLONE_VOLUME_NAME
                                                                IO_GROUP, VOLUME_GROUP,
                                                                VOLUME_NAME, SNAPSHOT_NAME,
                                                                SNAPSHOT_VOLUME_NAME,
-                                                               SNAPSHOT_VOLUME_WWN, VIRT_SNAP_FUNC_TRUE)
+                                                               SNAPSHOT_VOLUME_WWN, VIRT_SNAP_FUNC_TRUE, SECRET,
+                                                               SECRET_PASSWORD_KEY, SECRET_PASSWORD_VALUE,
+                                                               SECRET_MANAGEMENT_ADDRESS_KEY,
+                                                               SECRET_MANAGEMENT_ADDRESS_VALUE, SECRET_USERNAME_KEY,
+                                                               SECRET_USERNAME_VALUE)
 from controllers.tests.utils import ProtoBufMock
 
 
@@ -42,7 +46,7 @@ class BaseControllerSetUp(unittest.TestCase):
         self.servicer = CSIControllerServicer()
 
         self.request = ProtoBufMock()
-        self.request.secrets = {"username": "user", "password": "pass", "management_address": "mg"}
+        self.request.secrets = SECRET
 
         self.request.parameters = {}
         self.request.volume_context = {}
@@ -87,13 +91,15 @@ class CommonControllerTest:
     def _test_request_with_wrong_secrets(self, storage_agent):
         storage_agent.return_value = self.storage_agent
 
-        secrets = {"password": "pass", "management_address": "mg"}
+        secrets = {SECRET_PASSWORD_KEY: SECRET_PASSWORD_VALUE,
+                   SECRET_MANAGEMENT_ADDRESS_KEY: SECRET_MANAGEMENT_ADDRESS_VALUE}
         self._test_request_with_wrong_secrets_parameters(secrets)
 
-        secrets = {"username": "user", "management_address": "mg"}
+        secrets = {SECRET_USERNAME_KEY: SECRET_USERNAME_VALUE,
+                   SECRET_MANAGEMENT_ADDRESS_KEY: SECRET_MANAGEMENT_ADDRESS_VALUE}
         self._test_request_with_wrong_secrets_parameters(secrets)
 
-        secrets = {"username": "user", "password": "pass"}
+        secrets = {SECRET_USERNAME_KEY: SECRET_USERNAME_VALUE, SECRET_PASSWORD_KEY: SECRET_PASSWORD_VALUE}
         self._test_request_with_wrong_secrets_parameters(secrets)
 
         secrets = utils.get_fake_secret_config(system_id="u-")
@@ -721,10 +727,13 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INTERNAL,
                                          err=array_errors.NotEnoughSpaceInPool("pool"))
 
+    def _prepare_snapshot_request_volume_content_source(self):
+        self.request.volume_content_source = self._get_source_snapshot("wwn1")
+
     def _prepare_idempotent_tests(self):
         self.mediator.get_volume = Mock()
         self.mediator.copy_to_existing_volume = Mock()
-        self.request.volume_content_source = self._get_source_snapshot("wwn1")
+        self._prepare_snapshot_request_volume_content_source()
 
     @patch("controllers.servers.csi.csi_controller_server.get_agent")
     def test_create_volume_idempotent_with_source_succeed(self, storage_agent):
@@ -779,12 +788,33 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self._prepare_idempotent_test_with_other_source(storage_agent)
         self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
 
+    def _enable_virt_snap_func(self):
+        self.request.parameters[config.PARAMETERS_VIRT_SNAP_FUNC] = "true"
+
     @patch("controllers.servers.csi.csi_controller_server.get_agent")
     def test_create_volume_idempotent_with_other_source_and_virt_snap_func_enabled(self, storage_agent):
-        self.request.parameters[config.PARAMETERS_VIRT_SNAP_FUNC] = "true"
+        self._enable_virt_snap_func()
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume()
         self._prepare_idempotent_test_with_other_source(storage_agent)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
+
+    @patch("controllers.servers.csi.csi_controller_server.get_agent")
+    def test_create_volume_virt_snap_func_enabled_no_source(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+        self._enable_virt_snap_func()
+        self._prepare_snapshot_request_volume_content_source()
+        self.mediator.get_object_by_id.return_value = None
+        self.servicer.CreateVolume(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
+
+    @patch("controllers.servers.csi.csi_controller_server.get_agent")
+    def test_create_volume_virt_snap_func_enabled_no_snapshot_source(self, storage_agent):
+        storage_agent.return_value = self.storage_agent
+        self._enable_virt_snap_func()
+        self._prepare_snapshot_request_volume_content_source()
+        self.mediator.get_object_by_id.side_effect = [utils.get_mock_mediator_response_snapshot(), None]
+        self.servicer.CreateVolume(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
 
     @patch("controllers.servers.csi.csi_controller_server.get_agent")
     def test_create_volume_idempotent_with_size_not_matched(self, storage_agent):
@@ -1317,8 +1347,9 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '2')
         self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "fc")
 
-        self.mediator.map_volume.side_effect = [array_errors.LunAlreadyInUseError("", "")] * (
-                    self.mediator.max_lun_retries + 1)
+        max_lun_retries = self.mediator.max_lun_retries + 1
+        error_all_retries = [array_errors.LunAlreadyInUseError("", "")] * max_lun_retries
+        self.mediator.map_volume.side_effect = error_all_retries
         storage_agent.return_value = self.storage_agent
 
         self.servicer.ControllerPublishVolume(self.request, self.context)
