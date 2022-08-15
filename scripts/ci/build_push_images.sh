@@ -13,43 +13,32 @@ specific_tag="${IMAGE_VERSION}_b${BUILD_NUMBER}_${branch}"
 # Set latest tag only if its from develop branch or master and prepare tags
 [ "$GIT_BRANCH" = "develop" -o "$GIT_BRANCH" = "origin/develop" -o "$GIT_BRANCH" = "master" ] && tag_latest="true" || tag_latest="false"
 
+build_and_push (){
+    repository=$1
+    dockerfile=$2
+    driver_type=$3
+    registry="${DOCKER_REGISTRY}/${repository}"
+    tag_specific="${registry}:${specific_tag}"
+    tag_latest="${registry}:latest"
+    [ "$tag_latest" = "true" ] && taglatestflag="-t ${tag_latest}"
+
+    echo "Build and push ${driver_type} image"
+    docker build -t $tag_specific $taglatestflag -f $dockerfile --build-arg VERSION="${IMAGE_VERSION}" --build-arg BUILD_NUMBER="${BUILD_NUMBER}" .
+    docker push $tag_specific
+    [ "$tag_latest" = "true" ] && docker push $tag_latest || :
+}
 
 # CSI controller
 # --------------
-ctl_registry="${DOCKER_REGISTRY}/${CSI_CONTROLLER_IMAGE}"
-ctl_tag_specific="${ctl_registry}:${specific_tag}"
-ctl_tag_latest=${ctl_registry}:latest
-[ "$tag_latest" = "true" ] && taglatestflag="-t ${ctl_tag_latest}" 
-
-echo "Build and push the CSI controller image"
-docker build -t ${ctl_tag_specific} $taglatestflag -f Dockerfile-csi-controller --build-arg VERSION="${IMAGE_VERSION}" --build-arg BUILD_NUMBER="${BUILD_NUMBER}" .
-docker push ${ctl_tag_specific}
-[ "$tag_latest" = "true" ] && docker push ${ctl_tag_latest} || :
+build_and_push $CSI_CONTROLLER_IMAGE Dockerfile-csi-controller controller
 
 # CSI node
 # --------
-node_registry="${DOCKER_REGISTRY}/${CSI_NODE_IMAGE}"
-node_tag_specific="${node_registry}:${specific_tag}"
-node_tag_latest=${node_registry}:latest
-[ "$tag_latest" = "true" ] && taglatestflag="-t ${node_tag_latest}" 
-
-echo "Build and push the CSI node image"
-docker build -t ${node_tag_specific} $taglatestflag -f Dockerfile-csi-node --build-arg VERSION="${IMAGE_VERSION}" --build-arg BUILD_NUMBER="${BUILD_NUMBER}" .
-docker push ${node_tag_specific}
-[ "$tag_latest" = "true" ] && docker push ${node_tag_latest} || :
+build_and_push $CSI_NODE_IMAGE Dockerfile-csi-node node
 
 # Host Definer
 # --------
-host_definer_registry="${DOCKER_REGISTRY}/${CSI_HOST_DEFINER_IMAGE}"
-host_definer_tag_specific="${host_definer_registry}:${specific_tag}"
-host_definer_tag_latest=${host_definer_registry}:latest
-[ "$tag_latest" = "true" ] && taglatestflag="-t ${host_definer_tag_latest}" 
-
-echo "Build and push the Host Definer image"
-docker build -t ${host_definer_tag_specific} $taglatestflag -f Dockerfile-csi-host-definer --build-arg VERSION="${IMAGE_VERSION}" --build-arg BUILD_NUMBER="${BUILD_NUMBER}" .
-docker push ${host_definer_tag_specific}
-[ "$tag_latest" = "true" ] && docker push ${host_definer_tag_latest} || :
-
+build_and_push $CSI_HOST_DEFINER_IMAGE Dockerfile-csi-host-definer "Host Definer"
 
 set +x
 echo ""
