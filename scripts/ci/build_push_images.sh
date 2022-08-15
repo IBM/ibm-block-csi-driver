@@ -12,7 +12,9 @@ specific_tag="${IMAGE_VERSION}_b${BUILD_NUMBER}_${branch}"
 
 # Set latest tag only if its from develop branch or master and prepare tags
 [ "$GIT_BRANCH" = "develop" -o "$GIT_BRANCH" = "origin/develop" -o "$GIT_BRANCH" = "master" ] && tag_latest="true" || tag_latest="false"
-[ -n "$1" ] && printf "" > $1 || :
+
+images_file=$1
+[ -n "$images_file" ] && printf "" > $images_file || :
 
 build_and_push (){
     repository=$1
@@ -27,7 +29,7 @@ build_and_push (){
     docker build -t $tag_specific $taglatestflag -f $dockerfile --build-arg VERSION="${IMAGE_VERSION}" --build-arg BUILD_NUMBER="${BUILD_NUMBER}" .
     docker push $tag_specific
     [ "$tag_latest" = "true" ] && docker push $tag_latest || :
-    [ -n "$1" ] && printf "${tag_specific}\n" >> $1 || :
+    [ -n "$images_file" ] && printf "${tag_specific}\n" >> $images_file || :
     echo ""
     echo "Image ready:"
     echo "   ${tag_specific}"
@@ -35,7 +37,7 @@ build_and_push (){
 
 # CSI controller
 # --------------
-build_and_push $CSI_CONTROLLER_IMAGE Dockerfile-csi-controller controller
+build_and_push $CSI_CONTROLLER_IMAGE Dockerfile-csi-controller controller 
 
 # CSI node
 # --------
