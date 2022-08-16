@@ -21,10 +21,13 @@ from controllers.tests.array_action.ds8k.test_settings import VOLUME_FAKE_NAME, 
     DUMMY_VOLUME_ID3, DUMMY_ABSTRACT_VOLUME_UID, DUMMY_VOLUME_UID, DUMMY_ZERO_OUT_OF_SYNC_TRACKS, \
     DUMMY_OUT_OF_SYNC_TRACKS, DUMMY_UNSUPPORTED_SYSTEM_BUNDLE, DUMMY_SYSTEM_WWNN, DUMMY_SYSTEM_BUNDLE, \
     DUMMY_GET_SYSTEM_ID, DUMMY_VOLUME_CAPACITY, VALID_STATE, ENABLED_BACKGROUND_COPY, UNSUPPORTED_SPACE_EFFICIENCY, \
-    DISABLED_BACKGROUND_COPY
+    DISABLED_BACKGROUND_COPY, INVALID_STATE, GET_HOSTS_LUN_ID_ATTR_KEY, GET_HOSTS_VOLUME_ID_ATTR_KEY, \
+    GET_HOSTS_MAPPINGS_BRIEFS_ATTR_KEY, GET_HOSTS_NAME_ATTR_KEY, FLASHCOPY_ID_DELIMITER, GET_HOST_MAPPINGS_ID_ATTR_KEY, \
+    GET_HOST_MAPPINGS_VOLUME_ATTR_KEY, GET_HOST_LOGIN_PORTS_ATTR_KEY, LOGIN_PORT_STATE_OFFLINE, GET_HOSTS_WWPN_ATTR_KEY, \
+    GET_HOSTS_HOST_PORTS_BRIEFS_ATTR_KEY
 from controllers.tests.array_action.test_settings import DUMMY_ERROR_MESSAGE, DUMMY_HOST_NAME1, DUMMY_FC_WWN1, \
     DUMMY_FC_WWN2, FC_CONNECTIVITY_TYPE, DUMMY_CONNECTIVITY_TYPE, DUMMY_FC_WWN3, DUMMY_FC_WWN4, VOLUME_NAME_ATTR_KEY, \
-    VOLUME_ID_ATTR_KEY
+    VOLUME_ID_ATTR_KEY, DUMMY_LUN_ID
 from controllers.tests.common.test_settings import VOLUME_NAME, DUMMY_POOL1, USER, PASSWORD, VOLUME_UID, \
     SNAPSHOT_NAME, SNAPSHOT_VOLUME_UID, INTERNAL_SNAPSHOT_ID, VOLUME_OBJECT_TYPE, SNAPSHOT_OBJECT_TYPE, HOST_NAME, \
     SOURCE_VOLUME_NAME, DUMMY_POOL2, SOURCE_VOLUME_ID
@@ -73,12 +76,16 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                       VOLUME_FLASHCOPY_ATTR_KEY: ""}
                      )
 
-    def _get_flashcopy_response(self, source_volume, target_volume, background_copy):
+    def _get_flashcopy_id(self, source_volume, target_volume):
+        return FLASHCOPY_ID_DELIMITER.join([source_volume, target_volume])
+
+    def _get_flashcopy_response(self, source_volume, target_volume, background_copy=ENABLED_BACKGROUND_COPY,
+                                state=VALID_STATE):
         return Munch(
             {FLASHCOPY_SOURCE_VOLUME_ATTR_KEY: source_volume,
              FLASHCOPY_TARGET_VOLUME_ATTR_KEY: target_volume,
-             FLASHCOPY_ID_ATTR_KEY: ":".join([source_volume, target_volume]),
-             FLASHCOPY_STATE_ATTR_KEY: VALID_STATE,
+             FLASHCOPY_ID_ATTR_KEY: self._get_flashcopy_id(source_volume, target_volume),
+             FLASHCOPY_STATE_ATTR_KEY: state,
              FLASHCOPY_BACKGROUND_COPY_ATTR_KEY: background_copy,
              PYDS8K_REPRESENTATION_KEY: {}
              }
@@ -284,7 +291,8 @@ class TestArrayMediatorDS8K(unittest.TestCase):
     def test_delete_volume_with_flashcopy_as_target_success(self):
         self._prepare_mocks_for_volume()
         self.array.delete_volume(DUMMY_VOLUME_ID1)
-        self.client_mock.delete_flashcopy.assert_called_once_with(":".join([DUMMY_VOLUME_ID1, DUMMY_VOLUME_ID2]))
+        self.client_mock.delete_flashcopy.assert_called_once_with(self._get_flashcopy_id(DUMMY_VOLUME_ID1,
+                                                                                         DUMMY_VOLUME_ID2))
         self.client_mock.delete_volume.assert_called_once_with(volume_id=DUMMY_VOLUME_ID1)
 
     def test_get_volume_mappings_fail_with_client_exception(self):
@@ -292,34 +300,42 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         with self.assertRaises(ClientException):
             self.array.get_volume_mappings(VOLUME_NAME)
 
+    def _mock_get_hosts_response(self, volume_id=DUMMY_VOLUME_ID3, lun_id=DUMMY_LUN_ID, wwpn1=DUMMY_FC_WWN1,
+                                 wwpn2=DUMMY_FC_WWN2, host_name=HOST_NAME):
+        return [
+            Munch({
+                GET_HOSTS_MAPPINGS_BRIEFS_ATTR_KEY: [{
+                    GET_HOSTS_VOLUME_ID_ATTR_KEY: volume_id,
+                    GET_HOSTS_LUN_ID_ATTR_KEY: lun_id,
+                }],
+                GET_HOST_LOGIN_PORTS_ATTR_KEY: [
+                    {
+                        LOGIN_PORT_WWPN: wwpn1,
+                        LOGIN_PORT_STATE: LOGIN_PORT_STATE_ONLINE,
+                    },
+                    {
+                        LOGIN_PORT_WWPN: wwpn2,
+                        LOGIN_PORT_STATE: LOGIN_PORT_STATE_OFFLINE,
+                    }
+                ],
+                GET_HOSTS_NAME_ATTR_KEY: host_name,
+                GET_HOSTS_HOST_PORTS_BRIEFS_ATTR_KEY: [{GET_HOSTS_WWPN_ATTR_KEY: wwpn1},
+                                                       {GET_HOSTS_WWPN_ATTR_KEY: wwpn2}]
+            })
+        ]
+
     def test_get_volume_mappings_found_nothing(self):
         volume_id = DUMMY_VOLUME_ID1
         scsi_id = DUMMY_ABSTRACT_VOLUME_UID.format(volume_id)
-        self.client_mock.get_hosts.return_value = [
-            Munch({
-                "mappings_briefs": [{
-                    "volume_id": "0000",
-                    "lunid": "1",
-                }]
-            })
-        ]
+        self.client_mock.get_hosts.return_value = self._mock_get_hosts_response()
         self.assertDictEqual(self.array.get_volume_mappings(scsi_id), {})
 
     def test_get_volume_mappings(self):
         volume_id = DUMMY_VOLUME_ID1
-        lunid = "1"
-        host_name = HOST_NAME
+        lunid = DUMMY_LUN_ID
         scsi_id = DUMMY_ABSTRACT_VOLUME_UID.format(volume_id)
-        self.client_mock.get_hosts.return_value = [
-            Munch({
-                "mappings_briefs": [{
-                    "volume_id": volume_id,
-                    "lunid": lunid,
-                }],
-                "name": host_name,
-            })
-        ]
-        self.assertDictEqual(self.array.get_volume_mappings(scsi_id), {host_name: int(lunid)})
+        self.client_mock.get_hosts.return_value = self._mock_get_hosts_response(volume_id=volume_id, lun_id=lunid)
+        self.assertDictEqual(self.array.get_volume_mappings(scsi_id), {HOST_NAME: int(lunid)})
 
     def test_map_volume_host_not_found(self):
         self.client_mock.map_volume_to_host.side_effect = NotFound("404")
@@ -345,9 +361,9 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         scsi_id = DUMMY_VOLUME_UID
         host_name = VOLUME_NAME
         connectivity_type = DUMMY_CONNECTIVITY_TYPE
-        self.client_mock.map_volume_to_host.return_value = Munch({"lunid": "01"})
+        self.client_mock.map_volume_to_host.return_value = Munch({GET_HOSTS_LUN_ID_ATTR_KEY: DUMMY_LUN_ID})
         lun = self.array.map_volume(scsi_id, host_name, connectivity_type)
-        self.assertEqual(1, lun)
+        self.assertEqual(5, lun)
         self.client_mock.map_volume_to_host.assert_called_once_with(host_name, scsi_id[-4:])
 
     def test_unmap_volume_host_not_found(self):
@@ -367,13 +383,13 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_unmap_volume_fail_with_client_exception(self):
         volume_id = DUMMY_VOLUME_ID1
-        lunid = "1"
+        lunid = DUMMY_LUN_ID
         host_name = HOST_NAME
         scsi_id = DUMMY_ABSTRACT_VOLUME_UID.format(volume_id)
         self.client_mock.get_host_mappings.return_value = [
             Munch({
-                "volume": volume_id,
-                "id": lunid
+                GET_HOST_MAPPINGS_VOLUME_ATTR_KEY: volume_id,
+                GET_HOST_MAPPINGS_ID_ATTR_KEY: lunid
             })
         ]
         self.client_mock.unmap_volume_from_host.side_effect = ClientException("500")
@@ -382,13 +398,13 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_unmap_volume(self):
         volume_id = DUMMY_VOLUME_ID1
-        lunid = "1"
+        lunid = DUMMY_LUN_ID
         host_name = HOST_NAME
         scsi_id = DUMMY_ABSTRACT_VOLUME_UID.format(volume_id)
         self.client_mock.get_host_mappings.return_value = [
             Munch({
-                "volume": volume_id,
-                "id": lunid
+                GET_HOST_MAPPINGS_VOLUME_ATTR_KEY: volume_id,
+                GET_HOST_MAPPINGS_ID_ATTR_KEY: lunid
             })
         ]
         self.array.unmap_volume(scsi_id, host_name)
@@ -402,34 +418,16 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_get_array_fc_wwns_skip_offline_port(self):
         wwpn1 = DUMMY_FC_WWN1
-        wwpn2 = DUMMY_FC_WWN2
-        self.client_mock.get_host.return_value = Munch(
-            {"login_ports": [
-                {
-                    LOGIN_PORT_WWPN: wwpn1,
-                    LOGIN_PORT_STATE: LOGIN_PORT_STATE_ONLINE,
-                },
-                {
-                    LOGIN_PORT_WWPN: wwpn2,
-                    LOGIN_PORT_STATE: "offline",
-                }
-            ]})
+        self.client_mock.get_host.return_value = self._mock_get_hosts_response()[0]
         self.assertListEqual(self.array.get_array_fc_wwns(None), [wwpn1])
 
     def test_get_array_fc_wwns(self):
         wwpn = DUMMY_FC_WWN1
-        self.client_mock.get_host.return_value = Munch(
-            {"login_ports": [
-                {
-                    LOGIN_PORT_WWPN: wwpn,
-                    LOGIN_PORT_STATE: LOGIN_PORT_STATE_ONLINE
-                }
-            ]})
+        self.client_mock.get_host.return_value = self._mock_get_hosts_response()[0]
         self.assertListEqual(self.array.get_array_fc_wwns(None), [wwpn])
 
     def test_get_host_by_name_success(self):
-        self.client_mock.get_host.return_value = Munch(
-            {"name": DUMMY_HOST_NAME1, "host_ports_briefs": [{"wwpn": DUMMY_FC_WWN1}, {"wwpn": DUMMY_FC_WWN2}]})
+        self.client_mock.get_host.return_value = self._mock_get_hosts_response(host_name=DUMMY_HOST_NAME1)[0]
         host = self.array.get_host_by_name(DUMMY_HOST_NAME1)
         self.assertEqual(DUMMY_HOST_NAME1, host.name)
         self.assertEqual([FC_CONNECTIVITY_TYPE], host.connectivity_types)
@@ -443,45 +441,26 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             self.array.get_host_by_name(DUMMY_HOST_NAME1)
 
     def test_get_host_by_identifiers(self):
-        host_name = HOST_NAME
         wwpn1 = DUMMY_FC_WWN1
         wwpn2 = DUMMY_FC_WWN2
-        self.client_mock.get_hosts.return_value = [
-            Munch({
-                "name": host_name,
-                "host_ports_briefs": [{"wwpn": wwpn1}, {"wwpn": wwpn2}]
-            })
-        ]
+        self.client_mock.get_hosts.return_value = self._mock_get_hosts_response()
         host, connectivity_type = self.array.get_host_by_host_identifiers(
             Initiators([], [wwpn1, wwpn2], [])
         )
-        self.assertEqual(host_name, host)
+        self.assertEqual(HOST_NAME, host)
         self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_type)
 
     def test_get_host_by_identifiers_partial_match(self):
-        host_name = HOST_NAME
         wwpn1 = DUMMY_FC_WWN1
-        wwpn2 = DUMMY_FC_WWN2
-        self.client_mock.get_hosts.return_value = [
-            Munch({
-                "name": host_name,
-                "host_ports_briefs": [{"wwpn": wwpn1}, {"wwpn": wwpn2}]
-            })
-        ]
+        self.client_mock.get_hosts.return_value = self._mock_get_hosts_response()
         host, connectivity_type = self.array.get_host_by_host_identifiers(
             Initiators([], [wwpn1, DUMMY_FC_WWN3], [])
         )
-        self.assertEqual(host, host_name)
+        self.assertEqual(host, HOST_NAME)
         self.assertEqual([config.FC_CONNECTIVITY_TYPE], connectivity_type)
 
     def test_get_host_by_identifiers_not_found(self):
-        host_name = HOST_NAME
-        self.client_mock.get_hosts.return_value = [
-            Munch({
-                "name": host_name,
-                "host_ports_briefs": [{"wwpn": DUMMY_FC_WWN1}, {"wwpn": DUMMY_FC_WWN2}]
-            })
-        ]
+        self.client_mock.get_hosts.return_value = self._mock_get_hosts_response()
         with self.assertRaises(array_errors.HostNotFoundError):
             self.array.get_host_by_host_identifiers(
                 Initiators([], [DUMMY_FC_WWN3, DUMMY_FC_WWN4], [])
@@ -648,17 +627,16 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_create_snapshot_not_valid(self):
         self._prepare_mocks_for_create_snapshot()
-        flashcopy_response = Munch(
-            {FLASHCOPY_SOURCE_VOLUME_ATTR_KEY: {"id": DUMMY_VOLUME_ID1},
-             FLASHCOPY_TARGET_VOLUME_ATTR_KEY: {"id": DUMMY_VOLUME_ID2},
-             "id": ":".join([DUMMY_VOLUME_ID1, DUMMY_VOLUME_ID2]),
-             FLASHCOPY_STATE_ATTR_KEY: "invalid"
-             })
+        flashcopy_response = self._get_flashcopy_response(
+            DUMMY_VOLUME_ID1,
+            DUMMY_VOLUME_ID2,
+            state=INVALID_STATE
+        )
         self.client_mock.get_flashcopies.return_value = flashcopy_response
         with self.assertRaises(ValueError) as ar_context:
             self.array.create_snapshot(VOLUME_UID, SNAPSHOT_NAME, space_efficiency=None,
                                        pool=self.volume_response.pool, is_virt_snap_func=False)
-        self.assertIn("invalid", str(ar_context.exception))
+        self.assertIn(INVALID_STATE, str(ar_context.exception))
 
     def _prepare_mocks_for_snapshot(self):
         flashcopy_as_target = self.flashcopy_response
