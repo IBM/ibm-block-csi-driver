@@ -11,7 +11,7 @@ from controllers.array_action.array_mediator_svc import SVCArrayMediator
 from controllers.array_action.array_mediator_xiv import XIVArrayMediator
 from controllers.array_action.errors import FailedToFindStorageSystemType
 from controllers.array_action.storage_agent import (StorageAgent, get_agent, clear_agents,
-                                                    get_agents, detect_array_type)
+                                                    get_agents, detect_array_type, array_type_cache)
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
 
 
@@ -128,6 +128,19 @@ class TestStorageAgent(unittest.TestCase):
         with self.assertRaises(FailedToFindStorageSystemType):
             detect_array_type(["unknown_host", ])
 
+    def test_detect_array_type_with_cache(self):
+        array_type_cache.clear()
+        self.assertNotIn("svc_host", array_type_cache)
+        detect_array_type(["svc_host", ])
+
+        self.assertIn("svc_host", array_type_cache)
+
+        first_call_count = self.socket_mock.call_count
+        detect_array_type(["svc_host", ])
+        second_call_count = self.socket_mock.call_count
+
+        self.assertEqual(first_call_count, second_call_count)
+
     def test_init_storage_agent_prepopulates_one_mediator(self):
         # one mediator client is already initialized.
         self.client_mock.get_system.assert_called_once_with()
@@ -210,10 +223,10 @@ class TestStorageAgent(unittest.TestCase):
         t1.join()
         t2.join()
         t3.join()
-
-        self.assertEqual(get_agent(
-            ArrayConnectionInfo(array_addresses=["ds8k_host", ], user="test", password="test")).conn_pool.current_size,
-            3)
+        conn_pool_size = get_agent(ArrayConnectionInfo(array_addresses=["ds8k_host", ],
+                                                       user="test",
+                                                       password="test")).conn_pool.current_size
+        self.assertEqual(3, conn_pool_size)
 
     def test_get_mediator_timeout(self):
         self._test_get_mediator_timeout()
