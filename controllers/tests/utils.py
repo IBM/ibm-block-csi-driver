@@ -5,8 +5,8 @@ from mock import Mock, MagicMock
 
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
 from controllers.tests.common.test_settings import USER as test_user, \
-    PASSWORD as test_password, \
-    ARRAY as test_array, VOLUME_NAME, VOLUME_UID, DUMMY_POOL1, INTERNAL_VOLUME_ID
+    PASSWORD as test_password, ARRAY as test_array, VOLUME_NAME, VOLUME_UID, DUMMY_POOL1, INTERNAL_VOLUME_ID, \
+    SNAPSHOT_NAME, SNAPSHOT_VOLUME_NAME, SNAPSHOT_VOLUME_UID
 
 
 class ProtoBufMock(MagicMock):
@@ -29,13 +29,14 @@ def get_mock_mediator_response_volume(size=10, name=VOLUME_NAME, volume_id=VOLUM
     return volume
 
 
-def get_mock_mediator_response_snapshot(capacity, name, snapshot_id, volume_name, array_type):
+def get_mock_mediator_response_snapshot(capacity=10, name=SNAPSHOT_NAME, snapshot_id=SNAPSHOT_VOLUME_UID ,
+                                        volume_name=SNAPSHOT_VOLUME_NAME, array_type="xiv"):
     snapshot = Mock()
     snapshot.capacity_bytes = capacity
     snapshot.id = snapshot_id
     snapshot.internal_id = "0"
     snapshot.name = name
-    snapshot.volume_name = volume_name
+    snapshot.source_id = volume_name
     snapshot.array_address = "arr1"
     snapshot.array_type = array_type
     snapshot.is_ready = True

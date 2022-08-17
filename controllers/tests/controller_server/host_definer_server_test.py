@@ -1,13 +1,11 @@
 import unittest
-from unittest.mock import Mock, patch
-
-from mock import MagicMock
+from mock import Mock, patch, MagicMock
 
 from controllers.array_action.array_action_types import Host
 from controllers.array_action.errors import HostNotFoundError, HostAlreadyExists
 from controllers.common.node_info import Initiators
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
-from controllers.tests.common.test_settings import VOLUME_NAME, HOST_NAME
+from controllers.tests.common.test_settings import VOLUME_NAME, HOST_NAME, SECRET
 from controllers.tests.controller_server.common import mock_get_agent
 
 HOST_DEFINER_SERVER_PATH = "controllers.servers.host_definer.storage_manager.host_definer_server"
@@ -19,7 +17,7 @@ class BaseSetUp(unittest.TestCase):
 
         detect_array_type_path = '.'.join((HOST_DEFINER_SERVER_PATH, 'detect_array_type'))
         detect_array_type_patcher = patch(detect_array_type_path)
-        self.detect_array_type = detect_array_type_patcher.start()
+        detect_array_type_patcher.start()
         self.addCleanup(detect_array_type_patcher.stop)
 
         self.mediator = Mock()
@@ -34,7 +32,7 @@ class BaseSetUp(unittest.TestCase):
         self.request.prefix = None
         self.request.connectivity_type = 'fc'
         self.request.node_id = '{};;;{}'.format(HOST_NAME, self.iqn)
-        self.request.system_info = {'username': 'user', 'password': 'pass', 'management_address': 'mg111'}
+        self.request.system_info = SECRET
 
 
 class TestDefineHost(BaseSetUp):

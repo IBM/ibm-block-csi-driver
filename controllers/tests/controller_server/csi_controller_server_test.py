@@ -44,7 +44,7 @@ class BaseControllerSetUp(unittest.TestCase):
         self.servicer = CSIControllerServicer()
 
         self.request = ProtoBufMock()
-        self.request.secrets = {"username": USER, "password": PASSWORD, "management_address": MANAGEMENT_ADDRESS}
+        self.request.secrets = SECRET
 
         self.request.parameters = {}
         self.request.volume_context = {}
@@ -86,13 +86,15 @@ class CommonControllerTest:
         self.assertIn(message, context.details)
 
     def _test_request_with_wrong_secrets(self):
-        secrets = {"password": PASSWORD, "management_address": MANAGEMENT_ADDRESS}
+        secrets = {SECRET_PASSWORD_KEY: SECRET_PASSWORD_VALUE,
+                   SECRET_MANAGEMENT_ADDRESS_KEY: SECRET_MANAGEMENT_ADDRESS_VALUE}
         self._test_request_with_wrong_secrets_parameters(secrets)
 
-        secrets = {"username": USER, "management_address": MANAGEMENT_ADDRESS}
+        secrets = {SECRET_USERNAME_KEY: SECRET_USERNAME_VALUE,
+                   SECRET_MANAGEMENT_ADDRESS_KEY: SECRET_MANAGEMENT_ADDRESS_VALUE}
         self._test_request_with_wrong_secrets_parameters(secrets)
 
-        secrets = {"username": USER, "password": PASSWORD}
+        secrets = {SECRET_USERNAME_KEY: SECRET_USERNAME_VALUE, SECRET_PASSWORD_KEY: SECRET_PASSWORD_VALUE}
         self._test_request_with_wrong_secrets_parameters(secrets)
 
         secrets = utils.get_fake_secret_config(system_id="u-")
@@ -663,10 +665,13 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INTERNAL,
                                          err=array_errors.NotEnoughSpaceInPool(DUMMY_POOL1))
 
+    def _prepare_snapshot_request_volume_content_source(self):
+        self.request.volume_content_source = self._get_source_snapshot(SNAPSHOT_VOLUME_UID)
+
     def _prepare_idempotent_tests(self):
         self.mediator.get_volume = Mock()
         self.mediator.copy_to_existing_volume = Mock()
-        self.request.volume_content_source = self._get_source_snapshot(SNAPSHOT_VOLUME_UID)
+        self._prepare_snapshot_request_volume_content_source()
 
     def test_create_volume_idempotent_with_source_succeed(self):
         self._prepare_idempotent_tests()
@@ -719,9 +724,28 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
     def test_create_volume_idempotent_with_other_source_and_virt_snap_func_enabled(self):
         self.request.parameters[config.PARAMETERS_VIRT_SNAP_FUNC] = "true"
+    def _enable_virt_snap_func(self):
+        self.request.parameters[config.PARAMETERS_VIRT_SNAP_FUNC] = "true"
+
+    def test_create_volume_idempotent_with_other_source_and_virt_snap_func_enabled(self):
+        self._enable_virt_snap_func()
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume()
         self._prepare_idempotent_test_with_other_source()
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
+
+    def test_create_volume_virt_snap_func_enabled_no_source(self):
+        self._enable_virt_snap_func()
+        self._prepare_snapshot_request_volume_content_source()
+        self.mediator.get_object_by_id.return_value = None
+        self.servicer.CreateVolume(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
+
+    def test_create_volume_virt_snap_func_enabled_no_snapshot_source(self):
+        self._enable_virt_snap_func()
+        self._prepare_snapshot_request_volume_content_source()
+        self.mediator.get_object_by_id.side_effect = [utils.get_mock_mediator_response_snapshot(), None]
+        self.servicer.CreateVolume(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
 
     def test_create_volume_idempotent_with_size_not_matched(self):
         self.mediator.get_volume = Mock()
@@ -1199,8 +1223,9 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '2')
         self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "fc")
 
-        self.mediator.map_volume.side_effect = [array_errors.LunAlreadyInUseError("", "")] * (
-                self.mediator.max_lun_retries + 1)
+        max_lun_retries = self.mediator.max_lun_retries + 1
+        error_all_retries = [array_errors.LunAlreadyInUseError("", "")] * max_lun_retries
+        self.mediator.map_volume.side_effect = error_all_retries
 
         self.servicer.ControllerPublishVolume(self.request, self.context)
 
