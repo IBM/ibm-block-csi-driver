@@ -1,5 +1,6 @@
 import time
 from threading import Thread
+from munch import Munch
 
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher, NODES, SECRET_IDS
@@ -20,11 +21,12 @@ class CsiNodeWatcher(Watcher):
         while True:
             resource_version = self.csi_nodes_api.get().metadata.resourceVersion
             stream = self.csi_nodes_api.watch(resource_version=resource_version, timeout=5)
-            for event in stream:
-                csi_node = self._get_csi_node_object(event[settings.OBJECT_KEY])
-                if (event[settings.TYPE_KEY] == settings.DELETED_EVENT) and (csi_node.name in NODES):
+            for watch_event in stream:
+                watch_event = Munch.fromDict(watch_event)
+                csi_node = self._get_csi_node_object(watch_event.object)
+                if (watch_event.type == settings.DELETED_EVENT) and (csi_node.name in NODES):
                     self._handle_deleted_csi_node_pod(csi_node.name)
-                elif event[settings.TYPE_KEY] == settings.MODIFIED_EVENT:
+                elif watch_event.type == settings.MODIFIED_EVENT:
                     self._handle_modified_csi_node(csi_node)
 
     def _handle_modified_csi_node(self, csi_node):

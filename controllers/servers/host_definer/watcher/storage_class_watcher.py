@@ -1,4 +1,5 @@
 from kubernetes import watch
+from munch import Munch
 
 import controllers.servers.host_definer.messages as messages
 from controllers.common.csi_logger import get_stdout_logger
@@ -14,21 +15,22 @@ class StorageClassWatcher(Watcher):
         storage_classes = self._get_storage_classes()
         for storage_class in storage_classes:
             secrets = self._get_secrets_from_storage_class_with_driver_provisioner(storage_class)
-            self._handle_added_storage_class_event(secrets, storage_class.name)
+            self._handle_added_watch_event(secrets, storage_class.name)
 
     def watch_storage_class_resources(self):
         while True:
             resource_version = self.storage_api.list_storage_class().metadata.resource_version
             stream = watch.Watch().stream(self.storage_api.list_storage_class,
                                           resource_version=resource_version, timeout_seconds=5)
-            for event in stream:
-                storage_class = self._get_storage_class_object(event[settings.OBJECT_KEY])
+            for watch_event in stream:
+                watch_event = Munch.fromDict(watch_event)
+                storage_class = self._get_storage_class_object(watch_event.object)
                 secrets = self._get_secrets_from_storage_class_with_driver_provisioner(storage_class)
-                if event[settings.TYPE_KEY] == settings.ADDED_EVENT:
-                    self._handle_added_storage_class_event(secrets, storage_class.name)
+                if watch_event.type == settings.ADDED_EVENT:
+                    self._handle_added_watch_event(secrets, storage_class.name)
 
-                if event[settings.TYPE_KEY] == settings.DELETED_EVENT:
-                    self._handle_deleted_storage_class_event(secrets)
+                if watch_event.type == settings.DELETED_EVENT:
+                    self._handle_deleted_watch_event(secrets)
 
     def _get_secrets_from_storage_class_with_driver_provisioner(self, storage_class):
         if self._is_storage_class_has_csi_as_a_provisioner(storage_class):
@@ -58,7 +60,7 @@ class StorageClassWatcher(Watcher):
             storage_class.parameters[parameter_name],
             storage_class.parameters[prefix + secret_name_suffix.replace(settings.NAME, settings.NAMESPACE)])
 
-    def _handle_added_storage_class_event(self, secrets, storage_class_name):
+    def _handle_added_watch_event(self, secrets, storage_class_name):
         logger.info(messages.NEW_STORAGE_CLASS.format(storage_class_name))
         for secret in secrets:
             self._verify_nodes_defined_when_new_secret(secret)
@@ -82,6 +84,6 @@ class StorageClassWatcher(Watcher):
         else:
             SECRET_IDS[secret] = 1
 
-    def _handle_deleted_storage_class_event(self, secrets):
+    def _handle_deleted_watch_event(self, secrets):
         for secret in secrets:
             SECRET_IDS[secret] -= 1

@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from controllers.servers.csi.controller_types import ArrayConnectionInfo
 
 
 @dataclass
@@ -6,7 +7,7 @@ class DefineHostRequest:
     prefix: str = ''
     connectivity_type: str = ''
     node_id: str = ''
-    system_info: dict = field(default_factory=dict)
+    array_connection_info: ArrayConnectionInfo = ArrayConnectionInfo(array_addresses='', user='', password='')
 
 
 @dataclass

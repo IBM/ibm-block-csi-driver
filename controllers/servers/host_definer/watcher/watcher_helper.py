@@ -3,13 +3,15 @@ import os
 import random
 import string
 
+from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.config import (SECRET_ARRAY_PARAMETER,
                                         SECRET_PASSWORD_PARAMETER,
                                         SECRET_USERNAME_PARAMETER)
-import controllers.servers.host_definer.messages as messages
 import controllers.servers.messages as common_messages
+from controllers.servers.utils import get_array_connection_info_from_secrets
+from controllers.servers.errors import ValidationException
+import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
-from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer import settings
 from controllers.servers.host_definer.types import DefineHostRequest, DefineHostResponse, HostDefinition, Secret
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
@@ -161,8 +163,8 @@ class Watcher(KubernetesManager):
 
     def _get_request_from_secret(self, secret):
         request = self._get_new_request()
-        request.system_info = self._get_system_info_from_secret(secret)
-        if request.system_info:
+        request.array_connection_info = self._get_array_connection_info_from_secret(secret)
+        if request.array_connection_info:
             return request
         return None
 
@@ -183,20 +185,24 @@ class Watcher(KubernetesManager):
         host_definition.secret = secret
         return host_definition
 
-    def _get_system_info_from_secret(self, secret):
+    def _get_array_connection_info_from_secret(self, secret):
         secret_data = self._get_data_from_secret(secret)
-        return self._get_system_info_from_secret_data(secret_data)
+        return self._get_array_connection_info_from_secret_data(secret_data)
 
-    def _get_system_info_from_secret_data(self, secret_data):
+    def _get_array_connection_info_from_secret_data(self, secret_data):
         try:
-            return self._get_system_info(secret_data)
+            system_info = self._get_system_info(secret_data)
+            if system_info:
+                return get_array_connection_info_from_secrets(system_info)
         except KeyError:
             logger.error(common_messages.INVALID_SECRET_CONFIG_MESSAGE)
-            return ''
+        except ValidationException as ex:
+            logger.error(str(ex))
+        return None
 
     def _get_system_info(self, secret_data):
         if not secret_data:
-            return ''
+            return None
 
         return {
             SECRET_ARRAY_PARAMETER: self._decode_base64_to_string(secret_data[SECRET_ARRAY_PARAMETER]),

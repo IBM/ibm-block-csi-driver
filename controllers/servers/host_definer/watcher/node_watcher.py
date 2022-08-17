@@ -1,5 +1,6 @@
 from queue import Empty
 from kubernetes import watch
+from munch import Munch
 
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import NODES, Watcher
@@ -33,14 +34,15 @@ class NodeWatcher(Watcher):
         while True:
             resource_version = self.core_api.list_node().metadata.resource_version
             stream = watch.Watch().stream(self.core_api.list_node, resource_version=resource_version, timeout_seconds=5)
-            for event in stream:
-                node_name = event[settings.OBJECT_KEY].metadata.name
+            for watch_event in stream:
+                watch_event = Munch.fromDict(watch_event)
+                node_name = watch_event.object.metadata.name
                 csi_node = self._get_csi_node(node_name)
-                if event[settings.TYPE_KEY] in settings.MODIFIED_EVENT and \
+                if watch_event.type in settings.MODIFIED_EVENT and \
                         self._is_unmanaged_csi_node_has_driver(csi_node):
                     self.unmanaged_csi_nodes_with_driver.add(csi_node.name)
 
-                if event[settings.TYPE_KEY] == settings.MODIFIED_EVENT and \
+                if watch_event.type == settings.MODIFIED_EVENT and \
                         self._is_node_has_new_manage_node_label(csi_node):
                     self._add_node_to_nodes(csi_node)
                     self._define_host_on_all_storages_from_secrets(node_name)
