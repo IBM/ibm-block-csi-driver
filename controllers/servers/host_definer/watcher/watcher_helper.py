@@ -118,18 +118,15 @@ class Watcher(KubernetesManager):
         self._create_event(settings.DEFAULT_NAMESPACE, event)
 
     def _is_host_can_be_defined(self, node_name):
-        if self._is_dynamic_node_labeling_allowed():
-            return True
-        return self._is_node_has_manage_node_label(node_name)
+        return self._is_dynamic_node_labeling_allowed() or self._is_node_has_manage_node_label(node_name)
 
     def _is_dynamic_node_labeling_allowed(self):
         return os.getenv(settings.DYNAMIC_NODE_LABELING_ENV_VAR) == settings.TRUE_STRING
 
     def _is_host_can_be_undefined(self, node_name):
-        if self._is_host_definer_can_delete_hosts():
-            return self._is_node_has_manage_node_label(node_name) and \
-                (not self._is_node_has_forbid_deletion_label(node_name))
-        return False
+        return self._is_host_definer_can_delete_hosts() and \
+            self._is_node_has_manage_node_label(node_name) and \
+            not self._is_node_has_forbid_deletion_label(node_name)
 
     def _is_host_definer_can_delete_hosts(self):
         return os.getenv(settings.ALLOW_DELETE_ENV_VAR) == settings.TRUE_STRING
@@ -222,14 +219,14 @@ class Watcher(KubernetesManager):
         return host_definition
 
     def _get_host_definition_name(self, node_name):
-        return '{0}.{1}'.format(node_name, self._get_random_string()).replace('_', '.')
+        return '{0}-{1}'.format(node_name, self._get_random_string()).replace('_', '.')
 
     def _get_random_string(self):
         return ''.join(random.choices(string.ascii_lowercase + string.digits, k=20))
 
     def _get_secret_object_from_id(self, secret_id):
         secret = Secret()
-        secret.name, secret.namespace = secret_id.split(',')
+        secret.name, secret.namespace = secret_id
         return secret
 
     def _add_node_to_nodes(self, csi_node):
@@ -256,4 +253,4 @@ class Watcher(KubernetesManager):
             self._create_definition(host_definition)
 
     def _generate_secret_id_from_secret_and_namespace(self, secret_name, secret_namespace):
-        return secret_name + settings.SECRET_SEPARATOR + secret_namespace
+        return (secret_name, secret_namespace)
