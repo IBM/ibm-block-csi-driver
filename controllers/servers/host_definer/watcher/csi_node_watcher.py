@@ -50,30 +50,30 @@ class CsiNodeWatcher(Watcher):
     def _is_host_part_of_update(self, worker):
         daemon_set_name = self._wait_until_all_daemon_set_pods_are_up_to_date()
         if daemon_set_name:
-            return self._is_csi_ibm_block_node_pod_running_on_worker(worker, daemon_set_name)
+            return self._is_csi_node_pod_running_on_worker(worker, daemon_set_name)
         return False
 
-    def _is_csi_ibm_block_node_pod_running_on_worker(self, worker, daemon_set_name):
-        csi_ibm_block_pods = self._get_csi_ibm_block_pods()
-        for pod in csi_ibm_block_pods:
+    def _is_csi_node_pod_running_on_worker(self, worker, daemon_set_name):
+        csi_pods = self._get_csi_pods()
+        for pod in csi_pods:
             if (pod.node_name == worker) and (daemon_set_name in pod.name):
                 return True
         return False
 
     def _wait_until_all_daemon_set_pods_are_up_to_date(self):
-        csi_ibm_block_daemon_set = self._get_csi_ibm_block_daemon_set()
-        if not csi_ibm_block_daemon_set:
+        csi_daemon_set = self._get_csi_daemon_set()
+        if not csi_daemon_set:
             return None
-        status = csi_ibm_block_daemon_set.status
+        status = csi_daemon_set.status
         while status.updated_number_scheduled != status.desired_number_scheduled:
             if status.desired_number_scheduled == 0:
                 return None
-            csi_ibm_block_daemon_set = self._get_csi_ibm_block_daemon_set()
-            if not csi_ibm_block_daemon_set:
+            csi_daemon_set = self._get_csi_daemon_set()
+            if not csi_daemon_set:
                 return None
-            status = csi_ibm_block_daemon_set.status
+            status = csi_daemon_set.status
             time.sleep(0.5)
-        return csi_ibm_block_daemon_set.metadata.name
+        return csi_daemon_set.metadata.name
 
     def _undefine_hosts(self, node_name):
         for secret_id in SECRET_IDS:

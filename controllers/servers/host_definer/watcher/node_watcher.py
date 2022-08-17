@@ -20,13 +20,13 @@ class NodeWatcher(Watcher):
             csi_node = self._get_csi_node(node_name)
             if self._is_csi_driver_node_deleted_while_host_definer_was_down(csi_node):
                 self._delete_host_definitions(node_name)
-                self._remove_managed_by_host_definer_label(node_name)
+                self._remove_manage_node_label(node_name)
 
             if self._is_unmanaged_csi_node_has_driver(csi_node):
                 self.unmanaged_csi_nodes_with_driver.add(csi_node.name)
 
     def _is_csi_driver_node_deleted_while_host_definer_was_down(self, csi_node):
-        return self._is_node_has_managed_by_host_definer_label(csi_node.name) and \
+        return self._is_node_has_manage_node_label(csi_node.name) and \
             self._is_node_has_host_definitions(csi_node.name) and not csi_node.node_id
 
     def watch_nodes_resources(self):
@@ -41,7 +41,7 @@ class NodeWatcher(Watcher):
                     self.unmanaged_csi_nodes_with_driver.add(csi_node.name)
 
                 if event[settings.TYPE_KEY] == settings.MODIFIED_EVENT and \
-                        self._is_node_has_new_managed_by_host_definer_label(csi_node):
+                        self._is_node_has_new_manage_node_label(csi_node):
                     self._add_node_to_nodes(csi_node)
                     self._define_host_on_all_storages_from_secrets(node_name)
                     self.unmanaged_csi_nodes_with_driver.remove(csi_node.name)
@@ -69,7 +69,7 @@ class NodeWatcher(Watcher):
                 node_host_definitions.append(host_definition_obj)
         return node_host_definitions
 
-    def _is_node_has_new_managed_by_host_definer_label(self, csi_node):
+    def _is_node_has_new_manage_node_label(self, csi_node):
         return not self._is_dynamic_node_labeling_allowed() and \
-            self._is_node_has_managed_by_host_definer_label(csi_node.name) and \
+            self._is_node_has_manage_node_label(csi_node.name) and \
             csi_node.name not in NODES and csi_node.node_id and csi_node.name in self.unmanaged_csi_nodes_with_driver

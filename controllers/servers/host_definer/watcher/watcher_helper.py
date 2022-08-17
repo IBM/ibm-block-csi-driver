@@ -6,7 +6,8 @@ import string
 from controllers.servers.config import (SECRET_ARRAY_PARAMETER,
                                         SECRET_PASSWORD_PARAMETER,
                                         SECRET_USERNAME_PARAMETER)
-import controllers.servers.messages as messages
+import controllers.servers.host_definer.messages as messages
+import controllers.servers.messages as common_messages
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer import settings
@@ -99,7 +100,7 @@ class Watcher(KubernetesManager):
             self._create_event_to_host_definition(host_definition_instance, response.error_message)
         elif not response.error_message and host_definition_instance:
             self._delete_host_definition(host_definition_instance.name)
-            self._remove_managed_by_host_definer_label(node_name)
+            self._remove_manage_node_label(node_name)
 
     def _undefine_host(self, host_definition):
         return self._ensure_definition_state(host_definition, self.storage_host_servicer.undefine_host)
@@ -117,25 +118,25 @@ class Watcher(KubernetesManager):
     def _is_host_can_be_defined(self, node_name):
         if self._is_dynamic_node_labeling_allowed():
             return True
-        return self._is_node_has_managed_by_host_definer_label(node_name)
+        return self._is_node_has_manage_node_label(node_name)
 
     def _is_dynamic_node_labeling_allowed(self):
         return os.getenv(settings.DYNAMIC_NODE_LABELING_ENV_VAR) == settings.TRUE_STRING
 
     def _is_host_can_be_undefined(self, node_name):
         if self._is_host_definer_can_delete_hosts():
-            return self._is_node_has_managed_by_host_definer_label(node_name) and \
-                (not self._is_node_has_host_definer_avoid_deletion_label(node_name))
+            return self._is_node_has_manage_node_label(node_name) and \
+                (not self._is_node_has_forbid_deletion_label(node_name))
         return False
 
     def _is_host_definer_can_delete_hosts(self):
         return os.getenv(settings.ALLOW_DELETE_ENV_VAR) == settings.TRUE_STRING
 
-    def _is_node_has_managed_by_host_definer_label(self, node_name):
-        return self._is_host_has_label_in_true(node_name, settings.MANAGED_BY_HOST_DEFINER_LABEL)
+    def _is_node_has_manage_node_label(self, node_name):
+        return self._is_host_has_label_in_true(node_name, settings.MANAGE_NODE_LABEL)
 
-    def _is_node_has_host_definer_avoid_deletion_label(self, node_name):
-        return self._is_host_has_label_in_true(node_name, settings.HOST_DEFINER_FORBID_DELETION_LABEL)
+    def _is_node_has_forbid_deletion_label(self, node_name):
+        return self._is_host_has_label_in_true(node_name, settings.FORBID_DELETION_LABEL)
 
     def _is_host_has_label_in_true(self, node_name, label):
         node = self._read_node(node_name)
@@ -190,7 +191,7 @@ class Watcher(KubernetesManager):
         try:
             return self._get_system_info(secret_data)
         except KeyError:
-            logger.error(messages.INVALID_SECRET_CONFIG_MESSAGE)
+            logger.error(common_messages.INVALID_SECRET_CONFIG_MESSAGE)
             return ''
 
     def _get_system_info(self, secret_data):
@@ -227,19 +228,19 @@ class Watcher(KubernetesManager):
 
     def _add_node_to_nodes(self, csi_node):
         logger.info(messages.NEW_KUBERNETES_NODE.format(csi_node.name))
-        self._add_managed_by_host_definer_label_to_node(csi_node.name)
+        self._add_manage_node_label_to_node(csi_node.name)
         NODES[csi_node.name] = csi_node.node_id
 
-    def _add_managed_by_host_definer_label_to_node(self, node_name):
-        if self._is_node_has_managed_by_host_definer_label(node_name):
+    def _add_manage_node_label_to_node(self, node_name):
+        if self._is_node_has_manage_node_label(node_name):
             return
-        logger.info(messages.ADD_LABEL_TO_NODE.format(settings.MANAGED_BY_HOST_DEFINER_LABEL, node_name))
-        self._update_node_managed_by_host_definer_label(node_name, settings.TRUE_STRING)
+        logger.info(messages.ADD_LABEL_TO_NODE.format(settings.MANAGE_NODE_LABEL, node_name))
+        self._update_manage_node_label(node_name, settings.TRUE_STRING)
 
-    def _remove_managed_by_host_definer_label(self, node_name):
+    def _remove_manage_node_label(self, node_name):
         if self._is_dynamic_node_labeling_allowed():
-            logger.info(messages.REMOVE_LABEL_FROM_NODE.format(settings.MANAGED_BY_HOST_DEFINER_LABEL, node_name))
-            self._update_node_managed_by_host_definer_label(node_name, None)
+            logger.info(messages.REMOVE_LABEL_FROM_NODE.format(settings.MANAGE_NODE_LABEL, node_name))
+            self._update_manage_node_label(node_name, None)
 
     def _define_host_on_all_storages_from_secrets(self, node_name):
         for secret_id, storage_classes_using_this_secret in SECRET_IDS.items():

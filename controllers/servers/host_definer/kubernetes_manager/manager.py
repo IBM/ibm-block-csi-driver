@@ -5,7 +5,7 @@ from kubernetes.client import api_client
 from kubernetes.client.rest import ApiException
 
 from controllers.common.csi_logger import get_stdout_logger
-import controllers.servers.messages as messages
+import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer import settings
 from controllers.servers.host_definer.types import CsiNode, Pod, Node, StorageClass, HostDefinition
 
@@ -90,7 +90,7 @@ class KubernetesManager():
     def _is_csi_node_has_driver(self, csi_node):
         if csi_node.spec.drivers:
             for driver in csi_node.spec.drivers:
-                return driver.name == settings.IBM_BLOCK_CSI_PROVISIONER_NAME
+                return driver.name == settings.CSI_PROVISIONER_NAME
         return False
 
     def _get_csi_node(self, node_name):
@@ -113,7 +113,7 @@ class KubernetesManager():
     def _get_node_id_from_csi_node(self, csi_node):
         if csi_node.spec.drivers:
             for driver in csi_node.spec.drivers:
-                if driver.name == settings.IBM_BLOCK_CSI_PROVISIONER_NAME:
+                if driver.name == settings.CSI_PROVISIONER_NAME:
                     return driver.nodeID
         return None
 
@@ -123,12 +123,12 @@ class KubernetesManager():
             for host_definition in host_definitions:
                 host_definition_obj = self._get_host_definition_object(host_definition)
                 if self._is_host_definition_matches(host_definition_obj, node_name, secret):
-                    return (host_definition_obj, 200)
-            return ('', 404)
+                    return host_definition_obj, 200
+            return None, 404
         except ApiException as ex:
             logger.error(messages.FAILED_TO_GET_HOST_DEFINITION.format(
                 node_name, secret.name, secret.namespace, ex.body))
-            return '', ex.status
+            return None, ex.status
 
     def _get_host_definitions(self):
         try:
@@ -231,19 +231,19 @@ class KubernetesManager():
             if ex.status != 404:
                 logger.error(messages.FAILED_TO_DELETE_HOST_DEFINITION.format(host_definition_name, ex.body))
 
-    def _update_node_managed_by_host_definer_label(self, node_name, label_value):
+    def _update_manage_node_label(self, node_name, label_value):
         body = self._get_body_for_labels(label_value)
         try:
             self.core_api.patch_node(node_name, body)
         except ApiException as ex:
             logger.error(messages.FAILED_TO_UPDATE_NODE_LABEL.format(
-                node_name, settings.MANAGED_BY_HOST_DEFINER_LABEL, ex.body))
+                node_name, settings.MANAGE_NODE_LABEL, ex.body))
 
     def _get_body_for_labels(self, label_value):
         body = {
             settings.METADATA: {
                 settings.LABELS: {
-                    settings.MANAGED_BY_HOST_DEFINER_LABEL: label_value}
+                    settings.MANAGE_NODE_LABEL: label_value}
             }
         }
 
@@ -266,7 +266,7 @@ class KubernetesManager():
             logger.error(messages.FAILED_TO_GET_NODE.format(node_name, ex.body))
             return None
 
-    def _get_csi_ibm_block_daemon_set(self):
+    def _get_csi_daemon_set(self):
         try:
             daemon_sets = self.apps_api.list_daemon_set_for_all_namespaces(label_selector=settings.DRIVER_PRODUCT_LABEL)
             if daemon_sets.items:
@@ -276,7 +276,7 @@ class KubernetesManager():
             logger.error(messages.FAILED_TO_LIST_DAEMON_SETS.format(ex.body))
             return None
 
-    def _get_csi_ibm_block_pods(self):
+    def _get_csi_pods(self):
         try:
             pods = []
             pods_from_cluster = self.core_api.list_pod_for_all_namespaces(label_selector=settings.DRIVER_PRODUCT_LABEL)

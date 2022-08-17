@@ -1,7 +1,7 @@
 from threading import Thread
 from time import sleep
 
-import controllers.servers.messages as messages
+import controllers.servers.host_definer.messages as messages
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher
 from controllers.servers.host_definer.types import DefineHostResponse
@@ -24,7 +24,7 @@ class HostDefinitionWatcher(Watcher):
                     self._verify_host_defined_after_pending_host_definition(host_definition)
 
     def _is_host_definition_in_pending_phase(self, phase):
-        return settings.PENDING_PREFIX in phase
+        return phase.startswith(settings.PENDING_PREFIX)
 
     def _verify_host_defined_after_pending_host_definition(self, host_definition):
         remove_host_thread = Thread(target=self._verify_host_defined_using_exponential_backoff,
@@ -50,6 +50,8 @@ class HostDefinitionWatcher(Watcher):
         host_definition_instance, status_code = self._get_host_definition(
             host_definition.node_name, host_definition.secret)
         phase = host_definition.phase
+        if not host_definition_instance:
+            return False
         if status_code == 404 and phase == settings.PENDING_DELETION_PHASE:
             return True
         return host_definition_instance.phase == settings.READY_PHASE

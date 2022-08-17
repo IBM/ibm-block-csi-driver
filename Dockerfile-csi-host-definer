@@ -29,9 +29,9 @@ LABEL name="IBM block storage CSI driver host definer" \
       version=$VERSION \
       release=$BUILD_NUMBER \
       summary="The host definer defines Kubernetes nodes on IBM block storage" \
-      description="The host definer defines container orchestrators, such as Kubernetes and OpenShift, nodes on IBM block storage." \
+      description="The host definer defines container orchestrator nodes on IBM block storage." \
       io.k8s.display-name="IBM block storage CSI driver host definer" \
-      io.k8s.description="The host definer defines container orchestrators, such as Kubernetes and OpenShift, nodes on IBM block storage." \
+      io.k8s.description="The host definer defines container orchestrator nodes on IBM block storage." \
       io.openshift.tags=ibm,csi,ibm-block-csi-driver,host-definer
 
 COPY --from=builder /opt/app-root /opt/app-root

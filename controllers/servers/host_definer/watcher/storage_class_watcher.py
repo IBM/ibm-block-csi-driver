@@ -1,6 +1,6 @@
 from kubernetes import watch
 
-import controllers.servers.messages as messages
+import controllers.servers.host_definer.messages as messages
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher, SECRET_IDS
 from controllers.servers.host_definer import settings
@@ -31,33 +31,32 @@ class StorageClassWatcher(Watcher):
                     self._handle_deleted_storage_class_event(secrets)
 
     def _get_secrets_from_storage_class_with_driver_provisioner(self, storage_class):
-        if self._is_storage_class_has_csi_ibm_block_as_a_provisioner(storage_class):
+        if self._is_storage_class_has_csi_as_a_provisioner(storage_class):
             return self._get_secrets_from_storage_class(storage_class)
         return []
 
-    def _is_storage_class_has_csi_ibm_block_as_a_provisioner(
+    def _is_storage_class_has_csi_as_a_provisioner(
             self, storage_class):
-        return storage_class.provisioner == settings.IBM_BLOCK_CSI_PROVISIONER_NAME
+        return storage_class.provisioner == settings.CSI_PROVISIONER_NAME
 
     def _get_secrets_from_storage_class(self, storage_class):
         secrets = set()
-        for parameter in storage_class.parameters:
-            if self._is_secret(parameter):
-                secret = self._get_secret_if_parameter_is_valid(storage_class, parameter)
+        for parameter_name in storage_class.parameters:
+            if self._is_secret(parameter_name):
+                secret = self._get_secret(storage_class, parameter_name)
                 secrets.add(secret)
         return list(filter(None, secrets))
 
-    def _is_secret(self, parameter):
-        return parameter.endswith(settings.SECRET_NAME_SUBSTRING)
+    def _is_secret(self, parameter_name):
+        return parameter_name.endswith(settings.SECRET_NAME_SUFFIX) and \
+            parameter_name.startswith(settings.CSI_PARAMETER_PREFIX)
 
-    def _get_secret_if_parameter_is_valid(self, storage_class, parameter):
-        return self._get_secret(storage_class, parameter, settings.SECRET_NAME_SUBSTRING)
-
-    def _get_secret(self, storage_class, parameter, secret_name_substring):
-        prefix = parameter.split(secret_name_substring)[0]
+    def _get_secret(self, storage_class, parameter_name):
+        secret_name_suffix = settings.SECRET_NAME_SUFFIX
+        prefix = parameter_name.split(secret_name_suffix)[0]
         return self._generate_secret_id_from_secret_and_namespace(
-            storage_class.parameters[parameter],
-            storage_class.parameters[prefix + secret_name_substring.replace(settings.NAME, settings.NAMESPACE)])
+            storage_class.parameters[parameter_name],
+            storage_class.parameters[prefix + secret_name_suffix.replace(settings.NAME, settings.NAMESPACE)])
 
     def _handle_added_storage_class_event(self, secrets, storage_class_name):
         logger.info(messages.NEW_STORAGE_CLASS.format(storage_class_name))
