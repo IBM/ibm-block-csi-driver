@@ -53,6 +53,13 @@ class CsiNodeWatcher(Watcher):
             return self._is_csi_ibm_block_node_pod_running_on_worker(worker, daemon_set_name)
         return False
 
+    def _is_csi_ibm_block_node_pod_running_on_worker(self, worker, daemon_set_name):
+        csi_ibm_block_pods = self._get_csi_ibm_block_pods()
+        for pod in csi_ibm_block_pods:
+            if (pod.node_name == worker) and (daemon_set_name in pod.name):
+                return True
+        return False
+
     def _wait_until_all_daemon_set_pods_are_up_to_date(self):
         csi_ibm_block_daemon_set = self._get_csi_ibm_block_daemon_set()
         if not csi_ibm_block_daemon_set:
@@ -67,17 +74,6 @@ class CsiNodeWatcher(Watcher):
             status = csi_ibm_block_daemon_set.status
             time.sleep(0.5)
         return csi_ibm_block_daemon_set.metadata.name
-
-    def _is_csi_ibm_block_node_pod_running_on_worker(self, worker, daemon_set_name):
-        csi_ibm_block_pods = self._get_csi_ibm_block_pods()
-        if not csi_ibm_block_pods:
-            return False
-
-        if csi_ibm_block_pods.items:
-            for pod in csi_ibm_block_pods.items:
-                if (pod.spec.node_name == worker) and (daemon_set_name in pod.metadata.name):
-                    return True
-        return False
 
     def _undefine_hosts(self, node_name):
         for secret_id in SECRET_IDS:

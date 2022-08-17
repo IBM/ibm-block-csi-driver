@@ -14,7 +14,7 @@ class StorageClassWatcher(Watcher):
         storage_classes = self._get_storage_classes()
         for storage_class in storage_classes:
             secrets = self._get_secrets_from_storage_class_with_driver_provisioner(storage_class)
-            self._handle_added_storage_class_event(secrets, storage_class.metadata.name)
+            self._handle_added_storage_class_event(secrets, storage_class.name)
 
     def watch_storage_class_resources(self):
         while True:
@@ -22,10 +22,10 @@ class StorageClassWatcher(Watcher):
             stream = watch.Watch().stream(self.storage_api.list_storage_class,
                                           resource_version=resource_version, timeout_seconds=5)
             for event in stream:
-                storage_class = event[settings.OBJECT_KEY]
+                storage_class = self._get_storage_class_object(event[settings.OBJECT_KEY])
                 secrets = self._get_secrets_from_storage_class_with_driver_provisioner(storage_class)
                 if event[settings.TYPE_KEY] == settings.ADDED_EVENT:
-                    self._handle_added_storage_class_event(secrets, storage_class.metadata.name)
+                    self._handle_added_storage_class_event(secrets, storage_class.name)
 
                 if event[settings.TYPE_KEY] == settings.DELETED_EVENT:
                     self._handle_deleted_storage_class_event(secrets)

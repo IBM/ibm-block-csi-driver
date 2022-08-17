@@ -35,3 +35,21 @@ class HostDefinition:
 class CsiNode:
     name: str = ''
     node_id: str = ''
+
+
+@dataclass
+class Pod:
+    name: str = ''
+    node_name: str = ''
+
+
+@dataclass
+class Node:
+    name: str = ''
+
+
+@dataclass
+class StorageClass:
+    name: str = ''
+    provisioner: str = ''
+    parameters: dict = field(default_factory=dict)

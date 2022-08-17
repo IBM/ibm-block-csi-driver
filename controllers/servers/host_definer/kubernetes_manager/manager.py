@@ -6,9 +6,8 @@ from kubernetes.client.rest import ApiException
 
 from controllers.common.csi_logger import get_stdout_logger
 import controllers.servers.messages as messages
-from controllers.servers.host_definer.types import HostDefinition
 from controllers.servers.host_definer import settings
-from controllers.servers.host_definer.types import CsiNode
+from controllers.servers.host_definer.types import CsiNode, Pod, Node, StorageClass, HostDefinition
 
 logger = get_stdout_logger()
 
@@ -55,17 +54,38 @@ class KubernetesManager():
 
     def _get_nodes(self):
         try:
-            return self.core_api.list_node().items
+            nodes = []
+            for node in self.core_api.list_node().items:
+                node = self._get_node_object(node)
+                nodes.append(node)
+            return nodes
         except ApiException as ex:
             logger.error(messages.FAILED_TO_GET_NODES.format(ex.body))
             return []
 
+    def _get_node_object(self, node_from_cluster):
+        node = Node()
+        node.name = node_from_cluster.metadata.name
+        return node
+
     def _get_storage_classes(self):
         try:
-            return self.storage_api.list_storage_class().items
+            storage_classes = []
+            for storage_class in self.storage_api.list_storage_class().items:
+                storage_class = self._get_storage_class_object(storage_class)
+                storage_classes.append(storage_class)
+            return storage_classes
+
         except ApiException as ex:
             logger.error(messages.FAILED_TO_GET_STORAGE_CLASSES.format(ex.body))
             return []
+
+    def _get_storage_class_object(self, storage_class_from_cluster):
+        storage_class = StorageClass()
+        storage_class.name = storage_class_from_cluster.metadata.name
+        storage_class.provisioner = storage_class_from_cluster.provisioner
+        storage_class.parameters = storage_class_from_cluster.parameters
+        return storage_class
 
     def _is_csi_node_has_driver(self, csi_node):
         if csi_node.spec.drivers:
@@ -258,7 +278,19 @@ class KubernetesManager():
 
     def _get_csi_ibm_block_pods(self):
         try:
-            return self.core_api.list_pod_for_all_namespaces(label_selector=settings.DRIVER_PRODUCT_LABEL)
+            pods = []
+            pods_from_cluster = self.core_api.list_pod_for_all_namespaces(label_selector=settings.DRIVER_PRODUCT_LABEL)
+            for pod in pods_from_cluster.items:
+                pod = self._get_pod_object(pod)
+                pods.append(pod)
+            return pods
+
         except ApiException as ex:
             logger.error(messages.FAILED_TO_LIST_PODS.format(ex.body))
             return None
+
+    def _get_pod_object(self, pod_from_cluster):
+        pod = Pod()
+        pod.name = pod_from_cluster.metadata.name
+        pod.node_name = pod_from_cluster.spec.node_name
+        return pod

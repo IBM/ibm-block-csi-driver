@@ -16,7 +16,7 @@ class NodeWatcher(Watcher):
     def add_initial_nodes(self):
         nodes = self._get_nodes()
         for node in nodes:
-            node_name = node.metadata.name
+            node_name = node.name
             csi_node = self._get_csi_node(node_name)
             if self._is_csi_driver_node_deleted_while_host_definer_was_down(csi_node):
                 self._delete_host_definitions(node_name)
