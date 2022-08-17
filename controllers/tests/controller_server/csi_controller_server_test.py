@@ -20,9 +20,13 @@ from controllers.tests.common.test_settings import (CLONE_VOLUME_NAME,
                                                     DUMMY_IO_GROUP, DUMMY_VOLUME_GROUP,
                                                     VOLUME_NAME, SNAPSHOT_NAME,
                                                     SNAPSHOT_VOLUME_NAME,
-                                                    SNAPSHOT_VOLUME_UID, VIRT_SNAP_FUNC_TRUE, PASSWORD, USER,
-                                                    VOLUME_UID, INTERNAL_VOLUME_ID, DUMMY_POOL2, MANAGEMENT_ADDRESS,
-                                                    NAME_PREFIX, INTERNAL_SNAPSHOT_ID, SOURCE_VOLUME_ID)
+                                                    SNAPSHOT_VOLUME_UID, VIRT_SNAP_FUNC_TRUE, SECRET_PASSWORD_VALUE,
+                                                    SECRET_USERNAME_VALUE,
+                                                    VOLUME_UID, INTERNAL_VOLUME_ID, DUMMY_POOL2,
+                                                    SECRET_MANAGEMENT_ADDRESS_VALUE,
+                                                    NAME_PREFIX, INTERNAL_SNAPSHOT_ID, SOURCE_VOLUME_ID,
+                                                    SECRET_MANAGEMENT_ADDRESS_KEY, SECRET_PASSWORD_KEY,
+                                                    SECRET_USERNAME_KEY, SECRET)
 from controllers.tests.controller_server.common import mock_get_agent, mock_array_type
 from controllers.tests.utils import ProtoBufMock
 
@@ -35,7 +39,7 @@ class BaseControllerSetUp(unittest.TestCase):
         patch("controllers.array_action.array_mediator_xiv.XIVArrayMediator._connect").start()
         mock_array_type(self, CONTROLLER_SERVER_PATH)
         self.fqdn = "fqdn"
-        self.mediator = XIVArrayMediator(USER, PASSWORD, self.fqdn)
+        self.mediator = XIVArrayMediator(SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, self.fqdn)
         self.mediator.client = Mock()
 
         self.storage_agent = MagicMock()
@@ -722,8 +726,6 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self._prepare_idempotent_test_with_other_source()
         self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
 
-    def test_create_volume_idempotent_with_other_source_and_virt_snap_func_enabled(self):
-        self.request.parameters[config.PARAMETERS_VIRT_SNAP_FUNC] = "true"
     def _enable_virt_snap_func(self):
         self.request.parameters[config.PARAMETERS_VIRT_SNAP_FUNC] = "true"
 

@@ -18,8 +18,9 @@ from controllers.tests.array_action.xiv import utils
 from controllers.tests.array_action.xiv.test_settings import VOLUME_COPY_MASTER_WWN_ATTR_KEY, \
     VOLUME_POOL_NAME_ATTR_KEY, VOLUME_VDISK_UID_ATTR_KEY, VOLUME_CAPACITY_ATTR_KEY
 from controllers.tests.common.test_settings import VOLUME_NAME, DUMMY_POOL1, VOLUME_UID, VOLUME_OBJECT_TYPE, \
-    HOST_NAME, SNAPSHOT_NAME, DUMMY_POOL2, SNAPSHOT_VOLUME_UID, INTERNAL_SNAPSHOT_ID, SNAPSHOT_OBJECT_TYPE, USER, \
-    PASSWORD
+    HOST_NAME, SNAPSHOT_NAME, DUMMY_POOL2, SNAPSHOT_VOLUME_UID, INTERNAL_SNAPSHOT_ID, SNAPSHOT_OBJECT_TYPE, \
+    SECRET_USERNAME_VALUE, \
+    SECRET_PASSWORD_VALUE
 
 
 class TestArrayMediatorXIV(unittest.TestCase):
@@ -27,7 +28,7 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def setUp(self):
         self.fqdn = "fqdn"
         with patch("controllers.array_action.array_mediator_xiv.XIVArrayMediator._connect"):
-            self.mediator = XIVArrayMediator(USER, PASSWORD, self.fqdn)
+            self.mediator = XIVArrayMediator(SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, self.fqdn)
         self.mediator.client = Mock()
         self.required_bytes = 2000
 

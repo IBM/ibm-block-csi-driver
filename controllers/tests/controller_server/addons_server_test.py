@@ -8,7 +8,8 @@ from controllers.servers.config import PARAMETERS_SYSTEM_ID, PARAMETERS_COPY_TYP
 from controllers.servers.csi.addons_server import ReplicationControllerServicer
 from controllers.tests import utils
 from controllers.tests.common.test_settings import VOLUME_NAME, VOLUME_UID, OBJECT_INTERNAL_ID, \
-    OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE, USER, PASSWORD, MANAGEMENT_ADDRESS
+    OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE, SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, \
+    SECRET_MANAGEMENT_ADDRESS_VALUE
 from controllers.tests.controller_server.common import mock_get_agent
 from controllers.tests.controller_server.csi_controller_server_test import (CommonControllerTest)
 from controllers.tests.utils import ProtoBufMock
@@ -34,7 +35,8 @@ class TestControllerServicerEnableVolumeReplication(unittest.TestCase, CommonCon
         mock_get_agent(self, ADDON_SERVER_PATH)
 
         self.request = ProtoBufMock()
-        self.request.secrets = {"username": USER, "password": PASSWORD, "management_address": MANAGEMENT_ADDRESS}
+        self.request.secrets = {"username": SECRET_USERNAME_VALUE, "password": SECRET_PASSWORD_VALUE,
+                                "management_address": SECRET_MANAGEMENT_ADDRESS_VALUE}
         self.request.volume_id = "{}:{};{}".format("A9000", OBJECT_INTERNAL_ID, VOLUME_UID)
         self.request.replication_id = "{}:{};{}".format("A9000", OTHER_OBJECT_INTERNAL_ID, VOLUME_UID)
         self.request.parameters = {PARAMETERS_SYSTEM_ID: SYSTEM_ID,

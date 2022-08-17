@@ -17,7 +17,7 @@ from controllers.servers import config as controller_config
 from controllers.servers.csi.csi_controller_server import CSIControllerServicer
 from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controllers.tests import utils as test_utils
-from controllers.tests.common.test_settings import DUMMY_POOL1, USER, PASSWORD, ARRAY
+from controllers.tests.common.test_settings import DUMMY_POOL1, SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, ARRAY
 from controllers.tests.controller_server.csi_controller_server_test import ProtoBufMock
 from controllers.tests.utils import get_fake_secret_config
 
@@ -57,22 +57,22 @@ class TestUtils(unittest.TestCase):
         self._test_validation_exception(utils.validate_secrets, secrets)
 
     def test_validate_secrets_success(self):
-        secrets = {"username": USER, "password": PASSWORD, "management_address": ARRAY}
+        secrets = {"username": SECRET_USERNAME_VALUE, "password": SECRET_PASSWORD_VALUE, "management_address": ARRAY}
         utils.validate_secrets(secrets)
 
     def test_validate_secrets_with_no_secret(self):
         self._test_validate_secrets_validation_exception(None)
 
     def test_validate_secrets_with_no_management_address(self):
-        secrets = {"username": USER, "password": PASSWORD}
+        secrets = {"username": SECRET_USERNAME_VALUE, "password": SECRET_PASSWORD_VALUE}
         self._test_validate_secrets_validation_exception(secrets)
 
     def test_validate_secrets_with_no_password(self):
-        secrets = {"username": USER, "management_address": ARRAY}
+        secrets = {"username": SECRET_USERNAME_VALUE, "management_address": ARRAY}
         self._test_validate_secrets_validation_exception(secrets)
 
     def test_validate_secrets_with_no_username(self):
-        secrets = {"password": PASSWORD, "management_address": ARRAY}
+        secrets = {"password": SECRET_PASSWORD_VALUE, "management_address": ARRAY}
         self._test_validate_secrets_validation_exception(secrets)
 
     def test_validate_secrets_with_empty_dict(self):
@@ -118,8 +118,8 @@ class TestUtils(unittest.TestCase):
             secrets=secrets,
             topologies=topologies,
             system_id=system_id)
-        self.assertEqual(USER, array_connection_info.user)
-        self.assertEqual(PASSWORD, array_connection_info.password)
+        self.assertEqual(SECRET_USERNAME_VALUE, array_connection_info.user)
+        self.assertEqual(SECRET_PASSWORD_VALUE, array_connection_info.password)
         self.assertEqual(ARRAY, array_connection_info.array_addresses[0])
         if topologies or system_id:
             self.assertIsNotNone(array_connection_info.system_id)
@@ -129,7 +129,7 @@ class TestUtils(unittest.TestCase):
     def test_get_array_connection_info_from_secrets(self):
         secrets = get_fake_secret_config()
         self._test_get_array_connection_info_from_secrets(secrets, system_id="u1")
-        secrets = {"username": USER, "password": PASSWORD, "management_address": ARRAY}
+        secrets = {"username": SECRET_USERNAME_VALUE, "password": SECRET_PASSWORD_VALUE, "management_address": ARRAY}
         self._test_get_array_connection_info_from_secrets(secrets)
         secrets = get_fake_secret_config(supported_topologies=[{"topology.block.csi.ibm.com/test1": "zone1"}])
         self._test_get_array_connection_info_from_secrets(secrets,

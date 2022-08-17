@@ -29,7 +29,8 @@ from controllers.tests.array_action.ds8k.test_settings import VOLUME_FAKE_NAME, 
 from controllers.tests.array_action.test_settings import DUMMY_ERROR_MESSAGE, DUMMY_HOST_NAME1, DUMMY_FC_WWN1, \
     DUMMY_FC_WWN2, FC_CONNECTIVITY_TYPE, DUMMY_CONNECTIVITY_TYPE, DUMMY_FC_WWN3, DUMMY_FC_WWN4, VOLUME_NAME_ATTR_KEY, \
     VOLUME_ID_ATTR_KEY, DUMMY_LUN_ID
-from controllers.tests.common.test_settings import VOLUME_NAME, DUMMY_POOL1, USER, PASSWORD, VOLUME_UID, \
+from controllers.tests.common.test_settings import VOLUME_NAME, DUMMY_POOL1, SECRET_USERNAME_VALUE, \
+    SECRET_PASSWORD_VALUE, VOLUME_UID, \
     SNAPSHOT_NAME, SNAPSHOT_VOLUME_UID, INTERNAL_SNAPSHOT_ID, VOLUME_OBJECT_TYPE, SNAPSHOT_OBJECT_TYPE, HOST_NAME, \
     SOURCE_VOLUME_NAME, DUMMY_POOL2, SOURCE_VOLUME_ID
 
@@ -64,7 +65,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
                                                                ENABLED_BACKGROUND_COPY
                                                                )
 
-        self.array = DS8KArrayMediator(USER, PASSWORD, self.endpoint)
+        self.array = DS8KArrayMediator(SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, self.endpoint)
         self.array.volume_cache = Mock()
 
     def _get_volume_response(self, volume_id, volume_name, cap=DUMMY_VOLUME_CAPACITY, pool=DUMMY_POOL1,
@@ -96,19 +97,19 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         self.client_mock.get_system.side_effect = \
             ClientError("400", "BE7A002D")
         with self.assertRaises(array_errors.CredentialsError):
-            DS8KArrayMediator(USER, PASSWORD, self.endpoint)
+            DS8KArrayMediator(SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, self.endpoint)
 
     def test_connect_to_unsupported_system(self):
         self.client_mock.get_system.return_value = \
             Munch({GET_SYSTEM_BUNDLE_ATTR_KEY: DUMMY_UNSUPPORTED_SYSTEM_BUNDLE})
         with self.assertRaises(array_errors.UnsupportedStorageVersionError):
-            DS8KArrayMediator(USER, PASSWORD, self.endpoint)
+            DS8KArrayMediator(SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, self.endpoint)
 
     def test_connect_with_error(self):
         self.client_mock.get_system.side_effect = \
             ClientError("400", DUMMY_ERROR_MESSAGE)
         with self.assertRaises(ClientError) as ex:
-            DS8KArrayMediator(USER, PASSWORD, self.endpoint)
+            DS8KArrayMediator(SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, self.endpoint)
         self.assertEqual(DUMMY_ERROR_MESSAGE, ex.exception.message)
 
     def test_validate_space_efficiency_thin_success(self):

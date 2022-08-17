@@ -1,4 +1,5 @@
 import unittest
+
 from mock import Mock, patch, MagicMock
 
 from controllers.array_action.array_action_types import Host

@@ -21,8 +21,10 @@ from controllers.tests.array_action.test_settings import NVME_OVER_FC_CONNECTIVI
     DUMMY_FC_WWN4, DUMMY_NVME_NQN1, DUMMY_NVME_NQN2, DUMMY_NVME_NQN3, DUMMY_NVME_NQN4, VOLUME_ID_ATTR_KEY, \
     VOLUME_NAME_ATTR_KEY, DUMMY_CAPACITY_INT, DUMMY_SMALL_CAPACITY_INT, DUMMY_SMALL_CAPACITY_STR, \
     DUMMY_IP_ADDRESS_6_1, DUMMY_IP_ADDRESS2, DUMMY_IP_ADDRESS1, DUMMY_LUN_ID, DUMMY_CAPACITY_STR
-from controllers.tests.common.test_settings import USER, PASSWORD, VOLUME_NAME, DUMMY_POOL1, VOLUME_UID, HOST_NAME, \
-    SNAPSHOT_NAME, MANAGEMENT_ADDRESS, SOURCE_VOLUME_NAME, SOURCE_VOLUME_ID, INTERNAL_SNAPSHOT_ID, INTERNAL_VOLUME_ID, \
+from controllers.tests.common.test_settings import SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, VOLUME_NAME, \
+    DUMMY_POOL1, VOLUME_UID, HOST_NAME, \
+    SNAPSHOT_NAME, SECRET_MANAGEMENT_ADDRESS_VALUE, SOURCE_VOLUME_NAME, SOURCE_VOLUME_ID, INTERNAL_SNAPSHOT_ID, \
+    INTERNAL_VOLUME_ID, \
     TARGET_VOLUME_NAME, VOLUME_OBJECT_TYPE, SNAPSHOT_VOLUME_UID, SNAPSHOT_OBJECT_TYPE, STRETCHED_POOL, \
     DUMMY_POOL2, DUMMY_IO_GROUP, DUMMY_VOLUME_GROUP, FCS_DELIMITER
 
@@ -32,9 +34,9 @@ EMPTY_BYTES = b""
 class TestArrayMediatorSVC(unittest.TestCase):
 
     def setUp(self):
-        self.endpoint = [MANAGEMENT_ADDRESS]
+        self.endpoint = [SECRET_MANAGEMENT_ADDRESS_VALUE]
         with patch("controllers.array_action.array_mediator_svc.SVCArrayMediator._connect"):
-            self.svc = SVCArrayMediator(USER, PASSWORD, self.endpoint)
+            self.svc = SVCArrayMediator(SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, self.endpoint)
         self.svc.client = Mock()
         self.svc.client.svcinfo.lssystem.return_value = [
             Munch({svc_settings.LSSYSTEM_LOCATION_ATTR_KEY: svc_settings.LOCAL_LOCATION,
@@ -80,18 +82,18 @@ class TestArrayMediatorSVC(unittest.TestCase):
         svc_mock.svcinfo.lssystem.return_value = [system]
         connect_mock.return_value = svc_mock
         with self.assertRaises(array_errors.UnsupportedStorageVersionError):
-            SVCArrayMediator(USER, PASSWORD, self.endpoint)
+            SVCArrayMediator(SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, self.endpoint)
 
     def test_raise_management_ips_not_support_error_in_init(self):
         self.endpoint = ["IP_1", "IP_2"]
         with self.assertRaises(
                 array_errors.StorageManagementIPsNotSupportError):
-            SVCArrayMediator(USER, PASSWORD, self.endpoint)
+            SVCArrayMediator(SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, self.endpoint)
 
         self.endpoint = []
         with self.assertRaises(
                 array_errors.StorageManagementIPsNotSupportError):
-            SVCArrayMediator(USER, PASSWORD, self.endpoint)
+            SVCArrayMediator(SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, self.endpoint)
 
     @patch("controllers.array_action.array_mediator_svc.connect")
     def test_connect_errors(self, connect_mock):

@@ -4,8 +4,9 @@ import grpc
 from mock import Mock, MagicMock
 
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
-from controllers.tests.common.test_settings import USER as test_user, \
-    PASSWORD as test_password, ARRAY as test_array, VOLUME_NAME, VOLUME_UID, DUMMY_POOL1, INTERNAL_VOLUME_ID, \
+from controllers.tests.common.test_settings import SECRET_USERNAME_VALUE as test_user, \
+    SECRET_PASSWORD_VALUE as test_password, ARRAY as test_array, VOLUME_NAME, VOLUME_UID, DUMMY_POOL1, \
+    INTERNAL_VOLUME_ID, \
     SNAPSHOT_NAME, SNAPSHOT_VOLUME_NAME, SNAPSHOT_VOLUME_UID
 
 
@@ -29,7 +30,7 @@ def get_mock_mediator_response_volume(size=10, name=VOLUME_NAME, volume_id=VOLUM
     return volume
 
 
-def get_mock_mediator_response_snapshot(capacity=10, name=SNAPSHOT_NAME, snapshot_id=SNAPSHOT_VOLUME_UID ,
+def get_mock_mediator_response_snapshot(capacity=10, name=SNAPSHOT_NAME, snapshot_id=SNAPSHOT_VOLUME_UID,
                                         volume_name=SNAPSHOT_VOLUME_NAME, array_type="xiv"):
     snapshot = Mock()
     snapshot.capacity_bytes = capacity
