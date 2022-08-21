@@ -98,7 +98,8 @@ class Watcher(KubernetesManager):
         if response.error_message and host_definition_instance:
             self._set_host_definition_status(host_definition_instance.name, settings.PENDING_DELETION_PHASE)
             self._create_event_for_host_definition(
-                host_definition_instance, response.error_message, settings.UNDEFINE_ACTION, settings.FAILED_MESSAGE_TYPE)
+                host_definition_instance, response.error_message,
+                settings.UNDEFINE_ACTION, settings.FAILED_MESSAGE_TYPE)
         elif not response.error_message and host_definition_instance:
             self._delete_host_definition(host_definition_instance.name)
 
