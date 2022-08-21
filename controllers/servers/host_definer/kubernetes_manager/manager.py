@@ -149,7 +149,8 @@ class KubernetesManager():
             k8s_host_definition, settings.SECRET_NAME_FIELD)
         host_definition_info.secret_info.namespace = self._get_attr_from_host_definition(
             k8s_host_definition, settings.SECRET_NAMESPACE_FIELD)
-        host_definition_info.node_name = self._get_attr_from_host_definition(k8s_host_definition, settings.NODE_NAME_FIELD)
+        host_definition_info.node_name = self._get_attr_from_host_definition(
+            k8s_host_definition, settings.NODE_NAME_FIELD)
         host_definition_info.node_id = self._get_attr_from_host_definition(k8s_host_definition, settings.NODE_ID_FIELD)
         return host_definition_info
 

@@ -45,7 +45,7 @@ class CsiNodeWatcher(Watcher):
             remove_host_thread = Thread(target=self._undefine_host_when_node_pod_is_deleted, args=(node_name,))
             remove_host_thread.start()
         else:
-            NODES.pop(node_name)
+            NODES.pop(node_name, None)
 
     def _undefine_host_when_node_pod_is_deleted(self, node_name):
         if self._is_host_part_of_update(node_name):
@@ -85,4 +85,4 @@ class CsiNodeWatcher(Watcher):
         for secret_id in SECRET_IDS:
             host_definition_info = self._get_host_definition_info_from_secret_and_node_name(node_name, secret_id)
             self._delete_definition(host_definition_info)
-        NODES.pop(node_name)
+        NODES.pop(node_name, None)

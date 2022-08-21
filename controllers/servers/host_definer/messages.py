@@ -18,7 +18,8 @@ FAILED_TO_UPDATE_NODE_LABEL = 'Failed to update node {} {} label, got: {}'
 FAILED_TO_GET_NODE = 'Failed to get node {}, got: {}'
 PATCHING_HOST_DEFINITION = 'Patching host definition: {}'
 SET_HOST_DEFINITION_STATUS = 'Set host definition {} status to: {}'
-VERIFY_HOST_DEFINITION_USING_EXPONENTIAL_BACKOFF = 'Verifying host definition {}, using exponential backoff'
+VERIFY_HOST_DEFINITION_USING_EXPONENTIAL_BACKOFF = "Verifying host definition {}, using exponential backoff."\
+    " number of retries left [{}]"
 SET_HOST_DEFINITION_PHASE_TO_ERROR = 'Set host definition {} phase to error'
 SECRET_HAS_BEEN_MODIFIED = 'Secret {} in namespace {}, has been modified'
 NEW_STORAGE_CLASS = 'New storageClass {}'

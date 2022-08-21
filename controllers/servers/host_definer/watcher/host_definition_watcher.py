@@ -36,8 +36,9 @@ class HostDefinitionWatcher(Watcher):
         retries = 5
         backoff_in_seconds = 3
         delay_in_seconds = 3
-        logger.info(messages.VERIFY_HOST_DEFINITION_USING_EXPONENTIAL_BACKOFF.format(host_definition_info.name))
-        while retries > 1:
+        while retries > 0:
+            logger.info(messages.VERIFY_HOST_DEFINITION_USING_EXPONENTIAL_BACKOFF.format(
+                host_definition_info.name, retries))
             if self._is_host_definition_in_desired_state(host_definition_info) and retries != 5:
                 return
             self._handle_pending_host_definition(host_definition_info)
@@ -64,10 +65,10 @@ class HostDefinitionWatcher(Watcher):
             response = self._define_host(host_definition_info)
         elif self._is_pending_for_deletion_need_to_be_handled(phase, host_definition_info.node_name):
             response = self._undefine_host(host_definition_info)
-        self._handle_error_message_for_pending_host_definition(
+        self._handle_message_from_storage(
             host_definition_info, response.error_message)
 
-    def _handle_error_message_for_pending_host_definition(self, host_definition_info, error_message):
+    def _handle_message_from_storage(self, host_definition_info, error_message):
         phase = host_definition_info.phase
         if error_message:
             self._add_k8s_event_to_host_definition(host_definition_info, str(error_message))
