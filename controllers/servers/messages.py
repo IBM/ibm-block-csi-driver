@@ -38,4 +38,3 @@ SPACE_EFFICIENCY_NOT_MATCH_VOLUME_MESSAGE = 'space efficiency: {0}' \
 POOL_NOT_MATCH_VOLUME_MESSAGE = 'pool name: {0} does not match existing volume pool name: {1}'
 PREFIX_NOT_MATCH_VOLUME_MESSAGE = 'prefix: {0} does not match existing volume name: {1}'
 REQUIRED_BYTES_MISMATCH_MESSAGE = "required bytes : {0} does not match the source volume required bytes : {1}"
-

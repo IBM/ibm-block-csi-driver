@@ -16,15 +16,15 @@ class DefineHostResponse:
 
 
 @dataclass
-class Secret:
+class SecretInfo:
     name: str = ''
     namespace: str = ''
 
 
 @dataclass
-class HostDefinition:
+class HostDefinitionInfo:
     name: str = ''
-    secret: Secret = Secret()
+    secret_info: SecretInfo = SecretInfo()
     node_name: str = ''
     node_id: str = ''
     phase: str = ''
@@ -33,24 +33,24 @@ class HostDefinition:
 
 
 @dataclass
-class CsiNode:
+class CsiNodeInfo:
     name: str = ''
     node_id: str = ''
 
 
 @dataclass
-class Pod:
+class PodInfo:
     name: str = ''
     node_name: str = ''
 
 
 @dataclass
-class Node:
+class NodeInfo:
     name: str = ''
 
 
 @dataclass
-class StorageClass:
+class StorageClassInfo:
     name: str = ''
     provisioner: str = ''
     parameters: dict = field(default_factory=dict)

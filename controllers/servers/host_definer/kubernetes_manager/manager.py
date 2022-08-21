@@ -7,7 +7,8 @@ from kubernetes.client.rest import ApiException
 from controllers.common.csi_logger import get_stdout_logger
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer import settings
-from controllers.servers.host_definer.types import CsiNode, Pod, Node, StorageClass, HostDefinition
+from controllers.servers.host_definer.types import (
+    CsiNodeInfo, PodInfo, NodeInfo, StorageClassInfo, HostDefinitionInfo)
 
 logger = get_stdout_logger()
 
@@ -37,100 +38,100 @@ class KubernetesManager():
         return self.dynamic_client.resources.get(api_version=settings.CSI_IBM_API_VERSION,
                                                  kind=settings.HOST_DEFINITION_KIND)
 
-    def _get_csi_nodes_with_driver(self):
-        csi_nodes_with_driver = []
-        csi_nodes = self._get_csi_nodes()
-        for csi_node in csi_nodes:
-            if self._is_csi_node_has_driver(csi_node):
-                csi_nodes_with_driver.append(self._get_csi_node_object(csi_node))
-        return csi_nodes_with_driver
+    def _get_csi_nodes_info_with_driver(self):
+        csi_nodes_info_with_driver = []
+        k8s_csi_nodes = self._get_k8s_csi_nodes()
+        for k8s_csi_node in k8s_csi_nodes:
+            if self._is_k8s_csi_node_has_driver(k8s_csi_node):
+                csi_nodes_info_with_driver.append(self._generate_csi_node_info(k8s_csi_node))
+        return csi_nodes_info_with_driver
 
-    def _get_csi_nodes(self):
+    def _get_k8s_csi_nodes(self):
         try:
             return self.csi_nodes_api.get().items
         except ApiException as ex:
             logger.error(messages.FAILED_TO_GET_CSI_NODES.format(ex.body))
             return []
 
-    def _get_nodes(self):
+    def _get_nodes_info(self):
         try:
-            nodes = []
-            for node in self.core_api.list_node().items:
-                node = self._get_node_object(node)
-                nodes.append(node)
-            return nodes
+            nodes_info = []
+            for k8s_node in self.core_api.list_node().items:
+                k8s_node = self._generate_node_info(k8s_node)
+                nodes_info.append(k8s_node)
+            return nodes_info
         except ApiException as ex:
             logger.error(messages.FAILED_TO_GET_NODES.format(ex.body))
             return []
 
-    def _get_node_object(self, node_from_cluster):
-        node = Node()
-        node.name = node_from_cluster.metadata.name
-        return node
+    def _generate_node_info(self, k8s_node):
+        node_info = NodeInfo()
+        node_info.name = k8s_node.metadata.name
+        return node_info
 
-    def _get_storage_classes(self):
+    def _get_storage_classes_info(self):
         try:
-            storage_classes = []
-            for storage_class in self.storage_api.list_storage_class().items:
-                storage_class = self._get_storage_class_object(storage_class)
-                storage_classes.append(storage_class)
-            return storage_classes
+            storage_classes_info = []
+            for k8s_storage_class in self.storage_api.list_storage_class().items:
+                storage_class_info = self._generate_storage_class_info(k8s_storage_class)
+                storage_classes_info.append(storage_class_info)
+            return storage_classes_info
 
         except ApiException as ex:
             logger.error(messages.FAILED_TO_GET_STORAGE_CLASSES.format(ex.body))
             return []
 
-    def _get_storage_class_object(self, storage_class_from_cluster):
-        storage_class = StorageClass()
-        storage_class.name = storage_class_from_cluster.metadata.name
-        storage_class.provisioner = storage_class_from_cluster.provisioner
-        storage_class.parameters = storage_class_from_cluster.parameters
-        return storage_class
+    def _generate_storage_class_info(self, k8s_storage_class):
+        storage_class_info = StorageClassInfo()
+        storage_class_info.name = k8s_storage_class.metadata.name
+        storage_class_info.provisioner = k8s_storage_class.provisioner
+        storage_class_info.parameters = k8s_storage_class.parameters
+        return storage_class_info
 
-    def _is_csi_node_has_driver(self, csi_node):
-        if csi_node.spec.drivers:
-            for driver in csi_node.spec.drivers:
+    def _is_k8s_csi_node_has_driver(self, k8s_csi_node):
+        if k8s_csi_node.spec.drivers:
+            for driver in k8s_csi_node.spec.drivers:
                 return driver.name == settings.CSI_PROVISIONER_NAME
         return False
 
-    def _get_csi_node(self, node_name):
+    def _get_csi_node_info(self, node_name):
         try:
-            csi_node = self.csi_nodes_api.get(name=node_name)
-            return self._get_csi_node_object(csi_node)
+            k8s_csi_node = self.csi_nodes_api.get(name=node_name)
+            return self._generate_csi_node_info(k8s_csi_node)
         except ApiException as ex:
             if ex.status != 404:
                 logger.error(messages.CSI_NODE_DOES_NOT_EXIST.format(node_name))
             else:
                 logger.error(messages.FAILED_TO_GET_CSI_NODE.format(node_name, ex.body))
-            return CsiNode()
+            return CsiNodeInfo()
 
-    def _get_csi_node_object(self, csi_node):
-        csi_node_obj = CsiNode()
-        csi_node_obj.name = csi_node.metadata.name
-        csi_node_obj.node_id = self._get_node_id_from_csi_node(csi_node)
-        return csi_node_obj
+    def _generate_csi_node_info(self, k8s_csi_node):
+        csi_node_info = CsiNodeInfo()
+        csi_node_info.name = k8s_csi_node.metadata.name
+        csi_node_info.node_id = self._get_node_id_from_k8s_csi_node(k8s_csi_node)
+        return csi_node_info
 
-    def _get_node_id_from_csi_node(self, csi_node):
-        if csi_node.spec.drivers:
-            for driver in csi_node.spec.drivers:
+    def _get_node_id_from_k8s_csi_node(self, k8s_csi_node):
+        if k8s_csi_node.spec.drivers:
+            for driver in k8s_csi_node.spec.drivers:
                 if driver.name == settings.CSI_PROVISIONER_NAME:
                     return driver.nodeID
         return None
 
-    def _get_host_definition(self, node_name, secret):
+    def _get_host_definition_info(self, node_name, secret_info):
         try:
-            host_definitions = self._get_host_definitions()
-            for host_definition in host_definitions:
-                host_definition_obj = self._get_host_definition_object(host_definition)
-                if self._is_host_definition_matches(host_definition_obj, node_name, secret):
-                    return host_definition_obj, 200
+            k8s_host_definitions = self._get_k8s_host_definitions()
+            for k8s_host_definition in k8s_host_definitions:
+                host_definition_info = self._generate_host_definition_info(k8s_host_definition)
+                if self._is_host_definition_matches(host_definition_info, node_name, secret_info):
+                    return host_definition_info, 200
             return None, 404
         except ApiException as ex:
             logger.error(messages.FAILED_TO_GET_HOST_DEFINITION.format(
-                node_name, secret.name, secret.namespace, ex.body))
+                node_name, secret_info.name, secret_info.namespace, ex.body))
             return None, ex.status
 
-    def _get_host_definitions(self):
+    def _get_k8s_host_definitions(self):
         try:
             return self.host_definitions_api.get().items
 
@@ -138,33 +139,34 @@ class KubernetesManager():
             logger.error(messages.FAILED_TO_GET_LIST_OF_HOST_DEFINITIONS.format(ex.body))
             return []
 
-    def _get_host_definition_object(self, host_definition):
-        host_definition_obj = HostDefinition()
-        host_definition_obj.name = host_definition.metadata.name
-        host_definition_obj.resource_version = host_definition.metadata.resource_version
-        host_definition_obj.uid = host_definition.metadata.uid
-        host_definition_obj.phase = self._get_host_definition_phase(host_definition)
-        host_definition_obj.secret.name = self._get_attr_from_host_definition(
-            host_definition, settings.SECRET_NAME_FIELD)
-        host_definition_obj.secret.namespace = self._get_attr_from_host_definition(
-            host_definition, settings.SECRET_NAMESPACE_FIELD)
-        host_definition_obj.node_name = self._get_attr_from_host_definition(host_definition, settings.NODE_NAME_FIELD)
-        host_definition_obj.node_id = self._get_attr_from_host_definition(host_definition, settings.NODE_ID_FIELD)
-        return host_definition_obj
+    def _generate_host_definition_info(self, k8s_host_definition):
+        host_definition_info = HostDefinitionInfo()
+        host_definition_info.name = k8s_host_definition.metadata.name
+        host_definition_info.resource_version = k8s_host_definition.metadata.resource_version
+        host_definition_info.uid = k8s_host_definition.metadata.uid
+        host_definition_info.phase = self._get_host_definition_phase(k8s_host_definition)
+        host_definition_info.secret_info.name = self._get_attr_from_host_definition(
+            k8s_host_definition, settings.SECRET_NAME_FIELD)
+        host_definition_info.secret_info.namespace = self._get_attr_from_host_definition(
+            k8s_host_definition, settings.SECRET_NAMESPACE_FIELD)
+        host_definition_info.node_name = self._get_attr_from_host_definition(k8s_host_definition, settings.NODE_NAME_FIELD)
+        host_definition_info.node_id = self._get_attr_from_host_definition(k8s_host_definition, settings.NODE_ID_FIELD)
+        return host_definition_info
 
-    def _get_host_definition_phase(self, host_definition):
-        if host_definition.status:
-            return host_definition.status.phase
+    def _get_host_definition_phase(self, k8s_host_definition):
+        if k8s_host_definition.status:
+            return k8s_host_definition.status.phase
         return ''
 
-    def _get_attr_from_host_definition(self, host_definition, attribute):
-        if hasattr(host_definition.spec.hostDefinition, attribute):
-            return getattr(host_definition.spec.hostDefinition, attribute)
+    def _get_attr_from_host_definition(self, k8s_host_definition, attribute):
+        if hasattr(k8s_host_definition.spec.hostDefinition, attribute):
+            return getattr(k8s_host_definition.spec.hostDefinition, attribute)
         return ''
 
-    def _is_host_definition_matches(self, host_definition, node_name, secret):
-        return host_definition.node_name == node_name and \
-            host_definition.secret.name == secret.name and host_definition.secret.namespace == secret.namespace
+    def _is_host_definition_matches(self, host_definition_info, node_name, secret_info):
+        return host_definition_info.node_name == node_name and \
+            host_definition_info.secret_info.name == secret_info.name and \
+            host_definition_info.secret_info.namespace == secret_info.namespace
 
     def _patch_host_definition(self, host_definition_manifest):
         host_definition_name = host_definition_manifest[settings.METADATA][settings.NAME]
@@ -207,22 +209,23 @@ class KubernetesManager():
 
         return status
 
-    def _get_event_for_host_definition(self, host_definition, message):
+    def _generate_k8s_event_for_host_definition(self, host_definition_info, message):
         return client.CoreV1Event(
-            metadata=client.V1ObjectMeta(generate_name='{}.'.format(host_definition.name),),
+            metadata=client.V1ObjectMeta(generate_name='{}.'.format(host_definition_info.name),),
             reporting_component=settings.HOST_DEFINER, reporting_instance=settings.HOST_DEFINER, action='Verifying',
             type='Error', reason=settings.FAILED_VERIFYING, message=str(message),
             event_time=datetime.datetime.utcnow().isoformat(timespec='microseconds') + 'Z',
             involved_object=client.V1ObjectReference(
-                api_version=settings.CSI_IBM_API_VERSION, kind=settings.HOST_DEFINITION_KIND, name=host_definition.name,
-                resource_version=host_definition.resource_version, uid=host_definition.uid,))
+                api_version=settings.CSI_IBM_API_VERSION, kind=settings.HOST_DEFINITION_KIND,
+                name=host_definition_info.name, resource_version=host_definition_info.resource_version,
+                uid=host_definition_info.uid,))
 
-    def _create_event(self, namespace, event):
+    def _create_k8s_event(self, namespace, k8s_event):
         try:
-            self.core_api.create_namespaced_event(namespace, event)
+            self.core_api.create_namespaced_event(namespace, k8s_event)
         except ApiException as ex:
             logger.error(messages.FAILED_TO_CREATE_EVENT_FOR_HOST_DEFINITION.format(
-                event.involved_object.name, ex.body))
+                k8s_event.involved_object.name, ex.body))
 
     def _delete_host_definition(self, host_definition_name):
         try:
@@ -249,14 +252,14 @@ class KubernetesManager():
 
         return body
 
-    def _get_data_from_secret(self, secret):
+    def _get_data_from_secret_info(self, secret_info):
         try:
-            return self.core_api.read_namespaced_secret(name=secret.name, namespace=secret.namespace).data
+            return self.core_api.read_namespaced_secret(name=secret_info.name, namespace=secret_info.namespace).data
         except ApiException as ex:
             if ex.status == 404:
-                logger.error(messages.SECRET_DOES_NOT_EXIST.format(secret.name, secret.namespace))
+                logger.error(messages.SECRET_DOES_NOT_EXIST.format(secret_info.name, secret_info.namespace))
             else:
-                logger.error(messages.FAILED_TO_GET_SECRET.format(secret.name, secret.namespace, ex.body))
+                logger.error(messages.FAILED_TO_GET_SECRET.format(secret_info.name, secret_info.namespace, ex.body))
             return None
 
     def _read_node(self, node_name):
@@ -276,21 +279,21 @@ class KubernetesManager():
             logger.error(messages.FAILED_TO_LIST_DAEMON_SETS.format(ex.body))
             return None
 
-    def _get_csi_pods(self):
+    def _get_csi_pods_info(self):
         try:
-            pods = []
-            pods_from_cluster = self.core_api.list_pod_for_all_namespaces(label_selector=settings.DRIVER_PRODUCT_LABEL)
-            for pod in pods_from_cluster.items:
-                pod = self._get_pod_object(pod)
-                pods.append(pod)
-            return pods
+            pods_info = []
+            k8s_pods = self.core_api.list_pod_for_all_namespaces(label_selector=settings.DRIVER_PRODUCT_LABEL)
+            for k8s_pod in k8s_pods.items:
+                pod_info = self._generate_pod_info(k8s_pod)
+                pods_info.append(pod_info)
+            return pods_info
 
         except ApiException as ex:
             logger.error(messages.FAILED_TO_LIST_PODS.format(ex.body))
             return None
 
-    def _get_pod_object(self, pod_from_cluster):
-        pod = Pod()
-        pod.name = pod_from_cluster.metadata.name
-        pod.node_name = pod_from_cluster.spec.node_name
-        return pod
+    def _generate_pod_info(self, k8s_pod):
+        pod_info = PodInfo()
+        pod_info.name = k8s_pod.metadata.name
+        pod_info.node_name = k8s_pod.spec.node_name
+        return pod_info
