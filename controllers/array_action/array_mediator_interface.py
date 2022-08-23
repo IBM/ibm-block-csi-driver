@@ -334,7 +334,7 @@ class ArrayMediator(ABC):
            host_name : name of the host in the storage system
 
         Returns:
-           Host
+            Host
 
         Raises:
             HostNotFoundError
@@ -344,7 +344,7 @@ class ArrayMediator(ABC):
     @abstractmethod
     def create_host(self, host_name, initiators, connectivity_type):
         """
-        This function will find the host by name.
+        This function should create a host in the storage system.
 
         Args:
            host_name         : name of the host to be created in the storage system
@@ -353,7 +353,7 @@ class ArrayMediator(ABC):
 
 
         Returns:
-           None
+            None
 
         Raises:
             HostAlreadyExists
@@ -363,13 +363,13 @@ class ArrayMediator(ABC):
     @abstractmethod
     def delete_host(self, host_name):
         """
-        This function will find the host by name.
+        This function should delete a host in the storage system.
 
         Args:
-           host_name : name of the host in the storage system
+            host_name : name of the host in the storage system
 
         Returns:
-           None
+            None
 
         Raises:
             None
