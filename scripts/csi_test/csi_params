@@ -1,3 +1,4 @@
 #SpaceEfficiency: Compression
 pool: POOL_NAME
+virt_snap_func: VIRT_SNAP_FUNC
 #volume_name_prefix: vol_
