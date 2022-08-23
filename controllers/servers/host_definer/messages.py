@@ -26,10 +26,14 @@ NEW_STORAGE_CLASS = 'New storageClass {}'
 HOST_ALREADY_ON_STORAGE_HOST_DEFINITION_READY = "Host {} is already on storage of {} secret in {} namespace,"\
     " detected host definition {} in Ready phase"
 CREATING_NEW_HOST_DEFINITION = 'Creating host Definition: {}'
-VERIFY_HOST_IS_UNDEFINED = 'Verifying that host {} is undefined from {} secret in {} namespace'
+UNDEFINED_HOST = 'Undefine host {} from {} secret in {} namespace'
 CREATE_EVENT_FOR_HOST_DEFINITION = 'Creating event for host definition: {} error event: {}'
 NEW_KUBERNETES_NODE = 'New Kubernetes node {}, has csi IBM block'
 ADD_LABEL_TO_NODE = 'Add {} label to node {}'
 REMOVE_LABEL_FROM_NODE = 'Remove {} label from node {}'
 FAILED_TO_LIST_DAEMON_SETS = 'Failed to list csi IBM block daemon set, got: {}'
 FAILED_TO_LIST_PODS = 'Failed to list csi IBM block pods, got: {}'
+FAILED_TO_GET_SECRET_EVENT = 'Failed to get secret {} in namespace {}'
+HOST_DEFINITION_IN_DESIRED_STATE = "Stopping verifying host definition {}, using exponential backoff,"\
+    " because it is in his wanted state"
+DELETE_HOST_DEFINITION = 'Deleting host definition {}'

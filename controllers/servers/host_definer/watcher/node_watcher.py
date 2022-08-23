@@ -1,6 +1,5 @@
 from queue import Empty
 from kubernetes import watch
-from munch import Munch
 
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import NODES, Watcher
@@ -35,7 +34,7 @@ class NodeWatcher(Watcher):
             resource_version = self.core_api.list_node().metadata.resource_version
             stream = watch.Watch().stream(self.core_api.list_node, resource_version=resource_version, timeout_seconds=5)
             for watch_event in stream:
-                watch_event = Munch.fromDict(watch_event)
+                watch_event = self._munch_watch_event(watch_event)
                 node_name = watch_event.object.metadata.name
                 csi_node_info = self._get_csi_node_info(node_name)
                 if watch_event.type in settings.MODIFIED_EVENT and \

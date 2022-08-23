@@ -2,6 +2,7 @@ import base64
 import os
 import random
 import string
+from munch import Munch
 
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.config import (SECRET_ARRAY_PARAMETER,
@@ -95,7 +96,7 @@ class Watcher(KubernetesManager):
     def _delete_definition(self, host_definition_info):
         node_name = host_definition_info.node_name
         secret_info = host_definition_info.secret_info
-        logger.info(messages.VERIFY_HOST_IS_UNDEFINED.format(node_name, secret_info.name, secret_info.namespace))
+        logger.info(messages.UNDEFINED_HOST.format(node_name, secret_info.name, secret_info.namespace))
         response = self._undefine_host(host_definition_info)
         current_host_definition_info_on_cluster, _ = self._get_host_definition_info(
             host_definition_info.node_name, host_definition_info.secret_info)
@@ -150,7 +151,8 @@ class Watcher(KubernetesManager):
         request = self._get_request_from_host_definition(host_definition_info)
         if not request:
             response = DefineHostResponse()
-            response.error_message = 'Failed to get Secret'
+            secret_info = host_definition_info.secret_info
+            response.error_message = messages.FAILED_TO_GET_SECRET_EVENT.format(secret_info.name, secret_info.namespace)
             return response
         return define_function(request)
 
@@ -158,7 +160,6 @@ class Watcher(KubernetesManager):
         request = self._get_request_from_secret(host_definition_info.secret_info)
         if request:
             request.node_id = host_definition_info.node_id
-            request.node_name = host_definition_info.node_name
         return request
 
     def _get_request_from_secret(self, secret_info):
@@ -257,3 +258,6 @@ class Watcher(KubernetesManager):
 
     def _generate_secret_id(self, secret_name, secret_namespace):
         return (secret_name, secret_namespace)
+
+    def _munch_watch_event(self, watch_event):
+        return Munch.fromDict(watch_event)

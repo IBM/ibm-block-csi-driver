@@ -229,6 +229,7 @@ class KubernetesManager():
                 k8s_event.involved_object.name, ex.body))
 
     def _delete_host_definition(self, host_definition_name):
+        logger.info(messages.DELETE_HOST_DEFINITION.format(host_definition_name))
         try:
             self.host_definitions_api.delete(name=host_definition_name, body={})
         except ApiException as ex:

@@ -1,6 +1,5 @@
 from threading import Thread
 from time import sleep
-from munch import Munch
 
 import controllers.servers.host_definer.messages as messages
 from controllers.common.csi_logger import get_stdout_logger
@@ -18,7 +17,7 @@ class HostDefinitionWatcher(Watcher):
             resource_version = self.host_definitions_api.get().metadata.resourceVersion
             stream = self.host_definitions_api.watch(resource_version=resource_version, timeout=5)
             for watch_event in stream:
-                watch_event = Munch.fromDict(watch_event)
+                watch_event = self._munch_watch_event(watch_event)
                 host_definition_info = self._generate_host_definition_info(watch_event.object)
                 if self._is_host_definition_in_pending_phase(host_definition_info.phase) and \
                         watch_event.type != settings.DELETED_EVENT:
@@ -40,6 +39,7 @@ class HostDefinitionWatcher(Watcher):
             logger.info(messages.VERIFY_HOST_DEFINITION_USING_EXPONENTIAL_BACKOFF.format(
                 host_definition_info.name, retries))
             if self._is_host_definition_in_desired_state(host_definition_info) and retries != 5:
+                logger.info(messages.HOST_DEFINITION_IN_DESIRED_STATE.format(host_definition_info.name))
                 return
             self._handle_pending_host_definition(host_definition_info)
             retries -= 1

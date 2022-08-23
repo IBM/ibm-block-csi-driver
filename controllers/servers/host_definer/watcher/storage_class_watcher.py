@@ -1,5 +1,4 @@
 from kubernetes import watch
-from munch import Munch
 
 import controllers.servers.host_definer.messages as messages
 from controllers.common.csi_logger import get_stdout_logger
@@ -23,7 +22,7 @@ class StorageClassWatcher(Watcher):
             stream = watch.Watch().stream(self.storage_api.list_storage_class,
                                           resource_version=resource_version, timeout_seconds=5)
             for watch_event in stream:
-                watch_event = Munch.fromDict(watch_event)
+                watch_event = self._munch_watch_event(watch_event)
                 storage_class_info = self._generate_storage_class_info(watch_event.object)
                 secrets_id = self._get_secrets_id_from_storage_class_with_driver_provisioner(storage_class_info)
                 if watch_event.type == settings.ADDED_EVENT:
