@@ -7,7 +7,7 @@ from csi_general import csi_pb2
 from mock import patch, Mock, MagicMock, call
 
 import controllers.array_action.errors as array_errors
-import controllers.servers.config as config
+import controllers.servers.settings as config
 import controllers.servers.errors as controller_errors
 from controllers.array_action.array_action_types import Host, ObjectIds
 from controllers.array_action.array_mediator_xiv import XIVArrayMediator

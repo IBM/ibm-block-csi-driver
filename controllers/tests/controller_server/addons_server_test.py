@@ -4,7 +4,7 @@ import grpc
 from csi_general import replication_pb2 as pb2
 from mock import Mock, MagicMock
 
-from controllers.servers.config import PARAMETERS_SYSTEM_ID, PARAMETERS_COPY_TYPE
+from controllers.servers.settings import PARAMETERS_SYSTEM_ID, PARAMETERS_COPY_TYPE
 from controllers.servers.csi.addons_server import ReplicationControllerServicer
 from controllers.tests import utils
 from controllers.tests.common.test_settings import VOLUME_NAME, VOLUME_UID, OBJECT_INTERNAL_ID, \

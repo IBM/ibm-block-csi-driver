@@ -6,14 +6,14 @@ from pyds8k.resources.ds8k.v1.common import types as ds8k_types
 from retry import retry
 
 import controllers.array_action.errors as array_errors
-import controllers.servers.config as controller_config
-from controllers.array_action import config
+import controllers.array_action.settings as array_settings
+import controllers.common.settings as common_settings
+import controllers.servers.settings as controller_config
 from controllers.array_action.array_action_types import Volume, Snapshot, Host
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controllers.array_action.ds8k_rest_client import RESTClient, scsilun_to_int
 from controllers.array_action.ds8k_volume_cache import VolumeCache
 from controllers.array_action.utils import ClassProperty
-from controllers.common import settings
 from controllers.common.csi_logger import get_stdout_logger
 
 LOGIN_PORT_WWPN = attr_names.IOPORT_WWPN
@@ -102,16 +102,16 @@ def get_flashcopy_as_target_if_exists(api_volume):
 def get_array_space_efficiency(space_efficiency):
     if space_efficiency:
         space_efficiency_lower = space_efficiency.lower()
-        if space_efficiency_lower == settings.SPACE_EFFICIENCY_THIN:
+        if space_efficiency_lower == common_settings.SPACE_EFFICIENCY_THIN:
             return ARRAY_SPACE_EFFICIENCY_THIN
     return ARRAY_SPACE_EFFICIENCY_NONE
 
 
 def _get_space_efficiency_aliases(array_space_efficiency):
     if array_space_efficiency == ARRAY_SPACE_EFFICIENCY_THIN:
-        return {settings.SPACE_EFFICIENCY_THIN}
+        return {common_settings.SPACE_EFFICIENCY_THIN}
     if array_space_efficiency == ARRAY_SPACE_EFFICIENCY_NONE:
-        return {settings.SPACE_EFFICIENCY_NONE, ""}
+        return {common_settings.SPACE_EFFICIENCY_NONE, ""}
     raise array_errors.SpaceEfficiencyNotSupported(array_space_efficiency)
 
 
@@ -120,7 +120,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     @ClassProperty
     def array_type(self):
-        return settings.ARRAY_TYPE_DS8K
+        return common_settings.ARRAY_TYPE_DS8K
 
     @ClassProperty
     def port(self):
@@ -640,7 +640,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         fc_wwns = self._get_fc_wwns_from_api_host(api_host)
         connectivity_types = []
         if fc_wwns:
-            connectivity_types.append(config.FC_CONNECTIVITY_TYPE)
+            connectivity_types.append(array_settings.FC_CONNECTIVITY_TYPE)
         return Host(name=api_host.name, connectivity_types=connectivity_types, fc_wwns=fc_wwns)
 
     def get_host_by_host_identifiers(self, initiators):
@@ -653,7 +653,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
                 break
         if found:
             logger.debug("found host {0} with fc wwpns: {1}".format(found, initiators.fc_wwns))
-            return found, [config.FC_CONNECTIVITY_TYPE]
+            return found, [array_settings.FC_CONNECTIVITY_TYPE]
         logger.debug("can not found host by initiators: {0} ".format(initiators))
         raise array_errors.HostNotFoundError(initiators)
 
@@ -661,7 +661,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         logger.debug("validate_supported_space_efficiency for space efficiency : {0}".format(space_efficiency))
 
         if (space_efficiency and space_efficiency.lower() not in
-                [settings.SPACE_EFFICIENCY_THIN, settings.SPACE_EFFICIENCY_NONE]):
+                [common_settings.SPACE_EFFICIENCY_THIN, common_settings.SPACE_EFFICIENCY_NONE]):
             logger.error("space efficiency is not supported.")
             raise array_errors.SpaceEfficiencyNotSupported(
                 space_efficiency)

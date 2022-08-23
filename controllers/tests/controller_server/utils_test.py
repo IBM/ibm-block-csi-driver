@@ -7,13 +7,13 @@ from munch import Munch
 
 import controllers.common.utils
 import controllers.servers.utils as utils
-from controllers.array_action.config import (NVME_OVER_FC_CONNECTIVITY_TYPE,
-                                             FC_CONNECTIVITY_TYPE,
-                                             ISCSI_CONNECTIVITY_TYPE)
+from controllers.array_action.settings import (NVME_OVER_FC_CONNECTIVITY_TYPE,
+                                               FC_CONNECTIVITY_TYPE,
+                                               ISCSI_CONNECTIVITY_TYPE)
 from controllers.common.node_info import NodeIdInfo
 from controllers.common.settings import SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED, SPACE_EFFICIENCY_NONE, \
     SPACE_EFFICIENCY_DEDUPLICATED, SPACE_EFFICIENCY_THIN
-from controllers.servers import config as controller_config
+from controllers.servers import settings as controller_config
 from controllers.servers.csi.csi_controller_server import CSIControllerServicer
 from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controllers.tests import utils as test_utils

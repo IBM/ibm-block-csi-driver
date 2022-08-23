@@ -7,9 +7,9 @@ import base58
 from csi_general import csi_pb2
 from google.protobuf.timestamp_pb2 import Timestamp
 
-import controllers.servers.config as config
 import controllers.servers.messages as messages
-from controllers.array_action.config import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
+import controllers.servers.settings as servers_settings
+from controllers.array_action.settings import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
     ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC
 from controllers.common import settings
 from controllers.common.config import config as common_config
@@ -42,7 +42,7 @@ def _is_topology_match(system_topologies, node_topologies):
 
 
 def get_volume_topologies(request):
-    if request.HasField(config.REQUEST_ACCESSIBILITY_REQUIREMENTS_FIELD):
+    if request.HasField(servers_settings.REQUEST_ACCESSIBILITY_REQUIREMENTS_FIELD):
         accessibility_requirements = request.accessibility_requirements
         if accessibility_requirements.preferred:
             topologies = accessibility_requirements.preferred[0].segments
@@ -53,14 +53,14 @@ def get_volume_topologies(request):
 
 def _get_system_info_for_topologies(secrets_config, node_topologies):
     for system_id, system_info in secrets_config.items():
-        system_topologies = system_info.get(config.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
+        system_topologies = system_info.get(servers_settings.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
         if _is_topology_match(system_topologies, node_topologies):
             return system_info, system_id
     raise ValidationException(messages.NO_SYSTEM_MATCH_REQUESTED_TOPOLOGIES.format(node_topologies))
 
 
 def _get_system_info_from_secrets(secrets, topologies=None, system_id=None):
-    raw_secrets_config = secrets.get(config.SECRET_CONFIG_PARAMETER)
+    raw_secrets_config = secrets.get(servers_settings.SECRET_CONFIG_PARAMETER)
     system_info = secrets
     if raw_secrets_config:
         secrets_config = _parse_raw_json(raw_json=raw_secrets_config)
@@ -75,9 +75,10 @@ def _get_system_info_from_secrets(secrets, topologies=None, system_id=None):
 
 
 def _get_array_connection_info_from_system_info(secrets, system_id):
-    user = secrets[config.SECRET_USERNAME_PARAMETER]
-    password = secrets[config.SECRET_PASSWORD_PARAMETER]
-    array_addresses = secrets[config.SECRET_ARRAY_PARAMETER].split(config.PARAMETERS_ARRAY_ADDRESSES_DELIMITER)
+    user = secrets[servers_settings.SECRET_USERNAME_PARAMETER]
+    password = secrets[servers_settings.SECRET_PASSWORD_PARAMETER]
+    array_addresses = secrets[servers_settings.SECRET_ARRAY_PARAMETER].split(
+        servers_settings.PARAMETERS_ARRAY_ADDRESSES_DELIMITER)
     return ArrayConnectionInfo(array_addresses=array_addresses, user=user, password=password, system_id=system_id)
 
 
@@ -87,11 +88,11 @@ def get_array_connection_info_from_secrets(secrets, topologies=None, system_id=N
 
 
 def get_volume_parameters(parameters, system_id=None):
-    return get_object_parameters(parameters, config.PARAMETERS_VOLUME_NAME_PREFIX, system_id)
+    return get_object_parameters(parameters, servers_settings.PARAMETERS_VOLUME_NAME_PREFIX, system_id)
 
 
 def get_snapshot_parameters(parameters, system_id):
-    return get_object_parameters(parameters, config.PARAMETERS_SNAPSHOT_NAME_PREFIX, system_id)
+    return get_object_parameters(parameters, servers_settings.PARAMETERS_SNAPSHOT_NAME_PREFIX, system_id)
 
 
 def _str_to_bool(parameter):
@@ -101,25 +102,25 @@ def _str_to_bool(parameter):
 
 
 def get_object_parameters(parameters, prefix_param_name, system_id):
-    raw_parameters_by_system = parameters.get(config.PARAMETERS_BY_SYSTEM)
+    raw_parameters_by_system = parameters.get(servers_settings.PARAMETERS_BY_SYSTEM)
     system_parameters = {}
     if raw_parameters_by_system and system_id:
         parameters_by_system = _parse_raw_json(raw_json=raw_parameters_by_system)
         system_parameters = parameters_by_system.get(system_id, {})
-    default_pool = parameters.get(config.PARAMETERS_POOL)
-    default_space_efficiency = parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
+    default_pool = parameters.get(servers_settings.PARAMETERS_POOL)
+    default_space_efficiency = parameters.get(servers_settings.PARAMETERS_SPACE_EFFICIENCY)
     default_prefix = parameters.get(prefix_param_name)
-    default_io_group = parameters.get(config.PARAMETERS_IO_GROUP)
-    default_volume_group = parameters.get(config.PARAMETERS_VOLUME_GROUP)
-    default_virt_snap_func = parameters.get(config.PARAMETERS_VIRT_SNAP_FUNC)
-    virt_snap_func_str = system_parameters.get(config.PARAMETERS_VIRT_SNAP_FUNC, default_virt_snap_func)
+    default_io_group = parameters.get(servers_settings.PARAMETERS_IO_GROUP)
+    default_volume_group = parameters.get(servers_settings.PARAMETERS_VOLUME_GROUP)
+    default_virt_snap_func = parameters.get(servers_settings.PARAMETERS_VIRT_SNAP_FUNC)
+    virt_snap_func_str = system_parameters.get(servers_settings.PARAMETERS_VIRT_SNAP_FUNC, default_virt_snap_func)
     is_virt_snap_func = _str_to_bool(virt_snap_func_str)
     return ObjectParameters(
-        pool=system_parameters.get(config.PARAMETERS_POOL, default_pool),
-        space_efficiency=system_parameters.get(config.PARAMETERS_SPACE_EFFICIENCY, default_space_efficiency),
+        pool=system_parameters.get(servers_settings.PARAMETERS_POOL, default_pool),
+        space_efficiency=system_parameters.get(servers_settings.PARAMETERS_SPACE_EFFICIENCY, default_space_efficiency),
         prefix=system_parameters.get(prefix_param_name, default_prefix),
-        io_group=system_parameters.get(config.PARAMETERS_IO_GROUP, default_io_group),
-        volume_group=system_parameters.get(config.PARAMETERS_VOLUME_GROUP, default_volume_group),
+        io_group=system_parameters.get(servers_settings.PARAMETERS_IO_GROUP, default_io_group),
+        volume_group=system_parameters.get(servers_settings.PARAMETERS_VOLUME_GROUP, default_volume_group),
         virt_snap_func=is_virt_snap_func)
 
 
@@ -132,31 +133,32 @@ def get_snapshot_id(new_snapshot, system_id):
 
 
 def _get_object_id(obj, system_id):
-    object_ids_delimiter = config.PARAMETERS_OBJECT_IDS_DELIMITER
+    object_ids_delimiter = servers_settings.PARAMETERS_OBJECT_IDS_DELIMITER
     object_ids_value = object_ids_delimiter.join((obj.internal_id, obj.id))
-    object_id_info_delimiter = config.PARAMETERS_OBJECT_ID_INFO_DELIMITER
+    object_id_info_delimiter = servers_settings.PARAMETERS_OBJECT_ID_INFO_DELIMITER
     if system_id:
         return object_id_info_delimiter.join((obj.array_type, system_id, object_ids_value))
     return object_id_info_delimiter.join((obj.array_type, object_ids_value))
 
 
 def _is_system_id_valid(system_id):
-    return system_id and re.match(config.SECRET_VALIDATION_REGEX, system_id)
+    return system_id and re.match(servers_settings.SECRET_VALIDATION_REGEX, system_id)
 
 
 def _validate_system_id(system_id):
     if not _is_system_id_valid(system_id):
         raise ValidationException(
-            messages.INVALID_SYSTEM_ID_MESSAGE.format(system_id, config.SECRET_VALIDATION_REGEX))
-    if len(system_id) > config.SECRET_SYSTEM_ID_MAX_LENGTH:
+            messages.INVALID_SYSTEM_ID_MESSAGE.format(system_id, servers_settings.SECRET_VALIDATION_REGEX))
+    if len(system_id) > servers_settings.SECRET_SYSTEM_ID_MAX_LENGTH:
         raise ValidationException(
-            messages.PARAMETER_LENGTH_IS_TOO_LONG.format("system id", system_id, config.SECRET_SYSTEM_ID_MAX_LENGTH))
+            messages.PARAMETER_LENGTH_IS_TOO_LONG.format("system id", system_id,
+                                                         servers_settings.SECRET_SYSTEM_ID_MAX_LENGTH))
 
 
 def _validate_secrets(secrets):
-    if not (config.SECRET_USERNAME_PARAMETER in secrets and
-            config.SECRET_PASSWORD_PARAMETER in secrets and
-            config.SECRET_ARRAY_PARAMETER in secrets):
+    if not (servers_settings.SECRET_USERNAME_PARAMETER in secrets and
+            servers_settings.SECRET_PASSWORD_PARAMETER in secrets and
+            servers_settings.SECRET_ARRAY_PARAMETER in secrets):
         raise ValidationException(messages.SECRET_MISSING_CONNECTION_INFO_MESSAGE)
 
 
@@ -173,7 +175,7 @@ def _validate_secrets_config(secrets_config):
         if system_id and system_info:
             _validate_system_id(system_id)
             _validate_secrets(system_info)
-            supported_topologies = system_info.get(config.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
+            supported_topologies = system_info.get(servers_settings.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
             _validate_topologies(supported_topologies)
         else:
             raise ValidationException(messages.INVALID_SECRET_CONFIG_MESSAGE)
@@ -183,7 +185,7 @@ def validate_secrets(secrets):
     logger.debug("validating secrets")
     if not secrets:
         raise ValidationException(messages.SECRET_MISSING_MESSAGE)
-    raw_secrets_config = secrets.get(config.SECRET_CONFIG_PARAMETER)
+    raw_secrets_config = secrets.get(servers_settings.SECRET_CONFIG_PARAMETER)
     if raw_secrets_config:
         secrets_config = _parse_raw_json(raw_secrets_config)
         _validate_secrets_config(secrets_config)
@@ -194,18 +196,18 @@ def validate_secrets(secrets):
 
 def validate_csi_volume_capability(cap):
     logger.debug("validating csi volume capability")
-    if cap.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_MOUNT):
-        if cap.mount.fs_type and (cap.mount.fs_type not in config.SUPPORTED_FS_TYPES):
+    if cap.HasField(servers_settings.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_MOUNT):
+        if cap.mount.fs_type and (cap.mount.fs_type not in servers_settings.SUPPORTED_FS_TYPES):
             raise ValidationException(messages.UNSUPPORTED_FS_TYPE_MESSAGE.format(cap.mount.fs_type))
         if cap.mount.mount_flags:
             raise ValidationException(messages.UNSUPPORTED_MOUNT_FLAGS_MESSAGE)
 
-    elif not cap.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_BLOCK):
+    elif not cap.HasField(servers_settings.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_BLOCK):
         # should never get here since the value can be only mount (for fs volume) or block (for raw block)
         logger.error(messages.UNSUPPORTED_VOLUME_ACCESS_TYPE_MESSAGE)
         raise ValidationException(messages.UNSUPPORTED_VOLUME_ACCESS_TYPE_MESSAGE)
 
-    if cap.access_mode.mode not in config.SUPPORTED_ACCESS_MODE:
+    if cap.access_mode.mode not in servers_settings.SUPPORTED_ACCESS_MODE:
         logger.error("unsupported access mode : {}".format(cap.access_mode))
         raise ValidationException(messages.UNSUPPORTED_ACCESS_MODE_MESSAGE.format(cap.access_mode))
 
@@ -227,39 +229,39 @@ def validate_create_volume_source(request):
     source = request.volume_content_source
     if source:
         logger.info(source)
-        if source.HasField(config.SNAPSHOT_TYPE_NAME):
-            _validate_source_info(source, config.SNAPSHOT_TYPE_NAME)
-        elif source.HasField(config.VOLUME_TYPE_NAME):
-            _validate_source_info(source, config.VOLUME_TYPE_NAME)
+        if source.HasField(servers_settings.SNAPSHOT_TYPE_NAME):
+            _validate_source_info(source, servers_settings.SNAPSHOT_TYPE_NAME)
+        elif source.HasField(servers_settings.VOLUME_TYPE_NAME):
+            _validate_source_info(source, servers_settings.VOLUME_TYPE_NAME)
 
 
 def _validate_source_info(source, source_type):
     source_object = getattr(source, source_type)
     logger.info("Source {0} specified: {1}".format(source_type, source_object))
-    source_object_id = getattr(source_object, config.VOLUME_SOURCE_ID_FIELDS[source_type])
+    source_object_id = getattr(source_object, servers_settings.VOLUME_SOURCE_ID_FIELDS[source_type])
     message = messages.VOLUME_SOURCE_ID_IS_MISSING.format(source_type)
     _validate_object_id(source_object_id, object_type=source_type, message=message)
 
 
 def _validate_pool_parameter(parameters):
     logger.debug("validating pool parameter")
-    if config.PARAMETERS_POOL in parameters:
-        if not parameters[config.PARAMETERS_POOL]:
+    if servers_settings.PARAMETERS_POOL in parameters:
+        if not parameters[servers_settings.PARAMETERS_POOL]:
             raise ValidationException(messages.POOL_SHOULD_NOT_BE_EMPTY_MESSAGE)
-    elif not parameters.get(config.PARAMETERS_BY_SYSTEM):
+    elif not parameters.get(servers_settings.PARAMETERS_BY_SYSTEM):
         raise ValidationException(messages.POOL_IS_MISSING_MESSAGE)
 
 
-def _validate_object_id(object_id, object_type=config.VOLUME_TYPE_NAME,
+def _validate_object_id(object_id, object_type=servers_settings.VOLUME_TYPE_NAME,
                         message=messages.VOLUME_ID_SHOULD_NOT_BE_EMPTY_MESSAGE):
     logger.debug("validating volume id")
-    object_id_info_delimiter = config.PARAMETERS_OBJECT_ID_INFO_DELIMITER
+    object_id_info_delimiter = servers_settings.PARAMETERS_OBJECT_ID_INFO_DELIMITER
     if not object_id:
         raise ValidationException(message)
     if object_id_info_delimiter not in object_id:
         raise ObjectIdError(object_type, object_id)
-    if len(object_id.split(object_id_info_delimiter)) not in {config.MINIMUM_VOLUME_ID_PARTS,
-                                                              config.MAXIMUM_VOLUME_ID_PARTS}:
+    if len(object_id.split(object_id_info_delimiter)) not in {servers_settings.MINIMUM_VOLUME_ID_PARTS,
+                                                              servers_settings.MAXIMUM_VOLUME_ID_PARTS}:
         raise ValidationException(messages.WRONG_FORMAT_MESSAGE.format("volume id"))
 
 
@@ -363,7 +365,7 @@ def generate_csi_create_volume_response(new_volume, system_id=None, source_type=
 
     content_source = None
     if new_volume.source_id:
-        if source_type == config.SNAPSHOT_TYPE_NAME:
+        if source_type == servers_settings.SNAPSHOT_TYPE_NAME:
             snapshot_source = csi_pb2.VolumeContentSource.SnapshotSource(snapshot_id=new_volume.source_id)
             content_source = csi_pb2.VolumeContentSource(snapshot=snapshot_source)
         else:
@@ -407,7 +409,7 @@ def generate_csi_expand_volume_response(capacity_bytes, node_expansion_required=
 def _get_supported_capability(volume_capability):
     access_mode = csi_pb2.VolumeCapability.AccessMode(mode=volume_capability.access_mode.mode)
 
-    if volume_capability.HasField(config.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_MOUNT):
+    if volume_capability.HasField(servers_settings.VOLUME_CAPABILITIES_FIELD_ACCESS_TYPE_MOUNT):
         return csi_pb2.VolumeCapability(
             mount=csi_pb2.VolumeCapability.MountVolume(fs_type=volume_capability.mount.fs_type),
             access_mode=access_mode)
@@ -474,25 +476,25 @@ def validate_publish_volume_request(request):
 
 
 def get_volume_id_info(volume_id):
-    return get_object_id_info(volume_id, config.VOLUME_TYPE_NAME)
+    return get_object_id_info(volume_id, servers_settings.VOLUME_TYPE_NAME)
 
 
 def get_snapshot_id_info(snapshot_id):
-    return get_object_id_info(snapshot_id, config.SNAPSHOT_TYPE_NAME)
+    return get_object_id_info(snapshot_id, servers_settings.SNAPSHOT_TYPE_NAME)
 
 
 def _get_context_from_volume(volume):
-    return {config.VOLUME_CONTEXT_VOLUME_NAME: volume.name,
-            config.VOLUME_CONTEXT_ARRAY_ADDRESS: ",".join(
+    return {servers_settings.VOLUME_CONTEXT_VOLUME_NAME: volume.name,
+            servers_settings.VOLUME_CONTEXT_ARRAY_ADDRESS: ",".join(
                 volume.array_address if isinstance(volume.array_address, list) else [volume.array_address]),
-            config.VOLUME_CONTEXT_POOL: volume.pool,
-            config.VOLUME_CONTEXT_STORAGE_TYPE: volume.array_type
+            servers_settings.VOLUME_CONTEXT_POOL: volume.pool,
+            servers_settings.VOLUME_CONTEXT_STORAGE_TYPE: volume.array_type
             }
 
 
 def get_object_id_info(full_object_id, object_type):
     logger.debug("getting {0} info for id : {1}".format(object_type, full_object_id))
-    splitted_object_id = full_object_id.split(config.PARAMETERS_OBJECT_ID_INFO_DELIMITER)
+    splitted_object_id = full_object_id.split(servers_settings.PARAMETERS_OBJECT_ID_INFO_DELIMITER)
     system_id, wwn, internal_id = None, None, None
     if len(splitted_object_id) == 2:
         array_type, object_id = splitted_object_id
@@ -500,7 +502,7 @@ def get_object_id_info(full_object_id, object_type):
         array_type, system_id, object_id = splitted_object_id
     else:
         raise ObjectIdError(object_type, full_object_id)
-    splitted_id = object_id.split(config.PARAMETERS_OBJECT_IDS_DELIMITER)
+    splitted_id = object_id.split(servers_settings.PARAMETERS_OBJECT_IDS_DELIMITER)
     if len(splitted_id) == 1:
         wwn = splitted_id[0]
     elif len(splitted_id) == 2:
@@ -573,8 +575,8 @@ def validate_addons_request(request):
         raise ValidationException(messages.VOLUME_ID_SHOULD_NOT_BE_EMPTY_MESSAGE)
 
     logger.debug("validating copy type")
-    if config.PARAMETERS_COPY_TYPE in request.parameters:
-        copy_type = request.parameters.get(config.PARAMETERS_COPY_TYPE)
+    if servers_settings.PARAMETERS_COPY_TYPE in request.parameters:
+        copy_type = request.parameters.get(servers_settings.PARAMETERS_COPY_TYPE)
         if copy_type not in (REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC):
             raise ValidationException(messages.INVALID_REPLICATION_COPY_TYPE_MESSAGE.format(copy_type))
 
@@ -608,15 +610,15 @@ def _validate_space_efficiency_match(space_efficiency, volume):
 
 def validate_parameters_match_volume(parameters, volume):
     logger.debug("validating space efficiency parameter matches volume's")
-    space_efficiency = parameters.get(config.PARAMETERS_SPACE_EFFICIENCY)
+    space_efficiency = parameters.get(servers_settings.PARAMETERS_SPACE_EFFICIENCY)
     _validate_space_efficiency_match(space_efficiency, volume)
 
     logger.debug("validating pool parameter matches volume's")
-    pool = parameters.get(config.PARAMETERS_POOL)
+    pool = parameters.get(servers_settings.PARAMETERS_POOL)
     _validate_parameter_matches_volume(pool, volume.pool, messages.POOL_NOT_MATCH_VOLUME_MESSAGE)
 
     logger.debug("validating prefix parameter matches volume's")
-    prefix = parameters.get(config.PARAMETERS_VOLUME_NAME_PREFIX)
+    prefix = parameters.get(servers_settings.PARAMETERS_VOLUME_NAME_PREFIX)
     _validate_parameter_matches_volume(prefix, volume.name, messages.PREFIX_NOT_MATCH_VOLUME_MESSAGE,
                                        lambda pref, name: name.startswith(pref + NAME_PREFIX_SEPARATOR))
 

@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 
-from controllers.array_action import config as array_config
+from controllers.array_action import settings as array_config
 from controllers.common import utils
-import controllers.servers.config as config
+import controllers.servers.settings as config
 
 
 class NodeIdInfo:
