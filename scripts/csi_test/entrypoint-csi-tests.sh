@@ -7,7 +7,7 @@ sed -i -e "s/PASSWORD/${PASSWORD}/g" ${SECRET_FILE}
 
 echo "update params file"
 sed -i -e "s/POOL_NAME/${POOL_NAME}/g" ${PARAM_FILE}
-sed -i -e "s/VIRT_SNAP_FUNC/${VIRT_SNAP_FUNC}/g" ${VIRT_SNAP_FUNC}
+sed -i -e "s/VIRT_SNAP_FUNC/${VIRT_SNAP_FUNC}/g" ${SNAP_PARAM_FILE}
 
 # get tests to skip
 TESTS=`cat ${TESTS_TO_SKIP_FILE}| sed -Ez '$ s/\n+$//' | tr '\n' "|"`
