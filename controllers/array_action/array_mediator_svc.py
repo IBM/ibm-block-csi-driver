@@ -48,8 +48,8 @@ HOST_ISCSI_NAME = 'iscsi_name'
 HOST_PORTSET_ID = 'portset_id'
 LIST_HOSTS_CMD_FORMAT = 'lshost {HOST_ID};echo;'
 HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
-DEFAULT_LIST_DELIMITER = ":"
-COMMA_LIST_DELIMITER = ","
+DEFAULT_PORTS_DELIMITER = ":"
+QUALIFIED_NAME_PORTS_DELIMITER = ","
 
 LUN_INTERVAL = 128
 
@@ -100,11 +100,11 @@ def _is_space_efficiency_matches_source(parameter_space_efficiency, array_space_
 def build_create_host_kwargs(host_name, connectivity_type, ports):
     cli_kwargs = {'name': host_name}
     if connectivity_type == config.NVME_OVER_FC_CONNECTIVITY_TYPE:
-        cli_kwargs.update({'nqn': COMMA_LIST_DELIMITER.join(ports), 'protocol': 'nvme'})
+        cli_kwargs.update({'nqn': QUALIFIED_NAME_PORTS_DELIMITER.join(ports), 'protocol': 'nvme'})
     elif connectivity_type == config.FC_CONNECTIVITY_TYPE:
-        cli_kwargs['fcwwpn'] = DEFAULT_LIST_DELIMITER.join(ports)
+        cli_kwargs['fcwwpn'] = DEFAULT_PORTS_DELIMITER.join(ports)
     elif connectivity_type == config.ISCSI_CONNECTIVITY_TYPE:
-        cli_kwargs['iscsiname'] = COMMA_LIST_DELIMITER.join(ports)
+        cli_kwargs['iscsiname'] = QUALIFIED_NAME_PORTS_DELIMITER.join(ports)
     else:
         raise array_errors.UnsupportedConnectivityTypeError(connectivity_type)
     return cli_kwargs
@@ -1543,6 +1543,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             self.client.svctask.mkhost(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during host {} creation : {}".format(host_name, ex.my_message))
             if OBJ_ALREADY_EXIST in ex.my_message:
                 raise array_errors.HostAlreadyExists(host_name, self.endpoint)
             raise ex
@@ -1552,13 +1554,27 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return config.NVME_OVER_FC_CONNECTIVITY_TYPE
         if initiators.fc_wwns:
             return config.FC_CONNECTIVITY_TYPE
-        return config.ISCSI_CONNECTIVITY_TYPE
+        if initiators.iscsi_iqns:
+            return config.ISCSI_CONNECTIVITY_TYPE
+        return None
 
     def create_host(self, host_name, initiators, connectivity_type):
         if not connectivity_type:
             connectivity_type = self._get_connectivity_type_by_initiators(initiators)
         ports = initiators.get_by_connectivity_type(connectivity_type)
-        self._mkhost(host_name, connectivity_type, ports)
+        if ports:
+            self._mkhost(host_name, connectivity_type, ports)
+            return
+        raise array_errors.NoPortFoundByConnectivityType(initiators, connectivity_type)
+
+    def _rmhost(self, host_name):
+        try:
+            self.client.svctask.rmhost(object_id=host_name)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during host {} deletion : {}".format(host_name, ex.my_message))
+                return
+            raise ex
 
     def delete_host(self, host_name):
-        self.client.svctask.rmhost(object_id=host_name)
+        self._rmhost(host_name)
