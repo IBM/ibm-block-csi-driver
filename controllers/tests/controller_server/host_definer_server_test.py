@@ -6,7 +6,7 @@ from controllers.array_action.array_action_types import Host
 from controllers.array_action.errors import HostNotFoundError, HostAlreadyExists
 from controllers.common.node_info import Initiators
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
-from controllers.tests.common.test_settings import VOLUME_NAME, HOST_NAME, SECRET
+from controllers.tests.common.test_settings import HOST_NAME, SECRET
 from controllers.tests.controller_server.common import mock_get_agent
 
 HOST_DEFINER_SERVER_PATH = "controllers.servers.host_definer.storage_manager.host_definer_server"
@@ -40,7 +40,7 @@ class TestDefineHost(BaseSetUp):
 
     def _prepare_define_host(self, is_idempotency=False):
         if is_idempotency:
-            self.mediator.get_host_by_host_identifiers.return_value = (VOLUME_NAME, '')
+            self.mediator.get_host_by_host_identifiers.return_value = (HOST_NAME, '')
         else:
             self.mediator.get_host_by_host_identifiers.side_effect = HostNotFoundError('host_identifier')
 
@@ -92,7 +92,7 @@ class TestUndefineHost(BaseSetUp):
 
     def _prepare_undefine_host_success(self, is_found=True):
         if is_found:
-            self.mediator.get_host_by_host_identifiers.return_value = (VOLUME_NAME, '')
+            self.mediator.get_host_by_host_identifiers.return_value = (HOST_NAME, '')
         else:
             self.mediator.get_host_by_host_identifiers.side_effect = HostNotFoundError('error')
 
@@ -102,7 +102,7 @@ class TestUndefineHost(BaseSetUp):
 
     def test_undefine_host_success(self):
         self._prepare_undefine_host_success()
-        self.mediator.delete_host.assert_called_once_with(VOLUME_NAME)
+        self.mediator.delete_host.assert_called_once_with(HOST_NAME)
 
     def test_undefine_host_idempotency_success(self):
         self._prepare_undefine_host_success(is_found=False)
