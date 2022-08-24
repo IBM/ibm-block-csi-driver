@@ -1,1 +1,2 @@
 virt_snap_func: VIRT_SNAP_FUNC
+pool: POOL_NAME
