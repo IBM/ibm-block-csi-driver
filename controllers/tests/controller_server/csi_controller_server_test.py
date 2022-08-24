@@ -7,8 +7,8 @@ from csi_general import csi_pb2
 from mock import patch, Mock, MagicMock, call
 
 import controllers.array_action.errors as array_errors
-import controllers.servers.settings as config
 import controllers.servers.errors as controller_errors
+import controllers.servers.settings as servers_settings
 from controllers.array_action.array_action_types import Host, ObjectIds
 from controllers.array_action.array_mediator_xiv import XIVArrayMediator
 from controllers.servers.csi.csi_controller_server import CSIControllerServicer
@@ -190,17 +190,17 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self._test_create_snapshot_succeeds()
 
     def test_create_snapshot_with_pool_parameter_succeeds(self, ):
-        self.request.parameters = {config.PARAMETERS_POOL: DUMMY_POOL1}
+        self.request.parameters = {servers_settings.PARAMETERS_POOL: DUMMY_POOL1}
         self._test_create_snapshot_succeeds(expected_pool=DUMMY_POOL1)
 
     def test_create_snapshot_with_space_efficiency_parameter_succeeds(self):
         self.mediator.validate_supported_space_efficiency = Mock()
-        self.request.parameters = {config.PARAMETERS_SPACE_EFFICIENCY: SPACE_EFFICIENCY}
+        self.request.parameters = {servers_settings.PARAMETERS_SPACE_EFFICIENCY: SPACE_EFFICIENCY}
         self._test_create_snapshot_succeeds(expected_space_efficiency=SPACE_EFFICIENCY)
 
     def test_create_snapshot_with_space_efficiency_and_virt_snap_func_enabled_fail(self):
-        self.request.parameters = {config.PARAMETERS_SPACE_EFFICIENCY: SPACE_EFFICIENCY,
-                                   config.PARAMETERS_VIRT_SNAP_FUNC: VIRT_SNAP_FUNC_TRUE}
+        self.request.parameters = {servers_settings.PARAMETERS_SPACE_EFFICIENCY: SPACE_EFFICIENCY,
+                                   servers_settings.PARAMETERS_VIRT_SNAP_FUNC: VIRT_SNAP_FUNC_TRUE}
 
         self.servicer.CreateSnapshot(self.request, self.context)
 
@@ -212,8 +212,9 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
     def _test_create_snapshot_with_by_system_id_parameter(self, system_id, expected_pool):
         system_id_part = ':{}'.format(system_id) if system_id else ''
         self.request.source_volume_id = "{}{}:{}".format("A9000", system_id_part, SNAPSHOT_VOLUME_UID)
-        self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
-            {"u1": {config.PARAMETERS_POOL: DUMMY_POOL1}, "u2": {config.PARAMETERS_POOL: DUMMY_POOL2}})}
+        self.request.parameters = {servers_settings.PARAMETERS_BY_SYSTEM: json.dumps(
+            {"u1": {servers_settings.PARAMETERS_POOL: DUMMY_POOL1},
+             "u2": {servers_settings.PARAMETERS_POOL: DUMMY_POOL2}})}
         self._test_create_snapshot_succeeds(expected_pool=expected_pool, system_id=system_id)
 
     def test_create_snapshot_with_by_system_id_parameter_succeeds(self):
@@ -322,7 +323,7 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
 
     def test_create_snapshot_with_name_prefix(self):
         self.request.name = VOLUME_NAME
-        self.request.parameters[config.PARAMETERS_SNAPSHOT_NAME_PREFIX] = NAME_PREFIX
+        self.request.parameters[servers_settings.PARAMETERS_SNAPSHOT_NAME_PREFIX] = NAME_PREFIX
         self.mediator.create_snapshot = Mock()
         self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, SNAPSHOT_NAME,
                                                                                                VOLUME_UID,
@@ -414,9 +415,9 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_volume.side_effect = array_errors.ObjectNotFoundError("vol")
         self.mediator.get_object_by_id = Mock()
 
-        self.request.parameters = {config.PARAMETERS_POOL: DUMMY_POOL1,
-                                   config.PARAMETERS_IO_GROUP: DUMMY_IO_GROUP,
-                                   config.PARAMETERS_VOLUME_GROUP: DUMMY_VOLUME_GROUP}
+        self.request.parameters = {servers_settings.PARAMETERS_POOL: DUMMY_POOL1,
+                                   servers_settings.PARAMETERS_IO_GROUP: DUMMY_IO_GROUP,
+                                   servers_settings.PARAMETERS_VOLUME_GROUP: DUMMY_VOLUME_GROUP}
         self.request.volume_capabilities = [self.volume_capability]
         self.request.name = VOLUME_NAME
         self.request.volume_content_source = None
@@ -455,15 +456,15 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
             ProtoBufMock(segments={"topology.block.csi.ibm.com/test": "topology_value",
                                    "topology.block.csi.ibm.com/test2": "topology_value2"})]
         second_system_parameters = self.request.parameters.copy()
-        second_system_parameters[config.PARAMETERS_POOL] = DUMMY_POOL2
-        self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps(
+        second_system_parameters[servers_settings.PARAMETERS_POOL] = DUMMY_POOL2
+        self.request.parameters = {servers_settings.PARAMETERS_BY_SYSTEM: json.dumps(
             {"u1": self.request.parameters, "u2": second_system_parameters})}
         self._test_create_volume_succeeds('xiv:u2:{};{}'.format(INTERNAL_VOLUME_ID, VOLUME_UID),
                                           expected_pool=DUMMY_POOL2)
 
     def test_create_volume_with_space_efficiency_succeeds(self):
         self._prepare_create_volume_mocks()
-        self.request.parameters.update({config.PARAMETERS_SPACE_EFFICIENCY: "not_none"})
+        self.request.parameters.update({servers_settings.PARAMETERS_SPACE_EFFICIENCY: "not_none"})
         self.mediator.validate_supported_space_efficiency = Mock()
 
         self.servicer.CreateVolume(self.request, self.context)
@@ -615,11 +616,11 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
                                                             None, False)
 
     def test_create_volume_with_name_prefix(self):
-        self.request.parameters[config.PARAMETERS_VOLUME_NAME_PREFIX] = NAME_PREFIX
+        self.request.parameters[servers_settings.PARAMETERS_VOLUME_NAME_PREFIX] = NAME_PREFIX
         self._test_create_volume_parameters("prefix_some_name")
 
     def test_create_volume_with_no_name_prefix(self):
-        self.request.parameters[config.PARAMETERS_VOLUME_NAME_PREFIX] = ""
+        self.request.parameters[servers_settings.PARAMETERS_VOLUME_NAME_PREFIX] = ""
         self._test_create_volume_parameters()
 
     def _test_create_volume_with_parameters_by_system_prefix(self, get_array_connection_info_from_secrets, prefix,
@@ -627,9 +628,9 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
                                                              space_efficiency=None):
         get_array_connection_info_from_secrets.side_effect = [utils.get_fake_array_connection_info()]
         system_parameters = self.request.parameters
-        system_parameters.update({config.PARAMETERS_VOLUME_NAME_PREFIX: prefix,
-                                  config.PARAMETERS_SPACE_EFFICIENCY: space_efficiency})
-        self.request.parameters = {config.PARAMETERS_BY_SYSTEM: json.dumps({"u1": system_parameters})}
+        system_parameters.update({servers_settings.PARAMETERS_VOLUME_NAME_PREFIX: prefix,
+                                  servers_settings.PARAMETERS_SPACE_EFFICIENCY: space_efficiency})
+        self.request.parameters = {servers_settings.PARAMETERS_BY_SYSTEM: json.dumps({"u1": system_parameters})}
         self._test_create_volume_parameters(final_name, space_efficiency)
 
     @patch("controllers.servers.utils.get_array_connection_info_from_secrets")
@@ -727,7 +728,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
 
     def _enable_virt_snap_func(self):
-        self.request.parameters[config.PARAMETERS_VIRT_SNAP_FUNC] = "true"
+        self.request.parameters[servers_settings.PARAMETERS_VIRT_SNAP_FUNC] = "true"
 
     def test_create_volume_idempotent_with_other_source_and_virt_snap_func_enabled(self):
         self._enable_virt_snap_func()
@@ -868,15 +869,15 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
 
     def _get_source_volume(self, object_id):
-        return self._get_source(object_id, config.VOLUME_TYPE_NAME)
+        return self._get_source(object_id, servers_settings.VOLUME_TYPE_NAME)
 
     def _get_source_snapshot(self, object_id):
-        return self._get_source(object_id, config.SNAPSHOT_TYPE_NAME)
+        return self._get_source(object_id, servers_settings.SNAPSHOT_TYPE_NAME)
 
     @staticmethod
     def _get_source(object_id, object_type):
         source = ProtoBufMock(spec=[object_type])
-        id_field_name = config.VOLUME_SOURCE_ID_FIELDS[object_type]
+        id_field_name = servers_settings.VOLUME_SOURCE_ID_FIELDS[object_type]
         object_field = MagicMock(spec=[id_field_name])
         setattr(source, object_type, object_field)
         setattr(object_field, id_field_name, "a9000:{0}".format(object_id))
@@ -1580,7 +1581,7 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
 
         arr_type = XIVArrayMediator.array_type
         self.request.volume_id = "{}:{}".format(arr_type, VOLUME_UID)
-        self.request.parameters = {config.PARAMETERS_POOL: DUMMY_POOL1}
+        self.request.parameters = {servers_settings.PARAMETERS_POOL: DUMMY_POOL1}
 
         self.mediator.get_object_by_id = Mock()
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(10, "vol", VOLUME_UID,
@@ -1656,14 +1657,14 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
         self._assert_response(grpc.StatusCode.NOT_FOUND, VOLUME_UID)
 
     def test_validate_volume_capabilities_with_volume_context_not_match(self):
-        self.request.volume_context = {config.VOLUME_CONTEXT_VOLUME_NAME: "fake"}
+        self.request.volume_context = {servers_settings.VOLUME_CONTEXT_VOLUME_NAME: "fake"}
 
         self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
         self._assert_response(grpc.StatusCode.INVALID_ARGUMENT, "volume context")
 
     def test_validate_volume_capabilities_with_space_efficiency_not_match(self):
-        self.request.parameters.update({config.PARAMETERS_SPACE_EFFICIENCY: "not_none"})
+        self.request.parameters.update({servers_settings.PARAMETERS_SPACE_EFFICIENCY: "not_none"})
         self.mediator.validate_supported_space_efficiency = Mock()
 
         self.servicer.ValidateVolumeCapabilities(self.request, self.context)
@@ -1671,23 +1672,23 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
         self._assert_response(grpc.StatusCode.INVALID_ARGUMENT, "space efficiency")
 
     def test_validate_volume_capabilities_with_pool_not_match(self):
-        self.request.parameters.update({config.PARAMETERS_POOL: "other pool"})
+        self.request.parameters.update({servers_settings.PARAMETERS_POOL: "other pool"})
 
         self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
         self._assert_response(grpc.StatusCode.INVALID_ARGUMENT, DUMMY_POOL1)
 
     def test_validate_volume_capabilities_with_prefix_not_match(self):
-        self.request.parameters.update({config.PARAMETERS_VOLUME_NAME_PREFIX: NAME_PREFIX})
+        self.request.parameters.update({servers_settings.PARAMETERS_VOLUME_NAME_PREFIX: NAME_PREFIX})
 
         self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
         self._assert_response(grpc.StatusCode.INVALID_ARGUMENT, NAME_PREFIX)
 
     def test_validate_volume_capabilities_parameters_success(self):
-        self.request.parameters = {config.PARAMETERS_VOLUME_NAME_PREFIX: NAME_PREFIX,
-                                   config.PARAMETERS_POOL: "pool2",
-                                   config.PARAMETERS_SPACE_EFFICIENCY: "not_none"}
+        self.request.parameters = {servers_settings.PARAMETERS_VOLUME_NAME_PREFIX: NAME_PREFIX,
+                                   servers_settings.PARAMETERS_POOL: "pool2",
+                                   servers_settings.PARAMETERS_SPACE_EFFICIENCY: "not_none"}
         volume_response = utils.get_mock_mediator_response_volume(10, "prefix_vol", VOLUME_UID, "a9k",
                                                                   space_efficiency="not_none")
         volume_response.pool = "pool2"

@@ -8,7 +8,7 @@ from retry import retry
 import controllers.array_action.errors as array_errors
 import controllers.array_action.settings as array_settings
 import controllers.common.settings as common_settings
-import controllers.servers.settings as controller_config
+import controllers.servers.settings as servers_settings
 from controllers.array_action.array_action_types import Volume, Snapshot, Host
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controllers.array_action.ds8k_rest_client import RESTClient, scsilun_to_int
@@ -578,7 +578,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         api_object = self._get_api_volume_by_id(object_id, not_exist_err=False)
         if not api_object:
             return None
-        if object_type is controller_config.SNAPSHOT_TYPE_NAME:
+        if object_type is servers_settings.SNAPSHOT_TYPE_NAME:
             return self._generate_snapshot_response_with_verification(api_object)
         return self._generate_volume_response(api_object)
 
