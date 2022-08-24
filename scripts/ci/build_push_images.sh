@@ -1,7 +1,7 @@
 #!/bin/bash -xe
 
 # Validations
-MANDATORY_ENVS="IMAGE_VERSION BUILD_NUMBER DOCKER_REGISTRY CSI_NODE_IMAGE CSI_CONTROLLER_IMAGE GIT_BRANCH"
+MANDATORY_ENVS="IMAGE_VERSION BUILD_NUMBER DOCKER_REGISTRY CSI_NODE_IMAGE CSI_CONTROLLER_IMAGE CSI_HOST_DEFINER_IMAGE GIT_BRANCH"
 for envi in $MANDATORY_ENVS; do 
     [ -z "${!envi}" ] && { echo "Error - Env $envi is mandatory for the script."; exit 1; } || :
 done
@@ -38,14 +38,27 @@ docker build -t ${node_tag_specific} $taglatestflag -f Dockerfile-csi-node --bui
 docker push ${node_tag_specific}
 [ "$tag_latest" = "true" ] && docker push ${node_tag_latest} || :
 
+# Host Definer
+# --------
+host_definer_registry="${DOCKER_REGISTRY}/${CSI_HOST_DEFINER_IMAGE}"
+host_definer_tag_specific="${host_definer_registry}:${specific_tag}"
+host_definer_tag_latest=${host_definer_registry}:latest
+[ "$tag_latest" = "true" ] && taglatestflag="-t ${host_definer_tag_latest}" 
+
+echo "Build and push the Host Definer image"
+docker build -t ${host_definer_tag_specific} $taglatestflag -f Dockerfile-csi-host-definer --build-arg VERSION="${IMAGE_VERSION}" --build-arg BUILD_NUMBER="${BUILD_NUMBER}" .
+docker push ${host_definer_tag_specific}
+[ "$tag_latest" = "true" ] && docker push ${host_definer_tag_latest} || :
+
 
 set +x
 echo ""
 echo "Image ready:"
 echo "   ${ctl_tag_specific}"
 echo "   ${node_tag_specific}"
-[ "$tag_latest" = "true" ] && { echo "   ${ctl_tag_latest}"; echo "   ${node_tag_latest}"; } || :
+echo "   ${host_definer_tag_specific}"
+[ "$tag_latest" = "true" ] && { echo "   ${ctl_tag_latest}"; echo "   ${node_tag_latest}"; echo "   ${host_definer_tag_latest}";} || :
 
 # if param $1 given the script echo the specific tag
-[ -n "$1" ] && printf "${ctl_tag_specific}\n${node_tag_specific}\n" > $1 || :
+[ -n "$1" ] && printf "${ctl_tag_specific}\n${node_tag_specific}\n${host_definer_tag_specific}\n" > $1 || :
 

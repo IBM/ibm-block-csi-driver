@@ -48,6 +48,8 @@ HOST_ISCSI_NAME = 'iscsi_name'
 HOST_PORTSET_ID = 'portset_id'
 LIST_HOSTS_CMD_FORMAT = 'lshost {HOST_ID};echo;'
 HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
+DEFAULT_PORTS_DELIMITER = ":"
+QUALIFIED_NAME_PORTS_DELIMITER = ","
 
 LUN_INTERVAL = 128
 
@@ -95,6 +97,19 @@ def _is_space_efficiency_matches_source(parameter_space_efficiency, array_space_
            (parameter_space_efficiency and parameter_space_efficiency == array_space_efficiency)
 
 
+def build_create_host_kwargs(host_name, connectivity_type, ports):
+    cli_kwargs = {'name': host_name}
+    if connectivity_type == config.NVME_OVER_FC_CONNECTIVITY_TYPE:
+        cli_kwargs.update({'nqn': QUALIFIED_NAME_PORTS_DELIMITER.join(ports), 'protocol': 'nvme'})
+    elif connectivity_type == config.FC_CONNECTIVITY_TYPE:
+        cli_kwargs['fcwwpn'] = DEFAULT_PORTS_DELIMITER.join(ports)
+    elif connectivity_type == config.ISCSI_CONNECTIVITY_TYPE:
+        cli_kwargs['iscsiname'] = QUALIFIED_NAME_PORTS_DELIMITER.join(ports)
+    else:
+        raise array_errors.UnsupportedConnectivityTypeError(connectivity_type)
+    return cli_kwargs
+
+
 def build_kwargs_from_parameters(space_efficiency, pool_name, io_group,
                                  volume_group, volume_name, volume_size):
     cli_kwargs = {}
@@ -140,19 +155,20 @@ def build_stop_replication_kwargs(rcrelationship_id, add_access):
     return cli_kwargs
 
 
-def _get_cli_volume_space_efficiency(cli_volume):
-    space_efficiency = config.SPACE_EFFICIENCY_THICK
+def _get_cli_volume_space_efficiency_aliases(cli_volume):
+    space_efficiency_aliases = {config.SPACE_EFFICIENCY_THICK, ''}
     if cli_volume.se_copy == YES:
-        space_efficiency = config.SPACE_EFFICIENCY_THIN
+        space_efficiency_aliases = {config.SPACE_EFFICIENCY_THIN}
     if cli_volume.compressed_copy == YES:
-        space_efficiency = config.SPACE_EFFICIENCY_COMPRESSED
+        space_efficiency_aliases = {config.SPACE_EFFICIENCY_COMPRESSED}
     if hasattr(cli_volume, "deduplicated_copy"):
         if cli_volume.deduplicated_copy == YES:
             if cli_volume.se_copy == YES:
-                space_efficiency = config.SPACE_EFFICIENCY_DEDUPLICATED_THIN
+                space_efficiency_aliases = {config.SPACE_EFFICIENCY_DEDUPLICATED_THIN}
             else:
-                space_efficiency = config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED
-    return space_efficiency
+                space_efficiency_aliases = {config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED,
+                                            config.SPACE_EFFICIENCY_DEDUPLICATED}
+    return space_efficiency_aliases
 
 
 class SVCArrayMediator(ArrayMediatorAbstract):
@@ -253,7 +269,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         source_id = None
         if not is_virt_snap_func:
             source_id = self._get_source_volume_wwn_if_exists(cli_volume)
-        space_efficiency = _get_cli_volume_space_efficiency(cli_volume)
+        space_efficiency = _get_cli_volume_space_efficiency_aliases(cli_volume)
         return Volume(
             capacity_bytes=int(cli_volume.capacity),
             id=cli_volume.vdisk_UID,
@@ -263,8 +279,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             pool=pool,
             source_id=source_id,
             array_type=self.array_type,
-            space_efficiency=space_efficiency,
-            default_space_efficiency=config.SPACE_EFFICIENCY_THICK
+            space_efficiency_aliases=space_efficiency,
         )
 
     def _generate_snapshot_response_from_cli_volume(self, cli_volume, source_id):
@@ -591,23 +606,30 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return None
         return self._generate_snapshot_response_with_verification(target_cli_volume)
 
-    def get_object_by_id(self, object_id, object_type):
-        cli_object = self._get_cli_volume_by_wwn(object_id)
-        if not cli_object:
+    def get_object_by_id(self, object_id, object_type, is_virt_snap_func=False):
+        if is_virt_snap_func and object_type == controller_config.SNAPSHOT_TYPE_NAME:
+            cli_snapshot = self._get_cli_snapshot_by_id(object_id)
+            if not cli_snapshot:
+                return None
+            source_cli_volume = self._get_cli_volume(cli_snapshot.volume_name)
+            if not source_cli_volume:
+                return None
+            return self._generate_snapshot_response_from_cli_snapshot(cli_snapshot, source_cli_volume)
+        cli_volume = self._get_cli_volume_by_wwn(object_id)
+        if not cli_volume:
             return None
         if object_type is controller_config.SNAPSHOT_TYPE_NAME:
-            return self._generate_snapshot_response_with_verification(cli_object)
-        cli_volume = self._get_cli_volume(cli_object.name)
+            return self._generate_snapshot_response_with_verification(cli_volume)
+        cli_volume = self._get_cli_volume(cli_volume.name)
         return self._generate_volume_response(cli_volume)
 
     def _create_similar_volume(self, source_cli_volume, target_volume_name, space_efficiency, pool):
         logger.info("creating target cli volume '{0}' from source volume '{1}'".format(target_volume_name,
                                                                                        source_cli_volume.name))
         if not space_efficiency:
-            space_efficiency = _get_cli_volume_space_efficiency(source_cli_volume)
+            space_efficiency_aliases = _get_cli_volume_space_efficiency_aliases(source_cli_volume)
+            space_efficiency = space_efficiency_aliases.pop()
         size_in_bytes = int(source_cli_volume.capacity)
-        if not pool:
-            pool = self._get_volume_pools(source_cli_volume)[0]
         io_group = source_cli_volume.IO_group_name
         self._create_cli_volume(target_volume_name, size_in_bytes, space_efficiency, pool, io_group)
 
@@ -778,6 +800,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         source_volume_name = self._get_volume_name_by_wwn(volume_id)
         source_cli_volume = self._get_cli_volume_in_pool_site(source_volume_name, pool)
+        if not pool:
+            pool = self._get_volume_pools(source_cli_volume)[0]
         if is_virt_snap_func:
             if self._is_vdisk_support_addsnapshot(volume_id):
                 target_cli_snapshot = self._add_snapshot(snapshot_name, source_cli_volume.id, pool)
@@ -857,9 +881,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                          "is: {0}".format(ex))
             raise ex
 
+    def _is_lsnvmefabric_supported(self):
+        return hasattr(self.client.svcinfo, "lsnvmefabric")
+
     def _get_host_names_by_nqn(self, nqn):
-        nvme_fabrics = self._lsnvmefabric(nqn)
-        return set(nvme_fabric.object_name for nvme_fabric in nvme_fabrics)
+        if self._is_lsnvmefabric_supported():
+            nvme_fabrics = self._lsnvmefabric(nqn)
+            return set(nvme_fabric.object_name for nvme_fabric in nvme_fabrics)
+        return None
 
     def _lshostiplogin(self, iqn):
         try:
@@ -871,10 +900,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                          "is: {0}".format(ex))
             raise ex
 
+    def _is_lshostiplogin_supported(self):
+        return hasattr(self.client.svcinfo, "lshostiplogin")
+
     def _get_host_name_by_iqn(self, iqn):
-        iscsi_login = self._lshostiplogin(iqn)
-        if iscsi_login:
-            return iscsi_login.host_name
+        if self._is_lshostiplogin_supported():
+            iscsi_login = self._lshostiplogin(iqn)
+            if iscsi_login:
+                return iscsi_login.host_name
         return None
 
     def _get_host_names_and_connectivity_types(self, initiators):
@@ -1505,14 +1538,43 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         cli_volume = self._get_cli_volume_by_wwn(vdisk_uid, not_exist_err=False)
         return cli_volume and cli_volume.FC_id
 
-    def validate_space_efficiency_matches_source(self, space_efficiency, source_id, source_type):
-        if source_type == controller_config.SNAPSHOT_TYPE_NAME:
-            cli_snapshot = self._get_cli_snapshot_by_id(source_id)
-            source_cli_volume = self._get_cli_volume(cli_snapshot.volume_id)
-        else:
-            source_volume_name = self._get_volume_name_by_wwn(source_id)
-            source_cli_volume = self._get_cli_volume(source_volume_name)
-        source_volume_space_efficiency = _get_cli_volume_space_efficiency(source_cli_volume)
-        if not _is_space_efficiency_matches_source(space_efficiency,
-                                                   source_volume_space_efficiency):
-            raise array_errors.SpaceEfficiencyMismatch(space_efficiency, source_volume_space_efficiency)
+    def _mkhost(self, host_name, connectivity_type, ports):
+        cli_kwargs = build_create_host_kwargs(host_name, connectivity_type, ports)
+        try:
+            self.client.svctask.mkhost(**cli_kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during host {} creation : {}".format(host_name, ex.my_message))
+            if OBJ_ALREADY_EXIST in ex.my_message:
+                raise array_errors.HostAlreadyExists(host_name, self.endpoint)
+            raise ex
+
+    def _get_connectivity_type_by_initiators(self, initiators):
+        if initiators.nvme_nqns:
+            return config.NVME_OVER_FC_CONNECTIVITY_TYPE
+        if initiators.fc_wwns:
+            return config.FC_CONNECTIVITY_TYPE
+        if initiators.iscsi_iqns:
+            return config.ISCSI_CONNECTIVITY_TYPE
+        return None
+
+    def create_host(self, host_name, initiators, connectivity_type):
+        if not connectivity_type:
+            connectivity_type = self._get_connectivity_type_by_initiators(initiators)
+        ports = initiators.get_by_connectivity_type(connectivity_type)
+        if ports:
+            self._mkhost(host_name, connectivity_type, ports)
+            return
+        raise array_errors.NoPortFoundByConnectivityType(initiators, connectivity_type)
+
+    def _rmhost(self, host_name):
+        try:
+            self.client.svctask.rmhost(object_id=host_name)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during host {} deletion : {}".format(host_name, ex.my_message))
+                return
+            raise ex
+
+    def delete_host(self, host_name):
+        self._rmhost(host_name)

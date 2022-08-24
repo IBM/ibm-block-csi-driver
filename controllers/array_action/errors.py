@@ -219,6 +219,20 @@ class SnapshotAlreadyExists(BaseArrayActionException):
         self.message = messages.SNAPSHOT_ALREADY_EXISTS_ERROR_MESSAGE.format(snapshot_id_or_name, array)
 
 
+class HostAlreadyExists(BaseArrayActionException):
+
+    def __init__(self, host_name, array):
+        super().__init__()
+        self.message = messages.HOST_ALREADY_EXISTS_ERROR_MESSAGE.format(host_name, array)
+
+
+class NoPortFoundByConnectivityType(BaseArrayActionException):
+
+    def __init__(self, initiators, connectivity_type):
+        super().__init__()
+        self.message = messages.NO_PORT_FOUND_BY_CONNECTIVITY_TYPE_ERROR_MESSAGE.format(initiators, connectivity_type)
+
+
 class SnapshotSourcePoolMismatch(BaseArrayActionException):
 
     def __init__(self, snapshot_pool, source_pool):

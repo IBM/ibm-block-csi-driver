@@ -217,12 +217,13 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_object_by_id(self, object_id, object_type):
+    def get_object_by_id(self, object_id, object_type, is_virt_snap_func=False):
         """
         This function return info about volume or snapshot.
         Args:
-            object_id   : id of the object in the storage system
-            object_type : volume or snapshot
+            object_id         : id of the object in the storage system
+            object_type       : volume or snapshot
+            is_virt_snap_func : indicate if svc's snapshot function feature is enabled
         Returns:
            Snapshot
            Volume
@@ -333,10 +334,45 @@ class ArrayMediator(ABC):
            host_name : name of the host in the storage system
 
         Returns:
-           Host
+            Host
 
         Raises:
             HostNotFoundError
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def create_host(self, host_name, initiators, connectivity_type):
+        """
+        This function should create a host in the storage system.
+
+        Args:
+           host_name         : name of the host to be created in the storage system
+           initiators        : initiators (e.g. fc wwns, iqn) of the host.
+           connectivity_type : the connectivity_type chosen by the user
+
+
+        Returns:
+            None
+
+        Raises:
+            HostAlreadyExists
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def delete_host(self, host_name):
+        """
+        This function should delete a host in the storage system.
+
+        Args:
+            host_name : name of the host in the storage system
+
+        Returns:
+            None
+
+        Raises:
+            None
         """
         raise NotImplementedError
 
@@ -361,24 +397,6 @@ class ArrayMediator(ABC):
 
         Raises:
             SpaceEfficiencyNotSupported
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def validate_space_efficiency_matches_source(self, space_efficiency, source_id, source_type):
-        """
-        This function will check if the space efficiency passed to CreateVolume matches the volume source.
-
-        Args:
-            space_efficiency : as passed from the CSI request
-            source_id        : id of source to create from
-            source_type      : volume or snapshot
-
-        Returns:
-            None
-
-        Raises:
-            SpaceEfficiencyMismatch
         """
         raise NotImplementedError
 

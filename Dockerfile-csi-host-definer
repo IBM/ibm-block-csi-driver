@@ -1,0 +1,46 @@
+FROM registry.access.redhat.com/ubi8/python-38:1-75.1638364053 as builder
+
+USER root
+RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
+USER default
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+RUN pip3 install --ignore-installed --default-timeout=100 --upgrade pip==21.2.4
+WORKDIR /tmp
+COPY controllers/servers/csi/requirements.txt ./csi_requirements.txt
+COPY controllers/servers/host_definer/requirements.txt ./host_definer_requirements.txt
+# avoid default- boringssl lib, since it does not support z systems
+ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
+RUN pip3 install -r ./csi_requirements.txt -r ./host_definer_requirements.txt
+
+USER root
+COPY controllers/scripts/csi_general .
+RUN ./csi_pb2.sh
+RUN pip3 install .
+
+FROM registry.access.redhat.com/ubi8/python-38:1-100
+
+ARG VERSION=1.11.0
+ARG BUILD_NUMBER=0
+
+###Required Labels
+LABEL name="IBM block storage CSI driver host definer" \
+      vendor="IBM" \
+      maintainer="IBM Storage" \
+      version=$VERSION \
+      release=$BUILD_NUMBER \
+      summary="The host definer defines Kubernetes nodes on IBM block storage" \
+      description="The host definer defines container orchestrators, such as Kubernetes and OpenShift, nodes on IBM block storage." \
+      io.k8s.display-name="IBM block storage CSI driver host definer" \
+      io.k8s.description="The host definer defines container orchestrators, such as Kubernetes and OpenShift, nodes on IBM block storage." \
+      io.openshift.tags=ibm,csi,ibm-block-csi-driver,host-definer
+
+COPY --from=builder /opt/app-root /opt/app-root
+COPY ./common /driver/common
+COPY ./controllers/ /driver/controllers/
+COPY ./LICENSE /licenses/
+COPY ./NOTICES /licenses/
+
+WORKDIR /driver/controllers/servers/host_definer/
+ENV PYTHONPATH=/driver
+
+CMD ["python3", "/driver/controllers/servers/host_definer/main.py"]

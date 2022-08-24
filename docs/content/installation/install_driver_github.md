@@ -4,14 +4,17 @@ The operator for IBM® block storage CSI driver can be installed directly with G
 
 Use the following steps to install the operator and driver, with [GitHub](https://github.com/IBM/ibm-block-csi-operator).
 
-**Note:** Before you begin, it is best practice to create a user-defined namespace. Create the project namespace, using the `kubectl create ns <namespace>` command.
+**Note:**
+    
+-  Before you begin, it is best practice to create a user-defined namespace. Create the project namespace, using the `kubectl create ns <namespace>` command.
+- When host definer is being installed, it is preferable to do so before installing the CSI driver IBMBlockCSI custom resource (see [Installing the host definer](install_hostdefiner.md).
 
 1.  Install the operator.
 
     1. Download the manifest from GitHub.
 
         ```
-        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.9.0/deploy/installer/generated/ibm-block-csi-operator.yaml > ibm-block-csi-operator.yaml
+        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.10.0/deploy/installer/generated/ibm-block-csi-operator.yaml > ibm-block-csi-operator.yaml
         ```
 
     2.  (Optional) Update the image fields in the `ibm-block-csi-operator.yaml`.
@@ -37,7 +40,7 @@ Use the following steps to install the operator and driver, with [GitHub](https:
     1.  Download the manifest from GitHub.
 
         ```
-        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.9.0/config/samples/csi.ibm.com_v1_ibmblockcsi_cr.yaml > csi.ibm.com_v1_ibmblockcsi_cr.yaml
+        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.10.0/config/samples/csi.ibm.com_v1_ibmblockcsi_cr.yaml > csi.ibm.com_v1_ibmblockcsi_cr.yaml
         ```
 
     2.  (Optional) Update the image repository field, tag field, or both in the `csi.ibm.com_v1_ibmblockcsi_cr.yaml`.

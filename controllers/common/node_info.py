@@ -30,6 +30,11 @@ class Initiators:
         self.nvme_nqns = self._filter_empty_parts(self.nvme_nqns)
         self.fc_wwns = self._filter_empty_parts(self.fc_wwns)
         self.iscsi_iqns = self._filter_empty_parts(self.iscsi_iqns)
+        self._ports_by_type = {
+            array_config.NVME_OVER_FC_CONNECTIVITY_TYPE: self.nvme_nqns,
+            array_config.FC_CONNECTIVITY_TYPE: self.fc_wwns,
+            array_config.ISCSI_CONNECTIVITY_TYPE: self.iscsi_iqns
+        }
 
     def _filter_empty_parts(self, ports):
         ports = [port.strip() for port in ports]
@@ -37,14 +42,15 @@ class Initiators:
         return list(ports)
 
     def _get_iter(self):
-        for connectivity_type, initiators in ((array_config.NVME_OVER_FC_CONNECTIVITY_TYPE, self.nvme_nqns),
-                                              (array_config.FC_CONNECTIVITY_TYPE, self.fc_wwns),
-                                              (array_config.ISCSI_CONNECTIVITY_TYPE, self.iscsi_iqns)):
+        for connectivity_type, initiators in self._ports_by_type.items():
             for initiator in initiators:
                 yield connectivity_type, initiator
 
     def __iter__(self):
         return self._get_iter()
+
+    def get_by_connectivity_type(self, connectivity_type):
+        return self._ports_by_type.get(connectivity_type)
 
     def _lower(self, ports):
         return {port.lower() for port in ports if ports}
@@ -66,5 +72,5 @@ class Initiators:
 
     def __contains__(self, other_initiators):
         return other_initiators.is_array_nvme_nqn_match(self.nvme_nqns) or \
-            other_initiators.is_array_wwns_match(self.fc_wwns) or \
-            other_initiators.is_array_iscsi_iqns_match(self.iscsi_iqns)
+               other_initiators.is_array_wwns_match(self.fc_wwns) or \
+               other_initiators.is_array_iscsi_iqns_match(self.iscsi_iqns)
