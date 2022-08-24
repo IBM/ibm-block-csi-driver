@@ -8,6 +8,7 @@ else
     csi_params='csi_params'
 fi
 
+snapshot_params='snapshot_params'
 common_tests_to_skip_file="scripts/csi_test/common_csi_tests_to_skip"
 array_specific_tests_to_skip_file="scripts/csi_test/$3_csi_tests_to_skip"
 tests_to_skip_file="scripts/csi_test/csi_tests_to_skip"
