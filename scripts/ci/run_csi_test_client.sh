@@ -14,5 +14,5 @@ tests_to_skip_file="scripts/csi_test/csi_tests_to_skip"
 cat $common_tests_to_skip_file $array_specific_tests_to_skip_file > $tests_to_skip_file
 
 #/tmp/k8s_dir is the directory of the csi grpc\unix socket that shared between csi server and csi-test docker
-docker build --no-cache -f Dockerfile-csi-test --build-arg CSI_PARAMS=${csi_params} -t csi-sanity-test .  && docker run --user=root -e STORAGE_ARRAYS=${STORAGE_ARRAYS} -e USERNAME=${USERNAME} -e PASSWORD=${PASSWORD}  -e POOL_NAME=${POOL_NAME} -v /tmp:/tmp:rw -v$2:/tmp/test_results:rw --rm  --name $1 csi-sanity-test
+docker build --no-cache -f Dockerfile-csi-test --build-arg CSI_PARAMS=${csi_params} -t csi-sanity-test .  && docker run --user=root -e STORAGE_ARRAYS=${STORAGE_ARRAYS} -e USERNAME=${USERNAME} -e PASSWORD=${PASSWORD}  -e POOL_NAME=${POOL_NAME} -e VIRT_SNAP_FUNC=${VIRT_SNAP_FUNC} -v /tmp:/tmp:rw -v$2:/tmp/test_results:rw --rm  --name $1 csi-sanity-test
 
