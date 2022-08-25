@@ -1,6 +1,6 @@
 import encodings
 
-from controllers.array_action.config import WWN_OUI_END, WWN_VENDOR_IDENTIFIER_END
+from controllers.array_action.settings import WWN_OUI_END, WWN_VENDOR_IDENTIFIER_END
 from controllers.common.csi_logger import get_stdout_logger
 
 UTF_8 = encodings.utf_8.getregentry().name

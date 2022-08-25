@@ -3,14 +3,14 @@ from abc import ABC
 from retry import retry
 
 import controllers.array_action.errors as array_errors
+import controllers.servers.utils as utils
 from controllers.array_action.array_mediator_interface import ArrayMediator
-from controllers.array_action.config import (NVME_OVER_FC_CONNECTIVITY_TYPE,
-                                             FC_CONNECTIVITY_TYPE,
-                                             ISCSI_CONNECTIVITY_TYPE)
 from controllers.array_action.errors import NoConnectionAvailableException, UnsupportedConnectivityTypeError
+from controllers.array_action.settings import (NVME_OVER_FC_CONNECTIVITY_TYPE,
+                                               FC_CONNECTIVITY_TYPE,
+                                               ISCSI_CONNECTIVITY_TYPE)
 from controllers.array_action.utils import convert_scsi_id_to_nguid
 from controllers.common.csi_logger import get_stdout_logger
-import controllers.servers.utils as utils
 
 logger = get_stdout_logger()
 
