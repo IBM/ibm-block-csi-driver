@@ -24,7 +24,8 @@ class SecretInfo:
 @dataclass
 class HostDefinitionInfo:
     name: str = ''
-    secret_info: SecretInfo = SecretInfo()
+    secret_name: str = ''
+    secret_namespace: str = ''
     node_name: str = ''
     node_id: str = ''
     phase: str = ''

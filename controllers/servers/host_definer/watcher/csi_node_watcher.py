@@ -84,4 +84,5 @@ class CsiNodeWatcher(Watcher):
         for secret_id in SECRET_IDS:
             host_definition_info = self._get_host_definition_info_from_secret_and_node_name(node_name, secret_id)
             self._delete_definition(host_definition_info)
+        self._remove_manage_node_label(node_name)
         NODES.pop(node_name, None)

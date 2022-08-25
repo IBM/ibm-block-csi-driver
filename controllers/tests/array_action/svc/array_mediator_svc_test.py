@@ -1193,8 +1193,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
     @patch.object(SVCResponse, 'as_list', new_callable=PropertyMock)
     def test_get_host_by_identifiers_slow_backward_compatible_return_nvme_fc_and_iscsi(self, svc_response):
         self._prepare_mocks_for_get_host_by_identifiers_backward_compatible(svc_response)
-        hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
-                    Initiators(['nqn.test.2'], ['WWN2'], ['iqn.test.2']))
+        initiators = Initiators(['nqn.test.2'], ['WWN2'], ['iqn.test.2'])
+        hostname, connectivity_types = self.svc.get_host_by_host_identifiers(initiators)
         self.assertEqual('test_host_2', hostname)
         self.assertEqual(
             {config.NVME_OVER_FC_CONNECTIVITY_TYPE, config.FC_CONNECTIVITY_TYPE, config.ISCSI_CONNECTIVITY_TYPE},
@@ -1562,3 +1562,31 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_create_host_iscsi_success(self):
         self.svc.create_host("host_name", Initiators([], [], ['iqn.test.s1']), "")
         self.svc.client.svctask.mkhost.assert_called_once_with(name='host_name', iscsiname='iqn.test.s1')
+
+    def test_create_host_with_connectivity_type_success(self):
+        self.svc.create_host("host_name", Initiators([], [], ['iqn.test.s1']), "iscsi")
+        self.svc.client.svctask.mkhost.assert_called_once_with(name='host_name', iscsiname='iqn.test.s1')
+
+    def test_create_host_with_connectivity_type_failed(self):
+        with self.assertRaises(array_errors.NoPortFoundByConnectivityType):
+            self.svc.create_host("host_name", Initiators([], [], ['iqn.test.s1']), "nvmeofc")
+        self.svc.client.svctask.mkhost.assert_not_called()
+
+    def _test_create_host_mkhost_errors(self, client_error, expected_error, connectivity_type=""):
+        self._test_mediator_method_client_error(self.svc.create_host,
+                                                ("host_name", Initiators([], [], ['iqn.test.s1']), connectivity_type),
+                                                self.svc.client.svctask.mkhost, client_error,
+                                                expected_error)
+
+    def test_create_host_errors(self):
+        self._test_create_host_mkhost_errors(CLIFailureError('CMMVC6035E'), array_errors.HostAlreadyExists)
+        self._test_create_host_mkhost_errors(Exception("Failed"), Exception)
+
+    def _test_delete_host_rmhost_errors(self, client_error, expected_error):
+        self._test_mediator_method_client_error(self.svc.delete_host,
+                                                ("host_name",),
+                                                self.svc.client.svctask.rmhost, client_error,
+                                                expected_error)
+
+    def test_delete_host_errors(self):
+        self._test_delete_host_rmhost_errors(Exception("Failed"), Exception)

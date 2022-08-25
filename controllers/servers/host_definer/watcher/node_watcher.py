@@ -47,10 +47,6 @@ class NodeWatcher(Watcher):
                     self._define_host_on_all_storages(node_name)
                     self.unmanaged_csi_nodes_with_driver.remove(csi_node_info.name)
 
-    def _is_node_has_host_definitions(self, node_name):
-        host_definitions_info = self._get_all_node_host_definitions_info(node_name)
-        return host_definitions_info is not Empty
-
     def _is_unmanaged_csi_node_has_driver(self, csi_node_info):
         return csi_node_info.node_id and not self._is_host_can_be_defined(csi_node_info.name)
 
@@ -60,15 +56,7 @@ class NodeWatcher(Watcher):
         host_definitions_info = self._get_all_node_host_definitions_info(node_name)
         for host_definition_info in host_definitions_info:
             self._delete_definition(host_definition_info)
-
-    def _get_all_node_host_definitions_info(self, node_name):
-        node_host_definitions_info = []
-        k8s_host_definitions = self._get_k8s_host_definitions()
-        for k8s_host_definition in k8s_host_definitions:
-            host_definition_info = self._generate_host_definition_info(k8s_host_definition)
-            if host_definition_info.node_name == node_name:
-                node_host_definitions_info.append(host_definition_info)
-        return node_host_definitions_info
+        self._remove_manage_node_label(node_name)
 
     def _is_node_has_new_manage_node_label(self, csi_node_info):
         return not self._is_dynamic_node_labeling_allowed() and \

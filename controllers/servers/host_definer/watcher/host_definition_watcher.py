@@ -49,33 +49,39 @@ class HostDefinitionWatcher(Watcher):
         self._set_host_definition_phase_to_error(host_definition_info)
 
     def _is_host_definition_in_desired_state(self, host_definition_info):
-        current_host_definition_info_on_cluster, status_code = self._get_host_definition_info(
-            host_definition_info.node_name, host_definition_info.secret_info)
-        phase = host_definition_info.phase
+        current_host_definition_info_on_cluster = self._get_matching_host_definition_info(
+            host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
         if not current_host_definition_info_on_cluster:
-            return False
-        if status_code == 404 and phase == settings.PENDING_DELETION_PHASE:
             return True
         return current_host_definition_info_on_cluster.phase == settings.READY_PHASE
 
     def _handle_pending_host_definition(self, host_definition_info):
         response = DefineHostResponse()
         phase = host_definition_info.phase
+        action = self._get_action(phase)
         if phase == settings.PENDING_CREATION_PHASE:
             response = self._define_host(host_definition_info)
         elif self._is_pending_for_deletion_need_to_be_handled(phase, host_definition_info.node_name):
             response = self._undefine_host(host_definition_info)
         self._handle_message_from_storage(
-            host_definition_info, response.error_message)
+            host_definition_info, response.error_message, action)
 
-    def _handle_message_from_storage(self, host_definition_info, error_message):
+    def _get_action(self, phase):
+        if phase == settings.PENDING_CREATION_PHASE:
+            return settings.DEFINE_ACTION
+        return settings.UNDEFINE_ACTION
+
+    def _handle_message_from_storage(self, host_definition_info, error_message, action):
         phase = host_definition_info.phase
         if error_message:
-            self._add_k8s_event_to_host_definition(host_definition_info, str(error_message))
+            self._create_k8s_event_for_host_definition(
+                host_definition_info, str(error_message),
+                action, settings.FAILED_MESSAGE_TYPE)
         elif phase == settings.PENDING_CREATION_PHASE:
-            self._set_host_definition_status(host_definition_info.name, settings.READY_PHASE)
+            self._set_host_definition_status_to_ready(host_definition_info)
         elif self._is_pending_for_deletion_need_to_be_handled(phase, host_definition_info.node_name):
             self._delete_host_definition(host_definition_info.name)
+            self._remove_manage_node_label(host_definition_info.node_name)
 
     def _is_pending_for_deletion_need_to_be_handled(self, phase, node_name):
         return phase == settings.PENDING_DELETION_PHASE and self._is_host_can_be_undefined(node_name)
