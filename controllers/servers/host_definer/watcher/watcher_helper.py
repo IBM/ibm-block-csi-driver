@@ -6,9 +6,9 @@ from munch import Munch
 from queue import Empty
 
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.config import (SECRET_ARRAY_PARAMETER,
-                                        SECRET_PASSWORD_PARAMETER,
-                                        SECRET_USERNAME_PARAMETER)
+from controllers.servers.settings import (SECRET_ARRAY_PARAMETER,
+                                          SECRET_PASSWORD_PARAMETER,
+                                          SECRET_USERNAME_PARAMETER)
 import controllers.servers.messages as common_messages
 from controllers.servers.utils import get_array_connection_info_from_secrets
 from controllers.servers.errors import ValidationException

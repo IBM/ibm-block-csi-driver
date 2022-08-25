@@ -2,11 +2,12 @@ import grpc
 from csi_general import replication_pb2 as pb2
 from csi_general import replication_pb2_grpc as pb2_grpc
 
+import controllers.servers.settings as servers_settings
 from controllers.array_action import errors as array_errors
-from controllers.array_action.config import REPLICATION_DEFAULT_COPY_TYPE
+from controllers.array_action.settings import REPLICATION_DEFAULT_COPY_TYPE
 from controllers.array_action.storage_agent import get_agent
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers import config, utils
+from controllers.servers import utils
 from controllers.servers.csi.decorators import csi_method
 from controllers.servers.csi.exception_handler import build_error_response
 
@@ -26,12 +27,12 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         other_volume_id_info = utils.get_volume_id_info(request.replication_id)
         other_volume_internal_id = other_volume_id_info.ids.internal_id
 
-        other_system_id = request.parameters.get(config.PARAMETERS_SYSTEM_ID)
-        copy_type = request.parameters.get(config.PARAMETERS_COPY_TYPE, REPLICATION_DEFAULT_COPY_TYPE)
+        other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
+        copy_type = request.parameters.get(servers_settings.PARAMETERS_COPY_TYPE, REPLICATION_DEFAULT_COPY_TYPE)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, volume_id_info.array_type).get_mediator() as mediator:
-            volume = mediator.get_object_by_id(volume_id, config.VOLUME_TYPE_NAME)
+            volume = mediator.get_object_by_id(volume_id, servers_settings.VOLUME_TYPE_NAME)
             if not volume:
                 raise array_errors.ObjectNotFoundError(volume_id)
             replication = mediator.get_replication(volume_internal_id, other_volume_internal_id, other_system_id)
@@ -62,7 +63,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         other_volume_id_info = utils.get_volume_id_info(request.replication_id)
         other_volume_internal_id = other_volume_id_info.ids.internal_id
 
-        other_system_id = request.parameters.get(config.PARAMETERS_SYSTEM_ID)
+        other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, volume_id_info.array_type).get_mediator() as mediator:
@@ -102,7 +103,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         other_volume_id_info = utils.get_volume_id_info(request.replication_id)
         other_volume_internal_id = other_volume_id_info.ids.internal_id
 
-        other_system_id = request.parameters.get(config.PARAMETERS_SYSTEM_ID)
+        other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, volume_id_info.array_type).get_mediator() as mediator:
@@ -138,7 +139,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         other_volume_id_info = utils.get_volume_id_info(request.replication_id)
         other_volume_internal_id = other_volume_id_info.ids.internal_id
 
-        other_system_id = request.parameters.get(config.PARAMETERS_SYSTEM_ID)
+        other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, volume_id_info.array_type).get_mediator() as mediator:

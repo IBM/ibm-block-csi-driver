@@ -38,12 +38,13 @@ var (
 	nodeUtils       = driver.NewNodeUtils(&executer.Executer{}, nil, ConfigYaml, device_connectivity.OsDeviceConnectivityHelperScsiGeneric{})
 	maxNodeIdLength = driver.MaxNodeIdLength
 	hostName        = "test-hostname"
-	longHostName    = strings.Repeat(hostName, 15)
+	longHostName    = strings.Repeat(hostName, 25)
 	nvmeNQN         = "nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1"
-	fcWWNs          = []string{"10000000c9934d9f", "10000000c9934d9h", "10000000c9934d9a", "10000000c9934d9b", "10000000c9934d9z"}
-	iscsiIQN        = "iqn.1994-07.com.redhat:e123456789"
-	volumeUuid      = "6oui000vendorsi0vendorsie0000000"
-	volumeNguid     = "vendorsie0000000oui0000vendorsi0"
+	fcWWNs          = []string{"10000000c9934d9f", "10000000c9934d9h", "10000000c9934d9a", "10000000c9934d9b",
+		"10000000c9934d9z", "10000000c9934d9c", "10000000c9934d9d", "10000000c9934d9e", "10000000c9934d9g", "10000000c9934d9i"}
+	iscsiIQN    = "iqn.1994-07.com.redhat:e123456789"
+	volumeUuid  = "6oui000vendorsi0vendorsie0000000"
+	volumeNguid = "vendorsie0000000oui0000vendorsi0"
 )
 
 func TestReadNvmeNqn(t *testing.T) {
@@ -308,9 +309,9 @@ func TestGenerateNodeID(t *testing.T) {
 		{name: "success all given, only nvme and fc in",
 			hostName:  hostName,
 			nvmeNQN:   nvmeNQN,
-			fcWWNs:    fcWWNs[:2],
+			fcWWNs:    fcWWNs,
 			iscsiIQN:  iscsiIQN,
-			expNodeId: fmt.Sprintf("%s;%s;%s", hostName, nvmeNQN, strings.Join(fcWWNs[:2], ":")),
+			expNodeId: fmt.Sprintf("%s;%s;%s", hostName, nvmeNQN, strings.Join(fcWWNs, ":")),
 		},
 		{name: "success only iscsi port",
 			hostName:  hostName,

@@ -4,9 +4,10 @@ import grpc
 from mock import Mock, MagicMock
 
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
-from controllers.tests.controller_server.test_settings import USER as test_user, \
-    PASSWORD as test_password, \
-    ARRAY as test_array, VOLUME_NAME, SNAPSHOT_NAME, SNAPSHOT_VOLUME_NAME
+from controllers.tests.common.test_settings import SECRET_USERNAME_VALUE as test_user, \
+    SECRET_PASSWORD_VALUE as test_password, ARRAY as test_array, VOLUME_NAME, VOLUME_UID, DUMMY_POOL1, \
+    INTERNAL_VOLUME_ID, \
+    SNAPSHOT_NAME, SNAPSHOT_VOLUME_NAME, SNAPSHOT_VOLUME_UID
 
 
 class ProtoBufMock(MagicMock):
@@ -14,26 +15,26 @@ class ProtoBufMock(MagicMock):
         return hasattr(self, field)
 
 
-def get_mock_mediator_response_volume(size=10, name=VOLUME_NAME, wwn="wwn1", array_type="a9k", source_id=None,
+def get_mock_mediator_response_volume(size=10, name=VOLUME_NAME, volume_id=VOLUME_UID, array_type="a9k", source_id=None,
                                       space_efficiency='thick'):
     volume = Mock()
     volume.capacity_bytes = size
-    volume.id = wwn
-    volume.internal_id = "0"
+    volume.id = volume_id
+    volume.internal_id = INTERNAL_VOLUME_ID
     volume.name = name
     volume.array_address = "arr1"
-    volume.pool = "pool1"
+    volume.pool = DUMMY_POOL1
     volume.array_type = array_type
     volume.source_id = source_id
     volume.space_efficiency_aliases = space_efficiency if isinstance(space_efficiency, set) else {space_efficiency}
     return volume
 
 
-def get_mock_mediator_response_snapshot(capacity=10, name=SNAPSHOT_NAME, wwn="wwn", volume_name=SNAPSHOT_VOLUME_NAME,
-                                        array_type="xiv"):
+def get_mock_mediator_response_snapshot(capacity=10, name=SNAPSHOT_NAME, snapshot_id=SNAPSHOT_VOLUME_UID,
+                                        volume_name=SNAPSHOT_VOLUME_NAME, array_type="xiv"):
     snapshot = Mock()
     snapshot.capacity_bytes = capacity
-    snapshot.id = wwn
+    snapshot.id = snapshot_id
     snapshot.internal_id = "0"
     snapshot.name = name
     snapshot.source_id = volume_name
