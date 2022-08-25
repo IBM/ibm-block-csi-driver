@@ -34,6 +34,6 @@ REMOVE_LABEL_FROM_NODE = 'Remove {} label from node {}'
 FAILED_TO_LIST_DAEMON_SETS = 'Failed to list csi IBM block daemon set, got: {}'
 FAILED_TO_LIST_PODS = 'Failed to list csi IBM block pods, got: {}'
 FAILED_TO_GET_SECRET_EVENT = 'Failed to get secret {} in namespace {}'
-HOST_DEFINITION_IN_DESIRED_STATE = "Stopping verifying host definition {}, using exponential backoff,"\
+HOST_DEFINITION_IS_NOT_PENDING = "Stopping verifying host definition {}, using exponential backoff,"\
     " because it is not in pending state"
 DELETE_HOST_DEFINITION = 'Deleting host definition {}'
