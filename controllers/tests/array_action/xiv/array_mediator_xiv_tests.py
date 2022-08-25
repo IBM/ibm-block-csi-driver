@@ -261,8 +261,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
             self.mediator.get_snapshot(common_settings.VOLUME_UID, common_settings.SNAPSHOT_NAME, None, False)
 
     def test_get_snapshot_raise_illegal_object_name(self):
-        self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalNameForObjectError("",
-                                                                                common_settings.SNAPSHOT_NAME, "")]
+        self.mediator.client.cmd.vol_list.side_effect = \
+            [xcli_errors.IllegalNameForObjectError("", common_settings.SNAPSHOT_NAME, "")]
         with self.assertRaises(array_errors.InvalidArgumentError):
             self.mediator.get_snapshot(common_settings.VOLUME_UID, common_settings.SNAPSHOT_NAME, None, False)
 
