@@ -51,9 +51,8 @@ class HostDefinitionWatcher(Watcher):
     def _is_host_definition_in_desired_state(self, host_definition_info):
         current_host_definition_info_on_cluster = self._get_matching_host_definition_info(
             host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
-        if not current_host_definition_info_on_cluster:
-            return True
-        return current_host_definition_info_on_cluster.phase == settings.READY_PHASE
+        return not current_host_definition_info_on_cluster or \
+            current_host_definition_info_on_cluster.phase == settings.READY_PHASE
 
     def _handle_pending_host_definition(self, host_definition_info):
         response = DefineHostResponse()
