@@ -35,12 +35,13 @@ class Watcher(KubernetesManager):
                 host_definition.secret.namespace, host_definition.name))
             return
         response = self._define_host(host_definition)
-        host_definition.name = self._create_host_definition_if_not_exist(host_definition)
-        if response.error_message:
-            self._set_host_definition_status(host_definition.name, settings.PENDING_CREATION_PHASE)
-            self._create_event_to_host_definition(host_definition, response.error_message)
-        else:
-            self._set_host_definition_status(host_definition.name, settings.READY_PHASE)
+        host_definition_instance = self._create_host_definition_if_not_exist(host_definition)
+        if response.error_message and host_definition_instance:
+            self._set_host_definition_status(host_definition_instance.name, settings.PENDING_CREATION_PHASE)
+            self._create_event_for_host_definition(
+                host_definition_instance, response.error_message, settings.DEFINE_ACTION, settings.FAILED_MESSAGE_TYPE)
+        elif host_definition_instance:
+            self._set_host_definition_status_to_ready(host_definition_instance)
 
     def _is_host_defined(self, node_name, secret):
         host_definition, _ = self._get_host_definition(node_name, secret)
@@ -60,10 +61,10 @@ class Watcher(KubernetesManager):
         if host_definition_instance:
             host_definition_manifest[settings.METADATA][settings.NAME] = host_definition_instance.name
             self._patch_host_definition(host_definition_manifest)
+            return host_definition_instance
         else:
             logger.info(messages.CREATING_NEW_HOST_DEFINITION.format(host_definition.name))
-            self._create_host_definition(host_definition_manifest)
-        return host_definition_manifest[settings.METADATA][settings.NAME]
+            return self._create_host_definition(host_definition_manifest)
 
     def _get_host_definition_manifest(self, host_definition):
         return {
@@ -96,21 +97,23 @@ class Watcher(KubernetesManager):
         host_definition_instance, _ = self._get_host_definition(host_definition.node_name, host_definition.secret)
         if response.error_message and host_definition_instance:
             self._set_host_definition_status(host_definition_instance.name, settings.PENDING_DELETION_PHASE)
-            self._create_event_to_host_definition(host_definition_instance, response.error_message)
+            self._create_event_for_host_definition(
+                host_definition_instance, response.error_message,
+                settings.UNDEFINE_ACTION, settings.FAILED_MESSAGE_TYPE)
         elif not response.error_message and host_definition_instance:
             self._delete_host_definition(host_definition_instance.name)
 
     def _undefine_host(self, host_definition):
         return self._ensure_definition_state(host_definition, self.storage_host_servicer.undefine_host)
 
-    def _create_event_to_host_definition(self, host_definition, message):
-        self._add_event_to_host_definition(host_definition, message)
-        if host_definition:
-            self._add_event_to_host_definition(host_definition, message)
+    def _set_host_definition_status_to_ready(self, host_definition):
+        self._set_host_definition_status(host_definition.name, settings.READY_PHASE)
+        self._create_event_for_host_definition(
+            host_definition, settings.SUCCESS_MESSAGE, settings.DEFINE_ACTION, settings.SUCCESSFUL_MESSAGE_TYPE)
 
-    def _add_event_to_host_definition(self, host_definition, message):
-        logger.info(messages.CREATE_EVENT_FOR_HOST_DEFINITION.format(host_definition.name, message))
-        event = self._get_event_for_host_definition(host_definition, message)
+    def _create_event_for_host_definition(self, host_definition, message, action, message_type):
+        logger.info(messages.CREATE_EVENT_FOR_HOST_DEFINITION.format(message, host_definition.name))
+        event = self._get_event_for_host_definition(host_definition, message, action, message_type)
         self._create_event(settings.DEFAULT_NAMESPACE, event)
 
     def _is_host_can_be_defined(self, node_name):

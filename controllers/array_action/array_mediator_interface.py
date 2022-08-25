@@ -334,7 +334,7 @@ class ArrayMediator(ABC):
            host_name : name of the host in the storage system
 
         Returns:
-           Host
+            Host
 
         Raises:
             HostNotFoundError
@@ -353,7 +353,7 @@ class ArrayMediator(ABC):
 
 
         Returns:
-           None
+            None
 
         Raises:
             HostAlreadyExists
@@ -366,10 +366,10 @@ class ArrayMediator(ABC):
         This function should delete a host in the storage system.
 
         Args:
-           host_name : name of the host in the storage system
+            host_name : name of the host in the storage system
 
         Returns:
-           None
+            None
 
         Raises:
             None
