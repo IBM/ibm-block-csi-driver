@@ -38,7 +38,7 @@ class HostDefinitionWatcher(Watcher):
         while retries > 0:
             logger.info(messages.VERIFY_HOST_DEFINITION_USING_EXPONENTIAL_BACKOFF.format(
                 host_definition_info.name, retries))
-            if self._is_host_definition_in_desired_state(host_definition_info) and retries != 5:
+            if self._is_host_definition_pending(host_definition_info) and retries != 5:
                 logger.info(messages.HOST_DEFINITION_IN_DESIRED_STATE.format(host_definition_info.name))
                 return
             self._handle_pending_host_definition(host_definition_info)
@@ -48,7 +48,7 @@ class HostDefinitionWatcher(Watcher):
 
         self._set_host_definition_phase_to_error(host_definition_info)
 
-    def _is_host_definition_in_desired_state(self, host_definition_info):
+    def _is_host_definition_pending(self, host_definition_info):
         current_host_definition_info_on_cluster = self._get_matching_host_definition_info(
             host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
         return not current_host_definition_info_on_cluster or \
