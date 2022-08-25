@@ -169,26 +169,20 @@ class KubernetesManager():
             host_definition_info.secret_name == secret_name and \
             host_definition_info.secret_namespace == secret_namespace
 
-    def _patch_host_definition(self, host_definition_manifest):
-        host_definition_name = host_definition_manifest[settings.METADATA][settings.NAME]
-        logger.info(messages.PATCHING_HOST_DEFINITION.format(host_definition_name))
-        try:
-            self.host_definitions_api.patch(body=host_definition_manifest, name=host_definition_name,
-                                            content_type='application/merge-patch+json')
-        except ApiException as ex:
-            if ex.status == 404:
-                logger.error(messages.HOST_DEFINITION_DOES_NOT_EXIST.format(host_definition_name))
-            else:
-                logger.error(messages.FAILED_TO_PATCH_HOST_DEFINITION.format(host_definition_name, ex.body))
-
     def _create_host_definition(self, host_definition_manifest):
         try:
             k8s_host_definition = self.host_definitions_api.create(body=host_definition_manifest)
+            self._add_finalizer_to_host_definition(k8s_host_definition.metadata.name)
             return self._generate_host_definition_info(k8s_host_definition)
         except ApiException as ex:
             if ex != 404:
                 logger.error(messages.FAILED_TO_CREATE_HOST_DEFINITION.format(
                     host_definition_manifest[settings.METADATA][settings.NAME], ex.body))
+
+    def _add_finalizer_to_host_definition(self, host_definition_name):
+        logger.info(messages.ADD_FINALIZER_TO_HOST_DEFINITION.format(host_definition_name))
+        self._update_finalizer_on_host_definition(
+            host_definition_name, [settings.HOST_DEFINITION_PLURAL + '.' + settings.CSI_IBM_GROUP, ])
 
     def _set_host_definition_status(self, host_definition_name, host_definition_phase):
         logger.info(messages.SET_HOST_DEFINITION_STATUS.format(host_definition_name, host_definition_phase))
@@ -237,10 +231,36 @@ class KubernetesManager():
     def _delete_host_definition(self, host_definition_name):
         logger.info(messages.DELETE_HOST_DEFINITION.format(host_definition_name))
         try:
+            self._remove_finalizer_from_host_definition(host_definition_name)
             self.host_definitions_api.delete(name=host_definition_name, body={})
         except ApiException as ex:
             if ex.status != 404:
                 logger.error(messages.FAILED_TO_DELETE_HOST_DEFINITION.format(host_definition_name, ex.body))
+
+    def _remove_finalizer_from_host_definition(self, host_definition_name):
+        logger.info(messages.REMOVE_FINALIZER_TO_HOST_DEFINITION.format(host_definition_name))
+        self._update_finalizer_on_host_definition(host_definition_name, [])
+
+    def _update_finalizer_on_host_definition(self, host_definition_name, finalizers):
+        finalizer_manifest = {
+            settings.METADATA: {
+                settings.NAME: host_definition_name,
+                settings.FINALIZERS: finalizers,
+            }
+        }
+        self._patch_host_definition(finalizer_manifest)
+
+    def _patch_host_definition(self, host_definition_manifest):
+        host_definition_name = host_definition_manifest[settings.METADATA][settings.NAME]
+        logger.info(messages.PATCHING_HOST_DEFINITION.format(host_definition_name))
+        try:
+            self.host_definitions_api.patch(body=host_definition_manifest, name=host_definition_name,
+                                            content_type='application/merge-patch+json')
+        except ApiException as ex:
+            if ex.status == 404:
+                logger.error(messages.HOST_DEFINITION_DOES_NOT_EXIST.format(host_definition_name))
+            else:
+                logger.error(messages.FAILED_TO_PATCH_HOST_DEFINITION.format(host_definition_name, ex.body))
 
     def _update_manage_node_label(self, node_name, label_value):
         body = self._get_body_for_labels(label_value)
