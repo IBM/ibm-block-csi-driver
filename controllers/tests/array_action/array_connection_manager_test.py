@@ -17,7 +17,8 @@ class TestWithFunctionality(unittest.TestCase):
     def setUp(self):
         self.fqdn = array_settings.DUMMY_FQDN
         self.array_connection = ArrayConnectionManager(
-            array_settings.DUMMY_USER_PARAMETER, array_settings.DUMMY_PASSWORD_PARAMETER, [self.fqdn, self.fqdn], XIVArrayMediator.array_type)
+            array_settings.DUMMY_USER_PARAMETER, array_settings.DUMMY_PASSWORD_PARAMETER, [self.fqdn, self.fqdn],
+            XIVArrayMediator.array_type)
 
     @patch("controllers.array_action.array_connection_manager.XIVArrayMediator._connect")
     @patch("controllers.array_action.array_connection_manager.XIVArrayMediator.disconnect")
@@ -47,7 +48,8 @@ class TestGetconnection(unittest.TestCase):
         self.connections = [self.fqdn, self.fqdn]
         self.connection_key = ",".join(self.connections)
         self.array_connection = ArrayConnectionManager(
-            array_settings.DUMMY_USER_PARAMETER, array_settings.DUMMY_PASSWORD_PARAMETER, self.connections, XIVArrayMediator.array_type)
+            array_settings.DUMMY_USER_PARAMETER, array_settings.DUMMY_PASSWORD_PARAMETER, self.connections,
+            XIVArrayMediator.array_type)
         array_connection_manager.array_connections_dict = {}
         self.connect_patcher = patch("controllers.array_action.array_connection_manager.XIVArrayMediator._connect")
         self.connect = self.connect_patcher.start()
@@ -62,7 +64,8 @@ class TestGetconnection(unittest.TestCase):
         self.assertEqual({self.connection_key: 1}, array_connection_manager.array_connections_dict)
 
         new_fqdn = "new-fqdn"
-        array_connection2 = ArrayConnectionManager(array_settings.DUMMY_USER_PARAMETER, array_settings.DUMMY_PASSWORD_PARAMETER,
+        array_connection2 = ArrayConnectionManager(array_settings.DUMMY_USER_PARAMETER,
+                                                   array_settings.DUMMY_PASSWORD_PARAMETER,
                                                    [new_fqdn], XIVArrayMediator.array_type)
 
         array_connection2.get_array_connection()

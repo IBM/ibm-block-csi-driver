@@ -549,8 +549,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def _test_get_snapshot_cli_failure_error(self, snapshot_name, client_method, error_message_id, expected_error,
                                              is_virt_snap_func=False):
         self._test_mediator_method_client_cli_failure_error(self.svc.get_snapshot,
-                                                            (common_settings.VOLUME_UID, snapshot_name, common_settings.DUMMY_POOL1,
-                                                             is_virt_snap_func),
+                                                            (common_settings.VOLUME_UID, snapshot_name,
+                                                             common_settings.DUMMY_POOL1, is_virt_snap_func),
                                                             client_method, error_message_id, expected_error)
 
     def _test_get_snapshot_illegal_name_cli_failure_errors(self, client_method, is_virt_snap_func=False):

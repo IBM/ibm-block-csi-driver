@@ -171,7 +171,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self._test_copy_to_existing_volume_from_snapshot(source_snapshot_capacity_in_bytes=500,
                                                          min_volume_size_in_bytes=1000)
 
-        self.mediator.client.cmd.vol_resize.assert_called_once_with(vol=common_settings.VOLUME_NAME, size_blocks=volume_size_in_blocks)
+        self.mediator.client.cmd.vol_resize.assert_called_once_with(vol=common_settings.VOLUME_NAME,
+                                                                    size_blocks=volume_size_in_blocks)
 
     def test_copy_to_existing_volume_from_snapshot_succeeds_without_resize(self):
         self._test_copy_to_existing_volume_from_snapshot(source_snapshot_capacity_in_bytes=1000,
@@ -234,7 +235,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
             self.mediator.delete_volume(common_settings.VOLUME_UID)
 
     def test_delete_volume_with_snapshot(self):
-        xcli_snapshot = self._get_single_snapshot_result_mock(common_settings.SNAPSHOT_NAME, common_settings.VOLUME_NAME)
+        xcli_snapshot = self._get_single_snapshot_result_mock(common_settings.SNAPSHOT_NAME,
+                                                              common_settings.VOLUME_NAME)
         self.mediator.client.cmd.snapshot_list.return_value = Mock(as_list=[xcli_snapshot])
         with self.assertRaises(array_errors.ObjectIsStillInUseError):
             self.mediator.delete_volume(common_settings.VOLUME_UID)
@@ -245,7 +247,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.delete_volume(common_settings.VOLUME_UID)
 
     def test_get_snapshot_return_correct_value(self):
-        xcli_snapshot = self._get_single_snapshot_result_mock(common_settings.SNAPSHOT_NAME, common_settings.VOLUME_NAME)
+        xcli_snapshot = self._get_single_snapshot_result_mock(common_settings.SNAPSHOT_NAME,
+                                                              common_settings.VOLUME_NAME)
         self.mediator.client.cmd.vol_list.return_value = xcli_snapshot
         snapshot = self.mediator.get_snapshot(common_settings.VOLUME_UID, common_settings.SNAPSHOT_NAME, None, False)
         self.assertEqual(common_settings.SNAPSHOT_NAME, snapshot.name)
@@ -258,14 +261,16 @@ class TestArrayMediatorXIV(unittest.TestCase):
             self.mediator.get_snapshot(common_settings.VOLUME_UID, common_settings.SNAPSHOT_NAME, None, False)
 
     def test_get_snapshot_raise_illegal_object_name(self):
-        self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalNameForObjectError("", common_settings.SNAPSHOT_NAME, "")]
+        self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalNameForObjectError("",
+                                                                                common_settings.SNAPSHOT_NAME, "")]
         with self.assertRaises(array_errors.InvalidArgumentError):
             self.mediator.get_snapshot(common_settings.VOLUME_UID, common_settings.SNAPSHOT_NAME, None, False)
 
     def test_create_snapshot_succeeds(self):
         size_in_blocks_string = "10"
         size_in_bytes = int(size_in_blocks_string) * XIVArrayMediator.BLOCK_SIZE_IN_BYTES
-        xcli_snapshot = self._get_single_snapshot_result_mock(common_settings.SNAPSHOT_NAME, common_settings.VOLUME_NAME,
+        xcli_snapshot = self._get_single_snapshot_result_mock(common_settings.SNAPSHOT_NAME,
+                                                              common_settings.VOLUME_NAME,
                                                               snapshot_capacity=size_in_blocks_string)
         self.mediator.client.cmd.snapshot_create.return_value = xcli_snapshot
         snapshot = self.mediator.create_snapshot(common_settings.VOLUME_UID, common_settings.SNAPSHOT_NAME,
@@ -279,8 +284,9 @@ class TestArrayMediatorXIV(unittest.TestCase):
         xcli_volume = self._get_cli_volume()
         self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=xcli_volume)
         with self.assertRaises(array_errors.SnapshotSourcePoolMismatch):
-            self.mediator.create_snapshot(common_settings.VOLUME_UID, common_settings.SNAPSHOT_NAME, space_efficiency=None,
-                                          pool=common_settings.DUMMY_POOL2, is_virt_snap_func=False)
+            self.mediator.create_snapshot(common_settings.VOLUME_UID, common_settings.SNAPSHOT_NAME,
+                                          space_efficiency=None, pool=common_settings.DUMMY_POOL2,
+                                          is_virt_snap_func=False)
 
     def test_create_snapshot_raise_illegal_name_for_object(self):
         self._test_create_snapshot_error(xcli_errors.IllegalNameForObjectError, array_errors.InvalidArgumentError)
@@ -350,7 +356,8 @@ class TestArrayMediatorXIV(unittest.TestCase):
         self.mediator.delete_snapshot(common_settings.SNAPSHOT_VOLUME_UID, common_settings.INTERNAL_SNAPSHOT_ID)
 
     def test_get_object_by_id_return_correct_snapshot(self):
-        xcli_snapshot = self._get_single_snapshot_result_mock(common_settings.SNAPSHOT_NAME, common_settings.VOLUME_NAME)
+        xcli_snapshot = self._get_single_snapshot_result_mock(common_settings.SNAPSHOT_NAME,
+                                                              common_settings.VOLUME_NAME)
         self.mediator.client.cmd.vol_list.return_value = xcli_snapshot
         snapshot = self.mediator.get_object_by_id(common_settings.SNAPSHOT_VOLUME_UID,
                                                   common_settings.SNAPSHOT_OBJECT_TYPE)

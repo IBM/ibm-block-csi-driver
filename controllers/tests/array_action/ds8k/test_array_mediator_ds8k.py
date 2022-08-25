@@ -330,9 +330,10 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_get_volume_mappings(self):
         scsi_id = ds8k_settings.DUMMY_ABSTRACT_VOLUME_UID.format(ds8k_settings.DUMMY_VOLUME_ID1)
-        self.client_mock.get_hosts.return_value = self._mock_get_hosts_response(volume_id=ds8k_settings.DUMMY_VOLUME_ID1,
+        self.client_mock.get_hosts.return_value =self._mock_get_hosts_response(volume_id=ds8k_settings.DUMMY_VOLUME_ID1,
                                                                                 lun_id=array_settings.DUMMY_LUN_ID)
-        self.assertDictEqual(self.array.get_volume_mappings(scsi_id), {common_settings.HOST_NAME: int(array_settings.DUMMY_LUN_ID)})
+        self.assertDictEqual(self.array.get_volume_mappings(scsi_id),
+                             {common_settings.HOST_NAME: int(array_settings.DUMMY_LUN_ID)})
 
     def test_map_volume_host_not_found(self):
         self.client_mock.map_volume_to_host.side_effect = NotFound("404")
