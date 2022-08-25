@@ -1,11 +1,16 @@
 ID_KEY = "id"
 NAME_KEY = "name"
 
+DUMMY_USER_PARAMETER = "user"
+DUMMY_PASSWORD_PARAMETER = "password"
+
 NVME_OVER_FC_CONNECTIVITY_TYPE = "nvmeofc"
 FC_CONNECTIVITY_TYPE = "fc"
 ISCSI_CONNECTIVITY_TYPE = "iscsi"
 DUMMY_CONNECTIVITY_TYPE = "connectivity_type"
 DUMMY_ERROR_MESSAGE = "failed"
+
+DUMMY_FQDN = "fqdn"
 
 DUMMY_HOST_NAME1 = "host_name_1"
 DUMMY_HOST_NAME2 = "host_name_2"
