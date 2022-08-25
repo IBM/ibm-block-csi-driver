@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 
-from controllers.array_action import config as array_config
+import controllers.servers.settings as servers_settings
+from controllers.array_action import settings as array_config
 from controllers.common import utils
-import controllers.servers.config as config
 
 
 class NodeIdInfo:
@@ -12,7 +12,7 @@ class NodeIdInfo:
             node_id: <node_name>,<iqn>,<wwns>
         """
         node_name, nvme_nqn, fc_wwns_str, iscsi_iqn = utils.get_node_id_info(node_id)
-        fc_wwns = fc_wwns_str.split(config.PARAMETERS_FC_WWN_DELIMITER)
+        fc_wwns = fc_wwns_str.split(servers_settings.PARAMETERS_FC_WWN_DELIMITER)
         self.node_name = node_name
         self.initiators = Initiators([nvme_nqn], fc_wwns, [iscsi_iqn])
 

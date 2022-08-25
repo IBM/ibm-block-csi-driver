@@ -4,10 +4,10 @@ from pyxcli import errors as xcli_errors
 from pyxcli.client import XCLIClient
 
 import controllers.array_action.errors as array_errors
-import controllers.servers.config as controller_config
+import controllers.servers.settings as servers_settings
 from controllers.array_action.array_action_types import Volume, Snapshot, Host
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
-from controllers.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
+from controllers.array_action.settings import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controllers.array_action.utils import ClassProperty
 from controllers.common import settings
 from controllers.common.csi_logger import get_stdout_logger
@@ -323,7 +323,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         cli_object = self._get_cli_object_by_wwn(object_id)
         if not cli_object:
             return None
-        if object_type is controller_config.SNAPSHOT_TYPE_NAME:
+        if object_type is servers_settings.SNAPSHOT_TYPE_NAME:
             if not cli_object.master_name:
                 raise array_errors.ExpectedSnapshotButFoundVolumeError(object_id, self.endpoint)
             return self._generate_snapshot_response(cli_object)
