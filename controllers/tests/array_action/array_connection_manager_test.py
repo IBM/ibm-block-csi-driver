@@ -71,7 +71,8 @@ class TestGetconnection(unittest.TestCase):
                                                    [new_management_address], XIVArrayMediator.array_type)
 
         array_connection2.get_array_connection()
-        self.assertEqual({self.connection_key: 1, new_management_address: 1}, array_connection_manager.array_connections_dict)
+        self.assertEqual({self.connection_key: 1, new_management_address: 1},
+                         array_connection_manager.array_connections_dict)
 
     def test_connection_adds_connections_to_connection_dict(self):
         self.assertEqual({}, array_connection_manager.array_connections_dict)
