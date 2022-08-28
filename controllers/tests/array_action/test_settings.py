@@ -10,8 +10,6 @@ ISCSI_CONNECTIVITY_TYPE = "iscsi"
 DUMMY_CONNECTIVITY_TYPE = "connectivity_type"
 DUMMY_ERROR_MESSAGE = "failed"
 
-DUMMY_FQDN = "fqdn"
-
 DUMMY_HOST_NAME1 = "host_name_1"
 DUMMY_HOST_NAME2 = "host_name_2"
 DUMMY_HOST_NAME3 = "host_name_3"

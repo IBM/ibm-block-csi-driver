@@ -16,10 +16,10 @@ from controllers.tests.array_action.xiv import utils
 class TestArrayMediatorXIV(unittest.TestCase):
 
     def setUp(self):
-        self.fqdn = array_settings.DUMMY_FQDN
+        self.endpoint = [common_settings.SECRET_MANAGEMENT_ADDRESS_VALUE]
         with patch("controllers.array_action.array_mediator_xiv.XIVArrayMediator._connect"):
             self.mediator = XIVArrayMediator(common_settings.SECRET_USERNAME_VALUE,
-                                             common_settings.SECRET_PASSWORD_VALUE, self.fqdn)
+                                             common_settings.SECRET_PASSWORD_VALUE, self.endpoint)
         self.mediator.client = Mock()
         self.required_bytes = 2000
 

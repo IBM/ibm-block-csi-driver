@@ -20,7 +20,7 @@ from controllers.common.settings import SPACE_EFFICIENCY_THIN, SPACE_EFFICIENCY_
 class TestArrayMediatorDS8K(unittest.TestCase):
 
     def setUp(self):
-        self.endpoint = ["1.2.3.4"]
+        self.endpoint = [common_settings.SECRET_MANAGEMENT_ADDRESS_VALUE]
         self.client_mock = NonCallableMagicMock()
         patcher = patch("controllers.array_action.array_mediator_ds8k.RESTClient")
         self.connect_mock = patcher.start()
