@@ -17,7 +17,7 @@ class SecretWatcher(Watcher):
             stream = watch.Watch().stream(self.core_api.list_secret_for_all_namespaces,
                                           resource_version=resource_version, timeout_seconds=5)
             for watch_event in stream:
-                watch_event = self._munch_watch_event(watch_event)
+                watch_event = self._munch(watch_event)
                 secret_info = self._generate_secret_info(watch_event.object)
                 if self._is_secret_used_by_storage_class(secret_info):
                     self._handle_storage_class_secret(secret_info, watch_event.type)

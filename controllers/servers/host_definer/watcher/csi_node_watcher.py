@@ -21,7 +21,7 @@ class CsiNodeWatcher(Watcher):
             resource_version = self.csi_nodes_api.get().metadata.resourceVersion
             stream = self.csi_nodes_api.watch(resource_version=resource_version, timeout=5)
             for watch_event in stream:
-                watch_event = self._munch_watch_event(watch_event)
+                watch_event = self._munch(watch_event)
                 csi_node_info = self._generate_csi_node_info(watch_event.object)
                 if (watch_event.type == settings.DELETED_EVENT) and (csi_node_info.name in NODES):
                     self._handle_deleted_csi_node_pod(csi_node_info.name)
