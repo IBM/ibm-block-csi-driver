@@ -3,9 +3,9 @@ import os
 import random
 import string
 
-from controllers.servers.config import (SECRET_ARRAY_PARAMETER,
-                                        SECRET_PASSWORD_PARAMETER,
-                                        SECRET_USERNAME_PARAMETER)
+from controllers.servers.settings import (SECRET_ARRAY_PARAMETER,
+                                          SECRET_PASSWORD_PARAMETER,
+                                          SECRET_USERNAME_PARAMETER)
 import controllers.servers.messages as messages
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
 from controllers.common.csi_logger import get_stdout_logger

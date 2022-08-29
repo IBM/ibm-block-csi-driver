@@ -59,7 +59,7 @@ var (
 const (
 	FCPath          = "/sys/class/fc_host"
 	FCPortPath      = "/sys/class/fc_host/host*/port_name"
-	MaxNodeIdLength = 128
+	MaxNodeIdLength = 256
 )
 
 //go:generate mockgen -destination=../../mocks/mock_NodeMounter.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeMounter
