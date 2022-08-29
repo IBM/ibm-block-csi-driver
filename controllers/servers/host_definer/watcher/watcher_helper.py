@@ -131,7 +131,7 @@ class Watcher(KubernetesManager):
 
     def _create_k8s_event_for_host_definition(self, host_definition_info, message, action, message_type):
         logger.info(messages.CREATE_EVENT_FOR_HOST_DEFINITION.format(message, host_definition_info.name))
-        k8s_event = self._generate_k8s_event_for_host_definition(host_definition_info, message, action, message_type)
+        k8s_event = self._generate_k8s_event(host_definition_info, message, action, message_type)
         self._create_k8s_event(settings.DEFAULT_NAMESPACE, k8s_event)
 
     def _is_host_can_be_defined(self, node_name):
@@ -295,5 +295,5 @@ class Watcher(KubernetesManager):
     def _generate_secret_id(self, secret_name, secret_namespace):
         return (secret_name, secret_namespace)
 
-    def _munch_watch_event(self, watch_event):
+    def _munch(self, watch_event):
         return Munch.fromDict(watch_event)

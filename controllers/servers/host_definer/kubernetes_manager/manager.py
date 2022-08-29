@@ -211,7 +211,7 @@ class KubernetesManager():
 
         return status
 
-    def _generate_k8s_event_for_host_definition(self, host_definition_info, message, action, message_type):
+    def _generate_k8s_event(self, host_definition_info, message, action, message_type):
         return client.CoreV1Event(
             metadata=client.V1ObjectMeta(generate_name='{}.'.format(host_definition_info.name),),
             reporting_component=settings.HOST_DEFINER, reporting_instance=settings.HOST_DEFINER, action=action,
