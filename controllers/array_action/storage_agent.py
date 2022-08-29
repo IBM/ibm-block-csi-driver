@@ -29,14 +29,29 @@ array_type_to_mediator = {
     DS8KArrayMediator.array_type: DS8KArrayMediator,
 }
 
+array_type_cache = {}
+
+
+def _get_array_type_from_cache(endpoints):
+    for endpoint in endpoints:
+        storage_type = array_type_cache.get(endpoint)
+        if storage_type:
+            logger.debug(
+                "found in cache, for endpoint : {}, storage array type is : {}".format(endpoint, storage_type))
+            return storage_type
+    return None
+
 
 def detect_array_type(endpoints):
     logger.debug("detecting array connection type")
-
+    storage_type = _get_array_type_from_cache(endpoints)
+    if storage_type:
+        return storage_type
     for storage_type, port in array_type_to_port.items():
         for endpoint in endpoints:
             if _socket_connect_test(endpoint, port) == 0:
                 logger.debug("storage array type is : {0}".format(storage_type))
+                array_type_cache[endpoint] = storage_type
                 return storage_type
 
     raise FailedToFindStorageSystemType(endpoints)
