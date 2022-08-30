@@ -5,6 +5,7 @@ from mock import Mock, patch, MagicMock
 from controllers.array_action.array_action_types import Host
 from controllers.array_action.errors import HostNotFoundError, HostAlreadyExists
 from controllers.common.node_info import Initiators
+from controllers.servers.utils import get_array_connection_info_from_secrets
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
 from controllers.tests.common.test_settings import HOST_NAME, SECRET
 from controllers.tests.controller_server.common import mock_get_agent
@@ -26,14 +27,14 @@ class BaseSetUp(unittest.TestCase):
         self.storage_agent = MagicMock()
         mock_get_agent(self, HOST_DEFINER_SERVER_PATH)
 
-        self.request = Mock(spec_set=['prefix', 'connectivity_type', 'node_id', 'system_info'])
+        self.request = Mock(spec_set=['prefix', 'connectivity_type', 'node_id', 'array_connection_info'])
 
         self.iqn = 'iqn.1994-05.com.redhat:686358c930fe'
         self.nqn = 'nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1'
         self.request.prefix = None
         self.request.connectivity_type = 'fc'
         self.request.node_id = '{};;;{}'.format(HOST_NAME, self.iqn)
-        self.request.system_info = SECRET
+        self.request.array_connection_info = get_array_connection_info_from_secrets(SECRET)
 
 
 class TestDefineHost(BaseSetUp):
