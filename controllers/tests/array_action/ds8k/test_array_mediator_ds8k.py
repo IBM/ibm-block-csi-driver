@@ -20,7 +20,7 @@ from controllers.common.settings import SPACE_EFFICIENCY_THIN, SPACE_EFFICIENCY_
 class TestArrayMediatorDS8K(unittest.TestCase):
 
     def setUp(self):
-        self.endpoint = ["1.2.3.4"]
+        self.endpoint = [common_settings.SECRET_MANAGEMENT_ADDRESS_VALUE]
         self.client_mock = NonCallableMagicMock()
         patcher = patch("controllers.array_action.array_mediator_ds8k.RESTClient")
         self.connect_mock = patcher.start()
@@ -324,17 +324,17 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         ]
 
     def test_get_volume_mappings_found_nothing(self):
-        volume_id = ds8k_settings.DUMMY_VOLUME_ID1
-        scsi_id = ds8k_settings.DUMMY_ABSTRACT_VOLUME_UID.format(volume_id)
+        scsi_id = ds8k_settings.DUMMY_ABSTRACT_VOLUME_UID.format(ds8k_settings.DUMMY_VOLUME_ID1)
         self.client_mock.get_hosts.return_value = self._mock_get_hosts_response()
         self.assertDictEqual(self.array.get_volume_mappings(scsi_id), {})
 
     def test_get_volume_mappings(self):
-        volume_id = ds8k_settings.DUMMY_VOLUME_ID1
-        lunid = array_settings.DUMMY_LUN_ID
-        scsi_id = ds8k_settings.DUMMY_ABSTRACT_VOLUME_UID.format(volume_id)
-        self.client_mock.get_hosts.return_value = self._mock_get_hosts_response(volume_id=volume_id, lun_id=lunid)
-        self.assertDictEqual(self.array.get_volume_mappings(scsi_id), {common_settings.HOST_NAME: int(lunid)})
+        scsi_id = ds8k_settings.DUMMY_ABSTRACT_VOLUME_UID.format(ds8k_settings.DUMMY_VOLUME_ID1)
+        self.client_mock.get_hosts.return_value =\
+            self._mock_get_hosts_response(volume_id=ds8k_settings.DUMMY_VOLUME_ID1,
+                                          lun_id=array_settings.DUMMY_LUN_ID)
+        self.assertDictEqual(self.array.get_volume_mappings(scsi_id),
+                             {common_settings.HOST_NAME: int(array_settings.DUMMY_LUN_ID)})
 
     def test_map_volume_host_not_found(self):
         self.client_mock.map_volume_to_host.side_effect = NotFound("404")
@@ -362,13 +362,12 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_map_volume(self):
         scsi_id = ds8k_settings.DUMMY_VOLUME_UID
-        host_name = common_settings.VOLUME_NAME
         connectivity_type = array_settings.DUMMY_CONNECTIVITY_TYPE
         self.client_mock.map_volume_to_host.return_value = Munch({
             ds8k_settings.GET_HOSTS_LUN_ID_ATTR_KEY: array_settings.DUMMY_LUN_ID})
-        lun = self.array.map_volume(scsi_id, host_name, connectivity_type)
+        lun = self.array.map_volume(scsi_id, common_settings.VOLUME_NAME, connectivity_type)
         self.assertEqual(5, lun)
-        self.client_mock.map_volume_to_host.assert_called_once_with(host_name, scsi_id[-4:])
+        self.client_mock.map_volume_to_host.assert_called_once_with(common_settings.VOLUME_NAME, scsi_id[-4:])
 
     def test_unmap_volume_host_not_found(self):
         self.client_mock.get_host_mappings.side_effect = NotFound("404", message="BE7A0016")
@@ -386,34 +385,28 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             self.array.unmap_volume(common_settings.VOLUME_NAME, common_settings.HOST_NAME)
 
     def test_unmap_volume_fail_with_client_exception(self):
-        volume_id = ds8k_settings.DUMMY_VOLUME_ID1
-        lunid = array_settings.DUMMY_LUN_ID
-        host_name = common_settings.HOST_NAME
-        scsi_id = ds8k_settings.DUMMY_ABSTRACT_VOLUME_UID.format(volume_id)
+        scsi_id = ds8k_settings.DUMMY_ABSTRACT_VOLUME_UID.format(ds8k_settings.DUMMY_VOLUME_ID1)
         self.client_mock.get_host_mappings.return_value = [
             Munch({
-                ds8k_settings.GET_HOST_MAPPINGS_VOLUME_ATTR_KEY: volume_id,
-                ds8k_settings.GET_HOST_MAPPINGS_ID_ATTR_KEY: lunid
+                ds8k_settings.GET_HOST_MAPPINGS_VOLUME_ATTR_KEY: ds8k_settings.DUMMY_VOLUME_ID1,
+                ds8k_settings.GET_HOST_MAPPINGS_ID_ATTR_KEY: array_settings.DUMMY_LUN_ID
             })
         ]
         self.client_mock.unmap_volume_from_host.side_effect = ClientException("500")
         with self.assertRaises(array_errors.UnmappingError):
-            self.array.unmap_volume(scsi_id, host_name)
+            self.array.unmap_volume(scsi_id, common_settings.HOST_NAME)
 
     def test_unmap_volume(self):
-        volume_id = ds8k_settings.DUMMY_VOLUME_ID1
-        lunid = array_settings.DUMMY_LUN_ID
-        host_name = common_settings.HOST_NAME
-        scsi_id = ds8k_settings.DUMMY_ABSTRACT_VOLUME_UID.format(volume_id)
+        scsi_id = ds8k_settings.DUMMY_ABSTRACT_VOLUME_UID.format(ds8k_settings.DUMMY_VOLUME_ID1)
         self.client_mock.get_host_mappings.return_value = [
             Munch({
-                ds8k_settings.GET_HOST_MAPPINGS_VOLUME_ATTR_KEY: volume_id,
-                ds8k_settings.GET_HOST_MAPPINGS_ID_ATTR_KEY: lunid
+                ds8k_settings.GET_HOST_MAPPINGS_VOLUME_ATTR_KEY: ds8k_settings.DUMMY_VOLUME_ID1,
+                ds8k_settings.GET_HOST_MAPPINGS_ID_ATTR_KEY: array_settings.DUMMY_LUN_ID
             })
         ]
-        self.array.unmap_volume(scsi_id, host_name)
-        self.client_mock.unmap_volume_from_host.assert_called_once_with(host_name=host_name,
-                                                                        lunid=lunid)
+        self.array.unmap_volume(scsi_id, common_settings.HOST_NAME)
+        self.client_mock.unmap_volume_from_host.assert_called_once_with(host_name=common_settings.HOST_NAME,
+                                                                        lunid=array_settings.DUMMY_LUN_ID)
 
     def test_get_array_fc_wwns_fail_with_client_exception(self):
         self.client_mock.get_host.side_effect = ClientException("500")
@@ -446,20 +439,17 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             self.array.get_host_by_name(array_settings.DUMMY_HOST_NAME1)
 
     def test_get_host_by_identifiers(self):
-        wwpn1 = array_settings.DUMMY_FC_WWN1
-        wwpn2 = array_settings.DUMMY_FC_WWN2
         self.client_mock.get_hosts.return_value = self._mock_get_hosts_response()
         host, connectivity_type = self.array.get_host_by_host_identifiers(
-            Initiators([], [wwpn1, wwpn2], [])
+            Initiators([], [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2], [])
         )
         self.assertEqual(common_settings.HOST_NAME, host)
         self.assertEqual([array_settings.FC_CONNECTIVITY_TYPE], connectivity_type)
 
     def test_get_host_by_identifiers_partial_match(self):
-        wwpn1 = array_settings.DUMMY_FC_WWN1
         self.client_mock.get_hosts.return_value = self._mock_get_hosts_response()
         host, connectivity_type = self.array.get_host_by_host_identifiers(
-            Initiators([], [wwpn1, array_settings.DUMMY_FC_WWN3], [])
+            Initiators([], [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN3], [])
         )
         self.assertEqual(host, common_settings.HOST_NAME)
         self.assertEqual([array_settings.FC_CONNECTIVITY_TYPE], connectivity_type)
