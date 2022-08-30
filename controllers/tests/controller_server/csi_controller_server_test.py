@@ -9,6 +9,7 @@ from mock import patch, Mock, MagicMock, call
 import controllers.array_action.errors as array_errors
 import controllers.servers.errors as controller_errors
 import controllers.servers.settings as servers_settings
+import controllers.tests.common.test_settings as common_settings
 from controllers.array_action.array_action_types import Host, ObjectIds
 from controllers.array_action.array_mediator_xiv import XIVArrayMediator
 from controllers.servers.csi.csi_controller_server import CSIControllerServicer
@@ -38,8 +39,8 @@ class BaseControllerSetUp(unittest.TestCase):
     def setUp(self):
         patch("controllers.array_action.array_mediator_xiv.XIVArrayMediator._connect").start()
         mock_array_type(self, CONTROLLER_SERVER_PATH)
-        self.fqdn = "fqdn"
-        self.mediator = XIVArrayMediator(SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, self.fqdn)
+        self.endpoint = [common_settings.SECRET_MANAGEMENT_ADDRESS_VALUE]
+        self.mediator = XIVArrayMediator(SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, self.endpoint)
         self.mediator.client = Mock()
 
         self.storage_agent = MagicMock()
