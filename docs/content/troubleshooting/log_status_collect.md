@@ -76,7 +76,7 @@ To collect logs for all controller containers, use the following commands:
 #### Log collection for CSI operator logs
 To collect CSI operator logs, use the following commands:
 
-    operatorpod=`kubectl get pods --all-namespaces |grep ibm-block-csi-operator|awk '{print $2}'`
+    operatorpod=`kubectl get pods -n <namespace> -l app.kubernetes.io/instance=ibm-block-csi-operator --output=jsonpath='{.items..metadata.name}'`
     kubectl logs $operatorpod -n <namespace> > logs/operator.log
 
 #### Log collection when using host definer
