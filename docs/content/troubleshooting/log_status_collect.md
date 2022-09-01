@@ -82,7 +82,7 @@ To collect CSI operator logs, use the following commands:
 #### Log collection when using host definer
 When a host definer issue occurs, be sure to collect logs from the host definer pod where the error occurred.
 
-    hostdefinerpod=`kubectl get pods --all-namespaces |grep host-definer-|awk '{print $2}'`
+    hostdefinerpod=`kubectl get pods -n <namespace> -l app.kubernetes.io/component=hostdefiner --output=jsonpath='{.items..metadata.name}'`
     kubectl logs $hostdefinerpod -n <namespace> > logs/hostdefiner.log
 
 ### Collecting details of all CSI objects and components
