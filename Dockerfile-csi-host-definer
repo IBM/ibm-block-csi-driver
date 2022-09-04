@@ -1,5 +1,9 @@
 FROM registry.access.redhat.com/ubi8/python-38:1-75.1638364053 as builder
 
+USER root
+RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
+USER default
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN pip3 install --ignore-installed --default-timeout=100 --upgrade pip==21.2.4
 WORKDIR /tmp
 COPY controllers/servers/csi/requirements.txt ./csi_requirements.txt
@@ -15,7 +19,7 @@ RUN pip3 install .
 
 FROM registry.access.redhat.com/ubi8/python-38:1-100
 
-ARG VERSION=1.10.0
+ARG VERSION=1.11.0
 ARG BUILD_NUMBER=0
 
 ###Required Labels

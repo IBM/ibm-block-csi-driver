@@ -31,7 +31,7 @@ WORKDIR /usr/local/go/src/github.com/kubernetes-csi/csi-test
 ENV JUNIT_OUTPUT="/tmp/test_results/out_client.xml"
 ENV SECRET_FILE="/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_secrets"
 ENV PARAM_FILE="/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/${CSI_PARAMS}"
-ENV SNAPSHOT_PARAM_FILE="/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_snapshot_params"
+ENV SNAPSHOT_PARAM_FILE="/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/snapshot_params"
 ENV ENDPOINT="/tmp/k8s_dir/nodecsi"
 ENV ENDPOINT_CONTROLLER="/tmp/k8s_dir/f"
 ENV TESTS_TO_SKIP_FILE="/usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver/csi_tests_to_skip"

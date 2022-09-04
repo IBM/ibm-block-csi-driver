@@ -1,13 +1,13 @@
 import unittest
-from unittest.mock import Mock, patch
 
-from mock import MagicMock
+from mock import Mock, patch, MagicMock
 
 from controllers.array_action.array_action_types import Host
 from controllers.array_action.errors import HostNotFoundError, HostAlreadyExists
 from controllers.common.node_info import Initiators
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
-from controllers.tests.controller_server.test_settings import VOLUME_NAME, HOST_NAME
+from controllers.tests.common.test_settings import HOST_NAME, SECRET
+from controllers.tests.controller_server.common import mock_get_agent
 
 HOST_DEFINER_SERVER_PATH = "controllers.servers.host_definer.storage_manager.host_definer_server"
 
@@ -18,17 +18,13 @@ class BaseSetUp(unittest.TestCase):
 
         detect_array_type_path = '.'.join((HOST_DEFINER_SERVER_PATH, 'detect_array_type'))
         detect_array_type_patcher = patch(detect_array_type_path)
-        self.detect_array_type = detect_array_type_patcher.start()
+        detect_array_type_patcher.start()
         self.addCleanup(detect_array_type_patcher.stop)
 
         self.mediator = Mock()
 
         self.storage_agent = MagicMock()
-        self.storage_agent.get_mediator.return_value.__enter__.return_value = self.mediator
-        get_agent_path = '.'.join((HOST_DEFINER_SERVER_PATH, 'get_agent'))
-        get_agent_patcher = patch(get_agent_path, return_value=self.storage_agent)
-        self.detect_array_type = get_agent_patcher.start()
-        self.addCleanup(get_agent_patcher.stop)
+        mock_get_agent(self, HOST_DEFINER_SERVER_PATH)
 
         self.request = Mock(spec_set=['prefix', 'connectivity_type', 'node_id', 'system_info'])
 
@@ -37,14 +33,14 @@ class BaseSetUp(unittest.TestCase):
         self.request.prefix = None
         self.request.connectivity_type = 'fc'
         self.request.node_id = '{};;;{}'.format(HOST_NAME, self.iqn)
-        self.request.system_info = {'username': 'user', 'password': 'pass', 'management_address': 'mg111'}
+        self.request.system_info = SECRET
 
 
 class TestDefineHost(BaseSetUp):
 
     def _prepare_define_host(self, is_idempotency=False):
         if is_idempotency:
-            self.mediator.get_host_by_host_identifiers.return_value = (VOLUME_NAME, '')
+            self.mediator.get_host_by_host_identifiers.return_value = (HOST_NAME, '')
         else:
             self.mediator.get_host_by_host_identifiers.side_effect = HostNotFoundError('host_identifier')
 
@@ -96,7 +92,7 @@ class TestUndefineHost(BaseSetUp):
 
     def _prepare_undefine_host_success(self, is_found=True):
         if is_found:
-            self.mediator.get_host_by_host_identifiers.return_value = (VOLUME_NAME, '')
+            self.mediator.get_host_by_host_identifiers.return_value = (HOST_NAME, '')
         else:
             self.mediator.get_host_by_host_identifiers.side_effect = HostNotFoundError('error')
 
@@ -106,7 +102,7 @@ class TestUndefineHost(BaseSetUp):
 
     def test_undefine_host_success(self):
         self._prepare_undefine_host_success()
-        self.mediator.delete_host.assert_called_once_with(VOLUME_NAME)
+        self.mediator.delete_host.assert_called_once_with(HOST_NAME)
 
     def test_undefine_host_idempotency_success(self):
         self._prepare_undefine_host_success(is_found=False)
