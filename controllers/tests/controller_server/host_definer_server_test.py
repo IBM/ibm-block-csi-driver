@@ -7,7 +7,7 @@ from controllers.tests.utils import get_fake_array_connection_info
 from controllers.array_action.errors import HostNotFoundError, HostAlreadyExists
 from controllers.common.node_info import Initiators
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
-from controllers.tests.common.test_settings import HOST_NAME, SECRET
+from controllers.tests.common.test_settings import HOST_NAME
 from controllers.tests.controller_server.common import mock_get_agent
 
 HOST_DEFINER_SERVER_PATH = "controllers.servers.host_definer.storage_manager.host_definer_server"
