@@ -1,9 +1,9 @@
 from kubernetes import watch
 
-import controllers.servers.messages as messages
+import controllers.servers.host_definer.messages as messages
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher, SECRET_IDS
-from controllers.servers.host_definer.types import Secret
+from controllers.servers.host_definer.types import SecretInfo
 from controllers.servers.host_definer import settings
 
 logger = get_stdout_logger()
@@ -16,25 +16,28 @@ class SecretWatcher(Watcher):
             resource_version = self.core_api.list_secret_for_all_namespaces().metadata.resource_version
             stream = watch.Watch().stream(self.core_api.list_secret_for_all_namespaces,
                                           resource_version=resource_version, timeout_seconds=5)
-            for event in stream:
-                secret_event_obj = event[settings.OBJECT_KEY]
-                secret = Secret()
-                secret.name = secret_event_obj.metadata.name
-                secret.namespace = secret_event_obj.metadata.namespace
-                if self._is_secret_used_by_storage_class(secret):
-                    event_type = event[settings.TYPE_KEY]
-                    self._handle_storage_class_secret(secret, event_type)
+            for watch_event in stream:
+                watch_event = self._munch(watch_event)
+                secret_info = self._generate_secret_info(watch_event.object)
+                if self._is_secret_used_by_storage_class(secret_info):
+                    self._handle_storage_class_secret(secret_info, watch_event.type)
 
-    def _handle_storage_class_secret(self, secret, secret_event_type):
-        secret_id = self._generate_secret_id_from_secret_and_namespace(secret.name, secret.namespace)
-        if secret_event_type in (settings.ADDED_EVENT, settings.MODIFIED_EVENT) and \
+    def _generate_secret_info(self, k8s_secret):
+        secret_info = SecretInfo()
+        secret_info.name = k8s_secret.metadata.name
+        secret_info.namespace = k8s_secret.metadata.namespace
+        return secret_info
+
+    def _is_secret_used_by_storage_class(self, secret_info):
+        return self._generate_secret_id(secret_info.name, secret_info.namespace) in SECRET_IDS
+
+    def _handle_storage_class_secret(self, secret_info, watch_event_type):
+        secret_id = self._generate_secret_id(secret_info.name, secret_info.namespace)
+        if watch_event_type in (settings.ADDED_EVENT, settings.MODIFIED_EVENT) and \
                 SECRET_IDS[secret_id] > 0:
-            self._verify_host_defined_after_secret_event(secret)
+            self.define_host_after_watch_event(secret_info)
 
-    def _is_secret_used_by_storage_class(self, secret):
-        return self._generate_secret_id_from_secret_and_namespace(secret.name, secret.namespace) in SECRET_IDS
-
-    def _verify_host_defined_after_secret_event(self, secret):
-        logger.info(messages.SECRET_HAS_BEEN_MODIFIED.format(secret.name, secret.namespace))
-        host_definition = self._get_host_definition_from_secret(secret)
-        self._verify_nodes_defined(host_definition)
+    def define_host_after_watch_event(self, secret_info):
+        logger.info(messages.SECRET_HAS_BEEN_MODIFIED.format(secret_info.name, secret_info.namespace))
+        host_definition_info = self._get_host_definition_info_from_secret(secret_info)
+        self.define_nodes(host_definition_info)
