@@ -65,7 +65,8 @@ var (
 	TimeOutBlockDevCmd                      = 10 * 1000
 	TimeOutSgInqCmd                         = 3 * 1000
 	MultipathdWildcardsVolumeIdAndMpath     = []string{"%w", "%d"}
-	multipathdWildcardsMpathNameAndVolumeId = []string{"%n", "%w"}
+	MultipathdWildcardsMpathNameAndVolumeId = []string{"%n", "%w"}
+	multipathdWildcardsMpathAndVolumeId     = []string{"%d", "%w"}
 )
 
 const (
@@ -98,12 +99,18 @@ func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterfac
 func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(volumeUuid string, volumePath string) (bool, error) {
 	logger.Infof("IsVolumePathMatchesVolumeId: Searching matching volume id for volume path: [%s] ", volumePath)
 	volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeUuid)
-	mpathdOutput, err := r.Helper.GetMpathdOutputForVolume(volumeIdVariations)
+
+	mpathDeviceName, err := r.Helper.GetMpathDeviceName(volumePath)
 	if err != nil {
 		return false, err
 	}
 
-	mpathDeviceName, err := r.Helper.GetMpathDeviceName(volumePath)
+	multipathdCommandFormatArgs := multipathdWildcardsMpathAndVolumeId
+	if r.Helper.IsDmName(mpathDeviceName) {
+		multipathdCommandFormatArgs = MultipathdWildcardsMpathNameAndVolumeId
+	}
+
+	mpathdOutput, err := r.Helper.GetMpathdOutputForVolume(volumeIdVariations, multipathdCommandFormatArgs)
 	if err != nil {
 		return false, err
 	}
@@ -347,11 +354,12 @@ type OsDeviceConnectivityHelperInterface interface {
 	GetDmsPath(volumeIdVariations []string) (string, error)
 	GetWwnByScsiInq(dev string) (string, error)
 	ReloadMultipath() error
-	GetMpathdOutputForVolume(volumeIdVariations []string) (string, error)
+	GetMpathdOutputForVolume(volumeIdVariations []string, multipathdCommandFormatArgs []string) (string, error)
 	GetVolumeIdVariations(volumeUuid string) []string
 	GetMpathDeviceName(volumePath string) (string, error)
 	IsAnyVariationInMpathVolumeId(mpathVolumeId string, volumeIdVariations []string) bool
 	GetMpathVolumeId(mpathdOutput string, mpathDeviceName string) (string, error)
+	IsDmName(mpathDeviceName string) bool
 }
 
 type OsDeviceConnectivityHelperGeneric struct {
@@ -565,9 +573,10 @@ func (o OsDeviceConnectivityHelperGeneric) ReloadMultipath() error {
 	return nil
 }
 
-func (o OsDeviceConnectivityHelperGeneric) GetMpathdOutputForVolume(volumeIdVariations []string) (string, error) {
+func (o OsDeviceConnectivityHelperGeneric) GetMpathdOutputForVolume(volumeIdVariations []string,
+	multipathdCommandFormatArgs []string) (string, error) {
 	mpathdOutput, err := o.Helper.WaitForDmToExist(volumeIdVariations, WaitForMpathRetries,
-		WaitForMpathWaitIntervalSec, multipathdWildcardsMpathNameAndVolumeId)
+		WaitForMpathWaitIntervalSec, multipathdCommandFormatArgs)
 	if err != nil {
 		return "", err
 	}
@@ -607,6 +616,10 @@ func (o OsDeviceConnectivityHelperGeneric) IsAnyVariationInMpathVolumeId(mpathVo
 		}
 	}
 	return false
+}
+
+func (o OsDeviceConnectivityHelperGeneric) IsDmName(mpathDeviceName string) bool {
+	return strings.Contains(mpathDeviceName, "mpath")
 }
 
 //go:generate mockgen -destination=../../../mocks/mock_GetDmsPathHelperInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity GetDmsPathHelperInterface
