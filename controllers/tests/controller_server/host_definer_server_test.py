@@ -12,6 +12,7 @@ from controllers.tests.controller_server.common import mock_get_agent
 
 HOST_DEFINER_SERVER_PATH = "controllers.servers.host_definer.storage_manager.host_definer_server"
 
+
 class BaseSetUp(unittest.TestCase):
     def setUp(self):
         self.servicer = HostDefinerServicer()
