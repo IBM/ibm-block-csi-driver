@@ -61,7 +61,7 @@ Be sure to run the following steps and copy the output to an external file, when
 
 To collect logs for all CSI driver node pods, use the following commands:
 
-    nodepods=`kubectl get pods -l product=ibm-block-csi-driver -l app.kubernetes.io/component=csi-node --output=jsonpath={.items..metadata.name}`
+    nodepods=`kubectl get pods -l product=ibm-block-csi-driver -l app.kubernetes.io/component=csi-node --output=jsonpath={.items.metadata.name}`
     
     for pod in $nodepods;do for container in `kubectl get -n <namespace> pod $pod -o jsonpath='{.spec.containers[*].name}'`;do kubectl logs -n <namespace> $pod -c $container > logs/${pod}_${container}.log;done;done
 
