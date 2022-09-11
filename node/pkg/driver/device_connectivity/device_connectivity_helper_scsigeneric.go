@@ -71,7 +71,7 @@ var (
 
 const (
 	DevPath                     = "/dev"
-	devMapperPath               = "/dev/mapper"
+	DevMapperPath               = "/dev/mapper"
 	WaitForMpathRetries         = 5
 	WaitForMpathWaitIntervalSec = 1
 	FcHostSysfsPath             = "/sys/class/fc_remote_ports/rport-*/port_name"
@@ -105,8 +105,10 @@ func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(volum
 		return false, err
 	}
 
+	dmDirectory := DevPath
 	multipathdCommandFormatArgs := multipathdWildcardsMpathAndVolumeId
 	if r.Helper.IsDmName(mpathDeviceName) {
+		dmDirectory = DevMapperPath
 		multipathdCommandFormatArgs = MultipathdWildcardsMpathNameAndVolumeId
 	}
 
@@ -115,7 +117,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(volum
 		return false, err
 	}
 
-	mpathVolumeId, err := r.Helper.GetMpathVolumeId(mpathdOutput, mpathDeviceName)
+	mpathVolumeId, err := r.Helper.GetMpathVolumeId(mpathdOutput, mpathDeviceName, dmDirectory)
 	if err != nil {
 		return false, err
 	}
@@ -358,7 +360,7 @@ type OsDeviceConnectivityHelperInterface interface {
 	GetVolumeIdVariations(volumeUuid string) []string
 	GetMpathDeviceName(volumePath string) (string, error)
 	IsAnyVariationInMpathVolumeId(mpathVolumeId string, volumeIdVariations []string) bool
-	GetMpathVolumeId(mpathdOutput string, mpathDeviceName string) (string, error)
+	GetMpathVolumeId(mpathdOutput string, mpathDeviceName string, dmDirectory string) (string, error)
 	IsDmName(mpathDeviceName string) bool
 }
 
@@ -447,14 +449,14 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 
 }
 
-func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(
-	mpathdOutput string, mpathDeviceName string) (string, error) {
+func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(mpathdOutput string, mpathDeviceName string,
+	dmDirectory string) (string, error) {
 
 	mpathVolumeId, err := o.Helper.ExtractVolumeId(mpathDeviceName, mpathdOutput)
 	if err != nil {
 		return "", err
 	}
-	dmPath := filepath.Join(devMapperPath, filepath.Base(strings.TrimSpace(mpathDeviceName)))
+	dmPath := filepath.Join(dmDirectory, filepath.Base(strings.TrimSpace(mpathDeviceName)))
 
 	SgInqWwn, err := o.GetWwnByScsiInq(dmPath)
 	if err != nil {
