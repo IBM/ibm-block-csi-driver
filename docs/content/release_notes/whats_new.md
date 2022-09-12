@@ -40,4 +40,4 @@ For more information about using metrics in Kubenertes, see [Metrics in Kubernet
 
 ## Additional supported orchestration platforms for deployment
 
-This version adds support for orchestration platforms Kubernetes 1.24 and Red Hat® OpenShift 4.11, suitable for deployment of the CSI (Container Storage Interface) driver.
+This version adds support for orchestration platforms Kubernetes 1.24 and Red Hat® OpenShift® 4.11, suitable for deployment of the CSI (Container Storage Interface) driver.
