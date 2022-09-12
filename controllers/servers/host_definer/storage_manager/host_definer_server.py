@@ -3,7 +3,7 @@ from controllers.array_action.storage_agent import detect_array_type, get_agent
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.node_info import NodeIdInfo
 from controllers.servers.host_definer.types import DefineHostResponse
-from controllers.servers.utils import join_object_prefix_with_name, get_array_connection_info_from_secrets
+from controllers.servers.utils import join_object_prefix_with_name
 
 logger = get_stdout_logger()
 
@@ -17,7 +17,7 @@ class HostDefinerServicer:
         logger.debug("host name : {}".format(host_name))
 
         try:
-            array_connection_info = get_array_connection_info_from_secrets(request.system_info)
+            array_connection_info = request.array_connection_info
 
             array_type = detect_array_type(array_connection_info.array_addresses)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
@@ -41,7 +41,7 @@ class HostDefinerServicer:
         node_id_info = NodeIdInfo(request.node_id)
         initiators = node_id_info.initiators
         try:
-            array_connection_info = get_array_connection_info_from_secrets(request.system_info)
+            array_connection_info = request.array_connection_info
             array_type = detect_array_type(array_connection_info.array_addresses)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
 
