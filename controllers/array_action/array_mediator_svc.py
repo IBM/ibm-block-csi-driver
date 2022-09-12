@@ -8,13 +8,13 @@ from pysvc.unified.client import connect
 from pysvc.unified.response import CLIFailureError, SVCResponse
 from retry import retry
 
-import controllers.array_action.config as config
 import controllers.array_action.errors as array_errors
-import controllers.servers.config as controller_config
+import controllers.array_action.settings as array_settings
+import controllers.servers.settings as controller_settings
 from controllers.array_action.array_action_types import Volume, Snapshot, Replication, Host
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
-from controllers.common import settings
+from controllers.common import settings as common_settings
 from controllers.common.csi_logger import get_stdout_logger
 
 array_connections_dict = {}
@@ -48,8 +48,8 @@ HOST_ISCSI_NAME = 'iscsi_name'
 HOST_PORTSET_ID = 'portset_id'
 LIST_HOSTS_CMD_FORMAT = 'lshost {HOST_ID};echo;'
 HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
-DEFAULT_LIST_DELIMITER = ":"
-COMMA_LIST_DELIMITER = ","
+DEFAULT_PORTS_DELIMITER = ":"
+QUALIFIED_NAME_PORTS_DELIMITER = ","
 
 LUN_INTERVAL = 128
 
@@ -80,31 +80,31 @@ def is_warning_message(exception):
 def _get_space_efficiency_kwargs(space_efficiency):
     if space_efficiency:
         space_efficiency = space_efficiency.lower()
-        if space_efficiency == config.SPACE_EFFICIENCY_THIN:
+        if space_efficiency == common_settings.SPACE_EFFICIENCY_THIN:
             return {'thin': True}
-        if space_efficiency == config.SPACE_EFFICIENCY_COMPRESSED:
+        if space_efficiency == common_settings.SPACE_EFFICIENCY_COMPRESSED:
             return {'compressed': True}
-        if space_efficiency == config.SPACE_EFFICIENCY_DEDUPLICATED_THIN:
+        if space_efficiency == common_settings.SPACE_EFFICIENCY_DEDUPLICATED_THIN:
             return {'deduplicated': True, 'thin': True}
-        if space_efficiency in (config.SPACE_EFFICIENCY_DEDUPLICATED,
-                                config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED):
+        if space_efficiency in (common_settings.SPACE_EFFICIENCY_DEDUPLICATED,
+                                common_settings.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED):
             return {'deduplicated': True, 'compressed': True}
     return {}
 
 
 def _is_space_efficiency_matches_source(parameter_space_efficiency, array_space_efficiency):
-    return (not parameter_space_efficiency and array_space_efficiency == config.SPACE_EFFICIENCY_THICK) or \
+    return (not parameter_space_efficiency and array_space_efficiency == common_settings.SPACE_EFFICIENCY_THICK) or \
            (parameter_space_efficiency and parameter_space_efficiency == array_space_efficiency)
 
 
 def build_create_host_kwargs(host_name, connectivity_type, ports):
     cli_kwargs = {'name': host_name}
-    if connectivity_type == config.NVME_OVER_FC_CONNECTIVITY_TYPE:
-        cli_kwargs.update({'nqn': COMMA_LIST_DELIMITER.join(ports), 'protocol': 'nvme'})
-    elif connectivity_type == config.FC_CONNECTIVITY_TYPE:
-        cli_kwargs['fcwwpn'] = DEFAULT_LIST_DELIMITER.join(ports)
-    elif connectivity_type == config.ISCSI_CONNECTIVITY_TYPE:
-        cli_kwargs['iscsiname'] = COMMA_LIST_DELIMITER.join(ports)
+    if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
+        cli_kwargs.update({'nqn': QUALIFIED_NAME_PORTS_DELIMITER.join(ports), 'protocol': 'nvme'})
+    elif connectivity_type == array_settings.FC_CONNECTIVITY_TYPE:
+        cli_kwargs['fcwwpn'] = DEFAULT_PORTS_DELIMITER.join(ports)
+    elif connectivity_type == array_settings.ISCSI_CONNECTIVITY_TYPE:
+        cli_kwargs['iscsiname'] = QUALIFIED_NAME_PORTS_DELIMITER.join(ports)
     else:
         raise array_errors.UnsupportedConnectivityTypeError(connectivity_type)
     return cli_kwargs
@@ -134,7 +134,7 @@ def build_create_replication_kwargs(master_cli_volume_id, aux_cli_volume_id, oth
         'aux': aux_cli_volume_id,
         'cluster': other_system_id,
     }
-    if copy_type == config.REPLICATION_COPY_TYPE_ASYNC:
+    if copy_type == array_settings.REPLICATION_COPY_TYPE_ASYNC:
         cli_kwargs.update({'global': True})
     return cli_kwargs
 
@@ -156,18 +156,18 @@ def build_stop_replication_kwargs(rcrelationship_id, add_access):
 
 
 def _get_cli_volume_space_efficiency_aliases(cli_volume):
-    space_efficiency_aliases = {config.SPACE_EFFICIENCY_THICK, ''}
+    space_efficiency_aliases = {common_settings.SPACE_EFFICIENCY_THICK, ''}
     if cli_volume.se_copy == YES:
-        space_efficiency_aliases = {config.SPACE_EFFICIENCY_THIN}
+        space_efficiency_aliases = {common_settings.SPACE_EFFICIENCY_THIN}
     if cli_volume.compressed_copy == YES:
-        space_efficiency_aliases = {config.SPACE_EFFICIENCY_COMPRESSED}
+        space_efficiency_aliases = {common_settings.SPACE_EFFICIENCY_COMPRESSED}
     if hasattr(cli_volume, "deduplicated_copy"):
         if cli_volume.deduplicated_copy == YES:
             if cli_volume.se_copy == YES:
-                space_efficiency_aliases = {config.SPACE_EFFICIENCY_DEDUPLICATED_THIN}
+                space_efficiency_aliases = {common_settings.SPACE_EFFICIENCY_DEDUPLICATED_THIN}
             else:
-                space_efficiency_aliases = {config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED,
-                                            config.SPACE_EFFICIENCY_DEDUPLICATED}
+                space_efficiency_aliases = {common_settings.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED,
+                                            common_settings.SPACE_EFFICIENCY_DEDUPLICATED}
     return space_efficiency_aliases
 
 
@@ -180,7 +180,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     @ClassProperty
     def array_type(self):
-        return settings.ARRAY_TYPE_SVC
+        return common_settings.ARRAY_TYPE_SVC
 
     @ClassProperty
     def port(self):
@@ -424,11 +424,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.debug("validate_supported_space_efficiency for "
                      "space efficiency : {0}".format(space_efficiency))
         if (space_efficiency and space_efficiency.lower() not in
-                [config.SPACE_EFFICIENCY_THIN, config.SPACE_EFFICIENCY_THICK,
-                 config.SPACE_EFFICIENCY_COMPRESSED,
-                 config.SPACE_EFFICIENCY_DEDUPLICATED,
-                 config.SPACE_EFFICIENCY_DEDUPLICATED_THIN,
-                 config.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED]):
+                [common_settings.SPACE_EFFICIENCY_THIN, common_settings.SPACE_EFFICIENCY_THICK,
+                 common_settings.SPACE_EFFICIENCY_COMPRESSED,
+                 common_settings.SPACE_EFFICIENCY_DEDUPLICATED,
+                 common_settings.SPACE_EFFICIENCY_DEDUPLICATED_THIN,
+                 common_settings.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED]):
             logger.error("space efficiency value is not "
                          "supported {0}".format(space_efficiency))
             raise array_errors.SpaceEfficiencyNotSupported(
@@ -552,7 +552,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._rmsnapshot(cli_snapshot.snapshot_id)
 
     def _create_cli_volume_from_source(self, name, pool, io_group, volume_group, source_ids, source_type):
-        if source_type == controller_config.SNAPSHOT_TYPE_NAME:
+        if source_type == controller_settings.SNAPSHOT_TYPE_NAME:
             self._create_cli_volume_from_snapshot(name, pool, io_group, volume_group, source_ids.internal_id)
         else:
             self._create_cli_volume_from_volume(name, pool, io_group, volume_group, source_ids.internal_id)
@@ -607,7 +607,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return self._generate_snapshot_response_with_verification(target_cli_volume)
 
     def get_object_by_id(self, object_id, object_type, is_virt_snap_func=False):
-        if is_virt_snap_func and object_type == controller_config.SNAPSHOT_TYPE_NAME:
+        if is_virt_snap_func and object_type == controller_settings.SNAPSHOT_TYPE_NAME:
             cli_snapshot = self._get_cli_snapshot_by_id(object_id)
             if not cli_snapshot:
                 return None
@@ -618,7 +618,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         cli_volume = self._get_cli_volume_by_wwn(object_id)
         if not cli_volume:
             return None
-        if object_type is controller_config.SNAPSHOT_TYPE_NAME:
+        if object_type is controller_settings.SNAPSHOT_TYPE_NAME:
             return self._generate_snapshot_response_with_verification(cli_volume)
         cli_volume = self._get_cli_volume(cli_volume.name)
         return self._generate_volume_response(cli_volume)
@@ -846,19 +846,19 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             host_nqns = self._get_host_ports(host, HOST_NQN)
             if initiators.is_array_nvme_nqn_match(host_nqns):
                 nvme_host = host.name
-                connectivity_types.add(config.NVME_OVER_FC_CONNECTIVITY_TYPE)
+                connectivity_types.add(array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
                 logger.debug("found nvme nqn in list : {0} for host : "
                              "{1}".format(initiators.nvme_nqns, nvme_host))
             host_wwns = self._get_host_ports(host, HOST_WWPN)
             if initiators.is_array_wwns_match(host_wwns):
                 fc_host = host.name
-                connectivity_types.add(config.FC_CONNECTIVITY_TYPE)
+                connectivity_types.add(array_settings.FC_CONNECTIVITY_TYPE)
                 logger.debug("found fc wwns in list : {0} for host : "
                              "{1}".format(initiators.fc_wwns, fc_host))
             host_iqns = self._get_host_ports(host, HOST_ISCSI_NAME)
             if initiators.is_array_iscsi_iqns_match(host_iqns):
                 iscsi_host = host.name
-                connectivity_types.add(config.ISCSI_CONNECTIVITY_TYPE)
+                connectivity_types.add(array_settings.ISCSI_CONNECTIVITY_TYPE)
                 logger.debug("found iscsi iqn in list : {0} for host : "
                              "{1}".format(initiators.iscsi_iqns, iscsi_host))
         if not connectivity_types:
@@ -914,21 +914,21 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         host_names = set()
         connectivity_types = set()
         for connectivity_type, initiator in initiators:
-            if connectivity_type == config.NVME_OVER_FC_CONNECTIVITY_TYPE:
+            if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
                 nvme_host_names = self._get_host_names_by_nqn(initiator)
                 if nvme_host_names:
                     host_names.update(nvme_host_names)
-                    connectivity_types.add(config.NVME_OVER_FC_CONNECTIVITY_TYPE)
-            elif connectivity_type == config.FC_CONNECTIVITY_TYPE:
+                    connectivity_types.add(array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+            elif connectivity_type == array_settings.FC_CONNECTIVITY_TYPE:
                 fc_host_names = self._get_host_names_by_wwpn(initiator)
                 if fc_host_names:
                     host_names.update(fc_host_names)
-                    connectivity_types.add(config.FC_CONNECTIVITY_TYPE)
-            elif connectivity_type == config.ISCSI_CONNECTIVITY_TYPE:
+                    connectivity_types.add(array_settings.FC_CONNECTIVITY_TYPE)
+            elif connectivity_type == array_settings.ISCSI_CONNECTIVITY_TYPE:
                 iscsi_host_name = self._get_host_name_by_iqn(initiator)
                 if iscsi_host_name:
                     host_names.add(iscsi_host_name)
-                    connectivity_types.add(config.ISCSI_CONNECTIVITY_TYPE)
+                    connectivity_types.add(array_settings.ISCSI_CONNECTIVITY_TYPE)
         return host_names, connectivity_types
 
     def get_host_by_host_identifiers(self, initiators):
@@ -973,11 +973,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         iscsi_iqns = self._get_host_ports(cli_host, HOST_ISCSI_NAME)
         connectivity_types = []
         if nvme_nqns:
-            connectivity_types.append(config.NVME_OVER_FC_CONNECTIVITY_TYPE)
+            connectivity_types.append(array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
         if fc_wwns:
-            connectivity_types.append(config.FC_CONNECTIVITY_TYPE)
+            connectivity_types.append(array_settings.FC_CONNECTIVITY_TYPE)
         if iscsi_iqns:
-            connectivity_types.append(config.ISCSI_CONNECTIVITY_TYPE)
+            connectivity_types.append(array_settings.ISCSI_CONNECTIVITY_TYPE)
         return Host(name=cli_host.name, connectivity_types=connectivity_types, nvme_nqns=nvme_nqns,
                     fc_wwns=fc_wwns, iscsi_iqns=iscsi_iqns)
 
@@ -1047,7 +1047,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         }
         lun = ""
         try:
-            if connectivity_type != config.NVME_OVER_FC_CONNECTIVITY_TYPE:
+            if connectivity_type != array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
                 lun = self._get_free_lun(host_name)
                 cli_kwargs.update({'scsi': lun})
             self.client.svctask.mkvdiskhostmap(**cli_kwargs)
@@ -1215,8 +1215,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     @staticmethod
     def _get_replication_copy_type(rcrelationship):
         if rcrelationship.copy_type == 'global':
-            return config.REPLICATION_COPY_TYPE_ASYNC
-        return config.REPLICATION_COPY_TYPE_SYNC
+            return array_settings.REPLICATION_COPY_TYPE_ASYNC
+        return array_settings.REPLICATION_COPY_TYPE_SYNC
 
     def _generate_replication_response(self, rcrelationship, volume_internal_id, other_volume_internal_id):
         copy_type = self._get_replication_copy_type(rcrelationship)
@@ -1543,22 +1543,38 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             self.client.svctask.mkhost(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during host {} creation : {}".format(host_name, ex.my_message))
             if OBJ_ALREADY_EXIST in ex.my_message:
                 raise array_errors.HostAlreadyExists(host_name, self.endpoint)
             raise ex
 
     def _get_connectivity_type_by_initiators(self, initiators):
         if initiators.nvme_nqns:
-            return config.NVME_OVER_FC_CONNECTIVITY_TYPE
+            return array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE
         if initiators.fc_wwns:
-            return config.FC_CONNECTIVITY_TYPE
-        return config.ISCSI_CONNECTIVITY_TYPE
+            return array_settings.FC_CONNECTIVITY_TYPE
+        if initiators.iscsi_iqns:
+            return array_settings.ISCSI_CONNECTIVITY_TYPE
+        return None
 
     def create_host(self, host_name, initiators, connectivity_type):
         if not connectivity_type:
             connectivity_type = self._get_connectivity_type_by_initiators(initiators)
         ports = initiators.get_by_connectivity_type(connectivity_type)
-        self._mkhost(host_name, connectivity_type, ports)
+        if ports:
+            self._mkhost(host_name, connectivity_type, ports)
+            return
+        raise array_errors.NoPortFoundByConnectivityType(initiators, connectivity_type)
+
+    def _rmhost(self, host_name):
+        try:
+            self.client.svctask.rmhost(object_id=host_name)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during host {} deletion : {}".format(host_name, ex.my_message))
+                return
+            raise ex
 
     def delete_host(self, host_name):
-        self.client.svctask.rmhost(object_id=host_name)
+        self._rmhost(host_name)
