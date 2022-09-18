@@ -9,8 +9,7 @@ from mock import patch, Mock, MagicMock, call
 import controllers.array_action.errors as array_errors
 import controllers.servers.errors as controller_errors
 import controllers.servers.settings as servers_settings
-import controllers.tests.common.test_settings as common_settings
-from controllers.array_action.array_action_types import Host, ObjectIds
+from controllers.array_action.array_action_types import ObjectIds
 from controllers.array_action.array_mediator_xiv import XIVArrayMediator
 from controllers.servers.csi.csi_controller_server import CSIControllerServicer
 from controllers.servers.csi.sync_lock import SyncLock
@@ -28,7 +27,7 @@ from controllers.tests.common.test_settings import (CLONE_VOLUME_NAME,
                                                     NAME_PREFIX, INTERNAL_SNAPSHOT_ID, SOURCE_VOLUME_ID,
                                                     SECRET_MANAGEMENT_ADDRESS_KEY, SECRET_PASSWORD_KEY,
                                                     SECRET_USERNAME_KEY, SECRET)
-from controllers.tests.controller_server.common import mock_get_agent, mock_array_type
+from controllers.tests.controller_server.common import mock_get_agent, mock_array_type, mock_mediator
 from controllers.tests.utils import ProtoBufMock
 
 CONTROLLER_SERVER_PATH = "controllers.servers.csi.csi_controller_server"
@@ -37,16 +36,14 @@ CONTROLLER_SERVER_PATH = "controllers.servers.csi.csi_controller_server"
 class BaseControllerSetUp(unittest.TestCase):
 
     def setUp(self):
-        patch("controllers.array_action.array_mediator_xiv.XIVArrayMediator._connect").start()
+        self.servicer = CSIControllerServicer()
+
         mock_array_type(self, CONTROLLER_SERVER_PATH)
-        self.endpoint = [common_settings.SECRET_MANAGEMENT_ADDRESS_VALUE]
-        self.mediator = XIVArrayMediator(SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, self.endpoint)
-        self.mediator.client = Mock()
+
+        self.mediator = mock_mediator()
 
         self.storage_agent = MagicMock()
         mock_get_agent(self, CONTROLLER_SERVER_PATH)
-
-        self.servicer = CSIControllerServicer()
 
         self.request = ProtoBufMock()
         self.request.secrets = SECRET
@@ -57,8 +54,6 @@ class BaseControllerSetUp(unittest.TestCase):
         self.capacity_bytes = 10
         self.request.capacity_range = Mock()
         self.request.capacity_range.required_bytes = self.capacity_bytes
-        self.mediator.maximal_volume_size_in_bytes = 10
-        self.mediator.minimal_volume_size_in_bytes = 2
         self.context = utils.FakeContext()
 
 
@@ -153,6 +148,8 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
 
         self.mediator.get_snapshot = Mock()
         self.mediator.get_snapshot.return_value = None
+
+        self.mediator.create_snapshot = Mock()
 
         self.request.name = SNAPSHOT_NAME
         self.request.source_volume_id = "{}:{};{}".format("A9000", OBJECT_INTERNAL_ID, SNAPSHOT_VOLUME_UID)
@@ -282,9 +279,8 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
-    @patch("controllers.array_action.array_mediator_xiv.XIVArrayMediator.create_snapshot")
-    def create_snapshot_returns_error(self, create_snapshot, return_code, err):
-        create_snapshot.side_effect = [err]
+    def create_snapshot_returns_error(self, return_code, err):
+        self.mediator.create_snapshot.side_effect = [err]
         msg = str(err)
 
         self.servicer.CreateSnapshot(self.request, self.context)
@@ -412,9 +408,11 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
     def setUp(self):
         super().setUp()
 
+        self.mediator.create_volume = Mock()
         self.mediator.get_volume = Mock()
         self.mediator.get_volume.side_effect = array_errors.ObjectNotFoundError("vol")
         self.mediator.get_object_by_id = Mock()
+        self.mediator.copy_to_existing_volume_from_source = Mock()
 
         self.request.parameters = {servers_settings.PARAMETERS_POOL: DUMMY_POOL1,
                                    servers_settings.PARAMETERS_IO_GROUP: DUMMY_IO_GROUP,
@@ -563,9 +561,9 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
-    @patch("controllers.array_action.array_mediator_xiv.XIVArrayMediator.create_volume")
-    def create_volume_returns_error(self, create_volume, return_code, err):
-        create_volume.side_effect = [err]
+    def create_volume_returns_error(self, return_code, err):
+        self.mediator.create_volume = Mock()
+        self.mediator.create_volume.side_effect = [err]
 
         self.servicer.CreateVolume(self.request, self.context)
         msg = str(err)
@@ -764,8 +762,6 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.create_volume = Mock()
         self.mediator.create_volume.return_value = utils.get_mock_mediator_response_volume(10, VOLUME_NAME, VOLUME_UID,
                                                                                            "a9k")
-        self.mediator.get_object_by_id = Mock()
-        self.mediator.copy_to_existing_volume = Mock()
 
     def test_create_volume_from_snapshot_success(self):
         self._prepare_mocks_for_copy_from_source()
@@ -777,11 +773,10 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
                                                                                                 snapshot_id,
                                                                                                 VOLUME_NAME,
                                                                                                 "a9k")
+
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.copy_to_existing_volume.assert_called_once_with(VOLUME_UID, snapshot_id,
-                                                                      snapshot_capacity_bytes,
-                                                                      self.capacity_bytes)
+        self.mediator.copy_to_existing_volume_from_source.assert_called_once()
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, snapshot_id)
 
@@ -828,28 +823,22 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
     def test_create_volume_from_source_get_object_none(self):
         self._test_create_volume_from_snapshot_error(None,
-                                                     grpc.StatusCode.NOT_FOUND)
+                                                     grpc.StatusCode.NOT_FOUND,
+                                                     array_errors.ObjectNotFoundError(""))
 
     def _test_create_volume_from_snapshot_error(self, copy_exception, return_code,
                                                 get_exception=None):
         self._prepare_mocks_for_copy_from_source()
         source_id = SNAPSHOT_VOLUME_UID
-        target_volume_id = VOLUME_UID
         self.request.volume_content_source = self._get_source_snapshot(source_id)
         if not copy_exception:
-            self.mediator.get_object_by_id.side_effect = [get_exception]
+            self.mediator.copy_to_existing_volume_from_source.side_effect = [get_exception]
             self.storage_agent.get_mediator.return_value.__exit__.side_effect = [get_exception]
         else:
-            self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_snapshot(1000, SNAPSHOT_NAME,
-                                                                                                    target_volume_id,
-                                                                                                    VOLUME_NAME, "a9k")
-            self.mediator.copy_to_existing_volume.side_effect = [copy_exception]
-
+            self.mediator.copy_to_existing_volume_from_source.side_effect = [copy_exception]
             self.storage_agent.get_mediator.return_value.__exit__.side_effect = [copy_exception]
-        self.mediator.delete_volume = Mock()
 
         response = self.servicer.CreateVolume(self.request, self.context)
-        self.mediator.delete_volume.assert_called_with(target_volume_id)
         self.assertEqual(self.context.code, return_code)
         self.assertIsInstance(response, csi_pb2.CreateVolumeResponse)
 
@@ -863,9 +852,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
                                                                                               volume_id, "a9k")
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.copy_to_existing_volume.assert_called_once_with(VOLUME_UID, volume_id,
-                                                                      volume_capacity_bytes,
-                                                                      self.capacity_bytes)
+        self.mediator.copy_to_existing_volume_from_source.assert_called_once()
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, volume_id)
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
 
@@ -905,6 +892,7 @@ class TestDeleteVolume(BaseControllerSetUp, CommonControllerTest):
         super().setUp()
 
         self.mediator.get_volume = Mock()
+        self.mediator.delete_volume = Mock()
         self.mediator.is_volume_has_snapshots = Mock()
         self.mediator.is_volume_has_snapshots.return_value = False
 
@@ -932,9 +920,8 @@ class TestDeleteVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
         self.assertTrue("a_enter error" in self.context.details)
 
-    @patch("controllers.array_action.array_mediator_xiv.XIVArrayMediator.delete_volume")
-    def delete_volume_returns_error(self, delete_volume, error, return_code):
-        delete_volume.side_effect = [error]
+    def delete_volume_returns_error(self, error, return_code):
+        self.mediator.delete_volume.side_effect = [error]
 
         self.servicer.DeleteVolume(self.request, self.context)
 
@@ -989,24 +976,16 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         super().setUp()
 
         self.hostname = "hostname"
-        self.mediator.get_host_by_host_identifiers = Mock()
-        self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi"]
 
-        self.mediator.get_volume_mappings = Mock()
-        self.mediator.get_volume_mappings.return_value = {}
-
-        self.mediator.map_volume = Mock()
-        self.mediator.map_volume.return_value = 1
-
-        self.mediator.get_iscsi_targets_by_iqn = Mock()
-        self.mediator.get_iscsi_targets_by_iqn.return_value = {"iqn1": ["1.1.1.1", "2.2.2.2"], "iqn2": ["[::1]"]}
+        self.mediator.map_volume_by_initiators = Mock()
+        self.mediator.map_volume_by_initiators.return_value = "2", "iscsi", {"iqn1": ["1.1.1.1", "2.2.2.2"],
+                                                                             "iqn2": ["[::1]"]}
 
         arr_type = XIVArrayMediator.array_type
         self.request.volume_id = "{}:wwn1".format(arr_type)
         self.iqn = "iqn.1994-05.com.redhat:686358c930fe"
         self.fc_port = "500143802426baf4"
         self.request.node_id = "{};;{};{}".format(self.hostname, self.fc_port, self.iqn)
-        self.request.readonly = False
         self.request.readonly = False
 
         self.request.volume_capability = utils.get_mock_volume_capability()
@@ -1046,35 +1025,20 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
 
     def test_publish_volume_get_host_by_host_identifiers_exception(self):
-        self.mediator.get_host_by_host_identifiers = Mock()
-        self.mediator.get_host_by_host_identifiers.side_effect = [array_errors.MultipleHostsFoundError("", "")]
+        self.mediator.map_volume_by_initiators = Mock()
+        self.mediator.map_volume_by_initiators.side_effect = [array_errors.MultipleHostsFoundError("", "")]
 
         self.servicer.ControllerPublishVolume(self.request, self.context)
         self.assertTrue("Multiple hosts" in self.context.details)
         self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
 
-        self.mediator.get_host_by_host_identifiers.side_effect = [array_errors.HostNotFoundError("")]
+        self.mediator.map_volume_by_initiators.side_effect = [array_errors.HostNotFoundError("")]
 
         self.servicer.ControllerPublishVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
 
-    def test_publish_volume_get_volume_mappings_one_map_for_existing_host(self):
-        self.mediator.get_volume_mappings = Mock()
-        self.mediator.get_volume_mappings.return_value = {self.hostname: 2}
-        self.mediator.get_host_by_name = Mock()
-        self.mediator.get_host_by_name.return_value = Host(name=self.hostname, connectivity_types=['iscsi'],
-                                                           iscsi_iqns=[self.iqn])
-
-        response = self.servicer.ControllerPublishVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.OK)
-
-        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '2')
-        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "iscsi")
-
     def test_publish_volume_with_connectivity_type_fc(self):
-        self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi", "fc"]
-        self.mediator.get_array_fc_wwns = Mock()
-        self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
+        self.mediator.map_volume_by_initiators.return_value = "1", "fc", ["500143802426baf4"]
 
         response = self.servicer.ControllerPublishVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
@@ -1084,14 +1048,10 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(response.publish_context["PUBLISH_CONTEXT_ARRAY_FC_INITIATORS"], "500143802426baf4")
 
     def test_publish_volume_with_connectivity_type_iscsi(self):
-        self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi"]
-        self.mediator.get_array_fc_wwns = Mock()
-        self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
-
         response = self.servicer.ControllerPublishVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
-        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '1')
+        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '2')
         self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
                          "iscsi")
         self.assertEqual(response.publish_context["PUBLISH_CONTEXT_ARRAY_IQN"],
@@ -1100,151 +1060,51 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
                          "1.1.1.1,2.2.2.2")
         self.assertEqual(response.publish_context["iqn2"],
                          "[::1]")
-
-    def test_publish_volume_with_node_id_only_has_iqns(self):
-        self.request.node_id = "hostname;iqn.1994-05.com.redhat:686358c930fe;"
-        self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi"]
-
-        response = self.servicer.ControllerPublishVolume(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.OK)
-
-        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '1')
-        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
-                         "iscsi")
-        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_ARRAY_IQN"],
-                         "iqn1,iqn2")
-        self.assertEqual(response.publish_context["iqn1"],
-                         "1.1.1.1,2.2.2.2")
-        self.assertEqual(response.publish_context["iqn2"],
-                         "[::1]")
-
-    def test_publish_volume_with_node_id_only_has_wwns(self):
-        self.request.node_id = "hostname;;500143802426baf4"
-        self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["fc"]
-        self.mediator.get_array_fc_wwns = Mock()
-        self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
-        self.mediator.get_iscsi_targets_by_iqn.return_value = {}
-
-        response = self.servicer.ControllerPublishVolume(self.request, self.context)
-
-        self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '1')
-        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
-                         "fc")
-        self.assertEqual(
-            response.publish_context["PUBLISH_CONTEXT_ARRAY_FC_INITIATORS"],
-            "500143802426baf4")
-
-        self.request.node_id = "hostname;;500143802426baf4:500143806626bae2"
-        self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["fc"]
-        self.mediator.get_array_fc_wwns = Mock()
-        self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4",
-                                                        "500143806626bae2"]
-
-        response = self.servicer.ControllerPublishVolume(self.request, self.context)
-
-        self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '1')
-        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
-                         "fc")
-        self.assertEqual(
-            response.publish_context["PUBLISH_CONTEXT_ARRAY_FC_INITIATORS"],
-            "500143802426baf4,500143806626bae2")
-
-    def test_publish_volume_get_volume_mappings_one_map_for_other_host(self):
-        self.mediator.get_volume_mappings = Mock()
-        self.mediator.get_volume_mappings.return_value = {self.hostname: 3}
-        self.mediator.get_host_by_name = Mock()
-        self.mediator.get_host_by_name.return_value = Host(name=self.hostname, connectivity_types=['iscsi'],
-                                                           iscsi_iqns="other_iqn")
-
-        self.servicer.ControllerPublishVolume(self.request, self.context)
-
-        self.assertEqual(self.context.code, grpc.StatusCode.FAILED_PRECONDITION)
-        self.assertTrue("Volume is already mapped" in self.context.details)
 
     def test_publish_volume_get_volume_mappings_more_then_one_mapping(self):
-        self.mediator.get_volume_mappings = Mock()
-        self.mediator.get_volume_mappings.return_value = {"other-hostname": 3, self.hostname: 4}
-
+        self.mediator.map_volume_by_initiators.side_effect = [array_errors.VolumeAlreadyMappedToDifferentHostsError("")]
         self.servicer.ControllerPublishVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.FAILED_PRECONDITION)
         self.assertTrue("Volume is already mapped" in self.context.details)
 
     def test_publish_volume_map_volume_excpetions(self):
-        self.mediator.map_volume.side_effect = [array_errors.PermissionDeniedError("msg")]
+        self.mediator.map_volume_by_initiators.side_effect = [array_errors.PermissionDeniedError("msg")]
 
         self.servicer.ControllerPublishVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.PERMISSION_DENIED)
 
-        self.mediator.map_volume.side_effect = [array_errors.ObjectNotFoundError("volume")]
+        self.mediator.map_volume_by_initiators.side_effect = [array_errors.ObjectNotFoundError("volume")]
 
         self.servicer.ControllerPublishVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
 
-        self.mediator.map_volume.side_effect = [array_errors.HostNotFoundError("host")]
+        self.mediator.map_volume_by_initiators.side_effect = [array_errors.HostNotFoundError("host")]
 
         self.servicer.ControllerPublishVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
 
-        self.mediator.map_volume.side_effect = [array_errors.MappingError("", "", "")]
+        self.mediator.map_volume_by_initiators.side_effect = [array_errors.MappingError("", "", "")]
 
         self.servicer.ControllerPublishVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
 
-    @patch.object(XIVArrayMediator, "MAX_LUN_NUMBER", 3)
-    @patch.object(XIVArrayMediator, "MIN_LUN_NUMBER", 1)
     def test_publish_volume_map_volume_lun_already_in_use(self):
-        self.mediator.map_volume.side_effect = [array_errors.LunAlreadyInUseError("", ""), 2]
-
-        response = self.servicer.ControllerPublishVolume(self.request, self.context)
-
-        self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '2')
-        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "iscsi")
-
-        self.mediator.map_volume.side_effect = [
-            array_errors.LunAlreadyInUseError("", ""), 2]
-        self.mediator.get_host_by_host_identifiers = Mock()
-        self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["fc"]
-        self.mediator.get_array_fc_wwns = Mock()
-        self.mediator.get_array_fc_wwns.return_value = ["500143802426baf4"]
-
-        response = self.servicer.ControllerPublishVolume(self.request, self.context)
-
-        self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '2')
-        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"],
-                         "fc")
-
-        self.mediator.map_volume.side_effect = [array_errors.LunAlreadyInUseError("", ""),
-                                                array_errors.LunAlreadyInUseError("", ""), 2]
-
-        self.servicer.ControllerPublishVolume(self.request, self.context)
-
-        self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_LUN"], '2')
-        self.assertEqual(response.publish_context["PUBLISH_CONTEXT_CONNECTIVITY"], "fc")
-
-        max_lun_retries = self.mediator.max_lun_retries + 1
-        error_all_retries = [array_errors.LunAlreadyInUseError("", "")] * max_lun_retries
-        self.mediator.map_volume.side_effect = error_all_retries
+        self.mediator.map_volume_by_initiators.side_effect = [array_errors.NoAvailableLunError("")]
 
         self.servicer.ControllerPublishVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.RESOURCE_EXHAUSTED)
 
     def test_publish_volume_get_iscsi_targets_by_iqn_excpetions(self):
-        self.mediator.get_iscsi_targets_by_iqn.side_effect = [array_errors.NoIscsiTargetsFoundError("some_endpoint")]
+        self.mediator.map_volume_by_initiators.side_effect = [array_errors.NoIscsiTargetsFoundError("some_endpoint")]
 
         self.servicer.ControllerPublishVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
 
-    @patch("controllers.array_action.array_mediator_abstract.ArrayMediatorAbstract.map_volume_by_initiators")
-    def test_map_volume_by_initiators_exceptions(self, map_volume_by_initiators):
-        map_volume_by_initiators.side_effect = [
+    def test_map_volume_by_initiators_exceptions(self):
+        self.mediator.map_volume_by_initiators.side_effect = [
             array_errors.UnsupportedConnectivityTypeError("usb")]
 
         self.servicer.ControllerPublishVolume(self.request, self.context)
@@ -1266,11 +1126,8 @@ class TestUnpublishVolume(BaseControllerSetUp, CommonControllerTest):
         super().setUp()
         self.hostname = "hostname"
 
-        self.mediator.get_host_by_host_identifiers = Mock()
-        self.mediator.get_host_by_host_identifiers.return_value = self.hostname, ["iscsi"]
-
-        self.mediator.unmap_volume = Mock()
-        self.mediator.unmap_volume.return_value = None
+        self.mediator.unmap_volume_by_initiators = Mock()
+        self.mediator.unmap_volume_by_initiators.return_value = None
 
         arr_type = XIVArrayMediator.array_type
         self.request.volume_id = "{}:wwn1".format(arr_type)
@@ -1321,8 +1178,7 @@ class TestUnpublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
     def test_unpublish_volume_get_host_by_host_identifiers_multiple_hosts_found_error(self):
-        self.mediator.get_host_by_host_identifiers = Mock()
-        self.mediator.get_host_by_host_identifiers.side_effect = [array_errors.MultipleHostsFoundError("", "")]
+        self.mediator.unmap_volume_by_initiators.side_effect = [array_errors.MultipleHostsFoundError("", "")]
 
         self.servicer.ControllerUnpublishVolume(self.request, self.context)
         self.assertTrue("Multiple hosts" in self.context.details)
@@ -1335,31 +1191,31 @@ class TestUnpublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.servicer.ControllerUnpublishVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
-    def _test_unpublish_volume_unmap_volume_with_error(self, array_error, status_code):
-        self.mediator.unmap_volume.side_effect = [array_error]
+    def _test_unpublish_volume_unmap_volume_by_initiators_with_error(self, array_error, status_code):
+        self.mediator.unmap_volume_by_initiators.side_effect = [array_error]
 
         self.servicer.ControllerUnpublishVolume(self.request, self.context)
         self.assertEqual(self.context.code, status_code)
 
-    def test_unpublish_volume_unmap_volume_object_not_found_error(self):
-        self._test_unpublish_volume_unmap_volume_with_error(array_errors.ObjectNotFoundError("volume"),
-                                                            grpc.StatusCode.OK)
+    def test_unpublish_volume_unmap_volume_by_initiators_object_not_found_error(self):
+        self._test_unpublish_volume_unmap_volume_by_initiators_with_error(array_errors.ObjectNotFoundError("volume"),
+                                                                          grpc.StatusCode.OK)
 
-    def test_unpublish_volume_unmap_volume_volume_already_unmapped_error(self):
-        self._test_unpublish_volume_unmap_volume_with_error(array_errors.VolumeAlreadyUnmappedError(""),
-                                                            grpc.StatusCode.OK)
+    def test_unpublish_volume_unmap_volume_by_initiators_volume_already_unmapped_error(self):
+        self._test_unpublish_volume_unmap_volume_by_initiators_with_error(array_errors.VolumeAlreadyUnmappedError(""),
+                                                                          grpc.StatusCode.OK)
 
-    def test_unpublish_volume_unmap_volume_permission_denied_error(self):
-        self._test_unpublish_volume_unmap_volume_with_error(array_errors.PermissionDeniedError("msg"),
-                                                            grpc.StatusCode.PERMISSION_DENIED)
+    def test_unpublish_volume_unmap_volume_by_initiators_permission_denied_error(self):
+        self._test_unpublish_volume_unmap_volume_by_initiators_with_error(array_errors.PermissionDeniedError("msg"),
+                                                                          grpc.StatusCode.PERMISSION_DENIED)
 
-    def test_unpublish_volume_unmap_volume_host_not_found_error(self):
-        self._test_unpublish_volume_unmap_volume_with_error(array_errors.HostNotFoundError("host"),
-                                                            grpc.StatusCode.OK)
+    def test_unpublish_volume_unmap_volume_by_initiators_host_not_found_error(self):
+        self._test_unpublish_volume_unmap_volume_by_initiators_with_error(array_errors.HostNotFoundError("host"),
+                                                                          grpc.StatusCode.OK)
 
-    def test_unpublish_volume_unmap_volume_unmapping_error(self):
-        self._test_unpublish_volume_unmap_volume_with_error(array_errors.UnmappingError("", "", ""),
-                                                            grpc.StatusCode.INTERNAL)
+    def test_unpublish_volume_unmap_volume_by_initiators_unmapping_error(self):
+        self._test_unpublish_volume_unmap_volume_by_initiators_with_error(array_errors.UnmappingError("", "", ""),
+                                                                          grpc.StatusCode.INTERNAL)
 
 
 class TestGetCapabilities(BaseControllerSetUp):
@@ -1380,6 +1236,8 @@ class TestExpandVolume(BaseControllerSetUp, CommonControllerTest):
 
     def setUp(self):
         super().setUp()
+
+        self.mediator.expand_volume = Mock()
 
         self.request.parameters = {}
         self.volume_id = "vol-id"
@@ -1472,9 +1330,8 @@ class TestExpandVolume(BaseControllerSetUp, CommonControllerTest):
     def test_expand_volume_with_array_connection_exception(self):
         self._test_request_with_array_connection_exception()
 
-    @patch("controllers.array_action.array_mediator_xiv.XIVArrayMediator.expand_volume")
-    def _expand_volume_returns_error(self, expand_volume, return_code, err):
-        expand_volume.side_effect = [err]
+    def _expand_volume_returns_error(self, return_code, err):
+        self.mediator.expand_volume.side_effect = [err]
         msg = str(err)
 
         self.servicer.ControllerExpandVolume(self.request, self.context)
