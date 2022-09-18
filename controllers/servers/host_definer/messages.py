@@ -37,3 +37,5 @@ FAILED_TO_GET_SECRET_EVENT = 'Failed to get secret {} in namespace {}'
 HOST_DEFINITION_IS_NOT_PENDING = "Stopping verifying host definition {}, using exponential backoff,"\
     " because it is not in pending state"
 DELETE_HOST_DEFINITION = 'Deleting host definition {}'
+ADD_FINALIZER_TO_HOST_DEFINITION = 'Adding finalizer to host definition {}'
+REMOVE_FINALIZER_TO_HOST_DEFINITION = 'removing finalizer from host definition {}'
