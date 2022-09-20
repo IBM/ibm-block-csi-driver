@@ -6,4 +6,4 @@ IBM® block storage CSI driver 1.10.0 adds new support and enhancements.
     - Dynamic host definition
     - Volume group configuration
 - New kubelet volume metrics support
-- Additional orchestration platform support for OpenShift 4.11 and Kubernetes 1.24
+- Additional orchestration platform support for Red Hat OpenShift 4.11 and Kubernetes 1.24
