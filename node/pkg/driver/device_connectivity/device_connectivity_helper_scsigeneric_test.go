@@ -939,6 +939,7 @@ func TestIsVolumePathMatchesVolumeId(t *testing.T) {
 		mpathdOutputErr             error
 		mpathDeviceName             string
 		mpathDeviceNameErr          error
+		isDmName                    bool
 		volumeIdByVolumePath        string
 		matchingVolumeIdErr         error
 		isVolumePathMatchesVolumeId bool
@@ -947,8 +948,9 @@ func TestIsVolumePathMatchesVolumeId(t *testing.T) {
 			name:                        "success",
 			volumeUuid:                  "volumeUuid",
 			volumePath:                  "/path",
-			mpathdOutput:                "fakeMpathDevice 64905684095684",
 			mpathDeviceName:             "fakeMpathDevice",
+			isDmName:                    true,
+			mpathdOutput:                "fakeMpathDevice 64905684095684",
 			volumeIdByVolumePath:        volumeUuid,
 			isVolumePathMatchesVolumeId: true,
 		},
@@ -956,13 +958,14 @@ func TestIsVolumePathMatchesVolumeId(t *testing.T) {
 			name:            "fail when trying to get mpath output",
 			volumeUuid:      "volumeUuid",
 			volumePath:      "/path",
+			mpathDeviceName: "fakeMpathDevice",
+			isDmName:        true,
 			mpathdOutputErr: errors.New("failed in getting mpath output"),
 		},
 		{
 			name:                        "fail when trying to get mpath device name",
 			volumeUuid:                  "volumeUuid",
 			volumePath:                  "/path",
-			mpathdOutput:                "fakeMpathDevice 64905684095684",
 			mpathDeviceNameErr:          errors.New("failed in getting mpath device name"),
 			isVolumePathMatchesVolumeId: false,
 		},
@@ -970,8 +973,9 @@ func TestIsVolumePathMatchesVolumeId(t *testing.T) {
 			name:                        "fail when trying to match volume id to mpath name",
 			volumeUuid:                  "volumeUuid",
 			volumePath:                  "/path",
-			mpathdOutput:                "fakeMpathDevice 64905684095684",
 			mpathDeviceName:             "fakeMpathDevice",
+			isDmName:                    true,
+			mpathdOutput:                "fakeMpathDevice 64905684095684",
 			matchingVolumeIdErr:         errors.New("failed in matching volume id to mpath name"),
 			isVolumePathMatchesVolumeId: false,
 		},
@@ -988,13 +992,16 @@ func TestIsVolumePathMatchesVolumeId(t *testing.T) {
 			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fakeExecuter, mockOsDeviceConHelper, nil)
 
 			mockOsDeviceConHelper.EXPECT().GetVolumeIdVariations(tc.volumeUuid).Return(volumeIdVariations)
-			mockOsDeviceConHelper.EXPECT().GetMpathdOutputForVolume(volumeIdVariations).Return(tc.mpathdOutput, tc.mpathdOutputErr)
-			if tc.mpathdOutput != "" {
-				mockOsDeviceConHelper.EXPECT().GetMpathDeviceName(tc.volumePath).Return(tc.mpathDeviceName, tc.mpathDeviceNameErr)
-			}
+			mockOsDeviceConHelper.EXPECT().GetMpathDeviceName(tc.volumePath).Return(tc.mpathDeviceName, tc.mpathDeviceNameErr)
 			if tc.mpathDeviceName != "" {
+				mockOsDeviceConHelper.EXPECT().IsDmName(tc.mpathDeviceName).Return(tc.isDmName)
+				mockOsDeviceConHelper.EXPECT().GetMpathdOutputForVolume(volumeIdVariations,
+					device_connectivity.MultipathdWildcardsMpathNameAndVolumeId).Return(tc.mpathdOutput, tc.mpathdOutputErr)
+			}
+			if tc.mpathdOutput != "" {
 				mockOsDeviceConHelper.EXPECT().GetMpathVolumeId(
-					tc.mpathdOutput, tc.mpathDeviceName).Return(tc.volumeIdByVolumePath, tc.matchingVolumeIdErr)
+					tc.mpathdOutput, tc.mpathDeviceName, device_connectivity.DevMapperPath).Return(
+					tc.volumeIdByVolumePath, tc.matchingVolumeIdErr)
 			}
 			if tc.volumeIdByVolumePath != "" {
 				mockOsDeviceConHelper.EXPECT().IsAnyVariationInMpathVolumeId(tc.volumeIdByVolumePath, volumeIdVariations).Return(
