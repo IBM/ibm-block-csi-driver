@@ -3,7 +3,6 @@ import os
 import random
 import string
 from munch import Munch
-from queue import Empty
 
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.settings import (SECRET_ARRAY_PARAMETER,
@@ -28,7 +27,7 @@ class Watcher(KubernetesManager):
         super().__init__()
         self.storage_host_servicer = HostDefinerServicer()
 
-    def define_nodes(self, host_definition_info):
+    def _define_nodes(self, host_definition_info):
         for node_name, _ in NODES.items():
             host_definition_info = self._add_name_to_host_definition_info(node_name, host_definition_info)
             self._create_definition(host_definition_info)
@@ -63,7 +62,7 @@ class Watcher(KubernetesManager):
             host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
         if current_host_definition_info_on_cluster:
             host_definition_manifest[settings.METADATA][settings.NAME] = current_host_definition_info_on_cluster.name
-            self._patch_host_definition(host_definition_manifest)
+            _ = self._patch_host_definition(host_definition_manifest)
             return current_host_definition_info_on_cluster
         else:
             logger.info(messages.CREATING_NEW_HOST_DEFINITION.format(host_definition_info.name))
@@ -213,6 +212,8 @@ class Watcher(KubernetesManager):
             logger.error(common_messages.INVALID_SECRET_CONFIG_MESSAGE)
         except ValidationException as ex:
             logger.error(str(ex))
+        except TypeError as ex:
+            logger.error(str(ex))
         return None
 
     def _get_system_info(self, secret_data):
@@ -226,9 +227,22 @@ class Watcher(KubernetesManager):
         }
 
     def _decode_base64_to_string(self, content_with_base64):
+        if not self._is_base64(content_with_base64):
+            return content_with_base64
         base64_bytes = content_with_base64.encode('ascii')
         decoded_string_in_bytes = base64.b64decode(base64_bytes)
         return decoded_string_in_bytes.decode('ascii')
+
+    def _is_base64(self, content_with_base64):
+        try:
+            if isinstance(content_with_base64, str):
+                string_in_bytes = bytes(content_with_base64, 'ascii')
+            else:
+                raise TypeError(messages.INVALID_SECRET_CONTENT_TYPE.format(
+                    content_with_base64, type(content_with_base64)))
+            return base64.b64encode(base64.b64decode(string_in_bytes)) == string_in_bytes
+        except Exception:
+            return False
 
     def _add_name_to_host_definition_info(self, node_name, host_definition_info):
         host_definition_info.node_name = node_name
@@ -270,11 +284,11 @@ class Watcher(KubernetesManager):
 
     def _is_node_has_ibm_block_csi(self, node_name):
         csi_node_info = self._get_csi_node_info(node_name)
-        return csi_node_info.node_id is not None
+        return csi_node_info.node_id != ''
 
     def _is_node_has_host_definitions(self, node_name):
         host_definitions_info = self._get_all_node_host_definitions_info(node_name)
-        return host_definitions_info is not Empty
+        return host_definitions_info != []
 
     def _get_all_node_host_definitions_info(self, node_name):
         node_host_definitions_info = []
@@ -297,3 +311,6 @@ class Watcher(KubernetesManager):
 
     def _munch(self, watch_event):
         return Munch.fromDict(watch_event)
+
+    def _loop_forever(self):
+        return True

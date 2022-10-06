@@ -1,4 +1,3 @@
-from queue import Empty
 from kubernetes import watch
 
 from controllers.common.csi_logger import get_stdout_logger
@@ -30,8 +29,8 @@ class NodeWatcher(Watcher):
             self._is_node_has_host_definitions(csi_node_info.name) and not csi_node_info.node_id
 
     def watch_nodes_resources(self):
-        while True:
-            resource_version = self.core_api.list_node().metadata.resource_version
+        while self._loop_forever():
+            resource_version = self._get_k8s_object_resource_version(self.core_api.list_node())
             stream = watch.Watch().stream(self.core_api.list_node, resource_version=resource_version, timeout_seconds=5)
             for watch_event in stream:
                 watch_event = self._munch(watch_event)
@@ -61,5 +60,8 @@ class NodeWatcher(Watcher):
     def _is_node_has_new_manage_node_label(self, csi_node_info):
         return not self._is_dynamic_node_labeling_allowed() and \
             self._is_node_has_manage_node_label(csi_node_info.name) and \
-            csi_node_info.name not in NODES and csi_node_info.node_id and \
+            self._is_node_with_csi_ibm_csi_node_and_is_not_managed(csi_node_info)
+
+    def _is_node_with_csi_ibm_csi_node_and_is_not_managed(self, csi_node_info):
+        return csi_node_info.name not in NODES and csi_node_info.node_id and \
             csi_node_info.name in self.unmanaged_csi_nodes_with_driver

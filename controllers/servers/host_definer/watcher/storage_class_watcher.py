@@ -17,8 +17,8 @@ class StorageClassWatcher(Watcher):
             self._handle_added_watch_event(secrets_id, storage_class_info.name)
 
     def watch_storage_class_resources(self):
-        while True:
-            resource_version = self.storage_api.list_storage_class().metadata.resource_version
+        while self._loop_forever():
+            resource_version = self._get_k8s_object_resource_version(self.storage_api.list_storage_class())
             stream = watch.Watch().stream(self.storage_api.list_storage_class,
                                           resource_version=resource_version, timeout_seconds=5)
             for watch_event in stream:
@@ -61,16 +61,16 @@ class StorageClassWatcher(Watcher):
     def _handle_added_watch_event(self, secrets_id, storage_class_name):
         logger.info(messages.NEW_STORAGE_CLASS.format(storage_class_name))
         for secret_id in secrets_id:
-            self.define_nodes_when_new_secret(secret_id)
+            self._define_nodes_when_new_secret(secret_id)
             if secret_id:
                 self._add_secret_if_uniq_or_add_secret_counter(secret_id)
 
-    def define_nodes_when_new_secret(self, secret_id):
+    def _define_nodes_when_new_secret(self, secret_id):
         secret_info = self._generate_secret_info_from_id(secret_id)
         if secret_id not in SECRET_IDS:
-            self.define_nodes_from_secret_id(secret_info)
+            self._define_nodes_from_secret_id(secret_info)
         elif SECRET_IDS[secret_id] == 0:
-            self.define_nodes_from_secret_id(secret_info)
+            self._define_nodes_from_secret_id(secret_info)
 
     def _add_secret_if_uniq_or_add_secret_counter(self, secret_id):
         if secret_id in SECRET_IDS:
@@ -78,9 +78,9 @@ class StorageClassWatcher(Watcher):
         else:
             SECRET_IDS[secret_id] = 1
 
-    def define_nodes_from_secret_id(self, secret_info):
+    def _define_nodes_from_secret_id(self, secret_info):
         host_definition_info = self._get_host_definition_info_from_secret(secret_info)
-        self.define_nodes(host_definition_info)
+        self._define_nodes(host_definition_info)
 
     def _handle_deleted_watch_event(self, secrets_id):
         for secret_id in secrets_id:

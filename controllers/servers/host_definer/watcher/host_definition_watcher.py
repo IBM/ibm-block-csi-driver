@@ -13,28 +13,28 @@ logger = get_stdout_logger()
 class HostDefinitionWatcher(Watcher):
 
     def watch_host_definitions_resources(self):
-        while True:
-            resource_version = self.host_definitions_api.get().metadata.resourceVersion
+        while self._loop_forever():
+            resource_version = self._get_k8s_object_resource_version(self.host_definitions_api.get())
             stream = self.host_definitions_api.watch(resource_version=resource_version, timeout=5)
             for watch_event in stream:
                 watch_event = self._munch(watch_event)
                 host_definition_info = self._generate_host_definition_info(watch_event.object)
                 if self._is_host_definition_in_pending_phase(host_definition_info.phase) and \
                         watch_event.type != settings.DELETED_EVENT:
-                    self.define_host_definition_after_pending_state(host_definition_info)
+                    self._define_host_definition_after_pending_state(host_definition_info)
 
     def _is_host_definition_in_pending_phase(self, phase):
         return phase.startswith(settings.PENDING_PREFIX)
 
-    def define_host_definition_after_pending_state(self, host_definition_info):
-        remove_host_thread = Thread(target=self.define_host_using_exponential_backoff,
+    def _define_host_definition_after_pending_state(self, host_definition_info):
+        remove_host_thread = Thread(target=self._define_host_using_exponential_backoff,
                                     args=(host_definition_info, ))
         remove_host_thread.start()
 
-    def define_host_using_exponential_backoff(self, host_definition_info):
-        retries = 5
-        backoff_in_seconds = 3
-        delay_in_seconds = 3
+    def _define_host_using_exponential_backoff(self, host_definition_info):
+        retries = settings.HOST_DEFINITION_PENDING_RETRIES
+        backoff_in_seconds = settings.HOST_DEFINITION_PENDING_EXPONENTIAL_BACKOFF_IN_SECONDS
+        delay_in_seconds = settings.HOST_DEFINITION_PENDING_DELAY_IN_SECONDS
         while retries > 0:
             logger.info(messages.VERIFY_HOST_DEFINITION_USING_EXPONENTIAL_BACKOFF.format(
                 host_definition_info.name, retries))
