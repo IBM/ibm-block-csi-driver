@@ -14,6 +14,7 @@ import controllers.servers.settings as controller_settings
 from controllers.array_action.array_action_types import Volume, Snapshot, Replication, Host
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
+from controllers.array_action.volume_group_interface import VolumeGroupInterface
 from controllers.common import settings as common_settings
 from controllers.common.csi_logger import get_stdout_logger
 
@@ -171,7 +172,7 @@ def _get_cli_volume_space_efficiency_aliases(cli_volume):
     return space_efficiency_aliases
 
 
-class SVCArrayMediator(ArrayMediatorAbstract):
+class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
     MAX_LUN_NUMBER = 511
@@ -1578,3 +1579,18 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def delete_host(self, host_name):
         self._rmhost(host_name)
+
+    def create_volume_group(self, name, io_group):
+        pass
+
+    def get_volume_group(self, volume_group_id):
+        pass
+
+    def delete_volume_group(self, volume_group_id):
+        pass
+
+    def add_volume_to_volume_group(self, volume_group_id, volume_id):
+        pass
+
+    def remove_volume_from_volume_group(self, volume_group_id, volume_id):
+        pass
