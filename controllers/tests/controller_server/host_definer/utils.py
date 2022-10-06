@@ -1,8 +1,8 @@
 from threading import Thread, Event
 from dataclasses import dataclass, field
+import unittest
 from munch import Munch
 from mock import patch, Mock
-import unittest
 
 from controllers.servers.host_definer.types import CsiNodeInfo
 import controllers.servers.host_definer.messages as messages

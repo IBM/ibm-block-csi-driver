@@ -100,4 +100,5 @@ class TestWatchHostDefinitionsResources(BaseSetUp):
 
     def _default_pending_mocks(self):
         self.host_definition_watcher.core_api.read_namespaced_secret.return_value = self.fake_k8s_secret
-        self.host_definition_watcher.host_definitions_api.get.return_value = self.fake_pending_deletion_k8s_host_definitions
+        self.host_definition_watcher.host_definitions_api.get.return_value = \
+            self.fake_pending_deletion_k8s_host_definitions

@@ -1,6 +1,7 @@
 import unittest
 import logging
 from mock import patch
+from kubernetes.client.rest import ApiException
 
 from controllers.common.csi_logger import get_stdout_logger
 import controllers.tests.controller_server.host_definer.utils as utils
@@ -10,7 +11,6 @@ from controllers.servers.host_definer.watcher.node_watcher import NodeWatcher
 from controllers.servers.host_definer.watcher.secret_watcher import SecretWatcher
 from controllers.servers.host_definer.watcher.storage_class_watcher import StorageClassWatcher
 import controllers.tests.controller_server.host_definer.settings as settings
-from kubernetes.client.rest import ApiException
 
 
 class MockLogHandler(logging.Handler):
