@@ -1,26 +1,24 @@
 import unittest
 
-from mock import Mock, patch, MagicMock
+from mock import Mock, MagicMock
 
 from controllers.array_action.array_action_types import Host
-from controllers.tests.utils import get_fake_array_connection_info
 from controllers.array_action.errors import HostNotFoundError, HostAlreadyExists
 from controllers.common.node_info import Initiators
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
 from controllers.tests.common.test_settings import HOST_NAME
-from controllers.tests.controller_server.common import mock_get_agent
+from controllers.tests.controller_server.common import mock_get_agent, mock_array_type
+from controllers.tests.utils import get_fake_array_connection_info
 
 HOST_DEFINER_SERVER_PATH = "controllers.servers.host_definer.storage_manager.host_definer_server"
 
 
 class BaseSetUp(unittest.TestCase):
+
     def setUp(self):
         self.servicer = HostDefinerServicer()
 
-        detect_array_type_path = '.'.join((HOST_DEFINER_SERVER_PATH, 'detect_array_type'))
-        detect_array_type_patcher = patch(detect_array_type_path)
-        detect_array_type_patcher.start()
-        self.addCleanup(detect_array_type_patcher.stop)
+        mock_array_type(self, HOST_DEFINER_SERVER_PATH)
 
         self.mediator = Mock()
 

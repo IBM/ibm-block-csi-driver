@@ -61,7 +61,7 @@ Be sure to run the following steps and copy the output to an external file, when
 
 To collect logs for all CSI driver node pods, use the following commands:
 
-    nodepods=`kubectl get pods -l product=ibm-block-csi-driver -l app.kubernetes.io/component=csi-node --output=jsonpath={.items..metadata.name}`
+    nodepods=`kubectl get pods -l product=ibm-block-csi-driver -l app.kubernetes.io/component=csi-node --output=jsonpath={.items.metadata.name}`
     
     for pod in $nodepods;do for container in `kubectl get -n <namespace> pod $pod -o jsonpath='{.spec.containers[*].name}'`;do kubectl logs -n <namespace> $pod -c $container > logs/${pod}_${container}.log;done;done
 
@@ -76,9 +76,14 @@ To collect logs for all controller containers, use the following commands:
 #### Log collection for CSI operator logs
 To collect CSI operator logs, use the following commands:
 
-    operatorpod=`kubectl get pods --all-namespaces |grep ibm-block-csi-operator|awk '{print $2}'`
+    operatorpod=`kubectl get pods -n <namespace> -l app.kubernetes.io/instance=ibm-block-csi-operator --output=jsonpath='{.items..metadata.name}'`
     kubectl logs $operatorpod -n <namespace> > logs/operator.log
 
+#### Log collection when using host definer
+When a host definer issue occurs, be sure to collect logs from the host definer pod where the error occurred.
+
+    hostdefinerpod=`kubectl get pods -n <namespace> -l app.kubernetes.io/component=hostdefiner --output=jsonpath='{.items..metadata.name}'`
+    kubectl logs $hostdefinerpod -n <namespace> > logs/hostdefiner.log
 
 ### Collecting details of all CSI objects and components
     kubectl describe all -l product=ibm-block-csi-driver -n <namespace> > logs/describe_ibm-block-csi-driver.log
