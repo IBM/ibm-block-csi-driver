@@ -99,7 +99,7 @@ class KubernetesManager():
             k8s_csi_node = self.csi_nodes_api.get(name=node_name)
             return self._generate_csi_node_info(k8s_csi_node)
         except ApiException as ex:
-            if ex.status != 404:
+            if ex.status == 404:
                 logger.error(messages.CSI_NODE_DOES_NOT_EXIST.format(node_name))
             else:
                 logger.error(messages.FAILED_TO_GET_CSI_NODE.format(node_name, ex.body))

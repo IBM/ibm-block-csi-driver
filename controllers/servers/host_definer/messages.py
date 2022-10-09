@@ -8,8 +8,6 @@ FAILED_TO_GET_CSI_NODES = 'Failed to get csi nodes, got: {}'
 FAILED_TO_GET_CSI_NODE = 'Failed to get csi node {}, got: {}'
 FAILED_TO_GET_NODES = 'Failed to get nodes, got: {}'
 FAILED_TO_GET_STORAGE_CLASSES = 'Failed to get storage classes, got: {}'
-FAILED_TO_GET_HOST_DEFINITION = "Failed to get host definition for node {}," \
-    " with {} secret in {} namespace, go this error: {}"
 FAILED_TO_GET_LIST_OF_HOST_DEFINITIONS = 'Could not get list of hostDefinitions, got: {}'
 FAILED_TO_PATCH_HOST_DEFINITION = 'Failed to patch host definition {}, go this error: {}'
 FAILED_TO_CREATE_HOST_DEFINITION = 'Failed to create host definition {}, go this error: {}'

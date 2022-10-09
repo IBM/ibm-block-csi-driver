@@ -1,5 +1,7 @@
 from unittest.mock import Mock, patch
+from kubernetes.client.rest import ApiException
 
+import controllers.servers.host_definer.messages as messages
 import controllers.tests.controller_server.host_definer.utils as utils
 import controllers.tests.controller_server.host_definer.settings as settings
 from controllers.tests.controller_server.host_definer.common import BaseSetUp
@@ -29,12 +31,41 @@ class TestAddInitialNodes(BaseSetUp):
         self.node_watcher.add_initial_nodes()
         self.node_watcher.unmanaged_csi_nodes_with_driver.add.assert_called()
 
+    def test_fail_to_read_nodes(self):
+        self._default_node_mocks()
+        self.node_watcher.core_api.read_node.side_effect = self.fake_api_exception
+        self.node_watcher.add_initial_nodes()
+        self.assertIn(messages.FAILED_TO_GET_NODE.format(settings.FAKE_NODE_NAME, self.http_resp.data), self._mock_logger.records)
+
+    def test_fail_to_get_nodes(self):
+        self.node_watcher.core_api.list_node.side_effect = self.fake_api_exception
+        self.node_watcher.add_initial_nodes()
+        self.assertIn(messages.FAILED_TO_GET_NODES.format(self.http_resp.data), self._mock_logger.records)
+
+    def test_fail_to_get_csi_node_info(self):
+        self._mock_fail_to_get_csi_node_info(self.http_resp)
+        self.assertIn(messages.FAILED_TO_GET_CSI_NODE.format(settings.FAKE_NODE_NAME,
+                      self.http_resp.data), self._mock_logger.records)
+
+    def test_fail_to_get_csi_node_info_because_csi_node_does_not_exist(self):
+        http_resp = self.http_resp
+        http_resp.status = 404
+        self._mock_fail_to_get_csi_node_info(http_resp)
+        self.assertIn(messages.CSI_NODE_DOES_NOT_EXIST.format(settings.FAKE_NODE_NAME), self._mock_logger.records)
+
     def _default_node_mocks(self):
         self.node_watcher.core_api.list_node.return_value = self.fake_k8s_nodes
         self.node_watcher.csi_nodes_api.get.return_value = self.fake_k8s_csi_node_with_ibm_block
         self.node_watcher.core_api.read_node.return_value = self.fake_k8s_node_with_manage_node_label
         self.node_watcher.host_definitions_api.get.return_value = self.fake_ready_k8s_host_definitions
         self.mock_os.getenv.return_value = settings.TRUE_STRING
+
+    def _mock_fail_to_get_csi_node_info(self, http_resp):
+        self._default_node_mocks()
+        self.node_watcher.core_api.read_node.return_value = self.fake_k8s_node_with_fake_label
+        self.node_watcher.csi_nodes_api.get.side_effect = ApiException(http_resp=http_resp)
+        self.node_watcher.add_initial_nodes()
+        self.node_watcher.unmanaged_csi_nodes_with_driver.add.assert_not_called()
 
 
 class TestWatchNodesResources(BaseSetUp):

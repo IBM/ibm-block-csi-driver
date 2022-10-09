@@ -1,4 +1,5 @@
 from unittest.mock import Mock
+from kubernetes.client.rest import ApiException
 
 import controllers.tests.controller_server.host_definer.utils as utils
 import controllers.tests.controller_server.host_definer.settings as settings
@@ -28,7 +29,7 @@ class TestWatchHostDefinitionsResources(BaseSetUp):
         self._assert_remove_finalizer_succeded_log_message()
         self.assertIn(messages.DELETE_HOST_DEFINITION.format(
             settings.FAKE_NODE_NAME), self._mock_logger.records)
-        self.host_definition_watcher._remove_manage_node_label.assert_called_once()
+        self.host_definition_watcher._remove_manage_node_label.assert_called()
 
     def test_pending_deletion_that_host_deleted_on_storage_but_failed_to_delete_host_definition_in_cluster(self):
         self._default_pending_deletion()
@@ -42,11 +43,22 @@ class TestWatchHostDefinitionsResources(BaseSetUp):
             settings.FAKE_NODE_NAME), self._mock_logger.records)
 
     def test_pending_deletion_that_host_deleted_on_storage_but_failed_to_delete_finalizer(self):
-        self._default_pending_deletion()
-        self.host_definition_watcher.host_definitions_api.patch.side_effect = self.fake_api_exception
-        utils.run_function_with_timeout(self.host_definition_watcher.watch_host_definitions_resources, 1)
+        self._mock_fail_to_delete_finalizer(self.http_resp)
         self.assertIn(messages.FAILED_TO_PATCH_HOST_DEFINITION.format(
             settings.FAKE_NODE_NAME, self.http_resp.data), self._mock_logger.records)
+
+    def test_failed_to_delete_finalizer_because_host_definition_does_not_exist(self):
+        http_resp = self.http_resp
+        http_resp.status = 404
+        self._mock_fail_to_delete_finalizer(http_resp)
+        self.assertIn(messages.HOST_DEFINITION_DOES_NOT_EXIST.format(
+            settings.FAKE_NODE_NAME), self._mock_logger.records)
+
+    def _mock_fail_to_delete_finalizer(self, http_resp):
+        self._default_pending_deletion()
+        self.host_definition_watcher.host_definitions_api.patch.side_effect = ApiException(http_resp=http_resp)
+        utils.run_function_with_timeout(self.host_definition_watcher.watch_host_definitions_resources, 1)
+        self.assertIn(messages.PATCHING_HOST_DEFINITION.format(settings.FAKE_NODE_NAME), self._mock_logger.records)
         self._assert_fail_to_delete_host_definition_log_message(messages.FAILED_TO_REMOVE_FINALIZER)
 
     def _assert_fail_to_delete_host_definition_log_message(self, error_message):
@@ -75,13 +87,15 @@ class TestWatchHostDefinitionsResources(BaseSetUp):
         self.host_definition_watcher._handle_pending_host_definition = Mock()
         self._default_pending_creation()
         self.host_definition_watcher.host_definitions_api.get.return_value = self.fake_ready_k8s_host_definitions
+        utils.patch_pending_variables()
         utils.run_function_with_timeout(self.host_definition_watcher.watch_host_definitions_resources, 1)
-        self.host_definition_watcher._handle_pending_host_definition.assert_called_once()
+        self.assertIn(messages.HOST_DEFINITION_IS_NOT_PENDING.format(settings.FAKE_NODE_NAME),
+                      self._mock_logger.records)
 
     def test_pending_creation_that_managed_to_be_created(self):
         self._default_pending_creation()
         utils.run_function_with_timeout(self.host_definition_watcher.watch_host_definitions_resources, 1)
-        self.host_definition_watcher._set_host_definition_status_to_ready.assert_called_once()
+        self.host_definition_watcher._set_host_definition_status_to_ready.assert_called()
 
     def test_set_error_event_on_pending_creation(self):
         self._default_pending_creation()
