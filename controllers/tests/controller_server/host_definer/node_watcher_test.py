@@ -35,7 +35,8 @@ class TestAddInitialNodes(BaseSetUp):
         self._default_node_mocks()
         self.node_watcher.core_api.read_node.side_effect = self.fake_api_exception
         self.node_watcher.add_initial_nodes()
-        self.assertIn(messages.FAILED_TO_GET_NODE.format(settings.FAKE_NODE_NAME, self.http_resp.data), self._mock_logger.records)
+        self.assertIn(messages.FAILED_TO_GET_NODE.format(
+            settings.FAKE_NODE_NAME, self.http_resp.data), self._mock_logger.records)
 
     def test_fail_to_get_nodes(self):
         self.node_watcher.core_api.list_node.side_effect = self.fake_api_exception
