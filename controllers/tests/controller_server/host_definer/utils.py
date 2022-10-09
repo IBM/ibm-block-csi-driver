@@ -1,6 +1,6 @@
-from threading import Thread, Event
-from dataclasses import dataclass, field
 import unittest
+from dataclasses import dataclass, field
+import func_timeout
 from munch import Munch
 from mock import patch, Mock
 
@@ -278,13 +278,11 @@ def _mock_class_vars(class_type):
     return class_instance
 
 
-def run_function_with_timeout(function, timeout):
-    stop_event = Event()
-    function_thread = Thread(target=function)
-    function_thread.daemon = True
-    function_thread.start()
-    function_thread.join(timeout=timeout)
-    stop_event.set()
+def run_function_with_timeout(function, max_wait):
+    try:
+        func_timeout.func_timeout(max_wait, function)
+    except func_timeout.FunctionTimedOut:
+        pass
 
 
 def get_error_http_resp():
