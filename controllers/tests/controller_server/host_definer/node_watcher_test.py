@@ -2,7 +2,7 @@ from unittest.mock import Mock, patch
 from kubernetes.client.rest import ApiException
 
 import controllers.servers.host_definer.messages as messages
-import controllers.tests.controller_server.host_definer.utils as utils
+import controllers.tests.controller_server.host_definer.utils.utils as utils
 import controllers.tests.controller_server.host_definer.settings as settings
 from controllers.tests.controller_server.host_definer.common import BaseSetUp
 

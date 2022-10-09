@@ -4,7 +4,7 @@ from mock import patch
 from kubernetes.client.rest import ApiException
 
 from controllers.common.csi_logger import get_stdout_logger
-import controllers.tests.controller_server.host_definer.utils as utils
+import controllers.tests.controller_server.host_definer.utils.utils as utils
 from controllers.servers.host_definer.watcher.csi_node_watcher import CsiNodeWatcher
 from controllers.servers.host_definer.watcher.host_definition_watcher import HostDefinitionWatcher
 from controllers.servers.host_definer.watcher.node_watcher import NodeWatcher

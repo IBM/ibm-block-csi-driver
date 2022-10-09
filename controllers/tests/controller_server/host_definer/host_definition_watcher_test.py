@@ -1,7 +1,7 @@
 from unittest.mock import Mock
 from kubernetes.client.rest import ApiException
 
-import controllers.tests.controller_server.host_definer.utils as utils
+import controllers.tests.controller_server.host_definer.utils.utils as utils
 import controllers.tests.controller_server.host_definer.settings as settings
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer.types import DefineHostResponse
