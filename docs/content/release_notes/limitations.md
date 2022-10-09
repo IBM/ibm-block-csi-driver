@@ -4,7 +4,9 @@ As opposed to known issues, limitations are functionality restrictions that are 
 
 ## IBM® DS8000® usage limitations
 
-Connectivity limits on the storage side might be reached with DS8000 family products due to too many open connections. This occurs due to connection closing lag times from the storage side.
+When using the CSI driver with DS8000 family storage systems:
+- Connectivity limits on the storage side might be reached with DS8000 family products due to too many open connections. This occurs due to connection closing lag times from the storage side.
+- There is a limit of 11 FlashCopy relationships per volume (including all snapshots and clones).
 
 ## Dynamic host definition limitations
 
@@ -109,4 +111,5 @@ When a role switch is conducted, this is not reflected within the other orchestr
 The following limitations apply when using volume snapshots with the IBM block storage CSI driver:
 
 **Note:** This limitation is not relevant when using Snapshot function. For more information, see [Snapshot function limitations](#snapshot-function-limitations).
--   When using the CSI (Container Storage Interface) driver with IBM Spectrum® Virtualize family products, a snapshot can only be used to provision a new volume of equal size.
+-   When using the CSI driver with IBM Spectrum® Virtualize family products, a snapshot can only be used to provision a new volume of equal size.
+- When using the CSI driver with DS8000 family storage systems, a snapshot is limited to creating 11 volumes.
