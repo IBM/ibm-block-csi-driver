@@ -551,3 +551,15 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             object_id_info = utils.get_object_id_info(source_id, source_type)
             object_ids = object_id_info.ids
         return source_type, object_ids
+
+    @csi_method(error_response_type=csi_pb2.CreateVolumeGroupResponse, lock_request_attribute="name")
+    def CreateVolumeGroup(self, request, context):
+        raise NotImplementedError()
+
+    @csi_method(error_response_type=csi_pb2.DeleteVolumeGroupResponse, lock_request_attribute="volume_group_id")
+    def DeleteVolumeGroup(self, request, _):
+        raise NotImplementedError()
+
+    @csi_method(error_response_type=csi_pb2.ModifyVolumeGroupResponse, lock_request_attribute="volume_group_id")
+    def ModifyVolumeGroup(self, request, context):
+        raise NotImplementedError()
