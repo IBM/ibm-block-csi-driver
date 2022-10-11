@@ -1316,9 +1316,16 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             else:
                 logger.warning("failed to start rcrelationship '{}': {}".format(rcrelationship_id, ex))
 
+    def _is_earreplication_supported(self):
+        return hasattr(self.client.svctask, "chvolumereplicationinternals")
+
     def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
-        rc_id = self._create_rcrelationship(volume_internal_id, other_volume_internal_id, other_system_id, copy_type)
-        self._start_rcrelationship(rc_id)
+        if self._is_earreplication_supported():
+            logger.info("create replication: EAR feature is supported")
+        else:
+            logger.info("create replication: EAR feature is not supported")
+            rc_id = self._create_rcrelationship(volume_internal_id, other_volume_internal_id, other_system_id, copy_type)
+            self._start_rcrelationship(rc_id)
 
     def _stop_rcrelationship(self, rcrelationship_id, add_access_to_secondary=False):
         logger.info("stopping remote copy relationship with id: {}. access: {}".format(rcrelationship_id,
@@ -1347,12 +1354,16 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 logger.warning("failed to delete rcrelationship '{0}': {1}".format(rcrelationship_id, ex))
 
     def delete_replication(self, replication_name):
-        rcrelationship = self._get_rcrelationship_by_name(replication_name, not_exist_error=False)
-        if not rcrelationship:
-            logger.info("could not find replication with name {}".format(replication_name))
-            return
-        self._stop_rcrelationship(rcrelationship.id)
-        self._delete_rcrelationship(rcrelationship.id)
+        if self._is_earreplication_supported():
+            logger.warning("delete replication: EAR feature is supported")
+        else:
+            logger.info("delete replication: EAR feature is not supported")
+            rcrelationship = self._get_rcrelationship_by_name(replication_name, not_exist_error=False)
+            if not rcrelationship:
+                logger.info("could not find replication with name {}".format(replication_name))
+                return
+            self._stop_rcrelationship(rcrelationship.id)
+            self._delete_rcrelationship(rcrelationship.id)
 
     def _promote_replication_endpoint(self, endpoint_type, replication_name):
         logger.info("making '{}' primary for remote copy relationship {}".format(endpoint_type, replication_name))
