@@ -510,6 +510,10 @@ def get_snapshot_id_info(snapshot_id):
     return get_object_id_info(snapshot_id, servers_settings.SNAPSHOT_TYPE_NAME)
 
 
+def get_volume_group_id_info(volume_group_id):
+    return get_object_id_info(volume_group_id, servers_settings.VOLUME_GROUP_TYPE_NAME)
+
+
 def _get_context_from_volume(volume):
     return {servers_settings.VOLUME_CONTEXT_VOLUME_NAME: volume.name,
             servers_settings.VOLUME_CONTEXT_ARRAY_ADDRESS: ",".join(
@@ -662,3 +666,13 @@ def validate_parameters_match_source_volume(space_efficiency, required_bytes, vo
     if volume_capacity_bytes < required_bytes:
         raise ValidationException(messages.REQUIRED_BYTES_MISMATCH_MESSAGE.format(
             required_bytes, volume_capacity_bytes))
+
+
+def validate_delete_volume_group_request(request):
+    logger.debug("validating delete volume group request")
+
+    _validate_request_required_field(request.volume_group_id, "volume_group_id")
+
+    validate_secrets(request.secrets)
+
+    logger.debug("delete volume group validation finished")

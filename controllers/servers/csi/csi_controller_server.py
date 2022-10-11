@@ -592,7 +592,30 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     @csi_method(error_response_type=csi_pb2.DeleteVolumeGroupResponse, lock_request_attribute="volume_group_id")
     def DeleteVolumeGroup(self, request, _):
-        raise NotImplementedError()
+        secrets = request.secrets
+        utils.validate_delete_volume_group_request(request)
+
+        try:
+            volume_group_id_info = utils.get_volume_group_id_info(request.volume_group_id)
+        except ObjectIdError as ex:
+            logger.warning("volume group id is invalid. error : {}".format(ex))
+            return csi_pb2.DeleteVolumeGroupResponse()
+
+        array_type = volume_group_id_info.array_type
+        volume_group_id = volume_group_id_info.ids.uid
+        array_connection_info = utils.get_array_connection_info_from_secrets(secrets)
+
+        with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
+            logger.debug(array_mediator)
+
+            try:
+                logger.debug("Deleting volume group {}".format(volume_group_id))
+                array_mediator.delete_volume_group(volume_group_id)
+
+            except array_errors.ObjectNotFoundError as ex:
+                logger.debug("volume group was not found during deletion: {0}".format(ex))
+
+        return csi_pb2.DeleteVolumeGroupResponse()
 
     @csi_method(error_response_type=csi_pb2.ModifyVolumeGroupResponse, lock_request_attribute="volume_group_id")
     def ModifyVolumeGroup(self, request, context):

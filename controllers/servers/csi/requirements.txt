@@ -13,3 +13,4 @@ pyxcli==1.2.1
 pysvc==1.1.1
 # DS8K python client
 pyds8k==1.4.0
+# git+https://github.com/IBM/pyds8k.git@76b4390992e3dd2b53914a455476de0372cc7d32

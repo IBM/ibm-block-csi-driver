@@ -1,14 +1,15 @@
 #!/bin/bash -e
 set -x
 
-CSI_VERSION="v1.5.0"
+CSI_VERSION="volume_group"
 ADDONS_VERSION="v0.1.1"
 PB2_DIR="csi_general"
 
 mkdir -p ./proto/${PB2_DIR}
 cd ./proto/${PB2_DIR}
 
-curl -O https://raw.githubusercontent.com/container-storage-interface/spec/${CSI_VERSION}/csi.proto
+#curl -O https://raw.githubusercontent.com/container-storage-interface/spec/${CSI_VERSION}/csi.proto
+curl -O https://raw.githubusercontent.com/xing-yang/spec/${CSI_VERSION}/csi.proto
 curl -O https://raw.githubusercontent.com/csi-addons/spec/${ADDONS_VERSION}/replication.proto
 
 cd -
