@@ -483,9 +483,12 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                                            servers_settings.VOLUME_TYPE_NAME)
 
     def _get_snapshot_final_name(self, volume_parameters, name, array_mediator):
-        name = self._get_object_final_name(volume_parameters, name, array_mediator,
+        return self._get_object_final_name(volume_parameters, name, array_mediator,
                                            servers_settings.SNAPSHOT_TYPE_NAME)
-        return name
+
+    def _get_volume_group_final_name(self, volume_parameters, name, array_mediator):
+        return self._get_object_final_name(volume_parameters, name, array_mediator,
+                                           servers_settings.VOLUME_GROUP_TYPE_NAME)
 
     def _get_object_final_name(self, volume_parameters, name, array_mediator, object_type):
         prefix = ""
@@ -554,7 +557,38 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     @csi_method(error_response_type=csi_pb2.CreateVolumeGroupResponse, lock_request_attribute="name")
     def CreateVolumeGroup(self, request, context):
-        raise NotImplementedError()
+        utils.validate_create_volume_group_request(request)
+
+        logger.debug("volume group name : {}".format(request.name))
+        try:
+            array_connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
+            volume_group_parameters = utils.get_volume_group_parameters(parameters=request.parameters)
+
+            # TODO : pass multiple array addresses
+            array_type = detect_array_type(array_connection_info.array_addresses)
+            with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
+                logger.debug(array_mediator)
+                volume_group_final_name = self._get_volume_group_final_name(volume_group_parameters, request.name,
+                                                                            array_mediator)
+
+                try:
+                    volume_group = array_mediator.get_volume_group(volume_group_final_name)
+                except array_errors.ObjectNotFoundError:
+                    logger.debug(
+                        "volume group was not found. creating a new volume group")
+                    volume_group = array_mediator.create_volume(volume_group_final_name)
+                else:
+                    logger.debug("volume group found : {}".format(volume_group))
+
+                    if len(volume_group.volumes) > 0:
+                        message = "Volume group {} is not empty".format(volume_group.name)
+                        return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
+                                                    csi_pb2.CreateVolumeGroupResponse)
+
+                response = utils.generate_csi_create_volume_group_response(volume_group)
+                return response
+        except array_errors.VolumeAlreadyExists as ex:
+            return handle_exception(ex, context, grpc.StatusCode.ALREADY_EXISTS, csi_pb2.CreateVolumeResponse)
 
     @csi_method(error_response_type=csi_pb2.DeleteVolumeGroupResponse, lock_request_attribute="volume_group_id")
     def DeleteVolumeGroup(self, request, _):

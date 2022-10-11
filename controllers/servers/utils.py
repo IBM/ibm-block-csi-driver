@@ -17,7 +17,7 @@ from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.settings import NAME_PREFIX_SEPARATOR
 from controllers.servers.csi.controller_types import (ArrayConnectionInfo,
                                                       ObjectIdInfo,
-                                                      ObjectParameters)
+                                                      ObjectParameters, VolumeGroupParameters)
 from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
 
 logger = get_stdout_logger()
@@ -93,6 +93,10 @@ def get_volume_parameters(parameters, system_id=None):
 
 def get_snapshot_parameters(parameters, system_id):
     return get_object_parameters(parameters, servers_settings.PARAMETERS_SNAPSHOT_NAME_PREFIX, system_id)
+
+
+def get_volume_group_parameters(parameters):
+    return VolumeGroupParameters(prefix=parameters.get(servers_settings.PARAMETERS_VOLUME_GROUP_NAME_PREFIX))
 
 
 def _str_to_bool(parameter):
@@ -265,12 +269,16 @@ def _validate_object_id(object_id, object_type=servers_settings.VOLUME_TYPE_NAME
         raise ValidationException(messages.WRONG_FORMAT_MESSAGE.format("volume id"))
 
 
+def _validate_request_required_field(field_value, field_name):
+    logger.debug("validating request {}".format(field_name))
+    if not field_value:
+        raise ValidationException(messages.PARAMETER_SHOULD_NOT_BE_EMPTY_MESSAGE.format(field_name))
+
+
 def validate_create_volume_request(request):
     logger.debug("validating create volume request")
 
-    logger.debug("validating volume name")
-    if not request.name:
-        raise ValidationException(messages.NAME_SHOULD_NOT_BE_EMPTY_MESSAGE)
+    _validate_request_required_field(request.name, "name")
 
     logger.debug("validating volume capacity")
     if request.capacity_range:
@@ -295,11 +303,19 @@ def validate_create_volume_request(request):
     logger.debug("request validation finished.")
 
 
+def validate_create_volume_group_request(request):
+    logger.debug("validating create volume group request")
+
+    _validate_request_required_field(request.name, "name")
+
+    validate_secrets(request.secrets)
+
+    logger.debug("request validation finished.")
+
+
 def validate_create_snapshot_request(request):
     logger.debug("validating create snapshot request")
-    logger.debug("validating snapshot name")
-    if not request.name:
-        raise ValidationException(messages.NAME_SHOULD_NOT_BE_EMPTY_MESSAGE)
+    _validate_request_required_field(request.name, "name")
 
     validate_secrets(request.secrets)
 
@@ -378,6 +394,17 @@ def generate_csi_create_volume_response(new_volume, system_id=None, source_type=
         content_source=content_source))
 
     logger.debug("finished creating volume response : {0}".format(response))
+    return response
+
+
+def generate_csi_create_volume_group_response(volume_group):
+    logger.debug("creating create volume group response for volume group : {0}".format(volume_group))
+
+    response = csi_pb2.CreateVolumeGroupResponse(volume_group=csi_pb2.VolumeGroup(
+        volume_group_id=volume_group.id,
+        volumes=[]))
+    logger.debug("finished creating volume group response : {0}".format(response))
+
     return response
 
 
