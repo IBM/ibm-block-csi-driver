@@ -1355,7 +1355,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def delete_replication(self, replication_name):
         if self._is_earreplication_supported():
-            logger.warning("delete replication: EAR feature is supported")
+            logger.info("delete replication: EAR feature is supported")
         else:
             logger.info("delete replication: EAR feature is not supported")
             rcrelationship = self._get_rcrelationship_by_name(replication_name, not_exist_error=False)
