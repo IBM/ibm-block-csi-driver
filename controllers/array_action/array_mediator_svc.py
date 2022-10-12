@@ -1580,7 +1580,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def delete_host(self, host_name):
         self._rmhost(host_name)
 
-    def create_volume_group(self, name, io_group):
+    def create_volume_group(self, name):
         pass
 
     def get_volume_group(self, volume_group_id):
