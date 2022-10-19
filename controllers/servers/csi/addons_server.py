@@ -29,7 +29,10 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         other_volume_id_info = utils.get_volume_id_info(request.replication_id)
         other_volume_internal_id = other_volume_id_info.ids.internal_id
 
-        other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
+        if replication_type == array_settings.REPLICATION_TYPE_EAR:
+            other_system_id = request.parameters.get(servers_settings.PARAMETERS_REPLICATION_POLICY)
+        else:
+            other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
         copy_type = request.parameters.get(servers_settings.PARAMETERS_COPY_TYPE, REPLICATION_DEFAULT_COPY_TYPE)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)

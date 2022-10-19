@@ -1324,7 +1324,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return self._get_mirror_replication(volume_internal_id, other_volume_internal_id, other_system_id)
         return self._get_ear_replication(volume_internal_id)
 
-
     def _get_mirror_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
         rcrelationship = self._get_rcrelationship(volume_internal_id, other_volume_internal_id, other_system_id)
         if not rcrelationship:
@@ -1388,11 +1387,13 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type,
                            replication_type):
         if replication_type == array_settings.REPLICATION_TYPE_EAR and not self._is_earreplication_supported():
-            #here we need to raise exception
             pass
         if replication_type == array_settings.REPLICATION_TYPE_EAR:
+            cli_volume = self._get_cli_volume(volume_internal_id)
+            volume_group_name = cli_volume.name + "_vg"
+
             logger.info("create EAR replication")
-            self._create_volume_group(volume_group_name, replication_policy)
+            self._create_volume_group(volume_group_name, other_system_id)
         else:
             logger.info("create mirror replication")
             rc_id = self._create_rcrelationship(volume_internal_id, other_volume_internal_id,
