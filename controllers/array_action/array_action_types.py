@@ -22,14 +22,13 @@ class Snapshot(Volume):
     is_ready: bool = False
 
 
+@dataclass
 class Replication:
-    def __init__(self, name, volume_internal_id, other_volume_internal_id, copy_type, is_ready, is_primary=None):
-        self.name = name
-        self.volume_internal_id = volume_internal_id
-        self.other_volume_internal_id = other_volume_internal_id
-        self.copy_type = copy_type
-        self.is_ready = is_ready
-        self.is_primary = is_primary
+    name: str
+    volume_group_id: str
+    copy_type: str
+    is_ready: str
+    is_primary: str = None
 
 
 @dataclass

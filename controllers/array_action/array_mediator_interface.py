@@ -401,7 +401,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
+    def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, replication_type):
         """
         This function will return the volume replication relationship info
 
@@ -421,7 +421,8 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
+    def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type,
+                           replication_type):
         """
         This function will create and activate a volume replication relationship
 

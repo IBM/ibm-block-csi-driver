@@ -514,10 +514,11 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         fc_wwns_objects = self.client.cmd.fc_port_list()
         return [port.wwpn for port in fc_wwns_objects if port.port_state == 'Online' and port.role == 'Target']
 
-    def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
+    def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, replication_type):
         raise NotImplementedError
 
-    def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
+    def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type,
+                           replication_type):
         raise NotImplementedError
 
     def delete_replication(self, replication_name):

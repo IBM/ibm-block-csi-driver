@@ -10,7 +10,7 @@ from google.protobuf.timestamp_pb2 import Timestamp
 import controllers.servers.messages as messages
 import controllers.servers.settings as servers_settings
 from controllers.array_action.settings import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
-    ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC
+    ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC, REPLICATION_TYPE_MIRROR
 from controllers.common import settings
 from controllers.common.config import config as common_config
 from controllers.common.csi_logger import get_stdout_logger
@@ -567,11 +567,11 @@ def validate_unpublish_volume_request(request):
     logger.debug("unpublish volume request validation finished.")
 
 
-def validate_addons_request(request):
+def validate_addons_request(request, replication_type):
     logger.debug("validating addons request")
 
     logger.debug("validating volume id")
-    if request.volume_id == "" or request.replication_id == "":
+    if request.volume_id == "" or (replication_type == REPLICATION_TYPE_MIRROR and request.replication_id == ""):
         raise ValidationException(messages.VOLUME_ID_SHOULD_NOT_BE_EMPTY_MESSAGE)
 
     logger.debug("validating copy type")
