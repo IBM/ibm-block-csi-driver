@@ -401,7 +401,7 @@ def generate_csi_create_volume_group_response(volume_group):
     logger.debug("creating create volume group response for volume group : {0}".format(volume_group))
 
     response = csi_pb2.CreateVolumeGroupResponse(volume_group=csi_pb2.VolumeGroup(
-        volume_group_id=volume_group.id,
+        volume_group_id=_get_object_id(volume_group, None),
         volumes=[]))
     logger.debug("finished creating volume group response : {0}".format(response))
 
@@ -508,6 +508,10 @@ def get_volume_id_info(volume_id):
 
 def get_snapshot_id_info(snapshot_id):
     return get_object_id_info(snapshot_id, servers_settings.SNAPSHOT_TYPE_NAME)
+
+
+def get_volume_group_id_info(volume_group_id):
+    return get_object_id_info(volume_group_id, servers_settings.VOLUME_GROUP_TYPE_NAME)
 
 
 def _get_context_from_volume(volume):
@@ -662,3 +666,14 @@ def validate_parameters_match_source_volume(space_efficiency, required_bytes, vo
     if volume_capacity_bytes < required_bytes:
         raise ValidationException(messages.REQUIRED_BYTES_MISMATCH_MESSAGE.format(
             required_bytes, volume_capacity_bytes))
+
+
+def get_volume_group_from_request(request_volume_group, parameters_volume_group, array_mediator):
+    storage_class_volume_group = parameters_volume_group
+    volume_group_id = get_volume_group_id_info(request_volume_group)
+    if volume_group_id:
+        volume_group_name = array_mediator.get_volume_group(volume_group_id.ids.internal_id)
+        if storage_class_volume_group != "" and volume_group_name != "":
+            raise ValidationException(messages.UNSUPPORTED_STORAGECLASS_VOLUME_GROUP)
+        return volume_group_name
+    return storage_class_volume_group

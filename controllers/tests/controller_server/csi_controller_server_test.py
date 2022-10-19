@@ -26,8 +26,8 @@ from controllers.tests.common.test_settings import (CLONE_VOLUME_NAME,
                                                     SECRET_MANAGEMENT_ADDRESS_VALUE,
                                                     NAME_PREFIX, INTERNAL_SNAPSHOT_ID, SOURCE_VOLUME_ID,
                                                     SECRET_MANAGEMENT_ADDRESS_KEY, SECRET_PASSWORD_KEY,
-                                                    SECRET_USERNAME_KEY, SECRET)
-from controllers.tests.controller_server.common import mock_get_agent, mock_array_type, mock_mediator
+                                                    SECRET_USERNAME_KEY, SECRET, VOLUME_GROUP_NAME)
+from controllers.tests.controller_server.common import mock_get_agent, mock_array_type, mock_mediator, mock_utils_method
 from controllers.tests.utils import ProtoBufMock
 
 CONTROLLER_SERVER_PATH = "controllers.servers.csi.csi_controller_server"
@@ -407,6 +407,8 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
     def setUp(self):
         super().setUp()
+
+        mock_utils_method(self, 'get_volume_group_from_request', return_value=DUMMY_VOLUME_GROUP)
 
         self.mediator.create_volume = Mock()
         self.mediator.get_volume = Mock()
@@ -1555,4 +1557,61 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
 
         self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+
+
+class TestCreateVolumeGroup(BaseControllerSetUp, CommonControllerTest):
+
+    @property
+    def tested_method(self):
+        return self.servicer.CreateVolumeGroup
+
+    @property
+    def tested_method_response_class(self):
+        return csi_pb2.CreateVolumeGroupResponse
+
+    def setUp(self):
+        super().setUp()
+        self.request.name = VOLUME_GROUP_NAME
+
+    def test_create_volume_group_with_empty_name(self):
+        self._test_create_object_with_empty_name()
+
+    def test_create_volume_group_with_wrong_secrets(self, ):
+        self._test_request_with_wrong_secrets()
+
+    def test_create_snapshot_already_processing(self):
+        self._test_request_already_processing("name", self.request.name)
+
+    def _prepare_create_volume_without_get(self):
+        self.mediator.get_volume_group = Mock(side_effect=array_errors.ObjectNotFoundError(""))
+        self.mediator.create_volume_group = Mock()
+        self.mediator.create_volume_group.return_value = utils.get_mock_mediator_response_volume_group()
+
+    def test_create_volume_group_success(self):
+        self._prepare_create_volume_without_get()
+
+        response = self.servicer.CreateVolumeGroup(self.request, self.context)
+
+        self.mediator.create_volume_group.assert_called_once_with(VOLUME_GROUP_NAME)
+        self.assertEqual(type(response), csi_pb2.CreateVolumeGroupResponse)
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+
+    def test_create_volume_group_with_prefix_success(self):
+        self._prepare_create_volume_without_get()
+        self.request.parameters = {servers_settings.PARAMETERS_VOLUME_GROUP_NAME_PREFIX: NAME_PREFIX}
+
+        self.servicer.CreateVolumeGroup(self.request, self.context)
+
+        self.mediator.create_volume_group.assert_called_once_with('prefix_volume_group_name')
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+
+    def test_create_volume_group_get_volume_success(self):
+        self.mediator.get_volume_group = Mock(return_value=utils.get_mock_mediator_response_volume_group())
+
+        response = self.servicer.CreateVolumeGroup(self.request, self.context)
+
+        self.mediator.get_volume_group.assert_called_once_with(VOLUME_GROUP_NAME)
+        self.mediator.create_volume_group.assert_not_called()
+        self.assertEqual(type(response), csi_pb2.CreateVolumeGroupResponse)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)

@@ -44,3 +44,7 @@ REPLICATION_NAME = "replication_name"
 SYSTEM_ID = "system_id"
 COPY_TYPE = "async"
 FCS_DELIMITER = ":"
+
+VOLUME_GROUP_NAME = "volume_group_name"
+VOLUME_GROUP_UID = "volume_group_wwn"
+INTERNAL_VOLUME_GROUP_ID = "internal_volume_group_id"

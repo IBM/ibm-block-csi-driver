@@ -58,6 +58,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             array_type = detect_array_type(array_connection_info.array_addresses)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
+                volume_group = utils.get_volume_group_from_request(request.volume_group_id,
+                                                                   volume_parameters.volume_group,
+                                                                   array_mediator)
                 volume_final_name = self._get_volume_final_name(volume_parameters, request.name, array_mediator)
 
                 required_bytes = request.capacity_range.required_bytes
@@ -100,7 +103,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                     array_mediator.validate_supported_space_efficiency(space_efficiency)
                     volume = array_mediator.create_volume(volume_final_name, required_bytes, space_efficiency, pool,
-                                                          volume_parameters.io_group, volume_parameters.volume_group,
+                                                          volume_parameters.io_group, volume_group,
                                                           source_ids, source_type, is_virt_snap_func)
                 else:
                     logger.debug("volume found : {}".format(volume))
@@ -576,7 +579,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 except array_errors.ObjectNotFoundError:
                     logger.debug(
                         "volume group was not found. creating a new volume group")
-                    volume_group = array_mediator.create_volume(volume_group_final_name)
+                    volume_group = array_mediator.create_volume_group(volume_group_final_name)
                 else:
                     logger.debug("volume group found : {}".format(volume_group))
 
