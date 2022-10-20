@@ -19,7 +19,7 @@ SPACE_EFFICIENCY_MISMATCH_MESSAGE = "space efficiency : {0}" \
 
 VIRT_SNAPSHOT_FUNCTION_NOT_SUPPORTED_MESSAGE = "Snapshot function is enabled but not supported with object : {0} "
 
-VOLUME_ALREADY_EXISTS_MESSAGE = "Volume already exists : {0} , array : {1}"
+OBJECT_ALREADY_EXISTS_MESSAGE = "{0} already exists : {1} , array : {2}"
 
 POOL_DOES_NOT_EXIST_MESSAGE = "Pool does not exist: {0} , array : {1}"
 
@@ -57,10 +57,6 @@ NO_ISCSI_TARGETS_FOUND_ERROR_MESSAGE = "Could not find iSCSI targets for endpoin
 UNSUPPORTED_CONNECTIVITY_TYPE_ERROR_MESSAGE = "Unsupported connectivity type: {0}"
 
 SNAPSHOT_NOT_FOUND_ERROR_MESSAGE = "Snapshot was not found : {0} "
-
-SNAPSHOT_ALREADY_EXISTS_ERROR_MESSAGE = "Snapshot already exists : {0} , array : {1}"
-
-HOST_ALREADY_EXISTS_ERROR_MESSAGE = "Host already exists : {0} , array : {1}"
 
 EXPECTED_SNAPSHOT_BUT_FOUND_VOLUME_ERROR_MESSAGE = "Could not find info about the source of: {0}, array: {1}"
 

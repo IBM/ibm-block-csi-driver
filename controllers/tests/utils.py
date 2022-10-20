@@ -31,13 +31,15 @@ def get_mock_mediator_response_volume(size=10, name=VOLUME_NAME, volume_id=VOLUM
     return volume
 
 
-def get_mock_mediator_response_volume_group(name=VOLUME_GROUP_NAME, volume_id=VOLUME_GROUP_UID, array_type="a9k"):
+def get_mock_mediator_response_volume_group(name=VOLUME_GROUP_NAME, volume_id=VOLUME_GROUP_UID, volumes=None):
+    if not volumes:
+        volumes = []
     volume_group = Mock()
     volume_group.id = volume_id
     volume_group.internal_id = INTERNAL_VOLUME_GROUP_ID
     volume_group.name = name
-    volume_group.array_type = array_type
-    volume_group.volumes = []
+    volume_group.array_type = "a9k"
+    volume_group.volumes = volumes
     return volume_group
 
 

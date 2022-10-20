@@ -1606,7 +1606,17 @@ class TestCreateVolumeGroup(BaseControllerSetUp, CommonControllerTest):
         self.mediator.create_volume_group.assert_called_once_with('prefix_volume_group_name')
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
-    def test_create_volume_group_get_volume_success(self):
+    def test_create_volume_group_already_exist_fail(self):
+        self.mediator.get_volume_group = Mock(side_effect=array_errors.ObjectNotFoundError(""))
+        self.mediator.create_volume_group = Mock(side_effect=array_errors.VolumeGroupAlreadyExists("", ""))
+
+        response = self.servicer.CreateVolumeGroup(self.request, self.context)
+
+        self.mediator.create_volume_group.assert_called_once_with(VOLUME_GROUP_NAME)
+        self.assertEqual(type(response), csi_pb2.CreateVolumeGroupResponse)
+        self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
+
+    def test_get_volume_success(self):
         self.mediator.get_volume_group = Mock(return_value=utils.get_mock_mediator_response_volume_group())
 
         response = self.servicer.CreateVolumeGroup(self.request, self.context)
@@ -1615,3 +1625,14 @@ class TestCreateVolumeGroup(BaseControllerSetUp, CommonControllerTest):
         self.mediator.create_volume_group.assert_not_called()
         self.assertEqual(type(response), csi_pb2.CreateVolumeGroupResponse)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
+
+    def test_group_get_volume_not_empty_fail(self):
+        volumes = [INTERNAL_VOLUME_ID]
+        response_volume_group = utils.get_mock_mediator_response_volume_group(volumes=volumes)
+        self.mediator.get_volume_group = Mock(return_value=response_volume_group)
+
+        response = self.servicer.CreateVolumeGroup(self.request, self.context)
+
+        self.mediator.get_volume_group.assert_called_once_with(VOLUME_GROUP_NAME)
+        self.assertEqual(type(response), csi_pb2.CreateVolumeGroupResponse)
+        self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)

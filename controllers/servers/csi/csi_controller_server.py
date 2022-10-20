@@ -590,8 +590,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 response = utils.generate_csi_create_volume_group_response(volume_group)
                 return response
-        except array_errors.VolumeAlreadyExists as ex:
-            return handle_exception(ex, context, grpc.StatusCode.ALREADY_EXISTS, csi_pb2.CreateVolumeResponse)
+        except array_errors.VolumeGroupAlreadyExists as ex:
+            return handle_exception(ex, context, grpc.StatusCode.ALREADY_EXISTS, csi_pb2.CreateVolumeGroupResponse)
 
     @csi_method(error_response_type=csi_pb2.DeleteVolumeGroupResponse, lock_request_attribute="volume_group_id")
     def DeleteVolumeGroup(self, request, _):
