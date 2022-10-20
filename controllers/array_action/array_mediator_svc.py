@@ -1421,16 +1421,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 logger.warning("failed to delete rcrelationship '{0}': {1}".format(rcrelationship_id, ex))
 
     def delete_replication(self, replication_name):
-        if self._is_earreplication_supported():
-            logger.info("delete replication: EAR feature is supported")
-        else:
-            logger.info("delete replication: EAR feature is not supported")
-            rcrelationship = self._get_rcrelationship_by_name(replication_name, not_exist_error=False)
-            if not rcrelationship:
-                logger.info("could not find replication with name {}".format(replication_name))
-                return
-            self._stop_rcrelationship(rcrelationship.id)
-            self._delete_rcrelationship(rcrelationship.id)
+        rcrelationship = self._get_rcrelationship_by_name(replication_name, not_exist_error=False)
+        if not rcrelationship:
+            logger.info("could not find replication with name {}".format(replication_name))
+            return
+        self._stop_rcrelationship(rcrelationship.id)
+        self._delete_rcrelationship(rcrelationship.id)
 
     def _promote_replication_endpoint(self, endpoint_type, replication_name):
         logger.info("making '{}' primary for remote copy relationship {}".format(endpoint_type, replication_name))
