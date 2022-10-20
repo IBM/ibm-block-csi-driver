@@ -88,6 +88,9 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         logger.info(method_name)
         replication_type = self._get_replication_type(request)
         utils.validate_addons_request(request, replication_type)
+        if replication_type == array_settings.REPLICATION_TYPE_EAR:
+            logger.info("finished {}".format(method_name))
+            return response_type()
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
         volume_internal_id = volume_id_info.ids.internal_id
@@ -149,7 +152,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         return pb2.ResyncVolumeResponse(ready=replication.is_ready)
 
     def _get_replication_type(self, request):
-        if servers_settings.PARAMETERS_REPLICATION_POLICY in request.parameters and request.replication_id == "":
+        if servers_settings.PARAMETERS_REPLICATION_POLICY in request.parameters:
             replication_type = array_settings.REPLICATION_TYPE_EAR
         else:
             replication_type = array_settings.REPLICATION_TYPE_MIRROR
@@ -188,7 +191,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         replication = mediator.get_ear_replication(volume_internal_id)
         if replication:
-            if replication.volume_group_id != volume.volume_group_id:
+            if replication.volume_group_id != volume.group_id:
                 message = "replication already exists " \
                           "but volume {} belongs to another group {}".format(volume_name, volume.volume_group_name)
                 return False, message
@@ -198,5 +201,5 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             return True, message
 
         message = "creating replication for volume {} with policy: {}".format(volume_name, replication_policy)
-        mediator.create_ear_replication(volume_internal_id)
+        mediator.create_ear_replication(volume_internal_id, replication_policy)
         return True, message

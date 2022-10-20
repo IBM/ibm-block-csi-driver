@@ -300,6 +300,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             source_id=source_id,
             array_type=self.array_type,
             space_efficiency_aliases=space_efficiency,
+            group_id=cli_volume.volume_group_id
         )
 
     def _generate_snapshot_response_from_cli_volume(self, cli_volume, source_id):
@@ -349,9 +350,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             return self.client.svcinfo.lsvolumegroup(object_id=volume_group_name).as_single_element
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if (OBJ_NOT_FOUND in ex.my_message or
+            if (SPECIFIED_OBJ_NOT_EXIST in ex.my_message or
                     NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message):
-                logger.info("volume group not found")
+                logger.info("volume group {} was not found".format(volume_group_name))
                 return None
             if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
                 raise array_errors.InvalidArgumentError(ex.my_message)
@@ -1386,12 +1387,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def create_ear_replication(self, volume_internal_id, replication_policy):
         if not self._is_earreplication_supported():
-            pass
+            logger.info("EAR replication is not supported on the existing storage")
+            return
         cli_volume = self._get_cli_volume(volume_internal_id)
         volume_group_name = cli_volume.name + "_vg"
 
         logger.info("create EAR replication")
         self._create_volume_group(volume_group_name, replication_policy)
+        self._change_volume_group(volume_internal_id, volume_group_name)
 
     def _stop_rcrelationship(self, rcrelationship_id, add_access_to_secondary=False):
         logger.info("stopping remote copy relationship with id: {}. access: {}".format(rcrelationship_id,
