@@ -1377,9 +1377,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             else:
                 logger.warning("failed to start rcrelationship '{}': {}".format(rcrelationship_id, ex))
 
-    def _is_earreplication_supported(self):
-        return hasattr(self.client.svctask, "chvolumereplicationinternals")
-
     def create_mirror_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
         rc_id = self._create_rcrelationship(volume_internal_id, other_volume_internal_id, other_system_id, copy_type)
         self._start_rcrelationship(rc_id)
@@ -1393,6 +1390,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
         self._create_volume_group(volume_group_name, replication_policy)
         self._change_volume_group(volume_internal_id, volume_group_name)
+
+    def _is_earreplication_supported(self):
+        return hasattr(self.client.svctask, "chvolumereplicationinternals")
 
     def _stop_rcrelationship(self, rcrelationship_id, add_access_to_secondary=False):
         logger.info("stopping remote copy relationship with id: {}. access: {}".format(rcrelationship_id,
