@@ -1381,7 +1381,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return hasattr(self.client.svctask, "chvolumereplicationinternals")
 
     def create_mirror_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
-        logger.info("create mirror replication")
         rc_id = self._create_rcrelationship(volume_internal_id, other_volume_internal_id, other_system_id, copy_type)
         self._start_rcrelationship(rc_id)
 
@@ -1392,7 +1391,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         cli_volume = self._get_cli_volume(volume_internal_id)
         volume_group_name = cli_volume.name + "_vg"
 
-        logger.info("create EAR replication")
         self._create_volume_group(volume_group_name, replication_policy)
         self._change_volume_group(volume_internal_id, volume_group_name)
 
