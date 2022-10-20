@@ -363,6 +363,8 @@ def validate_expand_volume_request(request):
 def generate_csi_create_volume_response(new_volume, system_id=None, source_type=None):
     logger.debug("creating create volume response for volume : {0}".format(new_volume))
 
+    volume_context = _get_context_from_volume(volume=new_volume)
+
     content_source = None
     if new_volume.source_id:
         if source_type == servers_settings.SNAPSHOT_TYPE_NAME:
@@ -375,7 +377,8 @@ def generate_csi_create_volume_response(new_volume, system_id=None, source_type=
     response = csi_pb2.CreateVolumeResponse(volume=csi_pb2.Volume(
         capacity_bytes=new_volume.capacity_bytes,
         volume_id=get_volume_id(new_volume, system_id),
-        content_source=content_source))
+        content_source=content_source,
+        volume_context=volume_context))
 
     logger.debug("finished creating volume response : {0}".format(response))
     return response
@@ -487,7 +490,8 @@ def _get_context_from_volume(volume):
     return {servers_settings.VOLUME_CONTEXT_VOLUME_NAME: volume.name,
             servers_settings.VOLUME_CONTEXT_ARRAY_ADDRESS: ",".join(
                 volume.array_address if isinstance(volume.array_address, list) else [volume.array_address]),
-            servers_settings.VOLUME_CONTEXT_POOL: volume.pool,
+            servers_settings.VOLUME_CONTEXT_POOL: ",".join(
+                volume.pool if isinstance(volume.pool, list) else [volume.pool]),
             servers_settings.VOLUME_CONTEXT_STORAGE_TYPE: volume.array_type
             }
 
