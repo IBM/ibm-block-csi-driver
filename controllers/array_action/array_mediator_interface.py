@@ -426,7 +426,7 @@ class ArrayMediator(ABC):
         This function will return the EAR volume group replication info
 
         Args:
-            volume_internal_id : internal id of the volume in the replication relationship
+            volume_internal_id : internal id of the volume in the replication
 
         Returns:
             Replication
@@ -465,7 +465,7 @@ class ArrayMediator(ABC):
         This function will create EAR volume group replication
 
         Args:
-            volume_internal_id : internal id of the volume in the replication relationship
+            volume_internal_id : internal id of the volume in the replication
             replication_policy : replication policy name or id
 
         Returns:
