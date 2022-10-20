@@ -17,6 +17,13 @@ class Volume:
 
 
 @dataclass
+class VolumeGroup:
+    name: str
+    id: str
+    volumes: list = field(default_factory=list)
+
+
+@dataclass
 class Snapshot(Volume):
     pool: str = None
     is_ready: bool = False
