@@ -401,7 +401,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, replication_type):
+    def get_mirror_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
         """
         This function will return the volume replication relationship info
 
@@ -421,8 +421,25 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type,
-                           replication_type):
+    def get_ear_replication(self, volume_internal_id):
+        """
+        This function will return the EAR volume group replication info
+
+        Args:
+            volume_internal_id : internal id of the volume in the replication relationship
+
+        Returns:
+            Replication
+
+        Raises:
+            ObjectNotFound
+            InvalidArgument
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def create_mirror_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
         """
         This function will create and activate a volume replication relationship
 
@@ -431,6 +448,25 @@ class ArrayMediator(ABC):
             other_volume_internal_id : internal id of the other volume in the replication relationship
             other_system_id : id of the other system of the replication relationship
             copy_type : sync/async
+
+        Returns:
+            None
+
+        Raises:
+            ObjectNotFound
+            InvalidArgument
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def create_ear_replication(self, volume_internal_id, replication_policy):
+        """
+        This function will create EAR volume group replication
+
+        Args:
+            volume_internal_id : internal id of the volume in the replication relationship
+            replication_policy : replication policy name or id
 
         Returns:
             None

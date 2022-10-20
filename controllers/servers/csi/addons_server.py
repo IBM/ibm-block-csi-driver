@@ -24,16 +24,6 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
         volume_id = volume_id_info.ids.uid
-        volume_internal_id = volume_id_info.ids.internal_id
-
-        other_volume_id_info = utils.get_volume_id_info(request.replication_id)
-        other_volume_internal_id = other_volume_id_info.ids.internal_id
-
-        if replication_type == array_settings.REPLICATION_TYPE_EAR:
-            other_system_id = request.parameters.get(servers_settings.PARAMETERS_REPLICATION_POLICY)
-        else:
-            other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
-        copy_type = request.parameters.get(servers_settings.PARAMETERS_COPY_TYPE, REPLICATION_DEFAULT_COPY_TYPE)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, volume_id_info.array_type).get_mediator() as mediator:
@@ -41,33 +31,15 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             if not volume:
                 raise array_errors.ObjectNotFoundError(volume_id)
 
-            replication = mediator.get_replication(volume_internal_id, other_volume_internal_id, other_system_id,
-                                                   replication_type)
-            if replication:
-                if replication_type == array_settings.REPLICATION_TYPE_MIRROR:
-                    if replication.copy_type != copy_type:
-                        message = "replication already exists " \
-                                  "but has copy type of {} and not {}".format(replication.copy_type, copy_type)
-                        return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
-                                                    pb2.EnableVolumeReplicationResponse)
-                    logger.info("idempotent case. replication already exists "
-                                "for volume {} with system: {}".format(volume.name,
-                                                                       other_system_id))
-                    return pb2.EnableVolumeReplicationResponse()
-                elif replication_type == array_settings.REPLICATION_TYPE_EAR:
-                    if replication.volume_group_id != volume.volume_group_id:
-                        message = "volume group already exists " \
-                                  "but volume {} belongs to other group {}".format(volume.name, volume.volume_group_id)
-                        return build_error_response(message, context, grpc.StatusCode.FAILED_PRECONDITION,
-                                                    pb2.EnableVolumeReplicationResponse)
-                    logger.info("idempotent case. replication already exists "
-                                "for volume {} in group: {}".format(volume.name,
-                                                                    replication.volume_group_id))
-                    return pb2.EnableVolumeReplicationResponse()
-            logger.info("creating replication for volume {} with system: {}".format(volume.name,
-                                                                                    other_system_id))
-            mediator.create_replication(volume_internal_id, other_volume_internal_id, other_system_id, copy_type,
-                                        replication_type)
+            if replication_type == array_settings.REPLICATION_TYPE_MIRROR:
+                return_value, message = self._enable_mirror_replication(request, mediator, volume.name)
+            else:
+                return_value, message = self._enable_ear_replication(request, mediator, volume)
+
+            if not return_value:
+                return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
+                                            pb2.EnableVolumeReplicationResponse)
+            logger.info(message)
 
         return pb2.EnableVolumeReplicationResponse()
 
@@ -86,8 +58,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, volume_id_info.array_type).get_mediator() as mediator:
-            replication = mediator.get_replication(volume_internal_id, other_volume_internal_id, other_system_id,
-                                                   replication_type)
+            replication = mediator.get_mirror_replication(volume_internal_id, other_volume_internal_id, other_system_id)
             if replication:
                 logger.info("deleting replication {} with system {}".format(replication.name,
                                                                             other_system_id))
@@ -128,8 +99,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, volume_id_info.array_type).get_mediator() as mediator:
-            replication = mediator.get_replication(volume_internal_id, other_volume_internal_id, other_system_id,
-                                                   replication_type)
+            replication = mediator.get_mirror_replication(volume_internal_id, other_volume_internal_id, other_system_id)
             if not replication:
                 message = "could not find replication for volume internal id: {} " \
                           "with volume internal id: {} of system: {}".format(volume_internal_id,
@@ -166,8 +136,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, volume_id_info.array_type).get_mediator() as mediator:
-            replication = mediator.get_replication(volume_internal_id, other_volume_internal_id, other_system_id,
-                                                   replication_type)
+            replication = mediator.get_mirror_replication(volume_internal_id, other_volume_internal_id, other_system_id)
             if not replication:
                 message = "could not find replication for volume internal id: {} " \
                           "with volume internal id: {} of system: {}".format(volume_internal_id,
@@ -187,3 +156,47 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         logger.info("replication type is {}".format(replication_type))
         return replication_type
+
+    def _enable_mirror_replication(self, request, mediator, volume_name):
+        volume_id_info = utils.get_volume_id_info(request.volume_id)
+        volume_internal_id = volume_id_info.ids.internal_id
+        other_volume_id_info = utils.get_volume_id_info(request.replication_id)
+        other_volume_internal_id = other_volume_id_info.ids.internal_id
+        other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
+        copy_type = request.parameters.get(servers_settings.PARAMETERS_COPY_TYPE, REPLICATION_DEFAULT_COPY_TYPE)
+
+        replication = mediator.get_mirror_replication(volume_internal_id, other_volume_internal_id, other_system_id)
+        if replication:
+            if replication.copy_type != copy_type:
+                message = "replication already exists " \
+                          "but has copy type of {} and not {}".format(replication.copy_type, copy_type)
+                return False, message
+
+            message = "idempotent case. replication already exists " \
+                      "for volume {} with system: {}".format(volume_name, other_system_id)
+            return True, message
+
+        message = "creating replication for volume {} with system: {}".format(volume_name, other_system_id)
+        mediator.create_mirror_replication(volume_internal_id, other_volume_internal_id, other_system_id, copy_type)
+        return True, message
+
+    def _enable_ear_replication(self, request, mediator, volume):
+        volume_id_info = utils.get_volume_id_info(request.volume_id)
+        volume_internal_id = volume_id_info.ids.internal_id
+        volume_name = volume.name
+        replication_policy = request.parameters.get(servers_settings.PARAMETERS_REPLICATION_POLICY)
+
+        replication = mediator.get_ear_replication(volume_internal_id)
+        if replication:
+            if replication.volume_group_id != volume.volume_group_id:
+                message = "replication already exists " \
+                          "but volume {} belongs to another group {}".format(volume_name, volume.volume_group_name)
+                return False, message
+
+            message = "idempotent case. replication already exists " \
+                      "for volume {} with policy: {}".format(volume_name, replication_policy)
+            return True, message
+
+        message = "creating replication for volume {} with policy: {}".format(volume_name, replication_policy)
+        mediator.create_ear_replication(volume_internal_id)
+        return True, message

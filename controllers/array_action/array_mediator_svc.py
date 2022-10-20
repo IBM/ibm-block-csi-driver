@@ -1319,19 +1319,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise RuntimeError(error_message)
         return rcrelationships[0] if rcrelationships else None
 
-    def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, replication_type):
-        if replication_type == array_settings.REPLICATION_TYPE_MIRROR:
-            return self._get_mirror_replication(volume_internal_id, other_volume_internal_id, other_system_id)
-        return self._get_ear_replication(volume_internal_id)
-
-    def _get_mirror_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
+    def get_mirror_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
         rcrelationship = self._get_rcrelationship(volume_internal_id, other_volume_internal_id, other_system_id)
         if not rcrelationship:
             return None
         logger.info("found rcrelationship: {}".format(rcrelationship))
         return self._generate_replication_response(rcrelationship)
 
-    def _get_ear_replication(self, volume_internal_id):
+    def get_ear_replication(self, volume_internal_id):
         cli_volume = self._get_cli_volume(volume_internal_id)
         volume_group_name = cli_volume.name + "_vg"
 
@@ -1384,21 +1379,19 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def _is_earreplication_supported(self):
         return hasattr(self.client.svctask, "chvolumereplicationinternals")
 
-    def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type,
-                           replication_type):
-        if replication_type == array_settings.REPLICATION_TYPE_EAR and not self._is_earreplication_supported():
-            pass
-        if replication_type == array_settings.REPLICATION_TYPE_EAR:
-            cli_volume = self._get_cli_volume(volume_internal_id)
-            volume_group_name = cli_volume.name + "_vg"
+    def create_mirror_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
+        logger.info("create mirror replication")
+        rc_id = self._create_rcrelationship(volume_internal_id, other_volume_internal_id, other_system_id, copy_type)
+        self._start_rcrelationship(rc_id)
 
-            logger.info("create EAR replication")
-            self._create_volume_group(volume_group_name, other_system_id)
-        else:
-            logger.info("create mirror replication")
-            rc_id = self._create_rcrelationship(volume_internal_id, other_volume_internal_id,
-                                                other_system_id, copy_type)
-            self._start_rcrelationship(rc_id)
+    def create_ear_replication(self, volume_internal_id, replication_policy):
+        if not self._is_earreplication_supported():
+            pass
+        cli_volume = self._get_cli_volume(volume_internal_id)
+        volume_group_name = cli_volume.name + "_vg"
+
+        logger.info("create EAR replication")
+        self._create_volume_group(volume_group_name, replication_policy)
 
     def _stop_rcrelationship(self, rcrelationship_id, add_access_to_secondary=False):
         logger.info("stopping remote copy relationship with id: {}. access: {}".format(rcrelationship_id,
