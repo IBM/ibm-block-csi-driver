@@ -17,7 +17,8 @@ from controllers.servers import settings as controller_config
 from controllers.servers.csi.csi_controller_server import CSIControllerServicer
 from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controllers.tests import utils as test_utils
-from controllers.tests.common.test_settings import DUMMY_POOL1, SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, ARRAY
+from controllers.tests.common.test_settings import DUMMY_POOL1, SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, ARRAY, \
+    VOLUME_GROUP_NAME, REQUEST_VOLUME_GROUP_ID, INTERNAL_VOLUME_GROUP_ID
 from controllers.tests.controller_server.csi_controller_server_test import ProtoBufMock
 from controllers.tests.utils import get_fake_secret_config
 
@@ -534,3 +535,30 @@ class TestUtils(unittest.TestCase):
         self._test_validate_parameters_match_volume(volume_field="name", volume_value="prefix_vol",
                                                     parameter_field=controller_config.PARAMETERS_VOLUME_NAME_PREFIX,
                                                     parameter_value="prefix")
+
+    def _get_volume_group_from_request(self, request_volume_group="", storageclass_volume_group=""):
+        volume_group = Mock(spec=["name"])
+        volume_group.name = VOLUME_GROUP_NAME
+        array_mediator = Mock(spec=["get_volume_group"])
+        array_mediator.get_volume_group.return_value = volume_group
+
+        return array_mediator, utils.get_volume_group_from_request(request_volume_group, storageclass_volume_group,
+                                                                   array_mediator)
+
+    def test_get_volume_group_from_request_with_request_parameter(self):
+
+        array_mediator, volume_group_name = self._get_volume_group_from_request(REQUEST_VOLUME_GROUP_ID)
+        array_mediator.get_volume_group.assert_called_once_with(INTERNAL_VOLUME_GROUP_ID)
+        self.assertEqual(VOLUME_GROUP_NAME, volume_group_name)
+
+    def test_get_volume_group_from_request_with_storageclass_parameter(self):
+        storageclass_volume_group = "volume_group"
+        array_mediator, volume_group_name = self._get_volume_group_from_request("", storageclass_volume_group)
+
+        array_mediator.get_volume_group.assert_not_called()
+        self.assertEqual(storageclass_volume_group, volume_group_name)
+
+    def test_get_volume_group_from_request_with_both_parameters(self):
+        storageclass_volume_group = "volume_group"
+        with self.assertRaises(ValidationException):
+            self._get_volume_group_from_request(REQUEST_VOLUME_GROUP_ID, storageclass_volume_group)

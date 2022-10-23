@@ -670,9 +670,10 @@ def validate_parameters_match_source_volume(space_efficiency, required_bytes, vo
 
 def get_volume_group_from_request(request_volume_group, parameters_volume_group, array_mediator):
     storage_class_volume_group = parameters_volume_group
-    volume_group_id = get_volume_group_id_info(request_volume_group)
-    if volume_group_id:
-        volume_group_name = array_mediator.get_volume_group(volume_group_id.ids.internal_id)
+    if request_volume_group:
+        volume_group_id = get_volume_group_id_info(request_volume_group)
+        volume_group = array_mediator.get_volume_group(volume_group_id.ids.internal_id)
+        volume_group_name = volume_group.name
         if storage_class_volume_group != "" and volume_group_name != "":
             raise ValidationException(messages.UNSUPPORTED_STORAGECLASS_VOLUME_GROUP)
         return volume_group_name

@@ -49,5 +49,6 @@ VOLUME_GROUP_OBJECT_TYPE = "volume group"
 VOLUME_GROUP_NAME = "volume_group_name"
 VOLUME_GROUP_UID = "volume_group_wwn"
 INTERNAL_VOLUME_GROUP_ID = "internal_volume_group_id"
+REQUEST_VOLUME_GROUP_ID = "SVC:{};{}".format(INTERNAL_VOLUME_GROUP_ID, VOLUME_GROUP_UID)
 
 HOST_OBJECT_TYPE = "host"
