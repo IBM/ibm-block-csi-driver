@@ -694,13 +694,22 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def create_ear_replication(self, volume_internal_id, replication_policy):
         raise NotImplementedError
 
-    def delete_replication(self, replication_name):
+    def delete_mirror_replication(self, replication_name):
         raise NotImplementedError
 
-    def promote_replication_volume(self, replication_name):
+    def delete_ear_replication(self, volume_internal_id):
         raise NotImplementedError
 
-    def demote_replication_volume(self, replication_name):
+    def promote_mirror_replication_volume(self, replication_name):
+        raise NotImplementedError
+
+    def demote_mirror_replication_volume(self, replication_name):
+        raise NotImplementedError
+
+    def promote_ear_replication_volume(self, volume_group_id):
+        raise NotImplementedError
+
+    def demote_ear_replication_volume(self, volume_group_id):
         raise NotImplementedError
 
     def create_host(self, host_name, initiators, connectivity_type):
