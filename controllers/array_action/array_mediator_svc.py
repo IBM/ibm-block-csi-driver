@@ -101,9 +101,8 @@ def _is_space_efficiency_matches_source(parameter_space_efficiency, array_space_
            (parameter_space_efficiency and parameter_space_efficiency == array_space_efficiency)
 
 
-def build_create_volume_group_kwargs(name, replication_policy):
+def build_create_volume_group_kwargs(name):
     cli_kwargs = {
-        'replicationpolicy': replication_policy,
         'name': name
     }
     return cli_kwargs
@@ -362,6 +361,18 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 raise array_errors.InvalidArgumentError(ex.my_message)
             raise ex
 
+    def _chvolumegroup(self, volume_group_name, **cli_kwargs):
+        try:
+            self.client.svctask.chvolumegroup(volumegroup_name=volume_group_name, **cli_kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if is_warning_message(ex.my_message):
+                logger.warning(
+                    "exception encountered while changing volume group '{}': {}".format(cli_kwargs, ex.my_message))
+            else:
+                if OBJ_ALREADY_EXIST in ex.my_message:
+                    raise array_errors.VolumeAlreadyExists(cli_kwargs, self.endpoint)
+                raise ex
+
 
     def _lsvolumegroupreplication(self, volume_group_name):
         try:
@@ -375,13 +386,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 raise array_errors.InvalidArgumentError(ex.my_message)
             raise ex
 
-    def _chvolumegroupreplication(self, id, mode):
+    def _chvolumegroupreplication(self, volume_group_id, **cli_kwargs):
         try:
-            cli_kwargs = {
-                'id': id,
-                'mode': mode
-            }
-            self.client.svctask.chvolumegroupreplication(**cli_kwargs)
+            self.client.svctask.chvolumegroupreplication(volumegroup_id=volume_group_id, **cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if is_warning_message(ex.my_message):
                 logger.warning(
@@ -599,8 +606,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         target_volume_name = self._get_volume_name_by_wwn(volume_id)
         self._copy_to_target_volume(target_volume_name, source_name)
 
-    def _create_volume_group(self, name, replication_policy):
-        cli_kwargs = build_create_volume_group_kwargs(name, replication_policy)
+    def _create_volume_group(self, name):
+        cli_kwargs = build_create_volume_group_kwargs(name)
         self._mkvolumegroup(**cli_kwargs)
 
     def _create_volume_in_volume_group(self, name, pool, io_group, source_id):
@@ -1419,12 +1426,16 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def create_ear_replication(self, volume_internal_id, replication_policy):
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
-            raise NotImplementedError
+            return
+            #raise NotImplementedError
         cli_volume = self._get_cli_volume(volume_internal_id)
         volume_group_name = cli_volume.name + "_vg"
 
-        self._create_volume_group(volume_group_name, replication_policy)
+        # for phase 1 - create empty volume group and move volume into it
+        self._create_volume_group(volume_group_name)
         self._change_volume_group(volume_internal_id, volume_group_name)
+
+        self._change_volume_group_policy(volume_group_name, replication_policy)
 
     def _is_earreplication_supported(self):
         return hasattr(self.client.svctask, "chvolumereplicationinternals")
@@ -1466,10 +1477,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def delete_ear_replication(self, volume_internal_id):
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
-            raise NotImplementedError
+            return
+            #raise NotImplementedError
         cli_volume = self._get_cli_volume(volume_internal_id)
         volume_group_name = cli_volume.name + "_vg"
 
+        self._change_volume_group_policy(volume_group_name, None)
+
+        # for phase 1 - move volume outside the group and delete the volume group
         self._change_volume_group(volume_internal_id, None)
         self._rmvolumegroup(volume_group_name)
 
@@ -1518,22 +1533,26 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def promote_ear_replication_volume(self, volume_group_id):
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
-            raise NotImplementedError
+            return
+            #raise NotImplementedError
 
         cli_volume_group = self._get_cli_volume_group(volume_group_id)
+        cli_kwargs = {}
         if cli_volume_group.location1_replication_mode == ENDPOINT_TYPE_RECOVERY:
-            self._chvolumegroupreplication(volume_group_id, ENDPOINT_TYPE_INDEPENDENT)
+            cli_kwargs ['mode'] = ENDPOINT_TYPE_INDEPENDENT
+            self._chvolumegroupreplication(volume_group_id, **cli_kwargs)
 
-        self._chvolumegroupreplication(volume_group_id, ENDPOINT_TYPE_INDEPENDENT)
-
+        cli_kwargs ['mode'] = ENDPOINT_TYPE_PRODUCTION
+        self._chvolumegroupreplication(volume_group_id, **cli_kwargs)
 
     def demote_ear_replication_volume(self, volume_group_id):
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
-            raise NotImplementedError
+            return
+            #raise NotImplementedError
 
         logger.info("Demote volume is not supported in the current version")
-        raise NotImplementedError
+        #raise NotImplementedError
 
     def _get_host_name_if_equal(self, nvme_host, fc_host, iscsi_host):
         unique_names = {nvme_host, iscsi_host, fc_host}
@@ -1633,6 +1652,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         else:
             cli_kwargs['novolumegroup'] = True
         self._chvdisk(cli_volume_id, **cli_kwargs)
+
+    def _change_volume_group_policy(self, volume_group_name, replication_policy):
+        cli_kwargs = {}
+        if replication_policy:
+            cli_kwargs['replicationpolicy'] = replication_policy
+        else:
+            cli_kwargs['noreplicationpolicy'] = True
+        self._chvolumegroup(volume_group_name, **cli_kwargs)
 
     def _rename_volume(self, cli_volume_id, name):
         self._chvdisk(cli_volume_id, name=name)
