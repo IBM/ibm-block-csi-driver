@@ -9,6 +9,7 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 import controllers.servers.messages as messages
 import controllers.servers.settings as servers_settings
+import controllers.array_action.errors as array_errors
 from controllers.array_action.settings import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
     ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC
 from controllers.common import settings
@@ -635,3 +636,26 @@ def validate_parameters_match_source_volume(space_efficiency, required_bytes, vo
     if volume_capacity_bytes < required_bytes:
         raise ValidationException(messages.REQUIRED_BYTES_MISMATCH_MESSAGE.format(
             required_bytes, volume_capacity_bytes))
+
+
+def _get_connectivity_type_by_initiators(initiators):
+    if initiators.nvme_nqns:
+        return NVME_OVER_FC_CONNECTIVITY_TYPE
+    if initiators.fc_wwns:
+        return FC_CONNECTIVITY_TYPE
+    if initiators.iscsi_iqns:
+        return ISCSI_CONNECTIVITY_TYPE
+    return None
+
+
+def get_initiators_connectivity_type(initiators, connectivity_type):
+    if not connectivity_type:
+        connectivity_type = _get_connectivity_type_by_initiators(initiators)
+    return connectivity_type
+
+
+def get_connectivity_type_ports(initiators, connectivity_type):
+    ports = initiators.get_by_connectivity_type(connectivity_type)
+    if ports:
+        return ports
+    raise array_errors.NoPortFoundByConnectivityType(initiators, connectivity_type)

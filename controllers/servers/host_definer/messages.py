@@ -41,3 +41,7 @@ ADD_FINALIZER_TO_HOST_DEFINITION = 'Adding finalizer to host definition {}'
 REMOVE_FINALIZER_TO_HOST_DEFINITION = 'Removing finalizer from host definition {}'
 INVALID_SECRET_CONTENT_TYPE = 'Got invalid value [{}] in secret, from type {}, should be string'
 FAILED_TO_REMOVE_FINALIZER = 'Failed to remove {} finalizer from node'.format(settings.CSI_IBM_FINALIZER)
+NODE_ID_WAS_CHANGED = 'NodeId was changed for {} node, updating his ports in his definitions'
+UPDATE_HOST_DEFINITION_CONNECTIVITY_TYPE = 'update host definition {} connectivity type to {}'
+UPDATE_HOST_DEFINITION_PORTS = 'update host definition {} ports to {}'
+UPDATE_HOST_DEFINITION_NODE_NAME_ON_STORAGE = 'update host definition {} nodeNameOnStorage to {}'
