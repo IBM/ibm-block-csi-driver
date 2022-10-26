@@ -363,7 +363,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _chvolumegroup(self, volume_group_name, **cli_kwargs):
         try:
-            self.client.svctask.chvolumegroup(volumegroup_name=volume_group_name, **cli_kwargs)
+            self.client.svctask.chvolumegroup(object_id=volume_group_name, **cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if is_warning_message(ex.my_message):
                 logger.warning(
@@ -374,13 +374,13 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 raise ex
 
 
-    def _lsvolumegroupreplication(self, volume_group_name):
+    def _lsvolumegroupreplication(self, id_or_name):
         try:
-            return self.client.svcinfo.lsvolumegroupreplication(object_id=volume_group_name).as_single_element
+            return self.client.svcinfo.lsvolumegroupreplication(object_id=id_or_name).as_single_element
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if (SPECIFIED_OBJ_NOT_EXIST in ex.my_message or
                     NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message):
-                logger.info("volume group {} was not found".format(volume_group_name))
+                logger.info("volume group {} was not found".format(id_or_name))
                 return None
             if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
                 raise array_errors.InvalidArgumentError(ex.my_message)
@@ -388,7 +388,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _chvolumegroupreplication(self, volume_group_id, **cli_kwargs):
         try:
-            self.client.svctask.chvolumegroupreplication(volumegroup_id=volume_group_id, **cli_kwargs)
+            self.client.svctask.chvolumegroupreplication(object_id=volume_group_id, **cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if is_warning_message(ex.my_message):
                 logger.warning(
@@ -1536,9 +1536,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return
             #raise NotImplementedError
 
-        cli_volume_group = self._get_cli_volume_group(volume_group_id)
         cli_kwargs = {}
-        if cli_volume_group.location1_replication_mode == ENDPOINT_TYPE_RECOVERY:
+        cli_volume_group_replic = self._lsvolumegroupreplication(volume_group_id)
+        if cli_volume_group_replic.location1_replication_mode == ENDPOINT_TYPE_RECOVERY:
             cli_kwargs ['mode'] = ENDPOINT_TYPE_INDEPENDENT
             self._chvolumegroupreplication(volume_group_id, **cli_kwargs)
 
