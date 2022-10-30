@@ -401,7 +401,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_mirror_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
+    def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
         """
         This function will return the volume replication relationship info
 
@@ -439,7 +439,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_mirror_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
+    def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
         """
         This function will create and activate a volume replication relationship
 
@@ -479,7 +479,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def delete_mirror_replication(self, replication_name):
+    def delete_replication(self, replication_name):
         """
         This function will disable and delete a volume replication relationship
 
@@ -515,27 +515,9 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def promote_mirror_replication_volume(self, replication_name):
+    def promote_replication_volume(self, replication_name):
         """
         This function will promote the role of the volume in the connected system to be primary
-
-        Args:
-            replication_name : name of the replication relationship
-
-        Returns:
-            None
-
-        Raises:
-            ObjectNotFound
-            InvalidArgument
-            PermissionDenied
-        """
-        raise NotImplementedError
-
-    @abstractmethod
-    def demote_mirror_replication_volume(self, replication_name):
-        """
-        This function will demote the role of the volume in the connected system to be secondary
 
         Args:
             replication_name : name of the replication relationship
@@ -553,10 +535,28 @@ class ArrayMediator(ABC):
     @abstractmethod
     def promote_ear_replication_volume(self, volume_group_id):
         """
-        This function will promote the role of the volume in the connected system to be primary
+        This function will promote the role of the volume in the connected system to be production
 
         Args:
             volume_group_id : name of the volume group that is going to be promoted
+
+        Returns:
+            None
+
+        Raises:
+            ObjectNotFound
+            InvalidArgument
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def demote_replication_volume(self, replication_name):
+        """
+        This function will demote the role of the volume in the connected system to be secondary
+
+        Args:
+            replication_name : name of the replication relationship
 
         Returns:
             None

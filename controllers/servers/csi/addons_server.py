@@ -74,22 +74,22 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
     def _ensure_volume_role_for_replication(self, mediator, replication, is_to_promote, replication_type):
         if replication_type == array_settings.REPLICATION_TYPE_MIRROR:
-            return self._ensure_volume_role_for_mirror_replication(mediator, replication, is_to_promote)
+            return self._ensure_volume_role_for_replication(mediator, replication, is_to_promote)
         elif replication_type == array_settings.REPLICATION_TYPE_EAR:
             return self._ensure_volume_role_for_ear_replication(mediator, replication, is_to_promote)
 
     @staticmethod
-    def _ensure_volume_role_for_mirror_replication(mediator, replication, is_to_promote):
+    def _ensure_volume_role_for_replication(mediator, replication, is_to_promote):
         if is_to_promote:
             if replication.is_primary:
                 logger.info("idempotent case. volume is already primary")
             else:
                 logger.info("promoting volume for replication {}".format(replication.name))
-                mediator.promote_mirror_replication_volume(replication.name)
+                mediator.promote_replication_volume(replication.name)
         else:
             if replication.is_primary or replication.is_primary is None:
                 logger.info("demoting volume for replication {}".format(replication.name))
-                mediator.demote_mirror_replication_volume(replication.name)
+                mediator.demote_replication_volume(replication.name)
             else:
                 logger.info("idempotent case. volume is already secondary")
 
@@ -158,7 +158,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, volume_id_info.array_type).get_mediator() as mediator:
-            replication = mediator.get_mirror_replication(volume_internal_id, other_volume_internal_id, other_system_id)
+            replication = mediator.get_replication(volume_internal_id, other_volume_internal_id, other_system_id)
             if not replication:
                 message = "could not find replication for volume internal id: {} " \
                           "with volume internal id: {} of system: {}".format(volume_internal_id,
@@ -181,22 +181,15 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         return replication_type
 
     @staticmethod
-    def _get_mirror_replication(mediator, request, volume_internal_id):
-        other_volume_id_info = utils.get_volume_id_info(request.replication_id)
-        other_volume_internal_id = other_volume_id_info.ids.internal_id
-        other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
-
-        return mediator.get_mirror_replication(volume_internal_id, other_volume_internal_id, other_system_id)
-
-    @staticmethod
-    def _get_ear_replication(mediator, volume_internal_id):
-        return mediator.get_ear_replication(volume_internal_id)
-
-    def _get_replication(self, mediator, request, volume_internal_id, replication_type):
+    def _get_replication(mediator, request, volume_internal_id, replication_type):
         if replication_type == array_settings.REPLICATION_TYPE_MIRROR:
-            return self._get_mirror_replication(mediator, request, volume_internal_id)
+            other_volume_id_info = utils.get_volume_id_info(request.replication_id)
+            other_volume_internal_id = other_volume_id_info.ids.internal_id
+            other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
+
+            return mediator.get_replication(volume_internal_id, other_volume_internal_id, other_system_id)
         elif replication_type == array_settings.REPLICATION_TYPE_EAR:
-            return self._get_ear_replication(mediator, volume_internal_id)
+            return mediator.get_ear_replication(volume_internal_id)
 
         return None
 
@@ -209,7 +202,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             copy_type = request.parameters.get(servers_settings.PARAMETERS_COPY_TYPE, REPLICATION_DEFAULT_COPY_TYPE)
 
             logger.info("creating replication for volume {} with system: {}".format(volume.name, other_system_id))
-            mediator.create_mirror_replication(volume_internal_id, other_volume_internal_id, other_system_id, copy_type)
+            mediator.create_replication(volume_internal_id, other_volume_internal_id, other_system_id, copy_type)
 
         else:
             replication_policy = request.parameters.get(servers_settings.PARAMETERS_REPLICATION_POLICY)
@@ -220,6 +213,6 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
     @staticmethod
     def _delete_replication(mediator, volume_internal_id, replication, replication_type):
         if replication_type == array_settings.REPLICATION_TYPE_MIRROR:
-            mediator.delete_mirror_replication(replication.name)
+            mediator.delete_replication(replication.name)
         else:
             mediator.delete_ear_replication(volume_internal_id)

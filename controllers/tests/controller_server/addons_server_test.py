@@ -17,7 +17,7 @@ from controllers.tests.utils import ProtoBufMock
 ADDON_SERVER_PATH = "controllers.servers.csi.addons_server"
 
 
-class TestControllerServicerEnableMirrorReplication(unittest.TestCase, CommonControllerTest):
+class TestControllerServicerEnableVolumeReplication(unittest.TestCase, CommonControllerTest):
     @property
     def tested_method(self):
         return self.servicer.EnableVolumeReplication
@@ -44,27 +44,27 @@ class TestControllerServicerEnableMirrorReplication(unittest.TestCase, CommonCon
         self.mediator.get_object_by_id = Mock()
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(10, VOLUME_NAME,
                                                                                               VOLUME_UID, "xiv")
-        self.mediator.get_mirror_replication = Mock()
+        self.mediator.get_replication = Mock()
         replication_mock = utils.get_mock_mediator_response_replication(REPLICATION_NAME,
                                                                         OBJECT_INTERNAL_ID,
                                                                         OTHER_OBJECT_INTERNAL_ID)
-        self.mediator.get_mirror_replication.return_value = replication_mock
+        self.mediator.get_replication.return_value = replication_mock
         self.context = utils.FakeContext()
 
-    def _prepare_enable_mirror_replication_mocks(self):
-        self.mediator.get_mirror_replication = Mock()
-        self.mediator.get_mirror_replication.return_value = None
+    def _prepare_enable_replication_mocks(self):
+        self.mediator.get_replication = Mock()
+        self.mediator.get_replication.return_value = None
         self.mediator.create_replication = Mock()
 
-    def test_enable_mirror_replication_succeeds(self):
-        self._prepare_enable_mirror_replication_mocks()
+    def test_enable_replication_succeeds(self):
+        self._prepare_enable_replication_mocks()
 
         self.servicer.EnableVolumeReplication(self.request, self.context)
 
         self.assertEqual(grpc.StatusCode.OK, self.context.code)
-        self.mediator.get_mirror_replication.assert_called_once_with(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID,
+        self.mediator.get_replication.assert_called_once_with(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID,
                                                                      SYSTEM_ID)
-        self.mediator.create_mirror_replication.assert_called_once_with(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID,
+        self.mediator.create_replication.assert_called_once_with(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID,
                                                                         SYSTEM_ID, COPY_TYPE)
 
     def test_enable_replication_already_processing(self):

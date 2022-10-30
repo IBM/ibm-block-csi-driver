@@ -1359,7 +1359,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise RuntimeError(error_message)
         return rcrelationships[0] if rcrelationships else None
 
-    def get_mirror_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
+    def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
         rcrelationship = self._get_rcrelationship(volume_internal_id, other_volume_internal_id, other_system_id)
         if not rcrelationship:
             return None
@@ -1421,7 +1421,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             else:
                 logger.warning("failed to start rcrelationship '{}': {}".format(rcrelationship_id, ex))
 
-    def create_mirror_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
+    def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
         rc_id = self._create_rcrelationship(volume_internal_id, other_volume_internal_id, other_system_id, copy_type)
         self._start_rcrelationship(rc_id)
 
@@ -1467,7 +1467,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             else:
                 logger.warning("failed to delete rcrelationship '{0}': {1}".format(rcrelationship_id, ex))
 
-    def delete_mirror_replication(self, replication_name):
+    def delete_replication(self, replication_name):
         rcrelationship = self._get_rcrelationship_by_name(replication_name, not_exist_error=False)
         if not rcrelationship:
             logger.info("could not find replication with name {}".format(replication_name))
@@ -1517,7 +1517,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self._start_rcrelationship(rcrelationship.id, primary_endpoint_type=other_endpoint_type, force=True)
         self._promote_replication_endpoint(endpoint_type, rcrelationship.name)
 
-    def promote_mirror_replication_volume(self, replication_name):
+    def promote_replication_volume(self, replication_name):
         rcrelationship = self._get_rcrelationship_by_name(replication_name)
         if self._is_replication_disconnected(rcrelationship):
             self._stop_rcrelationship(rcrelationship.id, add_access_to_secondary=True)
@@ -1525,7 +1525,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         endpoint_type = self._get_replication_endpoint_type(rcrelationship)
         self._ensure_endpoint_is_primary(rcrelationship, endpoint_type)
 
-    def demote_mirror_replication_volume(self, replication_name):
+    def demote_replication_volume(self, replication_name):
         rcrelationship = self._get_rcrelationship_by_name(replication_name)
         endpoint_type_to_promote = self._get_replication_other_endpoint_type(rcrelationship)
         self._ensure_endpoint_is_primary(rcrelationship, endpoint_type_to_promote)
