@@ -42,7 +42,8 @@ class HostDefinitionWatcher(Watcher):
         while retries > 0:
             logger.info(messages.VERIFY_HOST_DEFINITION_USING_EXPONENTIAL_BACKOFF.format(
                 host_definition_info.name, retries))
-            if self._is_host_definition_not_pending(host_definition_info) and retries != 5:
+            if self._is_host_definition_not_pending(host_definition_info) and \
+                    retries != settings.HOST_DEFINITION_PENDING_RETRIES:
                 logger.info(messages.HOST_DEFINITION_IS_NOT_PENDING.format(host_definition_info.name))
                 return
             self._handle_pending_host_definition(host_definition_info)
