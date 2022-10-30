@@ -1,11 +1,8 @@
-import unittest
 from dataclasses import dataclass, field
 import func_timeout
 from munch import Munch
 from mock import patch, Mock
 
-from controllers.servers.host_definer.types import CsiNodeInfo
-import controllers.servers.host_definer.messages as messages
 import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as manifest_utils
 import controllers.tests.controller_server.host_definer.settings as settings
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
@@ -26,17 +23,9 @@ class HttpResp():
         return None
 
 
-def get_fake_csi_node_info():
-    csi_node_info = CsiNodeInfo()
-    csi_node_info.name = settings.FAKE_NODE_NAME
-    csi_node_info.node_id = settings.FAKE_NODE_ID
-    return csi_node_info
-
-
 def get_fake_k8s_csi_nodes(csi_provisioner):
-    k8s_csi_node = K8sResourceItems()
-    k8s_csi_node.items = [Munch.fromDict(manifest_utils.get_k8s_csi_node_manifest(csi_provisioner))]
-    return k8s_csi_node
+    k8s_csi_node_manifest = manifest_utils.get_k8s_csi_node_manifest(csi_provisioner)
+    return K8sResourceItems([Munch.fromDict(k8s_csi_node_manifest)])
 
 
 def get_fake_k8s_csi_node(csi_provisioner):
@@ -45,82 +34,58 @@ def get_fake_k8s_csi_node(csi_provisioner):
 
 
 def get_fake_csi_node_watch_event(event_type):
-    return {
-        settings.TYPE: event_type,
-        settings.OBJECT: manifest_utils.get_k8s_csi_node_manifest(settings.CSI_PROVISIONER_NAME)
-    }
+    return manifest_utils.generate_watch_event(event_type,
+                                               manifest_utils.get_k8s_csi_node_manifest(settings.CSI_PROVISIONER_NAME))
 
 
 def get_fake_k8s_node(label):
-    node_manifest = {
-        settings.METADATA: {
-            settings.NAME: settings.FAKE_NODE_NAME,
-            settings.LABELS: {label: settings.TRUE_STRING}
-        }
-    }
-    return Munch.fromDict(node_manifest)
+    return Munch.fromDict(manifest_utils.get_fake_k8s_node_manifest(label))
 
 
 def get_fake_k8s_daemon_set_items(updated_pods, desired_updated_pods):
-    k8s_daemon_set = K8sResourceItems()
     k8s_daemon_set_manifest = manifest_utils.get_fake_k8s_daemon_set_manifest(updated_pods, desired_updated_pods)
-    k8s_daemon_set.items = [Munch.fromDict(k8s_daemon_set_manifest)]
-    return k8s_daemon_set
+    return K8sResourceItems([Munch.fromDict(k8s_daemon_set_manifest)])
 
 
-def get_no_k8s_pods_items():
-    k8s_pod = K8sResourceItems()
-    k8s_pod.items = []
-    return k8s_pod
+def get_empty_k8s_pods():
+    return K8sResourceItems()
 
 
 def get_fake_k8s_pods_items():
-    k8s_pod = K8sResourceItems()
-    k8s_pod.items = [Munch.fromDict(manifest_utils.get_fake_k8s_pod_manifest())]
-    return k8s_pod
+    k8s_pod_manifest = manifest_utils.get_fake_k8s_pod_manifest()
+    return K8sResourceItems([Munch.fromDict(k8s_pod_manifest)])
 
 
-def get_empty_k8s_host_definitions_items():
-    k8s_host_definition = K8sResourceItems()
-    k8s_host_definition.items = []
-    return k8s_host_definition
+def get_empty_k8s_host_definitions():
+    return K8sResourceItems()
 
 
 def get_fake_k8s_host_definitions_items(host_definition_phase):
-    k8s_host_definition = K8sResourceItems()
-    k8s_host_definition.items = [_get_fake_k8s_host_definitions(host_definition_phase)]
-    return k8s_host_definition
+    return K8sResourceItems([_get_fake_k8s_host_definitions(host_definition_phase)])
 
 
 def _get_fake_k8s_host_definitions(host_definition_phase):
-    return Munch.fromDict(manifest_utils.get_fake_k8s_host_manifest(host_definition_phase))
+    return Munch.fromDict(manifest_utils.get_fake_k8s_host_definition_manifest(host_definition_phase))
 
 
 def get_fake_host_definition_watch_event(event_type, host_definition_phase):
-    return {
-        settings.TYPE: event_type,
-        settings.OBJECT: manifest_utils.get_fake_k8s_host_manifest(host_definition_phase)
-    }
+    return manifest_utils.generate_watch_event(
+        event_type, manifest_utils.get_fake_k8s_host_definition_manifest(host_definition_phase))
 
 
 def get_fake_node_watch_event(event_type):
-    return {
-        settings.TYPE: event_type,
-        settings.OBJECT: manifest_utils.get_fake_k8s_node_manifest()
-    }
+    return manifest_utils.generate_watch_event(event_type,
+                                               manifest_utils.get_fake_k8s_node_manifest(settings.MANAGE_NODE_LABEL))
 
 
 def get_fake_k8s_nodes_items():
-    k8s_nodes = K8sResourceItems()
-    k8s_nodes.items = [Munch.fromDict(manifest_utils.get_fake_k8s_node_manifest())]
-    return k8s_nodes
+    k8s_node_manifest = manifest_utils.get_fake_k8s_node_manifest(settings.MANAGE_NODE_LABEL)
+    return K8sResourceItems([Munch.fromDict(k8s_node_manifest)])
 
 
 def get_fake_secret_watch_event(event_type):
-    return {
-        settings.TYPE: event_type,
-        settings.OBJECT: manifest_utils.get_fake_k8s_secret_manifest()
-    }
+    return manifest_utils.generate_watch_event(event_type,
+                                               manifest_utils.get_fake_k8s_secret_manifest())
 
 
 def get_fake_k8s_secret():
@@ -128,16 +93,13 @@ def get_fake_k8s_secret():
 
 
 def get_fake_k8s_storage_class_items(provisioner):
-    k8s_storage_classes = K8sResourceItems()
-    k8s_storage_classes.items = [Munch.fromDict(manifest_utils.get_fake_k8s_storage_class_manifest(provisioner))]
-    return k8s_storage_classes
+    k8s_storage_classes_manifest = manifest_utils.get_fake_k8s_storage_class_manifest(provisioner)
+    return K8sResourceItems([Munch.fromDict(k8s_storage_classes_manifest)])
 
 
 def get_fake_secret_storage_event(event_type, provisioner):
-    return {
-        settings.TYPE: event_type,
-        settings.OBJECT: manifest_utils.get_fake_k8s_storage_class_manifest(provisioner)
-    }
+    return manifest_utils.generate_watch_event(event_type,
+                                               manifest_utils.get_fake_k8s_storage_class_manifest(provisioner))
 
 
 def patch_pending_variables():
@@ -201,6 +163,9 @@ def patch_secret_ids_global_variable(module_path):
     return patch('{}.SECRET_IDS'.format(module_path), {settings.FAKE_SECRET_ID: 1}).start()
 
 
-def assert_fail_to_update_label_log_message(http_resp_data, records):
-    unittest.TestCase().assertIn(messages.FAILED_TO_UPDATE_NODE_LABEL.format(
-        settings.FAKE_NODE_NAME, settings.MANAGE_NODE_LABEL, http_resp_data), records)
+def get_pending_creation_status_manifest():
+    return manifest_utils.get_status_phase_manifest(settings.PENDING_CREATION_PHASE)
+
+
+def get_ready_status_manifest():
+    return manifest_utils.get_status_phase_manifest(settings.READY_PHASE)

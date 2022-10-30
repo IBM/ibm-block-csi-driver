@@ -197,13 +197,11 @@ class KubernetesManager():
                 logger.error(messages.FAILED_TO_SET_HOST_DEFINITION_STATUS.format(host_definition_name, ex.body))
 
     def _get_status_manifest(self, host_definition_phase):
-        status = {
+        return {
             settings.STATUS: {
                 settings.PHASE: host_definition_phase,
             }
         }
-
-        return status
 
     def _generate_k8s_event(self, host_definition_info, message, action, message_type):
         return client.CoreV1Event(
