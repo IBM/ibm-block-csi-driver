@@ -421,6 +421,24 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def get_ear_replication(self, volume_internal_id):
+        """
+        This function will return the EAR volume group replication info
+
+        Args:
+            volume_internal_id : internal id of the volume in the replication
+
+        Returns:
+            Replication
+
+        Raises:
+            ObjectNotFound
+            InvalidArgument
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
         """
         This function will create and activate a volume replication relationship
@@ -430,6 +448,25 @@ class ArrayMediator(ABC):
             other_volume_internal_id : internal id of the other volume in the replication relationship
             other_system_id : id of the other system of the replication relationship
             copy_type : sync/async
+
+        Returns:
+            None
+
+        Raises:
+            ObjectNotFound
+            InvalidArgument
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def create_ear_replication(self, volume_internal_id, replication_policy):
+        """
+        This function will create EAR volume group replication
+
+        Args:
+            volume_internal_id : internal id of the volume in the replication
+            replication_policy : replication policy name or id
 
         Returns:
             None
@@ -460,6 +497,24 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def delete_ear_replication(self, volume_internal_id):
+        """
+        This function will disable and delete a volume replication
+
+        Args:
+            volume_internal_id : internal id of the volume in the replication
+
+        Returns:
+            None
+
+        Raises:
+            ObjectNotFound
+            InvalidArgument
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def promote_replication_volume(self, replication_name):
         """
         This function will promote the role of the volume in the connected system to be primary
@@ -478,12 +533,45 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def promote_ear_replication_volume(self, volume_group_id):
+        """
+        This function will promote the role of the volume in the connected system to be production
+
+        Args:
+            volume_group_id : name of the volume group that is going to be promoted
+
+        Returns:
+            None
+
+        Raises:
+            ObjectNotFound
+            InvalidArgument
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def demote_replication_volume(self, replication_name):
         """
         This function will demote the role of the volume in the connected system to be secondary
 
         Args:
             replication_name : name of the replication relationship
+
+        Returns:
+            None
+
+        Raises:
+            ObjectNotFound
+            InvalidArgument
+            PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def demote_ear_replication_volume(self):
+        """
+        This function will demote the role of the volume in the connected system to be secondary
 
         Returns:
             None

@@ -517,16 +517,31 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
         raise NotImplementedError
 
+    def get_ear_replication(self, volume_internal_id):
+        raise NotImplementedError
+
     def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
+        raise NotImplementedError
+
+    def create_ear_replication(self, volume_internal_id, replication_policy):
         raise NotImplementedError
 
     def delete_replication(self, replication_name):
         raise NotImplementedError
 
+    def delete_ear_replication(self, volume_internal_id):
+        raise NotImplementedError
+
     def promote_replication_volume(self, replication_name):
         raise NotImplementedError
 
+    def promote_ear_replication_volume(self, volume_group_id):
+        raise NotImplementedError
+
     def demote_replication_volume(self, replication_name):
+        raise NotImplementedError
+
+    def demote_ear_replication_volume(self):
         raise NotImplementedError
 
     def create_host(self, host_name, initiators, connectivity_type):
