@@ -541,7 +541,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def promote_ear_replication_volume(self, volume_group_id):
         raise NotImplementedError
 
-    def demote_ear_replication_volume(self, volume_group_id):
+    def demote_ear_replication_volume(self):
         raise NotImplementedError
 
     def create_host(self, host_name, initiators, connectivity_type):

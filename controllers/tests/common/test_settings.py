@@ -15,6 +15,7 @@ SPACE_EFFICIENCY = "thin"
 VIRT_SNAP_FUNC_TRUE = "true"
 DUMMY_IO_GROUP = "iogrp1"
 DUMMY_VOLUME_GROUP = "volgrp1"
+DUMMY_VOLUME_GROUP_ID = "0"
 
 VOLUME_OBJECT_TYPE = "volume"
 VOLUME_NAME = "volume_name"

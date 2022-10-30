@@ -40,7 +40,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
                     return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
                                                 pb2.EnableVolumeReplicationResponse)
                 elif replication_type == array_settings.REPLICATION_TYPE_EAR and \
-                    replication.volume_group_id != volume.group_id:
+                        replication.volume_group_id != volume.group_id:
                     message = "replication already exists " \
                               "but volume {} belongs to another group {}".format(volume.name, volume.volume_group_name)
                     return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
@@ -103,7 +103,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
                 mediator.promote_ear_replication_volume(replication.volume_group_id)
         else:
             logger.info("demoting volume for replication {}".format(replication.name))
-            mediator.demote_ear_replication_volume(replication.volume_group_id)
+            mediator.demote_ear_replication_volume()
 
     def _ensure_volume_role(self, request, context, is_to_promote, response_type):
         method_name = "PromoteVolume" if is_to_promote else "DemoteVolume"

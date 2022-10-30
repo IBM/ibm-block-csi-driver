@@ -569,12 +569,9 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def demote_mirror_replication_volume(self, volume_group_id):
+    def demote_ear_replication_volume(self):
         """
         This function will demote the role of the volume in the connected system to be secondary
-
-        Args:
-            volume_group_id : name of the volume group that is going to be demoted
 
         Returns:
             None

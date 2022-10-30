@@ -373,7 +373,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                     raise array_errors.VolumeAlreadyExists(cli_kwargs, self.endpoint)
                 raise ex
 
-
     def _lsvolumegroupreplication(self, id_or_name):
         try:
             return self.client.svcinfo.lsvolumegroupreplication(object_id=id_or_name).as_single_element
@@ -1427,7 +1426,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
             return
-            #raise NotImplementedError
         cli_volume = self._get_cli_volume(volume_internal_id)
         volume_group_name = cli_volume.name + "_vg"
 
@@ -1478,7 +1476,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
             return
-            #raise NotImplementedError
         cli_volume = self._get_cli_volume(volume_internal_id)
         volume_group_name = cli_volume.name + "_vg"
 
@@ -1534,25 +1531,21 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
             return
-            #raise NotImplementedError
-
         cli_kwargs = {}
         cli_volume_group_replic = self._lsvolumegroupreplication(volume_group_id)
         if cli_volume_group_replic.location1_replication_mode == ENDPOINT_TYPE_RECOVERY:
-            cli_kwargs ['mode'] = ENDPOINT_TYPE_INDEPENDENT
+            cli_kwargs['mode'] = ENDPOINT_TYPE_INDEPENDENT
             self._chvolumegroupreplication(volume_group_id, **cli_kwargs)
 
-        cli_kwargs ['mode'] = ENDPOINT_TYPE_PRODUCTION
+        cli_kwargs['mode'] = ENDPOINT_TYPE_PRODUCTION
         self._chvolumegroupreplication(volume_group_id, **cli_kwargs)
 
-    def demote_ear_replication_volume(self, volume_group_id):
+    def demote_ear_replication_volume(self):
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
             return
-            #raise NotImplementedError
 
         logger.info("Demote volume is not supported in the current version")
-        #raise NotImplementedError
 
     def _get_host_name_if_equal(self, nvme_host, fc_host, iscsi_host):
         unique_names = {nvme_host, iscsi_host, fc_host}
