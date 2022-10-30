@@ -1309,7 +1309,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             is_primary = self._is_replication_endpoint_primary(rcrelationship)
         else:
             name = "replication_" + volume_group_replication.id
-            copy_type = None
+            copy_type = array_settings.REPLICATION_COPY_TYPE_ASYNC
             is_ready = True
             is_primary = (volume_group_replication.location1_replication_mode == ENDPOINT_TYPE_PRODUCTION)
 
