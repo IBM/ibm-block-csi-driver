@@ -151,7 +151,6 @@ class RESTClient:
             captype='bytes',
             pool=pool_id,
             tp=thin_provisioning,
-            id=None
         )[0]
 
     def rename_volume(self, volume_id, new_name):
