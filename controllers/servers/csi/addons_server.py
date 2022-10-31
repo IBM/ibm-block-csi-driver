@@ -23,28 +23,29 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
         volume_id = volume_id_info.ids.uid
-        rep_request = utils.generate_addons_replication_request(request, replication_type)
+        replication_request = utils.generate_addons_replication_request(request, replication_type)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, volume_id_info.array_type).get_mediator() as mediator:
             volume = mediator.get_object_by_id(volume_id, servers_settings.VOLUME_TYPE_NAME)
             if not volume:
                 raise array_errors.ObjectNotFoundError(volume_id)
-            replication = mediator.get_replication(rep_request)
+            replication = mediator.get_replication(replication_request)
             if replication:
-                if replication.copy_type != rep_request.copy_type:
+                if replication.copy_type != replication_request.copy_type:
                     message = "replication already exists " \
-                              "but has copy type of {} and not {}".format(replication.copy_type, rep_request.copy_type)
+                              "but has copy type of {} and not {}".format(replication.copy_type,
+                                                                          replication_request.copy_type)
                     return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
                                                 pb2.EnableVolumeReplicationResponse)
                 logger.info("idempotent case. replication already exists "
                             "for volume {} with system: {}".format(volume.name,
-                                                                   rep_request.other_system_id))
+                                                                   replication_request.other_system_id))
                 return pb2.EnableVolumeReplicationResponse()
 
-            logger.info("creating replication for volume {} with system: {}".format(volume.name,
-                                                                                    rep_request.other_system_id))
-            mediator.create_replication(rep_request)
+            logger.info("creating replication for volume {} with system: {}"
+                        .format(volume.name, replication_request.other_system_id))
+            mediator.create_replication(replication_request)
 
         return pb2.EnableVolumeReplicationResponse()
 
@@ -54,18 +55,18 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         utils.validate_addons_request(request, replication_type)
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
-        rep_request = utils.generate_addons_replication_request(request, replication_type)
+        replication_request = utils.generate_addons_replication_request(request, replication_type)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, volume_id_info.array_type).get_mediator() as mediator:
-            replication = mediator.get_replication(rep_request)
+            replication = mediator.get_replication(replication_request)
             if replication:
                 logger.info("deleting replication {} with system {}".format(replication.name,
-                                                                            rep_request.other_system_id))
+                                                                            replication_request.other_system_id))
                 mediator.delete_replication(replication.name)
             else:
                 logger.info("idempotent case. replication is already deleted with system {}"
-                            .format(rep_request.other_system_id))
+                            .format(replication_request.other_system_id))
 
         return pb2.DisableVolumeReplicationResponse()
 
@@ -91,16 +92,16 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         utils.validate_addons_request(request, replication_type)
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
-        rep_request = utils.generate_addons_replication_request(request, replication_type)
+        replication_request = utils.generate_addons_replication_request(request, replication_type)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, volume_id_info.array_type).get_mediator() as mediator:
-            replication = mediator.get_replication(rep_request)
+            replication = mediator.get_replication(replication_request)
             if not replication:
-                message = "could not find replication for volume internal id: {} " \
-                          "with volume internal id: {} of system: {}".format(rep_request.volume_internal_id,
-                                                                             rep_request.other_volume_internal_id,
-                                                                             rep_request.other_system_id)
+                message = "could not find replication for volume internal id: {} with " \
+                          "volume internal id: {} of system: {}".format(replication_request.volume_internal_id,
+                                                                        replication_request.other_volume_internal_id,
+                                                                        replication_request.other_system_id)
                 return build_error_response(message, context, grpc.StatusCode.FAILED_PRECONDITION, response_type)
             logger.info("found replication {} on system {}".format(replication.name, mediator.identifier))
 
@@ -123,16 +124,16 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         utils.validate_addons_request(request, replication_type)
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
-        rep_request = utils.generate_addons_replication_request(request, replication_type)
+        replication_request = utils.generate_addons_replication_request(request, replication_type)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, volume_id_info.array_type).get_mediator() as mediator:
-            replication = mediator.get_replication(rep_request)
+            replication = mediator.get_replication(replication_request)
             if not replication:
-                message = "could not find replication for volume internal id: {} " \
-                          "with volume internal id: {} of system: {}".format(rep_request.volume_internal_id,
-                                                                             rep_request.other_volume_internal_id,
-                                                                             rep_request.other_system_id)
+                message = "could not find replication for volume internal id: {} with " \
+                          "volume internal id: {} of system: {}".format(replication_request.volume_internal_id,
+                                                                        replication_request.other_volume_internal_id,
+                                                                        replication_request.other_system_id)
                 return build_error_response(message, context, grpc.StatusCode.FAILED_PRECONDITION,
                                             pb2.ResyncVolumeResponse)
 
