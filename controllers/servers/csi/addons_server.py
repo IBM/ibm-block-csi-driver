@@ -25,8 +25,6 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
         volume_id = volume_id_info.ids.uid
-
-        copy_type = request.parameters.get(servers_settings.PARAMETERS_COPY_TYPE, REPLICATION_DEFAULT_COPY_TYPE)
         rep_request = self._generate_replication_request(request, replication_type)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
@@ -36,9 +34,9 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
                 raise array_errors.ObjectNotFoundError(volume_id)
             replication = mediator.get_replication(rep_request)
             if replication:
-                if replication.copy_type != copy_type:
+                if replication.copy_type != rep_request.copy_type:
                     message = "replication already exists " \
-                              "but has copy type of {} and not {}".format(replication.copy_type, copy_type)
+                              "but has copy type of {} and not {}".format(replication.copy_type, rep_request.copy_type)
                     return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
                                                 pb2.EnableVolumeReplicationResponse)
                 logger.info("idempotent case. replication already exists "
