@@ -16,6 +16,7 @@ from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstra
 from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controllers.common import settings as common_settings
 from controllers.common.csi_logger import get_stdout_logger
+from controllers.servers.utils import get_connectivity_type_ports
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -1562,15 +1563,16 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             self.client.svctask.mkhost(**cli_kwargs)
             return 200
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if is_warning_message(ex.my_message):
-                logger.warning("exception encountered during host {} creation : {}".format(host_name, ex.my_message))
             if OBJ_ALREADY_EXIST in ex.my_message:
                 raise array_errors.HostAlreadyExists(host_name, self.endpoint)
             if self._is_port_invalid(ex.my_message):
                 return 400
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during host {} creation : {}".format(host_name, ex.my_message))
             raise ex
 
-    def create_host(self, host_name, ports, connectivity_type):
+    def create_host(self, host_name, initiators, connectivity_type):
+        ports = get_connectivity_type_ports(initiators, connectivity_type)
         for port in ports:
             status_code = self._mkhost(host_name, connectivity_type, port)
             if status_code == 200:
@@ -1600,13 +1602,14 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             self.client.svctask.addhostport(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if is_warning_message(ex.my_message):
-                logger.warning("exception encountered during adding port {} to host {} : {}".format(
-                    port, host_name, ex.my_message))
             if not self._is_port_invalid(ex.my_message):
+                if is_warning_message(ex.my_message):
+                    logger.warning("exception encountered during adding port {} to host {} : {}".format(
+                        port, host_name, ex.my_message))
                 raise ex
 
-    def add_ports_to_host(self, host_name, ports, connectivity_type):
+    def add_ports_to_host(self, host_name, initiators, connectivity_type):
+        ports = get_connectivity_type_ports(initiators, connectivity_type)
         for port in ports:
             self._addhostport(host_name, connectivity_type, port)
         self._raise_error_when_no_ports_added(host_name)
@@ -1616,29 +1619,24 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             self.client.svctask.rmhostport(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if is_warning_message(ex.my_message):
-                logger.warning("exception encountered during removing port {} from host {} : {}".format(
-                    port, host_name, ex.my_message))
             if not self._is_port_invalid(ex.my_message):
+                if is_warning_message(ex.my_message):
+                    logger.warning("exception encountered during removing port {} from host {} : {}".format(
+                        port, host_name, ex.my_message))
                 raise ex
 
     def remove_ports_from_host(self, host_name, ports, connectivity_type):
         for port in ports:
             self._rmhostport(host_name, connectivity_type, port)
 
-    def get_host_ports(self, host_name, connectivity_type):
+    def get_host_connectivity_ports(self, host_name, connectivity_type):
         cli_host = self._get_cli_host(host_name)
-        ports = ''
         if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
-            ports = cli_host.nqn
+            return self._get_host_ports(cli_host, HOST_NQN)
         elif connectivity_type == array_settings.FC_CONNECTIVITY_TYPE:
-            ports = cli_host.WWPN
+            return self._get_host_ports(cli_host, HOST_WWPN)
         elif connectivity_type == array_settings.ISCSI_CONNECTIVITY_TYPE:
-            ports = cli_host.iscsi_name
-        if ports:
-            if type(ports) != list:
-                ports = [ports]
-            return ports
+            return self._get_host_ports(cli_host, HOST_ISCSI_NAME)
         raise array_errors.UnsupportedConnectivityTypeError(connectivity_type)
 
     def get_host_connectivity_type(self, host_name):

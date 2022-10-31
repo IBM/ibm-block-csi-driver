@@ -4,8 +4,7 @@ from controllers.array_action.storage_agent import detect_array_type, get_agent
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.node_info import NodeIdInfo
 from controllers.servers.host_definer.types import DefineHostResponse
-from controllers.servers.utils import (join_object_prefix_with_name,
-                                       get_initiators_connectivity_type, get_connectivity_type_ports)
+from controllers.servers.utils import join_object_prefix_with_name, get_initiators_connectivity_type
 
 logger = get_stdout_logger()
 
@@ -77,8 +76,7 @@ class HostDefinerServicer:
         elif self._is_port_update_needed_when_same_protocol(request, connectivity_type_from_user,
                                                             connectivity_type_from_host):
             self._remove_host_ports(array_mediator, host, connectivity_type_from_host)
-            ports_to_add = get_connectivity_type_ports(initiators, connectivity_type_from_user)
-            array_mediator.add_ports_to_host(host, ports_to_add, connectivity_type_from_user)
+            array_mediator.add_ports_to_host(host, initiators, connectivity_type_from_user)
 
     def _get_initiators_from_node_id(self, node_id):
         node_id_info = NodeIdInfo(node_id)
@@ -92,19 +90,18 @@ class HostDefinerServicer:
         return connectivity_type_from_host == array_config.NVME_OVER_FC_CONNECTIVITY_TYPE and \
             self._is_connectivity_type_scsi(connectivity_type_from_user)
 
-    def _is_connectivity_type_scsi(self, connectivity_type):
-        return connectivity_type in [array_config.FC_CONNECTIVITY_TYPE, array_config.ISCSI_CONNECTIVITY_TYPE]
-
     def _is_switching_from_scsi_to_nvme(self, connectivity_type_from_user, connectivity_type_from_host):
         return self._is_connectivity_type_scsi(connectivity_type_from_host) and \
             connectivity_type_from_user == array_config.NVME_OVER_FC_CONNECTIVITY_TYPE
 
+    def _is_connectivity_type_scsi(self, connectivity_type):
+        return connectivity_type in [array_config.FC_CONNECTIVITY_TYPE, array_config.ISCSI_CONNECTIVITY_TYPE]
+
     def _create_host(self, host, array_mediator, request):
         initiators = self._get_initiators_from_node_id(request.node_id_from_csi_node)
         connectivity_type = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
-        ports = get_connectivity_type_ports(initiators, connectivity_type)
-        array_mediator.create_host(host, ports, connectivity_type)
-        array_mediator.add_ports_to_host(host, ports, connectivity_type)
+        array_mediator.create_host(host, initiators, connectivity_type)
+        array_mediator.add_ports_to_host(host, initiators, connectivity_type)
 
     def _is_port_update_needed_when_same_protocol(
             self, request, connectivity_type_from_user, connectivity_type_from_host):
@@ -113,7 +110,7 @@ class HostDefinerServicer:
 
     def _remove_host_ports(self, array_mediator, host_name, connectivity_type):
         if connectivity_type:
-            ports_to_remove = array_mediator.get_host_ports(host_name, connectivity_type)
+            ports_to_remove = array_mediator.get_host_connectivity_ports(host_name, connectivity_type)
             array_mediator.remove_ports_from_host(host_name, ports_to_remove, connectivity_type)
 
     def _validate_host(self, host, initiators):
@@ -125,6 +122,6 @@ class HostDefinerServicer:
 
     def _generate_response(self, array_mediator, host_name, connectivity_type):
         define_host_response = DefineHostResponse(connectivity_type=connectivity_type, node_name_on_storage=host_name)
-        ports = array_mediator.get_host_ports(host_name, connectivity_type)
+        ports = array_mediator.get_host_connectivity_ports(host_name, connectivity_type)
         define_host_response.ports = ports
         return define_host_response

@@ -1187,19 +1187,19 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_mocks_for_get_host_by_identifiers_no_hosts()
         host_1 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID1, array_settings.DUMMY_HOST_NAME1, nqn_list=[
             array_settings.DUMMY_NVME_NQN1],
-                                         wwpns_list=[array_settings.DUMMY_FC_WWN1],
-                                         iscsi_names_list=[array_settings.DUMMY_NODE1_IQN])
+            wwpns_list=[array_settings.DUMMY_FC_WWN1],
+            iscsi_names_list=[array_settings.DUMMY_NODE1_IQN])
         host_2 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID2, array_settings.DUMMY_HOST_NAME2, nqn_list=[
             array_settings.DUMMY_NVME_NQN2],
-                                         wwpns_list=[array_settings.DUMMY_FC_WWN2],
-                                         iscsi_names_list=[array_settings.DUMMY_NODE2_IQN])
+            wwpns_list=[array_settings.DUMMY_FC_WWN2],
+            iscsi_names_list=[array_settings.DUMMY_NODE2_IQN])
         if custom_host:
             host_3 = custom_host
         else:
             host_3 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID3, array_settings.DUMMY_HOST_NAME3, nqn_list=[
                 array_settings.DUMMY_NVME_NQN3],
-                                             wwpns_list=[array_settings.DUMMY_FC_WWN3], iscsi_names_list=[
-                    array_settings.DUMMY_NODE3_IQN])
+                wwpns_list=[array_settings.DUMMY_FC_WWN3], iscsi_names_list=[
+                array_settings.DUMMY_NODE3_IQN])
         hosts = [host_1, host_2, host_3]
         self.svc.client.svcinfo.lshost = Mock()
         self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
@@ -1340,13 +1340,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_host_by_identifiers_slow_return_fc_host(self, svc_response):
         host_1 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID1, array_settings.DUMMY_HOST_NAME1, wwpns_list=[
             array_settings.DUMMY_FC_WWN1],
-                                         iscsi_names_list=[])
+            iscsi_names_list=[])
         host_2 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID2, array_settings.DUMMY_HOST_NAME2, wwpns_list=[
             array_settings.DUMMY_FC_WWN2],
-                                         iscsi_names_list=[])
+            iscsi_names_list=[])
         host_3 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID3, array_settings.DUMMY_HOST_NAME3, wwpns_list=[
             array_settings.DUMMY_FC_WWN3, array_settings.DUMMY_FC_WWN4],
-                                         iscsi_names_list=[array_settings.DUMMY_NODE3_IQN])
+            iscsi_names_list=[array_settings.DUMMY_NODE3_IQN])
         hosts = [host_1, host_2, host_3]
         self._prepare_mocks_for_get_host_by_identifiers_slow(svc_response)
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
@@ -1396,13 +1396,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_host_by_identifiers_slow_with_wrong_fc_iscsi_raise_not_found(self, svc_response):
         host_1 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID1, array_settings.DUMMY_HOST_NAME1, wwpns_list=[
             array_settings.DUMMY_FC_WWN1],
-                                         iscsi_names_list=[])
+            iscsi_names_list=[])
         host_2 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID2, array_settings.DUMMY_HOST_NAME2, wwpns_list=[
             array_settings.DUMMY_FC_WWN3],
-                                         iscsi_names_list=[array_settings.DUMMY_NODE2_IQN])
+            iscsi_names_list=[array_settings.DUMMY_NODE2_IQN])
         host_3 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID3, array_settings.DUMMY_HOST_NAME3, wwpns_list=[
             array_settings.DUMMY_FC_WWN3],
-                                         iscsi_names_list=[array_settings.DUMMY_NODE3_IQN])
+            iscsi_names_list=[array_settings.DUMMY_NODE3_IQN])
         hosts = [host_1, host_2, host_3]
         self._prepare_mocks_for_get_host_by_identifiers_slow(svc_response)
         with self.assertRaises(array_errors.HostNotFoundError):
@@ -1556,8 +1556,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_mediator_method_client_error(self.svc.map_volume, (
             common_settings.VOLUME_UID, common_settings.HOST_NAME,
             array_settings.DUMMY_CONNECTIVITY_TYPE),
-                                                self.svc.client.svctask.mkvdiskhostmap, client_error,
-                                                expected_error)
+            self.svc.client.svctask.mkvdiskhostmap, client_error,
+            expected_error)
 
     def test_map_volume_mkvdiskhostmap_errors(self):
         self._test_map_volume_mkvdiskhostmap_error(svc_errors.CommandExecutionError("CMMVC5804E"),
@@ -1598,8 +1598,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def _test_unmap_volume_rmvdiskhostmap_error(self, client_error, expected_error):
         self._test_mediator_method_client_error(self.svc.unmap_volume, (
             common_settings.VOLUME_UID, common_settings.HOST_NAME),
-                                                self.svc.client.svctask.rmvdiskhostmap, client_error,
-                                                expected_error)
+            self.svc.client.svctask.rmvdiskhostmap, client_error,
+            expected_error)
 
     def test_unmap_volume_rmvdiskhostmap_errors(self):
         self._test_unmap_volume_rmvdiskhostmap_error(svc_errors.CommandExecutionError("CMMVC5753E"),
@@ -1620,9 +1620,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def _prepare_mocks_for_get_iscsi_targets(self, portset_id=None):
         host = self._get_host_as_munch(array_settings.DUMMY_HOST_ID1, common_settings.HOST_NAME, wwpns_list=[
             array_settings.DUMMY_FC_WWN1],
-                                       iscsi_names_list=[array_settings.DUMMY_NODE1_IQN,
-                                                         array_settings.DUMMY_NODE2_IQN],
-                                       portset_id=portset_id)
+            iscsi_names_list=[array_settings.DUMMY_NODE1_IQN,
+                              array_settings.DUMMY_NODE2_IQN],
+            portset_id=portset_id)
         self.svc.client.svcinfo.lshost = Mock()
         self.svc.client.svcinfo.lshost.return_value = Mock(as_single_element=host)
 
@@ -1839,7 +1839,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                              Initiators([array_settings.DUMMY_NVME_NQN1],
                                         [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
                                         [array_settings.DUMMY_NODE1_IQN]),
-                             "")
+                             array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
         self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
                                                                nqn=array_settings.DUMMY_NVME_NQN1,
                                                                protocol=svc_settings.MKHOST_NVME_PROTOCOL_VALUE)
@@ -1847,41 +1847,181 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_create_host_fc_success(self):
         self.svc.create_host(common_settings.HOST_NAME,
                              Initiators([], [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2], [
-                                 array_settings.DUMMY_NODE1_IQN]), "")
+                                 array_settings.DUMMY_NODE1_IQN]), array_settings.FC_CONNECTIVITY_TYPE)
         self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
-                                                               fcwwpn=common_settings.FCS_DELIMITER.join(
-                                                                   [array_settings.DUMMY_FC_WWN1,
-                                                                    array_settings.DUMMY_FC_WWN2]))
+                                                               fcwwpn=array_settings.DUMMY_FC_WWN1)
+
+    def test_create_host_fc_when_one_port_is_not_valid_success(self):
+        self.svc.client.svctask.mkhost.side_effect = [CLIFailureError('CMMVC5867E'), Mock()]
+        self.svc.create_host(common_settings.HOST_NAME,
+                             Initiators([], [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2], []),
+                             array_settings.FC_CONNECTIVITY_TYPE)
+        self.assertEqual(self.svc.client.svctask.mkhost.call_count, 2)
 
     def test_create_host_iscsi_success(self):
-        self.svc.create_host(common_settings.HOST_NAME, Initiators([], [], [array_settings.DUMMY_NODE1_IQN]), "")
+        self.svc.create_host(common_settings.HOST_NAME, Initiators([], [], [array_settings.DUMMY_NODE1_IQN]),
+                             array_settings.ISCSI_CONNECTIVITY_TYPE)
         self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
                                                                iscsiname=array_settings.DUMMY_NODE1_IQN)
 
-    def test_create_host_with_connectivity_type_success(self):
-        self.svc.create_host("host_name", Initiators([], [], ['iqn.test.s1']), "iscsi")
-        self.svc.client.svctask.mkhost.assert_called_once_with(name='host_name', iscsiname='iqn.test.s1')
+    def test_create_host_fc_when_two_ports_are_not_valid_failed(self):
+        self.svc.client.svctask.mkhost.side_effect = [CLIFailureError('CMMVC5867E'), CLIFailureError('CMMVC5867E')]
+        with self.assertRaises(array_errors.NoPortIsValid):
+            self.svc.create_host(common_settings.HOST_NAME,
+                                 Initiators([], [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2], []),
+                                 array_settings.FC_CONNECTIVITY_TYPE)
+        self.assertEqual(self.svc.client.svctask.mkhost.call_count, 2)
 
     def test_create_host_with_connectivity_type_failed(self):
         with self.assertRaises(array_errors.NoPortFoundByConnectivityType):
-            self.svc.create_host("host_name", Initiators([], [], ['iqn.test.s1']), "nvmeofc")
+            self.svc.create_host(common_settings.HOST_NAME,
+                                 Initiators([], [], [array_settings.DUMMY_NODE1_IQN]),
+                                 svc_settings.MKHOST_NVME_PROTOCOL_VALUE)
         self.svc.client.svctask.mkhost.assert_not_called()
 
     def _test_create_host_mkhost_errors(self, client_error, expected_error, connectivity_type=""):
         self._test_mediator_method_client_error(self.svc.create_host,
-                                                ("host_name", Initiators([], [], ['iqn.test.s1']), connectivity_type),
+                                                (common_settings.HOST_NAME,
+                                                 Initiators([], [], [array_settings.DUMMY_NODE1_IQN]),
+                                                 connectivity_type),
                                                 self.svc.client.svctask.mkhost, client_error,
                                                 expected_error)
 
     def test_create_host_errors(self):
-        self._test_create_host_mkhost_errors(CLIFailureError('CMMVC6035E'), array_errors.HostAlreadyExists)
-        self._test_create_host_mkhost_errors(Exception("Failed"), Exception)
+        self._test_create_host_mkhost_errors(CLIFailureError('CMMVC6035E'),
+                                             array_errors.HostAlreadyExists, array_settings.ISCSI_CONNECTIVITY_TYPE)
+        self._test_create_host_mkhost_errors(Exception("Failed"), Exception, array_settings.ISCSI_CONNECTIVITY_TYPE)
 
     def _test_delete_host_rmhost_errors(self, client_error, expected_error):
         self._test_mediator_method_client_error(self.svc.delete_host,
-                                                ("host_name",),
+                                                (common_settings.HOST_NAME,),
                                                 self.svc.client.svctask.rmhost, client_error,
                                                 expected_error)
 
     def test_delete_host_errors(self):
         self._test_delete_host_rmhost_errors(Exception("Failed"), Exception)
+
+    def _prepare_mocks_for_add_ports_to_host(self, port_count):
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = Mock(as_single_element=Munch({
+            svc_settings.PORT_COUNT_FIELD: port_count}))
+
+    def test_add_nvme_ports_to_host_success(self):
+        self._prepare_mocks_for_add_ports_to_host(1)
+        self.svc.add_ports_to_host(common_settings.HOST_NAME,
+                                   Initiators([array_settings.DUMMY_NVME_NQN1],
+                                              [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
+                                              [array_settings.DUMMY_NODE1_IQN]),
+                                   array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+        self.svc.client.svctask.addhostport.assert_called_once_with(host_name=common_settings.HOST_NAME,
+                                                                    nqn=array_settings.DUMMY_NVME_NQN1)
+
+    def _test_add_fc_ports_to_host_success(self):
+        self._prepare_mocks_for_add_ports_to_host(1)
+        self.svc.add_ports_to_host(common_settings.HOST_NAME,
+                                   Initiators([array_settings.DUMMY_NVME_NQN1],
+                                              [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
+                                              [array_settings.DUMMY_NODE1_IQN]),
+                                   array_settings.FC_CONNECTIVITY_TYPE)
+        self.assertEqual(self.svc.client.svctask.addhostport.call_count, 2)
+        self.svc.client.svctask.addhostport.assert_called_with(host_name=common_settings.HOST_NAME,
+                                                               fcwwpn=array_settings.DUMMY_FC_WWN2)
+
+    def test_add_fc_ports_to_host_success(self):
+        self._test_add_fc_ports_to_host_success()
+
+    def test_add_fc_ports_to_host_when_one_port_is_not_valid_success(self):
+        self.svc.client.svctask.addhostport.side_effect = [CLIFailureError('CMMVC5867E'), Mock()]
+        self._test_add_fc_ports_to_host_success()
+
+    def test_add_iscsi_ports_to_host_success(self):
+        self._prepare_mocks_for_add_ports_to_host(1)
+        self.svc.add_ports_to_host(common_settings.HOST_NAME,
+                                   Initiators([array_settings.DUMMY_NVME_NQN1],
+                                              [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
+                                              [array_settings.DUMMY_NODE1_IQN]),
+                                   array_settings.ISCSI_CONNECTIVITY_TYPE)
+        self.svc.client.svctask.addhostport.assert_called_once_with(host_name=common_settings.HOST_NAME,
+                                                                    iscsiname=array_settings.DUMMY_NODE1_IQN)
+
+    def test_add_fc_ports_to_host_when_two_ports_are_not_valid_falied(self):
+        self._prepare_mocks_for_add_ports_to_host(0)
+        self.svc.client.svctask.addhostport.side_effect = [CLIFailureError('CMMVC5867E'), CLIFailureError('CMMVC5867E')]
+        with self.assertRaises(array_errors.NoPortIsValid):
+            self.svc.add_ports_to_host(common_settings.HOST_NAME,
+                                       Initiators([], [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2], []),
+                                       array_settings.FC_CONNECTIVITY_TYPE)
+        self.assertEqual(self.svc.client.svctask.addhostport.call_count, 2)
+
+    def test_add_ports_to_host_falied(self):
+        self._test_mediator_method_client_error(self.svc.add_ports_to_host,
+                                                (common_settings.HOST_NAME,
+                                                 Initiators([], [], [array_settings.DUMMY_NODE1_IQN]),
+                                                 array_settings.ISCSI_CONNECTIVITY_TYPE),
+                                                self.svc.client.svctask.addhostport, Exception("Failed"), Exception)
+
+    def test_remove_nvme_ports_from_host_success(self):
+        self.svc.remove_ports_from_host(common_settings.HOST_NAME,
+                                        [array_settings.DUMMY_NVME_NQN1],
+                                        array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+        self.svc.client.svctask.rmhostport.assert_called_once_with(host_name=common_settings.HOST_NAME,
+                                                                   nqn=array_settings.DUMMY_NVME_NQN1)
+
+    def _test_remove_fc_ports_from_host_success(self):
+        self.svc.remove_ports_from_host(common_settings.HOST_NAME,
+                                        [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
+                                        array_settings.FC_CONNECTIVITY_TYPE)
+        self.assertEqual(self.svc.client.svctask.rmhostport.call_count, 2)
+        self.svc.client.svctask.rmhostport.assert_called_with(host_name=common_settings.HOST_NAME,
+                                                              fcwwpn=array_settings.DUMMY_FC_WWN2)
+
+    def test_remove_fc_ports_from_host_success(self):
+        self._test_remove_fc_ports_from_host_success()
+
+    def test_remove_fc_ports_from_host_when_one_port_is_not_valid_success(self):
+        self.svc.client.svctask.rmhostport.side_effect = [CLIFailureError('CMMVC5867E'), Mock()]
+        self._test_remove_fc_ports_from_host_success()
+
+    def test_remove_iscsi_ports_from_host_success(self):
+        self.svc.remove_ports_from_host(common_settings.HOST_NAME,
+                                        [array_settings.DUMMY_NODE1_IQN],
+                                        array_settings.ISCSI_CONNECTIVITY_TYPE)
+        self.svc.client.svctask.rmhostport.assert_called_once_with(host_name=common_settings.HOST_NAME,
+                                                                   iscsiname=array_settings.DUMMY_NODE1_IQN)
+
+    def test_remove_ports_from_host_falied(self):
+        self._test_mediator_method_client_error(self.svc.remove_ports_from_host,
+                                                (common_settings.HOST_NAME,
+                                                 [array_settings.DUMMY_NODE1_IQN],
+                                                 array_settings.ISCSI_CONNECTIVITY_TYPE),
+                                                self.svc.client.svctask.rmhostport, Exception("Failed"), Exception)
+
+    def _prepare_mocks_for_get_host_with_ports(self, attribute_name):
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = Mock(as_single_element=Munch({
+            attribute_name: ['port1', 'port2']}))
+
+    def _test_get_host_connectivity_port(self, connectivity_attribute_name, connectivity_type):
+        self._prepare_mocks_for_get_host_with_ports(connectivity_attribute_name)
+        result = self.svc.get_host_connectivity_ports(common_settings.HOST_NAME, connectivity_type)
+        self.assertEqual(result, ['port1', 'port2'])
+
+    def test_get_host_connectivity_port_success(self):
+        self._test_get_host_connectivity_port(svc_settings.HOST_NQN, array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+        self._test_get_host_connectivity_port(svc_settings.HOST_WWPN, array_settings.FC_CONNECTIVITY_TYPE)
+        self._test_get_host_connectivity_port(svc_settings.HOST_ISCSI_NAME, array_settings.ISCSI_CONNECTIVITY_TYPE)
+
+    def test_get_host_connectivity_port_falied(self):
+        with self.assertRaises(array_errors.UnsupportedConnectivityTypeError):
+            self.svc.get_host_connectivity_ports(common_settings.HOST_NAME, 'some_connectivity_type')
+
+    def _test_get_host_connectivity_type(self, connectivity_attribute_name, connectivity_type):
+        self._prepare_mocks_for_get_host_with_ports(connectivity_attribute_name)
+        result = self.svc.get_host_connectivity_type(common_settings.HOST_NAME)
+        self.assertEqual(result, connectivity_type)
+
+    def test_get_host_connectivity_type_success(self):
+        self._test_get_host_connectivity_type(svc_settings.HOST_NQN, array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+        self._test_get_host_connectivity_type(svc_settings.HOST_WWPN, array_settings.FC_CONNECTIVITY_TYPE)
+        self._test_get_host_connectivity_type(svc_settings.HOST_ISCSI_NAME, array_settings.ISCSI_CONNECTIVITY_TYPE)
+        self._test_get_host_connectivity_type('some_connectivity_attribute_name', None)

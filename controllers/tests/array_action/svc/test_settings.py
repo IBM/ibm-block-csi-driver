@@ -133,3 +133,8 @@ MKHOST_NVME_PROTOCOL_VALUE = "nvme"
 
 GET_CLI_VOLUME_VDISK_UID_KEY = "vdisk_uid"
 GET_CLI_VOLUME_FCMAP_KEY = "fc_id"
+
+PORT_COUNT_FIELD = 'port_count'
+HOST_NQN = 'nqn'
+HOST_WWPN = 'WWPN'
+HOST_ISCSI_NAME = 'iscsi_name'

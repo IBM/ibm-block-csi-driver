@@ -88,6 +88,7 @@ class CsiNodeWatcher(Watcher):
                 csi_node_info.name, secret_name, secret_namespace)
             if host_definition_info:
                 if self._is_node_id_changed(host_definition_info.node_id, csi_node_info.node_id):
+                    logger.info('matan3')
                     logger.info(messages.NODE_ID_WAS_CHANGED.format(csi_node_info.name))
                     NODES[csi_node_info.name] = csi_node_info.node_id
                     self._create_definition(host_definition_info)
