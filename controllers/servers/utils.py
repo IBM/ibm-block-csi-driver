@@ -12,7 +12,7 @@ import controllers.servers.settings as servers_settings
 from controllers.array_action.array_action_types import ReplicationRequest
 from controllers.array_action.settings import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
     ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC, REPLICATION_TYPE_MIRROR, \
-    REPLICATION_DEFAULT_COPY_TYPE
+    REPLICATION_TYPE_EAR, REPLICATION_DEFAULT_COPY_TYPE
 from controllers.common import settings
 from controllers.common.config import config as common_config
 from controllers.common.csi_logger import get_stdout_logger
@@ -585,6 +585,16 @@ def validate_addons_request(request, replication_type):
     validate_secrets(request.secrets)
 
     logger.debug("addons request validation finished")
+
+
+def get_addons_replication_type(request):
+    if servers_settings.PARAMETERS_REPLICATION_POLICY in request.parameters:
+        replication_type = REPLICATION_TYPE_EAR
+    else:
+        replication_type = REPLICATION_TYPE_MIRROR
+
+    logger.info("replication type is {}".format(replication_type))
+    return replication_type
 
 
 def generate_addons_replication_request(request, replication_type):

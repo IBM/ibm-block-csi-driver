@@ -18,7 +18,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
     @csi_method(error_response_type=pb2.EnableVolumeReplicationResponse, lock_request_attribute="volume_id")
     def EnableVolumeReplication(self, request, context):
-        replication_type = self._get_replication_type(request)
+        replication_type = utils.get_addons_replication_type(request)
         utils.validate_addons_request(request, replication_type)
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
@@ -51,7 +51,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
     @csi_method(error_response_type=pb2.DisableVolumeReplicationResponse, lock_request_attribute="volume_id")
     def DisableVolumeReplication(self, request, context):
-        replication_type = self._get_replication_type(request)
+        replication_type = utils.get_addons_replication_type(request)
         utils.validate_addons_request(request, replication_type)
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
@@ -88,7 +88,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
     def _ensure_volume_role(self, request, context, is_to_promote, response_type):
         method_name = "PromoteVolume" if is_to_promote else "DemoteVolume"
         logger.info(method_name)
-        replication_type = self._get_replication_type(request)
+        replication_type = utils.get_addons_replication_type(request)
         utils.validate_addons_request(request, replication_type)
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
@@ -120,7 +120,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
     @csi_method(error_response_type=pb2.ResyncVolumeResponse, lock_request_attribute="volume_id")
     def ResyncVolume(self, request, context):
-        replication_type = self._get_replication_type(request)
+        replication_type = utils.get_addons_replication_type(request)
         utils.validate_addons_request(request, replication_type)
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
@@ -139,13 +139,3 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         logger.info("is replication {} ready: {}".format(replication.name, replication.is_ready))
         return pb2.ResyncVolumeResponse(ready=replication.is_ready)
-
-    @staticmethod
-    def _get_replication_type(request):
-        if servers_settings.PARAMETERS_REPLICATION_POLICY in request.parameters:
-            replication_type = array_settings.REPLICATION_TYPE_EAR
-        else:
-            replication_type = array_settings.REPLICATION_TYPE_MIRROR
-
-        logger.info("replication type is {}".format(replication_type))
-        return replication_type
