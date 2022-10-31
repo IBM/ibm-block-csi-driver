@@ -64,10 +64,10 @@ class TestControllerServicerEnableVolumeReplication(unittest.TestCase, CommonCon
         self.servicer.EnableVolumeReplication(self.request, self.context)
 
         self.assertEqual(grpc.StatusCode.OK, self.context.code)
-        rep_request = ReplicationRequest(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID, SYSTEM_ID, COPY_TYPE,
+        replication_request = ReplicationRequest(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID, SYSTEM_ID, COPY_TYPE,
                                          REPLICATION_TYPE_MIRROR)
-        self.mediator.get_replication.assert_called_once_with(rep_request)
-        self.mediator.create_replication.assert_called_once_with(rep_request)
+        self.mediator.get_replication.assert_called_once_with(replication_request)
+        self.mediator.create_replication.assert_called_once_with(replication_request)
 
     def test_enable_replication_already_processing(self):
         self._test_request_already_processing("volume_id", self.request.volume_id)
