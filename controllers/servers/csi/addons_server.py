@@ -5,8 +5,6 @@ from csi_general import replication_pb2_grpc as pb2_grpc
 import controllers.servers.settings as servers_settings
 import controllers.array_action.settings as array_settings
 from controllers.array_action import errors as array_errors
-from controllers.array_action.settings import REPLICATION_DEFAULT_COPY_TYPE
-from controllers.array_action.array_action_types import ReplicationRequest
 from controllers.array_action.storage_agent import get_agent
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers import utils
@@ -25,7 +23,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
         volume_id = volume_id_info.ids.uid
-        rep_request = self._generate_replication_request(request, replication_type)
+        rep_request = utils.generate_addons_replication_request(request, replication_type)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, volume_id_info.array_type).get_mediator() as mediator:
@@ -56,7 +54,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         utils.validate_addons_request(request, replication_type)
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
-        rep_request = self._generate_replication_request(request, replication_type)
+        rep_request = utils.generate_addons_replication_request(request, replication_type)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, volume_id_info.array_type).get_mediator() as mediator:
@@ -93,7 +91,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         utils.validate_addons_request(request, replication_type)
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
-        rep_request = self._generate_replication_request(request, replication_type)
+        rep_request = utils.generate_addons_replication_request(request, replication_type)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, volume_id_info.array_type).get_mediator() as mediator:
@@ -125,7 +123,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         utils.validate_addons_request(request, replication_type)
 
         volume_id_info = utils.get_volume_id_info(request.volume_id)
-        rep_request = self._generate_replication_request(request, replication_type)
+        rep_request = utils.generate_addons_replication_request(request, replication_type)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, volume_id_info.array_type).get_mediator() as mediator:
@@ -150,19 +148,3 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         logger.info("replication type is {}".format(replication_type))
         return replication_type
-
-    @staticmethod
-    def _generate_replication_request(request, replication_type):
-        volume_id_info = utils.get_volume_id_info(request.volume_id)
-        volume_internal_id = volume_id_info.ids.internal_id
-
-        other_volume_id_info = utils.get_volume_id_info(request.replication_id)
-        other_volume_internal_id = other_volume_id_info.ids.internal_id
-
-        other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
-        copy_type = request.parameters.get(servers_settings.PARAMETERS_COPY_TYPE, REPLICATION_DEFAULT_COPY_TYPE)
-        return ReplicationRequest(volume_internal_id=volume_internal_id,
-                                  other_volume_internal_id=other_volume_internal_id,
-                                  other_system_id=other_system_id,
-                                  copy_type=copy_type,
-                                  replication_type=replication_type)

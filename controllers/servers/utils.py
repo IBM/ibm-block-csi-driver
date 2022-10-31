@@ -9,8 +9,10 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 import controllers.servers.messages as messages
 import controllers.servers.settings as servers_settings
+from controllers.array_action.array_action_types import ReplicationRequest
 from controllers.array_action.settings import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
-    ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC, REPLICATION_TYPE_MIRROR
+    ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC, REPLICATION_TYPE_MIRROR, \
+    REPLICATION_DEFAULT_COPY_TYPE
 from controllers.common import settings
 from controllers.common.config import config as common_config
 from controllers.common.csi_logger import get_stdout_logger
@@ -583,6 +585,22 @@ def validate_addons_request(request, replication_type):
     validate_secrets(request.secrets)
 
     logger.debug("addons request validation finished")
+
+
+def generate_addons_replication_request(request, replication_type):
+    volume_id_info = get_volume_id_info(request.volume_id)
+    volume_internal_id = volume_id_info.ids.internal_id
+
+    other_volume_id_info = get_volume_id_info(request.replication_id)
+    other_volume_internal_id = other_volume_id_info.ids.internal_id
+
+    other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
+    copy_type = request.parameters.get(servers_settings.PARAMETERS_COPY_TYPE, REPLICATION_DEFAULT_COPY_TYPE)
+    return ReplicationRequest(volume_internal_id=volume_internal_id,
+                              other_volume_internal_id=other_volume_internal_id,
+                              other_system_id=other_system_id,
+                              copy_type=copy_type,
+                              replication_type=replication_type)
 
 
 def get_current_timestamp():
