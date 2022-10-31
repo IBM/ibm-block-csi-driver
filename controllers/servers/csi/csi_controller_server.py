@@ -451,21 +451,21 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             return handle_exception(ex, context, grpc.StatusCode.INTERNAL,
                                     csi_pb2.ControllerExpandVolumeResponse)
 
+    def _get_controller_service_capability(self, capability_name):
+        types = csi_pb2.ControllerServiceCapability.RPC.Type
+        capability_enum_value = types.Value(capability_name)
+        return csi_pb2.ControllerServiceCapability(
+            rpc=csi_pb2.ControllerServiceCapability.RPC(type=capability_enum_value))
+
     def ControllerGetCapabilities(self, request, context):
         logger.info("ControllerGetCapabilities")
-        types = csi_pb2.ControllerServiceCapability.RPC.Type
-
         response = csi_pb2.ControllerGetCapabilitiesResponse(
-            capabilities=[csi_pb2.ControllerServiceCapability(
-                rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_VOLUME"))),
-                csi_pb2.ControllerServiceCapability(
-                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_SNAPSHOT"))),
-                csi_pb2.ControllerServiceCapability(
-                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("PUBLISH_UNPUBLISH_VOLUME"))),
-                csi_pb2.ControllerServiceCapability(
-                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CLONE_VOLUME"))),
-                csi_pb2.ControllerServiceCapability(
-                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("EXPAND_VOLUME")))])
+            capabilities=[self._get_controller_service_capability("CREATE_DELETE_VOLUME"),
+                          self._get_controller_service_capability("CREATE_DELETE_SNAPSHOT"),
+                          self._get_controller_service_capability("PUBLISH_UNPUBLISH_VOLUME"),
+                          self._get_controller_service_capability("CLONE_VOLUME"),
+                          self._get_controller_service_capability("EXPAND_VOLUME"),
+                          self._get_controller_service_capability("CREATE_DELETE_VOLUME_GROUP")])
 
         logger.info("finished ControllerGetCapabilities")
         return response
