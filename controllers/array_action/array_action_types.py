@@ -31,6 +31,15 @@ class Replication:
 
 
 @dataclass
+class ReplicationRequest:
+    volume_internal_id: str
+    other_volume_internal_id: str
+    other_system_id: str
+    copy_type: str
+    replication_type: str
+
+
+@dataclass
 class Host:
     name: str
     connectivity_types: list = field(repr=False)

@@ -1267,8 +1267,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise RuntimeError(error_message)
         return rcrelationships[0] if rcrelationships else None
 
-    def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
-        rcrelationship = self._get_rcrelationship(volume_internal_id, other_volume_internal_id, other_system_id)
+    def get_replication(self, replication_request):
+        rcrelationship = self._get_rcrelationship(replication_request.volume_internal_id,
+                                                  replication_request.other_volume_internal_id,
+                                                  replication_request.other_system_id)
         if not rcrelationship:
             return None
         logger.info("found rcrelationship: {}".format(rcrelationship))
@@ -1276,9 +1278,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _is_earreplication_supported(self):
         return hasattr(self.client.svctask, "chvolumereplicationinternals")
-
-    def get_ear_replication(self, volume_internal_id):
-        return None
 
     def _create_rcrelationship(self, master_cli_volume_id, aux_cli_volume_id, other_system_id, copy_type):
         logger.info("creating remote copy relationship for master volume id: {0} "
@@ -1320,12 +1319,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             else:
                 logger.warning("failed to start rcrelationship '{}': {}".format(rcrelationship_id, ex))
 
-    def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
-        rc_id = self._create_rcrelationship(volume_internal_id, other_volume_internal_id, other_system_id, copy_type)
+    def create_replication(self, replication_request):
+        rc_id = self._create_rcrelationship(replication_request.volume_internal_id,
+                                            replication_request.other_volume_internal_id,
+                                            replication_request.other_system_id,
+                                            replication_request.copy_type)
         self._start_rcrelationship(rc_id)
-
-    def create_ear_replication(self, volume_internal_id, replication_policy):
-        pass
 
     def _stop_rcrelationship(self, rcrelationship_id, add_access_to_secondary=False):
         logger.info("stopping remote copy relationship with id: {}. access: {}".format(rcrelationship_id,
@@ -1360,9 +1359,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return
         self._stop_rcrelationship(rcrelationship.id)
         self._delete_rcrelationship(rcrelationship.id)
-
-    def delete_ear_replication(self, volume_internal_id):
-        pass
 
     def _promote_replication_endpoint(self, endpoint_type, replication_name):
         logger.info("making '{}' primary for remote copy relationship {}".format(endpoint_type, replication_name))
@@ -1405,15 +1401,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         rcrelationship = self._get_rcrelationship_by_name(replication_name)
         endpoint_type_to_promote = self._get_replication_other_endpoint_type(rcrelationship)
         self._ensure_endpoint_is_primary(rcrelationship, endpoint_type_to_promote)
-
-    def promote_ear_replication_volume(self, volume_group_id):
-        if not self._is_earreplication_supported():
-            logger.info("EAR replication is not supported on the existing storage")
-
-    def demote_ear_replication_volume(self):
-        if not self._is_earreplication_supported():
-            logger.info("EAR replication is not supported on the existing storage")
-            return
 
     def _get_host_name_if_equal(self, nvme_host, fc_host, iscsi_host):
         unique_names = {nvme_host, iscsi_host, fc_host}
