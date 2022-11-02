@@ -1225,7 +1225,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         is_primary = self._is_replication_endpoint_primary(rcrelationship)
         return Replication(name=rcrelationship.name,
                            copy_type=copy_type,
-                           volume_group_id=None,
                            is_ready=is_ready,
                            is_primary=is_primary)
 

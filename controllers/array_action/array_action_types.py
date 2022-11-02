@@ -26,10 +26,10 @@ class Snapshot(Volume):
 @dataclass
 class Replication:
     name: str
-    volume_group_id: str
     copy_type: str
     is_ready: str
     is_primary: str = None
+    volume_group_id: str = None
 
 
 @dataclass
