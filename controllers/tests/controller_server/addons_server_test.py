@@ -5,6 +5,8 @@ from csi_general import replication_pb2 as pb2
 from mock import Mock, MagicMock
 
 from controllers.servers.settings import PARAMETERS_SYSTEM_ID, PARAMETERS_COPY_TYPE
+from controllers.array_action.settings import REPLICATION_TYPE_MIRROR
+from controllers.array_action.array_action_types import ReplicationRequest
 from controllers.servers.csi.addons_server import ReplicationControllerServicer
 from controllers.tests import utils
 from controllers.tests.common.test_settings import VOLUME_NAME, VOLUME_UID, OBJECT_INTERNAL_ID, \
@@ -62,9 +64,10 @@ class TestControllerServicerEnableVolumeReplication(unittest.TestCase, CommonCon
         self.servicer.EnableVolumeReplication(self.request, self.context)
 
         self.assertEqual(grpc.StatusCode.OK, self.context.code)
-        self.mediator.get_replication.assert_called_once_with(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID, SYSTEM_ID)
-        self.mediator.create_replication.assert_called_once_with(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID,
-                                                                 SYSTEM_ID, COPY_TYPE)
+        replication_request = ReplicationRequest(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID, SYSTEM_ID, COPY_TYPE,
+                                         REPLICATION_TYPE_MIRROR)
+        self.mediator.get_replication.assert_called_once_with(replication_request)
+        self.mediator.create_replication.assert_called_once_with(replication_request)
 
     def test_enable_replication_already_processing(self):
         self._test_request_already_processing("volume_id", self.request.volume_id)
