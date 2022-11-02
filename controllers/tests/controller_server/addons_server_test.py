@@ -65,7 +65,7 @@ class TestControllerServicerEnableVolumeReplication(unittest.TestCase, CommonCon
 
         self.assertEqual(grpc.StatusCode.OK, self.context.code)
         replication_request = ReplicationRequest(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID, SYSTEM_ID, COPY_TYPE,
-                                                 REPLICATION_TYPE_MIRROR)
+                                                 REPLICATION_TYPE_MIRROR, None)
         self.mediator.get_replication.assert_called_once_with(replication_request)
         self.mediator.create_replication.assert_called_once_with(replication_request)
 

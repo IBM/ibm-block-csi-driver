@@ -39,6 +39,7 @@ class ReplicationRequest:
     other_system_id: str
     copy_type: str
     replication_type: str
+    replication_policy: str = None
 
 
 @dataclass

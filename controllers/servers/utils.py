@@ -606,11 +606,16 @@ def generate_addons_replication_request(request, replication_type):
 
     other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
     copy_type = request.parameters.get(servers_settings.PARAMETERS_COPY_TYPE, REPLICATION_DEFAULT_COPY_TYPE)
+
+    replication_policy = None
+    if servers_settings.PARAMETERS_REPLICATION_POLICY in request.parameters:
+        replication_policy = request.parameters.get(servers_settings.PARAMETERS_REPLICATION_POLICY)
     return ReplicationRequest(volume_internal_id=volume_internal_id,
                               other_volume_internal_id=other_volume_internal_id,
                               other_system_id=other_system_id,
                               copy_type=copy_type,
-                              replication_type=replication_type)
+                              replication_type=replication_type,
+                              replication_policy=replication_policy)
 
 
 def get_current_timestamp():
