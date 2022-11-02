@@ -45,15 +45,15 @@ class TestWatchHostDefinitionsResources(HostDefinitionWatcherBase):
             [test_utils.get_fake_host_definition_watch_event(settings.MODIFIED_EVENT_TYPE,
                                                              settings.PENDING_DELETION_PHASE)])
         self._default_pending_mocks()
-        self.mock_os.getenv.return_value = settings.TRUE_STRING
-        self.host_definition_watcher.core_api.read_node.return_value = self.fake_k8s_node_with_manage_node_label
+        self.os.getenv.return_value = settings.TRUE_STRING
+        self.host_definition_watcher.core_api.read_node.return_value = self.k8s_node_with_manage_node_label
         self.host_definition_watcher.storage_host_servicer.undefine_host.return_value = DefineHostResponse()
         self.host_definition_watcher.csi_nodes_api.get.return_value = test_utils.get_fake_k8s_csi_node(
             settings.CSI_PROVISIONER_NAME)
 
     def test_handle_pending_host_definition_that_became_ready(self):
         self._default_pending_creation()
-        self.host_definition_watcher.host_definitions_api.get.return_value = self.fake_ready_k8s_host_definitions
+        self.host_definition_watcher.host_definitions_api.get.return_value = self.ready_k8s_host_definitions
         test_utils.patch_pending_variables()
         test_utils.run_function_with_timeout(self.host_definition_watcher.watch_host_definitions_resources, 0.5)
         self.host_definition_watcher.storage_host_servicer.define_host.assert_called_once()

@@ -10,7 +10,7 @@ class SecretWatcherBase(BaseSetUp):
     def setUp(self):
         super().setUp()
         self.secret_watcher = test_utils.get_class_mock(SecretWatcher)
-        self.mock_secret_ids_on_secret_watcher = test_utils.patch_secret_ids_global_variable(
+        self.secret_ids_on_secret_watcher = test_utils.patch_secret_ids_global_variable(
             settings.SECRET_WATCHER_PATH)
 
 
@@ -35,13 +35,13 @@ class TestWatchSecretResources(SecretWatcherBase):
 
     def test_do_not_create_definitions_when_managed_secret_modified_but_no_managed_nodes(self):
         self._default_secret_mocks()
-        self.mock_nodes_on_watcher_helper.pop(settings.FAKE_NODE_NAME)
+        self.nodes_on_watcher_helper.pop(settings.FAKE_NODE_NAME)
         self.secret_watcher.watch_secret_resources()
         self.secret_watcher.storage_host_servicer.define_host.assert_not_called()
 
     def test_modified_secret_that_is_not_in_managed_secrets(self):
         self._default_secret_mocks()
-        self.mock_secret_ids_on_secret_watcher.pop(settings.FAKE_SECRET_ID)
+        self.secret_ids_on_secret_watcher.pop(settings.FAKE_SECRET_ID)
         self.secret_watcher.watch_secret_resources()
         self.secret_watcher.storage_host_servicer.define_host.assert_not_called()
 
