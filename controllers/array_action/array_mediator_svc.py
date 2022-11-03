@@ -621,7 +621,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def _create_cli_volume_from_snapshot(self, name, pool, io_group, volume_group, source_id):
         logger.info("creating volume from snapshot")
         self._create_volume_in_volume_group(name, pool, io_group, source_id)
-        cli_volume_id = self._get_cli_volume_id_from_volume_group(name)
+        cli_volume_id = self._get_cli_volume_id_from_volume_group("volume_group_name", name)
         try:
             self._fix_creation_side_effects(name, cli_volume_id, volume_group)
         except (svc_errors.CommandExecutionError, CLIFailureError, array_errors.VolumeAlreadyExists) as ex:
@@ -1301,23 +1301,26 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return array_settings.REPLICATION_COPY_TYPE_ASYNC
         return array_settings.REPLICATION_COPY_TYPE_SYNC
 
-    def _generate_replication_response(self, rcrelationship, volume_group_replication=None):
-        if rcrelationship is not None:
-            name = rcrelationship.name
-            copy_type = self._get_replication_copy_type(rcrelationship)
-            is_ready = self._is_replication_ready(rcrelationship)
-            is_primary = self._is_replication_endpoint_primary(rcrelationship)
-        else:
-            name = "replication_" + volume_group_replication.id
-            copy_type = array_settings.REPLICATION_COPY_TYPE_ASYNC
-            is_ready = True
-            is_primary = (volume_group_replication.location1_replication_mode == ENDPOINT_TYPE_PRODUCTION)
-
-        return Replication(name=name,
-                           volume_group_id=volume_group_replication.id,
+    def _generate_replication_response(self, rcrelationship):
+        copy_type = self._get_replication_copy_type(rcrelationship)
+        is_ready = self._is_replication_ready(rcrelationship)
+        is_primary = self._is_replication_endpoint_primary(rcrelationship)
+        return Replication(name=rcrelationship.name,
                            copy_type=copy_type,
                            is_ready=is_ready,
                            is_primary=is_primary)
+
+    def _generate_ear_replication_response(self, volume_group_replication, replication_mode):
+        name = volume_group_replication.replication_policy_name
+        copy_type = array_settings.REPLICATION_COPY_TYPE_ASYNC
+        is_ready = True
+        is_primary = (replication_mode == ENDPOINT_TYPE_PRODUCTION)
+
+        return Replication(name=name,
+                           copy_type=copy_type,
+                           is_ready=is_ready,
+                           is_primary=is_primary,
+                           volume_group_id=volume_group_replication.id)
 
     def _lsrcrelationship(self, filter_value):
         return self.client.svcinfo.lsrcrelationship(filtervalue=filter_value)
@@ -1360,6 +1363,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return rcrelationships[0] if rcrelationships else None
 
     def get_replication(self, replication_request):
+        if replication_request.replication_type == array_settings.REPLICATION_TYPE_MIRROR:
+            return self._get_replication(replication_request)
+        elif replication_request.replication_type == array_settings.REPLICATION_TYPE_EAR:
+            return self._get_ear_replication(replication_request)
+
+    def _get_replication(self, replication_request):
         rcrelationship = self._get_rcrelationship(replication_request.volume_internal_id,
                                                   replication_request.other_volume_internal_id,
                                                   replication_request.other_system_id)
@@ -1368,8 +1377,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.info("found rcrelationship: {}".format(rcrelationship))
         return self._generate_replication_response(rcrelationship)
 
-    def get_ear_replication(self, volume_internal_id):
+    def _get_ear_replication(self, replication_request):
         # for phase 1 - find volume by id and get volume group id from result volume
+        volume_internal_id = replication_request.volume_internal_id
         cli_volume = self._get_cli_volume(volume_internal_id)
         volume_group_id = cli_volume.volume_group_id
         if volume_group_id == "":
@@ -1378,10 +1388,31 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         cli_volume_group = self._get_cli_volume_group(volume_group_id, not_exist_err=False)
         if not cli_volume_group:
             return None
-        cli_volume_group_replic = self._lsvolumegroupreplication(volume_group_id)
-        logger.info("found volume group: {} in mode: {}".format(cli_volume_group.name,
-                                                                cli_volume_group_replic.location1_replication_mode))
-        return self._generate_replication_response(None, cli_volume_group_replic)
+        cli_volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
+        replication_mode = self._get_replication_mode(cli_volume_group_replication)
+        logger.info("found replication: {} in mode: {}".format(cli_volume_group.name,
+                                                               replication_mode))
+        return self._generate_ear_replication_response(cli_volume_group_replication, replication_mode)
+
+    def _get_replication_mode(self, volume_group_id):
+        volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
+        replication_local_location = volume_group_replication.local_location
+        if replication_local_location == "1":
+            location_parameter = "location"+replication_local_location+"_replication_mode"
+            logger.info("local replication location is: {}".format(location_parameter))
+
+            mode = volume_group_replication.location1_replication_mode
+        elif replication_local_location == "2":
+            location_parameter = "location"+replication_local_location+"_replication_mode"
+            logger.info("local replication location is: {}".format(location_parameter))
+
+            mode = volume_group_replication.location2_replication_mode
+        else:
+            location_parameter = "location"+replication_local_location+"_replication_mode"
+            logger.info("local replication location is: {}".format(location_parameter))
+
+            mode = None
+        return mode
 
     def _is_earreplication_supported(self):
         return hasattr(self.client.svctask, "chvolumereplicationinternals")
@@ -1427,16 +1458,25 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 logger.warning("failed to start rcrelationship '{}': {}".format(rcrelationship_id, ex))
 
     def create_replication(self, replication_request):
+        if replication_request.replication_type == array_settings.REPLICATION_TYPE_MIRROR:
+            self._create_replication(replication_request)
+        elif replication_request.replication_type == array_settings.REPLICATION_TYPE_EAR:
+            self._create_ear_replication(replication_request)
+
+    def _create_replication(self, replication_request):
         rc_id = self._create_rcrelationship(replication_request.volume_internal_id,
                                             replication_request.other_volume_internal_id,
                                             replication_request.other_system_id,
                                             replication_request.copy_type)
         self._start_rcrelationship(rc_id)
 
-    def create_ear_replication(self, volume_internal_id, replication_policy):
+    def _create_ear_replication(self, replication_request):
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
             return
+        volume_internal_id = replication_request.volume_internal_id
+        replication_policy = replication_request.replication_policy
+
         cli_volume = self._get_cli_volume(volume_internal_id)
         volume_group_name = cli_volume.name + "_vg"
 
@@ -1491,12 +1531,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             logger.info("EAR replication is not supported on the existing storage")
             return
 
-        cli_volume_id = self._get_cli_volume_id_from_volume_group(name)
-
-        self._change_volume_group_policy(volume_group_id, None)
+        self._change_volume_group_policy(volume_group_id)
 
         # for phase 1 - move volume outside the group and delete the volume group
-        self._change_volume_group(volume_internal_id, None)
+        cli_volume_id = self._get_cli_volume_id_from_volume_group("volume_group_id", volume_group_id)
+        self._change_volume_group(cli_volume_id)
         self._rmvolumegroup(volume_group_id)
 
     def _promote_replication_endpoint(self, endpoint_type, replication_name):
@@ -1529,42 +1568,51 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._promote_replication_endpoint(endpoint_type, rcrelationship.name)
 
     def promote_replication_volume(self, replication):
-        rcrelationship = self._get_rcrelationship_by_name(replication.name)
+        if replication.replication_type == array_settings.REPLICATION_TYPE_MIRROR:
+            self._promote_replication_volume(replication.name)
+        elif replication.replication_type == array_settings.REPLICATION_TYPE_EAR:
+            self._promote_ear_replication_volume(replication.volume_group_id)
+
+    def _promote_replication_volume(self, replication_name):
+        rcrelationship = self._get_rcrelationship_by_name(replication_name)
         if self._is_replication_disconnected(rcrelationship):
             self._stop_rcrelationship(rcrelationship.id, add_access_to_secondary=True)
             return
         endpoint_type = self._get_replication_endpoint_type(rcrelationship)
         self._ensure_endpoint_is_primary(rcrelationship, endpoint_type)
 
-    def demote_replication_volume(self, replication):
-        rcrelationship = self._get_rcrelationship_by_name(replication.name)
-        endpoint_type_to_promote = self._get_replication_other_endpoint_type(rcrelationship)
-        self._ensure_endpoint_is_primary(rcrelationship, endpoint_type_to_promote)
-
-    def promote_ear_replication_volume(self, volume_group_id):
+    def _promote_ear_replication_volume(self, volume_group_id):
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
             return
         cli_kwargs = {}
-        cli_volume_group_replic = self._lsvolumegroupreplication(volume_group_id)
-        if cli_volume_group_replic.location1_replication_mode == ENDPOINT_TYPE_RECOVERY:
+        if self._get_replication_mode(volume_group_id) == ENDPOINT_TYPE_RECOVERY:
             cli_kwargs['mode'] = ENDPOINT_TYPE_INDEPENDENT
             logger.info("Changing the local volume group to be an independent copy")
             self._chvolumegroupreplication(volume_group_id, **cli_kwargs)
 
-        cli_volume_group_replic = self._lsvolumegroupreplication(volume_group_id)
-        if cli_volume_group_replic.location1_replication_mode == ENDPOINT_TYPE_INDEPENDENT:
+        if self._get_replication_mode(volume_group_id) == ENDPOINT_TYPE_INDEPENDENT:
             cli_kwargs['mode'] = ENDPOINT_TYPE_PRODUCTION
             logger.info("Changing the local volume group to be a production copy")
             self._chvolumegroupreplication(volume_group_id, **cli_kwargs)
         else:
             logger.info("Can't be promoted because the local volume group is not an independent copy")
 
-    def demote_ear_replication_volume(self):
+    def demote_replication_volume(self, replication):
+        if replication.replication_type == array_settings.REPLICATION_TYPE_MIRROR:
+            self._demote_replication_volume(replication.name)
+        elif replication.replication_type == array_settings.REPLICATION_TYPE_EAR:
+            self._demote_ear_replication_volume()
+
+    def _demote_replication_volume(self, replication_name):
+        rcrelationship = self._get_rcrelationship_by_name(replication_name)
+        endpoint_type_to_promote = self._get_replication_other_endpoint_type(rcrelationship)
+        self._ensure_endpoint_is_primary(rcrelationship, endpoint_type_to_promote)
+
+    def _demote_ear_replication_volume(self):
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
             return
-
         logger.info("Demote volume is not supported in the current version")
 
     def _get_host_name_if_equal(self, nvme_host, fc_host, iscsi_host):
@@ -1649,8 +1697,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 raise ex
         return None
 
-    def _get_cli_volume_id_from_volume_group(self, volume_group_name):
-        filter_value = 'volume_group_name={}'.format(volume_group_name)
+    def _get_cli_volume_id_from_volume_group(self, filter, filter_parameter):
+        filter_value = '{}={}'.format(filter, filter_parameter)
         cli_volume = self._lsvdisk(filtervalue=filter_value)
         return cli_volume.id
 
@@ -1658,7 +1706,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._rmvolume(cli_volume_id)
         self._rmvolumegroup(volume_group_name)
 
-    def _change_volume_group(self, cli_volume_id, volume_group):
+    def _change_volume_group(self, cli_volume_id, volume_group=None):
         cli_kwargs = {}
         if volume_group:
             cli_kwargs['volumegroup'] = volume_group
@@ -1666,7 +1714,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             cli_kwargs['novolumegroup'] = True
         self._chvdisk(cli_volume_id, **cli_kwargs)
 
-    def _change_volume_group_policy(self, id_or_name, replication_policy):
+    def _change_volume_group_policy(self, id_or_name, replication_policy=None):
         cli_kwargs = {}
         if replication_policy:
             cli_kwargs['replicationpolicy'] = replication_policy
