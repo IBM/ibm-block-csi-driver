@@ -10,8 +10,10 @@ from google.protobuf.timestamp_pb2 import Timestamp
 import controllers.servers.messages as messages
 import controllers.servers.settings as servers_settings
 import controllers.array_action.errors as array_errors
+from controllers.array_action.array_action_types import ReplicationRequest
 from controllers.array_action.settings import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
-    ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC
+    ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC, REPLICATION_TYPE_MIRROR, \
+    REPLICATION_TYPE_EAR, REPLICATION_DEFAULT_COPY_TYPE
 from controllers.common import settings
 from controllers.common.config import config as common_config
 from controllers.common.csi_logger import get_stdout_logger
@@ -568,11 +570,11 @@ def validate_unpublish_volume_request(request):
     logger.debug("unpublish volume request validation finished.")
 
 
-def validate_addons_request(request):
+def validate_addons_request(request, replication_type):
     logger.debug("validating addons request")
 
     logger.debug("validating volume id")
-    if request.volume_id == "" or request.replication_id == "":
+    if request.volume_id == "" or (replication_type == REPLICATION_TYPE_MIRROR and request.replication_id == ""):
         raise ValidationException(messages.VOLUME_ID_SHOULD_NOT_BE_EMPTY_MESSAGE)
 
     logger.debug("validating copy type")
@@ -584,6 +586,32 @@ def validate_addons_request(request):
     validate_secrets(request.secrets)
 
     logger.debug("addons request validation finished")
+
+
+def get_addons_replication_type(request):
+    if servers_settings.PARAMETERS_REPLICATION_POLICY in request.parameters:
+        replication_type = REPLICATION_TYPE_EAR
+    else:
+        replication_type = REPLICATION_TYPE_MIRROR
+
+    logger.info("replication type is {}".format(replication_type))
+    return replication_type
+
+
+def generate_addons_replication_request(request, replication_type):
+    volume_id_info = get_volume_id_info(request.volume_id)
+    volume_internal_id = volume_id_info.ids.internal_id
+
+    other_volume_id_info = get_volume_id_info(request.replication_id)
+    other_volume_internal_id = other_volume_id_info.ids.internal_id
+
+    other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
+    copy_type = request.parameters.get(servers_settings.PARAMETERS_COPY_TYPE, REPLICATION_DEFAULT_COPY_TYPE)
+    return ReplicationRequest(volume_internal_id=volume_internal_id,
+                              other_volume_internal_id=other_volume_internal_id,
+                              other_system_id=other_system_id,
+                              copy_type=copy_type,
+                              replication_type=replication_type)
 
 
 def get_current_timestamp():
