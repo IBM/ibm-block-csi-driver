@@ -666,6 +666,22 @@ def validate_parameters_match_source_volume(space_efficiency, required_bytes, vo
             required_bytes, volume_capacity_bytes))
 
 
+def _get_connectivity_type_by_initiators(initiators):
+    if initiators.nvme_nqns:
+        return NVME_OVER_FC_CONNECTIVITY_TYPE
+    if initiators.fc_wwns:
+        return FC_CONNECTIVITY_TYPE
+    if initiators.iscsi_iqns:
+        return ISCSI_CONNECTIVITY_TYPE
+    return None
+
+
+def get_initiators_connectivity_type(initiators, connectivity_type):
+    if not connectivity_type:
+        connectivity_type = _get_connectivity_type_by_initiators(initiators)
+    return connectivity_type
+
+
 def get_connectivity_type_ports(initiators, connectivity_type):
     ports = initiators.get_by_connectivity_type(connectivity_type)
     if ports:
