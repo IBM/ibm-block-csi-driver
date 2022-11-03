@@ -28,6 +28,7 @@ class Replication:
     name: str
     copy_type: str
     is_ready: str
+    replication_type: str
     is_primary: str = None
     volume_group_id: str = None
 

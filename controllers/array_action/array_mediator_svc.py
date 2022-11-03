@@ -379,7 +379,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if (SPECIFIED_OBJ_NOT_EXIST in ex.my_message or
                     NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message):
-                logger.info("volume group {} was not found".format(id_or_name))
+                logger.info("volume group replication {} was not found".format(id_or_name))
                 return None
             if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
                 raise array_errors.InvalidArgumentError(ex.my_message)
@@ -1308,6 +1308,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return Replication(name=rcrelationship.name,
                            copy_type=copy_type,
                            is_ready=is_ready,
+                           replication_type=array_settings.REPLICATION_TYPE_MIRROR,
                            is_primary=is_primary)
 
     def _generate_ear_replication_response(self, volume_group_replication, replication_mode):
@@ -1319,6 +1320,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return Replication(name=name,
                            copy_type=copy_type,
                            is_ready=is_ready,
+                           replication_type=array_settings.REPLICATION_TYPE_EAR,
                            is_primary=is_primary,
                            volume_group_id=volume_group_replication.id)
 
@@ -1389,13 +1391,15 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if not cli_volume_group:
             return None
         cli_volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
-        replication_mode = self._get_replication_mode(cli_volume_group_replication)
+        replication_mode = self._get_replication_mode(volume_group_id)
         logger.info("found replication: {} in mode: {}".format(cli_volume_group.name,
                                                                replication_mode))
         return self._generate_ear_replication_response(cli_volume_group_replication, replication_mode)
 
     def _get_replication_mode(self, volume_group_id):
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
+        if volume_group_replication is None:
+            return None
         replication_local_location = volume_group_replication.local_location
         if replication_local_location == "1":
             location_parameter = "location"+replication_local_location+"_replication_mode"
