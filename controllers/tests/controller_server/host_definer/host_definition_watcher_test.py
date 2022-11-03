@@ -53,18 +53,18 @@ class TestWatchHostDefinitionsResources(HostDefinitionWatcherBase):
             settings.CSI_PROVISIONER_NAME)
 
     def test_handle_pending_host_definition_that_became_ready(self):
-        self._prepare_defaultmocks_for_pending_creation()
+        self._prepare_default_mocks_for_pending_creation()
         self.host_definition_watcher.host_definitions_api.get.return_value = self.ready_k8s_host_definitions
         test_utils.patch_pending_variables()
         test_utils.run_function_with_timeout(self.host_definition_watcher.watch_host_definitions_resources, 0.5)
         self.host_definition_watcher.storage_host_servicer.define_host.assert_called_once()
 
     def test_pending_creation_that_managed_to_be_created(self):
-        self._prepare_defaultmocks_for_pending_creation()
+        self._prepare_default_mocks_for_pending_creation()
         test_utils.run_function_with_timeout(self.host_definition_watcher.watch_host_definitions_resources, 0.5)
         self.host_definition_watcher.custom_object_api.patch_cluster_custom_object_status.assert_called()
 
-    def _prepare_defaultmocks_for_pending_creation(self):
+    def _prepare_default_mocks_for_pending_creation(self):
         self.host_definition_watcher.host_definitions_api.watch.return_value = iter(
             [test_utils.get_fake_host_definition_watch_event(settings.MODIFIED_EVENT_TYPE,
                                                              settings.PENDING_CREATION_PHASE)])
