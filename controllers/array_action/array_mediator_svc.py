@@ -1398,16 +1398,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _get_replication_mode(self, volume_group_id):
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
-        if volume_group_replication is None:
+        if not volume_group_replication:
             return None
         replication_local_location = volume_group_replication.local_location
-        if replication_local_location == "1":
-            mode = volume_group_replication.location1_replication_mode
-        elif replication_local_location == "2":
-            mode = volume_group_replication.location2_replication_mode
-        else:
-            mode = None
-        return mode
+        location_attr_name = f"location{replication_local_location}_replication_mode"
+
+        return getattr(volume_group_replication, location_attr_name, None)
 
     def _is_earreplication_supported(self):
         return hasattr(self.client.svctask, "chvolumereplicationinternals")
