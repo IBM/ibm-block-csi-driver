@@ -437,7 +437,7 @@ class ArrayMediator(ABC):
         This function should return the ports' connectivity type from host in the storage system.
 
         Args:
-           host_name         : name of the host to be created in the storage system
+           host_name  : name of the host to be created in the storage system
 
         Returns:
             string
