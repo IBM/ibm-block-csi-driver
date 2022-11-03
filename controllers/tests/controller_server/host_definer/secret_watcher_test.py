@@ -30,8 +30,10 @@ class TestWatchSecretResources(SecretWatcherBase):
         self.secret_watcher.watch_secret_resources()
         self.secret_watcher.storage_host_servicer.define_host.assert_called()
 
-    def test_do_nothing_on_deleted_secret_event(self):
+    def test_ignore_deleted_events(self):
         self._prepare_default_mocks_for_secret()
+        self.secret_stream.return_value = iter([test_utils.get_fake_secret_watch_event(
+            settings.DELETED_EVENT_TYPE)])
         self.secret_watcher.watch_secret_resources()
         self.secret_watcher.storage_host_servicer.define_host.assert_not_called()
 

@@ -48,7 +48,8 @@ class CsiNodeWatcher(Watcher):
     def _undefine_host_when_node_pod_is_deleted(self, csi_node_info):
         if self._is_host_part_of_update(csi_node_info.name):
             self._create_definitions_when_csi_node_changed(csi_node_info)
-        elif self._is_host_definer_can_delete_hosts() and not self._is_node_has_forbid_deletion_label(csi_node_info.name):
+        elif self._is_host_definer_can_delete_hosts() and \
+                not self._is_node_has_forbid_deletion_label(csi_node_info.name):
             self._undefine_hosts(csi_node_info.name)
         else:
             NODES.pop(csi_node_info.name, None)

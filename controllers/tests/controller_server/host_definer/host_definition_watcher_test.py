@@ -11,6 +11,7 @@ class HostDefinitionWatcherBase(BaseSetUp):
     def setUp(self):
         super().setUp()
         self.host_definition_watcher = test_utils.get_class_mock(HostDefinitionWatcher)
+        self.nodes_on_watcher_helper[settings.FAKE_NODE_NAME] = settings.FAKE_NODE_ID
 
 
 class TestWatchHostDefinitionsResources(HostDefinitionWatcherBase):

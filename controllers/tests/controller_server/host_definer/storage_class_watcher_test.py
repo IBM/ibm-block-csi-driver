@@ -41,6 +41,7 @@ class TestAddInitialStorageClasses(StorageClassWatcherBase):
         self.storage_class_watcher.storage_api.list_storage_class.return_value = \
             test_utils.get_fake_k8s_storage_class_items(settings.FAKE_CSI_PROVISIONER)
         self.storage_class_watcher.add_initial_storage_classes()
+        self.assertEqual(0, len(self.secret_ids_on_storage_class_watcher))
         self.storage_class_watcher.storage_host_servicer.define_host.assert_not_called()
 
 
@@ -71,7 +72,10 @@ class TestWatchStorageClassResources(StorageClassWatcherBase):
         self.assertEqual(2, self.secret_ids_on_storage_class_watcher[settings.FAKE_SECRET_ID])
 
     def test_add_new_storage_class_without_ibm_csi_provisioner(self):
+        self.storage_class_stream.return_value = iter([test_utils.get_fake_secret_storage_event(
+            settings.ADDED_EVENT, settings.FAKE_CSI_PROVISIONER)])
         self.storage_class_watcher.watch_storage_class_resources()
+        self.assertEqual(0, len(self.secret_ids_on_storage_class_watcher))
         self.storage_class_watcher.storage_host_servicer.define_host.assert_not_called()
 
     def test_deleted_managed_storage_class(self):
