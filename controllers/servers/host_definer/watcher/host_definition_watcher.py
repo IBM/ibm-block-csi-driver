@@ -18,8 +18,8 @@ class HostDefinitionWatcher(Watcher):
             resource_version = self._get_k8s_object_resource_version(self.host_definitions_api.get())
             self._watch_host_definition_with_timeout(resource_version)
 
-    def _watch_host_definition_with_timeout(self, resource_version):
-        stream = self.host_definitions_api.watch(resource_version=resource_version, timeout=5)
+    def _watch_host_definition_with_timeout(self, resource_version, timeout=5):
+        stream = self.host_definitions_api.watch(resource_version=resource_version, timeout=timeout)
         for watch_event in stream:
             watch_event = self._munch(watch_event)
             host_definition_info = self._generate_host_definition_info(watch_event.object)
