@@ -28,54 +28,48 @@ class TestAddInitialCsiNodes(CsiNodeWatcherBase):
         self.assertEqual(0, len(self.nodes_on_watcher_helper))
 
     def test_host_not_defined_for_node_without_labels_and_no_dynamic_labeling(self):
-        self.csi_node_watcher.csi_nodes_api.get.return_value = test_utils.get_fake_k8s_csi_nodes(
-            settings.CSI_PROVISIONER_NAME)
+        self._prepare_default_mocks_for_add_node()
         self.os.getenv.return_value = ''
         self.csi_node_watcher.core_api.read_node.return_value = self.k8s_node_with_fake_label
         self.csi_node_watcher.add_initial_csi_nodes()
         self.assertEqual(0, len(self.nodes_on_watcher_helper))
 
     def test_host_defined_for_node_with_manage_label(self):
-        self.csi_node_watcher.csi_nodes_api.get.return_value = test_utils.get_fake_k8s_csi_nodes(
-            settings.CSI_PROVISIONER_NAME)
+        self._prepare_default_mocks_for_add_node()
         self.os.getenv.return_value = ''
-        self.csi_node_watcher.core_api.read_node.return_value = self.k8s_node_with_manage_node_label
         self.csi_node_watcher.add_initial_csi_nodes()
         self.assertEqual(1, len(self.nodes_on_watcher_helper))
 
     def test_host_defined_for_node_with_dynamic_labeling(self):
-        self.csi_node_watcher.csi_nodes_api.get.return_value = test_utils.get_fake_k8s_csi_nodes(
-            settings.CSI_PROVISIONER_NAME)
-        self.os.getenv.return_value = settings.TRUE_STRING
+        self._prepare_default_mocks_for_add_node()
         self.csi_node_watcher.add_initial_csi_nodes()
         self.assertEqual(1, len(self.nodes_on_watcher_helper))
 
     def test_add_node_not_update_labels(self):
-        self.csi_node_watcher.csi_nodes_api.get.return_value = test_utils.get_fake_k8s_csi_nodes(
-            settings.CSI_PROVISIONER_NAME)
-        self.os.getenv.return_value = settings.TRUE_STRING
-        self.csi_node_watcher.core_api.read_node.return_value = self.k8s_node_with_manage_node_label
+        self._prepare_default_mocks_for_add_node()
         self.csi_node_watcher.add_initial_csi_nodes()
         self.csi_node_watcher.core_api.patch_node.assert_not_called()
         self.assertEqual(1, len(self.nodes_on_watcher_helper))
 
     def test_add_node_update_labels(self):
-        self.csi_node_watcher.csi_nodes_api.get.return_value = test_utils.get_fake_k8s_csi_nodes(
-            settings.CSI_PROVISIONER_NAME)
-        self.os.getenv.return_value = settings.TRUE_STRING
+        self._prepare_default_mocks_for_add_node()
         self.csi_node_watcher.core_api.read_node.return_value = self.k8s_node_with_fake_label
         self.csi_node_watcher.add_initial_csi_nodes()
         self.csi_node_watcher.core_api.patch_node.assert_called()
         self.assertEqual(1, len(self.nodes_on_watcher_helper))
 
     def test_update_node_label_fail(self):
-        self.csi_node_watcher.csi_nodes_api.get.return_value = test_utils.get_fake_k8s_csi_nodes(
-            settings.CSI_PROVISIONER_NAME)
-        self.os.getenv.return_value = settings.TRUE_STRING
+        self._prepare_default_mocks_for_add_node()
         self.csi_node_watcher.core_api.read_node.return_value = self.k8s_node_with_fake_label
         self.csi_node_watcher.core_api.patch_node.side_effect = self.fake_api_exception
         self.csi_node_watcher.add_initial_csi_nodes()
         self.assertEqual(1, len(self.nodes_on_watcher_helper))
+
+    def _prepare_default_mocks_for_add_node(self):
+        self.csi_node_watcher.csi_nodes_api.get.return_value = test_utils.get_fake_k8s_csi_nodes(
+            settings.CSI_PROVISIONER_NAME)
+        self.os.getenv.return_value = settings.TRUE_STRING
+        self.csi_node_watcher.core_api.read_node.return_value = self.k8s_node_with_manage_node_label
 
     def test_get_csi_nodes_fail(self):
         self.csi_node_watcher.csi_nodes_api.get.side_effect = self.fake_api_exception
