@@ -1639,9 +1639,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         cli_host = self._get_cli_host(host_name)
         if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
             return self._get_host_ports(cli_host, HOST_NQN)
-        elif connectivity_type == array_settings.FC_CONNECTIVITY_TYPE:
+        if connectivity_type == array_settings.FC_CONNECTIVITY_TYPE:
             return self._get_host_ports(cli_host, HOST_WWPN)
-        elif connectivity_type == array_settings.ISCSI_CONNECTIVITY_TYPE:
+        if connectivity_type == array_settings.ISCSI_CONNECTIVITY_TYPE:
             return self._get_host_ports(cli_host, HOST_ISCSI_NAME)
         raise array_errors.UnsupportedConnectivityTypeError(connectivity_type)
 
