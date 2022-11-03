@@ -23,6 +23,8 @@ class TestWatchSecretResources(SecretWatcherBase):
 
     def test_create_definitions_managed_secret_was_modified(self):
         self._prepare_default_mocks_for_secret()
+        self.nodes_on_watcher_helper[settings.FAKE_NODE_NAME] = settings.FAKE_NODE_ID
+        self.secret_ids_on_secret_watcher[settings.FAKE_SECRET_ID] = 1
         self.secret_watcher.host_definitions_api.get.return_value = \
             test_utils.get_fake_k8s_host_definitions_items('not_ready')
         self.secret_watcher.watch_secret_resources()
@@ -35,13 +37,11 @@ class TestWatchSecretResources(SecretWatcherBase):
 
     def test_do_not_create_definitions_when_managed_secret_modified_but_no_managed_nodes(self):
         self._prepare_default_mocks_for_secret()
-        self.nodes_on_watcher_helper.pop(settings.FAKE_NODE_NAME)
         self.secret_watcher.watch_secret_resources()
         self.secret_watcher.storage_host_servicer.define_host.assert_not_called()
 
     def test_modified_secret_that_is_not_in_managed_secrets(self):
         self._prepare_default_mocks_for_secret()
-        self.secret_ids_on_secret_watcher.pop(settings.FAKE_SECRET_ID)
         self.secret_watcher.watch_secret_resources()
         self.secret_watcher.storage_host_servicer.define_host.assert_not_called()
 

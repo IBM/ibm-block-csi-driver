@@ -6,16 +6,15 @@ from controllers.tests.controller_server.host_definer.common import BaseSetUp
 from controllers.servers.host_definer.watcher.storage_class_watcher import StorageClassWatcher
 
 
-class CsiNodeWatcherBase(BaseSetUp):
+class StorageClassWatcherBase(BaseSetUp):
     def setUp(self):
         super().setUp()
         self.storage_class_watcher = test_utils.get_class_mock(StorageClassWatcher)
         self.secret_ids_on_storage_class_watcher = test_utils.patch_secret_ids_global_variable(
             settings.STORAGE_CLASS_WATCHER_PATH)
-        self.secret_ids_on_storage_class_watcher.pop(settings.FAKE_SECRET_ID)
 
 
-class TestAddInitialStorageClasses(CsiNodeWatcherBase):
+class TestAddInitialStorageClasses(StorageClassWatcherBase):
     def setUp(self):
         super().setUp()
         self.storage_class_watcher.storage_api.list_storage_class.return_value = \
@@ -27,6 +26,7 @@ class TestAddInitialStorageClasses(CsiNodeWatcherBase):
     def test_add_new_storage_class_with_new_secret(self):
         self.storage_class_watcher.host_definitions_api.get.return_value = \
             test_utils.get_fake_k8s_host_definitions_items('not_ready')
+        self.nodes_on_watcher_helper[settings.FAKE_NODE_NAME] = settings.FAKE_NODE_ID
         self.storage_class_watcher.add_initial_storage_classes()
         self.storage_class_watcher.storage_host_servicer.define_host.assert_called()
         self.assertEqual(1, len(self.secret_ids_on_storage_class_watcher))
@@ -44,7 +44,7 @@ class TestAddInitialStorageClasses(CsiNodeWatcherBase):
         self.storage_class_watcher.storage_host_servicer.define_host.assert_not_called()
 
 
-class TestWatchStorageClassResources(CsiNodeWatcherBase):
+class TestWatchStorageClassResources(StorageClassWatcherBase):
     def setUp(self):
         super().setUp()
         self.storage_class_stream = patch('{}.watch.Watch.stream'.format(settings.SECRET_WATCHER_PATH)).start()
@@ -59,6 +59,7 @@ class TestWatchStorageClassResources(CsiNodeWatcherBase):
     def test_add_new_storage_class_with_new_secret(self):
         self.storage_class_watcher.host_definitions_api.get.return_value = \
             test_utils.get_fake_k8s_host_definitions_items('not_ready')
+        self.nodes_on_watcher_helper[settings.FAKE_NODE_NAME] = settings.FAKE_NODE_ID
         self.storage_class_watcher.watch_storage_class_resources()
         self.storage_class_watcher.storage_host_servicer.define_host.assert_called()
         self.assertEqual(1, len(self.secret_ids_on_storage_class_watcher))

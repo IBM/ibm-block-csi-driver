@@ -156,11 +156,11 @@ def get_error_http_resp():
 
 
 def patch_nodes_global_variable(module_path):
-    return patch('{}.NODES'.format(module_path), {settings.FAKE_NODE_NAME: settings.FAKE_NODE_ID}).start()
+    return patch('{}.NODES'.format(module_path), {}).start()
 
 
 def patch_secret_ids_global_variable(module_path):
-    return patch('{}.SECRET_IDS'.format(module_path), {settings.FAKE_SECRET_ID: 1}).start()
+    return patch('{}.SECRET_IDS'.format(module_path), {}).start()
 
 
 def get_pending_creation_status_manifest():

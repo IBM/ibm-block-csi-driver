@@ -10,13 +10,11 @@ class NodeWatcherBase(BaseSetUp):
     def setUp(self):
         super().setUp()
         self.node_watcher = test_utils.get_class_mock(NodeWatcher)
-        self.nodes_on_watcher_helper.pop(settings.FAKE_NODE_NAME)
         self.unmanaged_csi_nodes_with_driver = patch(
             '{}.unmanaged_csi_nodes_with_driver'.format(settings.NODES_WATCHER_PATH), set()).start()
         self.expected_unmanaged_csi_nodes_with_driver = set()
         self.expected_unmanaged_csi_nodes_with_driver.add(settings.FAKE_NODE_NAME)
         self.nodes_on_node_watcher = test_utils.patch_nodes_global_variable(settings.NODES_WATCHER_PATH)
-        self.nodes_on_node_watcher.pop(settings.FAKE_NODE_NAME)
 
 
 class TestAddInitialNodes(NodeWatcherBase):
@@ -65,6 +63,7 @@ class TestWatchNodesResources(NodeWatcherBase):
 
     def test_catch_node_with_new_manage_node_label(self):
         self._prepare_default_mocks_for_modified_event()
+        self.secret_ids_on_watcher_helper[settings.FAKE_SECRET_ID] = 1
         self.node_watcher.watch_nodes_resources()
         self.assertEqual(1, len(self.nodes_on_watcher_helper))
         self.node_watcher.storage_host_servicer.define_host.assert_called()
