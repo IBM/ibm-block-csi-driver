@@ -32,8 +32,8 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
                 raise array_errors.ObjectNotFoundError(volume_id)
             replication = mediator.get_replication(replication_request)
             if replication:
-                is_idempotent, message = self._ensure_replication_idempotency(replication_request, replication, volume)
-                if not is_idempotent:
+                message = self._ensure_replication_idempotency(replication_request, replication, volume)
+                if message is not None:
                     return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
                                                 pb2.EnableVolumeReplicationResponse)
                 logger.info("idempotent case. replication already exists "
@@ -145,14 +145,14 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             message = "replication already exists " \
                       "but has copy type of {} and not {}".format(replication.copy_type,
                                                                   replication_request.copy_type)
-            return False, message
+            return message
         elif replication.replication_type == array_settings.REPLICATION_TYPE_EAR:
             if replication.volume_group_id != volume.volume_group_id:
                 message = "replication already exists, " \
                       "but volume {} belongs to another group {}".format(volume.name, volume.volume_group_name)
-                return False, message
+                return message
             if replication.name != replication_request.replication_policy:
                 message = "replication already exists, " \
                           "but volume {} uses another replication policy {}".format(volume.name, replication.name)
-                return False, message
-        return True, ""
+                return message
+        return None
