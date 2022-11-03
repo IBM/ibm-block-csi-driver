@@ -13,15 +13,19 @@ logger = get_stdout_logger()
 class HostDefinitionWatcher(Watcher):
 
     def watch_host_definitions_resources(self):
+        self._watch_host_definition_with_timeout('')
         while self._loop_forever():
             resource_version = self._get_k8s_object_resource_version(self.host_definitions_api.get())
-            stream = self.host_definitions_api.watch(resource_version=resource_version, timeout=5)
-            for watch_event in stream:
-                watch_event = self._munch(watch_event)
-                host_definition_info = self._generate_host_definition_info(watch_event.object)
-                if self._is_host_definition_in_pending_phase(host_definition_info.phase) and \
-                        watch_event.type != settings.DELETED_EVENT:
-                    self._define_host_definition_after_pending_state(host_definition_info)
+            self._watch_host_definition_with_timeout(resource_version)
+
+    def _watch_host_definition_with_timeout(self, resource_version):
+        stream = self.host_definitions_api.watch(resource_version=resource_version, timeout=5)
+        for watch_event in stream:
+            watch_event = self._munch(watch_event)
+            host_definition_info = self._generate_host_definition_info(watch_event.object)
+            if self._is_host_definition_in_pending_phase(host_definition_info.phase) and \
+                    watch_event.type != settings.DELETED_EVENT:
+                self._define_host_definition_after_pending_state(host_definition_info)
 
     def _is_host_definition_in_pending_phase(self, phase):
         return phase.startswith(settings.PENDING_PREFIX)
@@ -61,6 +65,7 @@ class HostDefinitionWatcher(Watcher):
         action = self._get_action(phase)
         if phase == settings.PENDING_CREATION_PHASE:
             response = self._define_host(host_definition_info)
+            self._update_host_definition_from_storage_response(host_definition_info.name, response)
         elif self._is_pending_for_deletion_need_to_be_handled(phase, host_definition_info.node_name):
             response = self._undefine_host(host_definition_info)
         self._handle_message_from_storage(

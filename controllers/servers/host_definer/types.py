@@ -35,6 +35,9 @@ class HostDefinitionInfo:
     phase: str = ''
     resource_version: str = ''
     uid: str = ''
+    connectivity_type: str = ''
+    ports: list = field(default_factory=list)
+    node_name_on_storage: str = ''
 
 
 @dataclass
