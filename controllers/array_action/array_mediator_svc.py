@@ -1402,19 +1402,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return None
         replication_local_location = volume_group_replication.local_location
         if replication_local_location == "1":
-            location_parameter = "location"+replication_local_location+"_replication_mode"
-            logger.info("local replication location is: {}".format(location_parameter))
-
             mode = volume_group_replication.location1_replication_mode
         elif replication_local_location == "2":
-            location_parameter = "location"+replication_local_location+"_replication_mode"
-            logger.info("local replication location is: {}".format(location_parameter))
-
             mode = volume_group_replication.location2_replication_mode
         else:
-            location_parameter = "location"+replication_local_location+"_replication_mode"
-            logger.info("local replication location is: {}".format(location_parameter))
-
             mode = None
         return mode
 
