@@ -27,7 +27,7 @@ from controllers.tests.common.test_settings import (CLONE_VOLUME_NAME,
                                                     NAME_PREFIX, INTERNAL_SNAPSHOT_ID, SOURCE_VOLUME_ID,
                                                     SECRET_MANAGEMENT_ADDRESS_KEY, SECRET_PASSWORD_KEY,
                                                     SECRET_USERNAME_KEY, SECRET, VOLUME_GROUP_NAME,
-                                                    REQUEST_VOLUME_GROUP_ID, VOLUME_GROUP_UID)
+                                                    REQUEST_VOLUME_GROUP_ID, VOLUME_GROUP_UID, REQUEST_VOLUME_ID)
 from controllers.tests.controller_server.common import mock_get_agent, mock_array_type, mock_mediator, mock_utils_method
 from controllers.tests.utils import ProtoBufMock
 
@@ -1476,7 +1476,7 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
 
         self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
-        self._assert_response(grpc.StatusCode.INVALID_ARGUMENT, "volume id")
+        self._assert_response(grpc.StatusCode.INVALID_ARGUMENT, "volume_id")
 
     def test_validate_volume_capabilities_with_wrong_secrets(self):
         self._test_request_with_wrong_secrets()
@@ -1628,7 +1628,7 @@ class TestCreateVolumeGroup(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
     def test_group_get_volume_not_empty_fail(self):
-        volumes = [INTERNAL_VOLUME_ID]
+        volumes = [utils.get_mock_mediator_response_volume()]
         response_volume_group = utils.get_mock_mediator_response_volume_group(volumes=volumes)
         self.mediator.get_volume_group = Mock(return_value=response_volume_group)
 
@@ -1684,3 +1684,81 @@ class TestDeleteVolumeGroup(BaseControllerSetUp, CommonControllerTest):
         self.request.volume_group_id = VOLUME_GROUP_UID
         self.servicer.DeleteVolumeGroup(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
+
+
+class TestModifyVolumeGroup(BaseControllerSetUp, CommonControllerTest):
+
+    @property
+    def tested_method(self):
+        return self.servicer.ModifyVolumeGroup
+
+    @property
+    def tested_method_response_class(self):
+        return csi_pb2.ModifyVolumeGroupResponse
+
+    def setUp(self):
+        super().setUp()
+        self.request.volume_group_id = REQUEST_VOLUME_GROUP_ID
+
+    def test_modify_volume_group_success(self):
+        self.mediator.get_volume_group.return_value = utils.get_mock_mediator_response_volume_group()
+        self.servicer.ModifyVolumeGroup(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+
+    def _prepare_modify_volume_group_volumes(self, volume_ids_in_request=None, volumes_in_volume_group=None,
+                                             volumes_in_volume_group_after=None):
+        if volume_ids_in_request is None:
+            volume_ids_in_request = []
+        self.request.volume_ids = volume_ids_in_request
+        self.mediator.get_volume_group.side_effect = [
+            utils.get_mock_mediator_response_volume_group(volumes=volumes_in_volume_group),
+            utils.get_mock_mediator_response_volume_group(volumes=volumes_in_volume_group_after)]
+
+    def test_modify_volume_group_add_success(self):
+        volume_in_volume_group = utils.get_mock_mediator_response_volume()
+        self._prepare_modify_volume_group_volumes(volume_ids_in_request=[REQUEST_VOLUME_ID],
+                                                  volumes_in_volume_group_after=[volume_in_volume_group])
+
+        volume_group_response = self.servicer.ModifyVolumeGroup(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+        self.mediator.add_volume_to_volume_group.assert_called_once_with(VOLUME_GROUP_UID, VOLUME_UID)
+        self.mediator.remove_volume_from_volume_group.assert_not_called()
+        self.assertEqual(volume_group_response.volume_group.volume_group_id, REQUEST_VOLUME_GROUP_ID)
+        self.assertEqual(len(volume_group_response.volume_group.volumes), 1)
+
+    def test_modify_volume_group_remove_success(self):
+        volume_in_volume_group = utils.get_mock_mediator_response_volume()
+        self._prepare_modify_volume_group_volumes(volumes_in_volume_group=[volume_in_volume_group])
+
+        volume_group_response = self.servicer.ModifyVolumeGroup(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+        self.mediator.remove_volume_from_volume_group.assert_called_once_with(VOLUME_GROUP_UID, VOLUME_UID)
+        self.mediator.add_volume_to_volume_group.assert_not_called()
+        self.assertEqual(volume_group_response.volume_group.volume_group_id, REQUEST_VOLUME_GROUP_ID)
+        self.assertEqual(len(volume_group_response.volume_group.volumes), 0)
+
+    def test_modify_volume_group_with_wrong_secrets(self):
+        self._test_request_with_wrong_secrets()
+
+    def test_modify_volume_group_with_array_connection_exception(self):
+        self._test_request_with_array_connection_exception()
+
+    def test_modify_volume_group_with_bad_id(self):
+        self.request.volume_group_id = "bad_id"
+
+        response = self.servicer.ModifyVolumeGroup(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
+        self.mediator.remove_volume_from_volume_group.assert_not_called()
+        self.mediator.add_volume_to_volume_group.assert_not_called()
+        self.assertEqual(type(response), csi_pb2.ModifyVolumeGroupResponse)
+
+    def test_modify_volume_group_already_exist_fail(self):
+        self.mediator.get_volume_group = Mock(side_effect=array_errors.ObjectNotFoundError(""))
+
+        response = self.servicer.ModifyVolumeGroup(self.request, self.context)
+
+        self.mediator.remove_volume_from_volume_group.assert_not_called()
+        self.mediator.add_volume_to_volume_group.assert_not_called()
+        self.assertEqual(type(response), csi_pb2.ModifyVolumeGroupResponse)
+        self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)

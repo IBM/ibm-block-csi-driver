@@ -660,7 +660,10 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             volumes_in_volume_group = volume_group.volumes
             volume_ids_in_volume_group = [volume.id for volume in volumes_in_volume_group]
-            volume_ids_in_request = request.volume_ids
+            volume_ids_in_request = []
+            for volume_id in request.volume_ids:
+                volume_id_info = utils.get_volume_id_info(volume_id)
+                volume_ids_in_request.append(volume_id_info.ids.uid)
 
             self._add_volumes_missing_from_group(array_mediator, volume_ids_in_request, volume_ids_in_volume_group,
                                                  volume_group_id)
