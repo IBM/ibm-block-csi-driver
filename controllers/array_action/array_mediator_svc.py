@@ -1584,3 +1584,15 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def delete_host(self, host_name):
         self._rmhost(host_name)
+
+    def add_ports_to_host(self, host_name, initiators, connectivity_type):
+        raise NotImplementedError
+
+    def remove_ports_from_host(self, host_name, ports, connectivity_type):
+        raise NotImplementedError
+
+    def get_host_connectivity_ports(self, host_name, connectivity_type):
+        raise NotImplementedError
+
+    def get_host_connectivity_type(self, host_name):
+        raise NotImplementedError
