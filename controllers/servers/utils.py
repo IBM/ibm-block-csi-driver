@@ -678,3 +678,13 @@ def get_volume_group_from_request(request_volume_group, parameters_volume_group,
             raise ValidationException(messages.UNSUPPORTED_STORAGECLASS_VOLUME_GROUP)
         return volume_group_name
     return storage_class_volume_group
+
+
+def validate_delete_volume_group_request(request):
+    logger.debug("validating delete volume group request")
+
+    _validate_request_required_field(request.volume_group_id, "volume_group_id")
+
+    validate_secrets(request.secrets)
+
+    logger.debug("delete volume group validation finished")

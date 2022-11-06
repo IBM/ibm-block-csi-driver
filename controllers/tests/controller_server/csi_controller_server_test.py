@@ -26,7 +26,8 @@ from controllers.tests.common.test_settings import (CLONE_VOLUME_NAME,
                                                     SECRET_MANAGEMENT_ADDRESS_VALUE,
                                                     NAME_PREFIX, INTERNAL_SNAPSHOT_ID, SOURCE_VOLUME_ID,
                                                     SECRET_MANAGEMENT_ADDRESS_KEY, SECRET_PASSWORD_KEY,
-                                                    SECRET_USERNAME_KEY, SECRET, VOLUME_GROUP_NAME)
+                                                    SECRET_USERNAME_KEY, SECRET, VOLUME_GROUP_NAME,
+                                                    REQUEST_VOLUME_GROUP_ID, VOLUME_GROUP_UID)
 from controllers.tests.controller_server.common import mock_get_agent, mock_array_type, mock_mediator, mock_utils_method
 from controllers.tests.utils import ProtoBufMock
 
@@ -1636,3 +1637,50 @@ class TestCreateVolumeGroup(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_volume_group.assert_called_once_with(VOLUME_GROUP_NAME)
         self.assertEqual(type(response), csi_pb2.CreateVolumeGroupResponse)
         self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
+
+
+class TestDeleteVolumeGroup(BaseControllerSetUp, CommonControllerTest):
+
+    @property
+    def tested_method(self):
+        return self.servicer.DeleteVolumeGroup
+
+    @property
+    def tested_method_response_class(self):
+        return csi_pb2.DeleteVolumeGroupResponse
+
+    def setUp(self):
+        super().setUp()
+        self.request.volume_group_id = REQUEST_VOLUME_GROUP_ID
+
+    def test_delete_volume_group_success(self):
+        self.servicer.DeleteVolumeGroup(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+
+    def _delete_volume_group_returns_error(self, error, return_code):
+        self.mediator.delete_volume_group.side_effect = [error]
+
+        self.servicer.DeleteVolumeGroup(self.request, self.context)
+
+        self.assertEqual(self.context.code, return_code)
+        if return_code != grpc.StatusCode.OK:
+            msg = str(error)
+            self.assertIn(msg, self.context.details, "msg : {0} is not in : {1}".format(msg, self.context.details))
+
+    def test_delete_volume_group_with_volume_not_found_error(self):
+        self._delete_volume_group_returns_error(error=array_errors.ObjectNotFoundError("volume"),
+                                                return_code=grpc.StatusCode.OK)
+
+    def test_delete_volume_group_with_delete_volume_other_exception(self):
+        self._delete_volume_group_returns_error(error=Exception("error"), return_code=grpc.StatusCode.INTERNAL)
+
+    def test_delete_volume_group_with_wrong_secrets(self):
+        self._test_request_with_wrong_secrets()
+
+    def test_delete_volume_group_with_array_connection_exception(self):
+        self._test_request_with_array_connection_exception()
+
+    def test_delete_volume_group_bad_id(self):
+        self.request.volume_group_id = VOLUME_GROUP_UID
+        self.servicer.DeleteVolumeGroup(self.request, self.context)
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
