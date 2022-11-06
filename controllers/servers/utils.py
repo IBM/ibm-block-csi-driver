@@ -604,6 +604,8 @@ def generate_addons_replication_request(request, replication_type):
     if replication_type == REPLICATION_TYPE_MIRROR:
         other_volume_id_info = get_volume_id_info(request.replication_id)
         other_volume_internal_id = other_volume_id_info.ids.internal_id
+    else:
+        other_volume_internal_id = None
 
     other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
     copy_type = request.parameters.get(servers_settings.PARAMETERS_COPY_TYPE, REPLICATION_DEFAULT_COPY_TYPE)

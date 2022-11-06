@@ -607,7 +607,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _create_volume_group(self, name):
         cli_kwargs = build_create_volume_group_kwargs(name)
-        self._mkvolumegroup(**cli_kwargs)
+        return self._mkvolumegroup(**cli_kwargs)
 
     def _create_volume_in_volume_group(self, name, pool, io_group, source_id):
         cli_kwargs = build_create_volume_in_volume_group_kwargs(name, pool, io_group, source_id)
@@ -1473,10 +1473,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         volume_group_name = cli_volume.name + "_vg"
 
         # for phase 1 - create empty volume group and move volume into it
-        self._create_volume_group(volume_group_name)
+        volume_group_id = self._create_volume_group(volume_group_name)
         self._change_volume_group(volume_internal_id, volume_group_name)
 
-        self._change_volume_group_policy(volume_group_name, replication_policy)
+        self._change_volume_group_policy(volume_group_id, replication_policy)
 
     def _stop_rcrelationship(self, rcrelationship_id, add_access_to_secondary=False):
         logger.info("stopping remote copy relationship with id: {}. access: {}".format(rcrelationship_id,
@@ -1671,7 +1671,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         name = cli_kwargs['name']
         pool = cli_kwargs['pool'] if 'pool' in cli_kwargs else None
         try:
-            return self.client.svctask.mkvolumegroup(**cli_kwargs)
+            svc_response = self.client.svctask.mkvolumegroup(**cli_kwargs)
+            return self._get_id_from_response(svc_response)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if is_warning_message(ex.my_message):
                 logger.warning(
