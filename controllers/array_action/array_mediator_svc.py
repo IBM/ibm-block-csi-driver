@@ -1366,9 +1366,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def get_replication(self, replication_request):
         if replication_request.replication_type == array_settings.REPLICATION_TYPE_MIRROR:
-            return self._get_replication(replication_request)
+            replication = self._get_replication(replication_request)
         elif replication_request.replication_type == array_settings.REPLICATION_TYPE_EAR:
-            return self._get_ear_replication(replication_request)
+            replication = self._get_ear_replication(replication_request)
+        return replication
 
     def _get_replication(self, replication_request):
         rcrelationship = self._get_rcrelationship(replication_request.volume_internal_id,
