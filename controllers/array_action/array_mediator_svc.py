@@ -1376,8 +1376,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _get_ear_replication(self, replication_request):
         # for phase 1 - find volume by id and get volume group id from result volume
-        volume_internal_id = replication_request.volume_internal_id
-        cli_volume = self._get_cli_volume(volume_internal_id)
+        cli_volume = self._get_cli_volume(replication_request.volume_internal_id)
         volume_group_id = cli_volume.volume_group_id
         if volume_group_id == "":
             return None
@@ -1387,7 +1386,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return None
         cli_volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
         replication_mode = self._get_replication_mode(volume_group_id)
-        logger.info("found replication: {} in mode: {}".format(cli_volume_group.name,
+        logger.info("found replication: {} in mode: {}".format(cli_volume_group_replication.replication_policy_name,
                                                                replication_mode))
         return self._generate_ear_replication_response(cli_volume_group_replication, replication_mode)
 
