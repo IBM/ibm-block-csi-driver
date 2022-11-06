@@ -397,12 +397,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                     raise array_errors.VolumeAlreadyExists(cli_kwargs, self.endpoint)
                 raise ex
 
-    def _get_cli_volume_group(self, id_or_name, not_exist_err=True):
-        cli_volume_group = self._lsvolumegroup(id_or_name)
-        if not cli_volume_group and not_exist_err:
-            raise array_errors.ObjectNotFoundError(id_or_name)
-        return cli_volume_group
-
     def _get_cli_volume(self, volume_name, not_exist_err=True):
         cli_volume = self._lsvdisk(object_id=volume_name)
         if not cli_volume and not_exist_err:
@@ -1388,7 +1382,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if volume_group_id == "":
             return None
 
-        cli_volume_group = self._get_cli_volume_group(volume_group_id, not_exist_err=False)
+        cli_volume_group = self._lsvolumegroup(volume_group_id)
         if not cli_volume_group:
             return None
         cli_volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
