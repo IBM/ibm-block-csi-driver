@@ -397,10 +397,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                     raise array_errors.VolumeAlreadyExists(cli_kwargs, self.endpoint)
                 raise ex
 
-    def _get_cli_volume_group(self, volume_group_name, not_exist_err=True):
-        cli_volume_group = self._lsvolumegroup(volume_group_name)
+    def _get_cli_volume_group(self, id_or_name, not_exist_err=True):
+        cli_volume_group = self._lsvolumegroup(id_or_name)
         if not cli_volume_group and not_exist_err:
-            raise array_errors.ObjectNotFoundError(volume_group_name)
+            raise array_errors.ObjectNotFoundError(id_or_name)
         return cli_volume_group
 
     def _get_cli_volume(self, volume_name, not_exist_err=True):
