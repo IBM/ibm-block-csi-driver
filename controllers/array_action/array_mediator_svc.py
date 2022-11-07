@@ -1296,8 +1296,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                            replication_type=array_settings.REPLICATION_TYPE_MIRROR,
                            is_primary=is_primary)
 
-    def _generate_ear_replication_response(self, volume_group_replication, replication_mode):
-        name = volume_group_replication.replication_policy_name
+    def _generate_ear_replication_response(self, volume_group_id, replication_mode):
+        name = volume_group_id
         copy_type = array_settings.REPLICATION_COPY_TYPE_ASYNC
         is_ready = True
         is_primary = (replication_mode == ENDPOINT_TYPE_PRODUCTION)
@@ -1307,7 +1307,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                            is_ready=is_ready,
                            replication_type=array_settings.REPLICATION_TYPE_EAR,
                            is_primary=is_primary,
-                           volume_group_id=volume_group_replication.id)
+                           volume_group_id=volume_group_id)
 
     def _lsrcrelationship(self, filter_value):
         return self.client.svcinfo.lsrcrelationship(filtervalue=filter_value)
@@ -1376,14 +1376,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if volume_group_id == "":
             return None
 
-        cli_volume_group = self._lsvolumegroup(volume_group_id)
-        if not cli_volume_group:
-            return None
-        cli_volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
         replication_mode = self._get_replication_mode(volume_group_id)
-        logger.info("found ear replication: {} in mode: {}".format(cli_volume_group_replication.replication_policy_name,
+        if not replication_mode:
+            return None
+        logger.info("found ear replication: {} in mode: {}".format(volume_group_id,
                                                                    replication_mode))
-        return self._generate_ear_replication_response(cli_volume_group_replication, replication_mode)
+        return self._generate_ear_replication_response(volume_group_id, replication_mode)
 
     def _get_replication_mode(self, volume_group_id):
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
@@ -1460,7 +1458,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         volume_internal_id = replication_request.volume_internal_id
         cli_volume = self._get_cli_volume(volume_internal_id)
 
-        volume_group_name = cli_volume.name + "_vg"
+        volume_group_name = cli_volume.name + common_settings.VOLUME_GROUP_NAME_SUFFIX
         volume_group_id = self._create_volume_group(volume_group_name)
         self._change_volume_group(volume_internal_id, volume_group_name)
 
