@@ -477,6 +477,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         deduplicated_copy = svc_settings.NO_VALUE_ALIAS
         compressed_copy = svc_settings.NO_VALUE_ALIAS
         se_copy = svc_settings.NO_VALUE_ALIAS
+        volume_group_id = svc_settings.DUMMY_VOLUME_GROUP_ID
         if with_deduplicated_copy:
             deduplicated_copy = YES
             compressed_copy = YES
@@ -491,7 +492,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
                       svc_settings.VOLUME_FC_ID_ATTR_KEY: fc_id,
                       svc_settings.VOLUME_SE_COPY_ATTR_KEY: se_copy,
                       svc_settings.VOLUME_DEDUPLICATED_COPY_ATTR_KEY: deduplicated_copy,
-                      svc_settings.VOLUME_COMPRESSED_COPY_ATTR_KEY: compressed_copy
+                      svc_settings.VOLUME_COMPRESSED_COPY_ATTR_KEY: compressed_copy,
+                      svc_settings.VOLUME_GROUP_ID_ATTR_KEY: volume_group_id
                       })
 
     @staticmethod
