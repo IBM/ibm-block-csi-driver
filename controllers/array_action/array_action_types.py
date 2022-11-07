@@ -14,6 +14,7 @@ class Volume:
     array_type: str
     pool: str
     space_efficiency_aliases: set = field(default_factory=set)
+    volume_group_id: str = None
 
 
 @dataclass
@@ -28,6 +29,7 @@ class Replication:
     copy_type: str
     is_ready: str
     is_primary: str = None
+    volume_group_id: str = None
 
 
 @dataclass
@@ -37,6 +39,7 @@ class ReplicationRequest:
     other_system_id: str
     copy_type: str
     replication_type: str
+    replication_policy: str = None
 
 
 @dataclass

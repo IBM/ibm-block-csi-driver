@@ -6,9 +6,9 @@ from controllers.servers.settings import (SECRET_ARRAY_PARAMETER,
 
 def get_k8s_csi_node_manifest(csi_provisioner):
     k8s_csi_node_spec = {
-        settings.SPEC: {
-            settings.DRIVERS: [{
-                settings.NAME: csi_provisioner,
+        settings.SPEC_FIELD: {
+            settings.DRIVERS_FIELD: [{
+                settings.NAME_FIELD: csi_provisioner,
                 settings.NODE_ID_FIELD_IN_CSI_NODE: settings.FAKE_NODE_ID
             }]
         },
@@ -18,7 +18,7 @@ def get_k8s_csi_node_manifest(csi_provisioner):
 
 def get_fake_k8s_daemon_set_manifest(updated_pods, desired_updated_pods):
     k8s_daemon_set_status = {
-        settings.STATUS: {
+        settings.STATUS_FIELD: {
             settings.UPDATED_PODS: updated_pods,
             settings.DESIRED_UPDATED_PODS: desired_updated_pods,
         }}
@@ -27,7 +27,7 @@ def get_fake_k8s_daemon_set_manifest(updated_pods, desired_updated_pods):
 
 def get_fake_k8s_pod_manifest():
     k8s_pod_spec = {
-        settings.SPEC: {
+        settings.SPEC_FIELD: {
             settings.NODE_NAME_FIELD_IN_PODS: settings.FAKE_NODE_NAME
         }}
     return _generate_manifest(settings.FAKE_NODE_PODS_NAME, k8s_pod_spec)
@@ -36,7 +36,7 @@ def get_fake_k8s_pod_manifest():
 def get_fake_k8s_host_definition_manifest(host_definition_phase):
     status_phase_manifest = get_status_phase_manifest(host_definition_phase)
     k8s_host_definition_body = {
-        settings.SPEC: {
+        settings.SPEC_FIELD: {
             settings.HOST_DEFINITION_FIELD: {
                 settings.SECRET_NAME_FIELD: settings.FAKE_SECRET,
                 settings.SECRET_NAMESPACE_FIELD: settings.FAKE_SECRET_NAMESPACE,
@@ -49,27 +49,27 @@ def get_fake_k8s_host_definition_manifest(host_definition_phase):
 
 def get_status_phase_manifest(phase):
     return {
-        settings.STATUS: {
-            settings.PHASE: phase
+        settings.STATUS_FIELD: {
+            settings.PHASE_FIELD: phase
         }
     }
 
 
 def get_fake_k8s_node_manifest(label):
     node_manifest = _generate_manifest(settings.FAKE_NODE_NAME)
-    node_manifest[settings.METADATA][settings.LABELS] = {label: settings.TRUE_STRING}
+    node_manifest[settings.METADATA_FIELD][settings.LABELS_FIELD] = {label: settings.TRUE_STRING}
     return node_manifest
 
 
 def get_fake_k8s_secret_manifest():
     secret_data_manifest = {
-        settings.DATA: {
+        settings.DATA_FIELD: {
             SECRET_ARRAY_PARAMETER: settings.FAKE_SECRET_ARRAY,
             SECRET_PASSWORD_PARAMETER: settings.FAKE_SECRET_PASSWORD,
             SECRET_USERNAME_PARAMETER: settings.FAKE_SECRET_USER_NAME
         }}
     secret_manifest = _generate_manifest(settings.FAKE_SECRET, secret_data_manifest)
-    secret_manifest[settings.METADATA][settings.NAMESPACE] = settings.FAKE_SECRET_NAMESPACE
+    secret_manifest[settings.METADATA_FIELD][settings.NAMESPACE_FIELD] = settings.FAKE_SECRET_NAMESPACE
     return secret_manifest
 
 
@@ -85,7 +85,7 @@ def get_fake_k8s_storage_class_manifest(provisioner):
 
 def _generate_manifest(object_name, *extra_dicts):
     metadata_manifest = _get_metadata_manifest()
-    metadata_manifest[settings.METADATA][settings.NAME] = object_name
+    metadata_manifest[settings.METADATA_FIELD][settings.NAME_FIELD] = object_name
     if len(extra_dicts) > 0:
         merged_dicts = _merge_dicts(metadata_manifest, extra_dicts[0])
     else:
@@ -97,9 +97,9 @@ def _generate_manifest(object_name, *extra_dicts):
 
 def _get_metadata_manifest():
     return {
-        settings.METADATA: {
-            settings.RESOURCE_VERSION: settings.FAKE_RESOURCE_VERSION,
-            settings.UID: settings.FAKE_UID
+        settings.METADATA_FIELD: {
+            settings.RESOURCE_VERSION_FIELD: settings.FAKE_RESOURCE_VERSION,
+            settings.UID_FIELD: settings.FAKE_UID
         }}
 
 
@@ -109,6 +109,6 @@ def _merge_dicts(dict1, dict2):
 
 def generate_watch_event(event_type, object_function):
     return {
-        settings.TYPE: event_type,
-        settings.OBJECT: object_function
+        settings.TYPE_FIELD: event_type,
+        settings.OBJECT_FIELD: object_function
     }

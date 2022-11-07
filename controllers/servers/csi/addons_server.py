@@ -32,11 +32,9 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
                 raise array_errors.ObjectNotFoundError(volume_id)
             replication = mediator.get_replication(replication_request)
             if replication:
-                if replication.copy_type != replication_request.copy_type:
-                    message = "replication already exists " \
-                              "but has copy type of {} and not {}".format(replication.copy_type,
-                                                                          replication_request.copy_type)
-                    return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
+                error_message = self._ensure_replication_idempotency(replication_request, replication, volume)
+                if error_message is not None:
+                    return build_error_response(error_message, context, grpc.StatusCode.ALREADY_EXISTS,
                                                 pb2.EnableVolumeReplicationResponse)
                 logger.info("idempotent case. replication already exists "
                             "for volume {} with system: {}".format(volume.name,
@@ -139,3 +137,22 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         logger.info("is replication {} ready: {}".format(replication.name, replication.is_ready))
         return pb2.ResyncVolumeResponse(ready=replication.is_ready)
+
+    @staticmethod
+    def _ensure_replication_idempotency(replication_request, replication, volume):
+        if replication_request.replication_type == array_settings.REPLICATION_TYPE_MIRROR and \
+                replication.copy_type != replication_request.copy_type:
+            error_message = "replication already exists " \
+                      "but has copy type of {} and not {}".format(replication.copy_type,
+                                                                  replication_request.copy_type)
+            return error_message
+        elif replication.replication_type == array_settings.REPLICATION_TYPE_EAR:
+            if replication.volume_group_id != volume.volume_group_id:
+                error_message = "replication already exists, " \
+                      "but volume {} belongs to another group {}".format(volume.name, volume.volume_group_name)
+                return error_message
+            if replication.name != replication_request.replication_policy:
+                error_message = "replication already exists, " \
+                          "but volume {} uses another replication policy {}".format(volume.name, replication.name)
+                return error_message
+        return None
