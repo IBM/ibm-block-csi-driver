@@ -62,7 +62,7 @@ class Watcher(KubernetesManager):
             host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
         if current_host_definition_info_on_cluster:
             host_definition_manifest[settings.METADATA][settings.NAME] = current_host_definition_info_on_cluster.name
-            _ = self._patch_host_definition(host_definition_manifest)
+            self._patch_host_definition(host_definition_manifest)
             return current_host_definition_info_on_cluster
         else:
             logger.info(messages.CREATING_NEW_HOST_DEFINITION.format(host_definition_info.name))
