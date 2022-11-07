@@ -101,19 +101,11 @@ def _is_space_efficiency_matches_source(parameter_space_efficiency, array_space_
            (parameter_space_efficiency and parameter_space_efficiency == array_space_efficiency)
 
 
-def build_create_volume_group_kwargs(name):
-    cli_kwargs = {
-        'name': name
-    }
-    return cli_kwargs
-
-
-def build_create_volume_in_volume_group_kwargs(name, pool, io_group, source_id):
+def build_create_volume_in_volume_group_kwargs(pool, io_group, source_id):
     cli_kwargs = {
         'type': 'clone',
         'fromsnapshotid': source_id,
-        'pool': pool,
-        'name': name
+        'pool': pool
     }
     if io_group:
         cli_kwargs['iogroup'] = io_group
@@ -600,12 +592,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         self._copy_to_target_volume(target_volume_name, source_name)
 
     def _create_volume_group(self, name):
-        cli_kwargs = build_create_volume_group_kwargs(name)
-        return self._mkvolumegroup(**cli_kwargs)
+        return self._mkvolumegroup(name=name)
 
     def _create_volume_in_volume_group(self, name, pool, io_group, source_id):
-        cli_kwargs = build_create_volume_in_volume_group_kwargs(name, pool, io_group, source_id)
-        self._mkvolumegroup(**cli_kwargs)
+        cli_kwargs = build_create_volume_in_volume_group_kwargs(pool, io_group, source_id)
+        self._mkvolumegroup(name, **cli_kwargs)
 
     def _fix_creation_side_effects(self, name, cli_volume_id, volume_group):
         self._change_volume_group(cli_volume_id, volume_group)
@@ -1665,11 +1656,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise array_errors.ObjectNotFoundError(snapshot_id)
         return cli_snapshot
 
-    def _mkvolumegroup(self, **cli_kwargs):
-        name = cli_kwargs['name']
+    def _mkvolumegroup(self, name, **cli_kwargs):
         pool = cli_kwargs['pool'] if 'pool' in cli_kwargs else None
         try:
-            svc_response = self.client.svctask.mkvolumegroup(**cli_kwargs)
+            svc_response = self.client.svctask.mkvolumegroup(name=name, **cli_kwargs)
             return self._get_id_from_response(svc_response)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if is_warning_message(ex.my_message):
