@@ -280,6 +280,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             source_id=source_id,
             array_type=self.array_type,
             space_efficiency_aliases=space_efficiency,
+            volume_group_id=cli_volume.volume_group_id
         )
 
     def _generate_snapshot_response_from_cli_volume(self, cli_volume, source_id):
