@@ -638,6 +638,16 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         except array_errors.ObjectNotFoundError:
             raise array_errors.ObjectNotFoundError(volume_group_id)
 
+    def _get_volume_ids_from_request(self, volume_ids):
+        volume_ids_in_request = []
+        for volume_id in volume_ids:
+            volume_id_info = utils.get_volume_id_info(volume_id)
+            volume_ids_in_request.append(volume_id_info.ids.uid)
+        return volume_ids_in_request
+
+    def _get_volume_ids_from_volume_group(self, volumes):
+        return [volume.id for volume in volumes]
+
     @csi_method(error_response_type=csi_pb2.ModifyVolumeGroupResponse, lock_request_attribute="volume_group_id")
     def ModifyVolumeGroup(self, request, context):
         secrets = request.secrets
@@ -658,12 +668,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             volume_group = self._get_volume_group(array_mediator, volume_group_id)
 
-            volumes_in_volume_group = volume_group.volumes
-            volume_ids_in_volume_group = [volume.id for volume in volumes_in_volume_group]
-            volume_ids_in_request = []
-            for volume_id in request.volume_ids:
-                volume_id_info = utils.get_volume_id_info(volume_id)
-                volume_ids_in_request.append(volume_id_info.ids.uid)
+            volume_ids_in_volume_group = self._get_volume_ids_from_volume_group(volume_group.volumes)
+            volume_ids_in_request = self._get_volume_ids_from_request(request.volume_ids)
 
             self._add_volumes_missing_from_group(array_mediator, volume_ids_in_request, volume_ids_in_volume_group,
                                                  volume_group_id)
