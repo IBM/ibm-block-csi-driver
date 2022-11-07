@@ -63,7 +63,7 @@ class TestWatchNodesResources(NodeWatcherBase):
 
     def test_catch_node_with_new_manage_node_label(self):
         self._prepare_default_mocks_for_modified_event()
-        self.secret_ids_on_watcher_helper[settings.FAKE_SECRET_ID] = 1
+        self.managed_secrets_on_watcher_helper.append(test_utils.get_fake_secret_info())
         self.node_watcher.watch_nodes_resources()
         self.assertEqual(1, len(self.nodes_on_watcher_helper))
         self.node_watcher.storage_host_servicer.define_host.assert_called()

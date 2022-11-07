@@ -10,7 +10,7 @@ class StorageClassWatcherBase(BaseSetUp):
     def setUp(self):
         super().setUp()
         self.storage_class_watcher = test_utils.get_class_mock(StorageClassWatcher)
-        self.secret_ids_on_storage_class_watcher = test_utils.patch_secret_ids_global_variable(
+        self.managed_secrets_on_storage_class_watcher = test_utils.patch_managed_secrets_global_variable(
             settings.STORAGE_CLASS_WATCHER_PATH)
 
 
@@ -29,19 +29,20 @@ class TestAddInitialStorageClasses(StorageClassWatcherBase):
         self.nodes_on_watcher_helper[settings.FAKE_NODE_NAME] = settings.FAKE_NODE_ID
         self.storage_class_watcher.add_initial_storage_classes()
         self.storage_class_watcher.storage_host_servicer.define_host.assert_called()
-        self.assertEqual(1, len(self.secret_ids_on_storage_class_watcher))
+        self.assertEqual(1, len(self.managed_secrets_on_storage_class_watcher))
 
     def test_add_new_storage_class_with_existing_secret(self):
-        self.secret_ids_on_storage_class_watcher[settings.FAKE_SECRET_ID] = 1
+        self.managed_secrets_on_storage_class_watcher.append(test_utils.get_fake_secret_info())
+        self.managed_secrets_on_watcher_helper.append(test_utils.get_fake_secret_info())
         self.storage_class_watcher.add_initial_storage_classes()
         self.storage_class_watcher.storage_host_servicer.define_host.assert_not_called()
-        self.assertEqual(2, self.secret_ids_on_storage_class_watcher[settings.FAKE_SECRET_ID])
+        self.assertEqual(2, self.managed_secrets_on_storage_class_watcher[0].managed_storage_classes)
 
     def test_add_new_storage_class_without_ibm_csi_provisioner(self):
         self.storage_class_watcher.storage_api.list_storage_class.return_value = \
             test_utils.get_fake_k8s_storage_class_items(settings.FAKE_CSI_PROVISIONER)
         self.storage_class_watcher.add_initial_storage_classes()
-        self.assertEqual(0, len(self.secret_ids_on_storage_class_watcher))
+        self.assertEqual(0, len(self.managed_secrets_on_storage_class_watcher))
         self.storage_class_watcher.storage_host_servicer.define_host.assert_not_called()
 
 
@@ -63,24 +64,26 @@ class TestWatchStorageClassResources(StorageClassWatcherBase):
         self.nodes_on_watcher_helper[settings.FAKE_NODE_NAME] = settings.FAKE_NODE_ID
         self.storage_class_watcher.watch_storage_class_resources()
         self.storage_class_watcher.storage_host_servicer.define_host.assert_called()
-        self.assertEqual(1, len(self.secret_ids_on_storage_class_watcher))
+        self.assertEqual(1, len(self.managed_secrets_on_storage_class_watcher))
 
     def test_add_new_storage_class_with_existing_secret(self):
-        self.secret_ids_on_storage_class_watcher[settings.FAKE_SECRET_ID] = 1
+        self.managed_secrets_on_storage_class_watcher.append(test_utils.get_fake_secret_info())
+        self.managed_secrets_on_watcher_helper.append(test_utils.get_fake_secret_info())
         self.storage_class_watcher.watch_storage_class_resources()
         self.storage_class_watcher.storage_host_servicer.define_host.assert_not_called()
-        self.assertEqual(2, self.secret_ids_on_storage_class_watcher[settings.FAKE_SECRET_ID])
+        self.assertEqual(2, self.managed_secrets_on_storage_class_watcher[0].managed_storage_classes)
 
     def test_add_new_storage_class_without_ibm_csi_provisioner(self):
         self.storage_class_stream.return_value = iter([test_utils.get_fake_secret_storage_event(
             settings.ADDED_EVENT, settings.FAKE_CSI_PROVISIONER)])
         self.storage_class_watcher.watch_storage_class_resources()
-        self.assertEqual(0, len(self.secret_ids_on_storage_class_watcher))
+        self.assertEqual(0, len(self.managed_secrets_on_storage_class_watcher))
         self.storage_class_watcher.storage_host_servicer.define_host.assert_not_called()
 
     def test_deleted_managed_storage_class(self):
         self.storage_class_stream.return_value = iter([test_utils.get_fake_secret_storage_event(
             settings.DELETED_EVENT_TYPE, settings.CSI_PROVISIONER_NAME)])
-        self.secret_ids_on_storage_class_watcher[settings.FAKE_SECRET_ID] = 1
+        self.managed_secrets_on_storage_class_watcher.append(test_utils.get_fake_secret_info())
+        self.managed_secrets_on_watcher_helper.append(test_utils.get_fake_secret_info())
         self.storage_class_watcher.watch_storage_class_resources()
-        self.assertEqual(0, self.secret_ids_on_storage_class_watcher[settings.FAKE_SECRET_ID])
+        self.assertEqual(0, self.managed_secrets_on_storage_class_watcher[0].managed_storage_classes)
