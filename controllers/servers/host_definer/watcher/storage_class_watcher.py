@@ -97,7 +97,7 @@ class StorageClassWatcher(Watcher):
         node_topology_labels = self._get_topology_labels(node_info.labels)
         try:
             _, system_id = get_system_info_for_topologies(secret_config, node_topology_labels)
-        except:
+        except ValidationException:
             return ''
         return system_id
 

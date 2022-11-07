@@ -71,7 +71,7 @@ def _get_system_info_from_secrets(secrets, topologies=None, system_id=None):
             system_info = secrets_config.get(system_id)
         elif topologies:
             system_info, system_id = get_system_info_for_topologies(secrets_config=secrets_config,
-                                                                     node_topologies=topologies)
+                                                                    node_topologies=topologies)
         else:
             raise ValidationException(messages.INSUFFICIENT_DATA_TO_CHOOSE_A_STORAGE_SYSTEM_MESSAGE)
     return system_info, system_id
