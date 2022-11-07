@@ -620,6 +620,63 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         return csi_pb2.DeleteVolumeGroupResponse()
 
+    def _add_volumes_missing_from_group(self, array_mediator, volume_ids_in_request, volume_ids_in_volume_group,
+                                        volume_group_id):
+        for volume_id in volume_ids_in_request:
+            if volume_id not in volume_ids_in_volume_group:
+                array_mediator.add_volume_to_volume_group(volume_group_id, volume_id)
+
+    def _remove_volumes_missing_from_request(self, array_mediator, volume_ids_in_request, volume_ids_in_volume_group,
+                                             volume_group_id):
+        for volume_id in volume_ids_in_volume_group:
+            if volume_id not in volume_ids_in_request:
+                array_mediator.remove_volume_from_volume_group(volume_group_id, volume_id)
+
+    def _get_volume_group(self, array_mediator, volume_group_id):
+        try:
+            return array_mediator.get_volume_group(volume_group_id)
+        except array_errors.ObjectNotFoundError:
+            raise array_errors.ObjectNotFoundError(volume_group_id)
+
+    def _get_volume_ids_from_request(self, volume_ids):
+        volume_ids_in_request = []
+        for volume_id in volume_ids:
+            volume_id_info = utils.get_volume_id_info(volume_id)
+            volume_ids_in_request.append(volume_id_info.ids.uid)
+        return volume_ids_in_request
+
+    def _get_volume_ids_from_volume_group(self, volumes):
+        return [volume.id for volume in volumes]
+
     @csi_method(error_response_type=csi_pb2.ModifyVolumeGroupResponse, lock_request_attribute="volume_group_id")
     def ModifyVolumeGroup(self, request, context):
-        raise NotImplementedError()
+        secrets = request.secrets
+        utils.validate_delete_volume_group_request(request)
+
+        try:
+            volume_group_id_info = utils.get_volume_group_id_info(request.volume_group_id)
+        except ObjectIdError as ex:
+            return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
+                                    csi_pb2.ModifyVolumeGroupResponse)
+
+        array_type = volume_group_id_info.array_type
+        volume_group_id = volume_group_id_info.ids.uid
+        array_connection_info = utils.get_array_connection_info_from_secrets(secrets)
+
+        with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
+            logger.debug(array_mediator)
+
+            volume_group = self._get_volume_group(array_mediator, volume_group_id)
+
+            volume_ids_in_volume_group = self._get_volume_ids_from_volume_group(volume_group.volumes)
+            volume_ids_in_request = self._get_volume_ids_from_request(request.volume_ids)
+
+            self._add_volumes_missing_from_group(array_mediator, volume_ids_in_request, volume_ids_in_volume_group,
+                                                 volume_group_id)
+            self._remove_volumes_missing_from_request(array_mediator, volume_ids_in_request, volume_ids_in_volume_group,
+                                                      volume_group_id)
+
+            volume_group = self._get_volume_group(array_mediator, volume_group_id)
+
+            response = utils.generate_csi_modify_volume_group_response(volume_group)
+            return response

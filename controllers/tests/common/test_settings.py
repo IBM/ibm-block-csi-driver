@@ -16,6 +16,8 @@ VIRT_SNAP_FUNC_TRUE = "true"
 DUMMY_IO_GROUP = "iogrp1"
 DUMMY_VOLUME_GROUP = "volgrp1"
 
+ID_FORMAT = "a9k:{};{}"
+
 VOLUME_OBJECT_TYPE = "volume"
 VOLUME_NAME = "volume_name"
 VOLUME_UID = "volume_wwn"
@@ -25,6 +27,7 @@ SOURCE_VOLUME_ID = "source_volume_id"
 TARGET_VOLUME_ID = "target_volume_id"
 TARGET_VOLUME_NAME = "target_volume_name"
 INTERNAL_VOLUME_ID = "internal_volume_id"
+REQUEST_VOLUME_ID = ID_FORMAT.format(INTERNAL_VOLUME_ID, VOLUME_UID)
 
 NAME_PREFIX = "prefix"
 
@@ -49,6 +52,6 @@ VOLUME_GROUP_OBJECT_TYPE = "volume group"
 VOLUME_GROUP_NAME = "volume_group_name"
 VOLUME_GROUP_UID = "volume_group_wwn"
 INTERNAL_VOLUME_GROUP_ID = "internal_volume_group_id"
-REQUEST_VOLUME_GROUP_ID = "SVC:{};{}".format(INTERNAL_VOLUME_GROUP_ID, VOLUME_GROUP_UID)
+REQUEST_VOLUME_GROUP_ID = ID_FORMAT.format(INTERNAL_VOLUME_GROUP_ID, VOLUME_GROUP_UID)
 
 HOST_OBJECT_TYPE = "host"
