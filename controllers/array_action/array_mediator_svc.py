@@ -1457,7 +1457,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
         replication_policy = replication_request.replication_policy
 
-        # for phase 1 - create empty volume group and move volume into it
         volume_internal_id = replication_request.volume_internal_id
         cli_volume = self._get_cli_volume(volume_internal_id)
 
@@ -1514,7 +1513,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
         self._change_volume_group_policy(volume_group_id)
 
-        # for phase 1 - move volume outside the group and delete the volume group
         cli_volume_id = self._get_cli_volume_id_from_volume_group("volume_group_id", volume_group_id)
         self._change_volume_group(cli_volume_id)
         self._rmvolumegroup(volume_group_id)
