@@ -872,7 +872,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _get_host_names_by_wwpn(self, host_wwpn):
         fabrics = self._lsfabric(wwpn=host_wwpn).as_list
-        return set(fabric.name for fabric in fabrics)
+        return set(fabric.name for fabric in fabrics if fabric.name)
 
     def _lsnvmefabric(self, host_nqn):
         try:
