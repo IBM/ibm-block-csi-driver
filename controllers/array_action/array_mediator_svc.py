@@ -281,6 +281,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             source_id=source_id,
             array_type=self.array_type,
             space_efficiency_aliases=space_efficiency,
+            volume_group_id=cli_volume.volume_group_id
         )
 
     def _generate_snapshot_response_from_cli_volume(self, cli_volume, source_id):
@@ -1219,13 +1220,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             return array_settings.REPLICATION_COPY_TYPE_ASYNC
         return array_settings.REPLICATION_COPY_TYPE_SYNC
 
-    def _generate_replication_response(self, rcrelationship, volume_internal_id, other_volume_internal_id):
+    def _generate_replication_response(self, rcrelationship):
         copy_type = self._get_replication_copy_type(rcrelationship)
         is_ready = self._is_replication_ready(rcrelationship)
         is_primary = self._is_replication_endpoint_primary(rcrelationship)
         return Replication(name=rcrelationship.name,
-                           volume_internal_id=volume_internal_id,
-                           other_volume_internal_id=other_volume_internal_id,
                            copy_type=copy_type,
                            is_ready=is_ready,
                            is_primary=is_primary)
@@ -1270,12 +1269,17 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             raise RuntimeError(error_message)
         return rcrelationships[0] if rcrelationships else None
 
-    def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
-        rcrelationship = self._get_rcrelationship(volume_internal_id, other_volume_internal_id, other_system_id)
+    def get_replication(self, replication_request):
+        rcrelationship = self._get_rcrelationship(replication_request.volume_internal_id,
+                                                  replication_request.other_volume_internal_id,
+                                                  replication_request.other_system_id)
         if not rcrelationship:
             return None
         logger.info("found rcrelationship: {}".format(rcrelationship))
-        return self._generate_replication_response(rcrelationship, volume_internal_id, other_volume_internal_id)
+        return self._generate_replication_response(rcrelationship)
+
+    def _is_earreplication_supported(self):
+        return hasattr(self.client.svctask, "chvolumereplicationinternals")
 
     def _create_rcrelationship(self, master_cli_volume_id, aux_cli_volume_id, other_system_id, copy_type):
         logger.info("creating remote copy relationship for master volume id: {0} "
@@ -1317,8 +1321,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             else:
                 logger.warning("failed to start rcrelationship '{}': {}".format(rcrelationship_id, ex))
 
-    def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
-        rc_id = self._create_rcrelationship(volume_internal_id, other_volume_internal_id, other_system_id, copy_type)
+    def create_replication(self, replication_request):
+        rc_id = self._create_rcrelationship(replication_request.volume_internal_id,
+                                            replication_request.other_volume_internal_id,
+                                            replication_request.other_system_id,
+                                            replication_request.copy_type)
         self._start_rcrelationship(rc_id)
 
     def _stop_rcrelationship(self, rcrelationship_id, add_access_to_secondary=False):

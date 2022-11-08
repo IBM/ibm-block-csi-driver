@@ -58,6 +58,7 @@ VOLUME_FC_ID_ATTR_KEY = "FC_id"
 VOLUME_SE_COPY_ATTR_KEY = "se_copy"
 VOLUME_DEDUPLICATED_COPY_ATTR_KEY = "deduplicated_copy"
 VOLUME_COMPRESSED_COPY_ATTR_KEY = "compressed_copy"
+VOLUME_GROUP_ID_ATTR_KEY = "volume_group_id"
 
 MANY_VALUE = "many"
 VOLUME_FC_ID_MANY = MANY_VALUE
@@ -121,6 +122,7 @@ DUMMY_POOL_SITE = "pool_site"
 LSRCRELATIONSHIP_AUX_VOLUME_ATTR_KEY = "aux_vdisk_name"
 DUMMY_VOLUME_SITE1 = "volume_site_1"
 DUMMY_VOLUME_SITE2 = "volume_site_2"
+DUMMY_VOLUME_GROUP_ID = "volume_group_id"
 
 FILTERVALUE_DELIMITER = "="
 
