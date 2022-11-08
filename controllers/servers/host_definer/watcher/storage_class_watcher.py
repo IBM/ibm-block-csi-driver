@@ -139,11 +139,9 @@ class StorageClassWatcher(Watcher):
     def _add_secret_if_uniq_or_add_secret_counter(self, secret_info):
         managed_secret_info, index = self._get_matching_managed_secret_info(secret_info)
         if managed_secret_info:
-            logger.info('matan4')
             secret_info.managed_storage_classes = managed_secret_info.managed_storage_classes + 1
             MANAGED_SECRETS[index] = secret_info
         else:
-            logger.info('matan5')
             secret_info.managed_storage_classes = 1
             MANAGED_SECRETS.append(secret_info)
 
