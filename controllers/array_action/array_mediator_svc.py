@@ -54,8 +54,6 @@ QUALIFIED_NAME_PORTS_DELIMITER = ","
 LUN_INTERVAL = 128
 
 FCMAP_STATUS_DONE = 'idle_or_copied'
-RCRELATIONSHIP_STATE_IDLE = 'idling'
-RCRELATIONSHIP_STATE_READY = 'consistent_synchronized'
 
 YES = 'yes'
 
@@ -64,10 +62,6 @@ ENDPOINT_TYPE_TARGET = 'target'
 
 ENDPOINT_TYPE_MASTER = 'master'
 ENDPOINT_TYPE_AUX = 'aux'
-
-ENDPOINT_TYPE_PRODUCTION = 'production'
-ENDPOINT_TYPE_INDEPENDENT = 'independent'
-ENDPOINT_TYPE_RECOVERY = 'recovery'
 
 
 def is_warning_message(exception):
@@ -1263,7 +1257,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     @staticmethod
     def _is_replication_idle(rcrelationship):
-        return rcrelationship.state == RCRELATIONSHIP_STATE_IDLE
+        return rcrelationship.state == array_settings.RCRELATIONSHIP_STATE_IDLE
 
     @staticmethod
     def _is_replication_disconnected(rcrelationship):
@@ -1271,7 +1265,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     @staticmethod
     def _is_replication_ready(rcrelationship):
-        return rcrelationship.state == RCRELATIONSHIP_STATE_READY
+        return rcrelationship.state == array_settings.RCRELATIONSHIP_STATE_READY
 
     def _is_replication_endpoint_primary(self, rcrelationship, endpoint_type=None):
         if not endpoint_type:
@@ -1300,7 +1294,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         name = volume_group_id
         copy_type = array_settings.REPLICATION_COPY_TYPE_ASYNC
         is_ready = True
-        is_primary = (replication_mode == ENDPOINT_TYPE_PRODUCTION)
+        is_primary = (replication_mode == array_settings.ENDPOINT_TYPE_PRODUCTION)
 
         return Replication(name=name,
                            copy_type=copy_type,
@@ -1563,13 +1557,13 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             logger.info("EAR replication is not supported on the existing storage")
             return
         cli_kwargs = {}
-        if self._get_replication_mode(volume_group_id) == ENDPOINT_TYPE_RECOVERY:
-            cli_kwargs['mode'] = ENDPOINT_TYPE_INDEPENDENT
+        if self._get_replication_mode(volume_group_id) == array_settings.ENDPOINT_TYPE_RECOVERY:
+            cli_kwargs['mode'] = array_settings.ENDPOINT_TYPE_INDEPENDENT
             logger.info("Changing the local volume group to be an independent copy")
             self._chvolumegroupreplication(volume_group_id, **cli_kwargs)
 
-        if self._get_replication_mode(volume_group_id) == ENDPOINT_TYPE_INDEPENDENT:
-            cli_kwargs['mode'] = ENDPOINT_TYPE_PRODUCTION
+        if self._get_replication_mode(volume_group_id) == array_settings.ENDPOINT_TYPE_INDEPENDENT:
+            cli_kwargs['mode'] = array_settings.ENDPOINT_TYPE_PRODUCTION
             logger.info("Changing the local volume group to be a production copy")
             self._chvolumegroupreplication(volume_group_id, **cli_kwargs)
         else:
