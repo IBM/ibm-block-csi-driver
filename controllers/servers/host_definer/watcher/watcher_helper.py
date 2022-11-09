@@ -350,8 +350,8 @@ class Watcher(KubernetesManager):
         return SecretInfo(secret_name, secret_namespace, nodes_with_system_id)
 
     def _is_secret_managed(self, secret_info):
-        managed_secret_info, _ = self._get_matching_managed_secret_info(secret_info)
-        if managed_secret_info:
+        _, index = self._get_matching_managed_secret_info(secret_info)
+        if index != -1:
             return True
         return False
 
@@ -359,4 +359,4 @@ class Watcher(KubernetesManager):
         for index, managed_secret_info in enumerate(MANAGED_SECRETS):
             if managed_secret_info.name == secret_info.name and managed_secret_info.namespace == secret_info.namespace:
                 return managed_secret_info, index
-        return '', -1
+        return secret_info, -1
