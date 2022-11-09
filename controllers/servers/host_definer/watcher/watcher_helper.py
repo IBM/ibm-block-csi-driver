@@ -2,13 +2,10 @@ import os
 import random
 import string
 from munch import Munch
+import json
 
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.settings import (SECRET_ARRAY_PARAMETER,
-                                          SECRET_PASSWORD_PARAMETER,
-                                          SECRET_USERNAME_PARAMETER)
-import controllers.servers.messages as common_messages
-from controllers.servers.utils import get_array_connection_info_from_secrets
+from controllers.servers.utils import validate_secrets, get_array_connection_info_from_secrets
 from controllers.servers.errors import ValidationException
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
@@ -56,6 +53,9 @@ class Watcher(KubernetesManager):
         return host_definition_info
 
     def _create_definition(self, host_definition_info):
+        if not self._is_node_should_be_managed_on_secret(
+                host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace):
+            return
         host_definition_info = self._update_host_definition_info(host_definition_info)
         response = self._define_host(host_definition_info)
         current_host_definition_info_on_cluster = self._create_host_definition_if_not_exist(host_definition_info)
@@ -151,16 +151,56 @@ class Watcher(KubernetesManager):
 
     def _delete_definition(self, host_definition_info):
         node_name = host_definition_info.node_name
+        response = DefineHostResponse()
         logger.info(messages.UNDEFINED_HOST.format(
             node_name, host_definition_info.secret_name, host_definition_info.secret_namespace))
-        response = self._undefine_host(host_definition_info)
-        current_host_definition_info_on_cluster = self._get_matching_host_definition_info(
-            host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
-        self._handle_k8s_host_definition_after_undefine_action(
-            response.error_message, current_host_definition_info_on_cluster)
+        if self._is_node_should_be_managed_on_secret(node_name, host_definition_info.secret_name,
+                                                     host_definition_info.secret_namespace):
+            response = self._undefine_host(host_definition_info)
+        self._handle_k8s_host_definition_after_undefine_action_if_exist(host_definition_info, response)
+
+    def _is_node_should_be_managed_on_secret(self, node_name, secret_name, secret_namespace):
+        logger.info(messages.CHECK_NODE_SHOULD_BE_MANAGED_BY_SECRET.format(node_name, secret_name, secret_namespace))
+        secret_data = self._get_secret_data(secret_name, secret_namespace)
+        self._validate_secret(secret_data)
+        managed_secret_info, _ = self._get_managed_secret_by_name_and_namespace(secret_name, secret_namespace)
+        if self._is_node_should_managed_on_secret_info(node_name, managed_secret_info):
+            logger.info(messages.NODE_SHOULD_BE_MANAGED_ON_SECRET.format(node_name, secret_name, secret_namespace))
+            return True
+        logger.info(messages.NODE_SHOULD_NOT_BE_MANAGED_ON_SECRET.format(node_name, secret_name, secret_namespace))
+        return False
+
+    def _validate_secret(self, secret_data):
+        secret_data = self._convert_secret_config_to_string(secret_data)
+        try:
+            validate_secrets(secret_data)
+        except ValidationException as ex:
+            logger.error(str(ex))
+
+    def _get_managed_secret_by_name_and_namespace(self, secret_name, secret_namespace):
+        secret_info = self._generate_secret_info(secret_name, secret_namespace)
+        managed_secret_info, index = self._get_matching_managed_secret_info(secret_info)
+        return managed_secret_info, index
+
+    def _is_node_should_managed_on_secret_info(self, node_name, secret_info):
+        if secret_info:
+            nodes_with_system_id = secret_info.nodes_with_system_id
+            if nodes_with_system_id and nodes_with_system_id.get(node_name):
+                return True
+            if nodes_with_system_id:
+                return False
+            return True
+        return False
 
     def _undefine_host(self, host_definition_info):
         return self._ensure_definition_state(host_definition_info, self.storage_host_servicer.undefine_host)
+
+    def _handle_k8s_host_definition_after_undefine_action_if_exist(self, host_definition_info, response):
+        current_host_definition_info_on_cluster = self._get_matching_host_definition_info(
+            host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
+        if current_host_definition_info_on_cluster:
+            self._handle_k8s_host_definition_after_undefine_action(
+                response.error_message, current_host_definition_info_on_cluster)
 
     def _handle_k8s_host_definition_after_undefine_action(self, message_from_storage, host_definition_info):
         if message_from_storage and host_definition_info:
@@ -203,7 +243,8 @@ class Watcher(KubernetesManager):
         return self._is_host_has_label_in_true(node_name, settings.FORBID_DELETION_LABEL)
 
     def _is_host_has_label_in_true(self, node_name, label):
-        return self._get_label_value(node_name, label) == settings.TRUE_STRING
+        node_info = self._get_node_info(node_name)
+        return self._get_label_value(node_info.labels, label) == settings.TRUE_STRING
 
     def _ensure_definition_state(self, host_definition_info, define_function):
         request = self._get_request_from_host_definition(host_definition_info)
@@ -215,67 +256,84 @@ class Watcher(KubernetesManager):
         return define_function(request)
 
     def _get_request_from_host_definition(self, host_definition_info):
-        request = self._get_new_request(host_definition_info.node_name)
+        node_info = self._get_node_info(host_definition_info.node_name)
+        request = self._get_new_request(node_info.labels)
         request = self._add_array_connectivity_info_to_request(
-            request, host_definition_info.secret_name, host_definition_info.secret_namespace)
+            request, host_definition_info.secret_name, host_definition_info.secret_namespace, node_info.labels)
         if request:
             request.node_id_from_host_definition = host_definition_info.node_id
             request.node_id_from_csi_node = NODES[host_definition_info.node_name]
         return request
 
-    def _add_array_connectivity_info_to_request(self, request, secret_name, secret_namespace):
-        request.array_connection_info = self._get_array_connection_info_from_secret(secret_name, secret_namespace)
-        if request.array_connection_info:
-            return request
-        return None
-
-    def _get_new_request(self, node_name):
+    def _get_new_request(self, labels):
         request = DefineHostRequest()
         request.prefix = self._get_prefix()
-        request.connectivity_type_from_user = self._get_connectivity_type_from_user(node_name)
+        request.connectivity_type_from_user = self._get_connectivity_type_from_user(labels)
         return request
 
     def _get_prefix(self):
         return os.getenv(settings.PREFIX_ENV_VAR)
 
-    def _get_connectivity_type_from_user(self, node_name):
-        connectivity_type_label_on_node = self._get_label_value(node_name, settings.CONNECTIVITY_TYPE_LABEL)
+    def _get_connectivity_type_from_user(self, labels):
+        connectivity_type_label_on_node = self._get_label_value(labels, settings.CONNECTIVITY_TYPE_LABEL)
         if connectivity_type_label_on_node:
             return connectivity_type_label_on_node
         return os.getenv(settings.CONNECTIVITY_ENV_VAR)
 
-    def _get_label_value(self, node_name, label):
-        k8s_node = self._read_node(node_name)
-        if not k8s_node:
-            return ''
-        return k8s_node.metadata.labels.get(label)
+    def _get_label_value(self, labels, label):
+        return labels.get(label)
 
-    def _get_array_connection_info_from_secret(self, secret_name, secret_namespace):
+    def _add_array_connectivity_info_to_request(self, request, secret_name, secret_namespace, labels):
+        request.array_connection_info = self._get_array_connection_info_from_secret(
+            secret_name, secret_namespace, labels)
+        if request.array_connection_info:
+            return request
+        return None
+
+    def _get_array_connection_info_from_secret(self, secret_name, secret_namespace, labels):
         secret_data = self._get_secret_data(secret_name, secret_namespace)
-        return self._get_array_connection_info_from_secret_data(secret_data)
+        node_topology_labels = self._get_topology_labels(labels)
+        return self._get_array_connection_info_from_secret_data(secret_data, node_topology_labels)
 
-    def _get_array_connection_info_from_secret_data(self, secret_data):
+    def _get_topology_labels(self, labels):
+        topology_labels = {}
+        for label in labels:
+            if self._is_topology_label(label):
+                topology_labels[label] = labels[label]
+        return topology_labels
+
+    def _is_topology_label(self, label):
+        for prefix in settings.TOPOLOGY_PREFIXES:
+            if label.startswith(prefix):
+                return True
+        return False
+
+    def _get_array_connection_info_from_secret_data(self, secret_data, labels):
         try:
-            system_info = self._get_system_info(secret_data)
-            if system_info:
-                return get_array_connection_info_from_secrets(system_info)
-        except KeyError:
-            logger.error(common_messages.INVALID_SECRET_CONFIG_MESSAGE)
+            secret_data = self._convert_secret_config_to_string(secret_data)
+            array_connection_info = get_array_connection_info_from_secrets(secret_data, labels)
+            return self._decode_array_connectivity_info(array_connection_info)
         except ValidationException as ex:
-            logger.error(str(ex))
-        except TypeError as ex:
             logger.error(str(ex))
         return None
 
-    def _get_system_info(self, secret_data):
-        if not secret_data:
-            return None
+    def _convert_secret_config_to_string(self, secret_data):
+        if settings.SECRET_CONFIG_FIELD in secret_data.keys():
+            if type(secret_data[settings.SECRET_CONFIG_FIELD]) is dict:
+                secret_data[settings.SECRET_CONFIG_FIELD] = json.dumps(secret_data[settings.SECRET_CONFIG_FIELD])
+        return secret_data
 
-        return {
-            SECRET_ARRAY_PARAMETER: self._decode_base64_to_string(secret_data[SECRET_ARRAY_PARAMETER]),
-            SECRET_USERNAME_PARAMETER: self._decode_base64_to_string(secret_data[SECRET_USERNAME_PARAMETER]),
-            SECRET_PASSWORD_PARAMETER: self._decode_base64_to_string(secret_data[SECRET_PASSWORD_PARAMETER])
-        }
+    def _decode_array_connectivity_info(self, array_connection_info):
+        array_connection_info.array_addresses = self._decode_list_base64_to_list_string(
+            array_connection_info.array_addresses)
+        array_connection_info.user = self._decode_base64_to_string(array_connection_info.user)
+        array_connection_info.password = self._decode_base64_to_string(array_connection_info.password)
+        return array_connection_info
+
+    def _decode_list_base64_to_list_string(self, list_with_base64):
+        for index, base64_content in enumerate(list_with_base64):
+            list_with_base64[index] = self._decode_base64_to_string(base64_content)
+        return list_with_base64
 
     def _get_host_definition_name(self, node_name):
         return '{0}-{1}'.format(node_name, self._get_random_string()).replace('_', '.')

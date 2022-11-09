@@ -6,7 +6,7 @@ from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher, MANAGED_SECRETS
 from controllers.servers.host_definer import settings
 from controllers.servers.errors import ValidationException
-from controllers.servers.utils import validate_secrets, get_system_info_for_topologies
+from controllers.servers.utils import get_system_info_for_topologies
 
 logger = get_stdout_logger()
 
@@ -73,12 +73,6 @@ class StorageClassWatcher(Watcher):
             return True
         return False
 
-    def _validate_secret(self, secret_data):
-        try:
-            validate_secrets(secret_data)
-        except ValidationException as ex:
-            logger.error(str(ex))
-
     def _generate_nodes_with_system_id(self, secret_data):
         nodes_with_system_id = {}
         secret_config = self._get_secret_secret_config(secret_data)
@@ -105,19 +99,6 @@ class StorageClassWatcher(Watcher):
             return ''
         return system_id
 
-    def _get_topology_labels(self, labels):
-        topology_labels = {}
-        for label in labels:
-            if self._is_topology_label(label):
-                topology_labels[label] = labels[label]
-        return topology_labels
-
-    def _is_topology_label(self, label):
-        for prefix in settings.TOPOLOGY_PREFIXES:
-            if label.startswith(prefix):
-                return True
-        return False
-
     def _add_secret_info_to_list(self, secret_info, list_with_secrets_info):
         for secret_info_in_list in list_with_secrets_info:
             if secret_info_in_list.name == secret_info.name and \
@@ -129,15 +110,16 @@ class StorageClassWatcher(Watcher):
     def _handle_added_watch_event(self, secrets_info, storage_class_name):
         logger.info(messages.NEW_STORAGE_CLASS.format(storage_class_name))
         for secret_info in secrets_info:
-            self._define_nodes_when_new_secret(secret_info)
             if secret_info:
                 self._add_secret_if_uniq_or_add_secret_counter(secret_info)
+            self._define_nodes_when_new_secret(secret_info)
 
     def _define_nodes_when_new_secret(self, secret_info):
         managed_secret_info, index = self._get_matching_managed_secret_info(secret_info)
         if managed_secret_info.managed_storage_classes == 0:
             secret_info.managed_storage_classes = managed_secret_info.managed_storage_classes + 1
             MANAGED_SECRETS[index] = secret_info
+            self._define_nodes_from_secret_info(secret_info)
 
     def _add_secret_if_uniq_or_add_secret_counter(self, secret_info):
         managed_secret_info, index = self._get_matching_managed_secret_info(secret_info)

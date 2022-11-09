@@ -65,9 +65,6 @@ class KubernetesManager():
             logger.error(messages.FAILED_TO_GET_NODES.format(ex.body))
             return []
 
-    def _generate_node_info(self, k8s_node):
-        return NodeInfo(k8s_node.metadata.name, k8s_node.metadata.labels)
-
     def _get_storage_classes_info(self):
         try:
             storage_classes_info = []
@@ -319,12 +316,21 @@ class KubernetesManager():
         except Exception:
             return content_with_base64
 
+    def _get_node_info(self, node_name):
+        k8s_node = self._read_node(node_name)
+        if k8s_node:
+            return self._generate_node_info(k8s_node)
+        return NodeInfo('', {})
+
     def _read_node(self, node_name):
         try:
             return self.core_api.read_node(name=node_name)
         except ApiException as ex:
             logger.error(messages.FAILED_TO_GET_NODE.format(node_name, ex.body))
             return None
+
+    def _generate_node_info(self, k8s_node):
+        return NodeInfo(k8s_node.metadata.name, k8s_node.metadata.labels)
 
     def _get_csi_daemon_set(self):
         try:
