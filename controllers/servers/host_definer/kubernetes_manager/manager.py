@@ -294,8 +294,6 @@ class KubernetesManager():
                 logger.error(messages.SECRET_DOES_NOT_EXIST.format(secret_name, secret_namespace))
             else:
                 logger.error(messages.FAILED_TO_GET_SECRET.format(secret_name, secret_namespace, ex.body))
-        except TypeError as ex:
-            logger.error(str(ex))
         return {}
 
     def _change_decode_base64_secret_config(self, secret_data):
