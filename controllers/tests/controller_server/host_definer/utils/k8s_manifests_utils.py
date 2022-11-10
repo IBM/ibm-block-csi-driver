@@ -4,11 +4,11 @@ from controllers.servers.settings import (SECRET_ARRAY_PARAMETER,
                                           SECRET_USERNAME_PARAMETER)
 
 
-def get_k8s_csi_node_manifest(csi_provisioner):
+def get_k8s_csi_node_manifest(csi_provisioner_name):
     k8s_csi_node_spec = {
         settings.SPEC_FIELD: {
             settings.STORAGE_CLASS_DRIVERS_FIELD: [{
-                settings.NAME_FIELD: csi_provisioner,
+                settings.NAME_FIELD: csi_provisioner_name,
                 settings.CSI_NODE_NODE_ID_FIELD: settings.FAKE_NODE_ID
             }]
         },

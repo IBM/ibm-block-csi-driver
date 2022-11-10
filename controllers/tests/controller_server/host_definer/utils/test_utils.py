@@ -23,13 +23,13 @@ class HttpResp():
         return None
 
 
-def get_fake_k8s_csi_nodes(csi_provisioner):
-    k8s_csi_node_manifest = manifest_utils.get_k8s_csi_node_manifest(csi_provisioner)
+def get_fake_k8s_csi_nodes(csi_provisioner_name):
+    k8s_csi_node_manifest = manifest_utils.get_k8s_csi_node_manifest(csi_provisioner_name)
     return K8sResourceItems([Munch.fromDict(k8s_csi_node_manifest)])
 
 
-def get_fake_k8s_csi_node(csi_provisioner):
-    csi_node_manifest = manifest_utils.get_k8s_csi_node_manifest(csi_provisioner)
+def get_fake_k8s_csi_node(csi_provisioner_name):
+    csi_node_manifest = manifest_utils.get_k8s_csi_node_manifest(csi_provisioner_name)
     return Munch.fromDict(csi_node_manifest)
 
 
