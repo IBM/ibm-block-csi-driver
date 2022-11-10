@@ -47,12 +47,13 @@ def get_mock_mediator_response_snapshot(capacity=10, name=SNAPSHOT_NAME, snapsho
 
 
 def get_mock_mediator_response_replication(name, replication_type,
-                                           copy_type=COPY_TYPE, is_primary=False, is_ready=True):
+                                           copy_type=COPY_TYPE, is_primary=False, is_ready=True, volume_group_id=None):
     replication = Replication(name=name,
                               replication_type=replication_type,
                               copy_type=copy_type,
                               is_ready=is_ready,
-                              is_primary=is_primary)
+                              is_primary=is_primary,
+                              volume_group_id=volume_group_id)
 
     return replication
 

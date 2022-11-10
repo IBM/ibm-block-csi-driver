@@ -14,14 +14,13 @@ import controllers.tests.common.test_settings as common_settings
 from controllers.array_action.array_mediator_svc import SVCArrayMediator, build_kwargs_from_parameters, \
     FCMAP_STATUS_DONE, YES
 from controllers.common.node_info import Initiators
-from controllers.array_action.settings import REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR,\
-    ENDPOINT_TYPE_INDEPENDENT, ENDPOINT_TYPE_RECOVERY, RCRELATIONSHIP_STATE_READY
+from controllers.array_action.settings import REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR, RCRELATIONSHIP_STATE_READY
 from controllers.array_action.array_action_types import ReplicationRequest
 from controllers.tests.common.test_settings import OBJECT_INTERNAL_ID, \
     OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE
 from controllers.common.settings import ARRAY_TYPE_SVC, SPACE_EFFICIENCY_THIN, SPACE_EFFICIENCY_COMPRESSED, \
     SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED, SPACE_EFFICIENCY_DEDUPLICATED_THIN, SPACE_EFFICIENCY_DEDUPLICATED, \
-    SPACE_EFFICIENCY_THICK
+    SPACE_EFFICIENCY_THICK, VOLUME_GROUP_NAME_SUFFIX
 
 EMPTY_BYTES = b""
 
@@ -53,6 +52,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.fcmaps_as_source = [self._mock_fcmap(common_settings.SNAPSHOT_NAME, svc_settings.DUMMY_FCMAP_ID)]
         self.svc.client.svcinfo.lsfcmap.return_value = Mock(as_list=self.fcmaps)
         del self.svc.client.svctask.addsnapshot
+        del self.svc.client.svctask.chvolumereplicationinternals
 
     def _mock_node(self, node_id=svc_settings.DUMMY_INTERNAL_ID1, name=array_settings.DUMMY_NODE1_NAME,
                    iqn=array_settings.DUMMY_NODE1_IQN, status=svc_settings.ONLINE_STATUS):
@@ -108,177 +108,196 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_replication_success(self):
         replication_request = ReplicationRequest(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID, SYSTEM_ID, COPY_TYPE,
                                                  REPLICATION_TYPE_MIRROR)
-        rcrelationship_to_return = \
-            Munch({svc_settings.RCRELATIONSHIP_STATE_ATTR_NAME: RCRELATIONSHIP_STATE_READY,
-                   svc_settings.RCRELATIONSHIP_COPY_TYPE_ATTR_NAME: svc_settings.RCRELATIONSHIP_COPY_TYPE,
-                   svc_settings.RCRELATIONSHIP_MASTER_CLUSTER_ID_ATTR_NAME: "",
-                   svc_settings.RCRELATIONSHIP_PRIMARY_ATTR_NAME: False,
-                   svc_settings.RCRELATIONSHIP_NAME_ATTR_NAME: ""})
-        self.svc._get_rcrelationship = Mock()
-        self.svc._get_rcrelationship.return_value = rcrelationship_to_return
+        rcrelationships_to_return = \
+            [Munch({svc_settings.RCRELATIONSHIP_STATE_ATTR_NAME: RCRELATIONSHIP_STATE_READY,
+                    svc_settings.RCRELATIONSHIP_COPY_TYPE_ATTR_NAME: svc_settings.RCRELATIONSHIP_COPY_TYPE,
+                    svc_settings.RCRELATIONSHIP_MASTER_CLUSTER_ID_ATTR_NAME: "",
+                    svc_settings.RCRELATIONSHIP_PRIMARY_ATTR_NAME: False,
+                    svc_settings.RCRELATIONSHIP_ID_ATTR_NAME: svc_settings.DUMMY_INTERNAL_ID1,
+                    svc_settings.RCRELATIONSHIP_NAME_ATTR_NAME: ""})]
+        self.svc.client.svcinfo.lsrcrelationship = Mock()
+        self.svc.client.svcinfo.lsrcrelationship.side_effect = [Mock(as_list=rcrelationships_to_return),
+                                                                Mock(as_list=[])]
 
         self.svc.get_replication(replication_request)
+        filter = "aux_vdisk_id=object_internal_id:master_vdisk_id=other_object_internal_id:master_cluster_id=system_id"
+        self.svc.client.svcinfo.lsrcrelationship.assert_called_with(filtervalue=filter)
 
     def test_get_replication_failure(self):
         replication_request = ReplicationRequest(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID, SYSTEM_ID, COPY_TYPE,
                                                  REPLICATION_TYPE_MIRROR)
-        self.svc._get_rcrelationship = Mock()
-        self.svc._get_rcrelationship.return_value = None
+        self.svc.client.svcinfo.lsrcrelationship = Mock()
+        self.svc.client.svcinfo.lsrcrelationship.return_value = Mock(as_list=[])
 
-        self.svc.get_replication(replication_request)
+        replication = self.svc.get_replication(replication_request)
+        filter = "aux_vdisk_id=object_internal_id:master_vdisk_id=other_object_internal_id:master_cluster_id=system_id"
+        self.svc.client.svcinfo.lsrcrelationship.assert_called_with(filtervalue=filter)
+        self.assertEqual(replication, None)
 
     def test_create_replication_success(self):
         replication_request = ReplicationRequest(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID, SYSTEM_ID, COPY_TYPE,
                                                  REPLICATION_TYPE_MIRROR)
-        rcrelationship_to_return = \
-            Munch({svc_settings.RCRELATIONSHIP_STATE_ATTR_NAME: RCRELATIONSHIP_STATE_READY,
-                   svc_settings.RCRELATIONSHIP_COPY_TYPE_ATTR_NAME: svc_settings.RCRELATIONSHIP_COPY_TYPE,
-                   svc_settings.RCRELATIONSHIP_MASTER_CLUSTER_ID_ATTR_NAME: "",
-                   svc_settings.RCRELATIONSHIP_PRIMARY_ATTR_NAME: False,
-                   svc_settings.RCRELATIONSHIP_NAME_ATTR_NAME: ""})
-        self.svc._create_rcrelationship = Mock()
-        self.svc._create_rcrelationship.return_value = rcrelationship_to_return
+        self.svc.client.svctask.mkrcrelationship = Mock()
+        self.svc.client.svctask.mkrcrelationship.return_value = Mock(response=(b"id [1]\n", b""))
 
         self.svc.create_replication(replication_request)
+        self.svc.client.svctask.startrcrelationship.assert_called_once_with(
+            object_id=int(svc_settings.DUMMY_INTERNAL_ID1))
 
-    def test_delete_replication_success(self):
+    def _prepare_mocks_for_replication(self):
         replication = utils.get_mock_mediator_response_replication(name=REPLICATION_NAME,
                                                                    replication_type=REPLICATION_TYPE_MIRROR)
-        rcrelationship_to_return = \
-            Munch({svc_settings.RCRELATIONSHIP_STATE_ATTR_NAME: RCRELATIONSHIP_STATE_READY,
-                   svc_settings.RCRELATIONSHIP_COPY_TYPE_ATTR_NAME: svc_settings.RCRELATIONSHIP_COPY_TYPE,
-                   svc_settings.RCRELATIONSHIP_MASTER_CLUSTER_ID_ATTR_NAME: "",
-                   svc_settings.RCRELATIONSHIP_PRIMARY_ATTR_NAME: False,
-                   svc_settings.RCRELATIONSHIP_ID_ATTR_NAME: "",
-                   svc_settings.RCRELATIONSHIP_NAME_ATTR_NAME: ""})
-        self.svc._get_rcrelationship_by_name = Mock()
-        self.svc._get_rcrelationship_by_name.return_value = rcrelationship_to_return
+        rcrelationship_to_return = Munch({
+            svc_settings.RCRELATIONSHIP_STATE_ATTR_NAME: RCRELATIONSHIP_STATE_READY,
+            svc_settings.RCRELATIONSHIP_COPY_TYPE_ATTR_NAME: svc_settings.RCRELATIONSHIP_COPY_TYPE,
+            svc_settings.RCRELATIONSHIP_MASTER_CLUSTER_ID_ATTR_NAME: "",
+            svc_settings.RCRELATIONSHIP_PRIMARY_ATTR_NAME: False,
+            svc_settings.RCRELATIONSHIP_ID_ATTR_NAME: svc_settings.DUMMY_INTERNAL_ID1,
+            svc_settings.RCRELATIONSHIP_NAME_ATTR_NAME: ""
+        })
+        self.svc.client.svcinfo.lsrcrelationship = Mock()
+        self.svc.client.svcinfo.lsrcrelationship.return_value = Mock(as_single_element=rcrelationship_to_return)
+        return replication
 
-        self.svc.delete_replication(replication)
-
-    def test_delete_replication_failure(self):
-        replication = utils.get_mock_mediator_response_replication(name=REPLICATION_NAME,
-                                                                   replication_type=REPLICATION_TYPE_MIRROR)
-        self.svc._get_rcrelationship_by_name = Mock()
-        self.svc._get_rcrelationship_by_name.return_value = None
-
-        self.svc.delete_replication(replication)
-
-    def test_promote_connected_replication_volume_success(self):
-        self._test_promote_replication_volume(False)
-
-    def test_promote_disconnected_replication_volume_success(self):
-        self._test_promote_replication_volume(True)
-
-    def _test_promote_replication_volume(self, is_connected):
-        self.svc._is_replication_disconnected = Mock()
-        self.svc._is_replication_disconnected.return_value = is_connected
-        replication = utils.get_mock_mediator_response_replication(name=REPLICATION_NAME,
-                                                                   replication_type=REPLICATION_TYPE_MIRROR)
-        self.svc.promote_replication_volume(replication)
-
-    def test_demote_replication_volume(self):
-        replication = utils.get_mock_mediator_response_replication(name=REPLICATION_NAME,
-                                                                   replication_type=REPLICATION_TYPE_MIRROR)
-        self.svc.demote_replication_volume(replication)
-
-    def test_get_ear_replication_success(self):
+    def _prepare_mocks_for_ear_replication(self):
         replication_request = ReplicationRequest(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID, SYSTEM_ID, COPY_TYPE,
-                                                 REPLICATION_TYPE_EAR)
-        self.svc._is_earreplication_supported = Mock()
-        self.svc._is_earreplication_supported.return_value = True
-
-        self.svc.get_replication(replication_request)
-
-    def test_get_ear_replication_not_supported_failure(self):
-        replication_request = ReplicationRequest(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID, SYSTEM_ID, COPY_TYPE,
-                                                 REPLICATION_TYPE_EAR)
-        self.svc._is_earreplication_supported = Mock()
-        self.svc._is_earreplication_supported.return_value = False
-
-        self.svc.get_replication(replication_request)
-
-    def test_get_ear_replication_illegal_mode_failure(self):
-        replication_request = ReplicationRequest(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID, SYSTEM_ID, COPY_TYPE,
-                                                 REPLICATION_TYPE_EAR)
-        self.svc._is_earreplication_supported = Mock()
-        self.svc._is_earreplication_supported.return_value = True
-        self.svc._lsvolumegroupreplication = Mock()
-        self.svc._lsvolumegroupreplication.return_value = None
-
-        self.svc.get_replication(replication_request)
-
-    def test_create_ear_replication_success(self):
-        replication_request = ReplicationRequest(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID, SYSTEM_ID, COPY_TYPE,
-                                                 REPLICATION_TYPE_EAR)
-        self.svc._is_earreplication_supported = Mock()
-        self.svc._is_earreplication_supported.return_value = True
+                                                 REPLICATION_TYPE_EAR, REPLICATION_NAME)
+        self.svc.client.svctask.chvolumereplicationinternals = Mock()
 
         cli_volume = self._get_cli_volume()
-        cli_volume.name = ""
-        self.svc._get_cli_volume = Mock()
-        self.svc._get_cli_volume.return_value = cli_volume
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(cli_volume)
+        return replication_request
 
-        self.svc._get_id_from_response = Mock()
-        self.svc._get_id_from_response.return_value = svc_settings.DUMMY_INTERNAL_ID1
+    def test_delete_replication_success(self):
+        replication = self._prepare_mocks_for_replication()
 
-        self.svc.create_replication(replication_request)
+        self.svc.delete_replication(replication)
+        self.svc.client.svctask.rmrcrelationship.assert_called_once_with(object_id=svc_settings.DUMMY_INTERNAL_ID1)
 
-    def test_create_ear_replication_not_supported_failure(self):
+    def test_delete_replication_no_replication_found(self):
+        replication = utils.get_mock_mediator_response_replication(name=REPLICATION_NAME,
+                                                                   replication_type=REPLICATION_TYPE_MIRROR)
+        self.svc.client.svcinfo.lsrcrelationship = Mock()
+        self.svc.client.svcinfo.lsrcrelationship.return_value = Mock(as_single_element=Munch({}))
+
+        self.svc.delete_replication(replication)
+        self.svc.client.svctask.stoprcrelationship.assert_not_called()
+        filter = f"RC_rel_name={REPLICATION_NAME}"
+        self.svc.client.svcinfo.lsrcrelationship.assert_called_once_with(filtervalue=filter)
+
+    def test_promote_replication_volume_success(self):
+        replication = self._prepare_mocks_for_replication()
+
+        self.svc.promote_replication_volume(replication)
+        self.svc.client.svctask.stoprcrelationship.assert_not_called()
+        self.svc.client.svctask.switchrcrelationship.assert_called_once_with(primary='aux', object_id='')
+
+    def test_demote_replication_volume_success(self):
+        replication = self._prepare_mocks_for_replication()
+
+        self.svc.demote_replication_volume(replication)
+        self.svc.client.svctask.stoprcrelationship.assert_not_called()
+        self.svc.client.svctask.switchrcrelationship.assert_called_once_with(primary='master', object_id='')
+
+    def test_get_ear_replication_success(self):
+        replication_request = self._prepare_mocks_for_ear_replication()
+
+        replication = self.svc.get_replication(replication_request)
+
+        self.assertEqual(replication.replication_type, REPLICATION_TYPE_EAR)
+        self.assertEqual(replication.volume_group_id, svc_settings.VOLUME_GROUP_ID_ATTR_KEY)
+
+        self.svc.client.svcinfo.lsvdisk.assert_called_once_with(object_id=OBJECT_INTERNAL_ID, bytes=True)
+        self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_once_with(object_id=svc_settings.
+                                                                                 VOLUME_GROUP_ID_ATTR_KEY)
+
+    def test_get_ear_replication_not_supported(self):
         replication_request = ReplicationRequest(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID, SYSTEM_ID, COPY_TYPE,
                                                  REPLICATION_TYPE_EAR)
-        self.svc._is_earreplication_supported = Mock()
-        self.svc._is_earreplication_supported.return_value = False
+
+        replication = self.svc.get_replication(replication_request)
+        self.assertEqual(replication, None)
+
+        self.svc.client.svcinfo.lsvdisk.assert_not_called()
+        self.svc.client.svcinfo.lsvolumegroupreplication.assert_not_called()
+
+    def test_get_ear_replication_illegal_mode_failure(self):
+        replication_request = self._prepare_mocks_for_ear_replication()
+
+        self.svc.client.svcinfo.lsvolumegroupreplication = Mock()
+        self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(as_single_element=None)
+
+        replication = self.svc.get_replication(replication_request)
+        self.assertEqual(replication, None)
+        self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_once_with(object_id=svc_settings.
+                                                                                 VOLUME_GROUP_ID_ATTR_KEY)
+
+    def test_create_ear_replication_success(self):
+        replication_request = self._prepare_mocks_for_ear_replication()
+
+        self.svc.client.svcinfo.lsvolumegroupreplication = Mock()
+        self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(as_single_element=None)
+        self.svc.client.svctask.mkvolumegroup = Mock()
+        self.svc.client.svctask.mkvolumegroup.return_value = Mock(response=(b"id [1]\n", b""))
 
         self.svc.create_replication(replication_request)
+        self.svc.client.svctask.mkvolumegroup.assert_called_once_with(name=common_settings.
+                                                                      SOURCE_VOLUME_NAME + VOLUME_GROUP_NAME_SUFFIX)
+        self.svc.client.svctask.chvolumegroup.assert_called_once_with(object_id=int(svc_settings.DUMMY_INTERNAL_ID1),
+                                                                      replicationpolicy=REPLICATION_NAME)
 
-    def test_promote_ear_replication_volume_from_independent_success(self):
-        self.svc._get_replication_mode = Mock()
-        self.svc._get_replication_mode.return_value = ENDPOINT_TYPE_INDEPENDENT
+    def test_create_ear_replication_not_supported(self):
+        replication_request = ReplicationRequest(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID, SYSTEM_ID, COPY_TYPE,
+                                                 REPLICATION_TYPE_EAR)
+
+        self.svc.create_replication(replication_request)
+        self.svc.client.svcinfo.mkvolumegroup.assert_not_called()
+        self.svc.client.svcinfo.chvolumegroup.assert_not_called()
+
+    def test_promote_ear_replication_volume_from_independent(self):
+        pass
+
+    def test_promote_ear_replication_volume_from_recovery(self):
+        pass
+
+    def test_promote_ear_replication_not_supported(self):
         replication = utils.get_mock_mediator_response_replication(name=REPLICATION_NAME,
                                                                    replication_type=REPLICATION_TYPE_EAR)
-        self.svc.promote_replication_volume(replication)
-
-    def test_promote_ear_replication_volume_from_recovery_success(self):
-        self.svc._get_replication_mode = Mock()
-        self.svc._get_replication_mode.return_value = ENDPOINT_TYPE_RECOVERY
-        replication = utils.get_mock_mediator_response_replication(name=REPLICATION_NAME,
-                                                                   replication_type=REPLICATION_TYPE_EAR)
-        self.svc.promote_replication_volume(replication)
-
-    def test_promote_ear_replication_not_supported_failure(self):
-        replication = utils.get_mock_mediator_response_replication(name=REPLICATION_NAME,
-                                                                   replication_type=REPLICATION_TYPE_EAR)
-        self.svc._is_earreplication_supported = Mock()
-        self.svc._is_earreplication_supported.return_value = False
 
         self.svc.promote_replication_volume(replication)
+        self.svc.client.svcinfo.lsvolumegroupreplication.assert_not_called()
+        self.svc.client.svcinfo.chvolumegroupreplication.assert_not_called()
 
     def test_delete_ear_replication_success(self):
+        self._prepare_mocks_for_ear_replication()
+        replication = utils.get_mock_mediator_response_replication(name=REPLICATION_NAME,
+                                                                   replication_type=REPLICATION_TYPE_EAR,
+                                                                   volume_group_id=OBJECT_INTERNAL_ID)
+        self.svc.delete_replication(replication)
+        self.svc.client.svctask.chvolumegroup.assert_called_once_with(object_id=OBJECT_INTERNAL_ID,
+                                                                      noreplicationpolicy=True)
+        self.svc.client.svctask.rmvolumegroup.assert_called_once_with(object_id=OBJECT_INTERNAL_ID)
+
+    def test_delete_ear_replication_not_supported(self):
         replication = utils.get_mock_mediator_response_replication(name=REPLICATION_NAME,
                                                                    replication_type=REPLICATION_TYPE_EAR)
         self.svc.delete_replication(replication)
 
-    def test_delete_ear_replication_not_supported_failure(self):
-        replication = utils.get_mock_mediator_response_replication(name=REPLICATION_NAME,
-                                                                   replication_type=REPLICATION_TYPE_EAR)
-        self.svc._is_earreplication_supported = Mock()
-        self.svc._is_earreplication_supported.return_value = False
-
-        self.svc.delete_replication(replication)
+        self.svc.client.svcinfo.chvolumegroup.assert_not_called()
+        self.svc.client.svctask.chvdisk.assert_not_called()
+        self.svc.client.svctask.rmvolumegroup.assert_not_called()
 
     def test_demote_ear_replication_volume(self):
+        self.svc.client.svctask.chvolumereplicationinternals = Mock()
         replication = utils.get_mock_mediator_response_replication(name=REPLICATION_NAME,
                                                                    replication_type=REPLICATION_TYPE_EAR)
         self.svc.demote_replication_volume(replication)
 
-    def test_demote_ear_replication_not_supported_failure(self):
+    def test_demote_ear_replication_not_supported(self):
         replication = utils.get_mock_mediator_response_replication(name=REPLICATION_NAME,
                                                                    replication_type=REPLICATION_TYPE_EAR)
-        self.svc._is_earreplication_supported = Mock()
-        self.svc._is_earreplication_supported.return_value = False
-
         self.svc.demote_replication_volume(replication)
+        self.svc.client.svcinfo.lsvolumegroupreplication.assert_not_called()
 
     def test_default_object_prefix_length_not_larger_than_max(self):
         prefix_length = len(self.svc.default_object_prefix)
