@@ -186,7 +186,7 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
         test_utils.run_function_with_timeout(self.csi_node_watcher.watch_csi_nodes_resources, 0.5)
         self.assertEqual(1, len(self.nodes_on_watcher_helper))
         self.csi_node_watcher.storage_host_servicer.define_host.assert_called_once_with(
-            test_utils.get_define_request(test_settings.TRUE_STRING, test_settings.TRUE_STRING))
+            test_utils.get_define_request(test_settings.TRUE_STRING))
 
     def test_define_host_not_called_on_new_csi_node_when_failed_to_get_secret(self):
         self._prepare_default_mocks_for_modified_event()
