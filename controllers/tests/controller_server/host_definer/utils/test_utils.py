@@ -6,6 +6,8 @@ from mock import patch, Mock
 import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as manifest_utils
 import controllers.tests.controller_server.host_definer.settings as settings
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
+from controllers.servers.host_definer.types import DefineHostRequest
+from controllers.servers.csi.controller_types import ArrayConnectionInfo
 
 
 @dataclass
@@ -173,3 +175,13 @@ def get_pending_creation_status_manifest():
 
 def get_ready_status_manifest():
     return manifest_utils.get_status_phase_manifest(settings.READY_PHASE)
+
+
+def get_array_connection_info():
+    return ArrayConnectionInfo(
+        [settings.FAKE_SECRET_ARRAY],
+        settings.FAKE_SECRET_USER_NAME, settings.FAKE_SECRET_PASSWORD)
+
+
+def get_define_request(prefix='', connectivity_type=''):
+    return DefineHostRequest(prefix, connectivity_type, settings.FAKE_NODE_ID, get_array_connection_info())

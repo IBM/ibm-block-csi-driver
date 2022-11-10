@@ -28,7 +28,8 @@ class TestWatchSecretResources(SecretWatcherBase):
         self.secret_watcher.host_definitions_api.get.return_value = \
             test_utils.get_fake_k8s_host_definitions_items('not_ready')
         self.secret_watcher.watch_secret_resources()
-        self.secret_watcher.storage_host_servicer.define_host.assert_called()
+        self.secret_watcher.storage_host_servicer.define_host.assert_called_once_with(
+            test_utils.get_define_request())
 
     def test_do_nothing_on_deleted_secret_event(self):
         self._prepare_default_mocks_for_secret()
@@ -51,3 +52,4 @@ class TestWatchSecretResources(SecretWatcherBase):
         self.secret_watcher.host_definitions_api.get.return_value = \
             test_utils.get_fake_k8s_host_definitions_items(settings.READY_PHASE)
         self.secret_watcher.core_api.read_namespaced_secret.return_value = test_utils.get_fake_k8s_secret()
+        self.os.getenv.return_value = ''

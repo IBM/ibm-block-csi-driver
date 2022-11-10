@@ -112,3 +112,11 @@ def generate_watch_event(event_type, object_function):
         settings.EVENT_TYPE_FIELD: event_type,
         settings.EVENT_OBJECT_FIELD: object_function
     }
+
+
+def get_metadata_with_manage_node_labels_manifest(label_value):
+    return {
+        settings.METADATA_FIELD: {
+            settings.NODE_LABELS_FIELD: {settings.MANAGE_NODE_LABEL: label_value}
+        }
+    }

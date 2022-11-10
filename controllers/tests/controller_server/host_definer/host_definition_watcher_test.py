@@ -29,7 +29,7 @@ class TestWatchHostDefinitionsResources(HostDefinitionWatcherBase):
     def test_pending_deletion_that_managed_to_be_deleted_log_messages(self):
         self._prepare_default_mocks_for_pending_deletion()
         test_utils.run_function_with_timeout(self.host_definition_watcher.watch_host_definitions_resources, 0.5)
-        self.host_definition_watcher.csi_nodes_api.get.assert_called()
+        self.host_definition_watcher.csi_nodes_api.get.assert_called_with(name=settings.FAKE_NODE_NAME)
 
     def test_set_error_event_on_pending_deletion(self):
         self._prepare_default_mocks_for_pending_deletion()
@@ -56,18 +56,24 @@ class TestWatchHostDefinitionsResources(HostDefinitionWatcherBase):
         self.host_definition_watcher.host_definitions_api.get.return_value = self.ready_k8s_host_definitions
         test_utils.patch_pending_variables()
         test_utils.run_function_with_timeout(self.host_definition_watcher.watch_host_definitions_resources, 0.5)
-        self.host_definition_watcher.storage_host_servicer.define_host.assert_called_once()
+        self.host_definition_watcher.storage_host_servicer.define_host.assert_called_once_with(
+            test_utils.get_define_request())
 
     def test_pending_creation_that_managed_to_be_created(self):
         self._prepare_default_mocks_for_pending_creation()
+        self.host_definition_watcher._loop_forever = Mock()
+        self.host_definition_watcher._loop_forever.side_effect = [True, False]
         test_utils.run_function_with_timeout(self.host_definition_watcher.watch_host_definitions_resources, 0.5)
-        self.host_definition_watcher.custom_object_api.patch_cluster_custom_object_status.assert_called()
+        self.host_definition_watcher.custom_object_api.patch_cluster_custom_object_status.assert_called_once_with(
+            settings.CSI_IBM_GROUP, settings.VERSION, settings.HOST_DEFINITION_PLURAL, settings.FAKE_NODE_NAME,
+            test_utils.get_ready_status_manifest())
 
     def _prepare_default_mocks_for_pending_creation(self):
         self.host_definition_watcher.host_definitions_api.watch.return_value = iter(
             [test_utils.get_fake_host_definition_watch_event(settings.MODIFIED_EVENT_TYPE,
                                                              settings.PENDING_CREATION_PHASE)])
         self.host_definition_watcher.storage_host_servicer.define_host.return_value = DefineHostResponse()
+        self.os.getenv.return_value = ''
         self._prepare_default_mocks_for_pending()
 
     def _prepare_default_mocks_for_pending(self):

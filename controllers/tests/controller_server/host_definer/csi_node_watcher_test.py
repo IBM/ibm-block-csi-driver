@@ -1,6 +1,7 @@
 from kubernetes.client.rest import ApiException
 
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
+import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as k8s_manifests_utils
 import controllers.tests.controller_server.host_definer.settings as settings
 from controllers.tests.controller_server.host_definer.common import BaseSetUp
 from controllers.servers.host_definer.types import DefineHostResponse
@@ -56,7 +57,9 @@ class TestAddInitialCsiNodes(CsiNodeWatcherBase):
         self._prepare_default_mocks_for_add_node()
         self.csi_node_watcher.core_api.read_node.return_value = self.k8s_node_with_fake_label
         self.csi_node_watcher.add_initial_csi_nodes()
-        self.csi_node_watcher.core_api.patch_node.assert_called()
+        self.csi_node_watcher.core_api.patch_node.assert_called_once_with(
+            settings.FAKE_NODE_NAME + '-0',
+            k8s_manifests_utils.get_metadata_with_manage_node_labels_manifest(settings.TRUE_STRING))
         self.assertEqual(1, len(self.nodes_on_watcher_helper))
 
     def test_update_node_label_fail(self):
@@ -94,7 +97,8 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
     def test_delete_host_definition(self):
         self._prepare_default_mocks_for_deletion()
         test_utils.run_function_with_timeout(self.csi_node_watcher.watch_csi_nodes_resources, 0.5)
-        self.csi_node_watcher.host_definitions_api.delete.assert_called()
+        self.csi_node_watcher.host_definitions_api.delete.assert_called_once_with(
+            name=settings.FAKE_NODE_NAME, body={})
         self.assertEqual(0, len(self.nodes_on_csi_node_watcher))
 
     def test_delete_host_from_storage_failed(self):
@@ -119,7 +123,8 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
         self.csi_node_watcher.host_definitions_api.get.return_value = test_utils.get_empty_k8s_host_definitions()
         test_utils.run_function_with_timeout(self.csi_node_watcher.watch_csi_nodes_resources, 0.5)
         self.assertEqual(0, len(self.nodes_on_csi_node_watcher))
-        self.csi_node_watcher.core_api.patch_node.assert_called()
+        self.csi_node_watcher.core_api.patch_node.assert_called_once_with(
+            settings.FAKE_NODE_NAME, k8s_manifests_utils.get_metadata_with_manage_node_labels_manifest(None))
 
     def test_nodes_global_variable_reduced_on_csi_node_deletion_and_definer_cannot_delete(self):
         self._prepare_default_mocks_for_deletion()
@@ -147,7 +152,8 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
         self.csi_node_watcher.csi_nodes_api.watch.return_value = iter(
             [test_utils.get_fake_csi_node_watch_event(settings.MODIFIED_EVENT_TYPE)])
         test_utils.run_function_with_timeout(self.csi_node_watcher.watch_csi_nodes_resources, 0.5)
-        self.csi_node_watcher.host_definitions_api.delete.assert_called()
+        self.csi_node_watcher.host_definitions_api.delete.assert_called_once_with(
+            name=settings.FAKE_NODE_NAME, body={})
 
     def _prepare_default_mocks_for_deletion(self):
         self.nodes_on_watcher_helper[settings.FAKE_NODE_NAME] = settings.FAKE_NODE_ID
@@ -178,7 +184,8 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
             test_utils.get_empty_k8s_host_definitions(), self.ready_k8s_host_definitions]
         test_utils.run_function_with_timeout(self.csi_node_watcher.watch_csi_nodes_resources, 0.5)
         self.assertEqual(1, len(self.nodes_on_watcher_helper))
-        self.csi_node_watcher.storage_host_servicer.define_host.assert_called()
+        self.csi_node_watcher.storage_host_servicer.define_host.assert_called_once_with(
+            test_utils.get_define_request(settings.TRUE_STRING, settings.TRUE_STRING))
 
     def test_define_host_not_called_on_new_csi_node_when_failed_to_get_secret(self):
         self._prepare_default_mocks_for_modified_event()
