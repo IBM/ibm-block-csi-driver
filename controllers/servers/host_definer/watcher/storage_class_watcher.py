@@ -4,6 +4,7 @@ import controllers.servers.host_definer.messages as messages
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher, SECRET_IDS
 from controllers.servers.host_definer import settings
+import controllers.common.settings as common_settings
 
 logger = get_stdout_logger()
 
@@ -56,7 +57,8 @@ class StorageClassWatcher(Watcher):
         prefix = parameter_name.split(secret_name_suffix)[0]
         return self._generate_secret_id(
             storage_class_info.parameters[parameter_name],
-            storage_class_info.parameters[prefix + secret_name_suffix.replace(settings.NAME, settings.NAMESPACE)])
+            storage_class_info.parameters[prefix + secret_name_suffix.replace(
+                common_settings.NAME_FIELD, common_settings.NAMESPACE_FIELD)])
 
     def _handle_added_watch_event(self, secrets_id, storage_class_name):
         logger.info(messages.NEW_STORAGE_CLASS.format(storage_class_name))
