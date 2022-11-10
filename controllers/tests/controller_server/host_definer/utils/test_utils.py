@@ -4,7 +4,7 @@ from munch import Munch
 from mock import patch, Mock
 
 import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as manifest_utils
-import controllers.tests.controller_server.host_definer.settings as settings
+import controllers.tests.controller_server.host_definer.settings as test_settings
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
 from controllers.servers.host_definer.types import DefineHostRequest
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
@@ -40,8 +40,8 @@ def get_fake_k8s_csi_node(csi_provisioner_name):
 
 
 def get_fake_csi_node_watch_event(event_type):
-    return manifest_utils.generate_watch_event(event_type,
-                                               manifest_utils.get_k8s_csi_node_manifest(settings.CSI_PROVISIONER_NAME))
+    return manifest_utils.generate_watch_event(event_type, manifest_utils.get_k8s_csi_node_manifest(
+        test_settings.CSI_PROVISIONER_NAME))
 
 
 def get_fake_k8s_node(label):
@@ -80,12 +80,12 @@ def get_fake_host_definition_watch_event(event_type, host_definition_phase):
 
 
 def get_fake_node_watch_event(event_type):
-    return manifest_utils.generate_watch_event(event_type,
-                                               manifest_utils.get_fake_k8s_node_manifest(settings.MANAGE_NODE_LABEL))
+    return manifest_utils.generate_watch_event(event_type, manifest_utils.get_fake_k8s_node_manifest(
+        test_settings.MANAGE_NODE_LABEL))
 
 
 def get_fake_k8s_nodes_items():
-    k8s_node_manifest = manifest_utils.get_fake_k8s_node_manifest(settings.MANAGE_NODE_LABEL)
+    k8s_node_manifest = manifest_utils.get_fake_k8s_node_manifest(test_settings.MANAGE_NODE_LABEL)
     return K8sResourceItems([Munch.fromDict(k8s_node_manifest)])
 
 
@@ -109,13 +109,13 @@ def get_fake_secret_storage_event(event_type, provisioner):
 
 
 def patch_pending_variables():
-    for pending_var, value in settings.HOST_DEFINITION_PENDING_VARS.items():
+    for pending_var, value in test_settings.HOST_DEFINITION_PENDING_VARS.items():
         patch('{}.{}'.format(
-            settings.SETTINGS_PATH, pending_var), value).start()
+            test_settings.SETTINGS_PATH, pending_var), value).start()
 
 
 def patch_kubernetes_manager_init():
-    for function_to_patch in settings.KUBERNETES_MANAGER_INIT_FUNCTIONS_TO_PATCH:
+    for function_to_patch in test_settings.KUBERNETES_MANAGER_INIT_FUNCTIONS_TO_PATCH:
         _patch_function(KubernetesManager, function_to_patch)
 
 
@@ -170,18 +170,18 @@ def patch_secret_ids_global_variable(module_path):
 
 
 def get_pending_creation_status_manifest():
-    return manifest_utils.get_status_phase_manifest(settings.PENDING_CREATION_PHASE)
+    return manifest_utils.get_status_phase_manifest(test_settings.PENDING_CREATION_PHASE)
 
 
 def get_ready_status_manifest():
-    return manifest_utils.get_status_phase_manifest(settings.READY_PHASE)
+    return manifest_utils.get_status_phase_manifest(test_settings.READY_PHASE)
 
 
 def get_array_connection_info():
     return ArrayConnectionInfo(
-        [settings.FAKE_SECRET_ARRAY],
-        settings.FAKE_SECRET_USER_NAME, settings.FAKE_SECRET_PASSWORD)
+        [test_settings.FAKE_SECRET_ARRAY],
+        test_settings.FAKE_SECRET_USER_NAME, test_settings.FAKE_SECRET_PASSWORD)
 
 
 def get_define_request(prefix='', connectivity_type=''):
-    return DefineHostRequest(prefix, connectivity_type, settings.FAKE_NODE_ID, get_array_connection_info())
+    return DefineHostRequest(prefix, connectivity_type, test_settings.FAKE_NODE_ID, get_array_connection_info())

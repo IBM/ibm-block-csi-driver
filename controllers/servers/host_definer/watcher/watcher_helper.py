@@ -14,6 +14,7 @@ from controllers.servers.errors import ValidationException
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
 from controllers.servers.host_definer import settings
+import controllers.common.settings as common_settings
 from controllers.servers.host_definer.types import DefineHostRequest, DefineHostResponse, HostDefinitionInfo, SecretInfo
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
 
@@ -61,7 +62,8 @@ class Watcher(KubernetesManager):
         current_host_definition_info_on_cluster = self._get_matching_host_definition_info(
             host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
         if current_host_definition_info_on_cluster:
-            host_definition_manifest[settings.METADATA][settings.NAME] = current_host_definition_info_on_cluster.name
+            host_definition_manifest[settings.METADATA][
+                common_settings.NAME_FIELD] = current_host_definition_info_on_cluster.name
             self._patch_host_definition(host_definition_manifest)
             return current_host_definition_info_on_cluster
         else:
@@ -73,12 +75,12 @@ class Watcher(KubernetesManager):
             settings.API_VERSION: settings.CSI_IBM_API_VERSION,
             settings.KIND: settings.HOST_DEFINITION_KIND,
             settings.METADATA: {
-                settings.NAME: host_definition_info.name,
+                common_settings.NAME_FIELD: host_definition_info.name,
             },
             settings.SPEC: {
                 settings.HOST_DEFINITION_FIELD: {
                     settings.NODE_NAME_FIELD: host_definition_info.node_name,
-                    settings.NODE_ID_FIELD: host_definition_info.node_id,
+                    common_settings.HOST_DEFINITION_NODE_ID_FIELD: host_definition_info.node_id,
                     settings.SECRET_NAME_FIELD: host_definition_info.secret_name,
                     settings.SECRET_NAMESPACE_FIELD: host_definition_info.secret_namespace,
                 },
