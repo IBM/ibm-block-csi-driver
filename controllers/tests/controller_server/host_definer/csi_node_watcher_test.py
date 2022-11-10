@@ -22,7 +22,7 @@ class CsiNodeWatcherBase(BaseSetUp):
 class TestAddInitialCsiNodes(CsiNodeWatcherBase):
     def test_host_not_defined_for_csi_node_without_ibm_block_provider(self):
         self.csi_node_watcher.csi_nodes_api.get.return_value = test_utils.get_fake_k8s_csi_nodes(
-            settings.FAKE_CSI_PROVISIONER)
+            settings.FAKE_CSI_PROVISIONER, 1)
         self.csi_node_watcher.add_initial_csi_nodes()
         self.assertEqual(0, len(self.nodes_on_watcher_helper))
 
@@ -39,10 +39,12 @@ class TestAddInitialCsiNodes(CsiNodeWatcherBase):
         self.csi_node_watcher.add_initial_csi_nodes()
         self.assertEqual(1, len(self.nodes_on_watcher_helper))
 
-    def test_host_defined_for_node_with_dynamic_labeling(self):
+    def test_host_defined_for_multiple_nodes_with_dynamic_labeling(self):
         self._prepare_default_mocks_for_add_node()
+        self.csi_node_watcher.csi_nodes_api.get.return_value = test_utils.get_fake_k8s_csi_nodes(
+            settings.CSI_PROVISIONER_NAME, 2)
         self.csi_node_watcher.add_initial_csi_nodes()
-        self.assertEqual(1, len(self.nodes_on_watcher_helper))
+        self.assertEqual(2, len(self.nodes_on_watcher_helper))
 
     def test_add_node_not_update_labels(self):
         self._prepare_default_mocks_for_add_node()
@@ -66,7 +68,7 @@ class TestAddInitialCsiNodes(CsiNodeWatcherBase):
 
     def _prepare_default_mocks_for_add_node(self):
         self.csi_node_watcher.csi_nodes_api.get.return_value = test_utils.get_fake_k8s_csi_nodes(
-            settings.CSI_PROVISIONER_NAME)
+            settings.CSI_PROVISIONER_NAME, 1)
         self.os.getenv.return_value = settings.TRUE_STRING
         self.csi_node_watcher.core_api.read_node.return_value = self.k8s_node_with_manage_node_label
 

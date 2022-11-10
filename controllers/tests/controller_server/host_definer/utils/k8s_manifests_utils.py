@@ -4,7 +4,7 @@ from controllers.servers.settings import (SECRET_ARRAY_PARAMETER,
                                           SECRET_USERNAME_PARAMETER)
 
 
-def get_k8s_csi_node_manifest(csi_provisioner_name):
+def get_k8s_csi_node_manifest(csi_provisioner_name, csi_node_suffix=''):
     k8s_csi_node_spec = {
         settings.SPEC_FIELD: {
             settings.STORAGE_CLASS_DRIVERS_FIELD: [{
@@ -13,7 +13,7 @@ def get_k8s_csi_node_manifest(csi_provisioner_name):
             }]
         },
     }
-    return _generate_manifest(settings.FAKE_NODE_NAME, k8s_csi_node_spec)
+    return _generate_manifest(settings.FAKE_NODE_NAME + csi_node_suffix, k8s_csi_node_spec)
 
 
 def get_fake_k8s_daemon_set_manifest(updated_pods, desired_updated_pods):

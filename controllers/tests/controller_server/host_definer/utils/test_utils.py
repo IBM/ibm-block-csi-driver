@@ -23,9 +23,13 @@ class HttpResp():
         return None
 
 
-def get_fake_k8s_csi_nodes(csi_provisioner_name):
-    k8s_csi_node_manifest = manifest_utils.get_k8s_csi_node_manifest(csi_provisioner_name)
-    return K8sResourceItems([Munch.fromDict(k8s_csi_node_manifest)])
+def get_fake_k8s_csi_nodes(csi_provisioner_name, number_of_csi_nodes):
+    k8s_csi_nodes = []
+    for csi_node_index in range(number_of_csi_nodes):
+        k8s_csi_node_manifest = manifest_utils.get_k8s_csi_node_manifest(
+            csi_provisioner_name, '-{}'.format(csi_node_index))
+        k8s_csi_nodes.append(Munch.fromDict(k8s_csi_node_manifest))
+    return K8sResourceItems(k8s_csi_nodes)
 
 
 def get_fake_k8s_csi_node(csi_provisioner_name):
