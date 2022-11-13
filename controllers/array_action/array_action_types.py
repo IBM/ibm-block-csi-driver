@@ -40,8 +40,9 @@ class Snapshot(Volume):
 class Replication:
     name: str
     copy_type: str
-    is_ready: str
-    is_primary: str = None
+    is_ready: bool
+    replication_type: str
+    is_primary: bool
     volume_group_id: str = None
 
 

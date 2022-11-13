@@ -3,12 +3,13 @@ import json
 import grpc
 from mock import Mock, MagicMock
 
+from controllers.array_action.array_action_types import Replication
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
 from controllers.tests.common.test_settings import SECRET_USERNAME_VALUE as test_user, \
     SECRET_PASSWORD_VALUE as test_password, ARRAY as test_array, VOLUME_NAME, VOLUME_UID, DUMMY_POOL1, \
-    INTERNAL_VOLUME_ID, \
-    SNAPSHOT_NAME, SNAPSHOT_VOLUME_NAME, SNAPSHOT_VOLUME_UID, VOLUME_GROUP_NAME, VOLUME_GROUP_UID, \
-    INTERNAL_VOLUME_GROUP_ID
+    VOLUME_GROUP_NAME, VOLUME_GROUP_UID, \
+    INTERNAL_VOLUME_GROUP_ID, INTERNAL_VOLUME_ID, COPY_TYPE, \
+    SNAPSHOT_NAME, SNAPSHOT_VOLUME_NAME, SNAPSHOT_VOLUME_UID
 
 
 class ProtoBufMock(MagicMock):
@@ -65,15 +66,14 @@ def get_mock_mediator_response_snapshot(capacity=10, name=SNAPSHOT_NAME, snapsho
     return snapshot
 
 
-def get_mock_mediator_response_replication(name, volume_internal_id, other_volume_internal_id,
-                                           copy_type="sync", is_primary=True, is_ready=True):
-    replication = Mock()
-    replication.name = name
-    replication.volume_internal_id = volume_internal_id
-    replication.other_volume_internal_id = other_volume_internal_id
-    replication.copy_type = copy_type
-    replication.is_primary = is_primary
-    replication.is_ready = is_ready
+def get_mock_mediator_response_replication(name, replication_type,
+                                           copy_type=COPY_TYPE, is_primary=False, is_ready=True, volume_group_id=None):
+    replication = Replication(name=name,
+                              replication_type=replication_type,
+                              copy_type=copy_type,
+                              is_ready=is_ready,
+                              is_primary=is_primary,
+                              volume_group_id=volume_group_id)
 
     return replication
 

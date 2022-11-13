@@ -437,12 +437,12 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def delete_replication(self, replication_name):
+    def delete_replication(self, replication):
         """
         This function will disable and delete a volume replication relationship
 
         Args:
-            replication_name : name of the replication relationship
+            replication : replication to be deleted
 
         Returns:
             None
@@ -455,12 +455,12 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def promote_replication_volume(self, replication_name):
+    def promote_replication_volume(self, replication):
         """
         This function will promote the role of the volume in the connected system to be primary
 
         Args:
-            replication_name : name of the replication relationship
+            replication : replication to be promoted
 
         Returns:
             None
@@ -473,12 +473,12 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def demote_replication_volume(self, replication_name):
+    def demote_replication_volume(self, replication):
         """
         This function will demote the role of the volume in the connected system to be secondary
 
         Args:
-            replication_name : name of the replication relationship
+            replication : replication to be demoted
 
         Returns:
             None
