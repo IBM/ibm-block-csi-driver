@@ -38,7 +38,6 @@ class TestAddInitialStorageClasses(StorageClassWatcherBase):
         self.managed_secrets_on_watcher_helper.append(test_utils.get_fake_secret_info())
         self.storage_class_watcher.add_initial_storage_classes()
         self.storage_class_watcher.storage_host_servicer.define_host.assert_not_called()
-        print('matan {}'.format(self.managed_secrets_on_storage_class_watcher))
         self.assertEqual(2, self.managed_secrets_on_storage_class_watcher[0].managed_storage_classes)
 
     def test_add_new_storage_class_without_ibm_csi_provisioner(self):
