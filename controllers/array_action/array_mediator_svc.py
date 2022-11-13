@@ -11,7 +11,7 @@ from retry import retry
 import controllers.array_action.errors as array_errors
 import controllers.array_action.settings as array_settings
 import controllers.servers.settings as controller_settings
-from controllers.array_action.array_action_types import Volume, Snapshot, Replication, Host
+from controllers.array_action.array_action_types import Volume, Snapshot, Replication, Host, VolumeGroup
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controllers.array_action.volume_group_interface import VolumeGroupInterface
@@ -323,10 +323,22 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         source_id = self._get_wwn_by_volume_name_if_exists(fcmap.source_vdisk_name)
         return self._generate_snapshot_response_from_cli_volume(cli_object, source_id)
 
+    def _lsvdisk_single_element(self, **kwargs):
+        lsvdisk_response = self._lsvdisk(**kwargs)
+        if lsvdisk_response is None:
+            return None
+        return lsvdisk_response.as_single_element
+
+    def _lsvdisk_list(self, **kwargs):
+        lsvdisk_response = self._lsvdisk(**kwargs)
+        if lsvdisk_response is None:
+            return None
+        return lsvdisk_response.as_list
+
     def _lsvdisk(self, **kwargs):
         kwargs['bytes'] = True
         try:
-            return self.client.svcinfo.lsvdisk(**kwargs).as_single_element
+            return self.client.svcinfo.lsvdisk(**kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if (OBJ_NOT_FOUND in ex.my_message or
                     NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message):
@@ -385,7 +397,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 raise ex
 
     def _get_cli_volume(self, volume_name, not_exist_err=True):
-        cli_volume = self._lsvdisk(object_id=volume_name)
+        cli_volume = self._lsvdisk_single_element(object_id=volume_name)
         if not cli_volume and not_exist_err:
             raise array_errors.ObjectNotFoundError(volume_name)
         return cli_volume
@@ -513,7 +525,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _lsvdisk_by_uid(self, vdisk_uid):
         filter_value = 'vdisk_UID=' + vdisk_uid
-        return self._lsvdisk(filtervalue=filter_value)
+        return self._lsvdisk_single_element(filtervalue=filter_value)
 
     def _get_cli_volume_by_wwn(self, volume_id, not_exist_err=False):
         cli_volume = self._lsvdisk_by_uid(volume_id)
@@ -1671,7 +1683,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _get_cli_volume_id_from_volume_group(self, filter, filter_parameter):
         filter_value = '{}={}'.format(filter, filter_parameter)
-        cli_volume = self._lsvdisk(filtervalue=filter_value)
+        cli_volume = self._lsvdisk_single_element(filtervalue=filter_value)
         return cli_volume.id
 
     def _rollback_create_volume_from_snapshot(self, cli_volume_id, volume_group_name):
@@ -1772,11 +1784,31 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def delete_host(self, host_name):
         self._rmhost(host_name)
 
+    def _get_cli_volumes_from_volume_group(self, volume_group_name):
+        filter_value = 'volume_group_name={}'.format(volume_group_name)
+        cli_volumes = self._lsvdisk_list(filtervalue=filter_value)
+        return [self._generate_volume_response(cli_volume) for cli_volume in cli_volumes]
+
+    def _generate_volume_group_response(self, cli_volume_group):
+        volumes = []
+        if cli_volume_group.volume_count > 0:
+            volumes = self._get_cli_volumes_from_volume_group(cli_volume_group.name)
+        return VolumeGroup(name=cli_volume_group.name,
+                           array_type=self.array_type,
+                           id=cli_volume_group.uid if hasattr(cli_volume_group, "uid") else cli_volume_group.id,
+                           internal_id=cli_volume_group.id,
+                           volumes=volumes)
+
     def create_volume_group(self, name):
-        pass
+        self._create_volume_group(name)
+        cli_volume_group = self._lsvolumegroup(name)
+        return self._generate_volume_group_response(cli_volume_group)
 
     def get_volume_group(self, volume_group_id):
-        pass
+        cli_volume_group = self._lsvolumegroup(volume_group_id)
+        if cli_volume_group is None:
+            raise array_errors.ObjectNotFoundError(volume_group_id)
+        return self._generate_volume_group_response(cli_volume_group)
 
     def delete_volume_group(self, volume_group_id):
         self._rmvolumegroup(volume_group_id)
