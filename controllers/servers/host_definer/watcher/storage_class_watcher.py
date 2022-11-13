@@ -7,6 +7,7 @@ from controllers.servers.host_definer.watcher.watcher_helper import Watcher, MAN
 from controllers.servers.host_definer import settings
 from controllers.servers.errors import ValidationException
 from controllers.servers.utils import get_system_info_for_topologies
+import controllers.common.settings as common_settings
 
 logger = get_stdout_logger()
 
@@ -65,7 +66,8 @@ class StorageClassWatcher(Watcher):
         secret_name_suffix = settings.SECRET_NAME_SUFFIX
         prefix = parameter_name.split(secret_name_suffix)[0]
         return (storage_class_info.parameters[parameter_name],
-                storage_class_info.parameters[prefix + secret_name_suffix.replace(settings.NAME, settings.NAMESPACE)])
+                storage_class_info.parameters[prefix + secret_name_suffix.replace(
+                    common_settings.NAME_FIELD, common_settings.NAMESPACE_FIELD)])
 
     def _is_topology_secret(self, secret_data):
         self._validate_secret(secret_data)
@@ -111,22 +113,19 @@ class StorageClassWatcher(Watcher):
         logger.info(messages.NEW_STORAGE_CLASS.format(storage_class_name))
         for secret_info in secrets_info:
             if secret_info:
-                self._add_secret_if_uniq_or_add_secret_counter(secret_info)
-            self._define_nodes_when_new_secret(secret_info)
+                self._define_nodes_when_new_secret(secret_info)
 
     def _define_nodes_when_new_secret(self, secret_info):
         managed_secret_info, index = self._get_matching_managed_secret_info(secret_info)
-        if managed_secret_info.managed_storage_classes == 0:
-            secret_info.managed_storage_classes = managed_secret_info.managed_storage_classes + 1
-            MANAGED_SECRETS[index] = secret_info
-            self._define_nodes_from_secret_info(secret_info)
-
-    def _add_secret_if_uniq_or_add_secret_counter(self, secret_info):
-        managed_secret_info, index = self._get_matching_managed_secret_info(secret_info)
+        secret_info.managed_storage_classes = 1
         if index == -1:
             MANAGED_SECRETS.append(secret_info)
+            self._define_nodes_from_secret_info(secret_info)
+        elif managed_secret_info.managed_storage_classes == 0:
+            MANAGED_SECRETS[index] = secret_info
+            self._define_nodes_from_secret_info(secret_info)
         else:
-            secret_info.managed_storage_classes = managed_secret_info.managed_storage_classes
+            secret_info.managed_storage_classes = managed_secret_info.managed_storage_classes + 1
             MANAGED_SECRETS[index] = secret_info
 
     def _define_nodes_from_secret_info(self, secret_info):
