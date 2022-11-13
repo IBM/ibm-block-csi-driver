@@ -16,7 +16,6 @@ from controllers.servers.host_definer.storage_manager.host_definer_server import
 
 MANAGED_SECRETS = []
 NODES = {}
-DELETED_MANAGED_NODES = {}
 logger = get_stdout_logger()
 
 
@@ -344,11 +343,8 @@ class Watcher(KubernetesManager):
     def _get_node_id_by_node(self, host_definition_info):
         try:
             return NODES[host_definition_info.node_name]
-        except KeyError:
-            try:
-                return DELETED_MANAGED_NODES[host_definition_info.node_name]
-            except Exception:
-                return host_definition_info.node_id
+        except Exception:
+            return host_definition_info.node_id
 
     def _get_host_definition_name(self, node_name):
         return '{0}-{1}'.format(node_name, self._get_random_string()).replace('_', '.')
