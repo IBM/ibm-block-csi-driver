@@ -22,6 +22,7 @@ class Volume(ArrayObject):
     array_type: str
     pool: str
     space_efficiency_aliases: set = field(default_factory=set)
+    volume_group_id: str = None
 
 
 @dataclass
@@ -35,14 +36,24 @@ class Snapshot(Volume):
     is_ready: bool = False
 
 
+@dataclass
 class Replication:
-    def __init__(self, name, volume_internal_id, other_volume_internal_id, copy_type, is_ready, is_primary=None):
-        self.name = name
-        self.volume_internal_id = volume_internal_id
-        self.other_volume_internal_id = other_volume_internal_id
-        self.copy_type = copy_type
-        self.is_ready = is_ready
-        self.is_primary = is_primary
+    name: str
+    copy_type: str
+    is_ready: bool
+    replication_type: str
+    is_primary: bool
+    volume_group_id: str = None
+
+
+@dataclass
+class ReplicationRequest:
+    volume_internal_id: str
+    other_volume_internal_id: str
+    other_system_id: str
+    copy_type: str
+    replication_type: str
+    replication_policy: str = None
 
 
 @dataclass

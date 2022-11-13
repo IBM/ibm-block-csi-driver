@@ -682,19 +682,19 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         flashcopy_process = self._get_flashcopy_process(flashcopy_id)
         return flashcopy_process.state
 
-    def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
+    def get_replication(self, replication_request):
         raise NotImplementedError
 
-    def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
+    def create_replication(self, replication_request):
         raise NotImplementedError
 
-    def delete_replication(self, replication_name):
+    def delete_replication(self, replication):
         raise NotImplementedError
 
-    def promote_replication_volume(self, replication_name):
+    def promote_replication_volume(self, replication):
         raise NotImplementedError
 
-    def demote_replication_volume(self, replication_name):
+    def demote_replication_volume(self, replication):
         raise NotImplementedError
 
     def create_host(self, host_name, initiators, connectivity_type):
