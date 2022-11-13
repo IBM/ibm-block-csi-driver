@@ -2,7 +2,7 @@ from kubernetes import watch
 
 import controllers.servers.host_definer.messages as messages
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.host_definer.watcher.watcher_helper import Watcher
+from controllers.servers.host_definer.watcher.watcher_helper import Watcher, MANAGED_SECRETS
 from controllers.servers.host_definer.types import SecretInfo
 from controllers.servers.host_definer import settings
 
@@ -26,11 +26,11 @@ class SecretWatcher(Watcher):
         return SecretInfo(k8s_secret.metadata.name, k8s_secret.metadata.namespace)
 
     def _handle_storage_class_secret(self, secret_info, watch_event_type):
-        managed_secret_info, _ = self._get_matching_managed_secret_info(secret_info)
-        if not managed_secret_info:
-            return
+        managed_secret_info, index = self._get_matching_managed_secret_info(secret_info)
         if watch_event_type in (settings.ADDED_EVENT, settings.MODIFIED_EVENT) and \
                 managed_secret_info.managed_storage_classes > 0:
+            secret_info.managed_storage_classes = managed_secret_info.managed_storage_classes
+            MANAGED_SECRETS[index] = secret_info
             self._define_host_after_watch_event(secret_info)
 
     def _define_host_after_watch_event(self, secret_info):

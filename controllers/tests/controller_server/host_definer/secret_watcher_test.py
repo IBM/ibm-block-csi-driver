@@ -10,6 +10,8 @@ class SecretWatcherBase(BaseSetUp):
     def setUp(self):
         super().setUp()
         self.secret_watcher = test_utils.get_class_mock(SecretWatcher)
+        self.managed_secrets_on_secret_watcher = test_utils.patch_managed_secrets_global_variable(
+            test_settings.SECRET_WATCHER_PATH)
 
 
 class TestWatchSecretResources(SecretWatcherBase):
@@ -24,6 +26,7 @@ class TestWatchSecretResources(SecretWatcherBase):
         self._prepare_default_mocks_for_secret()
         self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_settings.FAKE_NODE_ID
         self.managed_secrets_on_watcher_helper.append(test_utils.get_fake_secret_info())
+        self.managed_secrets_on_secret_watcher.append(test_utils.get_fake_secret_info())
         self.secret_watcher.host_definitions_api.get.return_value = \
             test_utils.get_fake_k8s_host_definitions_items('not_ready')
         self.secret_watcher.watch_secret_resources()
