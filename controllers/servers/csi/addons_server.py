@@ -147,12 +147,12 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
                                                                   replication_request.copy_type)
             return error_message
         elif replication.replication_type == array_settings.REPLICATION_TYPE_EAR:
-            if replication.volume_group_id != volume.volume_group_id:
-                error_message = "replication already exists, " \
-                      "but volume {} belongs to another group {}".format(volume.name, volume.volume_group_name)
-                return error_message
             if replication.name != replication_request.replication_policy:
                 error_message = "replication already exists, " \
                           "but volume {} uses another replication policy {}".format(volume.name, replication.name)
+                return error_message
+            if replication.volume_group_id != volume.volume_group_id:
+                error_message = "replication already exists, " \
+                      "but volume {} belongs to another group {}".format(volume.name, volume.volume_group_name)
                 return error_message
         return None
