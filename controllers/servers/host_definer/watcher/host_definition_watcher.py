@@ -64,10 +64,10 @@ class HostDefinitionWatcher(Watcher):
         phase = host_definition_info.phase
         action = self._get_action(phase)
         if phase == settings.PENDING_CREATION_PHASE:
-            response = self._define_host(host_definition_info)
+            response = self._define_host_after_pending(host_definition_info)
             self._update_host_definition_from_storage_response(host_definition_info.name, response)
         elif self._is_pending_for_deletion_need_to_be_handled(phase, host_definition_info.node_name):
-            response = self._undefine_host(host_definition_info)
+            response = self._undefine_host_after_pending(host_definition_info)
         self._handle_message_from_storage(
             host_definition_info, response.error_message, action)
 
@@ -75,6 +75,24 @@ class HostDefinitionWatcher(Watcher):
         if phase == settings.PENDING_CREATION_PHASE:
             return settings.DEFINE_ACTION
         return settings.UNDEFINE_ACTION
+
+    def _define_host_after_pending(self, host_definition_info):
+        response = DefineHostResponse()
+        if self._is_node_should_be_managed_on_secret(
+                host_definition_info.node_name, host_definition_info.secret_name,
+                host_definition_info.secret_namespace):
+            response = self._define_host(host_definition_info)
+        else:
+            self._delete_host_definition(host_definition_info.name)
+        return response
+
+    def _undefine_host_after_pending(self, host_definition_info):
+        response = DefineHostResponse()
+        if self._is_node_should_be_managed_on_secret(
+                host_definition_info.node_name, host_definition_info.secret_name,
+                host_definition_info.secret_namespace):
+            response = self._undefine_host(host_definition_info)
+        return response
 
     def _handle_message_from_storage(self, host_definition_info, error_message, action):
         phase = host_definition_info.phase
