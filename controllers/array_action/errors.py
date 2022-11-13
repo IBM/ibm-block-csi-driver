@@ -79,6 +79,13 @@ class VolumeDeletionError(BaseArrayActionException):
         self.message = messages.VOLUME_DELETION_ERROR_MESSAGE.format(volume_id)
 
 
+class VolumeAlreadyInVolumeGroup(BaseArrayActionException):
+
+    def __init__(self, volume_id, volume_group_name):
+        super().__init__()
+        self.message = messages.VOLUME_ALREADY_IN_VOLUME_GROUP_ERROR_MESSAGE.format(volume_id, volume_group_name)
+
+
 class PoolDoesNotMatchSpaceEfficiency(InvalidArgumentError):
 
     def __init__(self, pool, space_efficiency, error):

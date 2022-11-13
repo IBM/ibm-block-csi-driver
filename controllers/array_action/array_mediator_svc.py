@@ -1587,10 +1587,13 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         pass
 
     def delete_volume_group(self, volume_group_id):
-        pass
+        self._rmvolumegroup(volume_group_id)
 
     def add_volume_to_volume_group(self, volume_group_id, volume_id):
-        pass
+        cli_volume = self._get_cli_volume_by_wwn(volume_id)
+        if cli_volume.volume_group_id and cli_volume.volume_group_id != volume_group_id:
+            raise array_errors.VolumeAlreadyInVolumeGroup(volume_id, cli_volume.volume_group_name)
+        self._change_volume_group(volume_id, volume_group_id)
 
     def remove_volume_from_volume_group(self, volume_group_id, volume_id):
-        pass
+        self._change_volume_group(volume_id, None)
