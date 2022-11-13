@@ -7,6 +7,7 @@ from kubernetes.client.rest import ApiException
 from controllers.common.csi_logger import get_stdout_logger
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer import settings
+import controllers.common.settings as common_settings
 from controllers.servers.host_definer.types import (
     CsiNodeInfo, PodInfo, NodeInfo, StorageClassInfo, HostDefinitionInfo)
 
@@ -146,7 +147,8 @@ class KubernetesManager():
             k8s_host_definition, settings.SECRET_NAMESPACE_FIELD)
         host_definition_info.node_name = self._get_attr_from_host_definition(
             k8s_host_definition, settings.NODE_NAME_FIELD)
-        host_definition_info.node_id = self._get_attr_from_host_definition(k8s_host_definition, settings.NODE_ID_FIELD)
+        host_definition_info.node_id = self._get_attr_from_host_definition(
+            k8s_host_definition, common_settings.HOST_DEFINITION_NODE_ID_FIELD)
         host_definition_info.connectivity_type = self._get_attr_from_host_definition(
             k8s_host_definition, settings.CONNECTIVITY_TYPE_FIELD)
         return host_definition_info
@@ -179,7 +181,7 @@ class KubernetesManager():
         except ApiException as ex:
             if ex != 404:
                 logger.error(messages.FAILED_TO_CREATE_HOST_DEFINITION.format(
-                    host_definition_manifest[settings.METADATA][settings.NAME], ex.body))
+                    host_definition_manifest[settings.METADATA][common_settings.NAME_FIELD], ex.body))
 
     def _add_finalizer(self, host_definition_name):
         logger.info(messages.ADD_FINALIZER_TO_HOST_DEFINITION.format(host_definition_name))
@@ -191,7 +193,8 @@ class KubernetesManager():
         status = self._get_status_manifest(host_definition_phase)
         try:
             self.custom_object_api.patch_cluster_custom_object_status(
-                settings.CSI_IBM_GROUP, settings.VERSION, settings.HOST_DEFINITION_PLURAL, host_definition_name, status)
+                common_settings.CSI_IBM_GROUP, common_settings.VERSION, common_settings.HOST_DEFINITION_PLURAL,
+                host_definition_name, status)
         except ApiException as ex:
             if ex.status == 404:
                 logger.error(messages.HOST_DEFINITION_DOES_NOT_EXIST.format(host_definition_name))
@@ -248,14 +251,14 @@ class KubernetesManager():
     def _update_finalizer(self, host_definition_name, finalizers):
         finalizer_manifest = {
             settings.METADATA: {
-                settings.NAME: host_definition_name,
+                common_settings.NAME_FIELD: host_definition_name,
                 settings.FINALIZERS: finalizers,
             }
         }
         return self._patch_host_definition(finalizer_manifest)
 
     def _patch_host_definition(self, host_definition_manifest):
-        host_definition_name = host_definition_manifest[settings.METADATA][settings.NAME]
+        host_definition_name = host_definition_manifest[settings.METADATA][common_settings.NAME_FIELD]
         logger.info(messages.PATCHING_HOST_DEFINITION.format(host_definition_name))
         try:
             self.host_definitions_api.patch(body=host_definition_manifest, name=host_definition_name,
