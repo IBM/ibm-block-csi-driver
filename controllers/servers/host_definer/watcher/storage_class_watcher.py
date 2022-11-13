@@ -66,7 +66,8 @@ class StorageClassWatcher(Watcher):
         secret_name_suffix = settings.SECRET_NAME_SUFFIX
         prefix = parameter_name.split(secret_name_suffix)[0]
         return (storage_class_info.parameters[parameter_name],
-                storage_class_info.parameters[prefix + secret_name_suffix.replace(common_settings.NAME_FIELD, common_settings.NAMESPACE_FIELD)])
+                storage_class_info.parameters[prefix + secret_name_suffix.replace(
+                    common_settings.NAME_FIELD, common_settings.NAMESPACE_FIELD)])
 
     def _is_topology_secret(self, secret_data):
         self._validate_secret(secret_data)
