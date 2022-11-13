@@ -105,15 +105,17 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.disconnect()
         self.svc.client.close.assert_called_with()
 
+    def _prepare_rcrelationship_mock(self):
+        return Munch({svc_settings.RCRELATIONSHIP_STATE_ATTR_NAME: RCRELATIONSHIP_STATE_READY,
+                      svc_settings.RCRELATIONSHIP_COPY_TYPE_ATTR_NAME: svc_settings.RCRELATIONSHIP_COPY_TYPE,
+                      svc_settings.RCRELATIONSHIP_MASTER_CLUSTER_ID_ATTR_NAME: "",
+                      svc_settings.RCRELATIONSHIP_PRIMARY_ATTR_NAME: False,
+                      svc_settings.RCRELATIONSHIP_ID_ATTR_NAME: svc_settings.DUMMY_INTERNAL_ID1,
+                      svc_settings.RCRELATIONSHIP_NAME_ATTR_NAME: ""})
+
     def test_get_replication_success(self):
         _, replication_request = self._prepare_mocks_for_replication()
-        rcrelationships_to_return = \
-            [Munch({svc_settings.RCRELATIONSHIP_STATE_ATTR_NAME: RCRELATIONSHIP_STATE_READY,
-                    svc_settings.RCRELATIONSHIP_COPY_TYPE_ATTR_NAME: svc_settings.RCRELATIONSHIP_COPY_TYPE,
-                    svc_settings.RCRELATIONSHIP_MASTER_CLUSTER_ID_ATTR_NAME: "",
-                    svc_settings.RCRELATIONSHIP_PRIMARY_ATTR_NAME: False,
-                    svc_settings.RCRELATIONSHIP_ID_ATTR_NAME: svc_settings.DUMMY_INTERNAL_ID1,
-                    svc_settings.RCRELATIONSHIP_NAME_ATTR_NAME: ""})]
+        rcrelationships_to_return = [self._prepare_rcrelationship_mock()]
         self.svc.client.svcinfo.lsrcrelationship.side_effect = [Mock(as_list=rcrelationships_to_return),
                                                                 Mock(as_list=[])]
 
@@ -143,14 +145,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                  REPLICATION_TYPE_MIRROR)
         replication = utils.get_mock_mediator_response_replication(name=REPLICATION_NAME,
                                                                    replication_type=REPLICATION_TYPE_MIRROR)
-        rcrelationship_to_return = Munch({
-            svc_settings.RCRELATIONSHIP_STATE_ATTR_NAME: RCRELATIONSHIP_STATE_READY,
-            svc_settings.RCRELATIONSHIP_COPY_TYPE_ATTR_NAME: svc_settings.RCRELATIONSHIP_COPY_TYPE,
-            svc_settings.RCRELATIONSHIP_MASTER_CLUSTER_ID_ATTR_NAME: "",
-            svc_settings.RCRELATIONSHIP_PRIMARY_ATTR_NAME: False,
-            svc_settings.RCRELATIONSHIP_ID_ATTR_NAME: svc_settings.DUMMY_INTERNAL_ID1,
-            svc_settings.RCRELATIONSHIP_NAME_ATTR_NAME: ""
-        })
+        rcrelationship_to_return = self._prepare_rcrelationship_mock()
         self.svc.client.svcinfo.lsrcrelationship.return_value = Mock(as_single_element=rcrelationship_to_return)
         return replication, replication_request
 
