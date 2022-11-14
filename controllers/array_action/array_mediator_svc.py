@@ -11,7 +11,7 @@ from retry import retry
 import controllers.array_action.errors as array_errors
 import controllers.array_action.settings as array_settings
 import controllers.servers.settings as controller_settings
-from controllers.array_action.array_action_types import Volume, Snapshot, Replication, Host, VolumeGroup
+from controllers.array_action.array_action_types import Volume, Snapshot, Replication, Host, VolumeGroup, ThinVolume
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controllers.array_action.volume_group_interface import VolumeGroupInterface
@@ -1784,14 +1784,23 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def delete_host(self, host_name):
         self._rmhost(host_name)
 
+    def _generate_thin_volume_response(self, cli_volume):
+        return ThinVolume(
+            capacity_bytes=int(cli_volume.capacity),
+            id=cli_volume.vdisk_UID,
+            internal_id=cli_volume.id,
+            name=cli_volume.name,
+            array_type=self.array_type
+        )
+
     def _get_cli_volumes_from_volume_group(self, volume_group_name):
         filter_value = 'volume_group_name={}'.format(volume_group_name)
         cli_volumes = self._lsvdisk_list(filtervalue=filter_value)
-        return [self._generate_volume_response(cli_volume) for cli_volume in cli_volumes]
+        return [self._generate_thin_volume_response(cli_volume) for cli_volume in cli_volumes]
 
     def _generate_volume_group_response(self, cli_volume_group):
         volumes = []
-        if cli_volume_group.volume_count > 0:
+        if int(cli_volume_group.volume_count) > 0:
             volumes = self._get_cli_volumes_from_volume_group(cli_volume_group.name)
         return VolumeGroup(name=cli_volume_group.name,
                            array_type=self.array_type,
@@ -1800,8 +1809,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                            volumes=volumes)
 
     def create_volume_group(self, name):
-        self._create_volume_group(name)
-        cli_volume_group = self._lsvolumegroup(name)
+        volume_group_id = self._create_volume_group(name)
+        cli_volume_group = self._lsvolumegroup(volume_group_id)
         return self._generate_volume_group_response(cli_volume_group)
 
     def get_volume_group(self, volume_group_id):

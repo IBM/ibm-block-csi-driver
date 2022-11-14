@@ -425,17 +425,6 @@ def generate_csi_modify_volume_group_response(volume_group):
     return response
 
 
-def generate_csi_modify_volume_group_response(volume_group):
-    logger.debug("creating modify volume group response for volume group : {0}".format(volume_group))
-
-    response = csi_pb2.ModifyVolumeGroupResponse(volume_group=csi_pb2.VolumeGroup(
-        volume_group_id=_get_object_id(volume_group, None),
-        volumes=_generate_volumes_response(volume_group.volumes)))
-    logger.debug("finished creating volume group response : {0}".format(response))
-
-    return response
-
-
 def generate_csi_create_snapshot_response(new_snapshot, system_id, source_volume_id):
     logger.debug("creating create snapshot response for snapshot : {0}".format(new_snapshot))
 

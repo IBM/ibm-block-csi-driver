@@ -12,6 +12,12 @@ class ArrayObject:
 
 
 @dataclass
+class ThinVolume(ArrayObject):
+    capacity_bytes: int
+    source_id: str = ""
+
+
+@dataclass
 class Volume(ArrayObject):
     capacity_bytes: int
     id: str
