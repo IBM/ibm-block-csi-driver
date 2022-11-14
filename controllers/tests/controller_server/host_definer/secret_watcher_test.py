@@ -57,3 +57,4 @@ class TestWatchSecretResources(SecretWatcherBase):
             test_utils.get_fake_k8s_host_definitions_items(test_settings.READY_PHASE)
         self.secret_watcher.core_api.read_namespaced_secret.return_value = test_utils.get_fake_k8s_secret()
         self.os.getenv.return_value = ''
+        self.secret_watcher.core_api.list_node.return_value = test_utils.get_fake_k8s_nodes_items()

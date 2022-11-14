@@ -18,10 +18,11 @@ class SecretWatcher(Watcher):
                                           resource_version=resource_version, timeout_seconds=5)
             for watch_event in stream:
                 watch_event = self._munch(watch_event)
-                secret_data = self._change_decode_base64_secret_config(watch_event.object.data)
-                nodes_with_system_id = self._generate_nodes_with_system_id(secret_data)
-                secret_info = self._generate_k8s_secret_to_secret_info(watch_event.object, nodes_with_system_id)
+                secret_info = self._generate_k8s_secret_to_secret_info(watch_event.object, {})
                 if self._is_secret_managed(secret_info):
+                    secret_data = self._change_decode_base64_secret_config(watch_event.object.data)
+                    nodes_with_system_id = self._generate_nodes_with_system_id(secret_data)
+                    secret_info = self._generate_k8s_secret_to_secret_info(watch_event.object, nodes_with_system_id)
                     self._handle_storage_class_secret(secret_info, watch_event.type)
 
     def _generate_k8s_secret_to_secret_info(self, k8s_secret, nodes_with_system_id):
