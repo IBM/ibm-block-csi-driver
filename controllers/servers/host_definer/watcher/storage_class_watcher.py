@@ -5,8 +5,6 @@ import controllers.servers.host_definer.messages as messages
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher, MANAGED_SECRETS
 from controllers.servers.host_definer import settings
-from controllers.servers.errors import ValidationException
-from controllers.servers.utils import get_system_info_for_topologies
 import controllers.common.settings as common_settings
 
 logger = get_stdout_logger()
@@ -74,32 +72,6 @@ class StorageClassWatcher(Watcher):
         if self._get_secret_secret_config(secret_data):
             return True
         return False
-
-    def _generate_nodes_with_system_id(self, secret_data):
-        nodes_with_system_id = {}
-        secret_config = self._get_secret_secret_config(secret_data)
-        nodes_info = self._get_nodes_info()
-        for node_info in nodes_info:
-            nodes_with_system_id[node_info.name] = self._get_system_id_for_node(node_info, secret_config)
-        return nodes_with_system_id
-
-    def _get_secret_secret_config(self, secret_data):
-        secret_data = self._convert_secret_config_to_dict(secret_data)
-        return secret_data.get(settings.SECRET_CONFIG_FIELD, {})
-
-    def _convert_secret_config_to_dict(self, secret_data):
-        if settings.SECRET_CONFIG_FIELD in secret_data.keys():
-            if type(secret_data[settings.SECRET_CONFIG_FIELD]) is str:
-                secret_data[settings.SECRET_CONFIG_FIELD] = json.loads(secret_data[settings.SECRET_CONFIG_FIELD])
-        return secret_data
-
-    def _get_system_id_for_node(self, node_info, secret_config):
-        node_topology_labels = self._get_topology_labels(node_info.labels)
-        try:
-            _, system_id = get_system_info_for_topologies(secret_config, node_topology_labels)
-        except ValidationException:
-            return ''
-        return system_id
 
     def _add_secret_info_to_list(self, secret_info, list_with_secrets_info):
         for secret_info_in_list in list_with_secrets_info:
