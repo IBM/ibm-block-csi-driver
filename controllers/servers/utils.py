@@ -601,8 +601,7 @@ def generate_addons_replication_request(request, replication_type):
     volume_id_info = get_volume_id_info(request.volume_id)
     volume_internal_id = volume_id_info.ids.internal_id
 
-    other_volume_id_info = get_volume_id_info(request.replication_id)
-    other_volume_internal_id = other_volume_id_info.ids.internal_id
+    other_volume_internal_id = _get_other_volume_internal_id(request, replication_type)
 
     other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
     copy_type = request.parameters.get(servers_settings.PARAMETERS_COPY_TYPE, REPLICATION_DEFAULT_COPY_TYPE)
@@ -613,6 +612,15 @@ def generate_addons_replication_request(request, replication_type):
                               copy_type=copy_type,
                               replication_type=replication_type,
                               replication_policy=replication_policy)
+
+
+def _get_other_volume_internal_id(request, replication_type):
+    if replication_type == REPLICATION_TYPE_MIRROR:
+        other_volume_id_info = get_volume_id_info(request.replication_id)
+        other_volume_internal_id = other_volume_id_info.ids.internal_id
+    else:
+        other_volume_internal_id = None
+    return other_volume_internal_id
 
 
 def get_current_timestamp():

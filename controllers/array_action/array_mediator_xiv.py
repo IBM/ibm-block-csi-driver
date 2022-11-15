@@ -520,13 +520,13 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def create_replication(self, replication_request):
         raise NotImplementedError
 
-    def delete_replication(self, replication_name):
+    def delete_replication(self, replication):
         raise NotImplementedError
 
-    def promote_replication_volume(self, replication_name):
+    def promote_replication_volume(self, replication):
         raise NotImplementedError
 
-    def demote_replication_volume(self, replication_name):
+    def demote_replication_volume(self, replication):
         raise NotImplementedError
 
     def create_host(self, host_name, initiators, connectivity_type):
