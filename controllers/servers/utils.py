@@ -34,7 +34,7 @@ def _parse_raw_json(raw_json):
     return parsed_json
 
 
-def _is_topology_match(system_topologies, node_topologies):
+def is_topology_match(system_topologies, node_topologies):
     for topologies in system_topologies:
         logger.debug(
             "Comparing topologies: system topologies: {},"
@@ -57,7 +57,7 @@ def get_volume_topologies(request):
 def get_system_info_for_topologies(secrets_config, node_topologies):
     for system_id, system_info in secrets_config.items():
         system_topologies = system_info.get(servers_settings.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
-        if _is_topology_match(system_topologies, node_topologies):
+        if is_topology_match(system_topologies, node_topologies):
             return system_info, system_id
     raise ValidationException(messages.NO_SYSTEM_MATCH_REQUESTED_TOPOLOGIES.format(node_topologies))
 
