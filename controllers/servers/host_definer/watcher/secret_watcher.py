@@ -12,8 +12,8 @@ logger = get_stdout_logger()
 class SecretWatcher(Watcher):
 
     def watch_secret_resources(self):
-        while True:
-            resource_version = self.core_api.list_secret_for_all_namespaces().metadata.resource_version
+        while self._loop_forever():
+            resource_version = self._get_k8s_object_resource_version(self.core_api.list_secret_for_all_namespaces())
             stream = watch.Watch().stream(self.core_api.list_secret_for_all_namespaces,
                                           resource_version=resource_version, timeout_seconds=5)
             for watch_event in stream:
@@ -35,9 +35,9 @@ class SecretWatcher(Watcher):
         secret_id = self._generate_secret_id(secret_info.name, secret_info.namespace)
         if watch_event_type in (settings.ADDED_EVENT, settings.MODIFIED_EVENT) and \
                 SECRET_IDS[secret_id] > 0:
-            self.define_host_after_watch_event(secret_info)
+            self._define_host_after_watch_event(secret_info)
 
-    def define_host_after_watch_event(self, secret_info):
+    def _define_host_after_watch_event(self, secret_info):
         logger.info(messages.SECRET_HAS_BEEN_MODIFIED.format(secret_info.name, secret_info.namespace))
         host_definition_info = self._get_host_definition_info_from_secret(secret_info)
-        self.define_nodes(host_definition_info)
+        self._define_nodes(host_definition_info)
