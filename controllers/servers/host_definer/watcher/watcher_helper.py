@@ -249,7 +249,7 @@ class Watcher(KubernetesManager):
 
     def _get_connectivity_type_from_user(self, node_name):
         connectivity_type_label_on_node = self._get_label_value(node_name, settings.CONNECTIVITY_TYPE_LABEL)
-        if connectivity_type_label_on_node:
+        if connectivity_type_label_on_node in settings.SUPPORTED_CONNECTIVITY_TYPES:
             return connectivity_type_label_on_node
         return os.getenv(settings.CONNECTIVITY_ENV_VAR)
 

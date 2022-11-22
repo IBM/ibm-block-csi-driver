@@ -1,4 +1,5 @@
 from controllers.common.settings import HOST_DEFINITION_PLURAL, CSI_IBM_GROUP
+import controllers.array_action.settings as array_config
 
 STORAGE_API_VERSION = 'storage.k8s.io/v1'
 CSI_PARAMETER_PREFIX = "csi.storage.k8s.io/"
@@ -20,7 +21,9 @@ DEFAULT_NAMESPACE = 'default'
 HOST_DEFINER = 'hostDefiner'
 MANAGE_NODE_LABEL = 'hostdefiner.block.csi.ibm.com/manage-node'
 FORBID_DELETION_LABEL = 'hostdefiner.block.csi.ibm.com/do-not-delete-definition'
-CONNECTIVITY_TYPE_LABEL = 'hostdefiner.block.csi.ibm.com/connectivity-type'
+CONNECTIVITY_TYPE_LABEL = 'block.csi.ibm.com/connectivity-type'
+SUPPORTED_CONNECTIVITY_TYPES = [array_config.ISCSI_CONNECTIVITY_TYPE,
+                                array_config.FC_CONNECTIVITY_TYPE, array_config.NVME_OVER_FC_CONNECTIVITY_TYPE]
 NODE_NAME_FIELD = 'nodeName'
 SECRET_NAME_FIELD = 'secretName'
 SECRET_NAMESPACE_FIELD = 'secretNamespace'
