@@ -1841,11 +1841,53 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return array_settings.ISCSI_CONNECTIVITY_TYPE
         return None
 
+    def _addhostiogrp(self, host_name, io_group):
+        cli_kwargs = {'iogrp': io_group}
+        try:
+            self.client.svctask.addhostiogrp(object_id=host_name, **cli_kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during adding io_group {}, to host {} : {}".format(
+                    io_group, host_name, ex.my_message))
+            else:
+                if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
+                    raise array_errors.HostNotFoundError(host_name)
+                raise ex
+
     def add_io_group(self, host_name, io_group):
-        raise NotImplementedError
+        if not io_group:
+            return
+        self._addhostiogrp(host_name, io_group)
+
+    def _rmhostiogrp(self, host_name, io_group):
+        cli_kwargs = {'iogrp': io_group}
+        try:
+            self.client.svctask.rmhostiogrp(object_id=host_name, **cli_kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during removing io_group {}, from host {} : {}".format(
+                    io_group, host_name, ex.my_message))
+            else:
+                if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
+                    raise array_errors.HostNotFoundError(host_name)
+                raise ex
 
     def remove_io_group(self, host_name, io_group):
-        raise NotImplementedError
+        if not io_group:
+            return
+        self._rmhostiogrp(host_name, io_group)
+
+    def _lshostiogrp(self, host_name):
+        try:
+            return self.client.svcinfo.lshostiogrp(object_id=host_name).as_single_element
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during removing io_group {}, from host {} : {}".format(
+                    io_group, host_name, ex.my_message))
+            else:
+                if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
+                    raise array_errors.HostNotFoundError(host_name)
+                raise ex
 
     def get_io_group(self, host_name):
-        raise NotImplementedError
+        return self._lshostiogrp(host_name)

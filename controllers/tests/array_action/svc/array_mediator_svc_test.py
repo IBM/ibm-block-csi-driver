@@ -2207,3 +2207,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_get_host_connectivity_type(svc_settings.HOST_WWPN, array_settings.FC_CONNECTIVITY_TYPE)
         self._test_get_host_connectivity_type(svc_settings.HOST_ISCSI_NAME, array_settings.ISCSI_CONNECTIVITY_TYPE)
         self._test_get_host_connectivity_type('some_connectivity_attribute_name', None)
+
+    def test_add_io_group_to_host_success(self):
+        self.svc.add_io_group(common_settings.HOST_NAME,
+                                        [array_settings.DUMMY_NVME_NQN1],
+                                        array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+        self.svc.client.svctask.addhostiogrp.assert_called_once_with(host_name=common_settings.HOST_NAME,
+                                                                   nqn=array_settings.DUMMY_NVME_NQN1)
