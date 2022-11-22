@@ -2089,7 +2089,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             return_value = self._mock_cli_volume_group(volume_count=volume_count)
         self.svc.client.svcinfo.lsvolumegroup.return_value = Mock(as_single_element=return_value)
 
-    def test_create_volume_group(self):
+    def test_create_volume_group_success(self):
         self.svc.client.svctask.mkvolumegroup.return_value = Mock(response=(b"id [1]\n", b""))
         self._prepare_lsvolumegroup()
 
@@ -2098,7 +2098,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvolumegroup.assert_called_once_with(object_id=1)
         self.svc.client.svctask.mkvolumegroup.assert_called_once_with(name=common_settings.VOLUME_GROUP_NAME)
 
-    def test_get_volume_group(self):
+    def test_get_volume_group_success(self):
         self._prepare_lsvolumegroup()
         volume_group = self.svc.get_volume_group(common_settings.INTERNAL_VOLUME_GROUP_ID)
 
@@ -2106,12 +2106,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
             object_id=common_settings.INTERNAL_VOLUME_GROUP_ID)
         self.assertEqual(0, len(volume_group.volumes))
 
-    def test_get_volume_group_not_found(self):
+    def test_get_volume_group_not_found_failed(self):
         self._prepare_lsvolumegroup(no_return=True)
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.svc.get_volume_group(common_settings.INTERNAL_VOLUME_GROUP_ID)
 
-    def test_get_volume_group_with_volumes(self):
+    def test_get_volume_group_with_volumes_success(self):
         self._prepare_lsvolumegroup(volume_count=1)
         cli_volume = self._get_cli_volume()
         self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_list=[cli_volume])
@@ -2125,13 +2125,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(common_settings.VOLUME_GROUP_NAME, volume_group.name)
         self.assertEqual(1, len(volume_group.volumes))
 
-    def test_delete_volume_group(self):
+    def test_delete_volume_group_success(self):
         self.svc.delete_volume_group(common_settings.INTERNAL_VOLUME_GROUP_ID)
 
         self.svc.client.svctask.rmvolumegroup.assert_called_once_with(
             object_id=common_settings.INTERNAL_VOLUME_GROUP_ID)
 
-    def test_add_volume_to_volume_group(self):
+    def test_add_volume_to_volume_group_success(self):
         cli_volume = self._get_cli_volume()
         self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=cli_volume)
 
@@ -2140,7 +2140,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.chvdisk.assert_called_once_with(vdisk_id=common_settings.VOLUME_UID,
                                                                 volumegroup=common_settings.INTERNAL_VOLUME_GROUP_ID)
 
-    def test_add_volume_to_volume_group_already_in_volume_group(self):
+    def test_add_volume_to_volume_group_already_in_volume_group_failed(self):
         cli_volume = self._get_cli_volume(in_volume_group=True)
         self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=cli_volume)
 
@@ -2149,7 +2149,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.client.svctask.chvdisk.assert_not_called()
 
-    def test_remove_volume_from_volume_group(self):
+    def test_remove_volume_from_volume_group_success(self):
         self.svc.remove_volume_from_volume_group(common_settings.INTERNAL_VOLUME_GROUP_ID, common_settings.VOLUME_UID)
 
         self.svc.client.svctask.chvdisk.assert_called_once_with(vdisk_id=common_settings.VOLUME_UID, novolumegroup=True)
