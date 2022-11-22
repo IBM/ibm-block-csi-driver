@@ -568,7 +568,7 @@ class ArrayMediator(ABC):
 
         Args:
            host_name : name of the host in the storage system
-           io_group  : the io_group to add to the host  
+           io_group  : the io_group to add to the host
 
         Returns:
             None
@@ -585,7 +585,7 @@ class ArrayMediator(ABC):
 
         Args:
            host_name : name of the host in the storage system
-           io_group  : the io_group to remove from the host  
+           io_group  : the io_group to remove from the host
 
         Returns:
             None
