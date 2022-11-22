@@ -562,7 +562,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def add_io_group(self, host_name, io_group):
+    def add_io_group_to_host(self, host_name, io_group):
         """
         This function should add io_group to host.
 
@@ -579,7 +579,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def remove_io_group(self, host_name, io_group):
+    def remove_io_group_from_host(self, host_name, io_group):
         """
         This function should remove io_group from host.
 
@@ -596,7 +596,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_io_group(self, host_name):
+    def get_host_io_group(self, host_name):
         """
         This function should return the io_group from host.
 

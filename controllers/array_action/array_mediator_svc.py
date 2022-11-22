@@ -1854,7 +1854,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                     raise array_errors.HostNotFoundError(host_name)
                 raise ex
 
-    def add_io_group(self, host_name, io_group):
+    def add_io_group_to_host(self, host_name, io_group):
         if not io_group:
             return
         self._addhostiogrp(host_name, io_group)
@@ -1872,7 +1872,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                     raise array_errors.HostNotFoundError(host_name)
                 raise ex
 
-    def remove_io_group(self, host_name, io_group):
+    def remove_io_group_from_host(self, host_name, io_group):
         if not io_group:
             return
         self._rmhostiogrp(host_name, io_group)
@@ -1889,5 +1889,5 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                     raise array_errors.HostNotFoundError(host_name)
                 raise ex
 
-    def get_io_group(self, host_name):
+    def get_host_io_group(self, host_name):
         return self._lshostiogrp(host_name)
