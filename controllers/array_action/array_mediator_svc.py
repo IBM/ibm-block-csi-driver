@@ -1840,3 +1840,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if hasattr(cli_host, HOST_ISCSI_NAME):
             return array_settings.ISCSI_CONNECTIVITY_TYPE
         return None
+
+    def add_io_group(self, host_name, io_group):
+        raise NotImplementedError
+
+    def remove_io_group(self, host_name, io_group):
+        raise NotImplementedError
+
+    def get_io_group(self, host_name):
+        raise NotImplementedError
