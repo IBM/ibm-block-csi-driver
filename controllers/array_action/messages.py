@@ -9,6 +9,8 @@ OBJECT_NOT_FOUND_ERROR_MESSAGE = "Object was not found : {0} "
 VOLUME_NAME_BELONGS_TO_SNAPSHOT_ERROR_MESSAGE = "Volume not found. Snapshot with the same id exists. \
                                                          Name : {0} , array : {1}"
 
+VOLUME_ALREADY_IN_VOLUME_GROUP_ERROR_MESSAGE = "Volume {0} is already in a volume group {1}"
+
 POOL_DOES_NOT_MATCH_SPACE_EFFICIENCY_MESSAGE = "Pool : {0} does not match the following space efficiency : {1} . " \
                                                "error : {2}"
 
