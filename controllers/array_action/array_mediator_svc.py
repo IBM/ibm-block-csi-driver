@@ -1841,11 +1841,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return array_settings.ISCSI_CONNECTIVITY_TYPE
         return None
 
-    def add_io_group(self, host_name, io_group):
+    def add_io_group_to_host(self, host_name, io_group):
         raise NotImplementedError
 
-    def remove_io_group(self, host_name, io_group):
+    def remove_io_group_from_host(self, host_name, io_group):
         raise NotImplementedError
 
-    def get_io_group(self, host_name):
+    def get_host_io_group(self, host_name):
         raise NotImplementedError
