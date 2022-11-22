@@ -561,6 +561,56 @@ class ArrayMediator(ABC):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def add_io_group(self, host_name, io_group):
+        """
+        This function should add io_group to host.
+
+        Args:
+           host_name : name of the host in the storage system
+           io_group  : the io_group to add to the host  
+
+        Returns:
+            None
+
+        Raises:
+            HostNotFoundError
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def remove_io_group(self, host_name, io_group):
+        """
+        This function should remove io_group from host.
+
+        Args:
+           host_name : name of the host in the storage system
+           io_group  : the io_group to remove from the host  
+
+        Returns:
+            None
+
+        Raises:
+            HostNotFoundError
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_io_group(self, host_name):
+        """
+        This function should return the io_group from host.
+
+        Args:
+           host_name : name of the host in the storage system
+
+        Returns:
+            List
+
+        Raises:
+            HostNotFoundError
+        """
+        raise NotImplementedError
+
     @property
     @abstractmethod
     def identifier(self):

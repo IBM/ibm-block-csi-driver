@@ -714,3 +714,12 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def get_host_connectivity_type(self, host_name):
         raise NotImplementedError
+
+    def add_io_group(self, host_name, io_group):
+        raise NotImplementedError
+
+    def remove_io_group(self, host_name, io_group):
+        raise NotImplementedError
+
+    def get_io_group(self, host_name):
+        raise NotImplementedError
