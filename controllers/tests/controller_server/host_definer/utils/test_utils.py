@@ -196,5 +196,6 @@ def get_fake_secret_info():
     secret_info.managed_storage_classes = 1
     return secret_info
 
+
 def get_fake_host_io_group():
     return Munch.fromDict(manifest_utils.get_host_io_group_manifest())
