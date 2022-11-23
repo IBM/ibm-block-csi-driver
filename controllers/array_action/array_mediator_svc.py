@@ -16,6 +16,7 @@ from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstra
 from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controllers.common import settings as common_settings
 from controllers.common.csi_logger import get_stdout_logger
+from controllers.servers.utils import get_connectivity_type_ports
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -32,6 +33,9 @@ SPECIFIED_OBJ_NOT_EXIST = 'CMMVC5804E'
 LUN_ALREADY_IN_USE = 'CMMVC5879E'
 VOL_ALREADY_UNMAPPED = 'CMMVC5842E'
 OBJ_ALREADY_EXIST = 'CMMVC6035E'
+FC_PORT_IS_NOT_VALID = 'CMMVC5867E'
+ISCSI_PORT_IS_NOT_VALID = 'CMMVC6578E'
+NVME_PORT_IS_ALREADY_ASSIGNED = 'CMMVC9328E'
 FCMAP_ALREADY_EXIST = 'CMMVC6466E'
 FCMAP_ALREADY_COPYING = 'CMMVC5907E'
 FCMAP_ALREADY_IN_THE_STOPPED_STATE = 'CMMVC5912E'
@@ -48,8 +52,6 @@ HOST_ISCSI_NAME = 'iscsi_name'
 HOST_PORTSET_ID = 'portset_id'
 LIST_HOSTS_CMD_FORMAT = 'lshost {HOST_ID};echo;'
 HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
-DEFAULT_PORTS_DELIMITER = ":"
-QUALIFIED_NAME_PORTS_DELIMITER = ","
 
 LUN_INTERVAL = 128
 
@@ -106,17 +108,29 @@ def build_create_volume_in_volume_group_kwargs(pool, io_group, source_id):
     return cli_kwargs
 
 
-def build_create_host_kwargs(host_name, connectivity_type, ports):
-    cli_kwargs = {'name': host_name}
+def _add_port_to_command_kwargs(connectivity_type, port, cli_kwargs):
     if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
-        cli_kwargs.update({'nqn': QUALIFIED_NAME_PORTS_DELIMITER.join(ports), 'protocol': 'nvme'})
+        cli_kwargs['nqn'] = port
     elif connectivity_type == array_settings.FC_CONNECTIVITY_TYPE:
-        cli_kwargs['fcwwpn'] = DEFAULT_PORTS_DELIMITER.join(ports)
+        cli_kwargs['fcwwpn'] = port
     elif connectivity_type == array_settings.ISCSI_CONNECTIVITY_TYPE:
-        cli_kwargs['iscsiname'] = QUALIFIED_NAME_PORTS_DELIMITER.join(ports)
+        cli_kwargs['iscsiname'] = port
     else:
         raise array_errors.UnsupportedConnectivityTypeError(connectivity_type)
     return cli_kwargs
+
+
+def build_create_host_kwargs(host_name, connectivity_type, port):
+    cli_kwargs = {'name': host_name}
+    cli_kwargs = _add_port_to_command_kwargs(connectivity_type, port, cli_kwargs)
+    if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
+        cli_kwargs['protocol'] = 'nvme'
+    return cli_kwargs
+
+
+def build_host_port_command_kwargs(host_name, connectivity_type, port):
+    cli_kwargs = {'host_name': host_name}
+    return _add_port_to_command_kwargs(connectivity_type, port, cli_kwargs)
 
 
 def build_kwargs_from_parameters(space_efficiency, pool_name, io_group,
@@ -1730,34 +1744,32 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         cli_volume = self._get_cli_volume_by_wwn(vdisk_uid, not_exist_err=False)
         return cli_volume and cli_volume.FC_id
 
-    def _mkhost(self, host_name, connectivity_type, ports):
-        cli_kwargs = build_create_host_kwargs(host_name, connectivity_type, ports)
+    def _is_port_invalid(self, message_from_storage):
+        return FC_PORT_IS_NOT_VALID in message_from_storage or \
+            ISCSI_PORT_IS_NOT_VALID in message_from_storage or \
+            NVME_PORT_IS_ALREADY_ASSIGNED in message_from_storage
+
+    def _mkhost(self, host_name, connectivity_type, port):
+        cli_kwargs = build_create_host_kwargs(host_name, connectivity_type, port)
         try:
             self.client.svctask.mkhost(**cli_kwargs)
+            return 200
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if is_warning_message(ex.my_message):
-                logger.warning("exception encountered during host {} creation : {}".format(host_name, ex.my_message))
             if OBJ_ALREADY_EXIST in ex.my_message:
                 raise array_errors.HostAlreadyExists(host_name, self.endpoint)
+            if self._is_port_invalid(ex.my_message):
+                return 400
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during host {} creation : {}".format(host_name, ex.my_message))
             raise ex
 
-    def _get_connectivity_type_by_initiators(self, initiators):
-        if initiators.nvme_nqns:
-            return array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE
-        if initiators.fc_wwns:
-            return array_settings.FC_CONNECTIVITY_TYPE
-        if initiators.iscsi_iqns:
-            return array_settings.ISCSI_CONNECTIVITY_TYPE
-        return None
-
     def create_host(self, host_name, initiators, connectivity_type):
-        if not connectivity_type:
-            connectivity_type = self._get_connectivity_type_by_initiators(initiators)
-        ports = initiators.get_by_connectivity_type(connectivity_type)
-        if ports:
-            self._mkhost(host_name, connectivity_type, ports)
-            return
-        raise array_errors.NoPortFoundByConnectivityType(initiators, connectivity_type)
+        ports = get_connectivity_type_ports(initiators, connectivity_type)
+        for port in ports:
+            status_code = self._mkhost(host_name, connectivity_type, port)
+            if status_code == 200:
+                return
+        raise array_errors.NoPortIsValid(host_name)
 
     def _rmhost(self, host_name):
         try:
@@ -1771,14 +1783,60 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def delete_host(self, host_name):
         self._rmhost(host_name)
 
+    def _raise_error_when_no_ports_added(self, host_name):
+        cli_host = self._get_cli_host(host_name)
+        if int(cli_host.port_count) == 0:
+            self.delete_host(host_name)
+            raise array_errors.NoPortIsValid(host_name)
+
+    def _addhostport(self, host_name, connectivity_type, port):
+        cli_kwargs = build_host_port_command_kwargs(host_name, connectivity_type, port)
+        try:
+            self.client.svctask.addhostport(**cli_kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if not self._is_port_invalid(ex.my_message):
+                if is_warning_message(ex.my_message):
+                    logger.warning("exception encountered during adding port {} to host {} : {}".format(
+                        port, host_name, ex.my_message))
+                raise ex
+
     def add_ports_to_host(self, host_name, initiators, connectivity_type):
-        raise NotImplementedError
+        ports = get_connectivity_type_ports(initiators, connectivity_type)
+        for port in ports:
+            self._addhostport(host_name, connectivity_type, port)
+        self._raise_error_when_no_ports_added(host_name)
+
+    def _rmhostport(self, host_name, connectivity_type, port):
+        cli_kwargs = build_host_port_command_kwargs(host_name, connectivity_type, port)
+        try:
+            self.client.svctask.rmhostport(**cli_kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if not self._is_port_invalid(ex.my_message):
+                if is_warning_message(ex.my_message):
+                    logger.warning("exception encountered during removing port {} from host {} : {}".format(
+                        port, host_name, ex.my_message))
+                raise ex
 
     def remove_ports_from_host(self, host_name, ports, connectivity_type):
-        raise NotImplementedError
+        for port in ports:
+            self._rmhostport(host_name, connectivity_type, port)
 
     def get_host_connectivity_ports(self, host_name, connectivity_type):
-        raise NotImplementedError
+        cli_host = self._get_cli_host(host_name)
+        if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
+            return self._get_host_ports(cli_host, HOST_NQN)
+        if connectivity_type == array_settings.FC_CONNECTIVITY_TYPE:
+            return self._get_host_ports(cli_host, HOST_WWPN)
+        if connectivity_type == array_settings.ISCSI_CONNECTIVITY_TYPE:
+            return self._get_host_ports(cli_host, HOST_ISCSI_NAME)
+        raise array_errors.UnsupportedConnectivityTypeError(connectivity_type)
 
     def get_host_connectivity_type(self, host_name):
-        raise NotImplementedError
+        cli_host = self._get_cli_host(host_name)
+        if hasattr(cli_host, HOST_NQN):
+            return array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE
+        if hasattr(cli_host, HOST_WWPN):
+            return array_settings.FC_CONNECTIVITY_TYPE
+        if hasattr(cli_host, HOST_ISCSI_NAME):
+            return array_settings.ISCSI_CONNECTIVITY_TYPE
+        return None
