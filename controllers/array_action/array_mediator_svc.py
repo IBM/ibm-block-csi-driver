@@ -1766,7 +1766,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 logger.warning("exception encountered during host {} creation : {}".format(host_name, ex.my_message))
             raise ex
 
-    def create_host(self, host_name, initiators, connectivity_type):
+    def create_host(self, host_name, initiators, connectivity_type, io_group):
         ports = get_connectivity_type_ports(initiators, connectivity_type)
         for port in ports:
             status_code = self._mkhost(host_name, connectivity_type, port)
