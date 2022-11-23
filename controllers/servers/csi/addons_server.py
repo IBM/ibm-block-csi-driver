@@ -30,6 +30,11 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             volume = mediator.get_object_by_id(volume_id, servers_settings.VOLUME_TYPE_NAME)
             if not volume:
                 raise array_errors.ObjectNotFoundError(volume_id)
+            if volume.volume_group_id:
+                message = "could not enable replication, " \
+                      "volume {} already belongs to volume group {}".format(volume.name, volume.volume_group_id)
+                return build_error_response(message, context, grpc.StatusCode.FAILED_PRECONDITION,
+                                            pb2.ResyncVolumeResponse)
             replication = mediator.get_replication(replication_request)
             if replication:
                 error_message = self._ensure_replication_idempotency(replication_request, replication, volume)
