@@ -121,11 +121,13 @@ def _add_port_to_command_kwargs(connectivity_type, port, cli_kwargs):
     return cli_kwargs
 
 
-def build_create_host_kwargs(host_name, connectivity_type, port):
+def build_create_host_kwargs(host_name, connectivity_type, port, io_group):
     cli_kwargs = {'name': host_name}
     cli_kwargs = _add_port_to_command_kwargs(connectivity_type, port, cli_kwargs)
     if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
         cli_kwargs['protocol'] = 'nvme'
+    if io_group:
+        cli_kwargs['iogrp'] = io_group
     return cli_kwargs
 
 
@@ -1747,17 +1749,22 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         cli_volume = self._get_cli_volume_by_wwn(vdisk_uid, not_exist_err=False)
         return cli_volume and cli_volume.FC_id
 
+    def _raise_invalid_io_group(self, io_group, error_message):
+        if NOT_VALID_IO_GROUP in error_message:
+            raise array_errors.IoGroupIsInValid(io_group)
+
     def _is_port_invalid(self, message_from_storage):
         return FC_PORT_IS_NOT_VALID in message_from_storage or \
             ISCSI_PORT_IS_NOT_VALID in message_from_storage or \
             NVME_PORT_IS_ALREADY_ASSIGNED in message_from_storage
 
-    def _mkhost(self, host_name, connectivity_type, port):
-        cli_kwargs = build_create_host_kwargs(host_name, connectivity_type, port)
+    def _mkhost(self, host_name, connectivity_type, port, io_group):
+        cli_kwargs = build_create_host_kwargs(host_name, connectivity_type, port, io_group)
         try:
             self.client.svctask.mkhost(**cli_kwargs)
             return 200
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self._raise_invalid_io_group(io_group, ex.my_message)
             if OBJ_ALREADY_EXIST in ex.my_message:
                 raise array_errors.HostAlreadyExists(host_name, self.endpoint)
             if self._is_port_invalid(ex.my_message):
@@ -1766,10 +1773,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 logger.warning("exception encountered during host {} creation : {}".format(host_name, ex.my_message))
             raise ex
 
-    def create_host(self, host_name, initiators, connectivity_type):
+    def create_host(self, host_name, initiators, connectivity_type, io_group):
         ports = get_connectivity_type_ports(initiators, connectivity_type)
         for port in ports:
-            status_code = self._mkhost(host_name, connectivity_type, port)
+            status_code = self._mkhost(host_name, connectivity_type, port, io_group)
             if status_code == 200:
                 return
         raise array_errors.NoPortIsValid(host_name)
@@ -1844,10 +1851,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return array_settings.ISCSI_CONNECTIVITY_TYPE
         return None
 
-    def _raise_io_group_error(self, host_name, io_group, message):
-        self._raise_host_not_found_error(host_name, message)
-        if NOT_VALID_IO_GROUP in message:
-            raise array_errors.IoGroupIsInValid(io_group)
+    def _raise_io_group_error(self, host_name, io_group, error_message):
+        self._raise_host_not_found_error(host_name, error_message)
+        self._raise_invalid_io_group(io_group, error_message)
 
     def _addhostiogrp(self, host_name, io_group):
         cli_kwargs = {'iogrp': io_group}
