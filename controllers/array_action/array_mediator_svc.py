@@ -45,6 +45,7 @@ NOT_CHILD_POOL = 'CMMVC9760E'
 NOT_REDUCTION_POOL = 'CMMVC9301E'
 NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND = 'CMMVC5860E'
 NOT_ENOUGH_EXTENTS_IN_POOL_CREATE = 'CMMVC8710E'
+NOT_VALID_IO_GROUP = 'CMMVC5729E'
 
 HOST_NQN = 'nqn'
 HOST_WWPN = 'WWPN'
@@ -1112,6 +1113,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.debug("The chosen available lun is : {0}".format(lun))
         return lun
 
+    def _raise_host_not_found_error(self, host_name, error_message):
+        if NAME_NOT_EXIST_OR_MEET_RULES in error_message:
+            raise array_errors.HostNotFoundError(host_name)
+
     def map_volume(self, volume_id, host_name, connectivity_type):
         logger.debug("mapping volume : {0} to host : "
                      "{1}".format(volume_id, host_name))
@@ -1135,8 +1140,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             else:
                 logger.error("Map volume {0} to host {1} failed. Reason "
                              "is: {2}".format(volume_name, host_name, ex))
-                if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
-                    raise array_errors.HostNotFoundError(host_name)
+                self._raise_host_not_found_error(host_name, ex.my_message)
                 if SPECIFIED_OBJ_NOT_EXIST in ex.my_message:
                     raise array_errors.ObjectNotFoundError(volume_name)
                 if LUN_ALREADY_IN_USE in ex.my_message:
@@ -1167,8 +1171,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             else:
                 logger.error("unmapping volume {0} from host {1} failed. Reason "
                              "is: {2}".format(volume_name, host_name, ex))
-                if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
-                    raise array_errors.HostNotFoundError(host_name)
+                self._raise_host_not_found_error(host_name, ex.my_message)
                 if OBJ_NOT_FOUND in ex.my_message:
                     raise array_errors.ObjectNotFoundError(volume_name)
                 if VOL_ALREADY_UNMAPPED in ex.my_message:
@@ -1841,17 +1844,21 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return array_settings.ISCSI_CONNECTIVITY_TYPE
         return None
 
+    def _raise_io_group_error(self, host_name, io_group, message):
+        self._raise_host_not_found_error(host_name, message)
+        if NOT_VALID_IO_GROUP in message:
+            raise array_errors.IoGroupIsInValid(io_group)
+
     def _addhostiogrp(self, host_name, io_group):
         cli_kwargs = {'iogrp': io_group}
         try:
             self.client.svctask.addhostiogrp(object_id=host_name, **cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self._raise_io_group_error(host_name, io_group, ex.my_message)
             if is_warning_message(ex.my_message):
                 logger.warning("exception encountered during adding io_group {}, to host {} : {}".format(
                     io_group, host_name, ex.my_message))
             else:
-                if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
-                    raise array_errors.HostNotFoundError(host_name)
                 raise ex
 
     def add_io_group_to_host(self, host_name, io_group):
@@ -1864,12 +1871,11 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             self.client.svctask.rmhostiogrp(object_id=host_name, **cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self._raise_io_group_error(host_name, io_group, ex.my_message)
             if is_warning_message(ex.my_message):
                 logger.warning("exception encountered during removing io_group {}, from host {} : {}".format(
                     io_group, host_name, ex.my_message))
             else:
-                if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
-                    raise array_errors.HostNotFoundError(host_name)
                 raise ex
 
     def remove_io_group_from_host(self, host_name, io_group):
@@ -1881,13 +1887,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             return self.client.svcinfo.lshostiogrp(object_id=host_name).as_single_element
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self._raise_host_not_found_error(host_name, ex.my_message)
             if is_warning_message(ex.my_message):
-                logger.warning("exception encountered during removing io_group {}, from host {} : {}".format(
-                    io_group, host_name, ex.my_message))
-            else:
-                if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
-                    raise array_errors.HostNotFoundError(host_name)
-                raise ex
+                logger.warning("exception encountered during getting io_group, from host {} : {}".format(
+                    host_name, ex.my_message))
+                return None
+            raise ex
 
     def get_host_io_group(self, host_name):
         return self._lshostiogrp(host_name)
