@@ -1,3 +1,5 @@
+from controllers.servers.host_definer import settings
+
 SECRET_DOES_NOT_EXIST = 'Secret {} in namespace {} does not exist'
 FAILED_TO_GET_SECRET = 'Failed to get Secret {} in namespace {}, go this error: {}'
 CSI_NODE_DOES_NOT_EXIST = 'node {}, do not have csi node'
@@ -6,8 +8,6 @@ FAILED_TO_GET_CSI_NODES = 'Failed to get csi nodes, got: {}'
 FAILED_TO_GET_CSI_NODE = 'Failed to get csi node {}, got: {}'
 FAILED_TO_GET_NODES = 'Failed to get nodes, got: {}'
 FAILED_TO_GET_STORAGE_CLASSES = 'Failed to get storage classes, got: {}'
-FAILED_TO_GET_HOST_DEFINITION = "Failed to get host definition for node {}," \
-    " with {} secret in {} namespace, go this error: {}"
 FAILED_TO_GET_LIST_OF_HOST_DEFINITIONS = 'Could not get list of hostDefinitions, got: {}'
 FAILED_TO_PATCH_HOST_DEFINITION = 'Failed to patch host definition {}, go this error: {}'
 FAILED_TO_CREATE_HOST_DEFINITION = 'Failed to create host definition {}, go this error: {}'
@@ -38,4 +38,6 @@ HOST_DEFINITION_IS_NOT_PENDING = "Stopping verifying host definition {}, using e
     " because it is not in pending state"
 DELETE_HOST_DEFINITION = 'Deleting host definition {}'
 ADD_FINALIZER_TO_HOST_DEFINITION = 'Adding finalizer to host definition {}'
-REMOVE_FINALIZER_TO_HOST_DEFINITION = 'removing finalizer from host definition {}'
+REMOVE_FINALIZER_TO_HOST_DEFINITION = 'Removing finalizer from host definition {}'
+INVALID_SECRET_CONTENT_TYPE = 'Got invalid value [{}] in secret, from type {}, should be string'
+FAILED_TO_REMOVE_FINALIZER = 'Failed to remove {} finalizer from node'.format(settings.CSI_IBM_FINALIZER)

@@ -5,10 +5,10 @@ from mock import Mock, MagicMock
 from controllers.array_action.array_action_types import Host
 from controllers.array_action.errors import HostNotFoundError, HostAlreadyExists
 from controllers.common.node_info import Initiators
+from controllers.servers.utils import get_array_connection_info_from_secrets
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
-from controllers.tests.common.test_settings import HOST_NAME
+from controllers.tests.common.test_settings import HOST_NAME, SECRET
 from controllers.tests.controller_server.common import mock_get_agent, mock_array_type
-from controllers.tests.utils import get_fake_array_connection_info
 
 HOST_DEFINER_SERVER_PATH = "controllers.servers.host_definer.storage_manager.host_definer_server"
 
@@ -32,7 +32,7 @@ class BaseSetUp(unittest.TestCase):
         self.request.prefix = None
         self.request.connectivity_type = 'fc'
         self.request.node_id = '{};;;{}'.format(HOST_NAME, self.iqn)
-        self.request.array_connection_info = get_fake_array_connection_info()
+        self.request.array_connection_info = get_array_connection_info_from_secrets(SECRET)
 
 
 class TestDefineHost(BaseSetUp):

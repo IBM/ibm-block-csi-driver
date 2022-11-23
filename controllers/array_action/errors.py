@@ -266,3 +266,10 @@ class VirtSnapshotFunctionNotSupportedMessage(BaseArrayActionException):
     def __init__(self, id_or_name):
         super().__init__()
         self.message = messages.VIRT_SNAPSHOT_FUNCTION_NOT_SUPPORTED_MESSAGE.format(id_or_name)
+
+
+class NoPortIsValid(BaseArrayActionException):
+
+    def __init__(self, host_name):
+        super().__init__()
+        self.message = messages.ALL_THE_PORTS_FOR_HOST_ARE_INVALID.format(host_name)
