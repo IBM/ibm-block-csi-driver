@@ -575,6 +575,7 @@ class ArrayMediator(ABC):
 
         Raises:
             HostNotFoundError
+            IoGroupIsInValid
         """
         raise NotImplementedError
 
@@ -592,6 +593,7 @@ class ArrayMediator(ABC):
 
         Raises:
             HostNotFoundError
+            IoGroupIsInValid
         """
         raise NotImplementedError
 
