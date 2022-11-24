@@ -124,6 +124,17 @@ class HostDefinerServicer:
         array_mediator.add_io_group_to_host(host, io_group_to_add)
 
     def _get_io_group_to_remove_and_add(self, io_group_from_host, ig_group_from_user):
+        if not ig_group_from_user:
+            ig_group_from_user = settings.FULL_IO_GROUP.split(settings.IO_GROUP_DELIMITER)
+        if not io_group_from_host:
+            return '', settings.IO_GROUP_DELIMITER.join(ig_group_from_user)
+
+        io_group_to_add, io_group_to_delete = self._get_io_group_to_remove_and_add_lists(
+            io_group_from_host, ig_group_from_user)
+        return settings.IO_GROUP_DELIMITER.join(io_group_to_delete), \
+            settings.IO_GROUP_DELIMITER.join(io_group_to_add)
+
+    def _get_io_group_to_remove_and_add_lists(self, io_group_from_host, ig_group_from_user):
         io_group_to_add = []
         for io_group in ig_group_from_user:
             id_index = self._get_element_index_in_list(io_group, io_group_from_host.id)
@@ -133,9 +144,7 @@ class HostDefinerServicer:
                 io_group_from_host.name.pop(id_index)
             else:
                 io_group_to_add.append(io_group)
-
-        return settings.IO_GROUP_DELIMITER.join(io_group_from_host.id), \
-            settings.IO_GROUP_DELIMITER.join(io_group_to_add)
+        return io_group_to_add, io_group_from_host.id
 
     def _get_element_index_in_list(self, element, list_to_search_in):
         try:
