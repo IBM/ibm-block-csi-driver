@@ -183,6 +183,6 @@ def get_array_connection_info():
         test_settings.FAKE_SECRET_USER_NAME, test_settings.FAKE_SECRET_PASSWORD)
 
 
-def get_define_request(prefix='', connectivity_type='', node_id_from_host_definition='', node_id_from_csi_node=''):
+def get_define_request(prefix='', connectivity_type='', node_id_from_host_definition=''):
     return DefineHostRequest(prefix, connectivity_type, node_id_from_host_definition,
-                             node_id_from_csi_node, get_array_connection_info())
+                             test_settings.FAKE_NODE_ID, get_array_connection_info())

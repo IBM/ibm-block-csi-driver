@@ -83,17 +83,34 @@ class TestAddInitialCsiNodes(CsiNodeWatcherBase):
 
 
 class TestWatchCsiNodesResources(CsiNodeWatcherBase):
+
     def test_updated_csi_node_not_removed(self):
+        self._prepare_mocks_for_updated_csi_node()
+        self.csi_node_watcher.host_definitions_api.get.return_value = test_utils.get_empty_k8s_host_definitions()
+        test_utils.run_function_with_timeout(self.csi_node_watcher.watch_csi_nodes_resources, 0.5)
+        self.assertEqual(1, len(self.nodes_on_csi_node_watcher))
+        self.csi_node_watcher.storage_host_servicer.define_host.assert_not_called()
+
+    def test_updated_node_id_of_csi_node(self):
+        self._prepare_mocks_for_updated_csi_node()
+        host_definitions = self.ready_k8s_host_definitions
+        host_definitions.items[0].spec.hostDefinition.nodeId = 'other_node_id'
+        self.csi_node_watcher.host_definitions_api.get.return_value = self.ready_k8s_host_definitions
+        self.csi_node_watcher.core_api.read_namespaced_secret.return_value = test_utils.get_fake_k8s_secret()
+        test_utils.run_function_with_timeout(self.csi_node_watcher.watch_csi_nodes_resources, 0.5)
+        self.assertEqual(1, len(self.nodes_on_csi_node_watcher))
+        self.csi_node_watcher.storage_host_servicer.define_host.assert_called()
+
+    def _prepare_mocks_for_updated_csi_node(self):
         self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_settings.FAKE_NODE_ID
         self.nodes_on_csi_node_watcher[test_settings.FAKE_NODE_NAME] = test_settings.FAKE_NODE_ID
+        self.secret_ids_on_csi_node_watcher[test_settings.FAKE_SECRET_ID] = 1
         self.csi_node_watcher.csi_nodes_api.watch.return_value = iter(
             [test_utils.get_fake_csi_node_watch_event(test_settings.DELETED_EVENT_TYPE)])
         self.csi_node_watcher.core_api.read_node.return_value = self.k8s_node_with_manage_node_label
         self.csi_node_watcher.apps_api.list_daemon_set_for_all_namespaces.side_effect = [
             self.not_updated_daemon_set, self.updated_daemon_set]
         self.csi_node_watcher.core_api.list_pod_for_all_namespaces.return_value = test_utils.get_fake_k8s_pods_items()
-        test_utils.run_function_with_timeout(self.csi_node_watcher.watch_csi_nodes_resources, 0.5)
-        self.assertEqual(1, len(self.nodes_on_csi_node_watcher))
 
     def test_delete_host_definition(self):
         self._prepare_default_mocks_for_deletion()
@@ -162,7 +179,8 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
         self.csi_node_watcher.csi_nodes_api.watch.return_value = iter(
             [test_utils.get_fake_csi_node_watch_event(test_settings.DELETED_EVENT_TYPE)])
         self.csi_node_watcher.core_api.read_node.side_effect = [
-            self.k8s_node_with_manage_node_label, self.k8s_node_with_fake_label]
+            self.k8s_node_with_manage_node_label,
+            self.k8s_node_with_fake_label, self.k8s_node_with_fake_label]
         self.csi_node_watcher.apps_api.list_daemon_set_for_all_namespaces.return_value = self.deleted_daemon_set
         self.csi_node_watcher.core_api.list_pod_for_all_namespaces.return_value = test_utils.get_empty_k8s_pods()
         self.os.getenv.return_value = test_settings.TRUE_STRING
@@ -173,20 +191,15 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
             test_settings.CSI_PROVISIONER_NAME)
         self.secret_ids_on_csi_node_watcher[test_settings.FAKE_SECRET_ID] = 1
 
-    def test_do_nothing_new_csi_node_with_already_host_definition_on_cluster(self):
-        self._prepare_default_mocks_for_modified_event()
-        self.csi_node_watcher.host_definitions_api.get.return_value = self.ready_k8s_host_definitions
-        test_utils.run_function_with_timeout(self.csi_node_watcher.watch_csi_nodes_resources, 0.5)
-        self.csi_node_watcher.storage_host_servicer.define_host.assert_not_called()
-
     def test_define_host_called_on_new_csi_node(self):
         self._prepare_default_mocks_for_modified_event()
         self.csi_node_watcher.host_definitions_api.get.side_effect = [
             test_utils.get_empty_k8s_host_definitions(), self.ready_k8s_host_definitions]
+        self.os.getenv.side_effect = [test_settings.TRUE_STRING, test_settings.FAKE_PREFIX, '']
         test_utils.run_function_with_timeout(self.csi_node_watcher.watch_csi_nodes_resources, 0.5)
         self.assertEqual(1, len(self.nodes_on_watcher_helper))
-        self.csi_node_watcher.storage_host_servicer.define_host.assert_called_once_with(
-            test_utils.get_define_request(test_settings.TRUE_STRING))
+        self.csi_node_watcher.storage_host_servicer.define_host.assert_called_once_with(test_utils.get_define_request(
+            prefix=test_settings.FAKE_PREFIX, node_id_from_host_definition=test_settings.FAKE_NODE_ID))
 
     def test_define_host_not_called_on_new_csi_node_when_failed_to_get_secret(self):
         self._prepare_default_mocks_for_modified_event()
@@ -216,3 +229,4 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
         self.os.getenv.return_value = test_settings.TRUE_STRING
         self.csi_node_watcher.core_api.read_namespaced_secret.return_value = test_utils.get_fake_k8s_secret()
         self.csi_node_watcher.storage_host_servicer.define_host.return_value = DefineHostResponse()
+        self.csi_node_watcher.core_api.read_node.return_value = self.k8s_node_with_fake_label

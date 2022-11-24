@@ -149,6 +149,8 @@ class KubernetesManager():
             k8s_host_definition, settings.NODE_NAME_FIELD)
         host_definition_info.node_id = self._get_attr_from_host_definition(
             k8s_host_definition, common_settings.HOST_DEFINITION_NODE_ID_FIELD)
+        host_definition_info.connectivity_type = self._get_attr_from_host_definition(
+            k8s_host_definition, settings.CONNECTIVITY_TYPE_FIELD)
         return host_definition_info
 
     def _get_k8s_object_resource_version(self, k8s_object):
