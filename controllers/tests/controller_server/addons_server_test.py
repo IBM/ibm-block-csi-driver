@@ -19,7 +19,7 @@ from controllers.tests.utils import ProtoBufMock
 ADDON_SERVER_PATH = "controllers.servers.csi.addons_server"
 
 
-class BaseControllerServicerSetUp(unittest.TestCase):
+class BaseReplicationSetUp(unittest.TestCase):
 
     def setUp(self):
         self.servicer = ReplicationControllerServicer()
@@ -61,7 +61,7 @@ class BaseControllerServicerSetUp(unittest.TestCase):
         return replication_request
 
 
-class TestControllerServicerEnableVolumeReplication(BaseControllerServicerSetUp, CommonControllerTest):
+class TestEnableVolumeReplication(BaseReplicationSetUp, CommonControllerTest):
     @property
     def tested_method(self):
         return self.servicer.EnableVolumeReplication
@@ -149,7 +149,7 @@ class TestControllerServicerEnableVolumeReplication(BaseControllerServicerSetUp,
                                                   grpc_status=grpc.StatusCode.ALREADY_EXISTS)
 
 
-class TestControllerServicerDisableVolumeReplication(BaseControllerServicerSetUp, CommonControllerTest):
+class TestDisableVolumeReplication(BaseReplicationSetUp, CommonControllerTest):
     @property
     def tested_method(self):
         return self.servicer.DisableVolumeReplication
@@ -199,7 +199,7 @@ class TestControllerServicerDisableVolumeReplication(BaseControllerServicerSetUp
         self._test_disable_replication_succeeds(REPLICATION_TYPE_EAR)
 
 
-class TestControllerServicerPromoteVolumeReplication(BaseControllerServicerSetUp, CommonControllerTest):
+class TestPromoteVolume(BaseReplicationSetUp, CommonControllerTest):
     @property
     def tested_method(self):
         return self.servicer.PromoteVolume
@@ -256,7 +256,7 @@ class TestControllerServicerPromoteVolumeReplication(BaseControllerServicerSetUp
         self._test_promote_replication_fails(REPLICATION_TYPE_EAR)
 
 
-class TestControllerServicerDemoteVolumeReplication(BaseControllerServicerSetUp, CommonControllerTest):
+class TestDemoteVolume(BaseReplicationSetUp, CommonControllerTest):
     @property
     def tested_method(self):
         return self.servicer.DemoteVolume
@@ -314,7 +314,7 @@ class TestControllerServicerDemoteVolumeReplication(BaseControllerServicerSetUp,
         self._test_demote_replication_fails(REPLICATION_TYPE_EAR)
 
 
-class TestControllerServicerResyncVolumeReplication(BaseControllerServicerSetUp, CommonControllerTest):
+class TestResyncVolume(BaseReplicationSetUp, CommonControllerTest):
     @property
     def tested_method(self):
         return self.servicer.ResyncVolume
