@@ -84,3 +84,4 @@ class ManagedNode:
                 if io_group:
                     io_group += settings.IO_GROUP_DELIMITER
                 io_group += str(io_group_index)
+        return io_group
