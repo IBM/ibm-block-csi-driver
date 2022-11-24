@@ -357,6 +357,7 @@ class ArrayMediator(ABC):
 
         Raises:
             HostAlreadyExists
+            NoPortIsValid
         """
         raise NotImplementedError
 
@@ -373,6 +374,76 @@ class ArrayMediator(ABC):
 
         Raises:
             None
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def add_ports_to_host(self, host_name, initiators, connectivity_type):
+        """
+        This function should add ports to host in the storage system.
+
+        Args:
+           host_name         : name of the host to be created in the storage system
+           initiators        : initiators (e.g. fc wwns, iqn) of the host.
+           connectivity_type : the connectivity_type chosen by the user
+
+        Returns:
+            None
+
+        Raises:
+            NoPortIsValid
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def remove_ports_from_host(self, host_name, ports, connectivity_type):
+        """
+        This function should remove ports from host in the storage system.
+
+        Args:
+           host_name         : name of the host to be created in the storage system
+           ports             : ports (e.g. fc wwns, iqn) of the host.
+           connectivity_type : the connectivity_type chosen by the user
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_host_connectivity_ports(self, host_name, connectivity_type):
+        """
+        This function should return ports from connectivity type on host in the storage system.
+
+        Args:
+           host_name         : name of the host to be created in the storage system
+           connectivity_type : the connectivity_type chosen by the user
+
+        Returns:
+            list
+
+        Raises:
+            HostNotFoundError
+            UnsupportedConnectivityTypeError
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_host_connectivity_type(self, host_name):
+        """
+        This function should return the ports' connectivity type from host in the storage system.
+
+        Args:
+           host_name  : name of the host to be created in the storage system
+
+        Returns:
+            string
+
+        Raises:
+            HostNotFoundError
         """
         raise NotImplementedError
 

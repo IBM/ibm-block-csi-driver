@@ -17,8 +17,8 @@ class CsiNodeWatcher(Watcher):
                 self._add_node_to_nodes(csi_node_info)
 
     def watch_csi_nodes_resources(self):
-        while True:
-            resource_version = self.csi_nodes_api.get().metadata.resourceVersion
+        while self._loop_forever():
+            resource_version = self._get_k8s_object_resource_version(self.csi_nodes_api.get())
             stream = self.csi_nodes_api.watch(resource_version=resource_version, timeout=5)
             for watch_event in stream:
                 watch_event = self._munch(watch_event)
@@ -40,17 +40,17 @@ class CsiNodeWatcher(Watcher):
             csi_node_info.name not in NODES
 
     def _handle_deleted_csi_node_pod(self, node_name):
-        if self._is_host_can_be_undefined(node_name):
+        if self._is_node_has_manage_node_label(node_name):
             remove_host_thread = Thread(target=self._undefine_host_when_node_pod_is_deleted, args=(node_name,))
             remove_host_thread.start()
-        else:
-            NODES.pop(node_name, None)
 
     def _undefine_host_when_node_pod_is_deleted(self, node_name):
         if self._is_host_part_of_update(node_name):
             pass
-        else:
+        elif self._is_host_definer_can_delete_hosts() and not self._is_node_has_forbid_deletion_label(node_name):
             self._undefine_hosts(node_name)
+        else:
+            NODES.pop(node_name, None)
 
     def _is_host_part_of_update(self, worker):
         daemon_set_name = self._wait_until_all_daemon_set_pods_are_up_to_date()
