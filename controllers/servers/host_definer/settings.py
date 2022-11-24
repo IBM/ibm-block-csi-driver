@@ -58,3 +58,4 @@ HOST_DEFINITION_PENDING_DELAY_IN_SECONDS = 3
 SECRET_CONFIG_FIELD = 'config'
 TOPOLOGY_PREFIXES = ['topology.block.csi.ibm.com']
 IO_GROUP_DELIMITER = ':'
+IO_GROUP_LABEL_PREFIX = 'hostdefiner.block.csi.ibm.com/io-group-'

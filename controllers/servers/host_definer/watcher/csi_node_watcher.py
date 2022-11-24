@@ -91,7 +91,7 @@ class CsiNodeWatcher(Watcher):
             if host_definition_info:
                 if self._is_node_id_changed(host_definition_info.node_id, csi_node_info.node_id):
                     logger.info(messages.NODE_ID_WAS_CHANGED.format(csi_node_info.name))
-                    NODES[csi_node_info.name] = csi_node_info.node_id
+                    NODES[csi_node_info.name] = self._generate_managed_node(csi_node_info)
                     self._create_definition(host_definition_info)
 
     def _is_node_id_changed(self, host_definition_node_id, csi_node_node_id):
