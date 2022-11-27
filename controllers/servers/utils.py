@@ -577,6 +577,16 @@ def validate_addons_request(request, replication_type):
     if request.volume_id == "" or (replication_type == REPLICATION_TYPE_MIRROR and request.replication_id == ""):
         raise ValidationException(messages.VOLUME_ID_SHOULD_NOT_BE_EMPTY_MESSAGE)
 
+    if replication_type == REPLICATION_TYPE_EAR:
+        logger.debug("validating obsolete rcrelationship parameters")
+        if request.replication_id != "":
+            raise ValidationException(messages.INVALID_EAR_PARAMETER_MESSAGE.format(
+                servers_settings.PARAMETERS_REPLICATION_HANDLE))
+
+        if request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID):
+            raise ValidationException(messages.INVALID_EAR_PARAMETER_MESSAGE.format(
+                servers_settings.PARAMETERS_SYSTEM_ID))
+
     logger.debug("validating copy type")
     if servers_settings.PARAMETERS_COPY_TYPE in request.parameters:
         copy_type = request.parameters.get(servers_settings.PARAMETERS_COPY_TYPE)
