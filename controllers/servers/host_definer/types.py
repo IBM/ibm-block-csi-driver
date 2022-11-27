@@ -79,7 +79,7 @@ class ManagedNode:
 
     def _generate_io_group_from_labels(self, labels):
         io_group = ''
-        for io_group_index in range(4):
+        for io_group_index in range(host_definer_settings.POSSIBLE_NUMBER_OF_IO_GROUP):
             label_content = labels.get(common_settings.IO_GROUP_LABEL_PREFIX + str(io_group_index))
             if label_content == host_definer_settings.TRUE_STRING:
                 if io_group:
