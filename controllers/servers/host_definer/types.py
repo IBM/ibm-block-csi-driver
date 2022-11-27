@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
-from controllers.servers.host_definer import settings
+import controllers.servers.host_definer.settings as host_definer_settings
+import controllers.common.settings as common_settings
 
 
 @dataclass
@@ -79,9 +80,9 @@ class ManagedNode:
     def _generate_io_group_from_labels(self, labels):
         io_group = ''
         for io_group_index in range(4):
-            label_content = labels.get(settings.IO_GROUP_LABEL_PREFIX + str(io_group_index))
-            if label_content == settings.TRUE_STRING:
+            label_content = labels.get(common_settings.IO_GROUP_LABEL_PREFIX + str(io_group_index))
+            if label_content == host_definer_settings.TRUE_STRING:
                 if io_group:
-                    io_group += settings.IO_GROUP_DELIMITER
+                    io_group += common_settings.IO_GROUP_DELIMITER
                 io_group += str(io_group_index)
         return io_group

@@ -5,7 +5,8 @@ from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.node_info import NodeIdInfo
 from controllers.servers.host_definer.types import DefineHostResponse
 from controllers.servers.utils import join_object_prefix_with_name, get_initiators_connectivity_type
-from controllers.servers.host_definer import settings
+import controllers.servers.host_definer.settings as host_definer_settings
+import controllers.common.settings as common_settings
 
 logger = get_stdout_logger()
 
@@ -116,7 +117,7 @@ class HostDefinerServicer:
             array_mediator.remove_ports_from_host(host_name, ports_to_remove, connectivity_type)
 
     def _update_host_io_group(self, request, host, array_mediator):
-        ig_group_from_user = request.io_group.split(settings.IO_GROUP_DELIMITER)
+        ig_group_from_user = request.io_group.split(common_settings.IO_GROUP_DELIMITER)
         io_group_from_host = array_mediator.get_host_io_group(host)
         io_group_to_remove, io_group_to_add = self._get_io_group_to_remove_and_add(
             io_group_from_host, ig_group_from_user)
@@ -125,14 +126,15 @@ class HostDefinerServicer:
 
     def _get_io_group_to_remove_and_add(self, io_group_from_host, ig_group_from_user):
         if not ig_group_from_user:
-            ig_group_from_user = settings.FULL_IO_GROUP.split(settings.IO_GROUP_DELIMITER)
+            ig_group_from_user = host_definer_settings.FULL_IO_GROUP.split(
+                common_settings.IO_GROUP_DELIMITER)
         if not io_group_from_host:
-            return '', settings.IO_GROUP_DELIMITER.join(ig_group_from_user)
+            return '', common_settings.IO_GROUP_DELIMITER.join(ig_group_from_user)
 
         io_group_to_add, io_group_to_delete = self._get_io_group_to_remove_and_add_lists(
             io_group_from_host, ig_group_from_user)
-        return settings.IO_GROUP_DELIMITER.join(io_group_to_delete), \
-            settings.IO_GROUP_DELIMITER.join(io_group_to_add)
+        return common_settings.IO_GROUP_DELIMITER.join(io_group_to_delete), \
+            common_settings.IO_GROUP_DELIMITER.join(io_group_to_add)
 
     def _get_io_group_to_remove_and_add_lists(self, io_group_from_host, ig_group_from_user):
         io_group_to_add = []
