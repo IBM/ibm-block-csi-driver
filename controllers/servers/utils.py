@@ -578,7 +578,7 @@ def validate_addons_request(request, replication_type):
         raise ValidationException(messages.VOLUME_ID_SHOULD_NOT_BE_EMPTY_MESSAGE)
 
     if replication_type == REPLICATION_TYPE_EAR:
-        logger.debug("validating obsolete rcrelationship parameters")
+        logger.debug("validating obsolete non-EAR parameters")
         if request.replication_id != "":
             raise ValidationException(messages.INVALID_EAR_PARAMETER_MESSAGE.format(
                 servers_settings.PARAMETERS_REPLICATION_HANDLE))
