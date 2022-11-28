@@ -19,6 +19,7 @@ class DefineHostResponse:
     connectivity_type: str = ''
     ports: list = field(default_factory=list)
     node_name_on_storage: str = ''
+    io_group: list = field(default_factory=list)
 
 
 @dataclass
