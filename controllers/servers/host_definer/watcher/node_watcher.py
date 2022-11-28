@@ -4,6 +4,8 @@ from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.utils import is_topology_match
 from controllers.servers.host_definer.watcher.watcher_helper import NODES, Watcher, MANAGED_SECRETS
 from controllers.servers.host_definer import settings
+from controllers.servers.host_definer import utils
+from controllers.servers.host_definer import messages
 
 logger = get_stdout_logger()
 unmanaged_csi_nodes_with_driver = set()
@@ -38,6 +40,7 @@ class NodeWatcher(Watcher):
                 self._add_new_unmanaged_nodes_with_ibm_csi_driver(watch_event, csi_node_info)
                 self._define_new_managed_node(watch_event, node_name, csi_node_info)
                 self._handle_node_topologies(node_info, watch_event)
+                self._update_io_group(node_info)
 
     def _add_new_unmanaged_nodes_with_ibm_csi_driver(self, watch_event, csi_node_info):
         if watch_event.type in settings.MODIFIED_EVENT and \
@@ -104,3 +107,11 @@ class NodeWatcher(Watcher):
             if is_topology_match(system_topologies, topology_labels):
                 return system_id
         return ''
+
+    def _update_io_group(self, node_info):
+        io_group = utils.generate_io_group_from_labels(node_info.labels)
+        node_name = node_info.name
+        if node_name in NODES and io_group != NODES[node_name].io_group:
+            logger.info(messages.IO_GROUP_CHANGED.format(node_name, io_group, NODES[node_name].io_group))
+            NODES[node_name].io_group = io_group
+            self._define_host_on_all_storages(node_name)
