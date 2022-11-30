@@ -40,7 +40,8 @@ class HostDefinerServicer:
                             return define_host_response
                         host_name = host.name
 
-                return self._generate_response(array_mediator, host_name, connectivity_type_from_user)
+                return self._generate_response(
+                    array_mediator, host_name, connectivity_type_from_user, array_connection_info.array_addresses[0])
         except Exception as ex:
             logger.exception(ex)
             return DefineHostResponse(error_message=str(ex))
@@ -163,8 +164,9 @@ class HostDefinerServicer:
             return DefineHostResponse(error_message=str(error_message))
         return DefineHostResponse()
 
-    def _generate_response(self, array_mediator, host_name, connectivity_type):
-        define_host_response = DefineHostResponse(connectivity_type=connectivity_type, node_name_on_storage=host_name)
+    def _generate_response(self, array_mediator, host_name, connectivity_type, management_address):
+        define_host_response = DefineHostResponse(connectivity_type=connectivity_type, node_name_on_storage=host_name,
+                                                  management_address=management_address)
         ports = array_mediator.get_host_connectivity_ports(host_name, connectivity_type)
         define_host_response.ports = ports
         io_group_ids = array_mediator.get_host_io_group(host_name).id
