@@ -42,7 +42,8 @@ class BaseReplicationSetUp(unittest.TestCase):
             replication = utils.get_mock_mediator_response_replication(name=REPLICATION_NAME,
                                                                        replication_type=replication_type,
                                                                        copy_type=copy_type,
-                                                                       is_primary=is_primary)
+                                                                       is_primary=is_primary,
+                                                                       volume_group_id=volume_group_id)
         else:
             replication = None
         self.mediator.get_replication.return_value = replication
