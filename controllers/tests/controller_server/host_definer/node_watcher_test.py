@@ -67,7 +67,7 @@ class TestWatchNodesResources(NodeWatcherBase):
         self.node_watcher.watch_nodes_resources()
         self.assertEqual(1, len(self.nodes_on_watcher_helper))
         self.node_watcher.storage_host_servicer.define_host.assert_called_once_with(
-            test_utils.get_define_request())
+            test_utils.get_define_request(node_id_from_host_definition=test_settings.FAKE_NODE_ID))
         self.expected_unmanaged_csi_nodes_with_driver.clear()
         self.assertEqual(self.expected_unmanaged_csi_nodes_with_driver, self.unmanaged_csi_nodes_with_driver)
 

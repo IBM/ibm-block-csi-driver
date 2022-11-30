@@ -12,6 +12,7 @@ class HostDefinitionWatcherBase(BaseSetUp):
     def setUp(self):
         super().setUp()
         self.host_definition_watcher = test_utils.get_class_mock(HostDefinitionWatcher)
+        self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_settings.FAKE_NODE_ID
 
 
 class TestWatchHostDefinitionsResources(HostDefinitionWatcherBase):
@@ -57,9 +58,10 @@ class TestWatchHostDefinitionsResources(HostDefinitionWatcherBase):
         self._prepare_default_mocks_for_pending_creation()
         self.host_definition_watcher.host_definitions_api.get.return_value = self.ready_k8s_host_definitions
         test_utils.patch_pending_variables()
+        self.host_definition_watcher.core_api.read_node.return_value = self.k8s_node_with_fake_label
         test_utils.run_function_with_timeout(self.host_definition_watcher.watch_host_definitions_resources, 0.5)
         self.host_definition_watcher.storage_host_servicer.define_host.assert_called_once_with(
-            test_utils.get_define_request())
+            test_utils.get_define_request(node_id_from_host_definition=test_settings.FAKE_NODE_ID))
 
     def test_pending_creation_that_managed_to_be_created(self):
         self._prepare_default_mocks_for_pending_creation()
