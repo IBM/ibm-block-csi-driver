@@ -141,10 +141,8 @@ class HostDefinerServicer:
         io_group_to_add = []
         for io_group in ig_group_from_user:
             id_index = self._get_element_index_in_list(io_group, io_group_from_host.id)
-            name_index = self._get_element_index_in_list(io_group, io_group_from_host.name)
-            if id_index != -1 or name_index != -1:
+            if id_index != -1:
                 io_group_from_host.id.pop(id_index)
-                io_group_from_host.name.pop(id_index)
             else:
                 io_group_to_add.append(io_group)
         return io_group_to_add, io_group_from_host.id
