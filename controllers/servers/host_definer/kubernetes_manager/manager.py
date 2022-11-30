@@ -92,8 +92,7 @@ class KubernetesManager():
     def _is_k8s_csi_node_has_driver(self, k8s_csi_node):
         if k8s_csi_node.spec.drivers:
             for driver in k8s_csi_node.spec.drivers:
-                if driver.name == settings.CSI_PROVISIONER_NAME:
-                    return True
+                return driver.name == settings.CSI_PROVISIONER_NAME
         return False
 
     def _get_csi_node_info(self, node_name):
