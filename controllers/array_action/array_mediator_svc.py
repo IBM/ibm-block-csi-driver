@@ -16,7 +16,7 @@ from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstra
 from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controllers.common import settings as common_settings
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.utils import get_connectivity_type_ports
+from controllers.servers.utils import get_connectivity_type_ports, split_string
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -1901,4 +1901,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     def get_host_io_group(self, host_name):
-        return self._lshostiogrp(host_name)
+        io_group = self._lshostiogrp(host_name)
+        io_group.id = split_string(io_group.id)
+        io_group.name = split_string(io_group.name)
+        return io_group
