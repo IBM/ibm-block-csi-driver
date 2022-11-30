@@ -2269,18 +2269,34 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                 (common_settings.HOST_NAME, array_settings.DUMMY_IO_GROUP),
                                                 self.svc.client.svctask.rmhostiogrp, Exception("Failed"), Exception)
 
-    def _get_lshostiogrp(self):
+    def _get_lshostiogrp(self, io_group_ids, io_group_names):
         return {
-            'id': svc_settings.IO_GROUP_IDS,
-            'name': svc_settings.IO_GROUP_NAMES
+            'id': io_group_ids,
+            'name': io_group_names
         }
 
-    def test_get_host_io_group_success(self):
+    def _assert_get_host_io_group(self, io_group_ids, io_group_names, result):
+        self.assertEqual(type(result.id), list)
+        self.assertEqual(type(result.name), list)
+        if isinstance(io_group_ids, str):
+            io_group_ids = io_group_ids.split(" ")
+        if isinstance(io_group_names, str):
+            io_group_names = io_group_names.split(" ")
+        self.assertEqual(result, self._get_lshostiogrp(io_group_ids, io_group_names))
+
+    def _test_get_host_io_group_success(self, io_group_ids, io_group_names):
         self.svc.client.svcinfo.lshostiogrp = Mock()
-        self.svc.client.svcinfo.lshostiogrp.return_value = Mock(as_single_element=Munch(self._get_lshostiogrp()))
+        self.svc.client.svcinfo.lshostiogrp.return_value = Mock(
+            as_single_element=Munch(self._get_lshostiogrp(io_group_ids, io_group_names)))
         result = self.svc.get_host_io_group(common_settings.HOST_NAME)
         self.svc.client.svcinfo.lshostiogrp.assert_called_once_with(object_id=common_settings.HOST_NAME)
-        self.assertEqual(result, self._get_lshostiogrp())
+        self._assert_get_host_io_group(io_group_ids, io_group_names, result)
+
+    def test_get_host_multiple_io_groups_success(self):
+        self._test_get_host_io_group_success(svc_settings.MULTIPLE_IO_GROUP_IDS, svc_settings.MULTIPLE_IO_GROUP_NAMES)
+
+    def test_get_host_single_io_group_success(self):
+        self._test_get_host_io_group_success(svc_settings.SINGLE_IO_GROUP_ID, svc_settings.SINGLE_IO_GROUP_NAME)
 
     def test_get_io_group_from_not_exist_host_falied(self):
         self.svc.client.svcinfo.lshostiogrp = Mock()
