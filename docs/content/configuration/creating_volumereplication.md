@@ -12,7 +12,7 @@ When replicating a volume, be sure to follow all of the replication configuratio
 
     For more information about PVC configuration, see [Creating a PersistentVolumeClaim (PVC)](creating_pvc.md).
 
-    **Note:** Use the `spec.csi.volumeHandle` of the relevant target PersistentVolume (PV) for the `replicationHandle` value.
+    **Important:** If you are not using policy-based replication, use the `spec.csi.volumeHandle` of the relevant target PersistentVolume (PV) for the `replicationHandle` value. If policy-based replication is being used, **do not** use the `replicationHandle` value. Using the `replicationHandle` while policy-based replication is defined in the VolumeReplicationClass produces an error message. For more information, see TROUBLESHOOTING.
 
     ```
     apiVersion: replication.storage.openshift.io/v1alpha1
