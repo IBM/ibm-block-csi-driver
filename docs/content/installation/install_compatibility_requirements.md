@@ -53,7 +53,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 
 2. Configure your storage system host attachment, per worker node.
 
-    **Note:** IBM® block storage CSI driver 1.10 introduces dynamic host definition. For more information and installation instructions, see [Installing the host definer](install_hostdefiner.md). If this feature is not installed, the nodes are not dynamically defined on the  storage system and they must be defined manually.
+    **Note:** IBM® block storage CSI driver 1.11.0 introduces dynamic host definition. For more information and installation instructions, see [Installing the host definer](install_hostdefiner.md). If this feature is not installed, the nodes are not dynamically defined on the  storage system and they must be defined manually.
     
     Be sure to configure your storage system host attachment according to your storage system instructions.
 
