@@ -6,7 +6,7 @@ from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher, MANAGED_SECRETS
 from controllers.servers.host_definer import settings
 from controllers.servers.errors import ValidationException
-from controllers.servers.utils import validate_secrets, get_system_info_for_topologies
+from controllers.servers.utils import get_system_info_for_topologies
 import controllers.common.settings as common_settings
 
 logger = get_stdout_logger()
@@ -75,12 +75,6 @@ class StorageClassWatcher(Watcher):
             return True
         return False
 
-    def _validate_secret(self, secret_data):
-        try:
-            validate_secrets(secret_data)
-        except ValidationException as ex:
-            logger.error(str(ex))
-
     def _generate_nodes_with_system_id(self, secret_data):
         nodes_with_system_id = {}
         secret_config = self._get_secret_secret_config(secret_data)
@@ -106,19 +100,6 @@ class StorageClassWatcher(Watcher):
         except ValidationException:
             return ''
         return system_id
-
-    def _get_topology_labels(self, labels):
-        topology_labels = {}
-        for label in labels:
-            if self._is_topology_label(label):
-                topology_labels[label] = labels[label]
-        return topology_labels
-
-    def _is_topology_label(self, label):
-        for prefix in settings.TOPOLOGY_PREFIXES:
-            if label.startswith(prefix):
-                return True
-        return False
 
     def _add_secret_info_to_list(self, secret_info, list_with_secrets_info):
         for secret_info_in_list in list_with_secrets_info:
