@@ -2021,15 +2021,19 @@ class TestArrayMediatorSVC(unittest.TestCase):
                              Initiators([array_settings.DUMMY_NVME_NQN1],
                                         [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
                                         [array_settings.DUMMY_NODE1_IQN]),
-                             array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+                             array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE, array_settings.DUMMY_IO_GROUP)
         self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
                                                                nqn=array_settings.DUMMY_NVME_NQN1,
                                                                protocol=svc_settings.MKHOST_NVME_PROTOCOL_VALUE)
 
     def test_create_host_fc_success(self):
-        self.svc.create_host(common_settings.HOST_NAME,
-                             Initiators([], [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2], [
-                                 array_settings.DUMMY_NODE1_IQN]), array_settings.FC_CONNECTIVITY_TYPE)
+        self.svc.create_host(
+            common_settings.HOST_NAME,
+            Initiators(
+                [],
+                [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
+                [array_settings.DUMMY_NODE1_IQN]),
+            array_settings.FC_CONNECTIVITY_TYPE, array_settings.DUMMY_IO_GROUP)
         self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
                                                                fcwwpn=array_settings.DUMMY_FC_WWN1)
 
@@ -2037,12 +2041,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkhost.side_effect = [CLIFailureError('CMMVC5867E'), Mock()]
         self.svc.create_host(common_settings.HOST_NAME,
                              Initiators([], [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2], []),
-                             array_settings.FC_CONNECTIVITY_TYPE)
+                             array_settings.FC_CONNECTIVITY_TYPE, array_settings.DUMMY_IO_GROUP)
         self.assertEqual(self.svc.client.svctask.mkhost.call_count, 2)
 
     def test_create_host_iscsi_success(self):
         self.svc.create_host(common_settings.HOST_NAME, Initiators([], [], [array_settings.DUMMY_NODE1_IQN]),
-                             array_settings.ISCSI_CONNECTIVITY_TYPE)
+                             array_settings.ISCSI_CONNECTIVITY_TYPE, array_settings.DUMMY_IO_GROUP)
         self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
                                                                iscsiname=array_settings.DUMMY_NODE1_IQN)
 
@@ -2051,21 +2055,21 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.NoPortIsValid):
             self.svc.create_host(common_settings.HOST_NAME,
                                  Initiators([], [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2], []),
-                                 array_settings.FC_CONNECTIVITY_TYPE)
+                                 array_settings.FC_CONNECTIVITY_TYPE, array_settings.DUMMY_IO_GROUP)
         self.assertEqual(self.svc.client.svctask.mkhost.call_count, 2)
 
     def test_create_host_with_connectivity_type_failed(self):
         with self.assertRaises(array_errors.NoPortFoundByConnectivityType):
             self.svc.create_host(common_settings.HOST_NAME,
                                  Initiators([], [], [array_settings.DUMMY_NODE1_IQN]),
-                                 svc_settings.MKHOST_NVME_PROTOCOL_VALUE)
+                                 svc_settings.MKHOST_NVME_PROTOCOL_VALUE, array_settings.DUMMY_IO_GROUP)
         self.svc.client.svctask.mkhost.assert_not_called()
 
     def _test_create_host_mkhost_errors(self, client_error, expected_error, connectivity_type=""):
         self._test_mediator_method_client_error(self.svc.create_host,
                                                 (common_settings.HOST_NAME,
                                                  Initiators([], [], [array_settings.DUMMY_NODE1_IQN]),
-                                                 connectivity_type),
+                                                 connectivity_type, array_settings.DUMMY_IO_GROUP),
                                                 self.svc.client.svctask.mkhost, client_error,
                                                 expected_error)
 
