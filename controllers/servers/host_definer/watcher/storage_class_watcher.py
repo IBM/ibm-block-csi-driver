@@ -49,7 +49,9 @@ class StorageClassWatcher(Watcher):
                 secret_data = self._get_secret_data(secret_name, secret_namespace)
                 if self._is_topology_secret(secret_data):
                     nodes_with_system_id = self._generate_nodes_with_system_id(secret_data)
-                    secret_info = self._generate_secret_info(secret_name, secret_namespace, nodes_with_system_id)
+                    system_ids_topologies = self._generate_secret_system_ids_topologies(secret_data)
+                    secret_info = self._generate_secret_info(
+                        secret_name, secret_namespace, nodes_with_system_id, system_ids_topologies)
                     secrets_info = self._add_secret_info_to_list(secret_info, secrets_info)
                 else:
                     secret_info = self._generate_secret_info(secret_name, secret_namespace)

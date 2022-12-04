@@ -23,7 +23,8 @@ class DefineHostResponse:
 class SecretInfo:
     name: str
     namespace: str
-    nodes_with_system_id: dict = field(default_factory=dict)
+    nodes_with_system_id: dict
+    system_ids_topologies: dict
     managed_storage_classes: int = 0
 
 

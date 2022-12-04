@@ -5,6 +5,7 @@ from munch import Munch
 import json
 
 from controllers.common.csi_logger import get_stdout_logger
+from controllers.servers.settings import SECRET_SUPPORTED_TOPOLOGIES_PARAMETER
 from controllers.servers.utils import (
     validate_secrets, get_array_connection_info_from_secrets, get_system_info_for_topologies)
 from controllers.servers.errors import ValidationException
@@ -384,8 +385,8 @@ class Watcher(KubernetesManager):
     def _loop_forever(self):
         return True
 
-    def _generate_secret_info(self, secret_name, secret_namespace, nodes_with_system_id={}):
-        return SecretInfo(secret_name, secret_namespace, nodes_with_system_id)
+    def _generate_secret_info(self, secret_name, secret_namespace, nodes_with_system_id={}, system_ids_topologies={}):
+        return SecretInfo(secret_name, secret_namespace, nodes_with_system_id, system_ids_topologies)
 
     def _is_secret_managed(self, secret_info):
         _, index = self._get_matching_managed_secret_info(secret_info)
@@ -407,16 +408,6 @@ class Watcher(KubernetesManager):
             nodes_with_system_id[node_info.name] = self._get_system_id_for_node(node_info, secret_config)
         return nodes_with_system_id
 
-    def _get_secret_secret_config(self, secret_data):
-        secret_data = self._convert_secret_config_to_dict(secret_data)
-        return secret_data.get(settings.SECRET_CONFIG_FIELD, {})
-
-    def _convert_secret_config_to_dict(self, secret_data):
-        if settings.SECRET_CONFIG_FIELD in secret_data.keys():
-            if type(secret_data[settings.SECRET_CONFIG_FIELD]) is str:
-                secret_data[settings.SECRET_CONFIG_FIELD] = json.loads(secret_data[settings.SECRET_CONFIG_FIELD])
-        return secret_data
-
     def _get_system_id_for_node(self, node_info, secret_config):
         node_topology_labels = self._get_topology_labels(node_info.labels)
         try:
@@ -437,3 +428,20 @@ class Watcher(KubernetesManager):
             if label.startswith(prefix):
                 return True
         return False
+
+    def _generate_secret_system_ids_topologies(self, secret_data):
+        system_ids_topologies = {}
+        secret_config = self._get_secret_secret_config(secret_data)
+        for system_id, system_info in secret_config.items():
+            system_ids_topologies[system_id] = (system_info.get(SECRET_SUPPORTED_TOPOLOGIES_PARAMETER))
+        return system_ids_topologies
+
+    def _get_secret_secret_config(self, secret_data):
+        secret_data = self._convert_secret_config_to_dict(secret_data)
+        return secret_data.get(settings.SECRET_CONFIG_FIELD, {})
+
+    def _convert_secret_config_to_dict(self, secret_data):
+        if settings.SECRET_CONFIG_FIELD in secret_data.keys():
+            if type(secret_data[settings.SECRET_CONFIG_FIELD]) is str:
+                secret_data[settings.SECRET_CONFIG_FIELD] = json.loads(secret_data[settings.SECRET_CONFIG_FIELD])
+        return secret_data
