@@ -614,6 +614,24 @@ class ArrayMediator(ABC):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def change_host_protocol(self, host_name, protocol):
+        """
+        This function should change the protocol of a host.
+
+        Args:
+           host_name : name of the host in the storage system
+           protocol  : the new protocol
+
+        Returns:
+            None
+
+        Raises:
+            HostNotFoundError
+            UnSupportedParameter
+        """
+        raise NotImplementedError
+
     @property
     @abstractmethod
     def identifier(self):
