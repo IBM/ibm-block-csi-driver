@@ -13,6 +13,7 @@ SECRET_MISSING_TOPOLOGIES_MESSAGE = "secret is missing topologies"
 INVALID_SYSTEM_ID_MESSAGE = "got an invalid system id: {}, validation regex: {}"
 INVALID_JSON_PARAMETER_MESSAGE = "got an invalid json parameter: {}, error: {}."
 INVALID_REPLICATION_COPY_TYPE_MESSAGE = "got an invalid copy type: {}"
+INVALID_EAR_PARAMETER_MESSAGE = "got an invalid parameter: {}"
 SECRET_MISSING_MESSAGE = 'secret is missing'
 CAPABILITIES_NOT_SET_MESSAGE = "capabilities were not set"
 UNSUPPORTED_FS_TYPE_MESSAGE = "unsupported fs_type : {}"
