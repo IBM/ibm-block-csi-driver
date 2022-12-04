@@ -46,6 +46,7 @@ class KubernetesManager():
         for k8s_csi_node in k8s_csi_nodes:
             if self._is_k8s_csi_node_has_driver(k8s_csi_node):
                 csi_nodes_info_with_driver.append(self._generate_csi_node_info(k8s_csi_node))
+        logger.info(messages.CSI_NODES_WITH_IBM_BLOCK_CSI_DRIVER.format(csi_nodes_info_with_driver))
         return csi_nodes_info_with_driver
 
     def _get_k8s_csi_nodes(self):
@@ -172,6 +173,7 @@ class KubernetesManager():
     def _create_host_definition(self, host_definition_manifest):
         try:
             k8s_host_definition = self.host_definitions_api.create(body=host_definition_manifest)
+            logger.info(messages.CREATED_HOST_DEFINITION.format(k8s_host_definition.metadata.name))
             self._add_finalizer(k8s_host_definition.metadata.name)
             return self._generate_host_definition_info(k8s_host_definition)
         except ApiException as ex:
@@ -181,8 +183,7 @@ class KubernetesManager():
 
     def _add_finalizer(self, host_definition_name):
         logger.info(messages.ADD_FINALIZER_TO_HOST_DEFINITION.format(host_definition_name))
-        self._update_finalizer(
-            host_definition_name, [settings.CSI_IBM_FINALIZER, ])
+        self._update_finalizer(host_definition_name, [settings.CSI_IBM_FINALIZER, ])
 
     def _set_host_definition_status(self, host_definition_name, host_definition_phase):
         logger.info(messages.SET_HOST_DEFINITION_STATUS.format(host_definition_name, host_definition_phase))
@@ -287,6 +288,7 @@ class KubernetesManager():
 
     def _get_secret_data(self, secret_name, secret_namespace):
         try:
+            logger.info(messages.READ_SECRET.format(secret_name, secret_namespace))
             secret_data = self.core_api.read_namespaced_secret(name=secret_name, namespace=secret_namespace).data
             return self._change_decode_base64_secret_config(secret_data)
         except ApiException as ex:
@@ -325,6 +327,7 @@ class KubernetesManager():
 
     def _read_node(self, node_name):
         try:
+            logger.info(messages.READ_NODE.format(node_name))
             return self.core_api.read_node(name=node_name)
         except ApiException as ex:
             logger.error(messages.FAILED_TO_GET_NODE.format(node_name, ex.body))

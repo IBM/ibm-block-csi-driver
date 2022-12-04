@@ -10,6 +10,7 @@ from retry import retry
 
 import controllers.array_action.errors as array_errors
 import controllers.array_action.settings as array_settings
+from controllers.array_action import svc_messages
 import controllers.servers.settings as controller_settings
 from controllers.array_action.array_action_types import Volume, Snapshot, Replication, Host
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
@@ -1778,6 +1779,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         for port in ports:
             status_code = self._mkhost(host_name, connectivity_type, port, io_group)
             if status_code == 200:
+                if io_group:
+                    logger.info(svc_messages.CREATE_HOST_WITH_IO_GROUP.format(host_name, port, io_group))
+                else:
+                    logger.info(svc_messages.CREATE_HOST_WITHOUT_IO_GROUP.format(host_name, port))
                 return
         raise array_errors.NoPortIsValid(host_name)
 
@@ -1791,6 +1796,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     def delete_host(self, host_name):
+        logger.info(svc_messages.REMOVE_HOST.format(host_name))
         self._rmhost(host_name)
 
     def _raise_error_when_no_ports_added(self, host_name):
@@ -1813,6 +1819,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def add_ports_to_host(self, host_name, initiators, connectivity_type):
         ports = get_connectivity_type_ports(initiators, connectivity_type)
         for port in ports:
+            logger.info(svc_messages.ADD_PORT_TO_HOST.format(port, host_name))
             self._addhostport(host_name, connectivity_type, port)
         self._raise_error_when_no_ports_added(host_name)
 
@@ -1829,27 +1836,34 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def remove_ports_from_host(self, host_name, ports, connectivity_type):
         for port in ports:
+            logger.info(svc_messages.REMOVE_HOST_PORT.format(port, host_name))
             self._rmhostport(host_name, connectivity_type, port)
 
     def get_host_connectivity_ports(self, host_name, connectivity_type):
         cli_host = self._get_cli_host(host_name)
+        ports = None
         if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
-            return self._get_host_ports(cli_host, HOST_NQN)
+            ports = self._get_host_ports(cli_host, HOST_NQN)
         if connectivity_type == array_settings.FC_CONNECTIVITY_TYPE:
-            return self._get_host_ports(cli_host, HOST_WWPN)
+            ports = self._get_host_ports(cli_host, HOST_WWPN)
         if connectivity_type == array_settings.ISCSI_CONNECTIVITY_TYPE:
-            return self._get_host_ports(cli_host, HOST_ISCSI_NAME)
+            ports = self._get_host_ports(cli_host, HOST_ISCSI_NAME)
+        if ports:
+            logger.info(svc_messages.HOST_PORT_BY_CONNECTIVITY_TYPE.format(host_name, connectivity_type, ports))
+            return ports
         raise array_errors.UnsupportedConnectivityTypeError(connectivity_type)
 
     def get_host_connectivity_type(self, host_name):
+        connectivity_type = None
         cli_host = self._get_cli_host(host_name)
         if hasattr(cli_host, HOST_NQN):
-            return array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE
-        if hasattr(cli_host, HOST_WWPN):
-            return array_settings.FC_CONNECTIVITY_TYPE
-        if hasattr(cli_host, HOST_ISCSI_NAME):
-            return array_settings.ISCSI_CONNECTIVITY_TYPE
-        return None
+            connectivity_type = array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE
+        elif hasattr(cli_host, HOST_WWPN):
+            connectivity_type = array_settings.FC_CONNECTIVITY_TYPE
+        elif hasattr(cli_host, HOST_ISCSI_NAME):
+            connectivity_type = array_settings.ISCSI_CONNECTIVITY_TYPE
+        logger.info(svc_messages.HOST_CONNECTIVITY_TYPE.format(host_name, connectivity_type))
+        return connectivity_type
 
     def _raise_io_group_error(self, host_name, io_group, error_message):
         self._raise_host_not_found_error(host_name, error_message)
@@ -1870,6 +1884,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def add_io_group_to_host(self, host_name, io_group):
         if not io_group:
             return
+        logger.info(svc_messages.REMOVE_HOST_IO_GROUP.format(io_group, host_name))
         self._addhostiogrp(host_name, io_group)
 
     def _rmhostiogrp(self, host_name, io_group):
@@ -1887,6 +1902,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def remove_io_group_from_host(self, host_name, io_group):
         if not io_group:
             return
+        logger.info(svc_messages.REMOVE_HOST_IO_GROUP.format(io_group, host_name))
         self._rmhostiogrp(host_name, io_group)
 
     def _lshostiogrp(self, host_name):
@@ -1901,7 +1917,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     def get_host_io_group(self, host_name):
+        logger.info(svc_messages.GET_HOST_IO_GROUP.format(host_name))
         io_group = self._lshostiogrp(host_name)
         io_group.id = split_string(io_group.id)
         io_group.name = split_string(io_group.name)
+        logger.info(svc_messages.HOST_IO_GROUP_IDS.format(host_name, io_group.id))
         return io_group
