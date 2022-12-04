@@ -1936,13 +1936,16 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if NOT_SUPPORTED_PARAMETER in error_message:
             raise array_errors.UnSupportedParameter(parameter)
 
+    def _raise_error_when_host_not_found(self, host_name, error_message):
+        if OBJ_NOT_FOUND in error_message:
+            raise array_errors.HostNotFoundError(host_name)
+
     def _chhost(self, host_name, protocol):
         cli_kwargs = build_change_host_protocol_kwargs(host_name, protocol)
         try:
             self.client.svctask.chhost(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if OBJ_NOT_FOUND in ex.my_message:
-                raise array_errors.HostNotFoundError(host_name)
+            self._raise_error_when_host_not_found(host_name, ex.my_message)
             self._raise_unsupported_parameter_error(ex.my_message, 'protocol')
             if is_warning_message(ex.my_message):
                 logger.warning("exception encountered during getting io_group, from host {} : {}".format(
