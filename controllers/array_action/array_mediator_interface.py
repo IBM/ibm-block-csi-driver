@@ -629,6 +629,7 @@ class ArrayMediator(ABC):
         Raises:
             HostNotFoundError
             UnSupportedParameter
+            CannotChangeHostProtocolBecauseOfMappedPorts
         """
         raise NotImplementedError
 
