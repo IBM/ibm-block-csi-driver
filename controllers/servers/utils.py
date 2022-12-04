@@ -592,15 +592,18 @@ def validate_addons_request(request, replication_type):
 
     logger.debug("addons request validation finished")
 
+
 def _validate_addons_request_for_replication_id(request):
     if request.replication_id != "":
         raise ValidationException(messages.INVALID_EAR_PARAMETER_MESSAGE.format(
             servers_settings.PARAMETERS_REPLICATION_HANDLE))
 
+
 def _validate_addons_request_for_system_id(request):
     if request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID):
         raise ValidationException(messages.INVALID_EAR_PARAMETER_MESSAGE.format(
             servers_settings.PARAMETERS_SYSTEM_ID))
+
 
 def get_addons_replication_type(request):
     if servers_settings.PARAMETERS_REPLICATION_POLICY in request.parameters:
