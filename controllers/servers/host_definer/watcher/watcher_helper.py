@@ -5,7 +5,8 @@ from munch import Munch
 import json
 
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.utils import validate_secrets, get_array_connection_info_from_secrets
+from controllers.servers.utils import (
+    validate_secrets, get_array_connection_info_from_secrets, get_system_info_for_topologies)
 from controllers.servers.errors import ValidationException
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
@@ -300,19 +301,6 @@ class Watcher(KubernetesManager):
             return self._get_array_connection_info_from_secret_data(secret_data, node_topology_labels)
         return {}
 
-    def _get_topology_labels(self, labels):
-        topology_labels = {}
-        for label in labels:
-            if self._is_topology_label(label):
-                topology_labels[label] = labels[label]
-        return topology_labels
-
-    def _is_topology_label(self, label):
-        for prefix in settings.TOPOLOGY_PREFIXES:
-            if label.startswith(prefix):
-                return True
-        return False
-
     def _get_array_connection_info_from_secret_data(self, secret_data, labels):
         try:
             secret_data = self._convert_secret_config_to_string(secret_data)
@@ -410,3 +398,42 @@ class Watcher(KubernetesManager):
             if managed_secret_info.name == secret_info.name and managed_secret_info.namespace == secret_info.namespace:
                 return managed_secret_info, index
         return secret_info, -1
+
+    def _generate_nodes_with_system_id(self, secret_data):
+        nodes_with_system_id = {}
+        secret_config = self._get_secret_secret_config(secret_data)
+        nodes_info = self._get_nodes_info()
+        for node_info in nodes_info:
+            nodes_with_system_id[node_info.name] = self._get_system_id_for_node(node_info, secret_config)
+        return nodes_with_system_id
+
+    def _get_secret_secret_config(self, secret_data):
+        secret_data = self._convert_secret_config_to_dict(secret_data)
+        return secret_data.get(settings.SECRET_CONFIG_FIELD, {})
+
+    def _convert_secret_config_to_dict(self, secret_data):
+        if settings.SECRET_CONFIG_FIELD in secret_data.keys():
+            if type(secret_data[settings.SECRET_CONFIG_FIELD]) is str:
+                secret_data[settings.SECRET_CONFIG_FIELD] = json.loads(secret_data[settings.SECRET_CONFIG_FIELD])
+        return secret_data
+
+    def _get_system_id_for_node(self, node_info, secret_config):
+        node_topology_labels = self._get_topology_labels(node_info.labels)
+        try:
+            _, system_id = get_system_info_for_topologies(secret_config, node_topology_labels)
+        except ValidationException:
+            return ''
+        return system_id
+
+    def _get_topology_labels(self, labels):
+        topology_labels = {}
+        for label in labels:
+            if self._is_topology_label(label):
+                topology_labels[label] = labels[label]
+        return topology_labels
+
+    def _is_topology_label(self, label):
+        for prefix in settings.TOPOLOGY_PREFIXES:
+            if label.startswith(prefix):
+                return True
+        return False
