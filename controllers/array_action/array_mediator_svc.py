@@ -48,6 +48,7 @@ NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND = 'CMMVC5860E'
 NOT_ENOUGH_EXTENTS_IN_POOL_CREATE = 'CMMVC8710E'
 NOT_VALID_IO_GROUP = 'CMMVC5729E'
 NOT_SUPPORTED_PARAMETER = 'CMMVC5709E'
+CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS = 'CMMVC9331E'
 
 HOST_NQN = 'nqn'
 HOST_WWPN = 'WWPN'
@@ -1932,13 +1933,17 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.info(svc_messages.HOST_IO_GROUP_IDS.format(host_name, io_group.id))
         return io_group
 
+    def _raise_error_when_host_not_found(self, host_name, error_message):
+        if OBJ_NOT_FOUND in error_message:
+            raise array_errors.HostNotFoundError(host_name)
+
     def _raise_unsupported_parameter_error(self, error_message, parameter):
         if NOT_SUPPORTED_PARAMETER in error_message:
             raise array_errors.UnSupportedParameter(parameter)
 
-    def _raise_error_when_host_not_found(self, host_name, error_message):
-        if OBJ_NOT_FOUND in error_message:
-            raise array_errors.HostNotFoundError(host_name)
+    def _raise_error_when_cannot_change_host_protocol_because_of_mapped_ports(self, host_name, error_message):
+        if CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS in error_message:
+            raise array_errors.CannotChangeHostProtocolBecauseOfMappedPorts(host_name)
 
     def _chhost(self, host_name, protocol):
         cli_kwargs = build_change_host_protocol_kwargs(host_name, protocol)

@@ -83,4 +83,7 @@ ALL_THE_PORTS_FOR_HOST_ARE_INVALID = "All the ports for host {} are already assi
 
 IO_GROUP_IS_NOT_VALID = "IO group {} is not valid"
 
-UN_SUPPORTED_PARAMETER = "The parameter {} is not a supported parameter"
+UNSUPPORTED_PARAMETER = "The parameter {} is not a supported parameter"
+
+CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS = "The host protocol cannot be changed"\
+    " because the host {} has ports configured."
