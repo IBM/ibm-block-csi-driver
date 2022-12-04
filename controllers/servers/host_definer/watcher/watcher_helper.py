@@ -265,7 +265,7 @@ class Watcher(KubernetesManager):
             request, host_definition_info.secret_name, host_definition_info.secret_namespace, node_info.labels)
         if request:
             request.node_id_from_host_definition = host_definition_info.node_id
-            request.node_id_from_csi_node = NODES[host_definition_info.node_name]
+            request.node_id_from_csi_node = self._get_node_id_by_node(host_definition_info)
         return request
 
     def _get_new_request(self, labels):
@@ -339,6 +339,12 @@ class Watcher(KubernetesManager):
         for index, base64_content in enumerate(list_with_base64):
             list_with_base64[index] = self._decode_base64_to_string(base64_content)
         return list_with_base64
+
+    def _get_node_id_by_node(self, host_definition_info):
+        try:
+            return NODES[host_definition_info.node_name]
+        except Exception:
+            return host_definition_info.node_id
 
     def _get_host_definition_name(self, node_name):
         return '{0}-{1}'.format(node_name, self._get_random_string()).replace('_', '.')
