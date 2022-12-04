@@ -1941,7 +1941,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if NOT_SUPPORTED_PARAMETER in error_message:
             raise array_errors.UnSupportedParameter(parameter)
 
-    def _raise_error_when_cannot_change_host_protocol_because_of_mapped_ports(self, host_name, error_message):
+    def _raise_error_when_cannot_change_host_protocol_because_of_mapped_ports(self, error_message, host_name):
         if CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS in error_message:
             raise array_errors.CannotChangeHostProtocolBecauseOfMappedPorts(host_name)
 
@@ -1952,6 +1952,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             self._raise_error_when_host_not_found(host_name, ex.my_message)
             self._raise_unsupported_parameter_error(ex.my_message, 'protocol')
+            self._raise_error_when_cannot_change_host_protocol_because_of_mapped_ports(ex.my_message, host_name)
             if is_warning_message(ex.my_message):
                 logger.warning("exception encountered during getting io_group, from host {} : {}".format(
                     host_name, ex.my_message))
