@@ -46,13 +46,15 @@ class BaseReplicationSetUp(unittest.TestCase):
             replication = None
         self.mediator.get_replication.return_value = replication
 
-    def _prepare_request_params(self, replication_type, replication_name=REPLICATION_NAME):
+    def _prepare_request_params(self, replication_type, replication_name=REPLICATION_NAME,
+                                replication_id=""):
         if replication_type == REPLICATION_TYPE_MIRROR:
             self.request.parameters = {PARAMETERS_SYSTEM_ID: SYSTEM_ID,
                                        PARAMETERS_COPY_TYPE: COPY_TYPE}
             replication_request = ReplicationRequest(OBJECT_INTERNAL_ID, OTHER_OBJECT_INTERNAL_ID, SYSTEM_ID, COPY_TYPE,
                                                      REPLICATION_TYPE_MIRROR)
         else:
+            self.request.replication_id = replication_id
             self.request.parameters = {PARAMETERS_REPLICATION_POLICY: replication_name}
             replication_request = ReplicationRequest(OBJECT_INTERNAL_ID, None, None, REPLICATION_COPY_TYPE_SYNC,
                                                      REPLICATION_TYPE_EAR, replication_name)
@@ -84,12 +86,13 @@ class TestEnableVolumeReplication(BaseReplicationSetUp, CommonControllerTest):
         self.mediator.get_replication.assert_called_once_with(replication_request)
         self.mediator.create_replication.assert_called_once_with(replication_request)
 
-    def _test_enable_replication_no_volume_fails(self):
-        self.mediator.get_object_by_id.return_value = None
+    def _test_enable_replication_fails(self, replication_type, replication_id, grpc_status):
+        self._prepare_request_params(replication_type=replication_type, replication_id=replication_id)
+        self._prepare_replication_mocks(replication_type)
 
         self.servicer.EnableVolumeReplication(self.request, self.context)
 
-        self.assertEqual(grpc.StatusCode.NOT_FOUND, self.context.code)
+        self.assertEqual(grpc_status, self.context.code)
         self.mediator.get_replication.assert_not_called()
         self.mediator.create_replication.assert_not_called()
 
@@ -116,7 +119,8 @@ class TestEnableVolumeReplication(BaseReplicationSetUp, CommonControllerTest):
                                                   grpc_status=grpc.StatusCode.ALREADY_EXISTS)
 
     def test_enable_replication_no_volume_fails(self):
-        self._test_enable_replication_no_volume_fails()
+        self.mediator.get_object_by_id.return_value = None
+        self._test_enable_replication_fails(REPLICATION_TYPE_MIRROR, "", grpc.StatusCode.NOT_FOUND)
 
     def test_enable_replication_already_processing(self):
         self._test_request_already_processing("volume_id", self.request.volume_id)
@@ -126,6 +130,10 @@ class TestEnableVolumeReplication(BaseReplicationSetUp, CommonControllerTest):
 
     def test_enable_replication_with_array_connection_exception(self):
         self._test_request_with_array_connection_exception()
+
+    def test_enable_ear_replication_obsolete_request_parameters_fails(self):
+        replication_id = "{}:{};{}".format("A9000", OTHER_OBJECT_INTERNAL_ID, VOLUME_UID)
+        self._test_enable_replication_fails(REPLICATION_TYPE_EAR, replication_id, grpc.StatusCode.INVALID_ARGUMENT)
 
     def test_enable_ear_replication_succeeds(self):
         self._test_enable_replication_succeeds(REPLICATION_TYPE_EAR)
