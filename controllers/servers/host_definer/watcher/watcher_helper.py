@@ -1,4 +1,3 @@
-import base64
 import os
 import random
 import string
@@ -279,24 +278,6 @@ class Watcher(KubernetesManager):
             SECRET_USERNAME_PARAMETER: self._decode_base64_to_string(secret_data[SECRET_USERNAME_PARAMETER]),
             SECRET_PASSWORD_PARAMETER: self._decode_base64_to_string(secret_data[SECRET_PASSWORD_PARAMETER])
         }
-
-    def _decode_base64_to_string(self, content_with_base64):
-        if not self._is_base64(content_with_base64):
-            return content_with_base64
-        base64_bytes = content_with_base64.encode('ascii')
-        decoded_string_in_bytes = base64.b64decode(base64_bytes)
-        return decoded_string_in_bytes.decode('ascii')
-
-    def _is_base64(self, content_with_base64):
-        try:
-            if isinstance(content_with_base64, str):
-                string_in_bytes = bytes(content_with_base64, 'ascii')
-            else:
-                raise TypeError(messages.INVALID_SECRET_CONTENT_TYPE.format(
-                    content_with_base64, type(content_with_base64)))
-            return base64.b64encode(base64.b64decode(string_in_bytes)) == string_in_bytes
-        except Exception:
-            return False
 
     def _get_host_definition_name(self, node_name):
         return '{0}-{1}'.format(node_name, self._get_random_string()).replace('_', '.')

@@ -27,8 +27,11 @@ class TestAddInitialNodes(NodeWatcherBase):
         self._prepare_default_mocks_for_node()
         self.node_watcher.csi_nodes_api.get.return_value = test_utils.get_fake_k8s_csi_node(
             test_settings.FAKE_CSI_PROVISIONER)
+        self.os.getenv.side_effect = [test_settings.TRUE_STRING, test_settings.FAKE_PREFIX,
+                                      '', test_settings.TRUE_STRING, test_settings.TRUE_STRING]
         self.node_watcher.add_initial_nodes()
-        self.node_watcher.storage_host_servicer.undefine_host.assert_not_called()
+        self.node_watcher.storage_host_servicer.undefine_host.assert_called_once_with(test_utils.get_define_request(
+            prefix=test_settings.FAKE_PREFIX, node_id_from_host_definition=test_settings.FAKE_NODE_ID))
 
     def test_if_detect_unmanaged_node_with_csi_node(self):
         self._prepare_default_mocks_for_node()
@@ -44,6 +47,8 @@ class TestAddInitialNodes(NodeWatcherBase):
         self.node_watcher.core_api.read_node.return_value = self.k8s_node_with_manage_node_label
         self.node_watcher.host_definitions_api.get.return_value = self.ready_k8s_host_definitions
         self.os.getenv.return_value = test_settings.TRUE_STRING
+        self.node_watcher.core_api.read_namespaced_secret.return_value = test_utils.get_fake_k8s_secret()
+        self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_settings.FAKE_NODE_ID
 
 
 class TestWatchNodesResources(NodeWatcherBase):
