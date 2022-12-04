@@ -1932,9 +1932,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.info(svc_messages.HOST_IO_GROUP_IDS.format(host_name, io_group.id))
         return io_group
 
-    def _raise_unsupported_parameter_error(self, ex):
-        if NOT_SUPPORTED_PARAMETER in ex.my_message:
-            raise array_errors.UnSupportedParameter('protocol')
+    def _raise_unsupported_parameter_error(self, error_message, parameter):
+        if NOT_SUPPORTED_PARAMETER in error_message:
+            raise array_errors.UnSupportedParameter(parameter)
 
     def _chhost(self, host_name, protocol):
         cli_kwargs = build_change_host_protocol_kwargs(host_name, protocol)
@@ -1943,7 +1943,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if OBJ_NOT_FOUND in ex.my_message:
                 raise array_errors.HostNotFoundError(host_name)
-            self._raise_unsupported_parameter_error(ex)
+            self._raise_unsupported_parameter_error(ex.my_message, 'protocol')
             if is_warning_message(ex.my_message):
                 logger.warning("exception encountered during getting io_group, from host {} : {}".format(
                     host_name, ex.my_message))
