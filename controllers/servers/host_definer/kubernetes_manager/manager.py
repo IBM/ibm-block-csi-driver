@@ -66,9 +66,7 @@ class KubernetesManager():
             return []
 
     def _generate_node_info(self, k8s_node):
-        node_info = NodeInfo()
-        node_info.name = k8s_node.metadata.name
-        return node_info
+        return NodeInfo(k8s_node.metadata.name, k8s_node.metadata.labels)
 
     def _get_storage_classes_info(self):
         try:
@@ -290,7 +288,7 @@ class KubernetesManager():
 
         return body
 
-    def _get_data_from_secret(self, secret_name, secret_namespace):
+    def _get_secret_data(self, secret_name, secret_namespace):
         try:
             return self.core_api.read_namespaced_secret(name=secret_name, namespace=secret_namespace).data
         except ApiException as ex:
@@ -298,7 +296,7 @@ class KubernetesManager():
                 logger.error(messages.SECRET_DOES_NOT_EXIST.format(secret_name, secret_namespace))
             else:
                 logger.error(messages.FAILED_TO_GET_SECRET.format(secret_name, secret_namespace, ex.body))
-            return None
+            return {}
 
     def _read_node(self, node_name):
         try:

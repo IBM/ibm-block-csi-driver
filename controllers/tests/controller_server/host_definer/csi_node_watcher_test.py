@@ -17,7 +17,7 @@ class CsiNodeWatcherBase(BaseSetUp):
         self.updated_daemon_set = test_utils.get_fake_k8s_daemon_set_items(1, 1)
         self.not_updated_daemon_set = test_utils.get_fake_k8s_daemon_set_items(0, 1)
         self.deleted_daemon_set = test_utils.get_fake_k8s_daemon_set_items(0, 0)
-        self.secret_ids_on_csi_node_watcher = test_utils.patch_secret_ids_global_variable(
+        self.managed_secrets_on_csi_node_watcher = test_utils.patch_managed_secrets_global_variable(
             test_settings.CSI_NODE_WATCHER_PATH)
 
 
@@ -104,7 +104,7 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
     def _prepare_mocks_for_updated_csi_node(self):
         self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_settings.FAKE_NODE_ID
         self.nodes_on_csi_node_watcher[test_settings.FAKE_NODE_NAME] = test_settings.FAKE_NODE_ID
-        self.secret_ids_on_csi_node_watcher[test_settings.FAKE_SECRET_ID] = 1
+        self.managed_secrets_on_csi_node_watcher.append(test_utils.get_fake_secret_info())
         self.csi_node_watcher.csi_nodes_api.watch.return_value = iter(
             [test_utils.get_fake_csi_node_watch_event(test_settings.DELETED_EVENT_TYPE)])
         self.csi_node_watcher.core_api.read_node.return_value = self.k8s_node_with_manage_node_label
@@ -189,7 +189,7 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
         self.csi_node_watcher.core_api.read_namespaced_secret.return_value = test_utils.get_fake_k8s_secret()
         self.csi_node_watcher.csi_nodes_api.get.return_value = test_utils.get_fake_k8s_csi_node(
             test_settings.CSI_PROVISIONER_NAME)
-        self.secret_ids_on_csi_node_watcher[test_settings.FAKE_SECRET_ID] = 1
+        self.managed_secrets_on_csi_node_watcher.append(test_utils.get_fake_secret_info())
 
     def test_define_host_called_on_new_csi_node(self):
         self._prepare_default_mocks_for_modified_event()
@@ -223,7 +223,7 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
 
     def _prepare_default_mocks_for_modified_event(self):
         self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_settings.FAKE_NODE_ID
-        self.secret_ids_on_watcher_helper[test_settings.FAKE_SECRET_ID] = 1
+        self.managed_secrets_on_watcher_helper.append(test_utils.get_fake_secret_info())
         self.csi_node_watcher.csi_nodes_api.watch.return_value = iter(
             [test_utils.get_fake_csi_node_watch_event(test_settings.MODIFIED_EVENT_TYPE)])
         self.os.getenv.return_value = test_settings.TRUE_STRING

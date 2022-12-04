@@ -2,7 +2,7 @@ from kubernetes import watch
 
 import controllers.servers.host_definer.messages as messages
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.host_definer.watcher.watcher_helper import Watcher, SECRET_IDS
+from controllers.servers.host_definer.watcher.watcher_helper import Watcher
 from controllers.servers.host_definer.types import SecretInfo
 from controllers.servers.host_definer import settings
 
@@ -18,23 +18,19 @@ class SecretWatcher(Watcher):
                                           resource_version=resource_version, timeout_seconds=5)
             for watch_event in stream:
                 watch_event = self._munch(watch_event)
-                secret_info = self._generate_secret_info(watch_event.object)
-                if self._is_secret_used_by_storage_class(secret_info):
+                secret_info = self._generate_k8s_secret_to_secret_info(watch_event.object, {})
+                if self._is_secret_managed(secret_info):
                     self._handle_storage_class_secret(secret_info, watch_event.type)
 
-    def _generate_secret_info(self, k8s_secret):
-        secret_info = SecretInfo()
-        secret_info.name = k8s_secret.metadata.name
-        secret_info.namespace = k8s_secret.metadata.namespace
-        return secret_info
-
-    def _is_secret_used_by_storage_class(self, secret_info):
-        return self._generate_secret_id(secret_info.name, secret_info.namespace) in SECRET_IDS
+    def _generate_k8s_secret_to_secret_info(self, k8s_secret, nodes_with_system_id):
+        return SecretInfo(k8s_secret.metadata.name, k8s_secret.metadata.namespace)
 
     def _handle_storage_class_secret(self, secret_info, watch_event_type):
-        secret_id = self._generate_secret_id(secret_info.name, secret_info.namespace)
+        managed_secret_info, _ = self._get_matching_managed_secret_info(secret_info)
+        if not managed_secret_info:
+            return
         if watch_event_type in (settings.ADDED_EVENT, settings.MODIFIED_EVENT) and \
-                SECRET_IDS[secret_id] > 0:
+                managed_secret_info.managed_storage_classes > 0:
             self._define_host_after_watch_event(secret_info)
 
     def _define_host_after_watch_event(self, secret_info):

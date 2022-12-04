@@ -18,7 +18,7 @@ import controllers.common.settings as common_settings
 from controllers.servers.host_definer.types import DefineHostRequest, DefineHostResponse, HostDefinitionInfo, SecretInfo
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
 
-SECRET_IDS = {}
+MANAGED_SECRETS = []
 NODES = {}
 logger = get_stdout_logger()
 
@@ -29,22 +29,16 @@ class Watcher(KubernetesManager):
         self.storage_host_servicer = HostDefinerServicer()
 
     def _define_host_on_all_storages(self, node_name):
-        for secret_id, storage_classes_using_this_secret in SECRET_IDS.items():
-            if storage_classes_using_this_secret == 0:
+        for secret_info in MANAGED_SECRETS:
+            if secret_info.managed_storage_classes == 0:
                 continue
-            host_definition_info = self._get_host_definition_info_from_secret_and_node_name(node_name, secret_id)
+            host_definition_info = self._get_host_definition_info_from_secret_and_node_name(node_name, secret_info)
             self._create_definition(host_definition_info)
 
-    def _get_host_definition_info_from_secret_and_node_name(self, node_name, secret_id):
-        secret_info = self._generate_secret_info_from_id(secret_id)
+    def _get_host_definition_info_from_secret_and_node_name(self, node_name, secret_info):
         host_definition_info = self._get_host_definition_info_from_secret(secret_info)
         host_definition_info = self._add_name_to_host_definition_info(node_name, host_definition_info)
         return host_definition_info
-
-    def _generate_secret_info_from_id(self, secret_id):
-        secret_info = SecretInfo()
-        secret_info.name, secret_info.namespace = secret_id
-        return secret_info
 
     def _get_host_definition_info_from_secret(self, secret_info):
         host_definition_info = HostDefinitionInfo()
@@ -260,7 +254,7 @@ class Watcher(KubernetesManager):
         return k8s_node.metadata.labels.get(label)
 
     def _get_array_connection_info_from_secret(self, secret_name, secret_namespace):
-        secret_data = self._get_data_from_secret(secret_name, secret_namespace)
+        secret_data = self._get_secret_data(secret_name, secret_namespace)
         return self._get_array_connection_info_from_secret_data(secret_data)
 
     def _get_array_connection_info_from_secret_data(self, secret_data):
@@ -348,11 +342,23 @@ class Watcher(KubernetesManager):
                 node_host_definitions_info.append(host_definition_info)
         return node_host_definitions_info
 
-    def _generate_secret_id(self, secret_name, secret_namespace):
-        return (secret_name, secret_namespace)
-
     def _munch(self, watch_event):
         return Munch.fromDict(watch_event)
 
     def _loop_forever(self):
         return True
+
+    def _generate_secret_info(self, secret_name, secret_namespace, nodes_with_system_id={}):
+        return SecretInfo(secret_name, secret_namespace, nodes_with_system_id)
+
+    def _is_secret_managed(self, secret_info):
+        _, index = self._get_matching_managed_secret_info(secret_info)
+        if index != -1:
+            return True
+        return False
+
+    def _get_matching_managed_secret_info(self, secret_info):
+        for index, managed_secret_info in enumerate(MANAGED_SECRETS):
+            if managed_secret_info.name == secret_info.name and managed_secret_info.namespace == secret_info.namespace:
+                return managed_secret_info, index
+        return secret_info, -1

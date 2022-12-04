@@ -21,8 +21,10 @@ class DefineHostResponse:
 
 @dataclass
 class SecretInfo:
-    name: str = ''
-    namespace: str = ''
+    name: str
+    namespace: str
+    nodes_with_system_id: dict = field(default_factory=dict)
+    managed_storage_classes: int = 0
 
 
 @dataclass
@@ -54,7 +56,8 @@ class PodInfo:
 
 @dataclass
 class NodeInfo:
-    name: str = ''
+    name: str
+    labels: dict
 
 
 @dataclass
