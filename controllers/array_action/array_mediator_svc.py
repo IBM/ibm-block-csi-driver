@@ -1310,13 +1310,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                            replication_type=array_settings.REPLICATION_TYPE_MIRROR,
                            is_primary=is_primary)
 
-    def _generate_ear_replication_response(self, volume_group_id, replication_mode):
-        name = volume_group_id
+    def _generate_ear_replication_response(self, volume_group_id, replication_mode, replication_policy):
         copy_type = array_settings.REPLICATION_COPY_TYPE_ASYNC
         is_ready = True
         is_primary = (replication_mode == array_settings.ENDPOINT_TYPE_PRODUCTION)
 
-        return Replication(name=name,
+        return Replication(name=replication_policy,
                            copy_type=copy_type,
                            is_ready=is_ready,
                            replication_type=array_settings.REPLICATION_TYPE_EAR,
@@ -1395,7 +1394,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return None
         logger.info("found ear replication: {} in mode: {}".format(volume_group_id,
                                                                    replication_mode))
-        return self._generate_ear_replication_response(volume_group_id, replication_mode)
+        return self._generate_ear_replication_response(volume_group_id, replication_mode,
+                                                       replication_request.replication_policy)
 
     def _get_replication_mode(self, volume_group_id):
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
