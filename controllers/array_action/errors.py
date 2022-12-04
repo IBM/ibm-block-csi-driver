@@ -280,3 +280,9 @@ class IoGroupIsInValid(BaseArrayActionException):
     def __init__(self, io_group):
         super().__init__()
         self.message = messages.IO_GROUP_IS_NOT_VALID.format(io_group)
+
+class UnSupportedParameter(BaseArrayActionException):
+    
+    def __init__(self, parameter):
+        super().__init__()
+        self.message = messages.UN_SUPPORTED_PARAMETER.format(parameter)

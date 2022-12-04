@@ -47,6 +47,7 @@ NOT_REDUCTION_POOL = 'CMMVC9301E'
 NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND = 'CMMVC5860E'
 NOT_ENOUGH_EXTENTS_IN_POOL_CREATE = 'CMMVC8710E'
 NOT_VALID_IO_GROUP = 'CMMVC5729E'
+NOT_SUPPORTED_PARAMETER = 'CMMVC5709E'
 
 HOST_NQN = 'nqn'
 HOST_WWPN = 'WWPN'
@@ -180,6 +181,13 @@ def build_stop_replication_kwargs(rcrelationship_id, add_access):
     if add_access:
         cli_kwargs.update({'access': True})
     return cli_kwargs
+
+
+def build_change_host_protocol_kwargs(host_name, protocol):
+    return {
+        'object_id': host_name,
+        'protocol': protocol
+    }
 
 
 def _get_cli_volume_space_efficiency_aliases(cli_volume):
@@ -1924,5 +1932,27 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.info(svc_messages.HOST_IO_GROUP_IDS.format(host_name, io_group.id))
         return io_group
 
+    def _raise_unsupported_parameter_error(self, ex):
+        if NOT_SUPPORTED_PARAMETER in ex.my_message:
+            raise array_errors.UnSupportedParameter('protocol')
+
+    def _chhost(self, host_name, protocol):
+        cli_kwargs = build_change_host_protocol_kwargs(host_name, protocol)
+        try:
+            self.client.svctask.chhost(**cli_kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if OBJ_NOT_FOUND in ex.my_message:
+                raise array_errors.HostNotFoundError(host_name)
+            self._raise_unsupported_parameter_error(ex)
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during getting io_group, from host {} : {}".format(
+                    host_name, ex.my_message))
+            raise ex
+
     def change_host_protocol(self, host_name, protocol):
-        raise NotImplementedError
+        try:
+            self._chhost(host_name, protocol)
+        except array_errors.UnSupportedParameter:
+            logger.info("Could not change host [{}] protocol,"
+                        " because protocol parameter for chhost command is not supported in this array,"
+                        " changing the host protocol by deleting it and creating it again".format(host_name))
