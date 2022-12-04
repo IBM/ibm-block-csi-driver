@@ -1115,7 +1115,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.debug("The chosen available lun is : {0}".format(lun))
         return lun
 
-    def _raise_host_not_found_error(self, host_name, error_message):
+    def _raise_error_when_host_not_exist_or_not_meet_the_rules(self, host_name, error_message):
         if NAME_NOT_EXIST_OR_MEET_RULES in error_message:
             raise array_errors.HostNotFoundError(host_name)
 
@@ -1142,7 +1142,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             else:
                 logger.error("Map volume {0} to host {1} failed. Reason "
                              "is: {2}".format(volume_name, host_name, ex))
-                self._raise_host_not_found_error(host_name, ex.my_message)
+                self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, ex.my_message)
                 if SPECIFIED_OBJ_NOT_EXIST in ex.my_message:
                     raise array_errors.ObjectNotFoundError(volume_name)
                 if LUN_ALREADY_IN_USE in ex.my_message:
@@ -1173,7 +1173,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             else:
                 logger.error("unmapping volume {0} from host {1} failed. Reason "
                              "is: {2}".format(volume_name, host_name, ex))
-                self._raise_host_not_found_error(host_name, ex.my_message)
+                self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, ex.my_message)
                 if OBJ_NOT_FOUND in ex.my_message:
                     raise array_errors.ObjectNotFoundError(volume_name)
                 if VOL_ALREADY_UNMAPPED in ex.my_message:
@@ -1852,7 +1852,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         return None
 
     def _raise_io_group_error(self, host_name, io_group, error_message):
-        self._raise_host_not_found_error(host_name, error_message)
+        self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, error_message)
         self._raise_invalid_io_group(io_group, error_message)
 
     def _addhostiogrp(self, host_name, io_group):
@@ -1893,7 +1893,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         try:
             return self.client.svcinfo.lshostiogrp(object_id=host_name).as_single_element
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            self._raise_host_not_found_error(host_name, ex.my_message)
+            self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, ex.my_message)
             if is_warning_message(ex.my_message):
                 logger.warning("exception encountered during getting io_group, from host {} : {}".format(
                     host_name, ex.my_message))
