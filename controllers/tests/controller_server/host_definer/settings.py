@@ -8,7 +8,6 @@ CSI_NODE_NODE_ID_FIELD = 'nodeID'
 CSI_PROVISIONER_NAME = 'block.csi.ibm.com'
 FAKE_SECRET = 'fake_secret'
 FAKE_SECRET_NAMESPACE = 'fake_secret_namespace'
-FAKE_SECRET_ID = (FAKE_SECRET, FAKE_SECRET_NAMESPACE)
 FAKE_NODE_NAME = 'fake_node_name'
 FAKE_DAEMON_SET_NAME = 'fake_daemon_set_name'
 FAKE_NODE_PODS_NAME = '{}-jdf5g'.format(FAKE_DAEMON_SET_NAME)

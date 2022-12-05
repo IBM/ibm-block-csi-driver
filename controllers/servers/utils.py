@@ -34,7 +34,7 @@ def _parse_raw_json(raw_json):
     return parsed_json
 
 
-def _is_topology_match(system_topologies, node_topologies):
+def is_topology_match(system_topologies, node_topologies):
     for topologies in system_topologies:
         logger.debug(
             "Comparing topologies: system topologies: {},"
@@ -54,10 +54,10 @@ def get_volume_topologies(request):
     return None
 
 
-def _get_system_info_for_topologies(secrets_config, node_topologies):
+def get_system_info_for_topologies(secrets_config, node_topologies):
     for system_id, system_info in secrets_config.items():
         system_topologies = system_info.get(servers_settings.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
-        if _is_topology_match(system_topologies, node_topologies):
+        if is_topology_match(system_topologies, node_topologies):
             return system_info, system_id
     raise ValidationException(messages.NO_SYSTEM_MATCH_REQUESTED_TOPOLOGIES.format(node_topologies))
 
@@ -70,8 +70,8 @@ def _get_system_info_from_secrets(secrets, topologies=None, system_id=None):
         if system_id:
             system_info = secrets_config.get(system_id)
         elif topologies:
-            system_info, system_id = _get_system_info_for_topologies(secrets_config=secrets_config,
-                                                                     node_topologies=topologies)
+            system_info, system_id = get_system_info_for_topologies(secrets_config=secrets_config,
+                                                                    node_topologies=topologies)
         else:
             raise ValidationException(messages.INSUFFICIENT_DATA_TO_CHOOSE_A_STORAGE_SYSTEM_MESSAGE)
     return system_info, system_id
@@ -577,6 +577,11 @@ def validate_addons_request(request, replication_type):
     if request.volume_id == "" or (replication_type == REPLICATION_TYPE_MIRROR and request.replication_id == ""):
         raise ValidationException(messages.VOLUME_ID_SHOULD_NOT_BE_EMPTY_MESSAGE)
 
+    if replication_type == REPLICATION_TYPE_EAR:
+        logger.debug("validating obsolete non-EAR parameters")
+        _validate_addons_request_for_replication_id(request)
+        _validate_addons_request_for_system_id(request)
+
     logger.debug("validating copy type")
     if servers_settings.PARAMETERS_COPY_TYPE in request.parameters:
         copy_type = request.parameters.get(servers_settings.PARAMETERS_COPY_TYPE)
@@ -586,6 +591,18 @@ def validate_addons_request(request, replication_type):
     validate_secrets(request.secrets)
 
     logger.debug("addons request validation finished")
+
+
+def _validate_addons_request_for_replication_id(request):
+    if request.replication_id != "":
+        raise ValidationException(messages.INVALID_EAR_PARAMETER_MESSAGE.format(
+            servers_settings.PARAMETERS_REPLICATION_HANDLE))
+
+
+def _validate_addons_request_for_system_id(request):
+    if request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID):
+        raise ValidationException(messages.INVALID_EAR_PARAMETER_MESSAGE.format(
+            servers_settings.PARAMETERS_SYSTEM_ID))
 
 
 def get_addons_replication_type(request):

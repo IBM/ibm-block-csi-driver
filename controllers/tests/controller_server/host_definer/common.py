@@ -11,7 +11,7 @@ class BaseSetUp(unittest.TestCase):
         test_utils.patch_kubernetes_manager_init()
         self.os = patch('{}.os'.format(test_settings.WATCHER_HELPER_PATH)).start()
         self.nodes_on_watcher_helper = test_utils.patch_nodes_global_variable(test_settings.WATCHER_HELPER_PATH)
-        self.secret_ids_on_watcher_helper = test_utils.patch_secret_ids_global_variable(
+        self.managed_secrets_on_watcher_helper = test_utils.patch_managed_secrets_global_variable(
             test_settings.WATCHER_HELPER_PATH)
         self.k8s_node_with_manage_node_label = test_utils.get_fake_k8s_node(test_settings.MANAGE_NODE_LABEL)
         self.k8s_node_with_fake_label = test_utils.get_fake_k8s_node(test_settings.FAKE_LABEL)

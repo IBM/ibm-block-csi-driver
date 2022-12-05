@@ -1,4 +1,5 @@
 import datetime
+import base64
 
 from kubernetes import client, config, dynamic
 from kubernetes.client import api_client
@@ -65,11 +66,6 @@ class KubernetesManager():
             logger.error(messages.FAILED_TO_GET_NODES.format(ex.body))
             return []
 
-    def _generate_node_info(self, k8s_node):
-        node_info = NodeInfo()
-        node_info.name = k8s_node.metadata.name
-        return node_info
-
     def _get_storage_classes_info(self):
         try:
             storage_classes_info = []
@@ -92,7 +88,8 @@ class KubernetesManager():
     def _is_k8s_csi_node_has_driver(self, k8s_csi_node):
         if k8s_csi_node.spec.drivers:
             for driver in k8s_csi_node.spec.drivers:
-                return driver.name == settings.CSI_PROVISIONER_NAME
+                if driver.name == settings.CSI_PROVISIONER_NAME:
+                    return True
         return False
 
     def _get_csi_node_info(self, node_name):
@@ -289,15 +286,43 @@ class KubernetesManager():
 
         return body
 
-    def _get_data_from_secret(self, secret_name, secret_namespace):
+    def _get_secret_data(self, secret_name, secret_namespace):
         try:
-            return self.core_api.read_namespaced_secret(name=secret_name, namespace=secret_namespace).data
+            secret_data = self.core_api.read_namespaced_secret(name=secret_name, namespace=secret_namespace).data
+            return self._change_decode_base64_secret_config(secret_data)
         except ApiException as ex:
             if ex.status == 404:
                 logger.error(messages.SECRET_DOES_NOT_EXIST.format(secret_name, secret_namespace))
             else:
                 logger.error(messages.FAILED_TO_GET_SECRET.format(secret_name, secret_namespace, ex.body))
-            return None
+        return {}
+
+    def _change_decode_base64_secret_config(self, secret_data):
+        if settings.SECRET_CONFIG_FIELD in secret_data.keys():
+            secret_data[settings.SECRET_CONFIG_FIELD] = self._decode_base64_to_dict(
+                secret_data[settings.SECRET_CONFIG_FIELD])
+        return secret_data
+
+    def _decode_base64_to_dict(self, content_with_base64):
+        decoded_string_content = self._decode_base64_to_string(content_with_base64)
+        encoded_dict = str(decoded_string_content).encode('utf-8')
+        base64_dict = base64.b64encode(encoded_dict)
+        my_dict_again = eval(base64.b64decode(base64_dict))
+        return my_dict_again
+
+    def _decode_base64_to_string(self, content_with_base64):
+        try:
+            base64_bytes = content_with_base64.encode('ascii')
+            decoded_string_in_bytes = base64.b64decode(base64_bytes)
+            return decoded_string_in_bytes.decode('ascii')
+        except Exception:
+            return content_with_base64
+
+    def _get_node_info(self, node_name):
+        k8s_node = self._read_node(node_name)
+        if k8s_node:
+            return self._generate_node_info(k8s_node)
+        return NodeInfo('', {})
 
     def _read_node(self, node_name):
         try:
@@ -305,6 +330,9 @@ class KubernetesManager():
         except ApiException as ex:
             logger.error(messages.FAILED_TO_GET_NODE.format(node_name, ex.body))
             return None
+
+    def _generate_node_info(self, k8s_node):
+        return NodeInfo(k8s_node.metadata.name, k8s_node.metadata.labels)
 
     def _get_csi_daemon_set(self):
         try:
