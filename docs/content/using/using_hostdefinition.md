@@ -4,6 +4,11 @@ Dynamic host connectivity eliminates the necessity for manual host definitions. 
 
 A use case example of using dynamic host definition is when creating a new storage class with a new storage. With the dynamic host definition feature, new host definitions are created on the storage for the relevant nodes. For each host definition on the storage, a new host definition resource is created. With these resources, the status of the host definition on the storage system can easily be retrieved.
 
+Dynamic host definitions supports the following:
+
+- **CSI Topology**<br>For more information, see [Configuring for CSI Topology](../configuration/configuring_topology.md).
+- **I/O Groups**<br>By default the host definer creates all definitions on all possible I/O groups (0, 1, 2, 3) and there is no need to define the I/O groups.<br>If you want a node to use a specific I/O group, use the I/O group label to specify the usage. For more information, see [Adding optional labels for dynamic host definition](using_hostdefinition_labels.md).
+
 The host definer identifies the nodes available for host definition on each storage system and controls each of the host definitions. To see the phase status of all managed HostDefinitions by the host definer, use:
 
      kubectl get hostdefinitions
@@ -14,6 +19,10 @@ The host definer identifies the nodes available for host definition on each stor
 |PendingCreation|Host definition did not complete during the last attempt. The host definer will try again.|
 |PendingDeletion|Host deletion did not complete during the last attempt. The host definer will try again.|
 |Error|Host definition or deletion did not complete and will not try again.|
+
+Adding labels to nodes allows for greater control over the system nodes, when using dynamic host definition.
+
+Node labels can be used to help customize node usage with host definition. For more information, see [Adding optional labels for dynamic host definition](using_hostdefinition_labels.md).
 
 ## Recovering from an Error state
 

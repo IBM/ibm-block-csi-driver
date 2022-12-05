@@ -20,5 +20,14 @@ For example, if `connectivityType` is defined as using `fc` but you want to use 
 
 **Note:** The values for the connectivityType are the same as those for defining the HostDefiner: `nvmeofc`, `fc`, `iscsi`. If an invalid label is used, this label is ignored.
 
+## Specifying I/O group usage
+
+To specify which I/O group a node should use, add one of the following labels to the node:
+
+- `hostdefiner.block.csi.ibm.com/io-group-0=true`
+- `hostdefiner.block.csi.ibm.com/io-group-1=true`
+- `hostdefiner.block.csi.ibm.com/io-group-2=true`
+- `hostdefiner.block.csi.ibm.com/io-group-3=true`
+
 
 
