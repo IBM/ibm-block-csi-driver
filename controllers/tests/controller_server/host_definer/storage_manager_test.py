@@ -11,6 +11,7 @@ from controllers.tests.controller_server.common import mock_get_agent, mock_arra
 import controllers.tests.controller_server.host_definer.settings as settings
 import controllers.tests.array_action.test_settings as array_settings
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
+import controllers.common.settings as common_settings
 
 HOST_DEFINER_SERVER_PATH = "controllers.servers.host_definer.storage_manager.host_definer_server"
 
@@ -97,28 +98,42 @@ class TestDefineHost(BaseSetUp):
         self.mediator.remove_io_group_from_host.assert_called_once_with(HOST_NAME, '0')
         self.mediator.add_io_group_to_host.assert_called_once_with(HOST_NAME, array_settings.DUMMY_IO_GROUP_TO_ADD)
 
-    def test_define_host_update_ports_with_different_protocol_success(self):
+    def test_define_host_update_ports_with_different_protocol_on_storage_without_chhost_success(self):
+        self.mediator.change_host_protocol.side_effect = HostNotFoundError('error')
         self._prepare_define_host_update_ports(array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE,
                                                Initiators(iscsi_iqns=[settings.IQN]))
+
         self.mediator.delete_host.assert_called_once_with(HOST_NAME)
         self.mediator.create_host.assert_called_once_with(
             HOST_NAME, Initiators(iscsi_iqns=[settings.IQN]),
             self.request.connectivity_type_from_user, self.request.io_group)
-        self.mediator.remove_ports_from_host.assert_not_called()
+        self.mediator.remove_ports_from_host.assert_called_once()
         self._assert_io_group()
 
-    def test_define_host_update_ports_with_same_protocol_success(self):
+    def _prepare_define_host_update_ports_without_delete_host(self, host_connectivity_type):
         self.mediator.get_host_connectivity_ports.return_value = [settings.IQN]
         self.request.node_id_from_csi_node = '{};;{};'.format(HOST_NAME, settings.WWPN)
         self.request.connectivity_type_from_user = array_settings.FC_CONNECTIVITY_TYPE
-        self._prepare_define_host_update_ports(array_settings.ISCSI_CONNECTIVITY_TYPE,
+        self._prepare_define_host_update_ports(host_connectivity_type,
                                                Initiators(fc_wwns=[settings.WWPN]))
 
-        self.mediator.remove_ports_from_host.assert_called_once_with(HOST_NAME, [settings.IQN],
-                                                                     array_settings.ISCSI_CONNECTIVITY_TYPE)
         self.mediator.create_host.assert_not_called()
         self.mediator.delete_host.assert_not_called()
         self._assert_io_group()
+
+    def test_define_host_update_ports_with_different_protocol_on_storage_with_chhost_success(self):
+        self._prepare_define_host_update_ports_without_delete_host(array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+
+        self.assertEqual(2, self.mediator.get_host_connectivity_ports.call_count)
+        self.mediator.remove_ports_from_host.assert_called_once_with(HOST_NAME, [settings.IQN],
+                                                                     array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+        self.mediator.change_host_protocol.assert_called_once_with(
+            HOST_NAME, common_settings.SCSI_PROTOCOL)
+
+    def test_define_host_update_ports_with_same_protocol_success(self):
+        self._prepare_define_host_update_ports_without_delete_host(array_settings.ISCSI_CONNECTIVITY_TYPE)
+        self.mediator.remove_ports_from_host.assert_called_once_with(HOST_NAME, [settings.IQN],
+                                                                     array_settings.ISCSI_CONNECTIVITY_TYPE)
 
     def test_define_host_return_values(self):
         self._prepare_define_host()
