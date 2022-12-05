@@ -1959,9 +1959,4 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     def change_host_protocol(self, host_name, protocol):
-        try:
-            self._chhost(host_name, protocol)
-        except array_errors.UnSupportedParameter:
-            logger.info("Could not change host [{}] protocol,"
-                        " because protocol parameter for chhost command is not supported in this array,"
-                        " changing the host protocol by deleting it and creating it again".format(host_name))
+        self._chhost(host_name, protocol)
