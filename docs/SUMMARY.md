@@ -63,6 +63,7 @@
 * [Using](content/using/using.md)
 	* [Using dynamic host connectivity](content/using/using_hostdefinition.md)
 		* [Changing node connectivity](content/using/changing_node_connectivity.md)
+		* [Adding optional labels for dynamic host definition](content/using/using_hostdefinition_labels.md)
 	* [Sample configurations for running a stateful container](content/using/sample_stateful_container.md)
 * [Troubleshooting](content/troubleshooting/troubleshooting.md)
 	* [Log and status collection](content/troubleshooting/log_status_collect.md)
