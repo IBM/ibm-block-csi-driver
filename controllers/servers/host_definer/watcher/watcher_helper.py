@@ -144,13 +144,6 @@ class Watcher(KubernetesManager):
         logger.info(messages.NODE_SHOULD_NOT_BE_MANAGED_ON_SECRET.format(node_name, secret_name, secret_namespace))
         return False
 
-    def _validate_secret(self, secret_data):
-        secret_data = self._convert_secret_config_to_string(secret_data)
-        try:
-            validate_secrets(secret_data)
-        except ValidationException as ex:
-            logger.error(str(ex))
-
     def _get_managed_secret_by_name_and_namespace(self, secret_name, secret_namespace):
         secret_info = self._generate_secret_info(secret_name, secret_namespace)
         managed_secret_info, index = self._get_matching_managed_secret_info(secret_info)
@@ -165,6 +158,19 @@ class Watcher(KubernetesManager):
                 return False
             return True
         return False
+
+    def _is_topology_secret(self, secret_data):
+        self._validate_secret(secret_data)
+        if self._get_secret_secret_config(secret_data):
+            return True
+        return False
+
+    def _validate_secret(self, secret_data):
+        secret_data = self._convert_secret_config_to_string(secret_data)
+        try:
+            validate_secrets(secret_data)
+        except ValidationException as ex:
+            logger.error(str(ex))
 
     def _undefine_host(self, host_definition_info):
         logger.info(messages.UNDEFINED_HOST.format(host_definition_info.node_name,
