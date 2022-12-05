@@ -43,7 +43,7 @@ If any of the host definitions have an Error status, follow this procedure to ha
 
     ```
     $> kubectl get hostdefinition
-    NAME                     AGE    PHASE   NODE
-    <host_definition_name1>  102m   Ready   <node_name1>
-    <host_definition_name2>  102m   Ready   <node_name2>
+    NAME                     AGE    PHASE   NODE          MANAGEMENT_ADDRESS   
+    <host_definition_name1>  102m   Ready   <node_name1>  <management_address>
+    <host_definition_name2>  102m   Ready   <node_name2>  <management_address>
     ```
