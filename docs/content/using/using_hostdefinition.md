@@ -38,9 +38,3 @@ If any of the host definitions have an Error status, follow this procedure to ha
     <host_definition_name1>  102m   Ready   <node_name1>
     <host_definition_name2>  102m   Ready   <node_name2>
     ```
-
-## Blocking a specific node definition from being deleted
-
-To block a specific host definition from being deleted by the host definer, you can add the following label to the node: `hostdefiner.block.csi.ibm.com/avoid-deletion=true`.
-
-This label works on a per node basis, where the `allowDelete` parameter definition in the `csi_v1_hostdefiner_cr.yaml` is for all cluster nodes.
