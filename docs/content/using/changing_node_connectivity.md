@@ -1,6 +1,8 @@
 # Changing node connectivity
 
-Node connectivity for dynamic host definition needs to be updated when node connectivity changes take place.
+Node connectivity for dynamic host definition needs to be updated manually when node connectivity changes take place of the `connectivityType` in the HostDefiner is defined.
+
+Starting from CSI driver 1.11.0, if the `connectivityType` in the HostDefiner is left with its default empty value, the host ports dynamically update. For more information, see [Configuring the host definer](../configuration/configuring_hostdefiner.md).
 
 Before you begin, if the `allowDelete` parameter is set to `false`, ensure that the old host definition is deleted.
 
