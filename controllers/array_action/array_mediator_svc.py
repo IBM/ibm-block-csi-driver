@@ -1960,3 +1960,4 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def change_host_protocol(self, host_name, protocol):
         self._chhost(host_name, protocol)
+        logger.info(svc_messages.CHANGE_HOST_PROTOCOL.format(host_name, protocol))
