@@ -117,12 +117,12 @@ class HostDefinerServicer:
 
     def _update_host_io_group(self, request, host, array_mediator):
         io_group_from_host = array_mediator.get_host_io_group(host)
-        io_group_to_remove, io_group_to_add = self._get_io_group_to_remove_and_add(
+        io_group_to_remove, io_group_to_add = self._get_io_group_to_modify(
             io_group_from_host, request.io_group)
         array_mediator.remove_io_group_from_host(host, io_group_to_remove)
         array_mediator.add_io_group_to_host(host, io_group_to_add)
 
-    def _get_io_group_to_remove_and_add(self, io_group_from_host, ig_group_from_user):
+    def _get_io_group_to_modify(self, io_group_from_host, ig_group_from_user):
         ig_group_from_user = self._split_io_group_from_user(ig_group_from_user)
         if not io_group_from_host:
             return '', settings.IO_GROUP_DELIMITER.join(ig_group_from_user)
