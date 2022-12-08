@@ -2,7 +2,7 @@ import time
 from threading import Thread
 
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.host_definer.watcher.watcher_helper import Watcher, NODES, SECRET_IDS
+from controllers.servers.host_definer.watcher.watcher_helper import Watcher, NODES, MANAGED_SECRETS
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer import settings
 
@@ -46,13 +46,14 @@ class CsiNodeWatcher(Watcher):
             remove_host_thread.start()
 
     def _undefine_host_when_node_pod_is_deleted(self, csi_node_info):
-        if self._is_host_part_of_update(csi_node_info.name):
+        node_name = csi_node_info.name
+        if self._is_host_part_of_update(node_name):
             self._create_definitions_when_csi_node_changed(csi_node_info)
         elif self._is_host_definer_can_delete_hosts() and \
-                not self._is_node_has_forbid_deletion_label(csi_node_info.name):
+                not self._is_node_has_forbid_deletion_label(node_name):
             self._undefine_hosts(csi_node_info.name)
         else:
-            NODES.pop(csi_node_info.name, None)
+            NODES.pop(node_name, None)
 
     def _is_host_part_of_update(self, worker):
         daemon_set_name = self._wait_until_all_daemon_set_pods_are_up_to_date()
@@ -83,8 +84,8 @@ class CsiNodeWatcher(Watcher):
         return csi_daemon_set.metadata.name
 
     def _create_definitions_when_csi_node_changed(self, csi_node_info):
-        for secret_id in SECRET_IDS:
-            secret_name, secret_namespace = secret_id
+        for secret_info in MANAGED_SECRETS:
+            secret_name, secret_namespace = secret_info.name, secret_info.namespace
             host_definition_info = self._get_matching_host_definition_info(
                 csi_node_info.name, secret_name, secret_namespace)
             if host_definition_info:
@@ -98,8 +99,8 @@ class CsiNodeWatcher(Watcher):
             and host_definition_node_id and csi_node_node_id
 
     def _undefine_hosts(self, node_name):
-        for secret_id in SECRET_IDS:
-            host_definition_info = self._get_host_definition_info_from_secret_and_node_name(node_name, secret_id)
+        for secret_info in MANAGED_SECRETS:
+            host_definition_info = self._get_host_definition_info_from_secret_and_node_name(node_name, secret_info)
             self._delete_definition(host_definition_info)
         self._remove_manage_node_label(node_name)
         NODES.pop(node_name, None)

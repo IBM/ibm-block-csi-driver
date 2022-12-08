@@ -79,6 +79,7 @@ class TestWatchHostDefinitionsResources(HostDefinitionWatcherBase):
                                                              test_settings.PENDING_CREATION_PHASE)])
         self.host_definition_watcher.storage_host_servicer.define_host.return_value = DefineHostResponse()
         self.os.getenv.return_value = ''
+        self.host_definition_watcher.core_api.read_node.return_value = self.k8s_node_with_manage_node_label
         self._prepare_default_mocks_for_pending()
 
     def _prepare_default_mocks_for_pending(self):

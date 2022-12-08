@@ -34,7 +34,7 @@ def _parse_raw_json(raw_json):
     return parsed_json
 
 
-def _is_topology_match(system_topologies, node_topologies):
+def is_topology_match(system_topologies, node_topologies):
     for topologies in system_topologies:
         logger.debug(
             "Comparing topologies: system topologies: {},"
@@ -54,10 +54,10 @@ def get_volume_topologies(request):
     return None
 
 
-def _get_system_info_for_topologies(secrets_config, node_topologies):
+def get_system_info_for_topologies(secrets_config, node_topologies):
     for system_id, system_info in secrets_config.items():
         system_topologies = system_info.get(servers_settings.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
-        if _is_topology_match(system_topologies, node_topologies):
+        if is_topology_match(system_topologies, node_topologies):
             return system_info, system_id
     raise ValidationException(messages.NO_SYSTEM_MATCH_REQUESTED_TOPOLOGIES.format(node_topologies))
 
@@ -70,8 +70,8 @@ def _get_system_info_from_secrets(secrets, topologies=None, system_id=None):
         if system_id:
             system_info = secrets_config.get(system_id)
         elif topologies:
-            system_info, system_id = _get_system_info_for_topologies(secrets_config=secrets_config,
-                                                                     node_topologies=topologies)
+            system_info, system_id = get_system_info_for_topologies(secrets_config=secrets_config,
+                                                                    node_topologies=topologies)
         else:
             raise ValidationException(messages.INSUFFICIENT_DATA_TO_CHOOSE_A_STORAGE_SYSTEM_MESSAGE)
     return system_info, system_id

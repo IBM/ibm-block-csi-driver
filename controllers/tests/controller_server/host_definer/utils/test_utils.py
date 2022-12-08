@@ -165,8 +165,8 @@ def patch_nodes_global_variable(module_path):
     return patch('{}.NODES'.format(module_path), {}).start()
 
 
-def patch_secret_ids_global_variable(module_path):
-    return patch('{}.SECRET_IDS'.format(module_path), {}).start()
+def patch_managed_secrets_global_variable(module_path):
+    return patch('{}.MANAGED_SECRETS'.format(module_path), []).start()
 
 
 def get_pending_creation_status_manifest():
@@ -186,3 +186,12 @@ def get_array_connection_info():
 def get_define_request(prefix='', connectivity_type='', node_id_from_host_definition=''):
     return DefineHostRequest(prefix, connectivity_type, node_id_from_host_definition,
                              test_settings.FAKE_NODE_ID, get_array_connection_info())
+
+
+def get_fake_secret_info():
+    secret_info = Mock(spec_set=['name', 'namespace', 'nodes_with_system_id', 'managed_storage_classes'])
+    secret_info.name = test_settings.FAKE_SECRET
+    secret_info.namespace = test_settings.FAKE_SECRET_NAMESPACE
+    secret_info.nodes_with_system_id = {}
+    secret_info.managed_storage_classes = 1
+    return secret_info

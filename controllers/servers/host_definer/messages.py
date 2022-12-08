@@ -45,3 +45,6 @@ NODE_ID_WAS_CHANGED = 'NodeId was changed for {} node, updating his ports in his
 UPDATE_HOST_DEFINITION_CONNECTIVITY_TYPE = 'update host definition {} connectivity type to {}'
 UPDATE_HOST_DEFINITION_PORTS = 'update host definition {} ports to {}'
 UPDATE_HOST_DEFINITION_NODE_NAME_ON_STORAGE = 'update host definition {} nodeNameOnStorage to {}'
+CHECK_NODE_SHOULD_BE_MANAGED_BY_SECRET = 'Check if node {} should be managed by {} secret in {} namespace'
+NODE_SHOULD_BE_MANAGED_ON_SECRET = 'Node {} should be managed by {} secret in {} namespace'
+NODE_SHOULD_NOT_BE_MANAGED_ON_SECRET = 'Node {} should not be managed by {} secret in {} namespace'
