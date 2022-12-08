@@ -123,12 +123,16 @@ class TestEnableVolumeReplication(BaseReplicationSetUp, CommonControllerTest):
 
     def test_enable_replication_no_volume_fails(self):
         self.mediator.get_object_by_id.return_value = None
-        self._test_enable_replication_fails(grpc.StatusCode.NOT_FOUND)
+        self._test_enable_replication_fails(replication_type=REPLICATION_TYPE_MIRROR,
+                                            replication_id=None,
+                                            grpc_status=grpc.StatusCode.NOT_FOUND)
 
     def test_enable_replication_volume_in_group_fails(self):
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(
             volume_group_id=DUMMY_VOLUME_GROUP)
-        self._test_enable_replication_fails(grpc.StatusCode.FAILED_PRECONDITION)
+        self._test_enable_replication_fails(replication_type=REPLICATION_TYPE_MIRROR,
+                                            replication_id=None,
+                                            grpc_status=grpc.StatusCode.FAILED_PRECONDITION)
 
     def test_enable_replication_already_processing(self):
         self._test_request_already_processing("volume_id", self.request.volume_id)
@@ -141,7 +145,9 @@ class TestEnableVolumeReplication(BaseReplicationSetUp, CommonControllerTest):
 
     def test_enable_ear_replication_obsolete_request_parameters_fails(self):
         replication_id = "{}:{};{}".format("A9000", OTHER_OBJECT_INTERNAL_ID, VOLUME_UID)
-        self._test_enable_replication_fails(REPLICATION_TYPE_EAR, replication_id, grpc.StatusCode.INVALID_ARGUMENT)
+        self._test_enable_replication_fails(replication_type=REPLICATION_TYPE_EAR,
+                                            replication_id=replication_id,
+                                            grpc_status=grpc.StatusCode.INVALID_ARGUMENT)
 
     def test_enable_ear_replication_succeeds(self):
         self._test_enable_replication_succeeds(REPLICATION_TYPE_EAR)
