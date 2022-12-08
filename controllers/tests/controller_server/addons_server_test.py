@@ -11,7 +11,7 @@ from controllers.servers.csi.addons_server import ReplicationControllerServicer
 from controllers.tests import utils
 from controllers.tests.common.test_settings import VOLUME_NAME, VOLUME_UID, OBJECT_INTERNAL_ID, \
     OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE, SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, \
-    SECRET_MANAGEMENT_ADDRESS_VALUE
+    SECRET_MANAGEMENT_ADDRESS_VALUE, DUMMY_VOLUME_GROUP
 from controllers.tests.controller_server.common import mock_get_agent
 from controllers.tests.controller_server.csi_controller_server_test import (CommonControllerTest)
 from controllers.tests.utils import ProtoBufMock
@@ -36,12 +36,14 @@ class BaseReplicationSetUp(unittest.TestCase):
         self.request.replication_id = "{}:{};{}".format("A9000", OTHER_OBJECT_INTERNAL_ID, VOLUME_UID)
         self.context = utils.FakeContext()
 
-    def _prepare_replication_mocks(self, replication_type=None, copy_type=COPY_TYPE, is_primary=False):
+    def _prepare_replication_mocks(self, replication_type=None, copy_type=COPY_TYPE, is_primary=False,
+                                   volume_group_id=None):
         if replication_type:
             replication = utils.get_mock_mediator_response_replication(name=REPLICATION_NAME,
                                                                        replication_type=replication_type,
                                                                        copy_type=copy_type,
-                                                                       is_primary=is_primary)
+                                                                       is_primary=is_primary,
+                                                                       volume_group_id=volume_group_id)
         else:
             replication = None
         self.mediator.get_replication.return_value = replication
@@ -99,7 +101,8 @@ class TestEnableVolumeReplication(BaseReplicationSetUp, CommonControllerTest):
     def _test_enable_replication_idempotency(self, replication_type, replication_name=REPLICATION_NAME,
                                              copy_type=COPY_TYPE, grpc_status=grpc.StatusCode.OK):
         replication_request = self._prepare_request_params(replication_type, replication_name)
-        self._prepare_replication_mocks(replication_type=replication_type, copy_type=copy_type)
+        self._prepare_replication_mocks(replication_type=replication_type, copy_type=copy_type,
+                                        volume_group_id=DUMMY_VOLUME_GROUP)
 
         self.servicer.EnableVolumeReplication(self.request, self.context)
 
@@ -120,7 +123,16 @@ class TestEnableVolumeReplication(BaseReplicationSetUp, CommonControllerTest):
 
     def test_enable_replication_no_volume_fails(self):
         self.mediator.get_object_by_id.return_value = None
-        self._test_enable_replication_fails(REPLICATION_TYPE_MIRROR, "", grpc.StatusCode.NOT_FOUND)
+        self._test_enable_replication_fails(replication_type=REPLICATION_TYPE_MIRROR,
+                                            replication_id=None,
+                                            grpc_status=grpc.StatusCode.NOT_FOUND)
+
+    def test_enable_replication_volume_in_group_fails(self):
+        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(
+            volume_group_id=DUMMY_VOLUME_GROUP)
+        self._test_enable_replication_fails(replication_type=REPLICATION_TYPE_MIRROR,
+                                            replication_id=None,
+                                            grpc_status=grpc.StatusCode.FAILED_PRECONDITION)
 
     def test_enable_replication_already_processing(self):
         self._test_request_already_processing("volume_id", self.request.volume_id)
@@ -133,7 +145,9 @@ class TestEnableVolumeReplication(BaseReplicationSetUp, CommonControllerTest):
 
     def test_enable_ear_replication_obsolete_request_parameters_fails(self):
         replication_id = "{}:{};{}".format("A9000", OTHER_OBJECT_INTERNAL_ID, VOLUME_UID)
-        self._test_enable_replication_fails(REPLICATION_TYPE_EAR, replication_id, grpc.StatusCode.INVALID_ARGUMENT)
+        self._test_enable_replication_fails(replication_type=REPLICATION_TYPE_EAR,
+                                            replication_id=replication_id,
+                                            grpc_status=grpc.StatusCode.INVALID_ARGUMENT)
 
     def test_enable_ear_replication_succeeds(self):
         self._test_enable_replication_succeeds(REPLICATION_TYPE_EAR)
