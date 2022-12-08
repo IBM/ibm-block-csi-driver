@@ -166,5 +166,5 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         if volume.volume_group_id:
             error_message = "could not enable replication, " \
                       "volume {} already belongs to volume group {}".format(volume.name, volume.volume_group_id)
-            return volume, error_message
-        return volume, None
+            return error_message
+        return None
