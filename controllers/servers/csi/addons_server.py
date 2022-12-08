@@ -28,7 +28,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, volume_id_info.array_type).get_mediator() as mediator:
             volume = mediator.get_object_by_id(volume_id, servers_settings.VOLUME_TYPE_NAME)
-            error_message = self._validate_volume(volume)
+            error_message = self._validate_volume(volume, volume_id)
             if error_message:
                 return build_error_response(error_message, context, grpc.StatusCode.FAILED_PRECONDITION,
                                             pb2.EnableVolumeReplicationResponse)
@@ -160,9 +160,9 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         return None
 
     @staticmethod
-    def _validate_volume(volume):
+    def _validate_volume(volume, volume_id):
         if not volume:
-            raise array_errors.ObjectNotFoundError(volume.id)
+            raise array_errors.ObjectNotFoundError(volume_id)
         if volume.volume_group_id:
             error_message = "could not enable replication, " \
                       "volume {} already belongs to volume group {}".format(volume.name, volume.volume_group_id)
