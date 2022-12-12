@@ -648,8 +648,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
     def _get_volume_ids_from_volume_group(self, volumes):
         return [volume.id for volume in volumes]
 
-    @csi_method(error_response_type=csi_pb2.ModifyVolumeGroupResponse, lock_request_attribute="volume_group_id")
-    def ModifyVolumeGroup(self, request, context):
+    @csi_method(error_response_type=csi_pb2.ModifyVolumeGroupMembershipResponse,
+                lock_request_attribute="volume_group_id")
+    def ModifyVolumeGroupMembership(self, request, context):
         secrets = request.secrets
         utils.validate_delete_volume_group_request(request)
 
@@ -657,7 +658,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             volume_group_id_info = utils.get_volume_group_id_info(request.volume_group_id)
         except ObjectIdError as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
-                                    csi_pb2.ModifyVolumeGroupResponse)
+                                    csi_pb2.ModifyVolumeGroupMembershipResponse)
 
         array_type = volume_group_id_info.array_type
         volume_group_id = volume_group_id_info.ids.uid
