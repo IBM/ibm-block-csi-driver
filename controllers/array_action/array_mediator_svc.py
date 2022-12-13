@@ -1763,7 +1763,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 logger.warning("exception encountered during host {} creation : {}".format(host_name, ex.my_message))
             raise ex
 
-    def create_host(self, host_name, initiators, connectivity_type):
+    def create_host(self, host_name, initiators, connectivity_type, io_group):
         ports = get_connectivity_type_ports(initiators, connectivity_type)
         for port in ports:
             status_code = self._mkhost(host_name, connectivity_type, port)
@@ -1840,3 +1840,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if hasattr(cli_host, HOST_ISCSI_NAME):
             return array_settings.ISCSI_CONNECTIVITY_TYPE
         return None
+
+    def add_io_group_to_host(self, host_name, io_group):
+        raise NotImplementedError
+
+    def remove_io_group_from_host(self, host_name, io_group):
+        raise NotImplementedError
+
+    def get_host_io_group(self, host_name):
+        raise NotImplementedError
