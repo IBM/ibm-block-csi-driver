@@ -130,9 +130,15 @@ class TestEnableVolumeReplication(BaseReplicationSetUp, CommonControllerTest):
     def test_enable_replication_volume_in_group_fails(self):
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(
             volume_group_id=DUMMY_VOLUME_GROUP)
-        self._test_enable_replication_fails(replication_type=REPLICATION_TYPE_MIRROR,
-                                            replication_id=None,
-                                            grpc_status=grpc.StatusCode.FAILED_PRECONDITION)
+        replication_request = self._prepare_request_params(replication_type=REPLICATION_TYPE_EAR,
+                                                           replication_id="")
+        self._prepare_replication_mocks()
+
+        self.servicer.EnableVolumeReplication(self.request, self.context)
+
+        self.assertEqual(grpc.StatusCode.FAILED_PRECONDITION, self.context.code)
+        self.mediator.get_replication.assert_called_once_with(replication_request)
+        self.mediator.create_replication.assert_not_called()
 
     def test_enable_replication_already_processing(self):
         self._test_request_already_processing("volume_id", self.request.volume_id)
