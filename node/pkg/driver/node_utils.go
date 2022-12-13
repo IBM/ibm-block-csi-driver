@@ -17,6 +17,7 @@
 package driver
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -210,6 +211,26 @@ func (n NodeUtils) DevicesAreNvme(sysDevices []string) (bool, error) {
 	return false, nil
 }
 
+func getRelevantLines(rawContent *os.File) ([]string, error) {
+	scanner := bufio.NewScanner(rawContent)
+	var relevantLines []string
+	for scanner.Scan() {
+		line := scanner.Text()
+		trimmedLine := strings.TrimSpace(line)
+		if trimmedLine == "" {
+			continue
+		}
+		if strings.HasPrefix(trimmedLine, "#") || strings.HasPrefix(trimmedLine, "//") {
+			continue
+		}
+		relevantLines = append(relevantLines, trimmedLine)
+	}
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+	return relevantLines, nil
+}
+
 func readFile(path string) (string, error) {
 	file, err := os.Open(path)
 	if err != nil {
@@ -218,15 +239,16 @@ func readFile(path string) (string, error) {
 
 	defer file.Close()
 
-	rawContent, err := ioutil.ReadAll(file)
+	relevantLines, err := getRelevantLines(file)
 	if err != nil {
 		return "", err
 	}
+	if len(relevantLines) > 1 {
+		err := fmt.Errorf(fmt.Sprintf("to many lines in file %v", relevantLines))
+		return "", err
+	}
 
-	content := string(rawContent)
-	trimmedContent := strings.TrimSpace(content)
-
-	return trimmedContent, nil
+	return relevantLines[0], nil
 }
 
 func readAfterPrefix(path string, prefix string, portType string) (string, error) {
