@@ -36,7 +36,7 @@ class BaseSetUp(unittest.TestCase):
         self.request.node_id_from_csi_node = settings.FAKE_NODE_ID
         self.request.node_id_from_host_definition = settings.FAKE_NODE_ID
         self.request.array_connection_info = get_array_connection_info_from_secrets(SECRET)
-        self.request.io_group = array_settings.DUMMY_IO_GROUP
+        self.request.io_group = array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING
 
 
 class TestDefineHost(BaseSetUp):
