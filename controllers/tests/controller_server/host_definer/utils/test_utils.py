@@ -184,8 +184,10 @@ def get_array_connection_info():
 
 
 def get_define_request(prefix='', connectivity_type='', node_id_from_host_definition=''):
-    return DefineHostRequest(prefix, connectivity_type, node_id_from_host_definition,
-                             test_settings.FAKE_NODE_ID, get_array_connection_info())
+    return DefineHostRequest(
+        prefix, connectivity_type, node_id_from_host_definition, test_settings.FAKE_NODE_ID,
+        get_array_connection_info(),
+        test_settings.FAKE_STRING_IO_GROUP)
 
 
 def get_fake_secret_info():
@@ -199,3 +201,11 @@ def get_fake_secret_info():
 
 def get_fake_host_io_group():
     return Munch.fromDict(manifest_utils.get_host_io_group_manifest())
+
+
+def get_fake_managed_node():
+    managed_node = Mock(spec_set=['name', 'node_id', 'io_group'])
+    managed_node.name = test_settings.FAKE_NODE_NAME
+    managed_node.node_id = test_settings.FAKE_NODE_ID
+    managed_node.io_group = test_settings.FAKE_STRING_IO_GROUP
+    return managed_node

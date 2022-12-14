@@ -13,7 +13,8 @@ import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
 from controllers.servers.host_definer import settings
 import controllers.common.settings as common_settings
-from controllers.servers.host_definer.types import DefineHostRequest, DefineHostResponse, HostDefinitionInfo, SecretInfo
+from controllers.servers.host_definer.types import (
+    DefineHostRequest, DefineHostResponse, HostDefinitionInfo, SecretInfo, ManagedNode)
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
 
 MANAGED_SECRETS = []
@@ -51,7 +52,7 @@ class Watcher(KubernetesManager):
 
     def _add_name_to_host_definition_info(self, node_name, host_definition_info):
         host_definition_info.node_name = node_name
-        host_definition_info.node_id = NODES[node_name]
+        host_definition_info.node_id = NODES[node_name].node_id
         host_definition_info.name = self._get_host_definition_name(node_name)
         return host_definition_info
 
@@ -101,7 +102,7 @@ class Watcher(KubernetesManager):
             settings.SPEC: {
                 settings.HOST_DEFINITION_FIELD: {
                     settings.NODE_NAME_FIELD: host_definition_info.node_name,
-                    common_settings.HOST_DEFINITION_NODE_ID_FIELD: NODES[host_definition_info.node_name],
+                    common_settings.HOST_DEFINITION_NODE_ID_FIELD: NODES[host_definition_info.node_name].node_id,
                     settings.SECRET_NAME_FIELD: host_definition_info.secret_name,
                     settings.SECRET_NAMESPACE_FIELD: host_definition_info.secret_namespace
                 },
@@ -268,6 +269,7 @@ class Watcher(KubernetesManager):
         if request:
             request.node_id_from_host_definition = host_definition_info.node_id
             request.node_id_from_csi_node = self._get_node_id_by_node(host_definition_info)
+            request.io_group = self._get_io_group_by_node(host_definition_info.node_name)
         return request
 
     def _get_new_request(self, labels):
@@ -331,9 +333,15 @@ class Watcher(KubernetesManager):
 
     def _get_node_id_by_node(self, host_definition_info):
         try:
-            return NODES[host_definition_info.node_name]
+            return NODES[host_definition_info.node_name].node_id
         except Exception:
             return host_definition_info.node_id
+
+    def _get_io_group_by_node(self, node_name):
+        try:
+            return NODES[node_name].io_group
+        except Exception:
+            return ''
 
     def _get_host_definition_name(self, node_name):
         return '{0}-{1}'.format(node_name, self._get_random_string()).replace('_', '.')
@@ -344,13 +352,17 @@ class Watcher(KubernetesManager):
     def _add_node_to_nodes(self, csi_node_info):
         logger.info(messages.NEW_KUBERNETES_NODE.format(csi_node_info.name))
         self._add_manage_node_label_to_node(csi_node_info.name)
-        NODES[csi_node_info.name] = csi_node_info.node_id
+        NODES[csi_node_info.name] = self._generate_managed_node(csi_node_info)
 
     def _add_manage_node_label_to_node(self, node_name):
         if self._is_node_has_manage_node_label(node_name):
             return
         logger.info(messages.ADD_LABEL_TO_NODE.format(settings.MANAGE_NODE_LABEL, node_name))
         self._update_manage_node_label(node_name, settings.TRUE_STRING)
+
+    def _generate_managed_node(self, csi_node_info):
+        node_info = self._get_node_info(csi_node_info.name)
+        return ManagedNode(csi_node_info, node_info.labels)
 
     def _remove_manage_node_label(self, node_name):
         if self._is_managed_by_host_definer_label_should_be_removed(node_name):

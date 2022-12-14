@@ -5,7 +5,8 @@ from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.node_info import NodeIdInfo
 from controllers.servers.host_definer.types import DefineHostResponse
 from controllers.servers.utils import join_object_prefix_with_name, get_initiators_connectivity_type
-from controllers.servers.host_definer import settings
+import controllers.servers.host_definer.settings as host_definer_settings
+import controllers.common.settings as common_settings
 
 logger = get_stdout_logger()
 
@@ -125,17 +126,17 @@ class HostDefinerServicer:
     def _get_io_group_to_modify(self, io_group_from_host, ig_group_from_user):
         ig_group_from_user = self._split_io_group_from_user(ig_group_from_user)
         if not io_group_from_host:
-            return '', settings.IO_GROUP_DELIMITER.join(ig_group_from_user)
+            return '', common_settings.IO_GROUP_DELIMITER.join(ig_group_from_user)
 
         io_group_to_add, io_group_to_delete = self._get_io_group_to_remove_and_add_lists(
             io_group_from_host, ig_group_from_user)
-        return settings.IO_GROUP_DELIMITER.join(io_group_to_delete), \
-            settings.IO_GROUP_DELIMITER.join(io_group_to_add)
+        return common_settings.IO_GROUP_DELIMITER.join(io_group_to_delete), \
+            common_settings.IO_GROUP_DELIMITER.join(io_group_to_add)
 
     def _split_io_group_from_user(self, ig_group_from_user):
         if not ig_group_from_user:
-            return settings.FULL_IO_GROUP.split(settings.IO_GROUP_DELIMITER)
-        return ig_group_from_user.split(settings.IO_GROUP_DELIMITER)
+            return host_definer_settings.FULL_IO_GROUP.split(common_settings.IO_GROUP_DELIMITER)
+        return ig_group_from_user.split(common_settings.IO_GROUP_DELIMITER)
 
     def _get_io_group_to_remove_and_add_lists(self, io_group_from_host, ig_group_from_user):
         io_group_to_add = []
