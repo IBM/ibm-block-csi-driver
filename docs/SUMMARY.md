@@ -52,6 +52,8 @@
 	* [Creating a VolumeReplicationClass](content/configuration/creating_volumereplicationclass.md)
 		* [Finding a `system_id`](content/configuration/finding_systemid.md)
 	* [Creating a VolumeReplication](content/configuration/creating_volumereplication.md)
+	* [Creating a VolumeGroupClass](content/configuration/creating_volumegroupclass.md)
+	* [Creating a VolumeGroup](content/configuration/creating_volumegroup.md)
 	* [Expanding a PersistentVolumeClaim (PVC)](content/configuration/expanding_pvc.md)
 	* [Configuring for CSI Topology](content/configuration/configuring_topology.md)
 		* [Creating a Secret with topology awareness](content/configuration/creating_secret_topology_aware.md)
