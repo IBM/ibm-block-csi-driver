@@ -1,5 +1,6 @@
 #!/bin/bash
 set -x
-[ -n "$1" ] && coverage="-v $1:/driver/coverage:z"
-docker build -f Dockerfile-controllers.test -t csi-controller-tests . && \
-docker run --entrypoint ./controllers/scripts/unitests.sh --rm -t $coverage csi-controller-tests
+coveragedir=/driver/coverage/
+[ ! -d $coveragedir ] && mkdir -p $coveragedir
+#exec nosetests --exe --with-coverage --cover-xml --cover-xml-file=$coveragedir/.coverage.xml --cover-package=common --cover-package=controllers --with-xunit --xunit-file=$coveragedir/.unitests.xml $@
+exec pytest --cov-report term-missing --cov=controllers controllers/

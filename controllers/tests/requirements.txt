@@ -4,3 +4,4 @@ coverage==5.5
 pycodestyle==2.8.0
 pylint==2.14.3
 func-timeout==4.3.5
+pytest-cov
