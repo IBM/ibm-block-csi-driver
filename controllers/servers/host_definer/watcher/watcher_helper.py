@@ -63,8 +63,8 @@ class Watcher(KubernetesManager):
             return
         host_definition_info = self._update_host_definition_info(host_definition_info)
         response = self._define_host(host_definition_info)
-        current_host_definition_info_on_cluster = self._create_host_definition_if_not_exist(host_definition_info)
-        self._update_host_definition_from_storage_response(current_host_definition_info_on_cluster.name, response)
+        current_host_definition_info_on_cluster = self._create_host_definition_if_not_exist(
+            host_definition_info, response)
         self._set_status_to_host_definition_after_definition(
             response.error_message, current_host_definition_info_on_cluster)
 
@@ -79,8 +79,8 @@ class Watcher(KubernetesManager):
     def _define_host(self, host_definition_info):
         return self._ensure_definition_state(host_definition_info, self.storage_host_servicer.define_host)
 
-    def _create_host_definition_if_not_exist(self, host_definition_info):
-        host_definition_manifest = self._get_host_definition_manifest(host_definition_info)
+    def _create_host_definition_if_not_exist(self, host_definition_info, response):
+        host_definition_manifest = self._get_host_definition_manifest(host_definition_info, response)
         current_host_definition_info_on_cluster = self._get_matching_host_definition_info(
             host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
         if current_host_definition_info_on_cluster:
@@ -92,7 +92,7 @@ class Watcher(KubernetesManager):
             logger.info(messages.CREATING_NEW_HOST_DEFINITION.format(host_definition_info.name))
             return self._create_host_definition(host_definition_manifest)
 
-    def _get_host_definition_manifest(self, host_definition_info):
+    def _get_host_definition_manifest(self, host_definition_info, response):
         return {
             settings.API_VERSION: settings.CSI_IBM_API_VERSION,
             settings.KIND: settings.HOST_DEFINITION_KIND,
@@ -104,44 +104,11 @@ class Watcher(KubernetesManager):
                     settings.NODE_NAME_FIELD: host_definition_info.node_name,
                     common_settings.HOST_DEFINITION_NODE_ID_FIELD: NODES[host_definition_info.node_name].node_id,
                     settings.SECRET_NAME_FIELD: host_definition_info.secret_name,
-                    settings.SECRET_NAMESPACE_FIELD: host_definition_info.secret_namespace
-                },
-            },
-        }
-
-    def _update_host_definition_from_storage_response(self, host_definition_name, response):
-        self._update_host_definition_connectivity_type(host_definition_name, response.connectivity_type)
-        self._update_host_definition_ports(host_definition_name, response.ports)
-        self._update_host_definition_node_name_on_storage(host_definition_name, response.node_name_on_storage)
-
-    def _update_host_definition_connectivity_type(self, host_definition_name, connectivity_type):
-        logger.info(messages.UPDATE_HOST_DEFINITION_CONNECTIVITY_TYPE.format(host_definition_name, connectivity_type))
-        host_definition_manifest = self._generate_host_definition_manifest(host_definition_name)
-        host_definition_manifest[settings.SPEC][settings.HOST_DEFINITION_FIELD
-                                                ][settings.CONNECTIVITY_TYPE_FIELD] = connectivity_type
-        self._patch_host_definition(host_definition_manifest)
-
-    def _update_host_definition_ports(self, host_definition_name, ports):
-        logger.info(messages.UPDATE_HOST_DEFINITION_PORTS.format(host_definition_name, ports))
-        host_definition_manifest = self._generate_host_definition_manifest(host_definition_name)
-        host_definition_manifest[settings.SPEC][settings.HOST_DEFINITION_FIELD][settings.PORTS_FIELD] = ports
-        self._patch_host_definition(host_definition_manifest)
-
-    def _update_host_definition_node_name_on_storage(self, host_definition_name, node_name_on_storage):
-        logger.info(messages.UPDATE_HOST_DEFINITION_NODE_NAME_ON_STORAGE.format(
-            host_definition_name, node_name_on_storage))
-        host_definition_manifest = self._generate_host_definition_manifest(host_definition_name)
-        host_definition_manifest[settings.SPEC][settings.HOST_DEFINITION_FIELD
-                                                ][settings.NODE_NAME_ON_STORAGE_FIELD] = node_name_on_storage
-        self._patch_host_definition(host_definition_manifest)
-
-    def _generate_host_definition_manifest(self, host_definition_name):
-        return {
-            settings.METADATA: {
-                common_settings.NAME_FIELD: host_definition_name,
-            },
-            settings.SPEC: {
-                settings.HOST_DEFINITION_FIELD: {
+                    settings.SECRET_NAMESPACE_FIELD: host_definition_info.secret_namespace,
+                    settings.CONNECTIVITY_TYPE_FIELD: response.connectivity_type,
+                    settings.PORTS_FIELD: response.ports,
+                    settings.NODE_NAME_ON_STORAGE_FIELD: response.node_name_on_storage,
+                    settings.IO_GROUP_FIELD: response.io_group
                 },
             },
         }

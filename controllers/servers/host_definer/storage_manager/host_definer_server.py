@@ -165,4 +165,6 @@ class HostDefinerServicer:
         define_host_response = DefineHostResponse(connectivity_type=connectivity_type, node_name_on_storage=host_name)
         ports = array_mediator.get_host_connectivity_ports(host_name, connectivity_type)
         define_host_response.ports = ports
+        io_group_ids = array_mediator.get_host_io_group(host_name).id
+        define_host_response.io_group = [int(io_group_id) for io_group_id in io_group_ids]
         return define_host_response

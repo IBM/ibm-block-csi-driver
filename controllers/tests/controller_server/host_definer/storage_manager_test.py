@@ -10,7 +10,6 @@ from controllers.tests.common.test_settings import HOST_NAME, SECRET
 from controllers.tests.controller_server.common import mock_get_agent, mock_array_type
 import controllers.tests.controller_server.host_definer.settings as settings
 import controllers.tests.array_action.test_settings as array_settings
-from controllers.servers.host_definer.types import DefineHostResponse
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
 
 HOST_DEFINER_SERVER_PATH = "controllers.servers.host_definer.storage_manager.host_definer_server"
@@ -50,6 +49,7 @@ class TestDefineHost(BaseSetUp):
 
     def _test_define_host_success(self, is_host_exist=False):
         self._prepare_define_host(is_host_exist)
+        self.mediator.get_host_io_group.return_value = test_utils.get_fake_host_io_group()
         response = self.servicer.define_host(self.request)
         self.mediator.get_host_by_host_identifiers.assert_called_once_with(Initiators(iscsi_iqns=[settings.IQN]))
         self.assertEqual(response.error_message, '')
@@ -68,6 +68,7 @@ class TestDefineHost(BaseSetUp):
 
     def _prepare_define_host_already_exists(self, nqn, iqn):
         self._prepare_define_host()
+        self.mediator.get_host_io_group.return_value = test_utils.get_fake_host_io_group()
         self.mediator.create_host.side_effect = HostAlreadyExists(HOST_NAME, '')
         self.mediator.get_host_by_name.return_value = Host(name=HOST_NAME, nvme_nqns=[nqn], iscsi_iqns=[iqn],
                                                            connectivity_types=[])
@@ -91,7 +92,8 @@ class TestDefineHost(BaseSetUp):
         self.assertEqual(response.error_message, '')
 
     def _assert_io_group(self):
-        self.mediator.get_host_io_group.assert_called_once_with(HOST_NAME)
+        self.mediator.get_host_io_group.assert_called_with(HOST_NAME)
+        self.assertEqual(2, self.mediator.get_host_io_group.call_count)
         self.mediator.remove_io_group_from_host.assert_called_once_with(HOST_NAME, '0')
         self.mediator.add_io_group_to_host.assert_called_once_with(HOST_NAME, array_settings.DUMMY_IO_GROUP_TO_ADD)
 
@@ -120,9 +122,9 @@ class TestDefineHost(BaseSetUp):
 
     def test_define_host_return_values(self):
         self._prepare_define_host()
-        expected_response = DefineHostResponse(connectivity_type=self.request.connectivity_type_from_user,
-                                               node_name_on_storage=HOST_NAME,
-                                               ports=[settings.IQN])
+        self.mediator.get_host_io_group.return_value = test_utils.get_fake_host_io_group()
+        expected_response = test_utils.get_define_response(
+            self.request.connectivity_type_from_user, [settings.IQN])
         self.mediator.get_host_connectivity_ports.return_value = [settings.IQN]
         response = self.servicer.define_host(self.request)
         self.assertEqual(response, expected_response)
