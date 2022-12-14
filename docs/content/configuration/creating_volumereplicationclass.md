@@ -42,7 +42,7 @@ metadata:
 spec:
   provisioner: block.csi.ibm.com
   parameters:
-    replication_policy: demo_-eplication-policy-name
+    replication_policy: demo_replication-policy-name
     replication.storage.openshift.io/replication-secret-name: demo-secret
     replication.storage.openshift.io/replication-secret-namespace: default
 ```
