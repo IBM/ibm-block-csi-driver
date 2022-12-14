@@ -4,9 +4,11 @@ Create a PersistentVolumeClaim (PVC) YAML file for a persistent volume (PV).
 
 The IBM® block storage CSI driver supports using both file system and raw block volume modes.
 
-**Important:** If not defined, the default mode is `Filesystem`. Be sure to define the mode as `Block` if this configuration is preferred.
+**Important:**
+  - If not defined, the default mode is `Filesystem`. Be sure to define the mode as `Block` if this configuration is preferred.
+  - Only use the `volumegroup` label if the PVC is not using a StorageClass with a defined `volume_group`. The PVC `volumegroup` label value is the key defined in the VolumeGroup YAML.
 
-**Note:** The examples below create the PVC with a storage size 1 Gb. This can be changed, per customer needs.
+**Note:** The examples below create the PVC with a storage size 1 Gb and using the dynamic volume group feature. This can be changed, per customer needs.
 
 Use the sections below for creating YAML files for PVCs with file system and raw block volume modes. After each YAML file creation, use the `kubectl apply` command.
 
@@ -33,6 +35,8 @@ Create a PVC YAML file, similar to the following `demo-pvc-file-system.yaml` fil
     apiVersion: v1
     metadata:
       name: demo-pvc-file-system
+      labels:
+        volumegroup: demo-volumegroup
     spec:
       volumeMode: Filesystem  # Optional. The default is Filesystem.
       accessModes:
@@ -50,6 +54,8 @@ Create a PVC YAML file, similar to the following `demo-pvc-raw-block.yaml` file,
     apiVersion: v1
     metadata:
       name: demo-pvc-raw-block
+      labels:
+        volumegroup: demo-volumegroup
     spec:
       volumeMode: Block
       accessModes:
@@ -69,6 +75,8 @@ Update the `dataSource` parameters to reflect the existing volume snapshot infor
     apiVersion: v1
     metadata:
       name: demo-pvc-from-snapshot
+      labels:
+        volumegroup: demo-volumegroup
     spec:
       volumeMode: Filesystem
       accessModes:
@@ -94,6 +102,8 @@ Update the `dataSource` parameters to reflect the existing PVC object informatio
     apiVersion: v1
     metadata:
       name: demo-pvc-cloned-pvc
+      labels:
+        volumegroup: demo-volumegroup
     spec:
       volumeMode: Filesystem
       accessModes:
