@@ -714,3 +714,9 @@ def get_connectivity_type_ports(initiators, connectivity_type):
     if ports:
         return ports
     raise array_errors.NoPortFoundByConnectivityType(initiators, connectivity_type)
+
+
+def split_string(string, delimiter=' '):
+    if isinstance(string, str):
+        return string.split(delimiter)
+    return string

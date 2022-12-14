@@ -273,3 +273,10 @@ class NoPortIsValid(BaseArrayActionException):
     def __init__(self, host_name):
         super().__init__()
         self.message = messages.ALL_THE_PORTS_FOR_HOST_ARE_INVALID.format(host_name)
+
+
+class IoGroupIsInValid(BaseArrayActionException):
+
+    def __init__(self, io_group):
+        super().__init__()
+        self.message = messages.IO_GROUP_IS_NOT_VALID.format(io_group)
