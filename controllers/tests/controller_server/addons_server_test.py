@@ -127,7 +127,14 @@ class TestEnableVolumeReplication(BaseReplicationSetUp, CommonControllerTest):
                                             replication_id=None,
                                             grpc_status=grpc.StatusCode.NOT_FOUND)
 
-    def test_enable_replication_volume_in_group_fails(self):
+    def test_enable_ear_replication_idempotency_succeeds(self):
+        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(
+            volume_group_id=DUMMY_VOLUME_GROUP)
+        self._test_enable_replication_idempotency(replication_type=REPLICATION_TYPE_EAR,
+                                                  copy_type=REPLICATION_COPY_TYPE_SYNC,
+                                                  grpc_status=grpc.StatusCode.ALREADY_EXISTS)
+
+    def test_enable_ear_replication_volume_in_group_fails(self):
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(
             volume_group_id=DUMMY_VOLUME_GROUP)
         replication_request = self._prepare_request_params(replication_type=REPLICATION_TYPE_EAR,
