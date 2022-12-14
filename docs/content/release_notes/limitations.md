@@ -94,6 +94,12 @@ The following limitations apply when expanding volumes with the IBM block storag
 
 Volume group configuration is only supported for use with IBM Spectrum Virtualize family storage systems.
 
+In addition, volume groups can only be defined in one of the following ways:
+- Defined within a StorageClass
+- Defined within a PVC, using the volume group key
+
+PVCs that already belong to a StorageClass with a defined volume group cannot be added to a VolumeGroup object.
+
 ## Volume replication limitations
 
 When a role switch is conducted, this is not reflected within the other orchestration platform replication objects.
