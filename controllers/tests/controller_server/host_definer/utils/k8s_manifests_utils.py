@@ -121,3 +121,10 @@ def get_metadata_with_manage_node_labels_manifest(label_value):
             test_settings.NODE_LABELS_FIELD: {test_settings.MANAGE_NODE_LABEL: label_value}
         }
     }
+
+
+def get_host_io_group_manifest():
+    return {
+        test_settings.IO_GROUP_ID_FIELD: test_settings.IO_GROUP_IDS,
+        common_settings.NAME_FIELD: test_settings.IO_GROUP_NAMES
+    }

@@ -63,3 +63,6 @@ STORAGE_CLASS_PARAMETERS_FIELD = 'parameters'
 STORAGE_CLASS_SECRET_FIELD = 'csi.storage.k8s.io/secret-name'
 STORAGE_CLASS_SECRET_NAMESPACE_FIELD = 'csi.storage.k8s.io/secret-namespace'
 FAKE_PREFIX = 'fake-prefix'
+IO_GROUP_ID_FIELD = 'id'
+IO_GROUP_IDS = ['0', '2']
+IO_GROUP_NAMES = ['io_grp0', 'io_grp2']
