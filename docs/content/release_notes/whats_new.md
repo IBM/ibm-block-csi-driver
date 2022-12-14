@@ -13,7 +13,10 @@ With this new volume group support, the PersistentVolumeClaim (PVC) label can be
 
 The advantage of using volume groups is that actions, like replication, can be done simultaneously across all volumes in a volume group.
 
-For more information about volume groups and policy-based replication, see **What's new** > **Getting started with policy-based replication** within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
+For more information about volume groups and policy-based replication, see the following sections within your Spectrum Virtualize product documentation [IBM Documentation](https://www.ibm.com/docs).
+
+- **Product overview** > **Technical overview** > **Volume groups**
+- **What's new** > **Getting started with policy-based replication**
 
 ## Additional supported orchestration platforms for deployment
 
