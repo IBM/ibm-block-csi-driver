@@ -16,7 +16,7 @@ from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstra
 from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controllers.common import settings as common_settings
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.utils import get_connectivity_type_ports
+from controllers.servers.utils import get_connectivity_type_ports, split_string
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -45,6 +45,7 @@ NOT_CHILD_POOL = 'CMMVC9760E'
 NOT_REDUCTION_POOL = 'CMMVC9301E'
 NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND = 'CMMVC5860E'
 NOT_ENOUGH_EXTENTS_IN_POOL_CREATE = 'CMMVC8710E'
+NOT_VALID_IO_GROUP = 'CMMVC5729E'
 
 HOST_NQN = 'nqn'
 HOST_WWPN = 'WWPN'
@@ -120,11 +121,13 @@ def _add_port_to_command_kwargs(connectivity_type, port, cli_kwargs):
     return cli_kwargs
 
 
-def build_create_host_kwargs(host_name, connectivity_type, port):
+def build_create_host_kwargs(host_name, connectivity_type, port, io_group):
     cli_kwargs = {'name': host_name}
     cli_kwargs = _add_port_to_command_kwargs(connectivity_type, port, cli_kwargs)
     if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
         cli_kwargs['protocol'] = 'nvme'
+    if io_group:
+        cli_kwargs['iogrp'] = io_group
     return cli_kwargs
 
 
@@ -1112,6 +1115,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.debug("The chosen available lun is : {0}".format(lun))
         return lun
 
+    def _raise_error_when_host_not_exist_or_not_meet_the_rules(self, host_name, error_message):
+        if NAME_NOT_EXIST_OR_MEET_RULES in error_message:
+            raise array_errors.HostNotFoundError(host_name)
+
     def map_volume(self, volume_id, host_name, connectivity_type):
         logger.debug("mapping volume : {0} to host : "
                      "{1}".format(volume_id, host_name))
@@ -1135,8 +1142,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             else:
                 logger.error("Map volume {0} to host {1} failed. Reason "
                              "is: {2}".format(volume_name, host_name, ex))
-                if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
-                    raise array_errors.HostNotFoundError(host_name)
+                self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, ex.my_message)
                 if SPECIFIED_OBJ_NOT_EXIST in ex.my_message:
                     raise array_errors.ObjectNotFoundError(volume_name)
                 if LUN_ALREADY_IN_USE in ex.my_message:
@@ -1167,8 +1173,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             else:
                 logger.error("unmapping volume {0} from host {1} failed. Reason "
                              "is: {2}".format(volume_name, host_name, ex))
-                if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
-                    raise array_errors.HostNotFoundError(host_name)
+                self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, ex.my_message)
                 if OBJ_NOT_FOUND in ex.my_message:
                     raise array_errors.ObjectNotFoundError(volume_name)
                 if VOL_ALREADY_UNMAPPED in ex.my_message:
@@ -1744,17 +1749,22 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         cli_volume = self._get_cli_volume_by_wwn(vdisk_uid, not_exist_err=False)
         return cli_volume and cli_volume.FC_id
 
+    def _raise_invalid_io_group(self, io_group, error_message):
+        if NOT_VALID_IO_GROUP in error_message:
+            raise array_errors.IoGroupIsInValid(io_group)
+
     def _is_port_invalid(self, message_from_storage):
         return FC_PORT_IS_NOT_VALID in message_from_storage or \
             ISCSI_PORT_IS_NOT_VALID in message_from_storage or \
             NVME_PORT_IS_ALREADY_ASSIGNED in message_from_storage
 
-    def _mkhost(self, host_name, connectivity_type, port):
-        cli_kwargs = build_create_host_kwargs(host_name, connectivity_type, port)
+    def _mkhost(self, host_name, connectivity_type, port, io_group):
+        cli_kwargs = build_create_host_kwargs(host_name, connectivity_type, port, io_group)
         try:
             self.client.svctask.mkhost(**cli_kwargs)
             return 200
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self._raise_invalid_io_group(io_group, ex.my_message)
             if OBJ_ALREADY_EXIST in ex.my_message:
                 raise array_errors.HostAlreadyExists(host_name, self.endpoint)
             if self._is_port_invalid(ex.my_message):
@@ -1766,7 +1776,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def create_host(self, host_name, initiators, connectivity_type, io_group):
         ports = get_connectivity_type_ports(initiators, connectivity_type)
         for port in ports:
-            status_code = self._mkhost(host_name, connectivity_type, port)
+            status_code = self._mkhost(host_name, connectivity_type, port, io_group)
             if status_code == 200:
                 return
         raise array_errors.NoPortIsValid(host_name)
@@ -1841,11 +1851,57 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return array_settings.ISCSI_CONNECTIVITY_TYPE
         return None
 
+    def _raise_io_group_error(self, host_name, io_group, error_message):
+        self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, error_message)
+        self._raise_invalid_io_group(io_group, error_message)
+
+    def _addhostiogrp(self, host_name, io_group):
+        cli_kwargs = {'iogrp': io_group}
+        try:
+            self.client.svctask.addhostiogrp(object_id=host_name, **cli_kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self._raise_io_group_error(host_name, io_group, ex.my_message)
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during adding io_group {}, to host {} : {}".format(
+                    io_group, host_name, ex.my_message))
+            else:
+                raise ex
+
     def add_io_group_to_host(self, host_name, io_group):
-        raise NotImplementedError
+        if not io_group:
+            return
+        self._addhostiogrp(host_name, io_group)
+
+    def _rmhostiogrp(self, host_name, io_group):
+        cli_kwargs = {'iogrp': io_group}
+        try:
+            self.client.svctask.rmhostiogrp(object_id=host_name, **cli_kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self._raise_io_group_error(host_name, io_group, ex.my_message)
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during removing io_group {}, from host {} : {}".format(
+                    io_group, host_name, ex.my_message))
+            else:
+                raise ex
 
     def remove_io_group_from_host(self, host_name, io_group):
-        raise NotImplementedError
+        if not io_group:
+            return
+        self._rmhostiogrp(host_name, io_group)
+
+    def _lshostiogrp(self, host_name):
+        try:
+            return self.client.svcinfo.lshostiogrp(object_id=host_name).as_single_element
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, ex.my_message)
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during getting io_group, from host {} : {}".format(
+                    host_name, ex.my_message))
+                return None
+            raise ex
 
     def get_host_io_group(self, host_name):
-        raise NotImplementedError
+        io_group = self._lshostiogrp(host_name)
+        io_group.id = split_string(io_group.id)
+        io_group.name = split_string(io_group.name)
+        return io_group

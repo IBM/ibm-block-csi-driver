@@ -24,7 +24,7 @@ class TestWatchSecretResources(SecretWatcherBase):
 
     def test_create_definitions_managed_secret_was_modified(self):
         self._prepare_default_mocks_for_secret()
-        self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_settings.FAKE_NODE_ID
+        self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_utils.get_fake_managed_node()
         self.managed_secrets_on_watcher_helper.append(test_utils.get_fake_secret_info())
         self.managed_secrets_on_secret_watcher.append(test_utils.get_fake_secret_info())
         self.secret_watcher.host_definitions_api.get.return_value = \

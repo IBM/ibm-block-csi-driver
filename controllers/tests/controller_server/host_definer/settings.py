@@ -1,4 +1,5 @@
 from controllers.tests.common.test_settings import HOST_NAME
+import controllers.common.settings as common_settings
 
 SPEC_FIELD = 'spec'
 METADATA_FIELD = 'metadata'
@@ -63,3 +64,7 @@ STORAGE_CLASS_PARAMETERS_FIELD = 'parameters'
 STORAGE_CLASS_SECRET_FIELD = 'csi.storage.k8s.io/secret-name'
 STORAGE_CLASS_SECRET_NAMESPACE_FIELD = 'csi.storage.k8s.io/secret-namespace'
 FAKE_PREFIX = 'fake-prefix'
+IO_GROUP_ID_FIELD = 'id'
+IO_GROUP_IDS = ['0', '2']
+IO_GROUP_NAMES = ['io_grp0', 'io_grp2']
+FAKE_STRING_IO_GROUP = common_settings.IO_GROUP_DELIMITER.join(IO_GROUP_IDS)

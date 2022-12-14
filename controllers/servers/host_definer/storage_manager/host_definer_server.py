@@ -5,6 +5,8 @@ from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.node_info import NodeIdInfo
 from controllers.servers.host_definer.types import DefineHostResponse
 from controllers.servers.utils import join_object_prefix_with_name, get_initiators_connectivity_type
+import controllers.servers.host_definer.settings as host_definer_settings
+import controllers.common.settings as common_settings
 
 logger = get_stdout_logger()
 
@@ -25,6 +27,7 @@ class HostDefinerServicer:
                         request.node_id_from_host_definition)
                     found_host_name = self._get_host_name(initiators_from_host_definition, array_mediator)
                     self._update_host_ports(request, found_host_name, array_mediator)
+                    self._update_host_io_group(request, found_host_name, array_mediator)
                     host_name = found_host_name
                 except HostNotFoundError:
                     logger.debug("host was not found. creating a new host with initiators: {0}".format(initiators))
@@ -100,7 +103,7 @@ class HostDefinerServicer:
     def _create_host(self, host, array_mediator, request):
         initiators = self._get_initiators_from_node_id(request.node_id_from_csi_node)
         connectivity_type = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
-        array_mediator.create_host(host, initiators, connectivity_type)
+        array_mediator.create_host(host, initiators, connectivity_type, request.io_group)
         array_mediator.add_ports_to_host(host, initiators, connectivity_type)
 
     def _is_port_update_needed_when_same_protocol(
@@ -113,6 +116,44 @@ class HostDefinerServicer:
             ports_to_remove = array_mediator.get_host_connectivity_ports(host_name, connectivity_type)
             array_mediator.remove_ports_from_host(host_name, ports_to_remove, connectivity_type)
 
+    def _update_host_io_group(self, request, host, array_mediator):
+        io_group_from_host = array_mediator.get_host_io_group(host)
+        io_group_to_remove, io_group_to_add = self._get_io_group_to_modify(
+            io_group_from_host, request.io_group)
+        array_mediator.remove_io_group_from_host(host, io_group_to_remove)
+        array_mediator.add_io_group_to_host(host, io_group_to_add)
+
+    def _get_io_group_to_modify(self, io_group_from_host, ig_group_from_user):
+        ig_group_from_user = self._split_io_group_from_user(ig_group_from_user)
+        if not io_group_from_host:
+            return '', common_settings.IO_GROUP_DELIMITER.join(ig_group_from_user)
+
+        io_group_to_add, io_group_to_delete = self._get_io_group_to_remove_and_add_lists(
+            io_group_from_host, ig_group_from_user)
+        return common_settings.IO_GROUP_DELIMITER.join(io_group_to_delete), \
+            common_settings.IO_GROUP_DELIMITER.join(io_group_to_add)
+
+    def _split_io_group_from_user(self, ig_group_from_user):
+        if not ig_group_from_user:
+            return host_definer_settings.FULL_IO_GROUP.split(common_settings.IO_GROUP_DELIMITER)
+        return ig_group_from_user.split(common_settings.IO_GROUP_DELIMITER)
+
+    def _get_io_group_to_remove_and_add_lists(self, io_group_from_host, ig_group_from_user):
+        io_group_to_add = []
+        for io_group in ig_group_from_user:
+            id_index = self._get_element_index_in_list(io_group, io_group_from_host.id)
+            if id_index != -1:
+                io_group_from_host.id.pop(id_index)
+            else:
+                io_group_to_add.append(io_group)
+        return io_group_to_add, io_group_from_host.id
+
+    def _get_element_index_in_list(self, element, list_to_search_in):
+        try:
+            return list_to_search_in.index(element)
+        except ValueError:
+            return -1
+
     def _validate_host(self, host, initiators):
         if host.initiators not in initiators:
             error_message = "host ({}) found but with different initiators: {}".format(host, host.initiators)
@@ -124,4 +165,6 @@ class HostDefinerServicer:
         define_host_response = DefineHostResponse(connectivity_type=connectivity_type, node_name_on_storage=host_name)
         ports = array_mediator.get_host_connectivity_ports(host_name, connectivity_type)
         define_host_response.ports = ports
+        io_group_ids = array_mediator.get_host_io_group(host_name).id
+        define_host_response.io_group = [int(io_group_id) for io_group_id in io_group_ids]
         return define_host_response

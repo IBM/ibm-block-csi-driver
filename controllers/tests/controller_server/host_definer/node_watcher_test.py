@@ -48,7 +48,7 @@ class TestAddInitialNodes(NodeWatcherBase):
         self.node_watcher.host_definitions_api.get.return_value = self.ready_k8s_host_definitions
         self.os.getenv.return_value = test_settings.TRUE_STRING
         self.node_watcher.core_api.read_namespaced_secret.return_value = test_utils.get_fake_k8s_secret()
-        self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_settings.FAKE_NODE_ID
+        self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_utils.get_fake_managed_node()
 
 
 class TestWatchNodesResources(NodeWatcherBase):
@@ -78,7 +78,7 @@ class TestWatchNodesResources(NodeWatcherBase):
 
     def test_do_not_create_host_definitions_on_modified_node_without_csi_node(self):
         self._prepare_default_mocks_for_modified_event()
-        self.nodes_on_node_watcher[test_settings.FAKE_NODE_NAME] = test_settings.FAKE_NODE_ID
+        self.nodes_on_node_watcher[test_settings.FAKE_NODE_NAME] = test_utils.get_fake_managed_node()
         self.node_watcher.watch_nodes_resources()
         self.node_watcher.storage_host_servicer.define_host.assert_not_called()
         self.assertEqual(self.expected_unmanaged_csi_nodes_with_driver, self.unmanaged_csi_nodes_with_driver)

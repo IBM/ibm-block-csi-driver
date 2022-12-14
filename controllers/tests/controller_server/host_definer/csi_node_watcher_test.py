@@ -102,8 +102,8 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
         self.csi_node_watcher.storage_host_servicer.define_host.assert_called()
 
     def _prepare_mocks_for_updated_csi_node(self):
-        self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_settings.FAKE_NODE_ID
-        self.nodes_on_csi_node_watcher[test_settings.FAKE_NODE_NAME] = test_settings.FAKE_NODE_ID
+        self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_utils.get_fake_managed_node()
+        self.nodes_on_csi_node_watcher[test_settings.FAKE_NODE_NAME] = test_utils.get_fake_managed_node()
         self.managed_secrets_on_csi_node_watcher.append(test_utils.get_fake_secret_info())
         self.csi_node_watcher.csi_nodes_api.watch.return_value = iter(
             [test_utils.get_fake_csi_node_watch_event(test_settings.DELETED_EVENT_TYPE)])
@@ -174,8 +174,8 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
             name=test_settings.FAKE_NODE_NAME, body={})
 
     def _prepare_default_mocks_for_deletion(self):
-        self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_settings.FAKE_NODE_ID
-        self.nodes_on_csi_node_watcher[test_settings.FAKE_NODE_NAME] = test_settings.FAKE_NODE_ID
+        self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_utils.get_fake_managed_node()
+        self.nodes_on_csi_node_watcher[test_settings.FAKE_NODE_NAME] = test_utils.get_fake_managed_node()
         self.csi_node_watcher.csi_nodes_api.watch.return_value = iter(
             [test_utils.get_fake_csi_node_watch_event(test_settings.DELETED_EVENT_TYPE)])
         self.csi_node_watcher.core_api.read_node.side_effect = [
@@ -222,7 +222,7 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
             test_utils.get_pending_creation_status_manifest())
 
     def _prepare_default_mocks_for_modified_event(self):
-        self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_settings.FAKE_NODE_ID
+        self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_utils.get_fake_managed_node()
         self.managed_secrets_on_watcher_helper.append(test_utils.get_fake_secret_info())
         self.csi_node_watcher.csi_nodes_api.watch.return_value = iter(
             [test_utils.get_fake_csi_node_watch_event(test_settings.MODIFIED_EVENT_TYPE)])
