@@ -1686,15 +1686,15 @@ class TestDeleteVolumeGroup(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
 
-class TestModifyVolumeGroup(BaseControllerSetUp, CommonControllerTest):
+class TestModifyVolumeGroupMembership(BaseControllerSetUp, CommonControllerTest):
 
     @property
     def tested_method(self):
-        return self.servicer.ModifyVolumeGroup
+        return self.servicer.ModifyVolumeGroupMembership
 
     @property
     def tested_method_response_class(self):
-        return csi_pb2.ModifyVolumeGroupResponse
+        return csi_pb2.ModifyVolumeGroupMembershipResponse
 
     def setUp(self):
         super().setUp()
@@ -1702,7 +1702,7 @@ class TestModifyVolumeGroup(BaseControllerSetUp, CommonControllerTest):
 
     def test_modify_volume_group_success(self):
         self.mediator.get_volume_group.return_value = utils.get_mock_mediator_response_volume_group()
-        self.servicer.ModifyVolumeGroup(self.request, self.context)
+        self.servicer.ModifyVolumeGroupMembership(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
     def _prepare_modify_volume_group_volumes(self, volume_ids_in_request=None, volumes_in_volume_group=None,
@@ -1719,7 +1719,7 @@ class TestModifyVolumeGroup(BaseControllerSetUp, CommonControllerTest):
         self._prepare_modify_volume_group_volumes(volume_ids_in_request=[REQUEST_VOLUME_ID],
                                                   volumes_in_volume_group_after=[volume_in_volume_group])
 
-        volume_group_response = self.servicer.ModifyVolumeGroup(self.request, self.context)
+        volume_group_response = self.servicer.ModifyVolumeGroupMembership(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
         self.mediator.add_volume_to_volume_group.assert_called_once_with(VOLUME_GROUP_UID, VOLUME_UID)
         self.mediator.remove_volume_from_volume_group.assert_not_called()
@@ -1730,7 +1730,7 @@ class TestModifyVolumeGroup(BaseControllerSetUp, CommonControllerTest):
         volume_in_volume_group = utils.get_mock_mediator_response_volume()
         self._prepare_modify_volume_group_volumes(volumes_in_volume_group=[volume_in_volume_group])
 
-        volume_group_response = self.servicer.ModifyVolumeGroup(self.request, self.context)
+        volume_group_response = self.servicer.ModifyVolumeGroupMembership(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
         self.mediator.remove_volume_from_volume_group.assert_called_once_with(VOLUME_GROUP_UID, VOLUME_UID)
         self.mediator.add_volume_to_volume_group.assert_not_called()
@@ -1746,19 +1746,19 @@ class TestModifyVolumeGroup(BaseControllerSetUp, CommonControllerTest):
     def test_modify_volume_group_with_bad_id(self):
         self.request.volume_group_id = "bad_id"
 
-        response = self.servicer.ModifyVolumeGroup(self.request, self.context)
+        response = self.servicer.ModifyVolumeGroupMembership(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.mediator.remove_volume_from_volume_group.assert_not_called()
         self.mediator.add_volume_to_volume_group.assert_not_called()
-        self.assertEqual(type(response), csi_pb2.ModifyVolumeGroupResponse)
+        self.assertEqual(type(response), csi_pb2.ModifyVolumeGroupMembershipResponse)
 
     def test_modify_volume_group_already_exist_fail(self):
         self.mediator.get_volume_group = Mock(side_effect=array_errors.ObjectNotFoundError(""))
 
-        response = self.servicer.ModifyVolumeGroup(self.request, self.context)
+        response = self.servicer.ModifyVolumeGroupMembership(self.request, self.context)
 
         self.mediator.remove_volume_from_volume_group.assert_not_called()
         self.mediator.add_volume_to_volume_group.assert_not_called()
-        self.assertEqual(type(response), csi_pb2.ModifyVolumeGroupResponse)
+        self.assertEqual(type(response), csi_pb2.ModifyVolumeGroupMembershipResponse)
         self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
