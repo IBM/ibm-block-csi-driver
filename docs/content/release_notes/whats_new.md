@@ -24,7 +24,7 @@ The IBM® block storage CSI driver 1.11.0 host definition feature now supports t
 
     This version introduces a new label tag, allowing connectivity type definition of a specific node, regardless of connectivity hierarchy. For more information, see [Adding optional labels for dynamic host definition](../using/using_hostdefinition_labels.md).
     
-In addition, only valid ports are now defined when working with Fibre Channel.
+In addition, only valid ports are now defined. For example, if a host has a total of four Fibre Channel ports and only two of them are zoned to the storage system, only the two zoned ports are created on the host.
 
 ## Additional supported orchestration platforms for deployment
 
