@@ -244,7 +244,7 @@ func readFile(path string) (string, error) {
 		return "", err
 	}
 	if len(relevantLines) > 1 {
-		err := fmt.Errorf(fmt.Sprintf("to many lines in file %v", relevantLines))
+		err := fmt.Errorf(fmt.Sprintf("too many lines in file %v", relevantLines))
 		return "", err
 	}
 
