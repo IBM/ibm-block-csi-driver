@@ -12,7 +12,7 @@ If using policy-based replication, use the `replication_policy` parameter, with 
 
 If policy-based replication is not in use, use the `system_id` of the storage system containing the `replicationHandle` volumes. For information on obtaining your storage system `system_id`, see [Finding a `system_id`](finding_systemid.md).
 
-**Important:** Be sure to only use one of the following parameters: `replication_policy` **or** `system_id`. If both parameters are present within the VolumeReplicationClass, an error occurs. For more information, see TROUBLESHOOTING.
+**Important:** Be sure to only use one of the following parameters: `replication_policy` **or** `system_id`. Using both parameters within the VolumeReplicationClass, results in the following error message: `got an invalid parameter: system_id`.
 
 Use one of the following examples, depending on the replication type that is being used.
 
