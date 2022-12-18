@@ -55,7 +55,6 @@ LIST_HOSTS_CMD_FORMAT = 'lshost {HOST_ID};echo;'
 HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
 
 LUN_INTERVAL = 128
-EAR_VOLUME_FC_MAP_COUNT = "2"
 
 FCMAP_STATUS_DONE = 'idle_or_copied'
 
@@ -1749,7 +1748,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return False
         cli_volume = self._get_cli_volume_by_wwn(vdisk_uid, not_exist_err=False)
         if self._is_earreplication_supported():
-            return cli_volume and cli_volume.replication_mode and cli_volume.fc_map_count != EAR_VOLUME_FC_MAP_COUNT
+            return cli_volume and cli_volume.replication_mode and cli_volume.fc_map_count != \
+                   common_settings.EAR_VOLUME_FC_MAP_COUNT
         return cli_volume and cli_volume.FC_id
 
     def _raise_invalid_io_group(self, io_group, error_message):

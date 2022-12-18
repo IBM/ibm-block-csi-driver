@@ -14,13 +14,14 @@ import controllers.tests.common.test_settings as common_settings
 from controllers.array_action.array_mediator_svc import SVCArrayMediator, build_kwargs_from_parameters, \
     FCMAP_STATUS_DONE, YES
 from controllers.common.node_info import Initiators
-from controllers.array_action.settings import REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR, RCRELATIONSHIP_STATE_READY
+from controllers.array_action.settings import REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR,\
+    RCRELATIONSHIP_STATE_READY, ENDPOINT_TYPE_PRODUCTION
 from controllers.array_action.array_action_types import ReplicationRequest
 from controllers.tests.common.test_settings import OBJECT_INTERNAL_ID, \
     OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE
 from controllers.common.settings import ARRAY_TYPE_SVC, SPACE_EFFICIENCY_THIN, SPACE_EFFICIENCY_COMPRESSED, \
     SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED, SPACE_EFFICIENCY_DEDUPLICATED_THIN, SPACE_EFFICIENCY_DEDUPLICATED, \
-    SPACE_EFFICIENCY_THICK, VOLUME_GROUP_NAME_SUFFIX
+    SPACE_EFFICIENCY_THICK, VOLUME_GROUP_NAME_SUFFIX, EAR_VOLUME_FC_MAP_COUNT
 
 EMPTY_BYTES = b""
 
@@ -652,7 +653,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
                         pool_name=common_settings.DUMMY_POOL1,
                         vdisk_uid=common_settings.VOLUME_UID,
                         fc_id="", capacity=array_settings.DUMMY_CAPACITY_STR,
-                        thick=False):
+                        thick=False,
+                        replication_mode=None,
+                        fc_map_count=EAR_VOLUME_FC_MAP_COUNT):
 
         deduplicated_copy = svc_settings.NO_VALUE_ALIAS
         compressed_copy = svc_settings.NO_VALUE_ALIAS
@@ -673,7 +676,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
                       svc_settings.VOLUME_SE_COPY_ATTR_KEY: se_copy,
                       svc_settings.VOLUME_DEDUPLICATED_COPY_ATTR_KEY: deduplicated_copy,
                       svc_settings.VOLUME_COMPRESSED_COPY_ATTR_KEY: compressed_copy,
-                      svc_settings.VOLUME_GROUP_ID_ATTR_KEY: volume_group_id
+                      svc_settings.VOLUME_GROUP_ID_ATTR_KEY: volume_group_id,
+                      svc_settings.VOLUME_REPLICATION_MODE_ATTR_KEY: replication_mode,
+                      svc_settings.VOLUME_FC_MAP_COUNT_ATTR_KEY: fc_map_count
                       })
 
     @staticmethod
@@ -858,8 +863,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def _get_custom_cli_volume(self, support_deduplicated_copy, with_deduplicated_copy,
                                name=common_settings.SOURCE_VOLUME_NAME,
-                               pool_name=common_settings.DUMMY_POOL1):
-        volume = self._get_cli_volume(with_deduplicated_copy, name=name, pool_name=pool_name)
+                               pool_name=common_settings.DUMMY_POOL1,
+                               replication_mode=None,
+                               fc_map_count=EAR_VOLUME_FC_MAP_COUNT):
+        volume = self._get_cli_volume(with_deduplicated_copy, name=name, pool_name=pool_name,
+                                      replication_mode=replication_mode, fc_map_count=fc_map_count)
         if not support_deduplicated_copy:
             del volume.deduplicated_copy
         return volume
@@ -1089,17 +1097,25 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvolumesnapshot.return_value = self._mock_cli_object(
             self._get_cli_snapshot(snapshot_id))
 
-    def _prepare_mocks_for_create_snapshot_addsnapshot(self, snapshot_id=common_settings.INTERNAL_VOLUME_ID):
+    def _prepare_mocks_for_create_snapshot_addsnapshot(self, snapshot_id=common_settings.INTERNAL_VOLUME_ID,
+                                                       is_ear_supported=False,
+                                                       replication_mode=None,
+                                                       fc_map_count=EAR_VOLUME_FC_MAP_COUNT):
         self.svc.client.svctask.addsnapshot = Mock()
-        source_volume_to_copy_from = self._get_custom_cli_volume(False, False, pool_name=common_settings.DUMMY_POOL1)
+        if is_ear_supported:
+            self.svc.client.svctask.chvolumereplicationinternals = Mock()
+        source_volume_to_copy_from = self._get_custom_cli_volume(False, False, pool_name=common_settings.DUMMY_POOL1,
+                                                                 replication_mode=replication_mode,
+                                                                 fc_map_count=fc_map_count)
         volumes_to_return = [source_volume_to_copy_from, source_volume_to_copy_from, source_volume_to_copy_from]
         self.svc.client.svcinfo.lsvdisk.side_effect = self._mock_cli_objects(volumes_to_return)
         self.svc.client.svctask.addsnapshot.return_value = Mock(
             response=(b"Snapshot, id [0], successfully created or triggered\n", b""))
         self._prepare_mocks_for_lsvolumesnapshot(snapshot_id)
 
-    def _test_create_snapshot_addsnapshot_success(self, pool=common_settings.DUMMY_POOL1):
-        self._prepare_mocks_for_create_snapshot_addsnapshot()
+    def _test_create_snapshot_addsnapshot_success(self, pool=common_settings.DUMMY_POOL1,
+                                                  is_ear_supported=False):
+        self._prepare_mocks_for_create_snapshot_addsnapshot(is_ear_supported=is_ear_supported)
         snapshot = self.svc.create_snapshot(common_settings.SOURCE_VOLUME_ID, common_settings.SNAPSHOT_NAME,
                                             space_efficiency=None, pool=pool,
                                             is_virt_snap_func=True)
@@ -1124,6 +1140,18 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_create_snapshot_addsnapshot_success(pool=common_settings.DUMMY_POOL2)
 
     def test_create_snapshot_addsnapshot_not_supported_error(self):
+        with self.assertRaises(array_errors.VirtSnapshotFunctionNotSupportedMessage):
+            self.svc.create_snapshot(common_settings.SOURCE_VOLUME_ID, common_settings.SNAPSHOT_NAME,
+                                     space_efficiency=None, pool=common_settings.DUMMY_POOL1,
+                                     is_virt_snap_func=True)
+
+    def test_create_snapshot_addsnapshot_ear_success(self):
+        self._test_create_snapshot_addsnapshot_success(is_ear_supported=True)
+
+    def test_create_snapshot_addsnapshot_ear_wrong_fc_map_count_error(self):
+        self._prepare_mocks_for_create_snapshot_addsnapshot(is_ear_supported=True,
+                                                            replication_mode=ENDPOINT_TYPE_PRODUCTION,
+                                                            fc_map_count=3)
         with self.assertRaises(array_errors.VirtSnapshotFunctionNotSupportedMessage):
             self.svc.create_snapshot(common_settings.SOURCE_VOLUME_ID, common_settings.SNAPSHOT_NAME,
                                      space_efficiency=None, pool=common_settings.DUMMY_POOL1,

@@ -30,3 +30,5 @@ NAME_FIELD = 'name'
 NAMESPACE_FIELD = 'namespace'
 IO_GROUP_DELIMITER = ':'
 IO_GROUP_LABEL_PREFIX = 'hostdefiner.block.csi.ibm.com/io-group-'
+
+EAR_VOLUME_FC_MAP_COUNT = "2"
