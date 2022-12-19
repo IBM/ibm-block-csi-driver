@@ -554,7 +554,7 @@ def get_object_id_info(full_object_id, object_type):
         internal_id, wwn = splitted_id
     else:
         raise ObjectIdError(object_type, full_object_id)
-    logger.debug("volume id : {0}, array type :{1}".format(object_id, array_type))
+    logger.debug("{0} id : {1}, array type :{2}".format(object_type, object_id, array_type))
     return ObjectIdInfo(array_type=array_type, system_id=system_id, internal_id=internal_id, uid=wwn)
 
 
@@ -619,6 +619,11 @@ def validate_addons_request(request, replication_type):
         minimum_request_fields.append("replication_id")
     _validate_minimum_request_fields(request, minimum_request_fields)
 
+    if replication_type == REPLICATION_TYPE_EAR:
+        logger.debug("validating obsolete non-EAR parameters")
+        _validate_addons_request_for_replication_id(request)
+        _validate_addons_request_for_system_id(request)
+
     logger.debug("validating copy type")
     if servers_settings.PARAMETERS_COPY_TYPE in request.parameters:
         copy_type = request.parameters.get(servers_settings.PARAMETERS_COPY_TYPE)
@@ -626,6 +631,18 @@ def validate_addons_request(request, replication_type):
             raise ValidationException(messages.INVALID_REPLICATION_COPY_TYPE_MESSAGE.format(copy_type))
 
     logger.debug("addons request validation finished")
+
+
+def _validate_addons_request_for_replication_id(request):
+    if request.replication_id != "":
+        raise ValidationException(messages.INVALID_EAR_PARAMETER_MESSAGE.format(
+            servers_settings.PARAMETERS_REPLICATION_HANDLE))
+
+
+def _validate_addons_request_for_system_id(request):
+    if request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID):
+        raise ValidationException(messages.INVALID_EAR_PARAMETER_MESSAGE.format(
+            servers_settings.PARAMETERS_SYSTEM_ID))
 
 
 def get_addons_replication_type(request):
@@ -638,10 +655,8 @@ def get_addons_replication_type(request):
     return replication_type
 
 
-def generate_addons_replication_request(request, replication_type):
-    volume_id_info = get_volume_id_info(request.volume_id)
-    volume_internal_id = volume_id_info.ids.internal_id
-
+def generate_addons_replication_request(request, replication_type, object_type):
+    volume_internal_id = _get_volume_internal_id(request, object_type)
     other_volume_internal_id = _get_other_volume_internal_id(request, replication_type)
 
     other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
@@ -653,6 +668,16 @@ def generate_addons_replication_request(request, replication_type):
                               copy_type=copy_type,
                               replication_type=replication_type,
                               replication_policy=replication_policy)
+
+
+def _get_volume_internal_id(request, object_type):
+    if object_type == servers_settings.VOLUME_GROUP_TYPE_NAME:
+        volume_id_info = get_volume_group_id_info(request.volume_id)
+        volume_internal_id = volume_id_info.ids.uid
+    else:
+        volume_id_info = get_volume_id_info(request.volume_id)
+        volume_internal_id = volume_id_info.ids.internal_id
+    return volume_internal_id
 
 
 def _get_other_volume_internal_id(request, replication_type):
@@ -742,3 +767,23 @@ def validate_modify_volume_group_request(request):
     _validate_minimum_request_fields(request, ["volume_group_id"])
 
     logger.debug("modify volume group validation finished")
+
+
+def get_replication_object_type_and_id_info(request):
+    # object_type = servers_settings.VOLUME_TYPE_NAME
+    # object_id = request.volume_id
+    object_type = servers_settings.VOLUME_GROUP_TYPE_NAME
+    object_id = "SVC:3"
+    object_info = None
+    if object_info:
+        logger.info(object_info)
+        if object_info.HasField(servers_settings.VOLUME_TYPE_NAME):
+            object_id = object_info.volume.volume_id
+            object_type = servers_settings.VOLUME_TYPE_NAME
+        elif object_info.HasField(servers_settings.VOLUME_GROUP_TYPE_NAME):
+            object_id = object_info.volume.volume_group_id
+            object_type = servers_settings.VOLUME_GROUP_TYPE_NAME
+        else:
+            return object_type, object_id
+    object_id_info = get_object_id_info(object_id, object_type)
+    return object_type, object_id_info
