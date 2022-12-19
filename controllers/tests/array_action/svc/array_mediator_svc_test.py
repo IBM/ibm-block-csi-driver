@@ -17,7 +17,7 @@ from controllers.array_action.settings import REPLICATION_TYPE_MIRROR, REPLICATI
 from controllers.common.node_info import Initiators
 from controllers.common.settings import ARRAY_TYPE_SVC, SPACE_EFFICIENCY_THIN, SPACE_EFFICIENCY_COMPRESSED, \
     SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED, SPACE_EFFICIENCY_DEDUPLICATED_THIN, SPACE_EFFICIENCY_DEDUPLICATED, \
-    SPACE_EFFICIENCY_THICK, VOLUME_GROUP_NAME_SUFFIX
+    SPACE_EFFICIENCY_THICK
 from controllers.tests import utils
 from controllers.tests.common.test_settings import OBJECT_INTERNAL_ID, \
     OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE
@@ -197,11 +197,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
         replication = self.svc.get_replication(replication_request)
 
         self.assertEqual(replication.replication_type, REPLICATION_TYPE_EAR)
-        self.assertEqual(replication.volume_group_id, svc_settings.VOLUME_GROUP_ID_ATTR_KEY)
+        self.assertEqual(replication.volume_group_id, OBJECT_INTERNAL_ID)
 
-        self.svc.client.svcinfo.lsvdisk.assert_called_once_with(object_id=OBJECT_INTERNAL_ID, bytes=True)
-        self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_once_with(object_id=svc_settings.
-                                                                                 VOLUME_GROUP_ID_ATTR_KEY)
+        self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_once_with(object_id=OBJECT_INTERNAL_ID)
 
     def test_get_ear_replication_not_supported(self):
         _, replication_request = self._prepare_mocks_for_ear_replication(is_ear_supported=False)
@@ -219,26 +217,21 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         replication = self.svc.get_replication(replication_request)
         self.assertEqual(replication, None)
-        self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_once_with(object_id=svc_settings.
-                                                                                 VOLUME_GROUP_ID_ATTR_KEY)
+        self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_once_with(object_id=OBJECT_INTERNAL_ID)
 
     def test_create_ear_replication_success(self):
         _, replication_request = self._prepare_mocks_for_ear_replication()
 
         self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(as_single_element=None)
-        self.svc.client.svctask.mkvolumegroup.return_value = Mock(response=(b"id [1]\n", b""))
 
         self.svc.create_replication(replication_request)
-        self.svc.client.svctask.mkvolumegroup.assert_called_once_with(name=common_settings.
-                                                                      SOURCE_VOLUME_NAME + VOLUME_GROUP_NAME_SUFFIX)
-        self.svc.client.svctask.chvolumegroup.assert_called_once_with(object_id=int(svc_settings.DUMMY_INTERNAL_ID1),
+        self.svc.client.svctask.chvolumegroup.assert_called_once_with(object_id=OBJECT_INTERNAL_ID,
                                                                       replicationpolicy=REPLICATION_NAME)
 
     def test_create_ear_replication_not_supported(self):
         _, replication_request = self._prepare_mocks_for_ear_replication(is_ear_supported=False)
 
         self.svc.create_replication(replication_request)
-        self.svc.client.svcinfo.mkvolumegroup.assert_not_called()
         self.svc.client.svcinfo.chvolumegroup.assert_not_called()
 
     def test_promote_ear_replication_volume_from_independent(self):
@@ -259,15 +252,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.delete_replication(replication)
         self.svc.client.svctask.chvolumegroup.assert_called_once_with(object_id=OBJECT_INTERNAL_ID,
                                                                       noreplicationpolicy=True)
-        self.svc.client.svctask.rmvolumegroup.assert_called_once_with(object_id=OBJECT_INTERNAL_ID)
 
     def test_delete_ear_replication_not_supported(self):
         replication, _ = self._prepare_mocks_for_ear_replication(is_ear_supported=False)
         self.svc.delete_replication(replication)
 
         self.svc.client.svcinfo.chvolumegroup.assert_not_called()
-        self.svc.client.svctask.chvdisk.assert_not_called()
-        self.svc.client.svctask.rmvolumegroup.assert_not_called()
 
     def test_demote_ear_replication_volume(self):
         replication, _ = self._prepare_mocks_for_ear_replication(is_ear_supported=True)
