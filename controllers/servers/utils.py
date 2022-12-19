@@ -481,12 +481,13 @@ def validate_publish_volume_request(request):
 def get_volume_id_info(volume_id):
     return get_object_id_info(volume_id, servers_settings.VOLUME_TYPE_NAME)
 
-def get_volume_group_id_info(volume_id):
-    return get_object_id_info(volume_id, servers_settings.VOLUME_GROUP_TYPE_NAME)
-
 
 def get_snapshot_id_info(snapshot_id):
     return get_object_id_info(snapshot_id, servers_settings.SNAPSHOT_TYPE_NAME)
+
+
+def get_volume_group_id_info(volume_group_id):
+    return get_object_id_info(volume_group_id, servers_settings.VOLUME_GROUP_TYPE_NAME)
 
 
 def _get_context_from_volume(volume):
@@ -618,10 +619,8 @@ def get_addons_replication_type(request):
     return replication_type
 
 
-def generate_addons_replication_request(request, replication_type):
-    volume_id_info = get_volume_id_info(request.volume_id)
-    volume_internal_id = volume_id_info.ids.internal_id
-
+def generate_addons_replication_request(request, replication_type, object_type):
+    volume_internal_id = _get_volume_internal_id(request, object_type)
     other_volume_internal_id = _get_other_volume_internal_id(request, replication_type)
 
     other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
@@ -633,6 +632,16 @@ def generate_addons_replication_request(request, replication_type):
                               copy_type=copy_type,
                               replication_type=replication_type,
                               replication_policy=replication_policy)
+
+
+def _get_volume_internal_id(request, object_type):
+    if object_type == servers_settings.VOLUME_GROUP_TYPE_NAME:
+        volume_id_info = get_volume_group_id_info(request.volume_id)
+        volume_internal_id = volume_id_info.ids.uid
+    else:
+        volume_id_info = get_volume_id_info(request.volume_id)
+        volume_internal_id = volume_id_info.ids.internal_id
+    return volume_internal_id
 
 
 def _get_other_volume_internal_id(request, replication_type):
@@ -726,10 +735,8 @@ def split_string(string, delimiter=' '):
 
 
 def get_replication_object_type_and_id_info(request):
-    # object_type = servers_settings.VOLUME_TYPE_NAME
-    # object_id = request.volume_id
     object_type = servers_settings.VOLUME_GROUP_TYPE_NAME
-    object_id = "SVC:3"
+    object_id = request.volume_id
     object_info = None
     if object_info:
         logger.info(object_info)

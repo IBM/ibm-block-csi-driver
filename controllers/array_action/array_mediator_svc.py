@@ -11,7 +11,7 @@ from retry import retry
 import controllers.array_action.errors as array_errors
 import controllers.array_action.settings as array_settings
 import controllers.servers.settings as controller_settings
-from controllers.array_action.array_action_types import Volume, Snapshot, Replication, Host
+from controllers.array_action.array_action_types import Volume, Snapshot, Replication, Host, VolumeGroup, ThinVolume
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controllers.common import settings as common_settings
@@ -694,6 +694,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             if not source_cli_volume:
                 return None
             return self._generate_snapshot_response_from_cli_snapshot(cli_snapshot, source_cli_volume)
+        if object_type == controller_settings.VOLUME_GROUP_TYPE_NAME:
+            return self.get_volume_group(object_id)
         cli_volume = self._get_cli_volume_by_wwn(object_id)
         if not cli_volume:
             return None
@@ -1382,12 +1384,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             logger.info("EAR replication is not supported on the existing storage")
             return None
 
-        # for phase 1 - find volume by id and get volume group id from result volume
-        cli_volume = self._get_cli_volume(replication_request.volume_internal_id)
-        volume_group_id = cli_volume.volume_group_id
-        if volume_group_id == "":
-            return None
-
+        volume_group_id = replication_request.volume_internal_id
         replication_mode = self._get_replication_mode(volume_group_id)
         if not replication_mode:
             return None
@@ -1467,13 +1464,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return
 
         replication_policy = replication_request.replication_policy
-
-        volume_internal_id = replication_request.volume_internal_id
-        cli_volume = self._get_cli_volume(volume_internal_id)
-
-        volume_group_name = cli_volume.name + common_settings.VOLUME_GROUP_NAME_SUFFIX
-        volume_group_id = self._create_volume_group(volume_group_name)
-        self._change_volume_group(volume_internal_id, volume_group_name)
+        volume_group_id = replication_request.volume_internal_id
 
         self._change_volume_group_policy(volume_group_id, replication_policy)
 
@@ -1523,10 +1514,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return
 
         self._change_volume_group_policy(volume_group_id)
-
-        cli_volume_id = self._get_cli_volume_id_from_volume_group("volume_group_id", volume_group_id)
-        self._change_volume_group(cli_volume_id)
-        self._rmvolumegroup(volume_group_id)
 
     def _promote_replication_endpoint(self, endpoint_type, replication_name):
         logger.info("making '{}' primary for remote copy relationship {}".format(endpoint_type, replication_name))
@@ -1792,6 +1779,36 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def delete_host(self, host_name):
         self._rmhost(host_name)
+
+    def _generate_thin_volume_response(self, cli_volume):
+        return ThinVolume(
+            capacity_bytes=int(cli_volume.capacity),
+            id=cli_volume.vdisk_UID,
+            internal_id=cli_volume.id,
+            name=cli_volume.name,
+            array_type=self.array_type
+        )
+
+    def _get_cli_volumes_from_volume_group(self, volume_group_name):
+        filter_value = 'volume_group_name={}'.format(volume_group_name)
+        cli_volumes = self._lsvdisk_list(filtervalue=filter_value)
+        return [self._generate_thin_volume_response(cli_volume) for cli_volume in cli_volumes]
+
+    def _generate_volume_group_response(self, cli_volume_group):
+        volumes = []
+        if int(cli_volume_group.volume_count) > 0:
+            volumes = self._get_cli_volumes_from_volume_group(cli_volume_group.name)
+        return VolumeGroup(name=cli_volume_group.name,
+                           array_type=self.array_type,
+                           id=cli_volume_group.uid if hasattr(cli_volume_group, "uid") else cli_volume_group.id,
+                           internal_id=cli_volume_group.id,
+                           volumes=volumes)
+
+    def get_volume_group(self, volume_group_id):
+        cli_volume_group = self._lsvolumegroup(volume_group_id)
+        if cli_volume_group is None:
+            raise array_errors.ObjectNotFoundError(volume_group_id)
+        return self._generate_volume_group_response(cli_volume_group)
 
     def _raise_error_when_no_ports_added(self, host_name):
         cli_host = self._get_cli_host(host_name)

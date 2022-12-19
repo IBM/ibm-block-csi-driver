@@ -4,7 +4,21 @@ from controllers.common.node_info import Initiators
 
 
 @dataclass
-class Volume:
+class ArrayObject:
+    name: str
+    id: str
+    internal_id: str
+    array_type: str
+
+
+@dataclass
+class ThinVolume(ArrayObject):
+    capacity_bytes: int
+    source_id: str = ""
+
+
+@dataclass
+class Volume(ArrayObject):
     capacity_bytes: int
     id: str
     internal_id: str
@@ -15,6 +29,11 @@ class Volume:
     pool: str
     space_efficiency_aliases: set = field(default_factory=set)
     volume_group_id: str = None
+
+
+@dataclass
+class VolumeGroup(ArrayObject):
+    volumes: list = field(default_factory=list)
 
 
 @dataclass
