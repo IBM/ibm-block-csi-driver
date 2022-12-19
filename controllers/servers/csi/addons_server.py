@@ -21,15 +21,17 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         replication_type = utils.get_addons_replication_type(request)
         utils.validate_addons_request(request, replication_type)
 
-        volume_id_info = utils.get_volume_id_info(request.volume_id)
-        volume_id = volume_id_info.ids.uid
+        object_type, object_id_info = utils.get_replication_object_type_and_id_info(request)
+        object_id = object_id_info.ids.uid
+
+        logger.debug("Source from get_replication_source_type_and_ids {0} id : {1}".format(object_type, object_id))
         replication_request = utils.generate_addons_replication_request(request, replication_type)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
-        with get_agent(connection_info, volume_id_info.array_type).get_mediator() as mediator:
-            volume = mediator.get_object_by_id(volume_id, servers_settings.VOLUME_TYPE_NAME)
+        with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
+            volume = mediator.get_object_by_id(object_id, object_type)
             if not volume:
-                raise array_errors.ObjectNotFoundError(volume_id)
+                raise array_errors.ObjectNotFoundError(object_id)
             replication = mediator.get_replication(replication_request)
             if replication:
                 error_message = self._ensure_replication_idempotency(replication_request, replication, volume)

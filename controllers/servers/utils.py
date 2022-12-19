@@ -481,6 +481,9 @@ def validate_publish_volume_request(request):
 def get_volume_id_info(volume_id):
     return get_object_id_info(volume_id, servers_settings.VOLUME_TYPE_NAME)
 
+def get_volume_group_id_info(volume_id):
+    return get_object_id_info(volume_id, servers_settings.VOLUME_GROUP_TYPE_NAME)
+
 
 def get_snapshot_id_info(snapshot_id):
     return get_object_id_info(snapshot_id, servers_settings.SNAPSHOT_TYPE_NAME)
@@ -512,7 +515,7 @@ def get_object_id_info(full_object_id, object_type):
         internal_id, wwn = splitted_id
     else:
         raise ObjectIdError(object_type, full_object_id)
-    logger.debug("volume id : {0}, array type :{1}".format(object_id, array_type))
+    logger.debug("{0} id : {1}, array type :{2}".format(object_type, object_id, array_type))
     return ObjectIdInfo(array_type=array_type, system_id=system_id, internal_id=internal_id, uid=wwn)
 
 
@@ -720,3 +723,23 @@ def split_string(string, delimiter=' '):
     if isinstance(string, str):
         return string.split(delimiter)
     return string
+
+
+def get_replication_object_type_and_id_info(request):
+    # object_type = servers_settings.VOLUME_TYPE_NAME
+    # object_id = request.volume_id
+    object_type = servers_settings.VOLUME_GROUP_TYPE_NAME
+    object_id = "SVC:3"
+    object_info = None
+    if object_info:
+        logger.info(object_info)
+        if object_info.HasField(servers_settings.VOLUME_TYPE_NAME):
+            object_id = object_info.volume.volume_id
+            object_type = servers_settings.VOLUME_TYPE_NAME
+        elif object_info.HasField(servers_settings.VOLUME_GROUP_TYPE_NAME):
+            object_id = object_info.volume.volume_group_id
+            object_type = servers_settings.VOLUME_GROUP_TYPE_NAME
+        else:
+            return object_type, object_id
+    object_id_info = get_object_id_info(object_id, object_type)
+    return object_type, object_id_info
