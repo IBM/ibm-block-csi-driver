@@ -1805,7 +1805,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     def delete_host(self, host_name):
-        logger.info(svc_messages.REMOVE_HOST.format(host_name))
+        logger.info(svc_messages.DELETE_HOST.format(host_name))
         self._rmhost(host_name)
 
     def _raise_error_when_no_ports_added(self, host_name):
@@ -1893,7 +1893,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def add_io_group_to_host(self, host_name, io_group):
         if not io_group:
             return
-        logger.info(svc_messages.REMOVE_HOST_IO_GROUP.format(io_group, host_name))
+        logger.info(svc_messages.ADD_HOST_IO_GROUP.format(io_group, host_name))
         self._addhostiogrp(host_name, io_group)
 
     def _rmhostiogrp(self, host_name, io_group):
