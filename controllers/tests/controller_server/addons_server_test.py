@@ -32,7 +32,7 @@ class BaseReplicationSetUp(unittest.TestCase):
         self.request = ProtoBufMock()
         self.request.secrets = {"username": SECRET_USERNAME_VALUE, "password": SECRET_PASSWORD_VALUE,
                                 "management_address": SECRET_MANAGEMENT_ADDRESS_VALUE}
-        self.request.volume_id = "{}:{};{}".format("A9000", OBJECT_INTERNAL_ID, OBJECT_INTERNAL_ID)
+        self.request.volume_id = "{0}:{1};{1}".format("A9000", OBJECT_INTERNAL_ID)
         self.request.replication_id = "{}:{};{}".format("A9000", OTHER_OBJECT_INTERNAL_ID, VOLUME_UID)
         self.context = utils.FakeContext()
 

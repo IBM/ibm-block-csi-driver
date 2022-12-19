@@ -20,7 +20,7 @@ from controllers.tests.common.test_settings import OBJECT_INTERNAL_ID, \
     OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE
 from controllers.common.settings import ARRAY_TYPE_SVC, SPACE_EFFICIENCY_THIN, SPACE_EFFICIENCY_COMPRESSED, \
     SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED, SPACE_EFFICIENCY_DEDUPLICATED_THIN, SPACE_EFFICIENCY_DEDUPLICATED, \
-    SPACE_EFFICIENCY_THICK, VOLUME_GROUP_NAME_SUFFIX
+    SPACE_EFFICIENCY_THICK
 
 EMPTY_BYTES = b""
 
@@ -252,6 +252,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.delete_replication(replication)
         self.svc.client.svctask.chvolumegroup.assert_called_once_with(object_id=OBJECT_INTERNAL_ID,
                                                                       noreplicationpolicy=True)
+
     def test_delete_ear_replication_not_supported(self):
         replication, _ = self._prepare_mocks_for_ear_replication(is_ear_supported=False)
         self.svc.delete_replication(replication)
