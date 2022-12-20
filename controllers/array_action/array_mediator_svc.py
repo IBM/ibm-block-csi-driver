@@ -1381,8 +1381,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         volume_group_id = replication_request.volume_internal_id
         replication_policy = self._get_replication_policy(volume_group_id)
         if replication_policy != replication_request.replication_policy:
-            logger.info("found volume group: {} with policy: {}".format(volume_group_id,
-                                                                        replication_policy))
             return None
         replication_mode = self._get_replication_mode(volume_group_id)
         if not replication_mode:
