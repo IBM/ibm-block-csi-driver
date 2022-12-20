@@ -63,6 +63,11 @@ func TestReadNvmeNqn(t *testing.T) {
 			file_content: nvmeNQN,
 			expNqn:       nvmeNQN,
 		},
+		{
+			name:         "right nqn with commented lines",
+			file_content: fmt.Sprintf("//commentedlines\n//morecommentedlines\n%s", nvmeNQN),
+			expNqn:       nvmeNQN,
+		},
 	}
 
 	for _, tc := range testCases {
@@ -237,6 +242,11 @@ func TestParseIscsiInitiators(t *testing.T) {
 		{
 			name:         "right_iqn",
 			file_content: fmt.Sprintf("InitiatorName=%s", iscsiIQN),
+			expIqn:       iscsiIQN,
+		},
+		{
+			name:         "right iqn with commented lines",
+			file_content: fmt.Sprintf("//commentedlines\n//morecommentedlines\nInitiatorName=%s", iscsiIQN),
 			expIqn:       iscsiIQN,
 		},
 	}
